@@ -118,3 +118,37 @@ describe('RQ-19 — worklist tabpanel wiring', () => {
     expect(panel.getAttribute('aria-labelledby')).toBeNull();
   });
 });
+
+// RQ-20.b (child slice): the active status filter is visible as a badge but
+// had NO explicit reset control on the worklist itself (only the Welcome
+// quick cards or a manual URL edit cleared it — plan §RQ-20 "действующие
+// фильтры видны и сбрасываются явно"). The badge tail hosts a keyboard-
+// accessible clear button wired by the panel to the URL-state owner.
+describe('RQ-20.b — worklist status filter explicit reset', () => {
+  const withFilterProps = {
+    ...baseProps,
+    statusFilterLabel: 'Ожидает оплаты' as string | null,
+  };
+
+  it('active status filter badge exposes an explicit clear control that fires the callback', () => {
+    const onClearStatusFilter = vi.fn();
+    render(<WorklistView {...withFilterProps} onClearStatusFilter={onClearStatusFilter} />);
+
+    const clearButton = screen.getByRole('button', { name: /common\.reset/ });
+    expect(clearButton).toHaveAttribute('aria-label', 'common.reset: Ожидает оплаты');
+    clearButton.click();
+    expect(onClearStatusFilter).toHaveBeenCalledTimes(1);
+  });
+
+  it('no status filter → no clear control', () => {
+    render(<WorklistView {...baseProps} statusFilterLabel={null} onClearStatusFilter={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: /common\.reset/ })).toBeNull();
+  });
+
+  it('no callback provided → no clear control (optional prop compat)', () => {
+    render(<WorklistView {...withFilterProps} />);
+
+    expect(screen.queryByRole('button', { name: /common\.reset/ })).toBeNull();
+  });
+});

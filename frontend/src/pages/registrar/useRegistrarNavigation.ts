@@ -68,6 +68,17 @@ export const useRegistrarNavigation = ({
     setSearchParams(params);
   }, [searchParams, setSearchParams]);
 
+  // RQ-20.b (дочерний срез): явный сброс активного статус-фильтра (?status=).
+  // Бейдж фильтра был видим на worklist, но сбрасывался только через
+  // Welcome-карточку или правку URL (план §RQ-20 «действующие фильтры видны
+  // и сбрасываются явно»). Push — Back восстанавливает фильтр (контракт
+  // RQ-20.a); остальные параметры и выбранная вкладка сохраняются.
+  const clearStatusFilter = useCallback(() => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('status');
+    setSearchParams(params);
+  }, [searchParams, setSearchParams]);
+
   const currentView = useMemo(() => {
     // Phase 3: rely solely on canonical path-derived view.
     // Legacy ?view= and ?tab= params are auto-redirected to canonical paths
@@ -199,6 +210,7 @@ export const useRegistrarNavigation = ({
     navigate,
     activeTab,
     setActiveTab,
+    clearStatusFilter,
     currentView,
     searchQuery,
     statusFilter,
