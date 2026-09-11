@@ -21,6 +21,9 @@ import { useQueueManager } from '../../hooks/useQueueManager';
 // WebSocket подписка для мгновенных обновлений очереди вместо 30s polling.
 import { useQueueWebSocket } from '../../hooks/useQueueWebSocket';
 import QueueTable, { type QueueTableData } from './QueueTable';
+// RQ-11: честный показ срока действия QR (F-10) — классификация expires_at
+// из серверного ответа и подписи для скачиваемого PNG (pure-хелпер).
+import { buildQrDownloadCaptions, resolveQrExpiryView } from './qrExpiry';
 import logger from '../../utils/logger';
 import { getErrorMessage } from '../../utils/type-guards';
 import './ModernQueueManager.css';
@@ -94,6 +97,14 @@ const ModernQueueManager = ({
   const effectiveDate = selectedDate !== undefined && selectedDate !== '' ? selectedDate : internalDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // RQ-11 (F-10): классификация срока из серверного expires_at (valid/expired/
+  // unspecified). Пересчитывается при открытии диалога, чтобы истекший код
+  // показывался честно, а не как «действует до: —».
+  const qrExpiryView = useMemo(
+    () => resolveQrExpiryView(qrData?.expires_at, showQrDialog ? new Date() : undefined),
+    [qrData?.expires_at, showQrDialog]
+  );
 
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
   // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
@@ -346,21 +357,95 @@ const ModernQueueManager = ({
     }
   };
 
+  // RQ-11 (F-10): скачанный PNG честно сообщает срок действия токена —
+  // подписи «действует до / истек» + пометка «временный код» рисуются на
+  // изображении, чтобы плакат не обещал бессрочный доступ. Серверный TTL и
+  // single-use защиты не меняются.
   const downloadQR = () => {
     if (!qrData) {
       toast.error(t('misc.mqm_qr_unavailable'));
       return;
     }
 
-    if (qrData.qr_code_base64) {
+    if (!qrData.qr_code_base64) {
+      toast.error(t('misc.mqm_qr_image_unavailable'));
+      return;
+    }
+
+    const captions = buildQrDownloadCaptions({
+      state: qrExpiryView.state,
+      formattedExpiresAt: qrExpiryView.formattedExpiresAt,
+      labels: {
+        validUntil: qrExpiryView.formattedExpiresAt
+          ? t('misc.mqm_qr_valid_until', { time: qrExpiryView.formattedExpiresAt })
+          : '',
+        expired: t('misc.mqm_qr_download_expired'),
+        temporaryNote: t('misc.mqm_qr_download_note'),
+      },
+    });
+
+    const finishDownload = (dataUrl: string) => {
       const link = document.createElement('a');
       link.download = `qr-queue-${qrData.day}-${(qrData.specialist_name || 'doctor').replace(/\s+/g, '_')}.png`;
-      link.href = qrData.qr_code_base64;
+      link.href = dataUrl;
       link.click();
       toast.success(t('misc.mqm_qr_downloaded'));
-    } else {
-      toast.error(t('misc.mqm_qr_image_unavailable'));
-    }
+    };
+
+    // Fallback без canvas (недоступен ctx/jsdom): прежнее поведение.
+    const downloadRaw = () => finishDownload(qrData.qr_code_base64 as string);
+
+    // RQ-11: canvas 2D не поддерживает var(--mac-*) — резолвим дизайн-токены
+    // в рантайме, чтобы PNG следовал активной теме (fallback — CSS-имена).
+    const resolveColorToken = (token: string, fallback: string): string => {
+      try {
+        return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || fallback;
+      } catch {
+        return fallback;
+      }
+    };
+    const canvasPalette = {
+      background: resolveColorToken('--mac-bg-primary', 'white'),
+      primaryText: resolveColorToken('--mac-text-primary', 'black'),
+      noteText: resolveColorToken('--mac-text-secondary', 'gray'),
+    };
+
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const padding = 24;
+        const captionArea = captions.primaryLine ? 84 : 56;
+        canvas.width = image.width + padding * 2;
+        canvas.height = image.height + padding * 2 + captionArea;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          downloadRaw();
+          return;
+        }
+        ctx.fillStyle = canvasPalette.background;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, padding, padding);
+        ctx.textAlign = 'center';
+        if (captions.primaryLine) {
+          ctx.fillStyle = canvasPalette.primaryText;
+          ctx.font = '600 18px system-ui, sans-serif';
+          ctx.fillText(captions.primaryLine, canvas.width / 2, image.height + padding + 36);
+        }
+        ctx.fillStyle = canvasPalette.noteText;
+        ctx.font = '14px system-ui, sans-serif';
+        ctx.fillText(
+          captions.noteLine,
+          canvas.width / 2,
+          image.height + padding + (captions.primaryLine ? 64 : 36)
+        );
+        finishDownload(canvas.toDataURL('image/png'));
+      } catch {
+        downloadRaw();
+      }
+    };
+    image.onerror = downloadRaw;
+    image.src = qrData.qr_code_base64;
   };
 
   const doctorOptions = useMemo(() => {
@@ -739,17 +824,23 @@ const ModernQueueManager = ({
             }
           </div>
 
-          {/* Инструкция и срок действия */}
+          {/* Инструкция и срок действия (RQ-11: valid/expired/unspecified
+              честно различаются; формат — канонический клиник-таймзоны) */}
           <div className="mqm-qr-footer-info">
             <p className="mqm-qr-instruction">
               {t('misc.mqm_qr_instruction')}
             </p>
-            <p className="mqm-qr-expiry">
+            <p className={`mqm-qr-expiry${qrExpiryView.state === 'expired' ? ' mqm-qr-expiry-expired' : ''}`}>
               <Clock size={14} className="mqm-icon-margin-right-1" aria-hidden="true" />
-              {qrData?.expires_at
-                ? t('misc.mqm_qr_valid_until', { time: new Date(qrData.expires_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) })
-                : t('misc.mqm_qr_valid_until_empty')}
+              {qrExpiryView.state === 'expired'
+                ? t('misc.mqm_qr_expired')
+                : qrExpiryView.state === 'valid'
+                  ? t('misc.mqm_qr_valid_until', { time: qrExpiryView.formattedExpiresAt })
+                  : t('misc.mqm_qr_limited')}
             </p>
+            {qrExpiryView.state === 'expired' && (
+              <p className="mqm-qr-expiry-hint">{t('misc.mqm_qr_expired_hint')}</p>
+            )}
           </div>
 
           {/* Кнопки действий */}

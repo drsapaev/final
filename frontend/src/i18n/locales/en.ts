@@ -6035,6 +6035,12 @@ const en = {
     mqm_qr_instruction: 'Отсканируйте камеру телефона для записи в очередь',
     mqm_qr_valid_until: 'Действует до: {time}',
     mqm_qr_valid_until_empty: 'Действует до: —',
+    // RQ-11: honest QR expiry presentation (F-10)
+    mqm_qr_expired: 'This code has expired',
+    mqm_qr_expired_hint: 'Generate a new QR code and give the patient the current one',
+    mqm_qr_limited: 'This code has a limited validity period',
+    mqm_qr_download_note: 'Temporary queue check-in code — not a permanent pass',
+    mqm_qr_download_expired: 'Expired — generate a new code',
     mqm_download: 'Скачать',
     mqm_close: 'Закрыть',
     mqm_patient: 'Пациент',
