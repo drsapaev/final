@@ -308,6 +308,33 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 is not None
             )
             if not shared:
+                # Codex round-43 P2: парный appointment следует за
+                # перештампованным визитом — completion ищет аппойнтмент
+                # по НОВОЙ visit_date, а канонический паринг бьёт по
+                # patient/date/time/doctor: визит, переехавший без
+                # своего аппойнтмента, оставляет его запланированным на
+                # старом дне (и канонический резолв может родить под
+                # него второй визит). Паринг — тот же, что у
+                # CanonicalVisitRepository (время — оба написания).
+                appointment_filters = [
+                    Appointment.patient_id == visit.patient_id,
+                    Appointment.appointment_date == visit.visit_date,
+                    Appointment.status.not_in(["cancelled", "completed", "no_show"]),
+                ]
+                if visit.doctor_id is None:
+                    appointment_filters.append(Appointment.doctor_id.is_(None))
+                else:
+                    appointment_filters.append(Appointment.doctor_id == visit.doctor_id)
+                if visit.visit_time:
+                    _hhmm = visit.visit_time[:5]
+                    appointment_filters.append(
+                        Appointment.appointment_time.in_((_hhmm, f"{_hhmm}:00"))
+                    )
+                else:
+                    appointment_filters.append(Appointment.appointment_time.is_(None))
+                db.query(Appointment).filter(*appointment_filters).update(
+                    {"appointment_date": queue_day}, synchronize_session=False
+                )
                 visit.visit_date = queue_day
                 return visit
             # shared by live same-day tickets: fall through to the
@@ -357,6 +384,17 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 Visit.visit_date == queue_day,
                 Visit.status == "open",
                 Visit.doctor_id == doctor.id,
+                # Codex round-43 P2: департамент ОЧЕРЕДИ — врач может
+                # держать несколько активных очередей под разными
+                # тегами; без департамента .first() мог схватить
+                # чужой открытый визит того же врача/дня и
+                # перелинковать тикет на чужое событие. Легаси-визиты
+                # без департамента остаются резолвимыми — они не
+                # скоуплены ни под один тег
+                or_(
+                    Visit.department == department,
+                    Visit.department.is_(None),
+                ),
             )
             .first()
         )
@@ -880,9 +918,16 @@ def complete_patient_visit(
                 # QD-2C (Codex round-35 P1): визит записи — visit_id-first
                 # и департаментный поиск у ресурсной поверхности (см.
                 # хелпер): завершение мутирует тот же визит, что старт
-                visit = _resolve_entry_visit(
-                    db, queue_entry, doctor, resource_department or "cardiology"
+                # Codex round-43 P2: департамент завершения врач-очереди —
+                # тот же канонический маппинг, что у старта (тег или
+                # «general»), а не легаси-«cardiology»: с департаментным
+                # lookup резолва (round-43) рассинхрон департаментов
+                # заставлял завершение создавать второй визит и
+                # оставлять исходный открытым
+                department_hint = resource_department or (
+                    getattr(daily_queue, "queue_tag", None) or "general"
                 )
+                visit = _resolve_entry_visit(db, queue_entry, doctor, department_hint)
                 # ✅ Issue #06 Phase 3: delegate to VisitLifecycleService
                 # for state machine validation + row lock.
                 from app.services.visit_lifecycle_service import VisitLifecycleService

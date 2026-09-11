@@ -7043,3 +7043,219 @@ def test_legacy_statistics_default_day_rides_the_clinic_day(
     )
     assert payload["success"] is True, payload
     assert payload["statistics"]["total_entries"] == 1
+
+
+# ===================== AB. Codex round-43 pins =====================
+
+
+def test_re_dated_visit_moves_its_paired_appointment(db_session: Session) -> None:
+    """Codex round-43 P2: the solo re-date of a transferred ticket
+    moves the PAIRED appointment with the visit — completion pairs
+    appointments by patient/date/doctor and canonical resolution by
+    patient/date/time/doctor, so a visit moved alone left its
+    appointment scheduled on the old day (and canonical resolution
+    could fork a second visit for it)."""
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        call_patient,
+        start_patient_visit,
+    )
+    from app.crud import visit as crud_visit
+    from app.models.appointment import Appointment
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+    from app.services.force_majeure_service import ForceMajeureService
+
+    patient = Patient(
+        last_name="Ресурсный12",
+        first_name="Пациент",
+        phone="+998901234545",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        original_day = _dt_now_tashkent_day()
+        doc_user = _make_user(db_session, username="doc_ab1", role="Doctor")
+        therapist = _make_doctor(db_session, user_id=doc_user.id, specialty="therapy")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=original_day, specialist_id=therapist.id
+        )
+
+        visit = crud_visit.create_visit(
+            db=db_session,
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            visit_date=original_day,
+            visit_time="10:00",
+            department="therapy",
+        )
+        # the registrar booking paired with the visit (same patient/
+        # day/time/doctor, still scheduled)
+        appointment = Appointment(
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            appointment_date=original_day,
+            appointment_time="10:00",
+            status="scheduled",
+        )
+        db_session.add(appointment)
+        entry = _make_waiting_entry(db_session, queue, number=102)
+        entry.patient_id = patient.id
+        entry.visit_id = visit.id
+        db_session.commit()
+
+        result = ForceMajeureService(db_session).transfer_entries_to_tomorrow(
+            entries=[entry],
+            specialist_id=therapist.id,
+            reason="round-43 pin",
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert result["success"] is True
+        new_day = date.fromisoformat(result["new_date"])
+        assert new_day == original_day + timedelta(days=1)
+
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        admin = _make_user(db_session, username="adm_ab1", role="Admin")
+        assert call_patient(entry_id=moved.id, db=db_session, current_user=admin)[
+            "success"
+        ]
+        assert start_patient_visit(
+            entry_id=moved.id, db=db_session, current_user=admin
+        )["success"]
+
+        db_session.refresh(visit)
+        db_session.refresh(appointment)
+        # the visit AND its paired appointment follow the ticket
+        assert visit.visit_date == new_day
+        assert appointment.appointment_date == new_day
+        assert appointment.status == "scheduled"
+        visits = db_session.query(Visit).filter(Visit.patient_id == patient.id).all()
+        assert len(visits) == 1
+        # the completion pairing (patient/new date/doctor) finds the
+        # SAME appointment — no stale old-day copy left behind
+        found = (
+            db_session.query(Appointment)
+            .filter(
+                Appointment.patient_id == patient.id,
+                Appointment.appointment_date == visit.visit_date,
+                Appointment.doctor_id == visit.doctor_id,
+            )
+            .first()
+        )
+        assert found is not None and found.id == appointment.id
+    finally:
+        _durable_cleanup(db_session, "doc_ab1", "adm_ab1")
+        db_session.query(Appointment).filter(
+            Appointment.patient_id == patient.id
+        ).delete(synchronize_session=False)
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
+
+
+def test_doctor_fall_through_scopes_to_the_queue_department(
+    db_session: Session,
+) -> None:
+    """Codex round-43 P2: the doctor fall-through lookup is scoped to
+    the QUEUE department — one doctor can hold active queues under
+    different tags, and an open same-day visit of the same doctor for
+    ANOTHER tag must not capture the ticket (the department-less
+    .first() relinked the transferred ticket onto an unrelated
+    encounter, and start/completion mutated the wrong visit)."""
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        call_patient,
+        start_patient_visit,
+    )
+    from app.crud import visit as crud_visit
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+    from app.services.force_majeure_service import ForceMajeureService
+
+    patient = Patient(
+        last_name="Ресурсный13",
+        first_name="Пациент",
+        phone="+998901234546",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        original_day = _dt_now_tashkent_day()
+        doc_user = _make_user(db_session, username="doc_ab2", role="Doctor")
+        therapist = _make_doctor(db_session, user_id=doc_user.id, specialty="therapy")
+        # the ORIGINAL doctor queue (untagged): a walked-in ticket
+        # with NO visit link — the transfer keeps it visit-less
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=original_day, specialist_id=therapist.id
+        )
+        entry = _make_waiting_entry(db_session, queue, number=103)
+        entry.patient_id = patient.id
+        db_session.commit()
+
+        result = ForceMajeureService(db_session).transfer_entries_to_tomorrow(
+            entries=[entry],
+            specialist_id=therapist.id,
+            reason="round-43 pin",
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert result["success"] is True
+        new_day = date.fromisoformat(result["new_date"])
+        assert new_day == original_day + timedelta(days=1)
+
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+
+        # the patient ALREADY has an open visit on the new day with
+        # the SAME doctor under ANOTHER queue tag (ultrasound)
+        other_tag_visit = crud_visit.create_visit(
+            db=db_session,
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            visit_date=new_day,
+            visit_time="09:00",
+            department="ultrasound",
+        )
+        db_session.commit()
+
+        admin = _make_user(db_session, username="adm_ab2", role="Admin")
+        assert call_patient(entry_id=moved.id, db=db_session, current_user=admin)[
+            "success"
+        ]
+        assert start_patient_visit(
+            entry_id=moved.id, db=db_session, current_user=admin
+        )["success"]
+
+        db_session.refresh(other_tag_visit)
+        db_session.refresh(moved)
+        # the therapy-tag ticket resolves its OWN queue-department visit
+        assert moved.visit_id != other_tag_visit.id
+        own = db_session.query(Visit).filter(Visit.id == moved.visit_id).one()
+        assert own.department == "therapy"
+        assert own.visit_date == new_day
+        assert own.doctor_id == therapist.id
+        # the unrelated ultrasound visit stays untouched (still open)
+        assert other_tag_visit.status == "open"
+    finally:
+        _durable_cleanup(db_session, "doc_ab2", "adm_ab2")
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
