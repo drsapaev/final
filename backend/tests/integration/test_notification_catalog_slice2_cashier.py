@@ -408,6 +408,16 @@ def test_cashier_cancel_payment_creates_cancelled_payment_notification(
     db_session.commit()
     db_session.refresh(visit)
 
+    visit.status = "paid"
+    _add_visit_service(db_session, visit, price="70000", service_id=902)
+    invoice = _link_invoice(
+        db_session,
+        visit=visit,
+        amount=Decimal("70000"),
+    )
+    invoice.status = "paid"
+    db_session.commit()
+
     payment = Payment(
         visit_id=visit.id,
         amount=70000,
@@ -425,6 +435,13 @@ def test_cashier_cancel_payment_creates_cancelled_payment_notification(
     )
 
     assert response.status_code == 200, response.text
+    db_session.refresh(payment)
+    db_session.refresh(visit)
+    db_session.refresh(invoice)
+    assert payment.status == "cancelled"
+    assert payment.note == "Отменён: patient requested cancel"
+    assert visit.status == "waiting"
+    assert invoice.status == "pending"
     deliveries = _payment_event_deliveries(db_session, recipient_id=patient_user.id)
     assert len(deliveries) == 1
 
@@ -516,6 +533,59 @@ def test_cashier_cancel_paid_payment_requires_refund_without_mutation(
     assert "возврат" in response.json()["detail"].lower()
     db_session.refresh(payment)
     assert payment.status == "paid"
+    assert payment.note == "original note"
+    assert _payment_event_deliveries(
+        db_session,
+        recipient_id=patient.user_id,
+    ) == []
+
+
+def test_cashier_provider_cancel_failure_keeps_local_state(
+    client,
+    db_session,
+    auth_headers,
+    monkeypatch,
+):
+    patient, visit = _create_patient_visit(db_session, suffix="0008")
+    payment = Payment(
+        visit_id=visit.id,
+        amount=Decimal("40000"),
+        method="payme",
+        status="processing",
+        provider="payme",
+        provider_payment_id="clinic-payment-0008",
+        note="original note",
+    )
+    db_session.add(payment)
+    db_session.commit()
+    db_session.refresh(payment)
+
+    from app.services.payment_providers.base import PaymentResult
+
+    class _RejectingPaymentManager:
+        def cancel_payment(self, provider_name, provider_payment_id):
+            assert provider_name == "payme"
+            assert provider_payment_id == "clinic-payment-0008"
+            return PaymentResult(
+                success=False,
+                error_message="provider cancellation is unavailable",
+            )
+
+    monkeypatch.setattr(
+        "app.services.payment_provider_manager_factory.get_payment_manager",
+        lambda: _RejectingPaymentManager(),
+    )
+
+    response = client.post(
+        f"/api/v1/cashier/payments/{payment.id}/cancel",
+        json={"reason": "patient requested cancellation"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 502, response.text
+    assert "provider cancellation is unavailable" in response.json()["detail"]
+    db_session.refresh(payment)
+    assert payment.status == "processing"
     assert payment.note == "original note"
     assert _payment_event_deliveries(
         db_session,

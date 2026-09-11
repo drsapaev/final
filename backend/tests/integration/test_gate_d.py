@@ -1102,7 +1102,7 @@ def test_d6d_cashier_confirm_serializes_on_visit_lock(
 def test_d6e_cashier_confirm_and_cancel_share_visit_first_lock_order(
     db_session, new_session_factory, monkeypatch
 ):
-    """D6e: confirm and cancel must both wait on Visit before locking Payment."""
+    """D6e: both actions wait on Visit; the lock winner sets the final state."""
     from app.api.v1.endpoints.cashier import _payments as cashier_payments
 
     async def _skip_notification(**_kwargs):
@@ -1216,19 +1216,23 @@ def test_d6e_cashier_confirm_and_cancel_share_visit_first_lock_order(
             probe.close()
 
         db_session.rollback()
-        outcomes = [
-            confirm_future.result(timeout=10),
-            cancel_future.result(timeout=10),
-        ]
+        confirm_outcome = confirm_future.result(timeout=10)
+        cancel_outcome = cancel_future.result(timeout=10)
+        outcomes = [confirm_outcome, cancel_outcome]
 
     assert all(outcome[0] != "unexpected_error" for outcome in outcomes), outcomes
     assert ("http_error", 500) not in outcomes
-    assert any(outcome[0] == "success" for outcome in outcomes)
+    assert sum(outcome[0] == "success" for outcome in outcomes) == 1
+    expected_status = "paid" if confirm_outcome[0] == "success" else "cancelled"
+    if expected_status == "paid":
+        assert cancel_outcome[0] == "http_error"
+    else:
+        assert confirm_outcome[0] == "http_error"
 
     cleanup = new_session_factory()
     try:
         persisted = cleanup.query(Payment).filter(Payment.id == payment_id).one()
-        assert persisted.status == "cancelled"
+        assert persisted.status == expected_status
         cleanup.execute(
             text("DELETE FROM payments WHERE id = :pid"), {"pid": payment_id}
         )

@@ -965,85 +965,32 @@ async def cancel_payment(
     """
     Отменить платеж.
     """
-    from app.services.payment_invariant_service import PaymentInvariantService
-
-    invariant_service = PaymentInvariantService(db)
-    payment_reference = db.query(Payment).filter(Payment.id == payment_id).first()
-
-    if not payment_reference:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Платеж не найден"
-        )
-
-    expected_visit_id = payment_reference.visit_id
-    if expected_visit_id is not None:
-        invariant_service.lock_visit_for_payment_change(expected_visit_id)
-
-    payment = (
-        db.query(Payment)
-        .filter(Payment.id == payment_id)
-        .with_for_update()
-        .populate_existing()
-        .first()
-    )
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Платеж не найден",
-        )
-    if payment.visit_id != expected_visit_id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Визит платежа изменился; повторите операцию",
-        )
-
-    payment_status = _cashier_payment_status(payment)
-    if payment_status not in {"pending", "processing"}:
-        detail = (
-            "Оплаченный платеж необходимо оформить как возврат"
-            if payment_status in {"paid", "completed"}
-            else f"Платеж со статусом '{payment_status}' нельзя отменить"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=detail,
-        )
-
     try:
-        # Issue #06 Phase 4b B2: Replaced direct payment.status = "cancelled"
-        # with billing_service.update_payment_status() to enforce payment
-        # state machine validation.
-        from app.services.billing_service import BillingService
+        from app.services.payment_cancel_service import (
+            PaymentCancelDomainError,
+            PaymentCancelService,
+        )
+        from app.services.payment_provider_manager_factory import get_payment_manager
 
         try:
-            payment = BillingService(db).update_payment_status(
-                payment_id=payment.id,
-                new_status="cancelled",
-                commit=False,
+            PaymentCancelService(db, get_payment_manager()).cancel_payment(
+                payment_id=payment_id,
+                reason=cancel_data.reason,
             )
-        except ValueError as ve:
+        except PaymentCancelDomainError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+        payment = db.query(Payment).filter(Payment.id == payment_id).first()
+        if not payment:
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Cannot cancel payment: {ve}",
-            ) from ve
-        if hasattr(payment, 'note') and cancel_data.reason:
-            payment.note = f"Отменён: {cancel_data.reason}"
-
-        # Issue #06 Phase 3: delegate visit status normalization to
-        # VisitLifecycleService. The service acquires FOR UPDATE lock
-        # and ensures terminal visits are NOT reopened by payment changes.
-        # The payment.status change above will be committed together with
-        # the visit status change (same SQLAlchemy session).
-        visit = None
-        if payment.visit_id:
-            from app.services.visit_lifecycle_service import VisitLifecycleService
-
-            visit = VisitLifecycleService(db).restore_operational_status_after_payment_change(
-                visit_id=payment.visit_id,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Платеж не найден после отмены",
             )
-
-        db.commit()
+        visit = (
+            db.query(Visit).filter(Visit.id == payment.visit_id).first()
+            if payment.visit_id
+            else None
+        )
 
         await _emit_payment_notification(
             db=db,
