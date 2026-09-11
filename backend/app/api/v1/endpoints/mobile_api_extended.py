@@ -11,7 +11,7 @@
 # Use ``importlib.import_module`` to bypass the package-attribute shadowing
 # and bind to the actual modules.
 import importlib as _importlib
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -334,7 +334,13 @@ async def get_queues_status(
 ):
     """Статус всех очередей на сегодня"""
     try:
-        today = date.today()
+        # Codex round-29 P2: день статуса — clinic_today SSOT (таймзона
+        # настроек очередей): resource-очереди создаются на КЛИНИК-локальном
+        # дне, и host date.today() в окне 19:00-24:00Z молча пропускал
+        # живые lab/ECG очереди в мобильном статусе.
+        from app.crud.clinic import clinic_today
+
+        today = clinic_today(db)
         queues = crud_queue.get_daily_queues(db, day=today, active_only=True)
 
         result = []

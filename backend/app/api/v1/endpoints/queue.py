@@ -494,7 +494,13 @@ def get_today_queue(
     if not specialist:
         raise HTTPException(status_code=404, detail="Специалист не найден")
 
-    today = date.today()
+    # Codex round-29 P2: день «сегодня» — clinic_today SSOT (таймзона
+    # настроек очередей): resource-очереди создаются на КЛИНИК-локальном
+    # дне, и host date.today() в окне 19:00-24:00Z резолвил вчерашний
+    # tag-surface и отдавал 404 для валидной текущей ресурсной очереди.
+    from app.crud.clinic import clinic_today
+
+    today = clinic_today(db)
 
     # Получение очереди
     daily_queue = queue_api_service.get_daily_queue(

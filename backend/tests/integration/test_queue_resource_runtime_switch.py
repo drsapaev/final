@@ -2032,14 +2032,16 @@ def _test_mobile_queues_status_body(db_session: Session) -> None:
 
     from app.api.v1.endpoints.mobile_api_extended import get_queues_status
 
+    # Codex round-29: the status day is the clinic_today SSOT
+    today = _dt_now_tashkent_day()
     _make_resource(db_session, code="lab", queue_tag="lab")
     resource_queue = queue_service.get_or_create_daily_queue(
-        db_session, day=date.today(), specialist_id=None, queue_tag="lab"
+        db_session, day=today, specialist_id=None, queue_tag="lab"
     )
     user = _make_user(db_session, username="dr_mob18", role="doctor")
     doctor = _make_doctor(db_session, user_id=user.id, specialty="cardio")
     doctor_queue = queue_service.get_or_create_daily_queue(
-        db_session, day=date.today(), specialist_id=doctor.id, queue_tag="cardio"
+        db_session, day=today, specialist_id=doctor.id, queue_tag="cardio"
     )
 
     viewer = _make_user(db_session, username="lab_res18", role="Admin")
@@ -3264,11 +3266,11 @@ def test_display_state_snapshots_use_resource_owner(
     resource queue entries with display_name instead of «Врач #None»."""
     import asyncio
     import json
-    from datetime import datetime
 
     from app.services import display_websocket as dw
 
-    today = datetime.now().date()
+    # Codex round-29: the snapshot day is the clinic_today SSOT
+    today = _dt_now_tashkent_day()
     monkeypatch.setattr(dw, "SessionLocal", lambda: _shared_session(db_session))
 
     _make_resource(db_session, code="lab", queue_tag="lab")
@@ -5335,3 +5337,140 @@ def test_department_overview_counts_clinic_day_resource_queues(
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== MM. Codex round-29 pins =====================
+
+
+def test_mobile_queues_status_defaults_to_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-29 P2: /api/v1/mobile/queues/status enumerates the
+    CLINIC-local day — the handler resolved host date.today(), so on a
+    UTC host in the 19:00-24:00 window it silently dropped the live
+    lab/ECG resource queues (stamped with the next clinic-local date)
+    and returned stale or empty status. The timezone is chosen
+    dynamically so the divergence is real at any runtime."""
+    import asyncio
+
+    from app.api.v1.endpoints.mobile_api_extended import get_queues_status
+    from app.crud import clinic as crud_clinic
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()  # the divergence window is real
+    monkeypatch.setattr(crud_clinic, "clinic_today", lambda db: clinic_day)
+
+    try:
+        user = _make_user(db_session, username="lab_res_mm1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+        )
+        _make_waiting_entry(db_session, queue, number=9)
+
+        viewer = _make_user(db_session, username="adm_mm1", role="Admin")
+        payload = asyncio.run(get_queues_status(current_user=viewer, db=db_session))
+        rows = {row.doctor_id: row for row in payload["queues"]}
+
+        resource_row = rows[None]
+        assert resource_row.specialty == "lab"
+        assert resource_row.doctor_name == "Ресурс очереди"
+        assert resource_row.total_numbers >= 9
+        assert synthetic.id not in rows
+    finally:
+        _durable_cleanup(db_session, "lab_res_mm1", "adm_mm1")
+
+
+def test_display_reconnect_snapshot_defaults_to_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-29 P2: the display (re)connect snapshot selects the
+    CLINIC-local day — _send_current_state queried host date.today(), so
+    a board (re)connecting during the divergence window got a blank or
+    stale initial_state while the live resource tickets sat on the next
+    clinic-local date. The timezone is chosen dynamically so the
+    divergence is real at any runtime."""
+    import asyncio
+    import json
+
+    from app.crud import clinic as crud_clinic
+    from app.services import display_websocket as dw
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()  # the divergence window is real
+    monkeypatch.setattr(crud_clinic, "clinic_today", lambda db: clinic_day)
+    monkeypatch.setattr(dw, "SessionLocal", lambda: _shared_session(db_session))
+
+    try:
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        resource = (
+            db_session.query(QueueResource)
+            .filter(QueueResource.queue_tag == "lab")
+            .first()
+        )
+        queue = _make_queue(
+            db_session,
+            day=clinic_day,
+            specialist_id=None,
+            queue_tag="lab",
+            queue_resource_id=resource.id,
+        )
+        entry = _make_waiting_entry(db_session, queue, number=7)
+
+        manager = dw.DisplayWebSocketManager.__new__(dw.DisplayWebSocketManager)
+        manager.connections = {}
+        manager.board_states = {}
+
+        sent: dict = {}
+
+        class FakeWebSocket:
+            async def send_text(self, payload: str) -> None:
+                sent["payload"] = payload
+
+        asyncio.run(manager._send_current_state(FakeWebSocket(), "board-x"))
+        state = json.loads(sent["payload"])
+        numbers = [e["number"] for e in state["data"]["queue_entries"]]
+        assert (
+            entry.number in numbers
+        ), "the clinic-day resource entry must reach the initial snapshot"
+    finally:
+        _durable_cleanup(db_session)
+
+
+def test_legacy_today_endpoint_defaults_to_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-29 P2: the legacy GET /api/v1/queue/today resolves
+    «today» through the clinic_today SSOT — the handler passed host
+    date.today() into the resource-aware get_daily_queue, searched the
+    previous day's tag surface in the 19:00-24:00Z window and returned
+    404 for a valid current clinic-day resource queue. The timezone is
+    chosen dynamically so the divergence is real at any runtime."""
+    from app.api.v1.endpoints.queue import get_today_queue
+    from app.crud import clinic as crud_clinic
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()  # the divergence window is real
+    monkeypatch.setattr(crud_clinic, "clinic_today", lambda db: clinic_day)
+
+    try:
+        user = _make_user(db_session, username="lab_res_mm3", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+        )
+        _make_waiting_entry(db_session, queue, number=3)
+
+        viewer = _make_user(db_session, username="adm_mm3", role="Admin")
+        response = get_today_queue(
+            specialist_id=synthetic.id, db=db_session, current_user=viewer
+        )
+        assert response.queue_id == queue.id
+        assert response.day == clinic_day
+        assert response.specialist_name == "Ресурс очереди"
+        assert response.total_entries == 1
+        assert response.waiting_entries == 1
+    finally:
+        _durable_cleanup(db_session, "lab_res_mm3", "adm_mm3")

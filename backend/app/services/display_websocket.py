@@ -373,9 +373,14 @@ class DisplayWebSocketManager:
             # Получаем актуальные данные из базы
             db = SessionLocal()
             try:
-                from datetime import date
+                # Codex round-29 P2: день снапшота табло — clinic_today
+                # SSOT (таймзона настроек очередей): resource-очереди
+                # создаются на КЛИНИК-локальном дне, и host date.today()
+                # в окне 19:00-24:00Z отдавал пустой/вчерашний снапшот
+                # при (пере)подключении табло.
+                from app.crud.clinic import clinic_today
 
-                today = date.today()
+                today = clinic_today(db)
 
                 # Получаем активные очереди на сегодня
                 queues = (
