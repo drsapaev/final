@@ -48,29 +48,23 @@ from app.schemas.notifications import (
 )
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
+# PR-3: referenced via module namespace (not from-imported) so tests can
+# monkeypatch telegram_webhook_dedup.* the same way they patch
+# telegram_webhook.get_telegram_bot_service.
+from app.services import telegram_webhook_dedup
 
 
-def _is_duplicate_update(db, update_id: int | None) -> bool:
-    """P1-9: check if this Telegram update was already processed."""
+def _release_claim_after_failure(db, update_id: int | None) -> None:
+    """PR-3: undo the dedup claim on any failure path.
+
+    The handler may leave uncommitted state on ``db``; roll that back
+    first, then drop the claim so Telegram's redelivery is reprocessed
+    instead of being suppressed forever.
+    """
     if update_id is None:
-        return False
-    try:
-        from app.models.telegram_webhook_dedup import TelegramWebhookDedup
-
-        existing = (
-            db.query(TelegramWebhookDedup)
-            .filter(TelegramWebhookDedup.update_id == update_id)
-            .first()
-        )
-        if existing:
-            return True
-        # Record this update_id
-        dedup = TelegramWebhookDedup(update_id=update_id)
-        db.add(dedup)
-        db.commit()
-        return False
-    except Exception:
-        return False  # Non-blocking: if dedup fails, process anyway
+        return
+    db.rollback()
+    telegram_webhook_dedup.release_claim(db, update_id)
 
 
 @router.post(
@@ -727,6 +721,10 @@ async def telegram_webhook(
     """
     Webhook endpoint для получения обновлений от Telegram
     """
+    # PR-3: set once the dedup claim exists, so every failure path below
+    # can release it. Secret validation runs BEFORE the claim — a 403/503
+    # rejection must never write to the dedup ledger.
+    claimed_update_id: int | None = None
     try:
         _validate_webhook_secret(request, db)
         update = body.model_dump(exclude_none=True)
@@ -740,8 +738,23 @@ async def telegram_webhook(
         # telegram_webhook.get_telegram_bot_service takes effect.
         bot_service = await _ensure_bot_service_fresh(db)
 
+        # PR-3: claim the update_id before dispatching to any handler.
+        # DUPLICATE → ACK 200 without re-running handlers, so Telegram
+        # stops retrying a delivery that was already processed.
+        # UNAVAILABLE → fail open and process anyway (dedup must never
+        # reduce delivery availability).
+        claimed_update_id = body.update_id
+        claim = telegram_webhook_dedup.claim_update(db, claimed_update_id)
+        if claim == telegram_webhook_dedup.DUPLICATE:
+            logger.info(
+                "Telegram webhook duplicate update suppressed update_id=%s",
+                claimed_update_id,
+            )
+            return {"status": "ok", "handled": "duplicate_update"}
+
         # Обрабатываем обновление
         if await _handle_clinic_bot_update(update, db, bot_service):
+            telegram_webhook_dedup.mark_processed(db, claimed_update_id)
             return {"status": "ok", "handled": "clinic_bot_update"}
 
         # If _handle_clinic_bot_update returned False, the update was not
@@ -751,11 +764,14 @@ async def telegram_webhook(
         if callable(process_wh):
             await process_wh(update, db)
 
+        telegram_webhook_dedup.mark_processed(db, claimed_update_id)
         return {"status": "ok"}
 
     except HTTPException:
+        _release_claim_after_failure(db, claimed_update_id)
         raise
     except Exception as e:
+        _release_claim_after_failure(db, claimed_update_id)
         _raise_telegram_webhook_internal_error(
             "telegram_webhook",
             TELEGRAM_WEBHOOK_PUBLIC_ERROR,

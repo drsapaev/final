@@ -532,7 +532,7 @@ def _revision_graph() -> dict[str, tuple[str, ...]]:
     return graph
 
 
-def test_alembic_chain_single_head_0061() -> None:
+def test_alembic_chain_single_head_0062() -> None:
     graph = _revision_graph()
     assert "0056_queue_resource_role_cleanup" in graph
     assert graph["0056_queue_resource_role_cleanup"] == (
@@ -561,14 +561,21 @@ def test_alembic_chain_single_head_0061() -> None:
     # guard — the DB-level invariant behind the token-store race fix).
     assert "0061_telegram_config_singleton" in graph
     assert graph["0061_telegram_config_singleton"] == ("0060_visit_reminder_sent_at",)
+    # PR-3: the chain head moved to 0062 (telegram_webhook_dedup — the
+    # table behind the atomic update_id dedup; the ORM model existed
+    # without it, so PostgreSQL silently had no dedup ledger).
+    assert "0062_telegram_webhook_dedup" in graph
+    assert graph["0062_telegram_webhook_dedup"] == (
+        "0061_telegram_config_singleton",
+    )
     # alembic_version.version_num is VARCHAR(32): both ends of the new
     # link must fit (CI on 40cec49 exploded on real PostgreSQL with a
     # 38-char id — scratch-SQLite ignores VARCHAR widths).
+    assert len("0062_telegram_webhook_dedup") <= 32
     assert len("0061_telegram_config_singleton") <= 32
-    assert len("0060_visit_reminder_sent_at") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0061_telegram_config_singleton"]
+    assert heads == ["0062_telegram_webhook_dedup"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

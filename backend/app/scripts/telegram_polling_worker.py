@@ -17,6 +17,13 @@ from sqlalchemy.orm import Session
 from app.api.v1.endpoints.telegram_webhook import _handle_clinic_bot_update
 from app.db.session import SessionLocal
 from app.services.telegram_bot import get_telegram_bot_service
+# PR-3: update_id dedup shared with the webhook endpoint.
+from app.services.telegram_webhook_dedup import (
+    DUPLICATE,
+    claim_update,
+    mark_processed,
+    release_claim,
+)
 from app.services.telegram_token_store import resolve_patient_bot_token
 
 LOGGER = logging.getLogger("telegram_polling_worker")
@@ -299,14 +306,29 @@ class TelegramPollingWorker:
             if not bot_service.active:
                 await bot_service.initialize(db)
 
+            # PR-3: the same update_id dedup as the webhook endpoint. The
+            # offset cursor alone is not sufficient — a restart or token
+            # rotation resets it to None and Telegram re-delivers every
+            # unconfirmed update of the last 24h.
+            claim = claim_update(db, update_id)
+            if claim == DUPLICATE:
+                LOGGER.info(
+                    "Telegram update skipped as duplicate update_id=%s", update_id
+                )
+                return
+
             handled = await _handle_clinic_bot_update(update, db, bot_service)
             if not handled:
                 await bot_service.process_webhook_update(update, db)
+            mark_processed(db, update_id)
             LOGGER.info(
                 "Telegram update handled update_id=%s handled=%s", update_id, handled
             )
         except Exception as exc:
             db.rollback()
+            # PR-3: release the claim so a re-fetched batch reprocesses
+            # this update instead of suppressing it forever.
+            release_claim(db, update_id)
             LOGGER.warning(
                 "Telegram update failed update_id=%s error_type=%s",
                 update_id,
