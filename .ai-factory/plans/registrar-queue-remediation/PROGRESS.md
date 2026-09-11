@@ -6,12 +6,12 @@
 
 ## Точка продолжения
 
-- Обновлено: 2026-09-11, RQ-01 базис зафиксирован (VERIFIED в PR, DONE после merge-сверки).
-- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `be6012b18484a7221e704afcd0c04ce33c4a9cf4`.
-- Реализация: 0/30 runtime-задач закрыто; RQ-01 VERIFIED (сверка базиса — см. E-003).
-- Активная runtime-задача: нет. Владелец RQ-01: агент среза 2026-09-11.
+- Обновлено: 2026-09-11, RQ-01 DONE (merged #3159); RQ-02 VERIFIED в PR (DONE после merge-сверки).
+- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `84f561dff3f4d95b32e19cadc0a2c3b4f87ce2cb` (включает merged план #3157 и RQ-01 checkpoint #3159).
+- Реализация: 1/30 закрыто (RQ-01 DONE); RQ-02 VERIFIED (сверка базиса и fix поиска — см. E-003/E-004).
+- Активная runtime-задача: RQ-02 (PR открыт на момент записи). Владелец: агент среза 2026-09-11.
 - Подготовительный docs PR [#3157](https://github.com/drsapaev/final/pull/3157) **merged** в main (`be6012b18`); план доступен в fresh main — runtime-работа от fresh main разрешена.
-- Следующий шаг: **RQ-02** (минимальная незаблокированная: direct_execute, first-touch вне #3114). Перед стартом сверить merge RQ-01 и его фактический SHA.
+- Следующий шаг: после merge RQ-02 — сверить merge SHA, закрыть RQ-02 и взять **RQ-03** (минимальная по номеру незаблокированная; режим gate — pwsh установлен и gate валидирован в E-003).
 - Дрейф плана, зафиксированный RQ-01: QD-2A (0055–0059) уже merged через PR #3093 (`1f775cb`), поэтому открытый PR #3077 выглядит дубликатом/суперсeded — не мержить без сверки содержимого; F-10/F-16 частично смягчены; F-14 частично изменен. Подробности в E-003.
 - Открытые продуктовые решения: D-01…D-07 (все OPEN). Они не блокируют независимые fixes.
 - Среда: Node 24/npm/Playwright-chromium — frontend unit/MOCK доступны; pwsh 7.4.6 установлен user-local, gate валидирован; Python 3.12 (venv есть, зависимости backend НЕ установлены); PostgreSQL и Redis отсутствуют → PG/REAL_API-части соответствующих задач BLOCKED (см. E-003, частные blockers).
@@ -43,8 +43,8 @@ DONE требует: критерий из плана выполнен; узки
 
 | ID | Задача | Зависимости | Статус | Owner / branch / PR | Evidence |
 |---|---|---|---|---|---|
-| RQ-01 | Актуальный базис | — | VERIFIED | codex/rq-01-baseline-verification / PR после checkpoint | E-003 |
-| RQ-02 | Поиск пациента | RQ-01 | TODO | — | — |
+| RQ-01 | Актуальный базис | — | DONE | codex/rq-01-baseline-verification / [#3159](https://github.com/drsapaev/final/pull/3159) merged `84f561dff3f4d95b32e19cadc0a2c3b4f87ce2cb` | E-003 |
+| RQ-02 | Поиск пациента | RQ-01 | VERIFIED | codex/rq-02-registrar-search / PR этого среза | E-004 |
 | RQ-03 | Услуги мастера | RQ-01 | TODO | — | — |
 | RQ-04 | Атомарное отделение | RQ-01; проверить #3114 | TODO | — | — |
 | RQ-05 | Обязательный врач | RQ-01 | TODO | — | — |
@@ -181,8 +181,32 @@ Parent DONE только после обоих children; parent и children не
   3. PR #3114 активен (64 файла) → перед RQ-04/08/09/13/14/15/16/18/24 обязательна повторная сверка его head и файлов.
   4. D-01…D-07 OPEN — behavior-changing задачи ждут решений владельца.
 - Status now: RQ-01 VERIFIED (в границах этого PR; DONE — после merge-сверки следующего цикла).
+- Merge подтвержден (следующий цикл): PR #3159 squash-merged 2026-09-11, merge SHA `84f561dff3f4d95b32e19cadc0a2c3b4f87ce2cb`, все required checks на финальном head `193454461` success (PR Review Quality Gate перезапущен после приведения body к шаблону docs-only — первый прогон был FAIL по отсутствию обязательных секций, исправлено в том же PR). RQ-01 → DONE.
 - Next smallest action: RQ-02 — direct_execute, first-touch `frontend/src/pages/registrar/registrarWorklistRows.ts` + его тест (оба вне #3114); исправить пусто-цифровую телефонную ветку поиска и ожидание теста, закрепляющего дефект; targeted Vitest + `git diff --check`.
 - Checkpoint commit: см. PR из строки RQ-01; remote HEAD — сверять при продолжении.
+
+### E-004 — RQ-02: исправлен поиск пациента (F-01)
+
+- Task / child: RQ-02 (direct_execute — изменен только локальный фильтр отображения; gate не требуется по AGENTS для direct_execute).
+- UTC timestamp: 2026-09-11, срез облачного агента.
+- Repo branch: `codex/rq-02-registrar-search`; Base SHA / tested HEAD: `84f561dff3f4d95b32e19cadc0a2c3b4f87ce2cb` (fresh origin/main, включает merged RQ-01).
+- Mode / gate: direct_execute (план: «если меняется только локальный фильтр»); pre-work block зафиксирован перед правками (mode/root cause/first-touch/allowed/denied/validation/stop). Опциональный gate-прогон с known-root-cause выполнен ранее в E-003 как валидация инструментария, в этом срезе не требовался.
+- Exact first-touch files: `frontend/src/pages/registrar/registrarWorklistRows.ts`, `frontend/src/pages/registrar/__tests__/registrarWorklistRows.test.ts` (оба вне #3114, сверено в E-003).
+- Observed before: буквенный запрос (кириллица/латиница) не фильтровал список: `searchDigits=''` → `phoneDigits.includes('') === true` → телефонная ветка пропускала каждую строку (ветка вкладки `registrarWorklistRows.ts:168-171` и агрегированный список `:237-241`); поведение было закреплено тестом «pre-existing quirk».
+- Changed behavior: телефонная ветка поиска участвует только при непустых цифрах запроса (`searchDigits.length > 0 && …`) в обеих ветках (вкладка и «Все отделения»); буквенный запрос фильтрует по ФИО/ID/услугам; пустой запрос и цифровой/форматированный телефон ведут как раньше. Никаких серверных изменений, никаких новых полей пациента.
+- Commands (working dir `/home/z/repo/frontend`):
+  1. `node node_modules/vitest/vitest.mjs run src/pages/registrar/__tests__/registrarWorklistRows.test.ts --no-cache --reporter=dot` → **13/13 PASS** (включая новые RQ-02-проверки: пустой запрос возвращает исходный набор — обе ветки; кириллица «иван» находит только ФИО-совпадение; латиница «ivan» не возвращает все строки; форматированный телефон `+998 90 123-45-67` находит одну запись — обе ветки).
+  2. Обязательный Tier 1 перед merge UI PR (docs/AGENTS_UI.md §13): `npm run test:run` → **219 files / 1871 tests PASS**; `npm run type-check` → EXIT=0; `npm run lint:check` → 0 errors (3082 pre-existing warnings); `npm run check-theme` → PASS; `npm run audit:icon-controls` → 0 new findings; `npm run build` → PASS (pre-existing chunk-size warnings).
+  3. Self-contained Playwright suite (W0): `CI=1 npm run test:e2e -- e2e/registrar-time.spec.ts e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts --project=chromium` → **82 passed** (5.2m; vite proxy noise — ожидаемый MOCK-уровень, backend не запущен).
+  4. `git diff --check` → PASS. Локальный PR-review gate validator на body → PASS до push.
+- Acceptance S-IDs: S-01 — частично покрыт (Vitest PASS на синтетических строках: кириллица, часть телефона, форматированный телефон, пустой запрос, обе ветки; browser MOCK — W0 suite 82 passed на MOCK-данных). REAL_API — NOT_RUN (нет disposable backend/Redis; уровень MOCK явно маркирован).
+- Artifacts: изменения в этом PR (2 файла кода/теста + PROGRESS.md); no PHI (только синтетические ФИО/телефоны из фикстур теста).
+- Not checked and why: REAL_API/browser-над-реальным-backend — нет disposable backend+PostgreSQL+Redis (частные blockers E-003); миграций/скрытых контрактов нет — не применимо.
+- PR URL: см. строку RQ-02 реестра (PR этого среза); merge SHA — сверить в следующем цикле.
+- Status now: RQ-02 VERIFIED (в границах этого PR; DONE — после merge-сверки).
+- Blocker: нет (только общие частные blockers E-003, не влияющие на этот срез).
+- Next smallest action: после merge RQ-02 — сверить SHA; RQ-03 (gate): pre-work через `pwsh -NoProfile -File ./ai/langgraph/scripts/run_agent_gate.ps1 "RQ-03 …"` с известными якорями `frontend/src/components/wizard/wizardUtils.ts`; затем 3 воспроизведения из аудита.
+- Checkpoint commit / remote HEAD: см. PR; remote — сверять при продолжении.
 
 ### Шаблон следующей записи — скопировать и заполнить
 
