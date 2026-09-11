@@ -6,12 +6,12 @@
 
 ## Точка продолжения
 
-- Обновлено: 2026-09-11, RQ-03 VERIFIED (PR открыт, merge не подтвержден); RQ-01 и RQ-02 DONE (merged); следующая независимая задача — RQ-05 (после сверки merge SHA RQ-03).
-- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `ec9633f50e8fa6e61f18e96f73e65ab8ebfdb28e` (merged план #3157, RQ-01 #3159, RQ-02 #3160, docs-checkpoint #3162).
-- Реализация: 2/30 закрыто (RQ-01, RQ-02 DONE); RQ-03 VERIFIED/PR_OPEN.
-- Активная runtime-задача: RQ-03 — VERIFIED, PR на merge (см. строку реестра).
+- Обновлено: 2026-09-11, RQ-03 DONE (merged); RQ-01 и RQ-02 DONE; следующая минимальная незаблокированная задача — RQ-19 (frontend-only) либо RQ-06 (gate, frontend first-touch; backend reference-only). RQ-05 — валидация требует disposable PostgreSQL (P0): без него backend-часть BLOCKED.
+- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `2cf108cace3432690fb20843dfaa347c4b3ac121` (merged план #3157, RQ-01 #3159, RQ-02 #3160, docs-checkpoint #3162, RQ-03 #3163).
+- Реализация: 3/30 закрыто (RQ-01, RQ-02, RQ-03 DONE).
+- Активная runtime-задача: нет. Владелец: не назначен.
 - Подготовительный docs PR [#3157](https://github.com/drsapaev/final/pull/3157) **merged** в main (`be6012b18`); план доступен в fresh main — runtime-работа от fresh main разрешена.
-- Следующий шаг: после merge RQ-03 — сверить merge SHA (перевод RQ-03 в DONE в начале следующего цикла), затем минимальная незаблокированная задача: RQ-05 (режим gate, OpenAPI review; якоря вне #3114) или RQ-19 (a11y вкладок, frontend-only). Для RQ-04 сначала нужны disposable PostgreSQL и повторная сверка head #3114.
+- Следующий шаг: RQ-19 (frontend-only, gate/direct по AGENTS; якоря Tabs/navigation — вне wizard-PR #3083-#3086) или RQ-06 (gate; first-touch ServiceCatalog.tsx + новый contract-тест; backend только reference-only). Перед backend-задачами (RQ-05 и др.) требуется disposable PostgreSQL — иначе BLOCKED по P0. Для RQ-04 дополнительно сверить head #3114.
 - Дрейф плана, зафиксированный RQ-01: QD-2A (0055–0059) уже merged через PR #3093 (`1f775cb`), поэтому открытый PR #3077 выглядит дубликатом/суперсeded — не мержить без сверки содержимого; F-10/F-16 частично смягчены; F-14 частично изменен. Подробности в E-003.
 - Открытые продуктовые решения: D-01…D-07 (все OPEN). Они не блокируют независимые fixes.
 - Дрейф координации (RQ-03): открыты wizard-PR #3083/#3084/#3085/#3086/#3079 (Fix A/B/C/E/F) — трогают `AppointmentWizardV2.tsx` и хвост `wizardUtils.ts`, но НЕ блок фильтрации услуг (сверено по патчам, E-005). Перед следующим wizard-срезом — повторная сверка их head.
@@ -46,7 +46,7 @@ DONE требует: критерий из плана выполнен; узки
 |---|---|---|---|---|---|
 | RQ-01 | Актуальный базис | — | DONE | codex/rq-01-baseline-verification / [#3159](https://github.com/drsapaev/final/pull/3159) merged `84f561dff3f4d95b32e19cadc0a2c3b4f87ce2cb` | E-003 |
 | RQ-02 | Поиск пациента | RQ-01 | DONE | codex/rq-02-registrar-search / [#3160](https://github.com/drsapaev/final/pull/3160) merged `11e6ab69d5921a4e667748d99de6131f5c2e65dc` | E-004 |
-| RQ-03 | Услуги мастера | RQ-01 | VERIFIED | codex/rq-03-wizard-services / [#3163](https://github.com/drsapaev/final/pull/3163) | E-005 |
+| RQ-03 | Услуги мастера | RQ-01 | DONE | codex/rq-03-wizard-services / [#3163](https://github.com/drsapaev/final/pull/3163) merged `2cf108cace3432690fb20843dfaa347c4b3ac121` | E-005 |
 | RQ-04 | Атомарное отделение | RQ-01; проверить #3114 | TODO | — | — |
 | RQ-05 | Обязательный врач | RQ-01 | TODO | — | — |
 | RQ-06 | Профиль/тег/отделение | RQ-01 | TODO | — | — |
@@ -230,7 +230,8 @@ Parent DONE только после обоих children; parent и children не
 - Artifacts: изменения в этом PR (3 измененных файла + 1 новый тест + PROGRESS.md); данные в тестах — SYNTHETIC (ключи/теги профилей, без PHI).
 - Not checked and why: REAL_API/стенд с настоящим backend — среда без PostgreSQL/Redis (blocker E-003.2); миграций нет — не применимо; SQLite-проверки не требовались (frontend-срез).
 - PR URL: [#3163](https://github.com/drsapaev/final/pull/3163) (head `d43d938882234e460db54e27bc56197812ae968a`); merge SHA — сверить в следующем цикле (статус VERIFIED/PR_OPEN до сверки).
-- Status now: RQ-03 VERIFIED (в границах этого PR; DONE — после merge-сверки следующего цикла).
+- Status now: RQ-03 VERIFIED (в границах PR #3163).
+- Merge подтвержден (этот docs-checkpoint): PR #3163 squash-merged 2026-09-11, merge SHA `2cf108cace3432690fb20843dfaa347c4b3ac121`; все required checks на финальном head `3007ae7791` success (Frontend lint/build/unit/e2e, PR Review Quality Gate, PR Required Gate, Regression Audit Gate, CodeQL, security scans). RQ-03 → DONE.
 - Blocker: нет (частные blockers E-003 не затрагивают этот срез).
 - Next smallest action: после merge RQ-03 — сверить merge SHA и перевести RQ-03 в DONE; затем RQ-05 (gate, OpenAPI review; first-touch `backend/tests/integration/test_registrar_services_grouping.py`, serializer-ветка; `_services_doctors.py` вне #3114 — сверить перед стартом) или RQ-19 при продолжении блокировок.
 - Checkpoint commit / remote HEAD: см. PR этого среза; remote — сверять при продолжении.
