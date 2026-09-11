@@ -242,6 +242,62 @@ def get_doctor_queue_today(
 # ===================== УПРАВЛЕНИЕ СТАТУСАМИ ПАЦИЕНТОВ =====================
 
 
+# ============================================================================
+# QD-2C (Codex round-35 P1): visit resolution anchored to the queue entry
+# ============================================================================
+
+
+def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
+    """Визит командной поверхности доктора привязан к САМОЙ записи очереди.
+
+    visit_id-first: подтверждённый визит записи (OnlineQueueEntry.visit_id)
+    резолвится раньше любого поиска. Ресурсная запись (врача нет) ищет
+    открытый визит пациента того же дня по ДЕПАРТАМЕНТУ — doctor_id=None
+    в find_or_create_today_visit искал ЛЮБОЙ открытый визит (чужую
+    кардиологию того же пациента). Созданный/найденный визит НЕМЕДЛЕННО
+    линкуется на запись (прецедент qr_queue/_online_entries): старт и
+    завершение мутируют ОДНО ресурсное событие, а не создают второй
+    визит с брошенным первым.
+    """
+    if queue_entry.visit_id:
+        visit = db.query(Visit).filter(Visit.id == queue_entry.visit_id).first()
+        if visit is not None:
+            return visit
+
+    if doctor is None:
+        # ресурсная поверхность: пациент + сегодня + открыт + департамент
+        visit = (
+            db.query(Visit)
+            .filter(
+                Visit.patient_id == queue_entry.patient_id,
+                Visit.visit_date == date.today(),
+                Visit.status == "open",
+                Visit.department == department,
+            )
+            .first()
+        )
+        if visit is None:
+            visit = crud_visit.create_visit(
+                db=db,
+                patient_id=queue_entry.patient_id,
+                doctor_id=None,
+                visit_date=date.today(),
+                visit_time=datetime.now().strftime("%H:%M"),
+                department=department,
+            )
+    else:
+        visit = crud_visit.find_or_create_today_visit(
+            db=db,
+            patient_id=queue_entry.patient_id,
+            doctor_id=doctor.id,
+            department=department,
+        )
+
+    if queue_entry.visit_id != visit.id:
+        queue_entry.visit_id = visit.id
+    return visit
+
+
 @router.post("/doctor/queue/{entry_id}/call", response_model=dict[str, Any])
 def call_patient(
     entry_id: int,
@@ -492,13 +548,15 @@ def start_patient_visit(
         queue_entry.updated_at = changed_at
 
         # Создаем или обновляем визит в таблице visits
-        visit = crud_visit.find_or_create_today_visit(
-            db=db,
-            patient_id=queue_entry.patient_id,
-            # QD-2C (Codex round-34 P2): у ресурсной поверхности врача нет
-            # — визит создаётся без doctor_id, департамент уже из тега
-            doctor_id=doctor.id if doctor else None,
-            department=getattr(daily_queue, "queue_tag", None) or "general",
+        # QD-2C (Codex round-35 P1): визит записи — visit_id-first и
+        # департаментный поиск у ресурсной поверхности (см. хелпер);
+        # ресурсный старт не хватает чужой открытый визит и не
+        # оставляет незалинкованный in_progress
+        visit = _resolve_entry_visit(
+            db,
+            queue_entry,
+            doctor,
+            getattr(daily_queue, "queue_tag", None) or "general",
         )
 
         # BUG 3 fix (Codex P1): transition visit open→in_progress when starting
@@ -736,11 +794,11 @@ def complete_patient_visit(
                     resource_department = daily_queue.queue_tag or (
                         resource.code if resource is not None else None
                     )
-                visit = crud_visit.find_or_create_today_visit(
-                    db=db,
-                    patient_id=queue_entry.patient_id,
-                    doctor_id=doctor.id if doctor else None,
-                    department=resource_department or "cardiology",
+                # QD-2C (Codex round-35 P1): визит записи — visit_id-first
+                # и департаментный поиск у ресурсной поверхности (см.
+                # хелпер): завершение мутирует тот же визит, что старт
+                visit = _resolve_entry_visit(
+                    db, queue_entry, doctor, resource_department or "cardiology"
                 )
                 # ✅ Issue #06 Phase 3: delegate to VisitLifecycleService
                 # for state machine validation + row lock.

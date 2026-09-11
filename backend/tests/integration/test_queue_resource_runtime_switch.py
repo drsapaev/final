@@ -6149,3 +6149,101 @@ def test_doctor_call_and_start_visit_accept_resource_owner(
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== SS. Codex round-35 pins =====================
+
+
+def test_resource_start_and_complete_share_one_visit(db_session: Session) -> None:
+    """Codex round-35 P1: the resource command surface anchors its
+    Visit to the queue entry — a resource start must not transition an
+    unrelated open cardiology visit of the same patient (the
+    doctor_id=None lookup grabbed any open visit), and the created
+    Visit is linked onto the entry so the completion mutates the SAME
+    encounter instead of leaving the first in_progress and creating a
+    second."""
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        call_patient,
+        complete_patient_visit,
+        start_patient_visit,
+    )
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+
+    patient = Patient(
+        last_name="Ресурсный3",
+        first_name="Пациент",
+        phone="+998901234536",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        # an UNRELATED open cardiology visit of the same patient — must
+        # stay untouched by the resource command surface
+        unrelated = Visit(
+            patient_id=patient.id,
+            doctor_id=None,
+            visit_date=date.today(),
+            visit_time="08:00",
+            department="cardiology",
+            status="open",
+        )
+        db_session.add(unrelated)
+        db_session.commit()
+
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_dt_now_tashkent_day(), specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=1)
+        entry.patient_id = patient.id
+        db_session.commit()
+
+        admin = _make_user(db_session, username="adm_ss1", role="Admin")
+        assert call_patient(entry_id=entry.id, db=db_session, current_user=admin)[
+            "success"
+        ]
+        assert start_patient_visit(
+            entry_id=entry.id, db=db_session, current_user=admin
+        )["success"]
+
+        db_session.refresh(entry)
+        assert entry.visit_id is not None, "the started visit must be linked"
+
+        started = db_session.query(Visit).filter(Visit.id == entry.visit_id).first()
+        assert started is not None
+        assert started.department == "lab"  # NOT the unrelated cardiology visit
+        assert started.id != unrelated.id
+
+        # the unrelated cardiology visit stays open
+        db_session.refresh(unrelated)
+        assert unrelated.status == "open"
+
+        # completion mutates the SAME visit — no second lab encounter
+        assert complete_patient_visit(
+            entry_id=entry.id, db=db_session, current_user=admin
+        )["success"]
+        db_session.refresh(entry)
+        assert entry.visit_id == started.id
+
+        lab_visits = (
+            db_session.query(Visit)
+            .filter(Visit.patient_id == patient.id, Visit.department == "lab")
+            .all()
+        )
+        assert len(lab_visits) == 1, "start and completion share ONE visit"
+        db_session.refresh(started)
+        assert started.status == "completed"
+        db_session.refresh(unrelated)
+        assert unrelated.status == "open"
+    finally:
+        _durable_cleanup(db_session, "adm_ss1")
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
