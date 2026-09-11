@@ -6010,3 +6010,142 @@ def test_availability_compares_dates_on_clinic_clock(
         assert availability["available_from"] == "7:00"
     finally:
         _durable_cleanup(db_session, "lab_res_qq2")
+
+
+# ===================== RR. Codex round-34 pins =====================
+
+
+def test_doctor_completion_persists_resource_visit_department(
+    db_session: Session,
+) -> None:
+    """Codex round-34 P2: completing a resource-owned lab/ECG entry
+    without a linked Visit persists the encounter under the RESOURCE
+    department — DailyQueue has no department attribute, so the legacy
+    fallback always wrote «cardiology» for specialist-null queues. The
+    visit department now comes from the queue tag / registry axis."""
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        complete_patient_visit,
+    )
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+
+    patient = Patient(
+        last_name="Ресурсный",
+        first_name="Пациент",
+        phone="+998901234534",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_dt_now_tashkent_day(), specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=1)
+        entry.patient_id = patient.id
+        # the action ladder: complete is available from in_progress
+        entry.status = "in_progress"
+        db_session.commit()
+
+        admin = _make_user(db_session, username="adm_rr1", role="Admin")
+        result = complete_patient_visit(
+            entry_id=entry.id, db=db_session, current_user=admin
+        )
+        assert result["success"] is True
+
+        db_session.refresh(entry)
+        assert entry.status == "served"
+        visit = (
+            db_session.query(Visit)
+            .filter(Visit.patient_id == patient.id)
+            .order_by(Visit.id.desc())
+            .first()
+        )
+        assert visit is not None
+        # the RESOURCE department, not the legacy «cardiology» fallback
+        assert visit.department == "lab"
+        assert visit.doctor_id is None
+    finally:
+        _durable_cleanup(db_session, "adm_rr1")
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
+
+
+def test_doctor_call_and_start_visit_accept_resource_owner(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-34 P2: the doctor command surface (POST
+    /doctor/queue/{entry_id}/call and /start-visit) accepts a pure
+    resource queue as a valid owner — the unconditional 404 on the
+    missing specialist relationship made lab/ECG tickets uncallable
+    and unstartable. The resource authorization policy mirrors the
+    completion handler (round-5): Admin only."""
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        call_patient,
+        start_patient_visit,
+    )
+
+    # the display broadcast rides asyncio.create_task inside the
+    # handler's try/except — no loop in the sync test is swallowed there
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+
+    patient = Patient(
+        last_name="Ресурсный2",
+        first_name="Пациент",
+        phone="+998901234535",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=_dt_now_tashkent_day(), specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=1)
+        entry.patient_id = patient.id
+        db_session.commit()
+
+        admin = _make_user(db_session, username="adm_rr2", role="Admin")
+        called = call_patient(entry_id=entry.id, db=db_session, current_user=admin)
+        assert called["success"] is True
+        db_session.refresh(entry)
+        assert entry.status == "called"
+        assert entry.called_by_user_id == admin.id
+
+        started = start_patient_visit(
+            entry_id=entry.id, db=db_session, current_user=admin
+        )
+        assert started["success"] is True
+        db_session.refresh(entry)
+        assert entry.status == "in_progress"
+
+        # the non-Admin rejection keeps the completion-handler policy
+        from fastapi import HTTPException
+
+        outsider = _make_user(db_session, username="dr_rr2", role="doctor")
+        waiting2 = _make_waiting_entry(db_session, queue, number=2)
+        try:
+            call_patient(entry_id=waiting2.id, db=db_session, current_user=outsider)
+            raised = False
+        except HTTPException as exc:
+            raised = exc.status_code == 403
+        assert raised, "a non-Admin must not call a resource-owned entry"
+    finally:
+        _durable_cleanup(db_session, "adm_rr2", "dr_rr2")
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()

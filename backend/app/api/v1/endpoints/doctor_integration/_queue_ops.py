@@ -288,10 +288,21 @@ def call_patient(
         doctor = daily_queue.specialist
 
         if not doctor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Врач не найден для этой очереди",
-            )
+            # QD-2C (Codex round-34 P2): чистая ресурсная очередь
+            # (specialist NULL) — валидный владелец этой командной
+            # поверхности (Admin-only, той же формой, что и
+            # completion-политика round-5): прежний безусловный 404 не
+            # давал вызвать тикет ресурсной поверхности lab/ECG.
+            if getattr(daily_queue, "queue_resource_id", None) is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Врач не найден для этой очереди",
+                )
+            if current_user.role != "Admin":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Нет прав для работы с этой очередью",
+                )
 
         # PR-26: Allow any doctor of the same specialty to call patients
         # from this queue. Previously, only the queue owner (doctor.user_id
@@ -347,10 +358,24 @@ def call_patient(
 
             async def send_to_display():
                 manager = get_display_manager()
-                doctor_name = (
-                    doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
-                )
-                cabinet = doctor.cabinet
+                if doctor is not None:
+                    doctor_name = (
+                        doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
+                    )
+                    cabinet = doctor.cabinet
+                else:
+                    # QD-2C (Codex round-34 P2): ресурс-ось — владелец из
+                    # реестра (round-12 паттерн), не AttributeError на
+                    # None-враче
+                    resource = daily_queue.queue_resource
+                    doctor_name = (
+                        resource.display_name
+                        if resource is not None
+                        else "Ресурс очереди"
+                    )
+                    cabinet = daily_queue.cabinet_number or (
+                        resource.default_cabinet if resource is not None else None
+                    )
 
                 await manager.broadcast_patient_call(
                     queue_entry=queue_entry, doctor_name=doctor_name, cabinet=cabinet
@@ -420,10 +445,23 @@ def start_patient_visit(
         daily_queue = queue_entry.queue
         doctor = daily_queue.specialist if daily_queue else None
         if not doctor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Врач не найден для этой очереди",
-            )
+            # QD-2C (Codex round-34 P2): чистая ресурсная очередь —
+            # валидный владелец этой командной поверхности (Admin-only,
+            # форма completion-политики round-5): прежний безусловный 404
+            # не давал начать приём по тикету ресурсной поверхности.
+            if (
+                daily_queue is None
+                or getattr(daily_queue, "queue_resource_id", None) is None
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Врач не найден для этой очереди",
+                )
+            if current_user.role != "Admin":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Нет прав для работы с этой очередью",
+                )
 
         # PR-26: same-specialty doctors can also work with this queue
         if current_user.role != "Admin" and doctor.user_id and doctor.user_id != current_user.id:
@@ -457,7 +495,9 @@ def start_patient_visit(
         visit = crud_visit.find_or_create_today_visit(
             db=db,
             patient_id=queue_entry.patient_id,
-            doctor_id=doctor.id,
+            # QD-2C (Codex round-34 P2): у ресурсной поверхности врача нет
+            # — визит создаётся без doctor_id, департамент уже из тега
+            doctor_id=doctor.id if doctor else None,
             department=getattr(daily_queue, "queue_tag", None) or "general",
         )
 
@@ -682,15 +722,25 @@ def complete_patient_visit(
             # Создаем или обновляем визит на сегодня и помечаем как завершенный,
             # чтобы это отразилось в registrar/queues/today, который читает Visit/Appointment
             try:
+                # QD-2C (Codex round-34 P2): департамент визита — из оси
+                # ресурсной очереди (тег/реестр): у DailyQueue нет
+                # department-атрибута, и легаси-fallback писал «cardiology»
+                # — лабораторный/ЭКГ визит (specialist NULL) попадал в чужое
+                # отделение. Врач-очереди без ресурса сохраняют прежний
+                # fallback байт-идентично.
+                resource_department = None
+                if daily_queue is not None and (
+                    getattr(daily_queue, "queue_resource_id", None) is not None
+                ):
+                    resource = daily_queue.queue_resource
+                    resource_department = daily_queue.queue_tag or (
+                        resource.code if resource is not None else None
+                    )
                 visit = crud_visit.find_or_create_today_visit(
                     db=db,
                     patient_id=queue_entry.patient_id,
                     doctor_id=doctor.id if doctor else None,
-                    department=(
-                        daily_queue.department
-                        if daily_queue and hasattr(daily_queue, 'department')
-                        else "cardiology"
-                    ),
+                    department=resource_department or "cardiology",
                 )
                 # ✅ Issue #06 Phase 3: delegate to VisitLifecycleService
                 # for state machine validation + row lock.
