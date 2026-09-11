@@ -184,18 +184,111 @@ class VisitConfirmationService:
         self.queue_facade = QueueContextFacade(QueueDomainServiceContractAdapter(db))
 
     def _claim_pending_visit_for_confirmation(self, token: str) -> Visit | None:
-        updated = (
-            self.repository.db.query(Visit)
+        # PR-1 (Codex round 16, P2): the claim transition itself must be
+        # lease-coordinated. The patient-confirm flow used to grab the row
+        # (pending_confirmation → confirmation_processing) FIRST and only
+        # then run the round-15 pre-lock lease wait in
+        # VisitLifecycleService.confirm_visit — that wait polled the lease
+        # while the worker's finalize UPDATE was blocked on the very row
+        # lock this claim holds, burning the whole budget and 409-ing the
+        # patient. Now: (1) wait for a live lease BEFORE the claim (no row
+        # lock held), and (2) bind the claim UPDATE ITSELF to the
+        # no-live-lease predicate, so a claim landing between the wait and
+        # the update makes THIS claim lose atomically.
+        from sqlalchemy import or_ as _or
+
+        from app.tasks.lease import (
+            LEASE_TTL,
+            REMINDER_IN_PROGRESS_DETAIL,
+            wait_for_reminder_lease_clear,
+        )
+
+        # The lease pre-read uses a bare COLUMN select (like
+        # lease.wait_for_reminder_lease_clear itself): a column select
+        # never returns the cached identity-map instance, so it sees the
+        # freshest committed lease even when this session already holds
+        # the visit object (with possibly pending local changes).
+        pending = (
+            self.repository.db.query(Visit.id)
             .filter(
                 Visit.confirmation_token == token,
                 Visit.status == "pending_confirmation",
             )
+            .first()
+        )
+        if pending is not None and hasattr(Visit, "reminder_claimed_at"):
+            claimed_at = (
+                self.repository.db.query(Visit.reminder_claimed_at)
+                .filter(Visit.id == pending.id)
+                .scalar()
+            )
+            if claimed_at is not None:
+                from datetime import UTC, datetime
+
+                if claimed_at.tzinfo is None:
+                    claimed_at = claimed_at.replace(tzinfo=UTC)
+                if datetime.now(UTC) - claimed_at < LEASE_TTL:
+                    if not wait_for_reminder_lease_clear(
+                        self.repository.db, pending.id
+                    ):
+                        raise VisitConfirmationDomainError(
+                            status_code=409,
+                            detail=REMINDER_IN_PROGRESS_DETAIL,
+                        )
+
+        lease_free = None
+        if hasattr(Visit, "reminder_claimed_at"):
+            from datetime import UTC, datetime
+
+            from app.tasks.lease import LEASE_TTL
+
+            lease_free = _or(
+                Visit.reminder_claimed_at.is_(None),
+                Visit.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
+            )
+        claim_filters = [
+            Visit.confirmation_token == token,
+            Visit.status == "pending_confirmation",
+        ]
+        if lease_free is not None:
+            claim_filters.append(lease_free)
+        updated = (
+            self.repository.db.query(Visit)
+            .filter(*claim_filters)
             .update(
                 {Visit.status: CONFIRMATION_PROCESSING_STATUS},
                 synchronize_session=False,
             )
         )
         if updated == 0:
+            # Distinguish the loser's cause: a live reminder claim (409)
+            # vs the token raced away / already processed (None).
+            # The cause check reads bare COLUMNS so it never consults
+            # the identity map's possibly-stale copy.
+            raced_row = (
+                self.repository.db.query(
+                    Visit.id, Visit.status, Visit.reminder_claimed_at
+                )
+                .filter(Visit.confirmation_token == token)
+                .first()
+            )
+            if (
+                raced_row is not None
+                and raced_row.status == "pending_confirmation"
+                and raced_row.reminder_claimed_at is not None
+            ):
+                from datetime import UTC, datetime
+
+                from app.tasks.lease import LEASE_TTL
+
+                raced_claim = raced_row.reminder_claimed_at
+                if raced_claim.tzinfo is None:
+                    raced_claim = raced_claim.replace(tzinfo=UTC)
+                if datetime.now(UTC) - raced_claim < LEASE_TTL:
+                    raise VisitConfirmationDomainError(
+                        status_code=409,
+                        detail=REMINDER_IN_PROGRESS_DETAIL,
+                    )
             return None
         if updated != 1:
             raise VisitConfirmationDomainError(

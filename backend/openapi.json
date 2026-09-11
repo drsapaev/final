@@ -152,7 +152,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Appointment"
+                    "$ref": "#/components/schemas/AppointmentHistoryItem"
                   },
                   "type": "array",
                   "title": "Response Get My Appointments Api V1 Patients Appointments Get"
@@ -638,8 +638,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AppointmentHistoryItem"
+                  },
                   "title": "Response Get Patient Appointments Api V1 Patients  Patient Id  Appointments Get"
                 }
               }
@@ -67064,6 +67066,79 @@
         ],
         "title": "AppointmentDoctorInfoResponse",
         "description": "Схема информации о враче для записи"
+      },
+      "AppointmentHistoryItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "appointment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Appointment Date"
+          },
+          "appointment_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Time"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          },
+          "status": {
+            "type": "string",
+            "maxLength": 16,
+            "title": "Status"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "appointment_date",
+          "status"
+        ],
+        "title": "AppointmentHistoryItem",
+        "description": "Stable, minimal response item for patient appointment history."
       },
       "AppointmentNotificationRequest": {
         "properties": {

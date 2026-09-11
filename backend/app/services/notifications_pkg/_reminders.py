@@ -2,6 +2,7 @@
 
 Split from notifications.py.
 """
+
 from __future__ import annotations
 
 from app.services.notifications_pkg._base import (
@@ -16,7 +17,11 @@ class RemindersMixin(NotificationSenderMixinBase):
     """Reminders methods for NotificationSenderService."""
 
     async def send_confirmation_reminder(
-        self, db: Session, visit_id: int, hours_before: int = 24
+        self,
+        db: Session,
+        visit_id: int,
+        hours_before: int = 24,
+        channel: str | None = None,
     ) -> dict[str, Any]:
         """Отправляет напоминание о необходимости подтверждения"""
         from app.models.patient import Patient
@@ -31,28 +36,68 @@ class RemindersMixin(NotificationSenderMixinBase):
             if not patient:
                 return {"success": False, "error": "Пациент не найден"}
 
-            channel = self._determine_best_channel(patient)
+            # PR-1 (Codex round 18, P1): the reminder producer may pin the
+            # delivery channel to one PERMITTED BY THE VISIT'S contract —
+            # when it does, the auto-selection is bypassed entirely.
+            channel = channel or self._determine_best_channel(patient)
             notification_data = self._prepare_notification_data(db, visit, patient)
             notification_data["is_reminder"] = True
             notification_data["hours_before"] = hours_before
 
+            # Codex round 12, P2: the provider dispatch can hold this
+            # connection for up to the arq job timeout (300s). End the
+            # read-only transaction BEFORE the await so a slow provider
+            # never pins an idle-in-transaction connection (max_jobs
+            # workers would otherwise hold every connection and block
+            # vacuum / operational DDL). The reminder worker's session is
+            # created with expire_on_commit=False, so the attribute reads
+            # below (patient ids/phone) stay in-memory instead of
+            # reopening a transaction right under the await. Only reads
+            # happened on this session so far — the commit carries no
+            # caller state.
+            if channel == "telegram":
+                # PR-1 (Codex round 18, P1): Patient has NO telegram_id
+                # column — the Telegram linkage lives in TelegramUser.
+                chat_id = getattr(patient, "telegram_id", None)
+                if chat_id is None:
+                    from app.models.telegram_config import TelegramUser
+
+                    link = (
+                        db.query(TelegramUser)
+                        .filter(
+                            TelegramUser.patient_id == visit.patient_id,
+                            TelegramUser.active.is_(True),
+                            TelegramUser.blocked.is_(False),
+                            TelegramUser.appointment_reminders.is_(True),
+                        )
+                        .first()
+                    )
+                    chat_id = link.chat_id if link is not None else None
+                if chat_id is None:
+                    return {
+                        "success": False,
+                        "error": "Пациент не привязал Telegram",
+                    }
+            db.commit()
+
             if channel == "telegram":
                 # Упрощенная версия напоминания для Telegram (можно расширить)
                 message = f"🔔 Напоминание! Пожалуйста, подтвердите визит к врачу {notification_data['doctor_name']} на {notification_data['visit_date']} {notification_data['visit_time']}."
-                keyboard = self._create_telegram_keyboard(notification_data["confirmation_token"])
+                keyboard = self._create_telegram_keyboard(
+                    notification_data["confirmation_token"]
+                )
                 result = await self.telegram_bot.send_confirmation_invitation(
-                    chat_id=patient.telegram_id, message=message, keyboard=keyboard
+                    chat_id=chat_id, message=message, keyboard=keyboard
                 )
                 return {"success": result.get("success"), "error": result.get("error")}
             elif channel == "pwa":
-                 return await self._send_pwa_invitation(patient, notification_data)
+                return await self._send_pwa_invitation(patient, notification_data)
             else:
-                 return await self._send_phone_invitation(patient, notification_data)
+                return await self._send_phone_invitation(patient, notification_data)
 
         except Exception as e:
             logger.error(f"Ошибка отправки напоминания: {e}")
             return {"success": False, "error": str(e)}
-
 
     async def send_telegram_message(
         self, user_id: int | str, message: str, parse_mode: str = "HTML"
@@ -74,18 +119,18 @@ class RemindersMixin(NotificationSenderMixinBase):
 
             # В TelegramBotService обычно есть send_message
             if hasattr(self.telegram_bot, "send_message"):
-                 return await self.telegram_bot.send_message(user_id=user_id, text=message, parse_mode=parse_mode)
+                return await self.telegram_bot.send_message(
+                    user_id=user_id, text=message, parse_mode=parse_mode
+                )
             else:
-                 # Fallback
-                 await self.telegram_bot.application.bot.send_message(chat_id=user_id, text=message, parse_mode=parse_mode)
-                 return {"success": True}
+                # Fallback
+                await self.telegram_bot.application.bot.send_message(
+                    chat_id=user_id, text=message, parse_mode=parse_mode
+                )
+                return {"success": True}
 
         except Exception as e:
             logger.error(f"Error sending telegram message: {e}")
             return {"success": False, "error": str(e)}
 
     # === End merged methods ===
-
-
-
-

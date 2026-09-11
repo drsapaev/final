@@ -15,6 +15,7 @@ Each task function is async and idempotent. The arq worker entry point is
 """
 
 from app.tasks.scheduler import (
+    TaskEnqueueError,
     enqueue_data_retention,
     enqueue_reminder,
     enqueue_scheduled_report,
@@ -24,4 +25,5 @@ __all__ = [
     "enqueue_reminder",
     "enqueue_data_retention",
     "enqueue_scheduled_report",
+    "TaskEnqueueError",
 ]

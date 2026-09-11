@@ -29,6 +29,7 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
         limit: int = 100,
         search_query: str | None = None,
         phone: str | None = None,
+        doctor_ids: set[int] | None = None,
     ) -> list[Patient]:
         """
         Получить список пациентов с поиском
@@ -38,6 +39,14 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
             search_query: Общий поиск по всем полям
         """
         query = db.query(self.model).filter(self.model.is_deleted.is_(False))
+        if doctor_ids is not None:
+            from app.models.visit import Visit
+
+            query = (
+                query.join(Visit, Visit.patient_id == self.model.id)
+                .filter(Visit.doctor_id.in_(doctor_ids))
+                .distinct()
+            )
 
         # Приоритет 1: Точный поиск по телефону
         if phone:

@@ -32,6 +32,18 @@ class VisitsApiRepository:
     def get_bind(self):
         return self.db.get_bind()
 
+    def wait_for_reminder_lease_clear(self, visit_id: int) -> bool:
+        """Lease-coordination poll (PR-1, Codex rounds 11-13).
+
+        The service layer must not touch the session directly (the
+        service/repository boundary test forbids `repository.db`), so the
+        lease polling for the reschedule guard lives here — see
+        app/tasks/lease.py for the coordination contract.
+        """
+        from app.tasks.lease import wait_for_reminder_lease_clear
+
+        return wait_for_reminder_lease_clear(self.db, visit_id)
+
     def create_visit_via_crud(
         self,
         *,

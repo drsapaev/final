@@ -17,6 +17,23 @@ from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
 
 
 class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate]):
+    def get_patient_history(
+        self,
+        db: Session,
+        *,
+        patient_id: int,
+        doctor_ids: set[int] | None = None,
+    ) -> list[Appointment]:
+        """Return patient appointment history, optionally scoped to doctors."""
+        query = (
+            db.query(self.model)
+            .options(selectinload(self.model.department))
+            .filter(self.model.patient_id == patient_id)
+        )
+        if doctor_ids is not None:
+            query = query.filter(self.model.doctor_id.in_(doctor_ids))
+        return query.order_by(self.model.appointment_date.desc()).all()
+
     def get_appointments(
         self,
         db: Session,

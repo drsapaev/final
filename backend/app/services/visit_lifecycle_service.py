@@ -192,7 +192,63 @@ class VisitLifecycleService:
                 detail="reason is required (≥10 chars) when force=True",
             )
 
+        # PR-1 (Codex round 15, P2): the lease wait happens BEFORE the
+        # ``SELECT ... FOR UPDATE`` below. Waiting while holding the row
+        # lock would deadlock the worker's finalize (its conditional UPDATE
+        # needs the lock WE hold, while we poll for the lease field ITS
+        # transaction must clear) and burn the whole wait budget before
+        # timing out with 409. A cheap (unlocked) pre-read is enough here:
+        # step 3 revalidates the lease atomically under the lock.
+        if hasattr(Visit, "reminder_claimed_at"):
+            pre_claimed = (
+                self.db.query(Visit.reminder_claimed_at)
+                .filter(Visit.id == visit_id)
+                .scalar()
+            )
+            if pre_claimed is not None:
+
+                from app.tasks.lease import LEASE_TTL, REMINDER_IN_PROGRESS_DETAIL
+
+                if pre_claimed.tzinfo is None:
+                    pre_claimed = pre_claimed.replace(tzinfo=UTC)
+                if datetime.now(UTC) - pre_claimed < LEASE_TTL:
+                    from app.tasks.lease import wait_for_reminder_lease_clear
+
+                    if not wait_for_reminder_lease_clear(self.db, visit_id):
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail=REMINDER_IN_PROGRESS_DETAIL,
+                        )
+
         visit = self._load_visit_for_update(visit_id)
+
+        # PR-1 (Codex rounds 14+15, P2): a lifecycle transition out of
+        # ``pending_confirmation`` must not commit while a reminder
+        # delivery holds the lease — the in-flight provider dispatch would
+        # be an obsolete confirmation request the moment it lands (the
+        # worker's finalize predicate can only refuse to RECORD such a
+        # delivery, not retract the already-sent message). Under the row
+        # lock the revalidation is ATOMIC: a claim that landed between the
+        # pre-read above and the lock is visible here and refuses
+        # immediately (never WAIT under the lock — the worker's own UPDATE
+        # needs that lock to release the lease); a claim that lands after
+        # the lock cannot happen until we commit, and it then rejects
+        # itself on the ``status == 'pending_confirmation'`` predicate.
+        if visit.status == "pending_confirmation" and hasattr(
+            Visit, "reminder_claimed_at"
+        ):
+
+            from app.tasks.lease import LEASE_TTL, REMINDER_IN_PROGRESS_DETAIL
+
+            claimed = visit.reminder_claimed_at
+            if claimed is not None:
+                if claimed.tzinfo is None:
+                    claimed = claimed.replace(tzinfo=UTC)
+                if datetime.now(UTC) - claimed < LEASE_TTL:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=REMINDER_IN_PROGRESS_DETAIL,
+                    )
 
         if force:
             # Admin break-glass: bypass state machine, but require
@@ -454,7 +510,51 @@ class VisitLifecycleService:
                 Use ``commit=False`` when composing with
                 ``activate_confirmed_visit()`` in one transaction.
         """
+        # PR-1 (Codex round 15, P2): the lease wait happens BEFORE the row
+        # lock (same deadlock-free ordering as ``transition_status``), and
+        # the post-lock revalidation below refuses atomically.
+        if hasattr(Visit, "reminder_claimed_at"):
+            pre_claimed = (
+                self.db.query(Visit.reminder_claimed_at)
+                .filter(Visit.id == visit_id)
+                .scalar()
+            )
+            if pre_claimed is not None:
+
+                from app.tasks.lease import LEASE_TTL, REMINDER_IN_PROGRESS_DETAIL
+
+                if pre_claimed.tzinfo is None:
+                    pre_claimed = pre_claimed.replace(tzinfo=UTC)
+                if datetime.now(UTC) - pre_claimed < LEASE_TTL:
+                    from app.tasks.lease import wait_for_reminder_lease_clear
+
+                    if not wait_for_reminder_lease_clear(self.db, visit_id):
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail=REMINDER_IN_PROGRESS_DETAIL,
+                        )
+
         visit = self._load_visit_for_update(visit_id)
+
+        # PR-1 (Codex round 14, P2): the patient-facing confirm is a
+        # lifecycle transition out of ``pending_confirmation`` — see the
+        # coordination comment in ``transition_status`` (pre-lock wait,
+        # atomic post-lock revalidation, never wait under the lock).
+        if visit.status == "pending_confirmation" and hasattr(
+            Visit, "reminder_claimed_at"
+        ):
+
+            from app.tasks.lease import LEASE_TTL, REMINDER_IN_PROGRESS_DETAIL
+
+            claimed = visit.reminder_claimed_at
+            if claimed is not None:
+                if claimed.tzinfo is None:
+                    claimed = claimed.replace(tzinfo=UTC)
+                if datetime.now(UTC) - claimed < LEASE_TTL:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=REMINDER_IN_PROGRESS_DETAIL,
+                    )
 
         logger.info(
             "visit.confirm visit_id=%s current_status=%s user_id=%s confirmed_by=%r",

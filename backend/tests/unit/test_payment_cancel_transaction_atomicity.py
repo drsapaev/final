@@ -6,7 +6,7 @@ row-level locking on both tables.
 """
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -84,6 +84,43 @@ class TestPaymentCancelTransactionAtomicity:
         assert result["success"] is True
         assert payment.status == "cancelled"
         assert tx.status == "cancelled"
+
+    def test_provider_cancel_runs_after_local_rows_are_locked(
+        self, db_session, test_visit
+    ):
+        """The external call must not open a webhook status race window."""
+        payment, _ = self._create_payment_with_transaction(
+            db_session, test_visit, payment_status="processing", tx_status="processing"
+        )
+        events: list[str] = []
+
+        class _OrderingManager:
+            def cancel_payment(self, provider_name, provider_payment_id):
+                events.append("provider_cancel")
+                return PaymentResult(success=True)
+
+        service = PaymentCancelService(db_session, _OrderingManager())
+        original_payment_lock = service.repository.get_payment_for_update
+        original_transaction_lock = (
+            service.repository.get_transactions_by_payment_id_for_update
+        )
+
+        def track_payment_lock(payment_id):
+            events.append("payment_lock")
+            return original_payment_lock(payment_id)
+
+        def track_transaction_lock(payment_id):
+            events.append("transaction_lock")
+            return original_transaction_lock(payment_id)
+
+        service.repository.get_payment_for_update = track_payment_lock
+        service.repository.get_transactions_by_payment_id_for_update = (
+            track_transaction_lock
+        )
+
+        service.cancel_payment(payment_id=payment.id)
+
+        assert events == ["payment_lock", "transaction_lock", "provider_cancel"]
 
     def test_cancel_rolls_back_on_transaction_error(
         self, db_session, test_visit
@@ -260,17 +297,7 @@ class TestPaymentCancelTransactionAtomicity:
     def test_cancel_multiple_transactions_raises_before_provider_call(
         self, db_session, test_visit
     ):
-        """Codex P1 #1 regression guard: the cardinality pre-check must
-        fire BEFORE the external provider cancel is called.
-
-        Without the pre-check, the provider cancel would succeed first,
-        then the locked cardinality check inside
-        _cancel_payment_and_transaction would raise 500 — leaving the
-        provider cancelled while the local Payment stays unchanged.
-
-        With the pre-check, payment_manager.cancel_payment() is NEVER
-        called when the invariant is already violated.
-        """
+        """Cardinality validation must run before the provider call."""
         payment, _ = self._create_payment_with_transaction(
             db_session, test_visit, payment_status="processing", tx_status="processing"
         )
@@ -336,7 +363,6 @@ class TestPaymentCancelRepositoryLocking:
     ):
         """The query must call .with_for_update() to acquire row locks."""
         from app.repositories.payment_cancel_repository import PaymentCancelRepository
-        from unittest.mock import MagicMock
 
         # Build a fake query chain that records whether with_for_update
         # was called. We don't hit the real DB — we just verify the
@@ -364,3 +390,27 @@ class TestPaymentCancelRepositoryLocking:
         fake_filtered.with_for_update.assert_called_once_with()
         fake_locked.all.assert_called_once()
         assert result == []
+
+    def test_get_payment_for_update_uses_with_for_update(self):
+        """The definitive status check must read a locked Payment row."""
+        from app.repositories.payment_cancel_repository import PaymentCancelRepository
+
+        fake_db = MagicMock()
+        fake_query = MagicMock()
+        fake_filtered = MagicMock()
+        fake_locked = MagicMock()
+        fake_populated = MagicMock()
+        locked_payment = object()
+
+        fake_db.query.return_value = fake_query
+        fake_query.filter.return_value = fake_filtered
+        fake_filtered.with_for_update.return_value = fake_locked
+        fake_locked.populate_existing.return_value = fake_populated
+        fake_populated.first.return_value = locked_payment
+
+        repo = PaymentCancelRepository(fake_db)
+
+        assert repo.get_payment_for_update(payment_id=42) is locked_payment
+        fake_filtered.with_for_update.assert_called_once_with()
+        fake_locked.populate_existing.assert_called_once_with()
+        fake_populated.first.assert_called_once_with()
