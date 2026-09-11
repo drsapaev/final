@@ -211,6 +211,28 @@ async def test_resolve_returns_none_without_caching_when_getme_fails():
     assert token not in telegram_webhook_dedup._IDENTITY_BY_TOKEN
 
 
+@pytest.mark.real_identity_resolver
+def test_getme_suppresses_credential_bearing_request_logs(caplog):
+    """Codex round 33 (P1): the getMe URL embeds the bot credential and
+    httpx logs the full URL at INFO — the suppression window must keep
+    that line out of the handlers (and restore the levels afterwards)."""
+    import logging as _logging
+
+    httpx_logger = _logging.getLogger("httpx")
+    with caplog.at_level(_logging.INFO, logger="httpx"):
+        with telegram_webhook_dedup._no_http_request_logs():
+            httpx_logger.info(
+                "HTTP Request: GET https://api.telegram.org/"
+                "botSECRET-TOKEN/getMe"
+            )
+        httpx_logger.info(
+            "HTTP Request: GET https://api.telegram.org/after-suppression"
+        )
+
+    leaked = [r for r in caplog.records if "SECRET-TOKEN" in r.getMessage()]
+    assert leaked == []
+
+
 def _patch_service_session(monkeypatch, db_session):
     """Point the dedup service's own-session helpers at the fixture db."""
     monkeypatch.setattr(

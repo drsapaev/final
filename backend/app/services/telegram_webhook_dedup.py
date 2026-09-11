@@ -37,6 +37,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, select, update
@@ -223,18 +224,40 @@ def _persist_bot_identity(token_text: str, identity: str) -> None:
         )
 
 
+@contextmanager
+def _no_http_request_logs():
+    """Temporarily raise the httpx/httpcore log levels (codex round 33).
+
+    httpx logs the complete request URL at INFO — and the getMe URL
+    embeds the bot credential, which the PII filter does not recognize.
+    Suppressing the request logs for the duration of the call keeps the
+    credential out of stdout and the polling worker's log file; levels
+    are restored afterwards.
+    """
+    loggers = [logging.getLogger("httpx"), logging.getLogger("httpcore")]
+    previous = [(lg, lg.level) for lg in loggers]
+    for lg in loggers:
+        lg.setLevel(max(lg.level, logging.WARNING))
+    try:
+        yield
+    finally:
+        for lg, level in previous:
+            lg.setLevel(level)
+
+
 async def _fetch_bot_id(token: str) -> str | None:
     """Return the bot's numeric id via getMe, or None on any failure."""
     try:
         import httpx
 
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(
-                f"https://api.telegram.org/bot{token}/getMe"
-            )
-            payload = response.json()
-            if payload.get("ok"):
-                return str(payload["result"]["id"])
+        with _no_http_request_logs():
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    f"https://api.telegram.org/bot{token}/getMe"
+                )
+                payload = response.json()
+        if payload.get("ok"):
+            return str(payload["result"]["id"])
     except Exception as exc:  # noqa: BLE001 — identity resolution is best-effort
         logger.warning(
             "Telegram getMe identity lookup failed — falling back to the "
