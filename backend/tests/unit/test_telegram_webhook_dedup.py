@@ -115,7 +115,7 @@ def test_claim_none_update_id_is_claimed_without_row(db_session):
 def test_ledger_bot_identity_is_stable_and_non_secret():
     """The fallback identity binds a claim to its credential without
     leaking it."""
-    token = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
+    token = "123456789:test-only-not-a-real-credential-value"
     identity = telegram_webhook_dedup.ledger_bot_identity(token)
 
     assert identity is not None
