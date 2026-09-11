@@ -275,7 +275,37 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
     if queue_entry.visit_id:
         visit = db.query(Visit).filter(Visit.id == queue_entry.visit_id).first()
         if visit is not None:
-            return visit
+            # Codex round-40 P2: форс-мажор перенос копирует visit_id
+            # на завтрашнюю запись — валидируем удержанный визит против
+            # НОВОГО дня очереди записи (ресурс-поверхность): соло-визит
+            # следует за перенесённым тикетом (перештамповывается на день
+            # фактического обслуживания), визит, ещё шарящийся другими
+            # записями своего дня, дату сохраняет — запись резолвит
+            # свежий визит дня очереди ниже. Врач-поверхность не тронута.
+            if doctor is None:
+                queue_day = getattr(queue_entry.queue, "day", None)
+                if queue_day is None or visit.visit_date == queue_day:
+                    return visit
+                shared = (
+                    db.query(OnlineQueueEntry.id)
+                    .filter(
+                        OnlineQueueEntry.visit_id == visit.id,
+                        OnlineQueueEntry.id != queue_entry.id,
+                        # отозванные записи визит больше не якорят:
+                        # форс-мажор перенос оставляет visit_id на
+                        # отменённом оригинале — это не «шаринг»
+                        OnlineQueueEntry.status.not_in(["cancelled", "no_show"]),
+                    )
+                    .first()
+                    is not None
+                )
+                if not shared:
+                    visit.visit_date = queue_day
+                    return visit
+                # shared by same-day tickets: fall through to the
+                # queue-day resolution below (fresh visit + relink)
+            else:
+                return visit
 
     if doctor is None:
         # Codex round-36 P2: день визита — день ОЧЕРЕДИ записи
