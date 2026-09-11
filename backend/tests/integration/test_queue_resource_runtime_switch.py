@@ -7407,3 +7407,52 @@ def test_cabinet_filter_survives_registry_deactivation(db_session: Session) -> N
         day=None, specialist_id=synthetic.id, cabinet_number=None
     )
     assert resource_queue.id in [item["id"] for item in payload_all]
+
+
+# ===================== AF. Codex round-46 pin =====================
+
+
+def test_cabinet_specialist_filter_includes_bridged_queues(
+    db_session: Session,
+) -> None:
+    """Codex round-46 P2: a 0059 bridge (queue_resource_id set) may
+    retain a DIFFERENT synthetic owner — e.g. a general_resource-owned
+    lab queue — and the specialist-filtered cabinet reads must match
+    the resource axis by queue_resource_id + tag rather than by a NULL
+    specialist, or the bridge drops out of the lab identity's filter."""
+    from app.services.queue_domain_service import QueueDomainService
+
+    day = _dt_now_tashkent_day()
+    lab_user = _make_user(db_session, username="lab_res_af1", role="Resource")
+    lab_synthetic = _make_doctor(db_session, user_id=lab_user.id, specialty="lab")
+    gen_user = _make_user(db_session, username="gen_res_af1", role="Resource")
+    general_synthetic = _make_doctor(
+        db_session, user_id=gen_user.id, specialty="general"
+    )
+    lab_resource = _make_resource(db_session, code="lab", queue_tag="lab")
+
+    # the 0059 bridge shape: the lab-tag queue keeps its ORIGINAL
+    # synthetic owner (general_resource) while queue_resource_id marks
+    # resource ownership — exact-tag-wins cross-owner bridge
+    bridge = _make_queue(
+        db_session,
+        day=day,
+        specialist_id=general_synthetic.id,
+        queue_tag="lab",
+        active=True,
+        queue_resource_id=lab_resource.id,
+    )
+    _make_waiting_entry(db_session, bridge, number=107)
+
+    payload = QueueDomainService(db_session).list_queue_cabinet_info(
+        day=day, specialist_id=lab_synthetic.id, cabinet_number=None
+    )
+    # the LAB identity's filter sees the bridge (resource axis by
+    # queue_resource_id + tag, not by a NULL specialist)
+    assert [item["id"] for item in payload] == [bridge.id]
+
+    # the day-less filter keeps the bridge in scope as well
+    payload_all = QueueDomainService(db_session).list_queue_cabinet_info(
+        day=None, specialist_id=lab_synthetic.id, cabinet_number=None
+    )
+    assert bridge.id in [item["id"] for item in payload_all]
