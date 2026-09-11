@@ -397,35 +397,52 @@ def test_claim_supports_bigint_update_id(db_session):
 # ===================== service: stale-crash recovery =====================
 
 
-def test_stale_processing_claim_is_reclaimed(db_session):
-    stale_at = datetime.now(timezone.utc) - timedelta(
-        seconds=telegram_webhook_dedup.DEDUP_STALE_SECONDS + 60
-    )
-    db_session.add(
-        TelegramWebhookDedup(update_id=110, status="processing", processed_at=stale_at)
-    )
-    db_session.commit()
-
-    result = telegram_webhook_dedup.claim_update(db_session, 110)
-
-    assert result == telegram_webhook_dedup.CLAIMED
-    (row,) = _dedup_rows(db_session, 110)
-    assert row.status == "processing"
-    # sqlite hands the value back naive — normalize before comparing.
-    stored = row.processed_at.replace(tzinfo=timezone.utc)
-    assert stored > stale_at  # refreshed by the reclaim
-
-
-def test_stale_reclaim_fences_the_previous_owner(db_session):
-    """Codex round 29 (P2): the reclaim hands the claim to a NEW owner
-    token — a handler that is STILL ALIVE past DEDUP_STALE_SECONDS can
-    no longer mark or release the row, so it can neither duplicate the
-    retry's state-changing actions nor delete its live claim."""
+def test_stale_processing_claim_enters_two_phase_reclaim(db_session):
+    """Codex round 35: the FIRST stale contact only flips the claim to
+    'reclaiming' (no re-dispatch — the previous handler may still be
+    alive); the SECOND stale contact after another full window hands the
+    claim over with a fresh owner token."""
     stale_at = datetime.now(timezone.utc) - timedelta(
         seconds=telegram_webhook_dedup.DEDUP_STALE_SECONDS + 60
     )
     stale_row = TelegramWebhookDedup(
-        update_id=910, status="processing", processed_at=stale_at
+        update_id=110, status="processing", processed_at=stale_at
+    )
+    db_session.add(stale_row)
+    db_session.commit()
+    old_token = stale_row.owner_token
+
+    # Phase 1: the claim enters the reclaiming grace window.
+    assert telegram_webhook_dedup.claim_update(db_session, 110) == (
+        telegram_webhook_dedup.IN_FLIGHT
+    )
+    (row,) = _dedup_rows(db_session, 110)
+    assert row.status == "reclaiming"
+    assert row.owner_token == old_token  # phase 1 does NOT steal ownership
+
+    # Phase 2: the 'reclaiming' row goes stale for another full window.
+    row.processed_at = stale_at
+    db_session.commit()
+
+    result = telegram_webhook_dedup.claim_update(db_session, 110)
+    assert result == telegram_webhook_dedup.CLAIMED
+    assert result.owner_token and result.owner_token != old_token
+    (row,) = _dedup_rows(db_session, 110)
+    assert row.status == "processing"
+    assert row.owner_token == result.owner_token
+
+
+def test_stale_reclaim_fences_the_previous_owner(db_session):
+    """Codex rounds 29+35: after the TWO-PHASE window hands the claim to
+    a new owner token, the previous execution can no longer mark or
+    release the row."""
+    stale_at = datetime.now(timezone.utc) - timedelta(
+        seconds=telegram_webhook_dedup.DEDUP_STALE_SECONDS + 60
+    )
+    stale_row = TelegramWebhookDedup(
+        update_id=910,
+        status="reclaiming",  # already through phase 1
+        processed_at=stale_at,
     )
     db_session.add(stale_row)
     db_session.commit()
@@ -434,11 +451,11 @@ def test_stale_reclaim_fences_the_previous_owner(db_session):
     result = telegram_webhook_dedup.claim_update(
         db_session, 910, telegram_webhook_dedup.UNKNOWN_BOT_IDENTITY
     )
-    assert result == telegram_webhook_dedup.CLAIMED
+    assert result == telegram_webhook_dedup.CLAIMED  # phase 2
     new_token = result.owner_token
     assert new_token and new_token != old_token  # ownership changed hands
 
-    # The OLD (still-alive) handler cannot mark or release the row.
+    # The OLD (no-longer-owning) execution cannot mark or release.
     telegram_webhook_dedup.mark_processed(
         db_session, 910, telegram_webhook_dedup.UNKNOWN_BOT_IDENTITY, old_token
     )
@@ -455,6 +472,39 @@ def test_stale_reclaim_fences_the_previous_owner(db_session):
     )
     (row,) = _dedup_rows(db_session, 910)
     assert row.status == "processed"
+
+
+def test_slow_but_alive_handler_completes_during_reclaiming(db_session):
+    """Codex round 35: a slow-but-alive handler is NOT double-dispatched —
+    phase 1 never re-runs the handlers, and the handler's own (old-token)
+    mark still completes the row, so the next delivery is a plain
+    DUPLICATE."""
+    stale_at = datetime.now(timezone.utc) - timedelta(
+        seconds=telegram_webhook_dedup.DEDUP_STALE_SECONDS + 60
+    )
+    stale_row = TelegramWebhookDedup(
+        update_id=911, status="processing", processed_at=stale_at
+    )
+    db_session.add(stale_row)
+    db_session.commit()
+    old_token = stale_row.owner_token
+
+    # Phase 1: grace window entered, nothing dispatched.
+    assert telegram_webhook_dedup.claim_update(db_session, 911) == (
+        telegram_webhook_dedup.IN_FLIGHT
+    )
+
+    # The slow handler finally finishes and marks with ITS token.
+    telegram_webhook_dedup.mark_processed(
+        db_session, 911, telegram_webhook_dedup.UNKNOWN_BOT_IDENTITY, old_token
+    )
+    (row,) = _dedup_rows(db_session, 911)
+    assert row.status == "processed"
+
+    # A later delivery is a plain duplicate — no second execution.
+    assert telegram_webhook_dedup.claim_update(db_session, 911) == (
+        telegram_webhook_dedup.DUPLICATE
+    )
 
 
 def test_fresh_processing_claim_is_in_flight(db_session):

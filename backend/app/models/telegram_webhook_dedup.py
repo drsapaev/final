@@ -22,9 +22,15 @@ Row lifecycle:
 - After the handler succeeds the row is flipped to 'processed'.
 - On handler failure the row is deleted, so Telegram's redelivery is
   reprocessed instead of suppressed forever (at-least-once semantics).
-- A row stranded in 'processing' by a hard crash is reclaimable by a
-  later delivery of the same update_id after the stale threshold
-  (app.services.telegram_webhook_dedup.DEDUP_STALE_SECONDS).
+- A row stranded in 'processing' by a hard crash is reclaimable through
+  a TWO-PHASE window (codex round 35): the first stale contact flips it
+  to 'reclaiming' (a grace window with NO re-dispatch — the previous
+  handler may still be alive), and only a 'reclaiming' row after a
+  SECOND full DEDUP_STALE_SECONDS window is re-claimed ('processing'
+  again, fresh owner token).
+- Rows are purged after DEDUP_RETENTION_DAYS by the daily data-retention
+  sweep (app.services.data_retention); superseded-identity rows simply
+  age out.
 - Rows are purged after DEDUP_RETENTION_DAYS by the daily data-retention
   sweep (app.services.data_retention); credential swaps additionally
   wipe the ledger (token store) and superseded-identity rows simply

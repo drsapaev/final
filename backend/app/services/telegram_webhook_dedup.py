@@ -25,9 +25,13 @@ This service is the single source of truth for update_id dedup:
 - ``release_claim`` deletes the claim after a failure so Telegram's
   redelivery is reprocessed (at-least-once; dedup must not turn a
   failed handling into a permanently swallowed update).
-- A claim stranded in 'processing' by a hard crash is reclaimed by a
-  later delivery of the same update_id once it is older than
-  ``DEDUP_STALE_SECONDS`` — no update is ever lost to a crashed worker.
+- A claim stranded in 'processing' by a hard crash is reclaimable by a
+  later delivery of the same update_id through a TWO-PHASE window: the
+  first stale contact only marks the row 'reclaiming' (no re-dispatch —
+  the previous handler may still be alive), and the second stale contact
+  after another full window re-claims it with a fresh owner token — no
+  update is ever lost to a crashed worker, and a live handler is never
+  double-dispatched by timestamp alone (codex round 35).
 - Every database failure fails OPEN (returns ``UNAVAILABLE`` / no-op)
   and logs: dedup reduces duplicates, it must never reduce delivery
   availability.
@@ -57,9 +61,13 @@ DUPLICATE = "duplicate"  # already processed by this bot — suppress (ACK ok)
 IN_FLIGHT = "in_flight"  # a live handler owns it — NOT safe to ACK as handled
 UNAVAILABLE = "unavailable"  # dedup store unreachable — fail open
 
-# A 'processing' claim older than this is assumed dead (hard crash
-# between claim and release) and is reclaimable. Live handlers complete
-# in seconds; the ASGI/polling timeouts are far below this threshold.
+# A 'processing' claim older than this enters the reclaiming grace
+# window (phase 1 — NO re-dispatch yet: the previous handler may still
+# be alive, e.g. an outbound call hanging); a 'reclaiming' claim older
+# than ANOTHER full window is re-claimed with a fresh owner token
+# (phase 2 — codex round 35). Live handlers complete in seconds; the
+# two windows give a slow-but-alive handler 20 minutes to finish and
+# still own its row.
 DEDUP_STALE_SECONDS = 600
 
 # Ledger retention — comfortably above Telegram's maximum redelivery
@@ -67,6 +75,7 @@ DEDUP_STALE_SECONDS = 600
 DEDUP_RETENTION_DAYS = 7
 
 _STATUS_PROCESSING = "processing"
+_STATUS_RECLAIMING = "reclaiming"
 _STATUS_PROCESSED = "processed"
 
 
@@ -417,16 +426,23 @@ def _reclaim_stale_or_duplicate(
 ) -> str | None:
     """Disambiguate a rejected claim (same bot identity only).
 
-    Returns CLAIMED (stale-crash reclaim), DUPLICATE (already processed),
-    IN_FLIGHT (a fresh 'processing' row owned by a live handler) or None
-    when the conflicting row vanished — the caller retries the INSERT.
+    Returns CLAIMED (two-phase reclaim completed), DUPLICATE (already
+    processed), IN_FLIGHT (a live handler owns the row, or the claim
+    just entered its reclaiming grace window) or None when the
+    conflicting row vanished — the caller retries the INSERT.
     """
     cutoff = _utcnow() - timedelta(seconds=DEDUP_STALE_SECONDS)
-    # The reclaim hands the claim to a NEW owner: regenerate the owner
-    # token so the (possibly still-alive) previous handler's mark/release
-    # can no longer touch this row (codex round 29).
+    # Phase 2 hands the claim to a NEW owner: regenerate the owner token
+    # so the previous execution's bookkeeping is fenced from here on
+    # (codex round 29).
     reclaimed_owner = _new_owner_token()
     try:
+        # Phase 1 (codex round 35): a stale 'processing' claim is flipped
+        # to 'reclaiming' WITHOUT a token change and WITHOUT re-dispatch —
+        # the previous handler may still be alive, so this delivery must
+        # not run the state-changing handlers again. A slow-but-alive
+        # handler keeps owning the row (its mark still works) and its
+        # completion turns the row 'processed' before phase 2 ever fires.
         result = db.execute(
             update(TelegramWebhookDedup)
             .where(
@@ -435,14 +451,43 @@ def _reclaim_stale_or_duplicate(
                 TelegramWebhookDedup.status == _STATUS_PROCESSING,
                 TelegramWebhookDedup.processed_at < cutoff,
             )
-            .values(processed_at=_utcnow(), owner_token=reclaimed_owner)
+            .values(status=_STATUS_RECLAIMING, processed_at=_utcnow())
             .execution_options(synchronize_session=False)
         )
         db.commit()
         if result.rowcount == 1:
             logger.warning(
-                "Telegram webhook dedup reclaimed stale claim "
-                "update_id=%s stale_after_seconds=%s",
+                "Telegram webhook dedup entered the reclaiming grace "
+                "window update_id=%s stale_after_seconds=%s",
+                update_id,
+                DEDUP_STALE_SECONDS,
+            )
+            return ClaimResult(IN_FLIGHT, None)
+
+        # Phase 2: the claim has been 'reclaiming' for another full
+        # window — the previous execution had its chance to finish and
+        # did not, so it is treated as terminated and the retry proceeds
+        # with a fresh owner token.
+        result = db.execute(
+            update(TelegramWebhookDedup)
+            .where(
+                TelegramWebhookDedup.update_id == update_id,
+                TelegramWebhookDedup.bot_identity == bot_identity,
+                TelegramWebhookDedup.status == _STATUS_RECLAIMING,
+                TelegramWebhookDedup.processed_at < cutoff,
+            )
+            .values(
+                status=_STATUS_PROCESSING,
+                processed_at=_utcnow(),
+                owner_token=reclaimed_owner,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        db.commit()
+        if result.rowcount == 1:
+            logger.warning(
+                "Telegram webhook dedup reclaimed stale claim after the "
+                "two-phase window update_id=%s stale_after_seconds=%s",
                 update_id,
                 DEDUP_STALE_SECONDS,
             )
@@ -461,11 +506,11 @@ def _reclaim_stale_or_duplicate(
 
     if row_status == _STATUS_PROCESSED:
         return ClaimResult(DUPLICATE, None)
-    if row_status == _STATUS_PROCESSING:
-        # Fresh 'processing' row → a live handler owns the update. The
-        # delivery must NOT be ACKed as handled: if that handler later
-        # fails and releases, only an un-ACKed delivery is retried by
-        # Telegram (codex round 20).
+    if row_status in (_STATUS_PROCESSING, _STATUS_RECLAIMING):
+        # A live handler owns the update (or it is in its reclaiming
+        # grace window). The delivery must NOT be ACKed as handled: if
+        # that handler later fails and releases, only an un-ACKed
+        # delivery is retried by Telegram (codex round 20).
         return ClaimResult(IN_FLIGHT, None)
     # Row gone — retry the INSERT.
     return None
