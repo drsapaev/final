@@ -6,12 +6,12 @@
 
 ## Точка продолжения
 
-- Обновлено: 2026-09-11, RQ-01 DONE (merged #3159); RQ-02 VERIFIED в PR (DONE после merge-сверки).
-- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `84f561dff3f4d95b32e19cadc0a2c3b4f87ce2cb` (включает merged план #3157 и RQ-01 checkpoint #3159).
-- Реализация: 1/30 закрыто (RQ-01 DONE); RQ-02 VERIFIED (сверка базиса и fix поиска — см. E-003/E-004).
-- Активная runtime-задача: RQ-02 (PR открыт на момент записи). Владелец: агент среза 2026-09-11.
+- Обновлено: 2026-09-11, RQ-01 и RQ-02 DONE (merged); следующий незанятый шаг — RQ-03.
+- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `11e6ab69d5921a4e667748d99de6131f5c2e65dc` (merged план #3157, RQ-01 #3159, RQ-02 #3160).
+- Реализация: 2/30 закрыто (RQ-01, RQ-02 DONE).
+- Активная runtime-задача: нет. Владелец: не назначен.
 - Подготовительный docs PR [#3157](https://github.com/drsapaev/final/pull/3157) **merged** в main (`be6012b18`); план доступен в fresh main — runtime-работа от fresh main разрешена.
-- Следующий шаг: после merge RQ-02 — сверить merge SHA, закрыть RQ-02 и взять **RQ-03** (минимальная по номеру незаблокированная; режим gate — pwsh установлен и gate валидирован в E-003).
+- Следующий шаг: **RQ-03** (минимальная по номеру незаблокированная; режим gate — pwsh установлен и gate валидирован в E-003). Перед стартом: pre-work block через gate с якорями `frontend/src/components/wizard/wizardUtils.ts`, затем 3 воспроизведения из аудита; Tier 1 перед merge.
 - Дрейф плана, зафиксированный RQ-01: QD-2A (0055–0059) уже merged через PR #3093 (`1f775cb`), поэтому открытый PR #3077 выглядит дубликатом/суперсeded — не мержить без сверки содержимого; F-10/F-16 частично смягчены; F-14 частично изменен. Подробности в E-003.
 - Открытые продуктовые решения: D-01…D-07 (все OPEN). Они не блокируют независимые fixes.
 - Среда: Node 24/npm/Playwright-chromium — frontend unit/MOCK доступны; pwsh 7.4.6 установлен user-local, gate валидирован; Python 3.12 (venv есть, зависимости backend НЕ установлены); PostgreSQL и Redis отсутствуют → PG/REAL_API-части соответствующих задач BLOCKED (см. E-003, частные blockers).
@@ -44,7 +44,7 @@ DONE требует: критерий из плана выполнен; узки
 | ID | Задача | Зависимости | Статус | Owner / branch / PR | Evidence |
 |---|---|---|---|---|---|
 | RQ-01 | Актуальный базис | — | DONE | codex/rq-01-baseline-verification / [#3159](https://github.com/drsapaev/final/pull/3159) merged `84f561dff3f4d95b32e19cadc0a2c3b4f87ce2cb` | E-003 |
-| RQ-02 | Поиск пациента | RQ-01 | VERIFIED | codex/rq-02-registrar-search / PR этого среза | E-004 |
+| RQ-02 | Поиск пациента | RQ-01 | DONE | codex/rq-02-registrar-search / [#3160](https://github.com/drsapaev/final/pull/3160) merged `11e6ab69d5921a4e667748d99de6131f5c2e65dc` | E-004 |
 | RQ-03 | Услуги мастера | RQ-01 | TODO | — | — |
 | RQ-04 | Атомарное отделение | RQ-01; проверить #3114 | TODO | — | — |
 | RQ-05 | Обязательный врач | RQ-01 | TODO | — | — |
@@ -204,6 +204,7 @@ Parent DONE только после обоих children; parent и children не
 - Not checked and why: REAL_API/browser-над-реальным-backend — нет disposable backend+PostgreSQL+Redis (частные blockers E-003); миграций/скрытых контрактов нет — не применимо.
 - PR URL: см. строку RQ-02 реестра (PR этого среза); merge SHA — сверить в следующем цикле.
 - Status now: RQ-02 VERIFIED (в границах этого PR; DONE — после merge-сверки).
+- Merge подтвержден (сверка в отдельном docs-checkpoint): PR #3160 squash-merged 2026-09-11, merge SHA `11e6ab69d5921a4e667748d99de6131f5c2e65dc`; все required checks на head `1082d427` success (включая Frontend e2e). RQ-02 → DONE.
 - Blocker: нет (только общие частные blockers E-003, не влияющие на этот срез).
 - Next smallest action: после merge RQ-02 — сверить SHA; RQ-03 (gate): pre-work через `pwsh -NoProfile -File ./ai/langgraph/scripts/run_agent_gate.ps1 "RQ-03 …"` с известными якорями `frontend/src/components/wizard/wizardUtils.ts`; затем 3 воспроизведения из аудита.
 - Checkpoint commit / remote HEAD: см. PR; remote — сверять при продолжении.
