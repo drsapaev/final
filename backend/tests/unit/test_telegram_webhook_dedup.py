@@ -971,6 +971,33 @@ async def test_worker_failure_does_not_release_a_claim_it_does_not_own(
 
 
 @pytest.mark.asyncio
+async def test_worker_fail_open_does_not_mark_another_delivery_row(
+    worker, db_session, monkeypatch
+):
+    """Codex round 30 (P2): after a fail-open UNAVAILABLE claim the
+    worker owns NO row — its mark must not flip ANOTHER delivery's live
+    claim for the same update once the database recovers."""
+    fake = _FakeWorkerBotService()
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.get_telegram_bot_service",
+        AsyncMock(return_value=fake),
+    )
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.claim_update",
+        lambda db, update_id, bot_identity=None: telegram_webhook_dedup.UNAVAILABLE,
+    )
+    # Another delivery's LIVE claim for the same update.
+    telegram_webhook_dedup.claim_update(db_session, 607)
+
+    await worker._handle_update({"update_id": 607})
+
+    fake.process_webhook_update.assert_awaited_once()  # fail-open: processed
+    (row,) = _dedup_rows(db_session, 607)
+    # The other delivery's claim was NOT flipped by the unowned mark.
+    assert row.status == "processing"
+
+
+@pytest.mark.asyncio
 async def test_worker_processes_and_marks_update(worker, db_session, monkeypatch):
     fake = _FakeWorkerBotService()
     monkeypatch.setattr(

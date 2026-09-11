@@ -401,9 +401,17 @@ class TelegramPollingWorker:
             handled = await _handle_clinic_bot_update(update, db, bot_service)
             if not handled:
                 await bot_service.process_webhook_update(update, db)
-            mark_processed(
-                db, update_id, bot_identity, getattr(claim, "owner_token", None)
-            )
+            if claim == CLAIMED:
+                # Round 30: mark ONLY the row this worker owns — a
+                # fail-open UNAVAILABLE claim has no owner_token, and an
+                # unfenced mark could flip ANOTHER delivery's live row
+                # once the database recovers.
+                mark_processed(
+                    db,
+                    update_id,
+                    bot_identity,
+                    getattr(claim, "owner_token", None),
+                )
             LOGGER.info(
                 "Telegram update handled update_id=%s handled=%s", update_id, handled
             )
