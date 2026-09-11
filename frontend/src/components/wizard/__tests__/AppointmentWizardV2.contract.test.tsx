@@ -138,7 +138,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(source).toContain('updatePatient(patientId, { sex: selectedPatientSex })');
   });
 
-  it('filters services only for real department tabs, not registrar view tabs', () => {
+  it('filters services by tab profile tags and department without hiding catalog on all-tab', () => {
     const source = readCombinedWizardSource();
     const servicesLoadBlock = extractSourceBlock(
       source,
@@ -146,12 +146,22 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
       'const getServiceName = useCallback((item: CartItem): string => {',
     );
 
-    // PR-25: filter map renamed to _FALLBACK, function signature changed to accept queueProfiles
+    // RQ-03 (F-02): legacy map/helper kept for compatibility; catalog filtering
+    // now goes through getWizardServiceTabFilter — the «Все отделения» tab
+    // (null/'') must NOT restrict the catalog, profile tags are matched against
+    // service queue_tag and profile department_key against service department_key
+    // (tag ≠ department).
     expect(source).toContain('WIZARD_DEPARTMENT_FILTER_KEYS');
     expect(source).toContain('getWizardDepartmentFilterKeys');
     expect(source).toContain('echokg');
-    expect(servicesLoadBlock).toContain('getWizardDepartmentFilterKeys(activeTab');
-    expect(servicesLoadBlock).toContain('if (departmentFilterKeys.length > 0)');
+    expect(source).toContain('getWizardServiceTabFilter');
+    expect(servicesLoadBlock).toContain('getWizardServiceTabFilter(activeTab');
+    expect(servicesLoadBlock).toContain('if (serviceTabFilter)');
+    expect(servicesLoadBlock).toContain('serviceTagSet.has(queueTag)');
+    expect(servicesLoadBlock).toContain('serviceDepartmentSet.has(departmentKey)');
+    // Неклассифицированные услуги (без отдела и тега) остаются видимыми на любой вкладке.
+    expect(servicesLoadBlock).toContain('if (!departmentKey && !queueTag) return true;');
+    expect(servicesLoadBlock).not.toContain('getWizardDepartmentFilterKeys(activeTab');
     expect(servicesLoadBlock).not.toContain('if (activeTab && activeTab !== \'all\')');
   });
 
@@ -183,8 +193,8 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(initBlock).toContain('setActiveServiceCategory(activeTabToWizardCategory(activeTab));');
     expect(initBlock).toContain('setServiceSearchQuery(\'\');');
     expect(source).toContain('editMode={editMode}');
-    // PR-25: now uses dynamic queueProfiles param
-    expect(servicesLoadBlock).toContain('editMode ? [] : getWizardDepartmentFilterKeys(activeTab');
+    // PR-25: dynamic queueProfiles param; RQ-03 (F-02): tag/department-aware filter
+    expect(servicesLoadBlock).toContain('editMode ? null : getWizardServiceTabFilter(activeTab');
     expect(displayedServicesBlock).not.toContain('if (editMode) {');
     expect(displayedServicesBlock).toContain('switch (activeCategory)');
     expect(displayedServicesBlock).toContain('case \'specialists\':');

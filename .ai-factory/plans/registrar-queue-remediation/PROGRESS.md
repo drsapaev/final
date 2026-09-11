@@ -6,14 +6,15 @@
 
 ## Точка продолжения
 
-- Обновлено: 2026-09-11, RQ-01 и RQ-02 DONE (merged); следующий незанятый шаг — RQ-03.
-- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `11e6ab69d5921a4e667748d99de6131f5c2e65dc` (merged план #3157, RQ-01 #3159, RQ-02 #3160).
-- Реализация: 2/30 закрыто (RQ-01, RQ-02 DONE).
-- Активная runtime-задача: нет. Владелец: не назначен.
+- Обновлено: 2026-09-11, RQ-03 VERIFIED (PR открыт, merge не подтвержден); RQ-01 и RQ-02 DONE (merged); следующая независимая задача — RQ-05 (после сверки merge SHA RQ-03).
+- План: v1; исходный main аудита: `22febf376f710a3b3b6ce57ac85de589ebba3f21`; актуальный проверенный базис: `ec9633f50e8fa6e61f18e96f73e65ab8ebfdb28e` (merged план #3157, RQ-01 #3159, RQ-02 #3160, docs-checkpoint #3162).
+- Реализация: 2/30 закрыто (RQ-01, RQ-02 DONE); RQ-03 VERIFIED/PR_OPEN.
+- Активная runtime-задача: RQ-03 — VERIFIED, PR на merge (см. строку реестра).
 - Подготовительный docs PR [#3157](https://github.com/drsapaev/final/pull/3157) **merged** в main (`be6012b18`); план доступен в fresh main — runtime-работа от fresh main разрешена.
-- Следующий шаг: **RQ-03** (минимальная по номеру незаблокированная; режим gate — pwsh установлен и gate валидирован в E-003). Перед стартом: pre-work block через gate с якорями `frontend/src/components/wizard/wizardUtils.ts`, затем 3 воспроизведения из аудита; Tier 1 перед merge.
+- Следующий шаг: после merge RQ-03 — сверить merge SHA (перевод RQ-03 в DONE в начале следующего цикла), затем минимальная незаблокированная задача: RQ-05 (режим gate, OpenAPI review; якоря вне #3114) или RQ-19 (a11y вкладок, frontend-only). Для RQ-04 сначала нужны disposable PostgreSQL и повторная сверка head #3114.
 - Дрейф плана, зафиксированный RQ-01: QD-2A (0055–0059) уже merged через PR #3093 (`1f775cb`), поэтому открытый PR #3077 выглядит дубликатом/суперсeded — не мержить без сверки содержимого; F-10/F-16 частично смягчены; F-14 частично изменен. Подробности в E-003.
 - Открытые продуктовые решения: D-01…D-07 (все OPEN). Они не блокируют независимые fixes.
+- Дрейф координации (RQ-03): открыты wizard-PR #3083/#3084/#3085/#3086/#3079 (Fix A/B/C/E/F) — трогают `AppointmentWizardV2.tsx` и хвост `wizardUtils.ts`, но НЕ блок фильтрации услуг (сверено по патчам, E-005). Перед следующим wizard-срезом — повторная сверка их head.
 - Среда: Node 24/npm/Playwright-chromium — frontend unit/MOCK доступны; pwsh 7.4.6 установлен user-local, gate валидирован; Python 3.12 (venv есть, зависимости backend НЕ установлены); PostgreSQL и Redis отсутствуют → PG/REAL_API-части соответствующих задач BLOCKED (см. E-003, частные blockers).
 - Публикация состояния: проверять remote HEAD перед передачей; не считать локальный checkpoint доступным облаку.
 
@@ -45,7 +46,7 @@ DONE требует: критерий из плана выполнен; узки
 |---|---|---|---|---|---|
 | RQ-01 | Актуальный базис | — | DONE | codex/rq-01-baseline-verification / [#3159](https://github.com/drsapaev/final/pull/3159) merged `84f561dff3f4d95b32e19cadc0a2c3b4f87ce2cb` | E-003 |
 | RQ-02 | Поиск пациента | RQ-01 | DONE | codex/rq-02-registrar-search / [#3160](https://github.com/drsapaev/final/pull/3160) merged `11e6ab69d5921a4e667748d99de6131f5c2e65dc` | E-004 |
-| RQ-03 | Услуги мастера | RQ-01 | TODO | — | — |
+| RQ-03 | Услуги мастера | RQ-01 | VERIFIED | codex/rq-03-wizard-services / PR этого среза | E-005 |
 | RQ-04 | Атомарное отделение | RQ-01; проверить #3114 | TODO | — | — |
 | RQ-05 | Обязательный врач | RQ-01 | TODO | — | — |
 | RQ-06 | Профиль/тег/отделение | RQ-01 | TODO | — | — |
@@ -208,6 +209,31 @@ Parent DONE только после обоих children; parent и children не
 - Blocker: нет (только общие частные blockers E-003, не влияющие на этот срез).
 - Next smallest action: после merge RQ-02 — сверить SHA; RQ-03 (gate): pre-work через `pwsh -NoProfile -File ./ai/langgraph/scripts/run_agent_gate.ps1 "RQ-03 …"` с известными якорями `frontend/src/components/wizard/wizardUtils.ts`; затем 3 воспроизведения из аудита.
 - Checkpoint commit / remote HEAD: см. PR; remote — сверять при продолжении.
+
+### E-005 — RQ-03: возвращены правильные услуги в мастер (F-02)
+
+- Task / child: RQ-03 (режим gate — связь профилей и API-каталога; root cause подтвержден заранее, поэтому gate вызван с `--known-root-cause`).
+- UTC timestamp: 2026-09-11, срез облачного агента.
+- Repo branch: `codex/rq-03-wizard-services` (отдельный worktree `/home/z/final-rq03`, создан от fresh origin/main; базовый checkout не тронут). Base SHA / tested HEAD: `ec9633f50e8fa6e61f18e96f73e65ab8ebfdb28e` (= origin/main, включает merged RQ-01/RQ-02/docs-#3162).
+- Mode / gate: `pwsh -NoProfile -File ./ai/langgraph/scripts/run_agent_gate.ps1 "RQ-03: …" --known-root-cause frontend/src/components/wizard/wizardUtils.ts` → `{"result":"gate_ok","mode":"execute","gate_misroute":false,"override_used":false,"first_touch_files":["frontend/src/components/wizard/wizardUtils.ts"]}`. Pre-work block (mode/anchor/first-touch/allowed/denied/validation/stop) зафиксирован в чате до правок.
+- Exact first-touch files: `frontend/src/components/wizard/wizardUtils.ts`, `frontend/src/components/wizard/AppointmentWizardV2.tsx`, `frontend/src/components/wizard/__tests__/AppointmentWizardV2.contract.test.tsx`, новый соседний тест `frontend/src/components/wizard/__tests__/wizardServiceTabFilter.test.ts`, `PROGRESS.md` (checkpoint). Backend не менялся: поля `service.queue_tag`, `service.department_key`, `profile.queue_tags`, `profile.department_key` уже есть в текущем DTO (`_services_doctors.py` включает queue_tag; `/queues/profiles` возвращает department_key) — новый контракт не потребовался.
+- Координация (сверка перед стартом): открытые PR #3083/#3084/#3085/#3086/#3079 (Fix A/B/C/E/F) трогают `AppointmentWizardV2.tsx` и (три из них) добавляют хелперы в КОНЕЦ `wizardUtils.ts`; патчи НЕ содержат `getWizardDepartmentFilterKeys|departmentFilter|availableServices` — блок фильтрации услуг не пересекается. #3114 — вне якорей RQ-03 (E-003). Зафиксировано в «Точке продолжения».
+- Observed before (F-02): (1) `getWizardDepartmentFilterKeys(null)` → `['']`, потребитель фильтровал по `department_key ∈ {''}` → на «Все отделения» скрывалась каждая услуга с заполненным department_key; (2) теги профиля ecg `['ecg','echokg']` сравнивались с `department_key='cardiology'` услуги → ecg-услуга исчезала с вкладки ЭКГ (тег перепутан с отделением; в канонических данных `INITIAL_QUEUE_PROFILES` профиль ecg имеет `department_key: None`, поэтому сопоставление по отделению для ecg невозможно в принципе).
+- Changed behavior: (1) вкладка «Все отделения» (null/''/'all') возвращает `null` из нового хелпера — каталог не ограничивается; (2) добавлен `getWizardServiceTabFilter(value, profiles)`: теги профиля сопоставляются с `service.queue_tag` (тег↔тег), `department_key` профиля — с `service.department_key` (отделение↔отделение); (3) неклассифицированные услуги (без отдела и тега) остаются видимыми на любой вкладке — прежнее поведение строк без department_key; (4) неизвестная вкладка/пустой профиль/деградированный режим без profiles-API сохраняют прежнее поведение по ключу (E-000: neurology → ожидаемая услуга). Edit-mode по-прежнему показывает все услуги. Легаси-экспорты `WIZARD_DEPARTMENT_FILTER_KEYS`/`getWizardDepartmentFilterKeys` сохранены для совместимости, мастером больше не используются. Поиск по услугам не затронут; выбор исполнителя не затронут (stop-условия соблюдены).
+- Commands (working dir `/home/z/final-rq03/frontend`):
+  1. `npm ci --legacy-peer-deps` → EXIT=0.
+  2. `node node_modules/vitest/vitest.mjs run src/components/wizard/__tests__/wizardServiceTabFilter.test.ts src/components/wizard/__tests__/AppointmentWizardV2.contract.test.tsx --no-cache --reporter=dot` → **2 files / 25 tests PASS** (17 новых behavioral-тестов: 3 воспроизведения аудита + неизвестная/пустая/только-department профильные ветки + деградированный режим + регистронезависимость + совместимость легаси-хелпера; 8 обновленных contract-пинов).
+  3. Обязательный Tier 1 (docs/AGENTS_UI.md §13): `npm run type-check` → EXIT=0; `npm run lint:check` → 0 errors (3081 pre-existing warnings); `npm run check-theme` → PASS; `npm run audit:icon-controls` → 0 new findings; `npm run build` → PASS (pre-existing chunk-size warnings); `npm run test:run` → **220 files / 1887 tests PASS** (29.7s).
+  4. Self-contained Playwright suite (W0): `CI=1 npm run test:e2e -- e2e/registrar-time.spec.ts e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts --project=chromium` → **82 passed** (5.2m; vite proxy noise — ожидаемый MOCK-уровень, backend не запущен).
+  5. `git diff --check` → PASS (перед checkpoint-коммитом).
+- Acceptance S-IDs: S-02 — покрыт Vitest-уровнем (helper-тесты на SYNTHETIC-профилях/услугах: «Все»/null, ecg+echokg против department=cardiology, custom/пустой профиль, неизвестная вкладка) + contract-пины + browser MOCK (W0 suite 82 passed на MOCK-данных). REAL_API/browser-над-реальным-backend — NOT_RUN (нет disposable backend/PostgreSQL/Redis; частные blockers E-003). Уровень доказательства: Helper + wizard contract + browser MOCK (соответствует колонке S-02 «Vitest + browser»).
+- Artifacts: изменения в этом PR (3 измененных файла + 1 новый тест + PROGRESS.md); данные в тестах — SYNTHETIC (ключи/теги профилей, без PHI).
+- Not checked and why: REAL_API/стенд с настоящим backend — среда без PostgreSQL/Redis (blocker E-003.2); миграций нет — не применимо; SQLite-проверки не требовались (frontend-срез).
+- PR URL: см. строку RQ-03 реестра; merge SHA — сверить в следующем цикле (статус VERIFIED/PR_OPEN до сверки).
+- Status now: RQ-03 VERIFIED (в границах этого PR; DONE — после merge-сверки следующего цикла).
+- Blocker: нет (частные blockers E-003 не затрагивают этот срез).
+- Next smallest action: после merge RQ-03 — сверить merge SHA и перевести RQ-03 в DONE; затем RQ-05 (gate, OpenAPI review; first-touch `backend/tests/integration/test_registrar_services_grouping.py`, serializer-ветка; `_services_doctors.py` вне #3114 — сверить перед стартом) или RQ-19 при продолжении блокировок.
+- Checkpoint commit / remote HEAD: см. PR этого среза; remote — сверять при продолжении.
 
 ### Шаблон следующей записи — скопировать и заполнить
 
