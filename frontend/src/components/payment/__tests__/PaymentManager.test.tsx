@@ -30,7 +30,10 @@ vi.mock('react-toastify', () => ({
   },
 }));
 
-vi.mock('../PaymentClick', () => ({ default: () => null }));
+vi.mock('../PaymentClick', () => ({
+  default: ({ isOpen, invoiceId }: { isOpen: boolean; invoiceId: string | number }) =>
+    isOpen ? <div data-testid="click-payment">{String(invoiceId)}</div> : null,
+}));
 vi.mock('../PaymentPayMe', () => ({ default: () => null }));
 
 import PaymentManager from '../PaymentManager';
@@ -65,7 +68,7 @@ describe('PaymentManager provider capabilities', () => {
     ]);
   });
 
-  it('loads once, hides orphan invoice creation, and disables an unavailable legacy invoice', async () => {
+  it('loads once, omits linkless invoice creation, and disables an unavailable legacy invoice', async () => {
     render(<PaymentManager isOpen />);
 
     await waitFor(() => {
@@ -82,46 +85,34 @@ describe('PaymentManager provider capabilities', () => {
 
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'payment.pay_mgr_create_btn' })).not.toBeInTheDocument();
-    expect(screen.getByText('payment.pay_mgr_patient_required_hint')).toBeInTheDocument();
+    expect(paymentApiMocks.createPaymentInvoice).not.toHaveBeenCalled();
     expect(screen.getByText('payment.pay_mgr_provider_unavailable')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'payment.pay_mgr_provider_unavailable' })
     ).toBeDisabled();
   });
 
-  it('creates an invoice with only the canonical patient reference', async () => {
-    paymentApiMocks.getPendingInvoices.mockResolvedValue([]);
-    paymentApiMocks.createPaymentInvoice.mockResolvedValue({
+  it('opens checkout for an existing invoice with an authorized provider', async () => {
+    paymentApiMocks.getPendingInvoices.mockResolvedValue([{
       invoice_id: 73,
       amount: 50000,
       currency: 'UZS',
       provider: 'click',
       status: 'pending',
+    }]);
+
+    render(<PaymentManager isOpen />);
+
+    const payButton = await screen.findByRole('button', {
+      name: 'payment.pay_mgr_pay_btn',
     });
+    expect(payButton).toBeEnabled();
 
-    render(
-      <PaymentManager
-        isOpen
-        patientInfo={{ id: 17, fio: 'SYNTHETIC Patient', phone: 'SYNTHETIC-PHONE' }}
-      />
-    );
-
-    const providerOption = await screen.findByRole('radio');
-    expect(providerOption).toBeChecked();
-
-    fireEvent.change(screen.getByLabelText('payment.pay_mgr_amount_aria'), {
-      target: { value: '50000' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'payment.pay_mgr_create_btn' }));
+    fireEvent.click(payButton);
 
     await waitFor(() => {
-      expect(paymentApiMocks.createPaymentInvoice).toHaveBeenCalledWith({
-        amount: 50000,
-        currency: 'UZS',
-        provider: 'click',
-        description: 'payment.pay_mgr_description_with_patient',
-        patient_info: { patient_id: 17 },
-      });
+      expect(screen.getByTestId('click-payment')).toHaveTextContent('73');
     });
+    expect(paymentApiMocks.createPaymentInvoice).not.toHaveBeenCalled();
   });
 });

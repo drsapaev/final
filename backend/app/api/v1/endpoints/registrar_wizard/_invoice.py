@@ -40,6 +40,21 @@ def init_invoice_payment(
                 status_code=400, detail=f"Invoice уже обработан: {invoice.status}"
             )
 
+        linked_visit_exists = (
+            db.query(PaymentInvoiceVisit.id)
+            .filter(
+                PaymentInvoiceVisit.invoice_id == invoice.id,
+                PaymentInvoiceVisit.visit_amount > 0,
+            )
+            .first()
+            is not None
+        )
+        if not linked_visit_exists:
+            raise HTTPException(
+                status_code=409,
+                detail="Счёт не связан с оплачиваемыми визитами",
+            )
+
         # Инициализируем провайдер платежей
         provider_name = payment_req.provider.lower()
         payment_manager = get_payment_manager()
