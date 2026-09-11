@@ -227,7 +227,7 @@ class TestPaymentInvoiceService:
 
         invoices = PaymentInvoiceService(
             db_session, payment_manager=_PaymentManagerStub()
-        ).list_pending_invoices()
+        ).list_pending_invoices(actor_role="Registrar")
         result = next(row for row in invoices if row["invoice_id"] == invoice.id)
 
         assert result["provider"] is None
@@ -258,7 +258,7 @@ class TestPaymentInvoiceService:
 
         invoices = PaymentInvoiceService(
             db_session, payment_manager=_PaymentManagerStub()
-        ).list_pending_invoices()
+        ).list_pending_invoices(actor_role="Registrar")
         result = next(row for row in invoices if row["invoice_id"] == invoice.id)
 
         assert result["paid_amount"] == 30_000
@@ -268,6 +268,23 @@ class TestPaymentInvoiceService:
             result["online_payment_block_reason"]
             == "partial_online_payment_not_supported"
         )
+
+    def test_invoice_allocation_mismatch_blocks_online_charge(
+        self,
+        db_session,
+        test_visit,
+    ):
+        invoice = _create_linked_invoice(db_session, test_visit, amount=100_000)
+        invoice.visits[0].visit_amount = 80_000
+        db_session.commit()
+
+        invoices = PaymentInvoiceService(
+            db_session, payment_manager=_PaymentManagerStub()
+        ).list_pending_invoices(actor_role="Registrar")
+        result = next(row for row in invoices if row["invoice_id"] == invoice.id)
+
+        assert result["available_actions"] == []
+        assert result["online_payment_block_reason"] == "invoice_allocation_mismatch"
 
     def test_requested_hosted_provider_does_not_switch_when_unavailable(
         self,
@@ -284,7 +301,7 @@ class TestPaymentInvoiceService:
 
         invoices = PaymentInvoiceService(
             db_session, payment_manager=_PaymentManagerStub()
-        ).list_pending_invoices()
+        ).list_pending_invoices(actor_role="Registrar")
         result = next(row for row in invoices if row["invoice_id"] == invoice.id)
 
         assert result["available_actions"] == []
@@ -314,7 +331,7 @@ class TestPaymentInvoiceService:
 
         invoices = PaymentInvoiceService(
             db_session, payment_manager=_PaymentManagerStub()
-        ).list_pending_invoices()
+        ).list_pending_invoices(actor_role="Registrar")
         result = next(row for row in invoices if row["invoice_id"] == invoice.id)
 
         assert result["paid_amount"] == 0
@@ -323,3 +340,59 @@ class TestPaymentInvoiceService:
             {"action": "start_online_payment", "provider": "click"}
         ]
         assert result["online_payment_block_reason"] is None
+
+    def test_cashier_receives_balance_without_registrar_checkout_command(
+        self,
+        db_session,
+        test_visit,
+    ):
+        invoice = _create_linked_invoice(db_session, test_visit, amount=40_000)
+
+        invoices = PaymentInvoiceService(
+            db_session, payment_manager=_PaymentManagerStub()
+        ).list_pending_invoices(actor_role="Cashier")
+        result = next(row for row in invoices if row["invoice_id"] == invoice.id)
+
+        assert result["remaining_amount"] == 40_000
+        assert result["available_actions"] == []
+        assert result["online_payment_block_reason"] == "role_not_allowed"
+
+    def test_pending_invoice_action_is_hidden_when_visit_checkout_is_processing(
+        self,
+        db_session,
+        test_visit,
+    ):
+        pending_invoice = _create_linked_invoice(
+            db_session,
+            test_visit,
+            amount=40_000,
+        )
+        processing_invoice = PaymentInvoice(
+            patient_id=test_visit.patient_id,
+            total_amount=40_000,
+            currency="UZS",
+            status="processing",
+            payment_method="click",
+            provider="click",
+            provider_payment_id="click-in-progress",
+        )
+        db_session.add(processing_invoice)
+        db_session.flush()
+        db_session.add(
+            PaymentInvoiceVisit(
+                invoice_id=processing_invoice.id,
+                visit_id=test_visit.id,
+                visit_amount=40_000,
+            )
+        )
+        db_session.commit()
+
+        invoices = PaymentInvoiceService(
+            db_session, payment_manager=_PaymentManagerStub()
+        ).list_pending_invoices(actor_role="Registrar")
+        result = next(
+            row for row in invoices if row["invoice_id"] == pending_invoice.id
+        )
+
+        assert result["available_actions"] == []
+        assert result["online_payment_block_reason"] == "invoice_payment_in_progress"

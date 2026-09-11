@@ -39,3 +39,21 @@ class PaymentInvoiceRepository:
             .limit(limit)
             .all()
         )
+
+    def processing_visit_ids(self, visit_ids: set[int]) -> set[int]:
+        if not visit_ids:
+            return set()
+        rows = (
+            self.db.query(PaymentInvoiceVisit.visit_id)
+            .join(
+                PaymentInvoice,
+                PaymentInvoice.id == PaymentInvoiceVisit.invoice_id,
+            )
+            .filter(
+                PaymentInvoiceVisit.visit_id.in_(visit_ids),
+                PaymentInvoiceVisit.visit_amount > 0,
+                PaymentInvoice.status == "processing",
+            )
+            .all()
+        )
+        return {int(row[0]) for row in rows}

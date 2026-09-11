@@ -25,12 +25,13 @@ describe('PaymentManager invoice DTO contract', () => {
     expect(SOURCE).not.toContain('setCreatedInvoiceId(invoice.id);');
   });
 
-  it('allows existing invoices only through backend-authorized providers', () => {
-    expect(SOURCE).toContain('getPaymentProviders');
-    expect(SOURCE).toContain('provider.features?.registrar_invoice_payment === true');
-    expect(SOURCE).toContain('invoiceProviders.some((provider) => provider.code.toLowerCase() === providerCode)');
-    expect(SOURCE).toContain('disabled={loading || providersLoading || !providerSupported}');
-    expect(SOURCE).toContain('providersLoadFailed');
+  it('allows existing invoices only through backend-owned actions', () => {
+    expect(SOURCE).toContain('invoice.available_actions ?? []');
+    expect(SOURCE).toContain('action.action === \'start_online_payment\'');
+    expect(SOURCE).toContain('payExistingInvoice(invoice, action)');
+    expect(SOURCE).toContain('invoice.remaining_amount ?? invoice.amount ?? 0');
+    expect(SOURCE).not.toContain('getPaymentProviders');
+    expect(SOURCE).not.toContain('invoiceProviders');
     expect(SOURCE).not.toContain('createPaymentInvoice');
     expect(SOURCE).not.toContain('handleCreateInvoice');
     expect(SOURCE).not.toContain('value="payme"');
@@ -39,8 +40,6 @@ describe('PaymentManager invoice DTO contract', () => {
   it('does not reload on every translation wrapper identity change', () => {
     expect(SOURCE).toContain('const tRef = useRef(t);');
     expect(SOURCE).toContain('}, [getPendingInvoices]);');
-    expect(SOURCE).toContain('}, [getPaymentProviders]);');
     expect(SOURCE).not.toContain('[getPendingInvoices, t]');
-    expect(SOURCE).not.toContain('[getPaymentProviders, t]');
   });
 });

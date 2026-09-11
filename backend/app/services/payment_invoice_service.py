@@ -88,7 +88,12 @@ class PaymentInvoiceService:
                 status_code=500, detail=f"Ошибка создания счета: {exc}"
             )
 
-    def list_pending_invoices(self, *, limit: int = 50) -> list[dict[str, Any]]:
+    def list_pending_invoices(
+        self,
+        *,
+        limit: int = 50,
+        actor_role: str | None = None,
+    ) -> list[dict[str, Any]]:
         try:
             invoices = self.repository.list_pending(limit=limit)
             linked_visits = {
@@ -98,6 +103,9 @@ class PaymentInvoiceService:
                 if link.visit is not None
                 and Decimal(str(link.visit_amount or 0)) > Decimal("0")
             }
+            processing_visit_ids = self.repository.processing_visit_ids(
+                set(linked_visits)
+            )
             balances_by_visit_id = {}
             if linked_visits:
                 summary = self.payment_invariant_service.summarize_visits(
@@ -108,7 +116,10 @@ class PaymentInvoiceService:
                 }
             return [
                 self._serialize_invoice(
-                    invoice, balances_by_visit_id=balances_by_visit_id
+                    invoice,
+                    balances_by_visit_id=balances_by_visit_id,
+                    actor_role=actor_role,
+                    processing_visit_ids=processing_visit_ids,
                 )
                 for invoice in invoices
             ]
@@ -209,13 +220,23 @@ class PaymentInvoiceService:
         invoice: PaymentInvoice,
         *,
         balances_by_visit_id: dict[int, dict[str, Any]] | None = None,
+        actor_role: str | None = None,
+        processing_visit_ids: set[int] | None = None,
     ) -> dict[str, Any]:
+        positive_links = [
+            link
+            for link in invoice.visits
+            if Decimal(str(link.visit_amount or 0)) > Decimal("0")
+        ]
         linked_visits = {
             link.visit.id: link.visit
-            for link in invoice.visits
+            for link in positive_links
             if link.visit is not None
-            and Decimal(str(link.visit_amount or 0)) > Decimal("0")
         }
+        linked_amount = sum(
+            (Decimal(str(link.visit_amount)) for link in positive_links),
+            Decimal("0"),
+        )
         if linked_visits:
             if balances_by_visit_id is None:
                 balance = self.payment_invariant_service.summarize_visits(
@@ -239,12 +260,17 @@ class PaymentInvoiceService:
             remaining_amount = Decimal(str(invoice.total_amount or 0))
             ledger_remaining_amount = remaining_amount
 
-        available_actions, block_reason = self._online_payment_actions(
+        available_actions, block_reason = self.resolve_online_payment_actions(
             invoice=invoice,
             has_linked_visits=bool(linked_visits),
             paid_amount=paid_amount,
             remaining_amount=remaining_amount,
             ledger_remaining_amount=ledger_remaining_amount,
+            linked_amount=linked_amount,
+            actor_role=actor_role,
+            has_processing_reservation=bool(
+                set(linked_visits) & (processing_visit_ids or set())
+            ),
         )
         return {
             "invoice_id": invoice.id,
@@ -261,7 +287,7 @@ class PaymentInvoiceService:
             "created_at": invoice.created_at,
         }
 
-    def _online_payment_actions(
+    def resolve_online_payment_actions(
         self,
         *,
         invoice: PaymentInvoice,
@@ -269,6 +295,9 @@ class PaymentInvoiceService:
         paid_amount: Decimal,
         remaining_amount: Decimal,
         ledger_remaining_amount: Decimal,
+        linked_amount: Decimal,
+        actor_role: str | None,
+        has_processing_reservation: bool,
     ) -> tuple[list[dict[str, str]], str | None]:
         """Return hosted-payment commands that are safe for this invoice state.
 
@@ -283,7 +312,16 @@ class PaymentInvoiceService:
             return [], "invoice_not_linked"
         if remaining_amount <= Decimal("0"):
             return [], "invoice_settled"
+        if has_processing_reservation:
+            return [], "invoice_payment_in_progress"
+        normalized_role = str(
+            getattr(actor_role, "value", actor_role) or ""
+        ).strip().lower()
+        if normalized_role not in {"admin", "registrar"}:
+            return [], "role_not_allowed"
         invoice_total = Decimal(str(invoice.total_amount or 0))
+        if linked_amount != invoice_total:
+            return [], "invoice_allocation_mismatch"
         if ledger_remaining_amount < invoice_total or paid_amount > Decimal("0"):
             return [], "partial_online_payment_not_supported"
         if ledger_remaining_amount != invoice_total:

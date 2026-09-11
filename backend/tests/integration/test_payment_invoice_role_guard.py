@@ -5,10 +5,13 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.security import get_password_hash
 from app.models.enums import PaymentStatus
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.user import User
 from app.models.visit import VisitService
 from app.services import payment_invoice_service as payment_invoice_service_module
+from app.services.authentication_service import authentication_service
 
 
 class _PaymentManagerStub:
@@ -104,6 +107,78 @@ def test_registrar_can_list_linked_cart_invoice_without_bound_provider(
     assert result["available_actions"] == [
         {"action": "start_online_payment", "provider": "click"}
     ]
+
+
+def test_cashier_list_does_not_advertise_registrar_invoice_checkout(
+    client: TestClient,
+    db_session: Session,
+    test_visit,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        payment_invoice_service_module,
+        "get_payment_manager",
+        lambda: _PaymentManagerStub(),
+    )
+    cashier = User(
+        username="synthetic_invoice_cashier",
+        email="synthetic-invoice-cashier@example.invalid",
+        full_name="SYNTHETIC Invoice Cashier",
+        hashed_password=get_password_hash("synthetic-test-password"),
+        role="Cashier",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(cashier)
+    db_session.add(
+        VisitService(
+            visit_id=test_visit.id,
+            service_id=1,
+            name="SYNTHETIC-cashier role invoice",
+            qty=1,
+            price=55_000,
+        )
+    )
+    invoice = PaymentInvoice(
+        patient_id=test_visit.patient_id,
+        total_amount=55_000,
+        currency="UZS",
+        provider=None,
+        status=PaymentStatus.PENDING.value,
+        payment_method="cash",
+    )
+    db_session.add(invoice)
+    db_session.flush()
+    db_session.add(
+        PaymentInvoiceVisit(
+            invoice_id=invoice.id,
+            visit_id=test_visit.id,
+            visit_amount=55_000,
+        )
+    )
+    db_session.commit()
+    token = authentication_service.create_access_token(
+        {
+            "sub": str(cashier.id),
+            "username": cashier.username,
+            "role": cashier.role,
+            "is_active": cashier.is_active,
+            "is_superuser": cashier.is_superuser,
+        }
+    )
+
+    response = client.get(
+        "/api/v1/payments/invoices/pending",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200, response.text
+    result = next(
+        row for row in response.json() if row["invoice_id"] == invoice.id
+    )
+    assert result["remaining_amount"] == 55_000
+    assert result["available_actions"] == []
+    assert result["online_payment_block_reason"] == "role_not_allowed"
 
 
 def test_registrar_cannot_create_payment_invoice_without_patient(
