@@ -505,6 +505,8 @@ def render_text(payload: dict[str, object]) -> str:
         render_list(cast(list[str], payload["canonical_anchors"])),
         "First-touch files:",
         render_list(cast(list[str], payload["first_touch_files"])),
+        "Read-only reference files:",
+        render_list(cast(list[str], payload["read_only_reference_files"])),
         "Validation targets:",
         render_list(cast(list[str], payload["validation_targets"])),
         "Stop conditions:",

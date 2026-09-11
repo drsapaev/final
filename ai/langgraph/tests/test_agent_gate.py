@@ -100,7 +100,7 @@ def test_text_renderer_omits_prompt_when_handoff_is_not_required() -> None:
         mode="execute",
         first_touch=["ai/langgraph/scripts/agent_gate.py"],
         references=["AGENTS.md"],
-        read_only_references=[],
+        read_only_references=["backend/app/models/online_queue.py"],
         validations=["py_compile"],
         stops=["scope expands"],
         reasons=["known root"],
@@ -113,6 +113,8 @@ def test_text_renderer_omits_prompt_when_handoff_is_not_required() -> None:
 
     rendered = gate.render_text(payload)
     assert "Handoff required: no" in rendered
+    assert "Read-only reference files:" in rendered
+    assert "backend/app/models/online_queue.py" in rendered
     assert "Ready-to-send execution prompt" not in rendered
 
 
