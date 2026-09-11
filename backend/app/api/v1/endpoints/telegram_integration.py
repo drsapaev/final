@@ -12,15 +12,19 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_current_user, get_db, require_roles
 from app.core.config import settings
 from app.crud import patient as crud_patient
 from app.crud import telegram_config as crud_telegram
-from app.services.telegram_token_store import resolve_patient_bot_token
+from app.crud.patient import get_patient_by_user_id
 from app.models.appointment import Appointment
 from app.models.lab import LabOrder, LabResult
+from app.models.patient import Patient
+from app.models.telegram_config import TelegramUser
 from app.models.user import User
 from app.schemas.notifications import (
     SendAppointmentReminderIntegrationRequest,
@@ -28,12 +32,23 @@ from app.schemas.notifications import (
     SendQrCodeRequest,
     SendTelegramIntegrationNotificationRequest,
 )
+from app.services.telegram_bot import get_telegram_bot_service
 from app.services.telegram_service import (
     get_telegram_service,
     send_telegram_notification,
 )
+from app.services.telegram_token_store import resolve_patient_bot_token
 
 router = APIRouter()
+
+# Mobile-contract router (Android client, M-CONTRACT-FIX lineage): mounted at
+# /telegram-integration in api.py. The staff notification surface above stays
+# on /telegram unchanged.
+mobile_router = APIRouter()
+
+_MOBILE_SELF_TEST_TEXT = (
+    "🧪 Тестовое уведомление Clinic System — интеграция с Telegram работает."
+)
 
 
 def _appointment_id_from_payload(appointment_data: dict[str, Any]) -> int | None:
@@ -526,3 +541,98 @@ async def quick_qr_notification(
         db,
         current_user,
     )
+
+
+# ===================== МОБИЛЬНЫЙ КОНТРАКТ (Android) =====================
+
+
+class MobileTelegramSelfTestRequest(BaseModel):
+    """Body of POST /api/v1/telegram-integration/send-notification as sent by
+    the Android client. Every field is accepted for wire compatibility and
+    deliberately IGNORED: the recipient chat is always the CURRENT user's own
+    TelegramUser link and the text is a fixed server-side string, so the
+    endpoint can never be used to relay arbitrary messages to arbitrary
+    chats (no spam/phishing relay surface)."""
+
+    chat_id: str | int | None = None
+    message: str | None = None
+    parse_mode: str | None = None
+
+    model_config = {"extra": "ignore"}
+
+
+def _resolve_own_telegram_link(db: Session, current_user: User) -> TelegramUser:
+    """Resolve the CURRENT user's own TelegramUser link (never a client-
+    supplied chat): staff-style user_id link first, then the patient-domain
+    link (patient_id), preferring active unblocked rows."""
+    query = (
+        db.query(TelegramUser)
+        .filter(
+            or_(
+                TelegramUser.user_id == current_user.id,
+                TelegramUser.patient_id.in_(
+                    select(Patient.id).where(Patient.user_id == current_user.id)
+                ),
+            )
+        )
+        .filter(TelegramUser.blocked.is_(False))
+        .order_by(TelegramUser.active.desc(), TelegramUser.id.desc())
+    )
+    link = query.first()
+    if not link:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="telegram_not_linked",
+        )
+    return link
+
+
+@mobile_router.post("/send-notification", response_model=dict[str, Any])
+async def send_mobile_self_test_notification(
+    request: MobileTelegramSelfTestRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Self-test Telegram delivery for the mobile client.
+
+    Sends a fixed server-side test message to the CURRENT user's own linked
+    chat. The chat is resolved server-side from the TelegramUser link; the
+    client-supplied chat_id/message/parse_mode are parsed for wire
+    compatibility and ignored (no arbitrary-recipient relay).
+    """
+    link = _resolve_own_telegram_link(db, current_user)
+    chat_id = int(link.chat_id)
+
+    # PR-2 SSOT freshness: re-initialize whenever the cached credential no
+    # longer matches the canonical token; fail closed when the credential
+    # state cannot be verified (same semantics as the webhook send path).
+    service = await get_telegram_bot_service()
+    try:
+        canonical = resolve_patient_bot_token(db)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Telegram credential state is temporarily unverifiable",
+        ) from exc
+    if not service.active or service.bot_token != canonical:
+        initialized = await service.initialize(db)
+        if not initialized or not service.bot_token:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Telegram bot is not configured",
+            )
+
+    sent = await service.send_plain_message(chat_id, _MOBILE_SELF_TEST_TEXT)
+    if not sent:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="telegram_send_failed",
+        )
+
+    return {
+        "success": True,
+        "message": "Тестовое уведомление отправлено в ваш Telegram-чат",
+        "chat_id": chat_id,
+    }

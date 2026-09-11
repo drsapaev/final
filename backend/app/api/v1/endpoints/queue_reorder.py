@@ -21,6 +21,11 @@ from app.services.queue_reorder_api_service import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Alias router (mounted without prefix): serves the flat mobile-client path
+# PUT /api/v1/queue/move-entry next to the canonical PUT /api/v1/queue/reorder/move-entry.
+# Same handler logic, same response model, same role guard.
+alias_router = APIRouter()
+
 QUEUE_STATUS_ROLES = (
     "Admin",
     "Registrar",
@@ -121,15 +126,14 @@ async def reorder_queue(
         )
 
 
-@router.put("/move-entry", response_model=QueueReorderResponse)
-async def move_queue_entry(
+async def _move_queue_entry_impl(
     request: QueueEntryMoveRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),
-):
+    db: Session,
+    current_user: User,
+) -> QueueReorderResponse:
     """
-    Перемещение одной записи в очереди на новую позицию
-    Автоматически сдвигает остальные записи
+    Общая реализация перемещения записи очереди для канонического
+    и мобильного (алиасного) маршрутов.
     """
     try:
         queue_api_service = QueueReorderApiService(db)
@@ -156,6 +160,32 @@ async def move_queue_entry(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
+
+
+@router.put("/move-entry", response_model=QueueReorderResponse)
+async def move_queue_entry(
+    request: QueueEntryMoveRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),
+):
+    """
+    Перемещение одной записи в очереди на новую позицию
+    Автоматически сдвигает остальные записи
+    """
+    return await _move_queue_entry_impl(request, db, current_user)
+
+
+@alias_router.put("/queue/move-entry", response_model=QueueReorderResponse)
+async def move_queue_entry_mobile_alias(
+    request: QueueEntryMoveRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["Admin", "Registrar", "Doctor"])),
+):
+    """
+    Мобильный контракт (Android-клиент): PUT /api/v1/queue/move-entry.
+    Семантика и ответ идентичны каноническому /queue/reorder/move-entry.
+    """
+    return await _move_queue_entry_impl(request, db, current_user)
 
 
 @router.get("/status/by-specialist/", response_model=dict[str, Any])

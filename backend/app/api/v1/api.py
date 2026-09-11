@@ -184,6 +184,11 @@ api_router.include_router(visit_payments_ep.router, tags=["visit-payments"])
 # Эндпоинты подтверждения визитов (публичные, без авторизации)
 api_router.include_router(visit_confirmation_router, tags=["visit-confirmation"])
 
+# Mobile-contract alias (Android client): GET /api/v1/visits/{visit_id}.
+# MUST stay AFTER visit_confirmation_router: the static /visits/info/{token}
+# route has to keep winning over this parametric alias by registration order.
+api_router.include_router(visits.alias_router, tags=["visits-mobile-alias"])
+
 # M4-P1-4: WebAuthn/Passkey endpoints (alternative patient auth)
 api_router.include_router(webauthn_router, tags=["webauthn"])
 
@@ -287,6 +292,13 @@ api_router.include_router(
 api_router.include_router(
     telegram_integration.router, prefix="/telegram", tags=["telegram-integration"]
 )
+# Mobile-contract surface (Android client): POST /api/v1/telegram-integration/
+# send-notification (patient-scoped self-test; chat pinned server-side).
+api_router.include_router(
+    telegram_integration.mobile_router,
+    prefix="/telegram-integration",
+    tags=["telegram-integration-mobile"],
+)
 api_router.include_router(
     display_websocket.router, prefix="/display", tags=["display-websocket"]
 )
@@ -377,6 +389,8 @@ api_router.include_router(
 api_router.include_router(
     queue_reorder.router, prefix="/queue/reorder", tags=["queue-reorder"]
 )
+# Mobile-contract alias (Android client): PUT /api/v1/queue/move-entry.
+api_router.include_router(queue_reorder.alias_router, tags=["queue-reorder-mobile-alias"])
 api_router.include_router(
     websocket_auth.router, prefix="/ws-auth", tags=["websocket-auth"]
 )
@@ -508,6 +522,12 @@ api_router.include_router(
 api_router.include_router(
     emr_v2.router, prefix="/v2", tags=["emr-v2"]
 )
+
+# Mobile-contract alias (Android client): GET/POST /api/v1/emr/{visit_id} and
+# its sub-routes re-mounted without the /v2 segment. Kept AFTER every static
+# /emr/* router (templates/versions/lab/export/ai/phrase-suggest) so those
+# literal paths keep winning over the parametric /{visit_id} routes.
+api_router.include_router(emr_v2.router, tags=["emr-v2-mobile-alias"])
 
 # Global Search - агрегированный поиск по всем доменам
 api_router.include_router(

@@ -628,6 +628,16 @@ class TelegramBotService:
             logger.error(f"Ошибка отправки сообщения: {e}")
             return False
 
+    async def send_plain_message(self, chat_id: int, text: str) -> bool:
+        """Public wrapper around the raw sendMessage path.
+
+        Mobile-contract self-test endpoint (POST /api/v1/telegram-integration/
+        send-notification): sends a fixed server-side text to the caller's own
+        linked chat and reports honest success/failure. Returns False on any
+        send failure (corrupted text, missing token, non-200 Telegram reply).
+        """
+        return await self._send_message(chat_id, text)
+
     async def _send_document(
         self,
         chat_id: int,
