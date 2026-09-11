@@ -964,7 +964,7 @@ class TestPollingWorkerTokenReload:
         async def fake_load():
             return next(tokens)
 
-        async def fake_handle(update):
+        async def fake_handle(update, identity=None):
             return None
 
         def fake_get_updates(session, token, offset):
@@ -1011,7 +1011,7 @@ class TestPollingWorkerTokenReload:
                 raise RuntimeError("transient db outage")
             return value
 
-        async def fake_handle(update):
+        async def fake_handle(update, identity=None):
             return None
 
         response = _requests.Response()
@@ -1070,7 +1070,7 @@ class TestPollingWorkerTokenReload:
         async def fake_load():
             return next(tokens)
 
-        async def fake_handle(update):
+        async def fake_handle(update, identity=None):
             handled.append(update.get("update_id"))
 
         def fake_get_updates(session, token, offset):
@@ -1131,7 +1131,7 @@ class TestPollingWorkerTokenReload:
                 raise RuntimeError("transient db outage")
             return value
 
-        async def fake_handle(update):
+        async def fake_handle(update, identity=None):
             handled.append(update.get("update_id"))
 
         def fake_get_updates(session, token, offset):
@@ -1174,7 +1174,7 @@ class TestPollingWorkerTokenReload:
         async def fake_load():
             return next(tokens)
 
-        async def fake_handle(update):
+        async def fake_handle(update, identity=None):
             handled.append(update.get("update_id"))
 
         def fake_get_updates(session, token, offset):

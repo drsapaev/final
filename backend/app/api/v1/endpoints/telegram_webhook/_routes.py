@@ -54,7 +54,9 @@ from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services import telegram_webhook_dedup
 
 
-def _release_claim_after_failure(db, update_id: int | None) -> None:
+def _release_claim_after_failure(
+    db, update_id: int | None, bot_identity: str | None = None
+) -> None:
     """PR-3: undo the dedup claim on any failure path.
 
     The handler may leave uncommitted state on ``db``; roll that back
@@ -64,7 +66,7 @@ def _release_claim_after_failure(db, update_id: int | None) -> None:
     if update_id is None:
         return
     db.rollback()
-    telegram_webhook_dedup.release_claim(db, update_id)
+    telegram_webhook_dedup.release_claim(db, update_id, bot_identity)
 
 
 @router.post(
@@ -725,6 +727,7 @@ async def telegram_webhook(
     # can release it. Secret validation runs BEFORE the claim — a 403/503
     # rejection must never write to the dedup ledger.
     claimed_update_id: int | None = None
+    claimed_bot_identity: str | None = None
     try:
         _validate_webhook_secret(request, db)
         update = body.model_dump(exclude_none=True)
@@ -739,22 +742,47 @@ async def telegram_webhook(
         bot_service = await _ensure_bot_service_fresh(db)
 
         # PR-3: claim the update_id before dispatching to any handler.
+        # Claims are scoped to a stable, non-secret per-credential identity
+        # (codex round 20): Telegram update_id sequences are per-bot, and
+        # both ingress paths resolve the SAME SSOT credential, so an
+        # old-bot row can never suppress a replacement bot's update.
         # DUPLICATE → ACK 200 without re-running handlers, so Telegram
         # stops retrying a delivery that was already processed.
+        # IN_FLIGHT → 503: a live handler owns the update — acknowledging
+        # it as handled would lose the update if that handler later fails
+        # (codex round 20); Telegram retries the delivery instead.
         # UNAVAILABLE → fail open and process anyway (dedup must never
         # reduce delivery availability).
-        claimed_update_id = body.update_id
-        claim = telegram_webhook_dedup.claim_update(db, claimed_update_id)
+        claimed_bot_identity = telegram_webhook_dedup.ledger_bot_identity(
+            getattr(bot_service, "bot_token", None)
+        )
+        claim = telegram_webhook_dedup.claim_update(
+            db, body.update_id, claimed_bot_identity
+        )
         if claim == telegram_webhook_dedup.DUPLICATE:
             logger.info(
                 "Telegram webhook duplicate update suppressed update_id=%s",
-                claimed_update_id,
+                body.update_id,
             )
             return {"status": "ok", "handled": "duplicate_update"}
+        if claim == telegram_webhook_dedup.IN_FLIGHT:
+            logger.info(
+                "Telegram webhook update in flight elsewhere, retry "
+                "requested update_id=%s",
+                body.update_id,
+            )
+            return JSONResponse(
+                status_code=503,
+                content={"status": "update_in_flight"},
+            )
+        if claim == telegram_webhook_dedup.CLAIMED:
+            claimed_update_id = body.update_id
 
         # Обрабатываем обновление
         if await _handle_clinic_bot_update(update, db, bot_service):
-            telegram_webhook_dedup.mark_processed(db, claimed_update_id)
+            telegram_webhook_dedup.mark_processed(
+                db, claimed_update_id, claimed_bot_identity
+            )
             return {"status": "ok", "handled": "clinic_bot_update"}
 
         # If _handle_clinic_bot_update returned False, the update was not
@@ -764,14 +792,16 @@ async def telegram_webhook(
         if callable(process_wh):
             await process_wh(update, db)
 
-        telegram_webhook_dedup.mark_processed(db, claimed_update_id)
+        telegram_webhook_dedup.mark_processed(
+            db, claimed_update_id, claimed_bot_identity
+        )
         return {"status": "ok"}
 
     except HTTPException:
-        _release_claim_after_failure(db, claimed_update_id)
+        _release_claim_after_failure(db, claimed_update_id, claimed_bot_identity)
         raise
     except Exception as e:
-        _release_claim_after_failure(db, claimed_update_id)
+        _release_claim_after_failure(db, claimed_update_id, claimed_bot_identity)
         _raise_telegram_webhook_internal_error(
             "telegram_webhook",
             TELEGRAM_WEBHOOK_PUBLIC_ERROR,

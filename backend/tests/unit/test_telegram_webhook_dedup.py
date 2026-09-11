@@ -65,10 +65,18 @@ def test_claim_first_delivery_is_claimed(db_session):
     assert row.processed_at is not None
 
 
-def test_claim_second_delivery_is_duplicate(db_session):
+def test_claim_disambiguates_in_flight_from_duplicate(db_session):
+    """Codex round 20 (P1): a retry while the first handler is STILL
+    running is IN_FLIGHT (must not be ACKed as handled); once the first
+    handler completed, the retry is a true DUPLICATE (ACK ok)."""
     assert telegram_webhook_dedup.claim_update(db_session, 102) == (
         telegram_webhook_dedup.CLAIMED
     )
+    assert telegram_webhook_dedup.claim_update(db_session, 102) == (
+        telegram_webhook_dedup.IN_FLIGHT
+    )
+
+    telegram_webhook_dedup.mark_processed(db_session, 102)
     assert telegram_webhook_dedup.claim_update(db_session, 102) == (
         telegram_webhook_dedup.DUPLICATE
     )
@@ -83,6 +91,74 @@ def test_claim_none_update_id_is_claimed_without_row(db_session):
     assert db_session.query(TelegramWebhookDedup).count() == 0
 
 
+def test_ledger_bot_identity_is_stable_and_non_secret():
+    """The identity binds a claim to its credential without leaking it."""
+    token = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
+    identity = telegram_webhook_dedup.ledger_bot_identity(token)
+
+    assert identity is not None
+    assert identity == telegram_webhook_dedup.ledger_bot_identity(token)
+    assert token not in identity
+    assert len(identity) == 32  # sha256 hex prefix, fits String(64)
+    # A different credential (replacement bot or rotation) gets a
+    # different identity; no credential at all gets NULL (fail-open).
+    assert identity != telegram_webhook_dedup.ledger_bot_identity("other-token")
+    assert telegram_webhook_dedup.ledger_bot_identity(None) is None
+    assert telegram_webhook_dedup.ledger_bot_identity("") is None
+
+
+def test_claims_of_different_bots_do_not_collide(db_session):
+    """Codex round 20 core scenario: the ledger key is per-bot. The same
+    numeric update_id of a DIFFERENT bot must claim cleanly."""
+    identity_a = telegram_webhook_dedup.ledger_bot_identity("123456789:bot-a")
+    identity_b = telegram_webhook_dedup.ledger_bot_identity("123456789:bot-b")
+
+    assert telegram_webhook_dedup.claim_update(db_session, 710, identity_a) == (
+        telegram_webhook_dedup.CLAIMED
+    )
+    # The previous bot already processed this numeric id.
+    telegram_webhook_dedup.mark_processed(db_session, 710, identity_a)
+
+    # The replacement bot's update happens to carry the same numeric id —
+    # it must NOT be suppressed by the previous bot's retained row.
+    assert telegram_webhook_dedup.claim_update(db_session, 710, identity_b) == (
+        telegram_webhook_dedup.CLAIMED
+    )
+    rows = {
+        (r.bot_identity, r.status)
+        for r in db_session.query(TelegramWebhookDedup)
+        .filter(TelegramWebhookDedup.update_id == 710)
+        .all()
+    }
+    assert rows == {(identity_a, "processed"), (identity_b, "processing")}
+
+
+def test_mark_and_release_are_scoped_to_the_claiming_bot(db_session):
+    identity_a = telegram_webhook_dedup.ledger_bot_identity("123456789:bot-a")
+    identity_b = telegram_webhook_dedup.ledger_bot_identity("123456789:bot-b")
+    telegram_webhook_dedup.claim_update(db_session, 711, identity_a)
+    telegram_webhook_dedup.claim_update(db_session, 711, identity_b)
+
+    # Bot A completes: only A's row is flipped / deleted.
+    telegram_webhook_dedup.mark_processed(db_session, 711, identity_a)
+    statuses = {
+        r.bot_identity: r.status
+        for r in db_session.query(TelegramWebhookDedup)
+        .filter(TelegramWebhookDedup.update_id == 711)
+        .all()
+    }
+    assert statuses == {identity_a: "processed", identity_b: "processing"}
+
+    telegram_webhook_dedup.release_claim(db_session, 711, identity_a)
+    remaining = {
+        r.bot_identity
+        for r in db_session.query(TelegramWebhookDedup)
+        .filter(TelegramWebhookDedup.update_id == 711)
+        .all()
+    }
+    assert remaining == {identity_b}
+
+
 def test_unique_index_enforces_claim_at_db_level(db_session):
     """The dedup guarantee is the UNIQUE index, not app-level checks."""
     telegram_webhook_dedup.claim_update(db_session, 103)
@@ -92,7 +168,11 @@ def test_unique_index_enforces_claim_at_db_level(db_session):
         ix["name"]: ix for ix in inspector.get_indexes("telegram_webhook_dedup")
     }
     # sqlite introspection yields 1/0, PostgreSQL True/False.
-    assert bool(indexes["uq_telegram_webhook_dedup_update_id"]["unique"]) is True
+    uq = indexes["uq_telegram_webhook_dedup_bot_update_id"]
+    assert bool(uq["unique"]) is True
+    # The ledger key is (bot_identity, update_id) — Telegram update_id
+    # sequences are per-bot (codex round 20).
+    assert set(uq["column_names"]) == {"bot_identity", "update_id"}
 
 
 def test_claim_supports_bigint_update_id(db_session):
@@ -126,13 +206,19 @@ def test_stale_processing_claim_is_reclaimed(db_session):
     assert stored > stale_at  # refreshed by the reclaim
 
 
-def test_fresh_processing_claim_is_duplicate(db_session):
+def test_fresh_processing_claim_is_in_flight(db_session):
+    """A LIVE handler owns the update — the retry must NOT be ACKed as
+    handled (a premature 200 plus a later failure of the owner would
+    lose the update; codex round 20)."""
     db_session.add(TelegramWebhookDedup(update_id=111, status="processing"))
     db_session.commit()
 
     assert telegram_webhook_dedup.claim_update(db_session, 111) == (
-        telegram_webhook_dedup.DUPLICATE
+        telegram_webhook_dedup.IN_FLIGHT
     )
+    # The in-flight row was left untouched (still the owner's claim).
+    (row,) = _dedup_rows(db_session, 111)
+    assert row.status == "processing"
 
 
 def test_processed_row_is_duplicate_even_when_old(db_session):
@@ -369,6 +455,92 @@ def test_webhook_secret_rejection_writes_no_ledger_row(
     assert db_session.query(TelegramWebhookDedup).count() == 0
 
 
+def test_webhook_claims_are_bound_to_credential_identity(
+    client, db_session, monkeypatch
+):
+    """Codex round 20: claims carry a stable, non-secret per-credential
+    identity derived from the resolved bot token."""
+    _add_secret_config(db_session)
+    fake = FakeTelegramBotService()
+    monkeypatch.setattr(
+        telegram_webhook, "get_telegram_bot_service", AsyncMock(return_value=fake)
+    )
+
+    response = client.post(
+        WEBHOOK_URL, json={"update_id": 506}, headers=SECRET_HEADER
+    )
+
+    assert response.status_code == 200
+    (row,) = _dedup_rows(db_session, 506)
+    assert row.bot_identity == telegram_webhook_dedup.ledger_bot_identity(
+        "bot-token"
+    )
+
+
+def test_webhook_old_bot_row_never_suppresses_new_bot(
+    client, db_session, monkeypatch
+):
+    """Codex round 20: a row retained by a PREVIOUS bot (different
+    identity, same numeric update_id) must not suppress the current
+    bot's delivery."""
+    _add_secret_config(db_session)
+    fake = FakeTelegramBotService()
+    monkeypatch.setattr(
+        telegram_webhook, "get_telegram_bot_service", AsyncMock(return_value=fake)
+    )
+    stale_identity = telegram_webhook_dedup.ledger_bot_identity(
+        "123456789:previous-bot"
+    )
+    db_session.add(
+        TelegramWebhookDedup(
+            update_id=507, bot_identity=stale_identity, status="processed"
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        WEBHOOK_URL, json={"update_id": 507}, headers=SECRET_HEADER
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+    fake.process_webhook_update.assert_awaited_once()
+
+
+def test_webhook_in_flight_delivery_is_not_acknowledged(
+    client, db_session, monkeypatch
+):
+    """Codex round 20 (P1): a retry arriving while the original handler
+    is STILL running must not be ACKed with a success — if the original
+    handler later fails, only an un-ACKed delivery is retried by
+    Telegram. The endpoint answers 503 and leaves the owner's claim
+    alone."""
+    _add_secret_config(db_session)
+    fake = FakeTelegramBotService()
+    monkeypatch.setattr(
+        telegram_webhook, "get_telegram_bot_service", AsyncMock(return_value=fake)
+    )
+    live_identity = telegram_webhook_dedup.ledger_bot_identity("bot-token")
+    db_session.add(
+        TelegramWebhookDedup(
+            update_id=508, bot_identity=live_identity, status="processing"
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        WEBHOOK_URL, json={"update_id": 508}, headers=SECRET_HEADER
+    )
+
+    # Retryable 503 (not a success ACK) so Telegram redelivers later.
+    assert response.status_code == 503
+    assert response.json() == {"status": "update_in_flight"}
+    # The handler did not run, and the live claim was NOT released.
+    fake.process_webhook_update.assert_not_awaited()
+    (row,) = _dedup_rows(db_session, 508)
+    assert row.status == "processing"
+
+
 def test_webhook_update_schema_keeps_update_id_optional():
     """Contract pin: TelegramWebhookUpdateRequest.update_id feeds dedup."""
     assert TelegramWebhookUpdateRequest.model_fields["update_id"].default is None
@@ -436,6 +608,49 @@ async def test_worker_skips_duplicate_update(worker, db_session, monkeypatch):
     await worker._handle_update({"update_id": 601})
 
     fake.process_webhook_update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_worker_claims_are_bound_to_credential_identity(
+    worker, db_session, monkeypatch
+):
+    """Codex round 20: worker claims carry the identity derived from the
+    polled token (the same credential the batch was fetched with)."""
+    fake = _FakeWorkerBotService()
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.get_telegram_bot_service",
+        AsyncMock(return_value=fake),
+    )
+
+    await worker._handle_update(
+        {"update_id": 604},
+        telegram_webhook_dedup.ledger_bot_identity("123456789:worker-token"),
+    )
+
+    (row,) = _dedup_rows(db_session, 604)
+    assert row.status == "processed"
+    assert row.bot_identity == telegram_webhook_dedup.ledger_bot_identity(
+        "123456789:worker-token"
+    )
+
+
+@pytest.mark.asyncio
+async def test_worker_skips_in_flight_update(worker, db_session, monkeypatch):
+    """Codex round 20 (P1): a live claim of the same identity is skipped
+    without dispatching a concurrent handler."""
+    fake = _FakeWorkerBotService()
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.get_telegram_bot_service",
+        AsyncMock(return_value=fake),
+    )
+    identity = telegram_webhook_dedup.ledger_bot_identity("123456789:worker")
+    telegram_webhook_dedup.claim_update(db_session, 605, identity)
+
+    await worker._handle_update({"update_id": 605}, identity)
+
+    fake.process_webhook_update.assert_not_awaited()
+    (row,) = _dedup_rows(db_session, 605)
+    assert row.status == "processing"
 
 
 @pytest.mark.asyncio

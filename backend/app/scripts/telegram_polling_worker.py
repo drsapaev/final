@@ -20,7 +20,9 @@ from app.services.telegram_bot import get_telegram_bot_service
 # PR-3: update_id dedup shared with the webhook endpoint.
 from app.services.telegram_webhook_dedup import (
     DUPLICATE,
+    IN_FLIGHT,
     claim_update,
+    ledger_bot_identity,
     mark_processed,
     release_claim,
     reset_ledger,
@@ -261,7 +263,13 @@ class TelegramPollingWorker:
 
             for update in updates:
                 update_id = update.get("update_id")
-                await self._handle_update(update)
+                # PR-3 (round 20): claims are scoped to a stable, non-secret
+                # per-credential identity — Telegram update_id sequences
+                # are per-bot, and the identity is derived from the SAME
+                # token this batch was fetched with.
+                await self._handle_update(
+                    update, ledger_bot_identity(token)
+                )
                 if update_id is not None:
                     offset = int(update_id) + 1
 
@@ -330,7 +338,9 @@ class TelegramPollingWorker:
             raise RuntimeError(payload.get("description") or "getUpdates failed")
         return list(payload.get("result") or [])
 
-    async def _handle_update(self, update: dict[str, Any]) -> None:
+    async def _handle_update(
+        self, update: dict[str, Any], bot_identity: str | None = None
+    ) -> None:
         update_id = update.get("update_id")
         db: Session = SessionLocal()
         try:
@@ -342,17 +352,19 @@ class TelegramPollingWorker:
             # offset cursor alone is not sufficient — a restart or token
             # rotation resets it to None and Telegram re-delivers every
             # unconfirmed update of the last 24h.
-            claim = claim_update(db, update_id)
-            if claim == DUPLICATE:
+            claim = claim_update(db, update_id, bot_identity)
+            if claim in (DUPLICATE, IN_FLIGHT):
                 LOGGER.info(
-                    "Telegram update skipped as duplicate update_id=%s", update_id
+                    "Telegram update skipped as %s update_id=%s",
+                    claim,
+                    update_id,
                 )
                 return
 
             handled = await _handle_clinic_bot_update(update, db, bot_service)
             if not handled:
                 await bot_service.process_webhook_update(update, db)
-            mark_processed(db, update_id)
+            mark_processed(db, update_id, bot_identity)
             LOGGER.info(
                 "Telegram update handled update_id=%s handled=%s", update_id, handled
             )
@@ -360,7 +372,7 @@ class TelegramPollingWorker:
             db.rollback()
             # PR-3: release the claim so a re-fetched batch reprocesses
             # this update instead of suppressing it forever.
-            release_claim(db, update_id)
+            release_claim(db, update_id, bot_identity)
             LOGGER.warning(
                 "Telegram update failed update_id=%s error_type=%s",
                 update_id,
