@@ -30697,6 +30697,18 @@ export type components = {
             parse_mode?: string | null;
         };
         /**
+         * MobileTelegramSelfTestResponse
+         * @description Concrete response contract for the mobile self-test endpoint.
+         */
+        MobileTelegramSelfTestResponse: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
+            /** Chat Id */
+            chat_id: number;
+        };
+        /**
          * MonitoringThresholds
          * @description Пороговые значения для мониторинга
          */
@@ -53108,9 +53120,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MobileTelegramSelfTestResponse"];
                 };
             };
             /** @description Validation Error */

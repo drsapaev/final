@@ -16,11 +16,10 @@ from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_current_active_user, get_db, require_roles
 from app.core.config import settings
 from app.crud import patient as crud_patient
 from app.crud import telegram_config as crud_telegram
-from app.crud.patient import get_patient_by_user_id
 from app.models.appointment import Appointment
 from app.models.lab import LabOrder, LabResult
 from app.models.patient import Patient
@@ -49,6 +48,14 @@ mobile_router = APIRouter()
 _MOBILE_SELF_TEST_TEXT = (
     "🧪 Тестовое уведомление Clinic System — интеграция с Telegram работает."
 )
+
+
+class MobileTelegramSelfTestResponse(BaseModel):
+    """Concrete response contract for the mobile self-test endpoint."""
+
+    success: bool
+    message: str
+    chat_id: int
 
 
 def _appointment_id_from_payload(appointment_data: dict[str, Any]) -> int | None:
@@ -562,9 +569,10 @@ class MobileTelegramSelfTestRequest(BaseModel):
 
 
 def _resolve_own_telegram_link(db: Session, current_user: User) -> TelegramUser:
-    """Resolve the CURRENT user's own TelegramUser link (never a client-
-    supplied chat): staff-style user_id link first, then the patient-domain
-    link (patient_id), preferring active unblocked rows."""
+    """Resolve the CURRENT user's own ACTIVE TelegramUser link (never a
+    client-supplied chat): staff-style user_id link first, then the
+    patient-domain link (patient_id). Inactive or blocked links are rejected
+    the same way the canonical Mini App / notification paths treat them."""
     query = (
         db.query(TelegramUser)
         .filter(
@@ -575,8 +583,9 @@ def _resolve_own_telegram_link(db: Session, current_user: User) -> TelegramUser:
                 ),
             )
         )
+        .filter(TelegramUser.active.is_(True))
         .filter(TelegramUser.blocked.is_(False))
-        .order_by(TelegramUser.active.desc(), TelegramUser.id.desc())
+        .order_by(TelegramUser.id.desc())
     )
     link = query.first()
     if not link:
@@ -587,11 +596,14 @@ def _resolve_own_telegram_link(db: Session, current_user: User) -> TelegramUser:
     return link
 
 
-@mobile_router.post("/send-notification", response_model=dict[str, Any])
+@mobile_router.post(
+    "/send-notification",
+    response_model=MobileTelegramSelfTestResponse,
+)
 async def send_mobile_self_test_notification(
     request: MobileTelegramSelfTestRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Self-test Telegram delivery for the mobile client.
 
@@ -623,6 +635,14 @@ async def send_mobile_self_test_notification(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Telegram bot is not configured",
             )
+    if not service.active:
+        # initialize() can return True with a stored token while the bot is
+        # administratively disabled (TelegramConfig.active = False); do not
+        # send on a disabled bot.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="telegram_bot_disabled",
+        )
 
     sent = await service.send_plain_message(chat_id, _MOBILE_SELF_TEST_TEXT)
     if not sent:
@@ -631,8 +651,8 @@ async def send_mobile_self_test_notification(
             detail="telegram_send_failed",
         )
 
-    return {
-        "success": True,
-        "message": "Тестовое уведомление отправлено в ваш Telegram-чат",
-        "chat_id": chat_id,
-    }
+    return MobileTelegramSelfTestResponse(
+        success=True,
+        message="Тестовое уведомление отправлено в ваш Telegram-чат",
+        chat_id=chat_id,
+    )

@@ -23343,9 +23343,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Send Mobile Self Test Notification Api V1 Telegram Integration Send Notification Post"
+                  "$ref": "#/components/schemas/MobileTelegramSelfTestResponse"
                 }
               }
             }
@@ -88368,6 +88366,30 @@
         "type": "object",
         "title": "MobileTelegramSelfTestRequest",
         "description": "Body of POST /api/v1/telegram-integration/send-notification as sent by\nthe Android client. Every field is accepted for wire compatibility and\ndeliberately IGNORED: the recipient chat is always the CURRENT user's own\nTelegramUser link and the text is a fixed server-side string, so the\nendpoint can never be used to relay arbitrary messages to arbitrary\nchats (no spam/phishing relay surface)."
+      },
+      "MobileTelegramSelfTestResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "chat_id": {
+            "type": "integer",
+            "title": "Chat Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "chat_id"
+        ],
+        "title": "MobileTelegramSelfTestResponse",
+        "description": "Concrete response contract for the mobile self-test endpoint."
       },
       "MonitoringThresholds": {
         "properties": {

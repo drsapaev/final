@@ -3,6 +3,7 @@ Telegram Bot сервис для клиники
 Полнофункциональный бот с обработкой команд и webhook
 """
 
+import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
@@ -635,8 +636,16 @@ class TelegramBotService:
         send-notification): sends a fixed server-side text to the caller's own
         linked chat and reports honest success/failure. Returns False on any
         send failure (corrupted text, missing token, non-200 Telegram reply).
+
+        The underlying request path is a synchronous requests.post (up to the
+        10s timeout); run it in a worker thread so an authenticated caller
+        can never block the application event loop.
         """
-        return await self._send_message(chat_id, text)
+
+        def _blocking_send() -> bool:
+            return asyncio.run(self._send_message(chat_id, text))
+
+        return await asyncio.to_thread(_blocking_send)
 
     async def _send_document(
         self,

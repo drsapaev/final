@@ -332,6 +332,69 @@ def test_mobile_self_test_pins_own_chat_and_ignores_client_chat(
     assert fake.sent == [(777, ti_module._MOBILE_SELF_TEST_TEXT)]
 
 
+def test_mobile_self_test_rejects_inactive_link(
+    client, db, patient_user, patient_token
+) -> None:
+    from app.models.telegram_config import TelegramUser
+
+    db.add(
+        TelegramUser(
+            user_id=patient_user.id,
+            chat_id=777,
+            language_code="ru",
+            active=False,
+            blocked=False,
+        )
+    )
+    db.commit()
+
+    response = client.post(
+        "/api/v1/telegram-integration/send-notification",
+        json={"chat_id": "777"},
+        headers=_auth_headers(patient_token),
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "telegram_not_linked"
+
+
+def test_mobile_self_test_rejects_disabled_bot(
+    client, db, patient_user, patient_token, monkeypatch
+) -> None:
+    from app.api.v1.endpoints import telegram_integration as ti_module
+    from app.models.telegram_config import TelegramUser
+
+    db.add(
+        TelegramUser(
+            user_id=patient_user.id,
+            chat_id=777,
+            language_code="ru",
+            active=True,
+            blocked=False,
+        )
+    )
+    db.commit()
+
+    fake = _FakeBotService()
+    fake.active = False  # bot administratively disabled, token still stored
+
+    async def _fake_get_service():
+        return fake
+
+    monkeypatch.setattr(ti_module, "get_telegram_bot_service", _fake_get_service)
+    monkeypatch.setattr(
+        ti_module, "resolve_patient_bot_token", lambda db: "canonical-token"
+    )
+
+    response = client.post(
+        "/api/v1/telegram-integration/send-notification",
+        json={"chat_id": "777"},
+        headers=_auth_headers(patient_token),
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "telegram_bot_disabled"
+    assert fake.sent == []
+
+
 def test_mobile_self_test_send_failure_is_503(
     client, db, patient_user, patient_token, monkeypatch
 ) -> None:
