@@ -34,6 +34,16 @@ const getProviderLabel = (provider: string): string => {
   return provider;
 };
 
+const getInvoiceHostedProvider = (invoice: Invoice): string | null => {
+  const provider = invoice.provider?.trim();
+  if (provider) return provider;
+
+  const paymentMethod = invoice.payment_method?.trim().toLowerCase();
+  return paymentMethod && ['click', 'payme'].includes(paymentMethod)
+    ? paymentMethod
+    : null;
+};
+
 const getOnlinePaymentActions = (invoice: Invoice): PaymentInvoiceAction[] =>
   (invoice.available_actions ?? []).filter((action) => {
     const provider = action.provider.trim().toLowerCase();
@@ -126,11 +136,12 @@ const PaymentManager = ({
 
   const getProviderBlockReason = (invoice: Invoice): string => {
     if (invoice.online_payment_block_reason === 'provider_unavailable') {
-      if (!invoice.provider) {
+      const boundProvider = getInvoiceHostedProvider(invoice);
+      if (!boundProvider) {
         return t('payment.pay_mgr_no_providers');
       }
       return t('payment.pay_mgr_provider_unavailable', {
-        provider: getProviderLabel(invoice.provider),
+        provider: getProviderLabel(boundProvider),
       });
     }
 

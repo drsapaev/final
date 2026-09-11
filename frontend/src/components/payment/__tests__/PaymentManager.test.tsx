@@ -127,6 +127,24 @@ describe('PaymentManager backend-owned invoice actions', () => {
     ).toBeDisabled();
   });
 
+  it('preserves a legacy hosted-provider binding stored in payment_method', async () => {
+    paymentApiMocks.getPendingInvoices.mockResolvedValue([{
+      invoice_id: 45,
+      amount: 125000,
+      currency: 'UZS',
+      provider: null,
+      payment_method: 'payme',
+      status: 'pending',
+      available_actions: [],
+      online_payment_block_reason: 'provider_unavailable',
+    }]);
+
+    render(<PaymentManager isOpen />);
+
+    expect(await screen.findByText('payment.pay_mgr_provider_unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('payment.pay_mgr_no_providers')).not.toBeInTheDocument();
+  });
+
   it('opens checkout for an existing invoice with an authorized provider', async () => {
     paymentApiMocks.getPendingInvoices.mockResolvedValue([{
       invoice_id: 73,
