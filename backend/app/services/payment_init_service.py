@@ -6,12 +6,12 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from decimal import Decimal
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import Request
 
 from app.core.audit import extract_model_changes, log_critical_change
 from app.core.config import settings
-from app.models.enums import PaymentStatus
 from app.models.patient import Patient
 from app.models.user import User
 from app.repositories.payment_init_repository import PaymentInitRepository
@@ -24,6 +24,18 @@ from app.services.notifications import notification_sender_service
 from app.services.queue_service import queue_service
 
 logger = logging.getLogger(__name__)
+
+
+def _with_payment_id(url: str, payment_id: int) -> str:
+    """Return a payment result URL bound to the persisted local payment."""
+    parsed = urlsplit(url)
+    query = [
+        (key, value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if key != "payment_id"
+    ]
+    query.append(("payment_id", str(payment_id)))
+    return urlunsplit(parsed._replace(query=urlencode(query)))
 
 
 @dataclass
@@ -136,8 +148,14 @@ class PaymentInitService:
             order_id = f"clinic_{payment.id}_{int(now.timestamp())}"
 
             base_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
-            final_return_url = return_url or f"{base_url}/payment/success?payment_id={payment.id}"
-            final_cancel_url = cancel_url or f"{base_url}/payment/cancel?payment_id={payment.id}"
+            final_return_url = _with_payment_id(
+                return_url or f"{base_url}/payment/success",
+                payment.id,
+            )
+            final_cancel_url = _with_payment_id(
+                cancel_url or f"{base_url}/payment/cancel",
+                payment.id,
+            )
 
             result = self.payment_manager.create_payment(
                 provider_name=provider,
