@@ -18,10 +18,10 @@ from app.api.v1.endpoints import admin_telegram
 from app.api.v1.endpoints.admin_telegram import _settings as admin_telegram_settings
 from app.core.config import settings
 from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
+from app.models.audit import AuditLog
 from app.models.clinic import ClinicSettings
 from app.models.telegram_config import TelegramConfig
 from app.schemas.notifications import UpdateTelegramSettingsRequest
-from app.services import telegram_token_store as store
 from app.services.telegram_token_store import (
     decrypt_token,
     encrypt_token,
@@ -139,6 +139,62 @@ class TestStorePatientBotToken:
         with pytest.raises(TokenStoreError):
             store_patient_bot_token(db_session, None)
 
+    def test_store_supersedes_legacy_clinic_settings_row(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        db_session.add(
+            ClinicSettings(
+                key="bot_token", value="123456789:stale", category="telegram"
+            )
+        )
+        db_session.commit()
+
+        store_patient_bot_token(db_session, "123456789:fresh", actor_user_id=1)
+
+        db_session.expire_all()
+        # P1 pin: the superseded plaintext fallback must not survive the
+        # rotation — a fail-closed decrypt of the canonical value could
+        # otherwise reactivate the stale token through the legacy chain.
+        assert crud_clinic.get_setting_by_key(db_session, "bot_token") is None
+        row = db_session.query(TelegramConfig).one()
+        assert row.decrypted_bot_token == "123456789:fresh"
+
+    def test_store_without_legacy_row_records_no_removal(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+
+        store_patient_bot_token(db_session, "123456789:fresh", actor_user_id=1)
+
+        db_session.expire_all()
+        event = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_stored")
+            .one()
+        )
+        assert event.payload["legacy_clinic_settings_row_removed"] is False
+
+    def test_store_writes_audit_record_without_token_value(
+        self, db_session, monkeypatch
+    ):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        secret = "123456789:audited-secret"
+
+        store_patient_bot_token(db_session, secret, actor_user_id=42)
+
+        db_session.expire_all()
+        events = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_stored")
+            .all()
+        )
+        assert len(events) == 1
+        event = events[0]
+        assert event.actor_user_id == 42
+        assert event.entity_type == "telegram_config"
+        assert secret not in str(event.payload)
+        assert event.payload["token_encrypted"] is True
+
 
 @pytest.mark.unit
 class TestCrudEncryptionAtWrite:
@@ -202,7 +258,10 @@ class TestResolvePatientBotToken:
                 key="bot_token", value="123456789:legacy", category="telegram"
             )
         )
-        store_patient_bot_token(db_session, "123456789:canonical")
+        crud_telegram.create_telegram_config(
+            db_session, {"bot_token": "123456789:canonical"}
+        )
+        db_session.commit()
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123456789:env")
 
         assert resolve_patient_bot_token(db_session) == "123456789:canonical"
@@ -316,6 +375,12 @@ class TestAdminSettingsEndpoints:
         _clear_token_env(monkeypatch)
         _set_fernet_key(monkeypatch)
         secret = "123456789:put-routed-secret"
+        db_session.add(
+            ClinicSettings(
+                key="bot_token", value="123456789:pre-existing", category="telegram"
+            )
+        )
+        db_session.commit()
         payload = UpdateTelegramSettingsRequest(
             bot_token=secret,
             notifications_enabled=False,
@@ -330,7 +395,16 @@ class TestAdminSettingsEndpoints:
         config = db_session.query(TelegramConfig).one()
         assert config.bot_token != secret
         assert config.decrypted_bot_token == secret
+        # P1 pin: replacement also clears the legacy plaintext row.
         assert crud_clinic.get_setting_by_key(db_session, "bot_token") is None
+        # P2 pin: the rotation is attributed to the acting admin.
+        event = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_stored")
+            .one()
+        )
+        assert event.actor_user_id == 1
+        assert secret not in str(event.payload)
 
     def test_put_masked_placeholder_is_ignored(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)

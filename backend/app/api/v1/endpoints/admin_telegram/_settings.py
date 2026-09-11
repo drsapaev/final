@@ -97,7 +97,9 @@ def update_telegram_settings(
         if "bot_token" in settings_dict:
             token_value = settings_dict.pop("bot_token")
             if isinstance(token_value, str) and token_value.strip():
-                store_patient_bot_token(db, token_value)
+                store_patient_bot_token(
+                    db, token_value, actor_user_id=current_user.id
+                )
                 bot_token_stored = True
 
         # Обновляем настройки в категории "telegram"
@@ -154,7 +156,9 @@ def test_telegram_bot(
                 )
                 # PR-2: bot_token goes through the SSOT store (encrypted at
                 # write); non-secret fields stay on the regular crud path.
-                store_patient_bot_token(db, bot_token)
+                store_patient_bot_token(
+                    db, bot_token, actor_user_id=current_user.id
+                )
                 crud_telegram.update_telegram_config(
                     db,
                     {
@@ -352,7 +356,9 @@ def set_telegram_webhook(
                 )
                 # PR-2: bot_token via the SSOT store (encrypted at write);
                 # webhook fields stay on the regular crud path.
-                store_patient_bot_token(db, bot_token)
+                store_patient_bot_token(
+                    db, bot_token, actor_user_id=current_user.id
+                )
                 config_payload = {
                     "bot_username": _get_configured_bot_username(db),
                     "webhook_url": selected_webhook_url,

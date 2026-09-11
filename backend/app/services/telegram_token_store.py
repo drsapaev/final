@@ -158,12 +158,25 @@ def resolve_staff_bot_token(db, patient_token: str | None = None) -> str | None:
     return None
 
 
-def store_patient_bot_token(db, token: str | None) -> object:
+def store_patient_bot_token(
+    db, token: str | None, *, actor_user_id: int | None = None
+) -> object:
     """Create-or-update the TelegramConfig bot token (encrypted at write).
 
     This is the ONLY sanctioned write path for ``telegram_configs.bot_token``.
+
+    Storing a replacement also removes the legacy plaintext
+    ``clinic_settings[bot_token]`` row in the same transaction — otherwise a
+    fail-closed decrypt of the canonical value (missing/wrong key) could
+    silently reactivate the superseded credential through the legacy
+    fallback. An audit record is appended attributing the rotation to
+    ``actor_user_id`` WITHOUT recording the token value.
     """
-    from app.crud import telegram_config as crud_telegram
+    from app.crud import (
+        audit as crud_audit,
+        clinic as crud_clinic,
+        telegram_config as crud_telegram,
+    )
     from app.models.telegram_config import TelegramConfig
 
     if not token or not str(token).strip():
@@ -175,6 +188,25 @@ def store_patient_bot_token(db, token: str | None) -> object:
         config = TelegramConfig()
         db.add(config)
     config.set_bot_token(token_text)
+
+    legacy_setting = crud_clinic.get_setting_by_key(db, PATIENT_BOT_TOKEN_SETTING_KEY)
+    legacy_removed = False
+    if legacy_setting is not None:
+        db.delete(legacy_setting)
+        legacy_removed = True
+
+    crud_audit.log(
+        db,
+        action="telegram_bot_token_stored",
+        entity_type="telegram_config",
+        entity_id=config.id,
+        actor_user_id=actor_user_id,
+        payload={
+            "legacy_clinic_settings_row_removed": legacy_removed,
+            "token_encrypted": is_encrypted_token(config.bot_token),
+        },
+    )
+
     db.commit()
     db.refresh(config)
     return config
