@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
-"""Local pre-execute gate for risky repository changes.
-
-The gate intentionally avoids calling a remote model. Older versions of this
-tool depended on model-specific prompting; this replacement keeps the contract
-deterministic and treats the requested model as metadata for the downstream
-agent prompt.
-"""
+"""Deterministic, low-token pre-execute gate for risky repository changes."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 
 MODEL_ALIASES = {
@@ -39,11 +35,22 @@ EXPLICIT_PATH_RE = re.compile(
     r"(?:jsx|tsx|js|ts|py|json|yaml|yml|toml|ps1|bat|sh|md|txt))"
 )
 
-MIGRATION_TASK_RE = re.compile(
-    r"\b("
-    r"alembic|migration|migrations|model exists|table missing|"
-    r"sqlalchemy model|postgres ssot|storage migration|create table|revision"
-    r")\b",
+MIGRATION_INTENT_RE = re.compile(
+    r"(?:\b(?:add|create|generate|write|ship|apply|fix|repair|update|alter|remove)\b"
+    r".{0,60}\b(?:alembic|migration|revision|database schema|table)\b|"
+    r"\b(?:model exists|table missing|missing table|storage migration|"
+    r"schema change|create table)\b)",
+    re.IGNORECASE,
+)
+
+SELF_TOOLING_RE = re.compile(
+    r"\b(agent[_ -]?gate|repo[_ -]?gate|dev[_ -]?brain)\b", re.IGNORECASE
+)
+
+STRICT_TASK_RE = re.compile(
+    r"\b(?:alembic|migration|sqlalchemy|database schema|postgres(?:ql)?|rbac|"
+    r"billing|payment|emr|medical record|queue fairness|queue_time|telegram|"
+    r"token storage|ci/cd|deploy(?:ment)?|production)\b",
     re.IGNORECASE,
 )
 
@@ -67,7 +74,7 @@ RULES: tuple[Rule, ...] = (
         r"\b(agent[_ -]?gate|repo[_ -]?gate|dev[_ -]?brain|handoff|lightrag)\b",
         (
             "ai/langgraph/scripts/agent_gate.py",
-            "ai/langgraph/README.md",
+            "ai/langgraph/scripts/run_agent_gate.ps1",
         ),
         "dev-brain gate/tooling ownership",
     ),
@@ -102,9 +109,9 @@ RULES: tuple[Rule, ...] = (
     Rule(
         r"\b(doctorqueuepanel|doctor queue panel|canonical origin|localhost|127\.0\.0\.1)\b",
         (
-            "frontend/src/components/doctor/DoctorQueuePanel.jsx",
-            "frontend/src/components/doctor/__tests__/DoctorQueuePanel.test.jsx",
-            "frontend/src/api/runtime.js",
+            "frontend/src/components/doctor/DoctorQueuePanel.tsx",
+            "frontend/src/components/doctor/__tests__/DoctorQueuePanel.test.tsx",
+            "frontend/src/api/runtime.ts",
         ),
         "frontend runtime-origin and doctor queue contract ownership",
     ),
@@ -121,8 +128,8 @@ RULES: tuple[Rule, ...] = (
     Rule(
         r"\b(route|routing|alias|route registry|router)\b",
         (
-            "frontend/src/routing/routeRegistry.js",
-            "frontend/src/routing/routeSelectors.js",
+            "frontend/src/routing/routeRegistry.ts",
+            "frontend/src/routing/routeSelectors.ts",
         ),
         "routing SSOT ownership",
     ),
@@ -150,7 +157,7 @@ RULES: tuple[Rule, ...] = (
         r"\b(notification|notifications|preferences|mute|snooze|dnd|anti-noise|anti noise)\b",
         (
             "backend/app/services/notifications.py",
-            "backend/app/services/notifications_api_service.py",
+            "backend/app/services/notification_platform_service.py",
             "backend/app/schemas/notification.py",
             "backend/app/models/notification.py",
         ),
@@ -159,9 +166,9 @@ RULES: tuple[Rule, ...] = (
     Rule(
         r"\b(telegram|bot webhook|telegram webhook)\b",
         (
-            "backend/app/api/v1/endpoints/admin_telegram.py",
-            "backend/app/api/v1/endpoints/telegram_webhook.py",
-            "frontend/src/components/TelegramManager.jsx",
+            "backend/app/api/v1/endpoints/admin_telegram/_management.py",
+            "backend/app/api/v1/endpoints/telegram_webhook/_routes.py",
+            "frontend/src/components/TelegramManager.tsx",
         ),
         "Telegram mixed frontend/backend ownership",
     ),
@@ -170,10 +177,8 @@ RULES: tuple[Rule, ...] = (
 
 REFERENCE_FILES = (
     "AGENTS.md",
-    "CLAUDE.md",
-    ".ai-factory/DESCRIPTION.md",
-    ".ai-factory/ARCHITECTURE.md",
-    ".ai-factory/RULES.md",
+    "docs/devbrain/PROJECT_MEMORY.md",
+    "docs/devbrain/DEVBRAIN_STATUS.md",
 )
 
 
@@ -182,7 +187,7 @@ def repo_root_from_script() -> Path:
 
 
 def normalize_model(value: str | None) -> str:
-    raw = (value or os.getenv("AGENT_GATE_MODEL") or "gpt-5.5").strip()
+    raw = (value or os.getenv("AGENT_GATE_MODEL") or "current-agent").strip()
     return MODEL_ALIASES.get(raw.lower(), raw)
 
 
@@ -266,8 +271,33 @@ def rule_matches(task: str, repo_root: Path, tracked: set[str]) -> tuple[list[st
     return unique_existing(repo_root, tracked, found), reasons
 
 
-def is_migration_task(task: str) -> bool:
-    return bool(MIGRATION_TASK_RE.search(task))
+def is_self_tooling_task(task: str, known_root_cause: str | None) -> bool:
+    return bool(
+        SELF_TOOLING_RE.search(task)
+        and known_root_cause
+        and known_root_cause.startswith("ai/langgraph/")
+    )
+
+
+def is_migration_task(task: str, known_root_cause: str | None = None) -> bool:
+    if is_self_tooling_task(task, known_root_cause):
+        return False
+    return bool(MIGRATION_INTENT_RE.search(task))
+
+
+def requires_handoff(
+    task: str,
+    mode: str,
+    first_touch: list[str],
+    known_root_cause: str | None,
+) -> bool:
+    if mode == "migration":
+        return True
+    if is_self_tooling_task(task, known_root_cause):
+        return False
+    if STRICT_TASK_RE.search(task):
+        return True
+    return known_root_cause is None or len(first_touch) > 1
 
 
 def latest_numeric_migration(tracked: set[str]) -> str | None:
@@ -420,7 +450,7 @@ def render_list(values: list[str]) -> str:
     return "\n".join(f"- {value}" for value in values)
 
 
-def render_prompt(
+def gate_payload(
     *,
     task: str,
     model: str,
@@ -434,46 +464,72 @@ def render_prompt(
     known_root_cause: str | None,
     gate_misroute: bool,
     override_used: bool,
-) -> str:
+    handoff_required: bool,
+    include_execution_prompt: bool,
+) -> dict[str, object]:
     reason_text = "; ".join(dict.fromkeys(reasons)) if reasons else "explicit task paths only"
-    known = known_root_cause or "none"
-    return f"""Result: {'narrow override' if override_used else 'gate ok'}
-Model target: {model}
-Mode: {mode}
-Handoff required: yes
-Reason: {reason_text}
-Known root cause: {known}
-gate_misroute: {'yes' if gate_misroute else 'no'}
-override_used: {'yes' if override_used else 'no'}
+    payload: dict[str, object] = {
+        "result": "narrow_override" if override_used else "gate_ok",
+        "mode": mode,
+        "handoff_required": handoff_required,
+        "reason": reason_text,
+        "known_root_cause": known_root_cause,
+        "gate_misroute": gate_misroute,
+        "override_used": override_used,
+        "canonical_anchors": references,
+        "first_touch_files": first_touch,
+        "read_only_reference_files": read_only_references,
+        "validation_targets": validations,
+        "stop_conditions": stops,
+    }
+    if include_execution_prompt:
+        payload["execution_prompt"] = (
+            f"Task: {task}\nModel metadata: {model}\n"
+            f"Edit only: {', '.join(first_touch)}\n"
+            f"Validate: {'; '.join(validations)}\n"
+            f"Stop if: {'; '.join(stops)}"
+        )
+    return payload
 
-Canonical anchors:
-{render_list(references)}
 
-First-touch files:
-{render_list(first_touch)}
+def render_text(payload: dict[str, object]) -> str:
+    lines = [
+        f"Result: {payload['result']}",
+        f"Mode: {payload['mode']}",
+        f"Handoff required: {'yes' if payload['handoff_required'] else 'no'}",
+        f"Reason: {payload['reason']}",
+        f"Known root cause: {payload['known_root_cause'] or 'none'}",
+        f"gate_misroute: {'yes' if payload['gate_misroute'] else 'no'}",
+        f"override_used: {'yes' if payload['override_used'] else 'no'}",
+        "Canonical anchors:",
+        render_list(cast(list[str], payload["canonical_anchors"])),
+        "First-touch files:",
+        render_list(cast(list[str], payload["first_touch_files"])),
+        "Read-only reference files:",
+        render_list(cast(list[str], payload["read_only_reference_files"])),
+        "Validation targets:",
+        render_list(cast(list[str], payload["validation_targets"])),
+        "Stop conditions:",
+        render_list(cast(list[str], payload["stop_conditions"])),
+    ]
+    if "execution_prompt" in payload:
+        lines.extend(["Ready-to-send execution prompt", str(payload["execution_prompt"])])
+    return "\n".join(lines)
 
-Read-only reference files:
-{render_list(read_only_references)}
 
-Validation targets:
-{render_list(validations)}
+def emit_payload(payload: dict[str, object], output_format: str) -> None:
+    if output_format == "json":
+        print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+        return
+    print(render_text(payload))
 
-Stop conditions:
-{render_list(stops)}
 
-Ready-to-send execution prompt
-You are fixing this repository task:
-{task}
-
-Use model target `{model}` if you need to name the model in prompts or follow-up
-agent instructions. Do not rely on older GPT-specific formatting assumptions.
-
-Work only inside the First-touch files listed above for the first patch slice.
-Use the Canonical anchors as reference-only context unless the user explicitly
-asks to update instructions. Treat Stop conditions as hard stops and report
-instead of widening scope. After changing files, run the Validation targets and
-report exact pass/fail results.
-"""
+def emit_stop(reason: str, output_format: str) -> None:
+    payload: dict[str, object] = {"result": "stop", "reason": reason}
+    if output_format == "json":
+        print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+        return
+    print(f"Result: stop\nReason: {reason}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -487,12 +543,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--model",
         default=None,
-        help="Model metadata for the downstream prompt. Defaults to AGENT_GATE_MODEL or gpt-5.5.",
+        help=(
+            "Optional model metadata for a downstream handoff. Defaults to "
+            "AGENT_GATE_MODEL or current-agent."
+        ),
     )
     parser.add_argument(
         "--repo-root",
         default=None,
         help="Repository root. Defaults to the parent of ai/langgraph.",
+    )
+    parser.add_argument(
+        "--format",
+        choices=("json", "text"),
+        default="json",
+        help="Output format. Compact JSON is the default.",
+    )
+    parser.add_argument(
+        "--handoff",
+        action="store_true",
+        help="Include a compact execution prompt even when handoff is optional.",
     )
     args = parser.parse_args(argv)
 
@@ -524,10 +594,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if known:
         if not path_exists(repo_root, known, tracked):
-            print(f"Result: stop\nReason: known root cause does not exist: {known}")
+            emit_stop(f"known root cause does not exist: {known}", args.format)
             return 2
 
-    if is_migration_task(task):
+    # A confirmed gate/dev-brain owner takes precedence over incidental mentions
+    # of the strict domains that the tooling itself is expected to protect.
+    if is_self_tooling_task(task, known):
+        initial_first_touch = [known]
+        reasons = ["dev-brain gate/tooling ownership"]
+
+    if is_migration_task(task, known):
         new_revision = next_migration_pattern(tracked)
         first_touch = unique_paths([new_revision])
         read_only_references = migration_read_only_references(
@@ -542,8 +618,8 @@ def main(argv: list[str] | None = None) -> int:
         stops = unique_paths(
             stop_conditions(first_touch) + list(MIGRATION_STOP_CONDITIONS)
         )
-        print(
-            render_prompt(
+        emit_payload(
+            gate_payload(
                 task=task,
                 model=model,
                 mode="migration",
@@ -559,7 +635,10 @@ def main(argv: list[str] | None = None) -> int:
                 known_root_cause=known,
                 gate_misroute=False,
                 override_used=False,
-            ).rstrip()
+                handoff_required=True,
+                include_execution_prompt=True,
+            ),
+            args.format,
         )
         return 0
 
@@ -570,34 +649,43 @@ def main(argv: list[str] | None = None) -> int:
             reasons.append("known-root-cause override")
             initial_first_touch.insert(0, known)
 
-    first_touch = unique_paths(initial_first_touch)
+    strict_task = bool(STRICT_TASK_RE.search(task)) and not is_self_tooling_task(task, known)
+    if known and not strict_task:
+        first_touch = [known]
+    else:
+        first_touch = unique_paths(initial_first_touch)
+    read_only_references: list[str] = []
     if not first_touch:
-        print(
-            "Result: stop\n"
-            "Reason: no first-touch files could be resolved. Add an explicit path "
-            "or rerun with --known-root-cause."
+        emit_stop(
+            "no first-touch files could be resolved; add an explicit path or rerun "
+            "with --known-root-cause",
+            args.format,
         )
         return 2
 
     references = unique_existing(repo_root, tracked, list(REFERENCE_FILES))
     validations = validation_targets(repo_root, first_touch)
     stops = stop_conditions(first_touch)
+    handoff_required = requires_handoff(task, "execute", first_touch, known)
 
-    print(
-        render_prompt(
+    emit_payload(
+        gate_payload(
             task=task,
             model=model,
             mode="execute",
             first_touch=first_touch,
             references=references,
-            read_only_references=[],
+            read_only_references=read_only_references,
             validations=validations,
             stops=stops,
             reasons=reasons,
             known_root_cause=known,
             gate_misroute=gate_misroute,
             override_used=override_used,
-        ).rstrip()
+            handoff_required=handoff_required,
+            include_execution_prompt=handoff_required or args.handoff,
+        ),
+        args.format,
     )
     return 0
 

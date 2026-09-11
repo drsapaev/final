@@ -3380,3 +3380,27 @@ Continue the Telegram bot implementation loop and close the storage gap after th
 - current stack sufficient: no for this schema slice
 - would LightRAG likely help here: yes
 - Better retrieval should connect new SQLAlchemy table models to Alembic migration creation, revision chain ownership, and migration validation targets.
+
+## Task 95 - Agent gate self-update keyword misroute
+
+### User task
+Reduce gate token overhead for modern Codex agents while preserving strict handling
+for migration, RBAC, billing, EMR, queue, Telegram, CI/CD, deploy, and production work.
+
+### Gate result
+- mode: migration (incorrect)
+- handoff required: yes
+- handoff used: no; narrow override applied after the allowed retry
+- gate_misroute: yes
+- override_used: yes
+- known_root_cause_file: ai/langgraph/scripts/agent_gate.py
+
+### Observed regression
+- The task mentioned `DB/Alembic` only as behavior that must remain protected.
+- Keyword-only migration detection overrode the confirmed dev-brain owner and proposed a new Alembic revision.
+- The generated prompt repeated the full task and broad context even though the same agent already had a confirmed one-file root cause.
+
+### Follow-up
+- Make migration routing intent-aware and give confirmed dev-brain self-tooling ownership precedence.
+- Emit compact structured output by default and omit the execution prompt for narrow same-agent work.
+- Retain mandatory handoff and migration ownership for concrete risky-domain changes.
