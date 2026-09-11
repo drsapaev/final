@@ -65,23 +65,23 @@ class TelegramPollingWorker:
     def request_stop(self) -> None:
         self._stop_requested = True
 
-    def _clear_dedup_ledger(self) -> None:
-        """PR-3: wipe the update_id dedup ledger when the BOT IDENTITY
-        changes.
+    def _clear_dedup_ledger(self, bot_identity: str | None) -> None:
+        """PR-3: purge the SUPERSEDED bot's ledger rows when the identity
+        changes (codex round 24).
 
-        With the (bot_identity, update_id) ledger key a replacement bot
-        can never collide with the previous bot's rows anyway — the wipe
-        is bounded hygiene. It deliberately does NOT fire on a same-bot
-        token rotation: the identity (getMe bot id) is unchanged and the
-        retained rows keep deduplicating the unconfirmed backlog (codex
-        round 22). Fail-open: a failed clear is logged; the daily
-        retention sweep bounds any staleness.
+        The delete is scoped to the superseded identity: webhook workers
+        may already have claimed or completed updates for the NEW bot
+        before the polling worker observes the credential change — a
+        global reset would delete those claims and let a retry run the
+        handler again (or concurrently). The composite key isolates the
+        namespaces; anything not purged here ages out via the retention
+        sweep. Fail-open: a failed purge is logged.
         """
         db: Session = SessionLocal()
         try:
-            deleted = reset_ledger(db)
+            deleted = reset_ledger(db, bot_identity)
             LOGGER.info(
-                "Telegram dedup ledger cleared after credential change "
+                "Telegram dedup ledger cleared for the superseded bot "
                 "rows_deleted=%s",
                 deleted,
             )
@@ -137,6 +137,7 @@ class TelegramPollingWorker:
                     )
                     identity_changed = canonical_identity != ledger_identity
                     LOGGER.info("Telegram bot token changed — reloading")
+                    superseded_identity = ledger_identity
                     token = canonical
                     ledger_identity = canonical_identity
                     if not self.keep_webhook:
@@ -149,9 +150,9 @@ class TelegramPollingWorker:
                         # The ledger and the offset are both cursors of the
                         # superseded bot. A same-bot token rotation keeps
                         # the identity — and its dedup continuity (round
-                        # 22) — so the ledger is wiped only when the BOT
-                        # actually changed.
-                        self._clear_dedup_ledger()
+                        # 22) — so only the SUPERSEDED identity's rows are
+                        # purged, never the new bot's claims (round 24).
+                        self._clear_dedup_ledger(superseded_identity)
             if pending_webhook_deletion:
                 try:
                     self._delete_webhook(session, token)
@@ -196,7 +197,7 @@ class TelegramPollingWorker:
                         )
                         if refreshed_identity != ledger_identity:
                             offset = None
-                            self._clear_dedup_ledger()
+                            self._clear_dedup_ledger(ledger_identity)
                         ledger_identity = refreshed_identity
                         LOGGER.info("Telegram bot token rotated — reloading")
                         token = refreshed
@@ -268,15 +269,16 @@ class TelegramPollingWorker:
                 )
                 post_poll_identity = await resolve_ledger_bot_identity(post_poll)
                 identity_changed = post_poll_identity != ledger_identity
+                superseded_identity = ledger_identity
                 token = post_poll
                 ledger_identity = post_poll_identity
                 if not self.keep_webhook:
                     pending_webhook_deletion = True
                 offset = None
                 if identity_changed:
-                    # Same rule as the cycle-top swap: wipe only when the
-                    # BOT changed, not on a same-bot rotation (round 22).
-                    self._clear_dedup_ledger()
+                    # Same rule as the cycle-top swap: purge only the
+                    # superseded identity's rows (round 24).
+                    self._clear_dedup_ledger(superseded_identity)
                 if self.once:
                     return 0
                 time.sleep(self.retry_delay)

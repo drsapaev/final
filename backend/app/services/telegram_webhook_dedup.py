@@ -88,8 +88,75 @@ def ledger_bot_identity(token: str | None) -> str | None:
 # STABLE across token rotations — this is what keeps the dedup key
 # unchanged when the same bot's token is rotated (codex round 22) — so
 # the cache is keyed by the raw credential and never expires: the
-# identity of a given token cannot change.
+# identity of a given token cannot change. FAILURES ARE NEVER CACHED
+# (codex round 24): a worker that caches the credential-scoped fallback
+# while another worker resolves the real getMe id would claim the same
+# update under a DIFFERENT key — double execution. Every failed
+# resolution is retried on the next call until it converges on the
+# persisted id.
 _IDENTITY_BY_TOKEN: dict[str, str] = {}
+
+
+def _read_persisted_identity(token_text: str) -> str | None:
+    """Read the token-conditioned persisted identity (own session,
+    fail-open).
+
+    telegram_configs.bot_identity is the ONE identity value shared by
+    every uvicorn worker and the polling worker (codex round 24). It is
+    only used while the stored credential is the one it was resolved
+    for — a replacement bot's token gets a fresh resolution instead of
+    the previous bot's id.
+    """
+    try:
+        from app.crud import telegram_config as crud_telegram
+        from app.db.session import SessionLocal
+        from app.services.telegram_token_store import decrypt_token
+
+        db = SessionLocal()
+        try:
+            config = crud_telegram.get_telegram_config(db)
+            if (
+                config is not None
+                and config.bot_identity
+                and decrypt_token(config.bot_token) == token_text
+            ):
+                return config.bot_identity
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001 — best-effort read, fail open
+        logger.warning(
+            "Telegram persisted bot identity read failed error_type=%s",
+            type(exc).__name__,
+        )
+    return None
+
+
+def _persist_bot_identity(token_text: str, identity: str) -> None:
+    """Best-effort persist of the getMe-resolved identity (own session).
+
+    Concurrent resolvers store the SAME value (a token's bot id cannot
+    change), so the write is idempotent; failures are logged and the
+    next successful resolution retries the write.
+    """
+    try:
+        from app.crud import telegram_config as crud_telegram
+        from app.db.session import SessionLocal
+        from app.services.telegram_token_store import decrypt_token
+
+        db = SessionLocal()
+        try:
+            config = crud_telegram.get_telegram_config(db)
+            if config is not None and decrypt_token(config.bot_token) == token_text:
+                if config.bot_identity != identity:
+                    config.bot_identity = identity
+                    db.commit()
+        finally:
+            db.close()
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "Telegram persisted bot identity write failed error_type=%s",
+            type(exc).__name__,
+        )
 
 
 async def _fetch_bot_id(token: str) -> str | None:
@@ -122,12 +189,22 @@ async def resolve_ledger_bot_identity(token: str | None) -> str | None:
     bot (a different id) naturally gets a different namespace. The id is
     public and non-secret; the token itself is never stored.
 
-    Resolutions are cached per credential (a token's bot id cannot
-    change). When getMe is unreachable the resolver degrades to the
-    deterministic credential-scoped identity (:func:`ledger_bot_identity`)
-    — cross-path consistent, and still a different namespace per
-    credential, so a replacement bot can never collide. None means no
-    credential at all (the claim lands in the "unknown" namespace).
+    Resolution order (codex round 24):
+    1. in-process cache (successful resolutions only);
+    2. the PERSISTED identity (telegram_configs.bot_identity,
+       token-conditioned) — the ONE value shared by every uvicorn worker
+       and the polling worker, so retries routed across workers always
+       claim under the same key;
+    3. getMe — persisted on success so the other workers converge;
+    4. when getMe is unreachable: the deterministic credential-scoped
+       identity, deliberately NOT cached — the next resolution retries
+       getMe / re-reads the persisted value. All workers failing
+       together still agree on the same fallback (same credential), so
+       the namespace only ever diverges transiently instead of
+       permanently.
+
+    None means no credential at all (the claim lands in the "unknown"
+    namespace).
     """
     if not token:
         return None
@@ -135,10 +212,22 @@ async def resolve_ledger_bot_identity(token: str | None) -> str | None:
     cached = _IDENTITY_BY_TOKEN.get(token_text)
     if cached is not None:
         return cached
+
+    persisted = _read_persisted_identity(token_text)
+    if persisted:
+        _IDENTITY_BY_TOKEN[token_text] = persisted
+        return persisted
+
     bot_id = await _fetch_bot_id(token_text)
-    identity = f"tgbot:{bot_id}" if bot_id else ledger_bot_identity(token_text)
-    _IDENTITY_BY_TOKEN[token_text] = identity
-    return identity
+    if bot_id:
+        identity = f"tgbot:{bot_id}"
+        _persist_bot_identity(token_text, identity)
+        _IDENTITY_BY_TOKEN[token_text] = identity
+        return identity
+
+    # Degraded mode — deterministic, shared while the outage lasts, and
+    # never cached: every worker keeps retrying for the persisted id.
+    return ledger_bot_identity(token_text)
 
 
 def _log_db_failure(operation: str, update_id: int | None, exc: Exception) -> None:
@@ -322,25 +411,27 @@ def release_claim(
         _log_db_failure("release", update_id, exc)
 
 
-def reset_ledger(db: Session, *, commit: bool = True) -> int:
-    """Delete EVERY ledger row (all identities). Returns deleted count.
+def reset_ledger(
+    db: Session, bot_identity: str | None = None, *, commit: bool = True
+) -> int:
+    """Delete ledger rows. Returns the number of deleted rows.
 
-    Complementary defence for bot identity changes (codex round 19):
-    the token write path wipes the ledger IN THE SAME TRANSACTION as the
-    credential swap, and the polling worker wipes it whenever it resets
-    its offset after a credential change — a retained row of the previous
-    bot can never meet the replacement bot's claims. With the
-    (bot_identity, update_id) ledger key this is bounded hygiene rather
-    than the sole protection.
+    With ``bot_identity`` the delete is SCOPED to that identity's rows
+    (codex round 24): the polling worker wiping the superseded bot's
+    namespace must not delete a claim the webhook workers already made
+    or completed for the NEW bot — the composite key isolates the two
+    namespaces, so only the superseded one is purged. With
+    ``bot_identity=None`` EVERY row is deleted (all identities).
 
-    With ``commit=True`` (standalone use) the delete commits on its own
-    and follows the module's fail-open contract: a failure is logged and
-    returns 0 — the retention sweep bounds any staleness. With
-    ``commit=False`` the DELETE stays pending in the caller's transaction
-    (and errors propagate — the caller owns the transaction).
+    ... (commit semantics unchanged)
     """
     try:
-        result = db.execute(delete(TelegramWebhookDedup))
+        stmt = delete(TelegramWebhookDedup)
+        if bot_identity is not None:
+            stmt = stmt.where(
+                TelegramWebhookDedup.bot_identity == _key_identity(bot_identity)
+            )
+        result = db.execute(stmt)
         if commit:
             db.commit()
     except SQLAlchemyError as exc:
