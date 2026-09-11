@@ -372,11 +372,20 @@ def get_bot_status(
     try:
         config = crud_telegram.get_telegram_config(db)
 
+        # PR-2 (round 10): resolve BEFORE the no-config early return - a
+        # deployment relying only on TELEGRAM_BOT_TOKEN (including
+        # backend/.env) is configured even without a telegram_configs row.
+        configured = resolve_patient_bot_token(db) is not None
+
         if not config:
             return {
-                "configured": False,
+                "configured": configured,
                 "active": False,
-                "message": "Telegram бот не настроен",
+                "message": (
+                    "Telegram бот работает через переменную окружения"
+                    if configured
+                    else "Telegram бот не настроен"
+                ),
             }
 
         telegram_service = (
@@ -387,7 +396,7 @@ def get_bot_status(
             # PR-2 (round 8): report through the same SSOT resolver the
             # polling/webhook/admin paths use - an undecryptable config row
             # with a live legacy/env fallback must not read as unconfigured.
-            "configured": resolve_patient_bot_token(db) is not None,
+            "configured": configured,
             "active": config.active,
             "bot_username": config.bot_username,
             "notifications_enabled": config.notifications_enabled,

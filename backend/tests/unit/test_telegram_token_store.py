@@ -598,6 +598,22 @@ class TestCrossProcessVisibility:
         # must not read as unconfigured.
         assert result["configured"] is True
 
+    def test_bot_status_reports_env_only_deployment_configured(
+        self, db_session, monkeypatch
+    ):
+        from app.api.v1.endpoints import telegram_integration
+
+        _clear_token_env(monkeypatch)
+        _clear_fernet_key(monkeypatch)
+        monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456789:env-only")
+
+        result = telegram_integration.get_bot_status(db_session, _user())
+
+        # P2 pin (round 10): the no-config-row early return must resolve the
+        # token first - an env/.env-only deployment is configured.
+        assert result["configured"] is True
+        assert result["active"] is False
+
 
 @pytest.mark.unit
 class TestPollingWorkerTokenReload:
