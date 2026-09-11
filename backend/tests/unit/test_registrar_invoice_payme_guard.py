@@ -10,15 +10,53 @@ from app.api.v1.endpoints.registrar_wizard import _invoice as invoice_module
 from app.api.v1.endpoints.registrar_wizard._helpers import InvoicePaymentRequest
 
 
+def _db_with_invoice(invoice, *, linked_visit_exists: bool = True) -> Mock:
+    db = Mock()
+    invoice_query = Mock()
+    (
+        invoice_query.filter.return_value.with_for_update.return_value.first
+    ).return_value = invoice
+    linked_visit_query = Mock()
+    linked_visit_query.filter.return_value.first.return_value = (
+        SimpleNamespace(id=1) if linked_visit_exists else None
+    )
+    db.query.side_effect = [invoice_query, linked_visit_query]
+    return db
+
+
+@pytest.mark.unit
+def test_invoice_payment_rejects_invoice_without_payable_visit_link(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    invoice = SimpleNamespace(id=42, status="pending")
+    db = _db_with_invoice(invoice, linked_visit_exists=False)
+    manager_factory = Mock()
+    monkeypatch.setattr(
+        invoice_module,
+        "get_payment_manager",
+        manager_factory,
+    )
+
+    with pytest.raises(invoice_module.HTTPException) as exc_info:
+        invoice_module.init_invoice_payment(
+            payment_req=InvoicePaymentRequest(invoice_id=42, provider="click"),
+            db=db,
+            current_user=Mock(),
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "Счёт не связан с оплачиваемыми визитами"
+    assert invoice.status == "pending"
+    manager_factory.assert_not_called()
+    db.commit.assert_not_called()
+
+
 @pytest.mark.unit
 def test_invoice_payment_rejects_payme_before_emitting_unreconciled_link(
     monkeypatch: pytest.MonkeyPatch,
 ):
     invoice = SimpleNamespace(id=42, status="pending")
-    db = Mock()
-    (
-        db.query.return_value.filter.return_value.with_for_update.return_value.first
-    ).return_value = invoice
+    db = _db_with_invoice(invoice)
     manager = Mock()
     manager.supports_registrar_invoice_payment.return_value = False
     monkeypatch.setattr(
@@ -51,10 +89,7 @@ def test_invoice_payment_uses_click_when_manager_advertises_capability(
         total_amount=Decimal("125000"),
         currency="UZS",
     )
-    db = Mock()
-    (
-        db.query.return_value.filter.return_value.with_for_update.return_value.first
-    ).return_value = invoice
+    db = _db_with_invoice(invoice)
     manager = Mock()
     manager.supports_registrar_invoice_payment.return_value = True
     manager.create_payment.return_value = SimpleNamespace(
