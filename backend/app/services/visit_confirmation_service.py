@@ -8,12 +8,11 @@ import logging
 import re
 import secrets
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from typing import Any
 
 from app.core.config import settings
-from app.crud import clinic as crud_clinic
-from app.crud import telegram_config as crud_telegram
+from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.visit import Visit
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
@@ -23,6 +22,7 @@ from app.services.context_facades.queue_facade import (
     QueueDomainServiceContractAdapter,
 )
 from app.services.queue_service import queue_service
+from app.services.telegram_token_store import resolve_patient_bot_token
 from app.utils.validators import normalize_phone_uz
 
 logger = logging.getLogger(__name__)
@@ -223,7 +223,7 @@ class VisitConfirmationService:
                 .scalar()
             )
             if claimed_at is not None:
-                from datetime import UTC, datetime
+                from datetime import datetime, UTC
 
                 if claimed_at.tzinfo is None:
                     claimed_at = claimed_at.replace(tzinfo=UTC)
@@ -238,7 +238,7 @@ class VisitConfirmationService:
 
         lease_free = None
         if hasattr(Visit, "reminder_claimed_at"):
-            from datetime import UTC, datetime
+            from datetime import datetime, UTC
 
             from app.tasks.lease import LEASE_TTL
 
@@ -277,7 +277,7 @@ class VisitConfirmationService:
                 and raced_row.status == "pending_confirmation"
                 and raced_row.reminder_claimed_at is not None
             ):
-                from datetime import UTC, datetime
+                from datetime import datetime, UTC
 
                 from app.tasks.lease import LEASE_TTL
 
@@ -990,6 +990,18 @@ class VisitConfirmationService:
                 continue
             username = str(candidate).strip().lstrip("@")
             if TELEGRAM_USERNAME_RE.fullmatch(username):
+                # PR-2 (round 16): the username is only meaningful while a
+                # bot credential actually resolves. Generating a ticket QR
+                # link for an unresolvable bot would direct patients to a
+                # revoked/compromised bot this deployment cannot operate —
+                # fail closed instead (defense in depth on top of the
+                # identity cleanup in telegram_token_store).
+                if not resolve_patient_bot_token(self.repository.db):
+                    logger.warning(
+                        "Telegram bot username is configured but no bot token "
+                        "resolves — skipping ticket QR link (fail-closed)"
+                    )
+                    return None
                 return username
 
         return None

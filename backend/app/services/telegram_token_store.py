@@ -45,6 +45,10 @@ FERNET_PREFIX = "gAAAAA"
 # Legacy patient-bot-token clinic-settings key (read-only fallback).
 PATIENT_BOT_TOKEN_SETTING_KEY = "bot_token"
 
+# Legacy patient-bot-username clinic-settings key (identity metadata —
+# cleared together with the credential when no fallback remains).
+PATIENT_BOT_USERNAME_SETTING_KEY = "bot_username"
+
 # Staff bot token sources. Canonical home for these tuples (endpoints
 # re-export them for backwards compatibility).
 STAFF_BOT_TOKEN_ENV_KEYS = (
@@ -117,10 +121,24 @@ def decrypt_token(value: str | None) -> str | None:
         return None
 
 
-def resolve_patient_bot_token(db) -> str | None:
-    """Resolve the patient bot token: config -> clinic settings -> env."""
+def _patient_bot_env_token() -> str | None:
+    """Last-resort environment fallback for the patient bot token.
+
+    Runtime os.environ wins (post-import overrides), then the pydantic
+    Settings value — TELEGRAM_BOT_TOKEN configured only in backend/.env is
+    loaded into the settings object WITHOUT being present in os.environ,
+    so a bare os.getenv() would miss it (codex round 3).
+    """
     import os
 
+    env_token = str(os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+    if not env_token:
+        env_token = str(getattr(settings, "TELEGRAM_BOT_TOKEN", None) or "").strip()
+    return env_token or None
+
+
+def resolve_patient_bot_token(db) -> str | None:
+    """Resolve the patient bot token: config -> clinic settings -> env."""
     from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
 
     config = crud_telegram.get_telegram_config(db)
@@ -135,14 +153,7 @@ def resolve_patient_bot_token(db) -> str | None:
         if token:
             return token
 
-    # Runtime os.environ wins (post-import overrides), then the pydantic
-    # Settings value — TELEGRAM_BOT_TOKEN configured only in backend/.env is
-    # loaded into the settings object WITHOUT being present in os.environ,
-    # so a bare os.getenv() would miss it (codex round 3).
-    env_token = str(os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
-    if not env_token:
-        env_token = str(getattr(settings, "TELEGRAM_BOT_TOKEN", None) or "").strip()
-    return env_token or None
+    return _patient_bot_env_token()
 
 
 def resolve_staff_bot_token(db, patient_token: str | None = None) -> str | None:
@@ -302,16 +313,22 @@ def clear_patient_bot_token(
 
     Writes ``NULL`` to ``telegram_configs.bot_token``, removes the legacy
     ``clinic_settings[bot_token]`` row and appends an audit event — all in
-    the caller's transaction (see ``commit`` semantics above).
+    the caller's transaction (see ``commit`` semantics above). When no
+    environment fallback remains, the stale bot identity metadata is cleared
+    as well (``telegram_configs.bot_username`` + legacy
+    ``clinic_settings[bot_username]``; audited as ``bot_identity_cleared``).
     """
-    from app.crud import audit as crud_audit
-    from app.crud import clinic as crud_clinic
-    from app.crud import telegram_config as crud_telegram
+    from app.crud import (
+        audit as crud_audit,
+        clinic as crud_clinic,
+        telegram_config as crud_telegram,
+    )
 
     config = crud_telegram.get_telegram_config(db)
     legacy_setting = crud_clinic.get_setting_by_key(db, PATIENT_BOT_TOKEN_SETTING_KEY)
 
     cleared = False
+    identity_cleared = False
     if config is not None:
         if config.bot_token:
             config.set_bot_token(None)
@@ -329,7 +346,22 @@ def clear_patient_bot_token(
     if legacy_setting is not None:
         db.delete(legacy_setting)
         cleared = True
-    if not cleared:
+    # PR-2 (round 16): a revoked credential must not keep steering patients
+    # to the old bot. When no environment fallback remains, the bot identity
+    # metadata is stale too — VisitConfirmationService would otherwise keep
+    # generating ``t.me/<revoked-bot>`` ticket QR links from the surviving
+    # bot_username (canonical column + legacy clinic_settings row).
+    if not _patient_bot_env_token():
+        if config is not None and config.bot_username:
+            config.bot_username = None
+            identity_cleared = True
+        legacy_username = crud_clinic.get_setting_by_key(
+            db, PATIENT_BOT_USERNAME_SETTING_KEY
+        )
+        if legacy_username is not None:
+            db.delete(legacy_username)
+            identity_cleared = True
+    if not cleared and not identity_cleared:
         return config
 
     _invalidate_running_service_credential()
@@ -340,7 +372,7 @@ def clear_patient_bot_token(
         entity_type="telegram_config",
         entity_id=config.id if config is not None else None,
         actor_user_id=actor_user_id,
-        payload={},
+        payload={"bot_identity_cleared": identity_cleared},
     )
 
     if commit:

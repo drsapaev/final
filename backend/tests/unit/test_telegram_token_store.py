@@ -426,6 +426,51 @@ class TestClearPatientBotToken:
         assert row.active is False
         assert crud_clinic.get_setting_by_key(db_session, "bot_token") is None
 
+    def test_clear_removes_stale_bot_identity_without_fallback(
+        self, db_session, monkeypatch
+    ):
+        """P1 pin (round 16): with no env fallback the stale bot_username
+        must not keep generating t.me/<revoked-bot> ticket QR links."""
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:compromised")
+        config = db_session.query(TelegramConfig).one()
+        config.bot_username = "old_revoked_bot"
+        db_session.add(
+            ClinicSettings(
+                key="bot_username", value="old_revoked_bot", category="telegram"
+            )
+        )
+        db_session.commit()
+
+        clear_patient_bot_token(db_session)
+
+        db_session.expire_all()
+        row = db_session.query(TelegramConfig).one()
+        assert row.bot_username is None
+        assert crud_clinic.get_setting_by_key(db_session, "bot_username") is None
+        event = (
+            db_session.query(AuditLog)
+            .filter(AuditLog.action == "telegram_bot_token_cleared")
+            .one()
+        )
+        assert event.payload["bot_identity_cleared"] is True
+
+    def test_clear_keeps_identity_with_env_fallback(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        store_patient_bot_token(db_session, "123456789:compromised")
+        config = db_session.query(TelegramConfig).one()
+        config.bot_username = "old_revoked_bot"
+        db_session.commit()
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123456789:env-fallback")
+
+        clear_patient_bot_token(db_session)
+
+        db_session.expire_all()
+        row = db_session.query(TelegramConfig).one()
+        assert row.bot_username == "old_revoked_bot"
+
     def test_clear_is_noop_without_any_token(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
         _clear_fernet_key(monkeypatch)
@@ -613,6 +658,7 @@ class TestStaffBotServiceStaleState:
         self, db_session, monkeypatch
     ):
         import fastapi
+
         from app.api.v1.endpoints.telegram_webhook import _helpers
         from app.services import telegram_token_store as store_module
 
