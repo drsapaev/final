@@ -46,7 +46,7 @@ DONE требует: критерий из плана выполнен; узки
 |---|---|---|---|---|---|
 | RQ-01 | Актуальный базис | — | DONE | codex/rq-01-baseline-verification / [#3159](https://github.com/drsapaev/final/pull/3159) merged `84f561dff3f4d95b32e19cadc0a2c3b4f87ce2cb` | E-003 |
 | RQ-02 | Поиск пациента | RQ-01 | DONE | codex/rq-02-registrar-search / [#3160](https://github.com/drsapaev/final/pull/3160) merged `11e6ab69d5921a4e667748d99de6131f5c2e65dc` | E-004 |
-| RQ-03 | Услуги мастера | RQ-01 | VERIFIED | codex/rq-03-wizard-services / PR этого среза | E-005 |
+| RQ-03 | Услуги мастера | RQ-01 | VERIFIED | codex/rq-03-wizard-services / [#3163](https://github.com/drsapaev/final/pull/3163) | E-005 |
 | RQ-04 | Атомарное отделение | RQ-01; проверить #3114 | TODO | — | — |
 | RQ-05 | Обязательный врач | RQ-01 | TODO | — | — |
 | RQ-06 | Профиль/тег/отделение | RQ-01 | TODO | — | — |
@@ -229,7 +229,7 @@ Parent DONE только после обоих children; parent и children не
 - Acceptance S-IDs: S-02 — покрыт Vitest-уровнем (helper-тесты на SYNTHETIC-профилях/услугах: «Все»/null, ecg+echokg против department=cardiology, custom/пустой профиль, неизвестная вкладка) + contract-пины + browser MOCK (W0 suite 82 passed на MOCK-данных). REAL_API/browser-над-реальным-backend — NOT_RUN (нет disposable backend/PostgreSQL/Redis; частные blockers E-003). Уровень доказательства: Helper + wizard contract + browser MOCK (соответствует колонке S-02 «Vitest + browser»).
 - Artifacts: изменения в этом PR (3 измененных файла + 1 новый тест + PROGRESS.md); данные в тестах — SYNTHETIC (ключи/теги профилей, без PHI).
 - Not checked and why: REAL_API/стенд с настоящим backend — среда без PostgreSQL/Redis (blocker E-003.2); миграций нет — не применимо; SQLite-проверки не требовались (frontend-срез).
-- PR URL: см. строку RQ-03 реестра; merge SHA — сверить в следующем цикле (статус VERIFIED/PR_OPEN до сверки).
+- PR URL: [#3163](https://github.com/drsapaev/final/pull/3163) (head `d43d938882234e460db54e27bc56197812ae968a`); merge SHA — сверить в следующем цикле (статус VERIFIED/PR_OPEN до сверки).
 - Status now: RQ-03 VERIFIED (в границах этого PR; DONE — после merge-сверки следующего цикла).
 - Blocker: нет (частные blockers E-003 не затрагивают этот срез).
 - Next smallest action: после merge RQ-03 — сверить merge SHA и перевести RQ-03 в DONE; затем RQ-05 (gate, OpenAPI review; first-touch `backend/tests/integration/test_registrar_services_grouping.py`, serializer-ветка; `_services_doctors.py` вне #3114 — сверить перед стартом) или RQ-19 при продолжении блокировок.
