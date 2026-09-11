@@ -10101,6 +10101,7 @@ const en = {
     data_source_api: 'Data loaded from server',
     ds_error_message: 'Failed to load records. Check server connection.',
     ds_retry: 'Retry',
+    rp_worklist_stale_warning: 'Showing previously loaded data — the last refresh failed',
 
     // ─── RegistrarPanel.jsx (rp_) ──────────────────────────────────────────
     rp_aria_panel: 'Панель регистратора',

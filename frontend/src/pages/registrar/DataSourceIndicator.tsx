@@ -16,9 +16,13 @@ interface DataSourceIndicatorProps {
   count?: number;
   paginationInfo?: { total?: number; hasMore?: boolean } | null;
   onRetry?: (opts?: Record<string, unknown>) => void;
+  /** RQ-22 (F-18): true when displayed rows are kept after a failed
+   *  refresh — the success look is replaced by an explicit staleness
+   *  warning so the indicator never lies about freshness. */
+  stale?: boolean;
 }
 
-const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }: DataSourceIndicatorProps) => {
+const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry, stale }: DataSourceIndicatorProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   // QW-03 fix: 'demo' state replaced with 'error' state — no more fake data.
@@ -39,6 +43,21 @@ const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }
   }
 
   if (dataSource === 'api') {
+    // RQ-22 (F-18): rows kept after a failed refresh must not look fresh —
+    // swap the success color for the explicit staleness warning + retry.
+    if (stale) {
+      return (
+        <div className="registrar-ds-indicator registrar-ds-stale" role="status" aria-live="polite">
+          <AlertTriangle size={16} className="registrar-text-white" aria-hidden="true" />
+          <span>{t('registrarPanel.rp_worklist_stale_warning')}</span>
+          <button
+            onClick={() => onRetry?.({ source: 'stale_refresh_button', force: true })}
+            className="registrar-ds-retry-btn">
+            {t('registrarPanel.ds_retry')}
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="registrar-ds-indicator registrar-ds-success">
         <CheckCircle2 size={16} className="registrar-text-white" aria-hidden="true" />
