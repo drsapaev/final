@@ -61,6 +61,12 @@ class TokenStoreError(ValueError):
     """Raised when a token cannot be stored or the input is invalid."""
 
 
+# Real Telegram bot tokens are <= 64 characters; the headroom keeps the
+# Fernet ciphertext (~2.2x plaintext) safely inside the String(500)
+# telegram_configs.bot_token column on PostgreSQL (codex round 11).
+MAX_PLAINTEXT_TOKEN_LENGTH = 256
+
+
 def is_encrypted_token(value: str | None) -> bool:
     """True when the value looks like a Fernet token."""
     return bool(value) and str(value).startswith(FERNET_PREFIX)
@@ -218,6 +224,10 @@ def store_patient_bot_token(
     if not token or not str(token).strip():
         raise TokenStoreError("patient bot token must be a non-empty string")
     token_text = str(token).strip()
+    if len(token_text) > MAX_PLAINTEXT_TOKEN_LENGTH:
+        raise TokenStoreError(
+            "patient bot token exceeds the Telegram bot token length limit"
+        )
 
     for attempt in range(2):
         try:

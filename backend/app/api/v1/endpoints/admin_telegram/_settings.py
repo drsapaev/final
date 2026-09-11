@@ -23,6 +23,7 @@ from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401  
 )
 from app.schemas.notifications import UpdateTelegramSettingsRequest
 from app.services.telegram_token_store import (
+    TokenStoreError,
     clear_patient_bot_token,
     resolve_patient_bot_token,
     store_patient_bot_token,
@@ -102,20 +103,24 @@ def update_telegram_settings(
                 # commit=False: update_settings_batch below commits the
                 # token, its audit event and the remaining settings in ONE
                 # transaction (codex round 2).
-                store_patient_bot_token(
-                    db,
-                    token_value,
-                    actor_user_id=current_user.id,
-                    commit=False,
-                )
+                try:
+                    store_patient_bot_token(
+                        db,
+                        token_value,
+                        actor_user_id=current_user.id,
+                        commit=False,
+                    )
+                except TokenStoreError as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=str(exc),
+                    ) from exc
                 bot_token_stored = True
             elif isinstance(token_value, str):
                 # PR-2 round 4: an explicitly emptied field revokes the
                 # stored credential (masked placeholders are filtered out
                 # above and never reach this branch).
-                clear_patient_bot_token(
-                    db, actor_user_id=current_user.id, commit=False
-                )
+                clear_patient_bot_token(db, actor_user_id=current_user.id, commit=False)
                 bot_token_cleared = True
 
         # Обновляем настройки в категории "telegram"
@@ -139,6 +144,8 @@ def update_telegram_settings(
             "bot_token_cleared": bot_token_cleared,
             "environment_fallback_active": environment_fallback_active,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise_admin_telegram_error(
             "settings-update",
@@ -313,6 +320,7 @@ async def register_staff_bot_commands(
         from app.api.v1.endpoints.admin_telegram import (
             get_telegram_bot_service as _get_telegram_bot_service,
         )
+
         bot_service = await _get_telegram_bot_service()
         ok, error = await bot_service.set_staff_bot_commands(
             staff_bot_token, commands=commands
@@ -693,4 +701,3 @@ def get_telegram_integration_status(
             "Ошибка получения статуса Telegram интеграции",
             e,
         )
-

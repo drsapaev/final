@@ -134,6 +134,15 @@ class TestStorePatientBotToken:
         assert len(rows) == 1
         assert rows[0].decrypted_bot_token == "123456789:second"
 
+    def test_store_rejects_oversized_token(self, db_session, monkeypatch):
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        oversized = "1" + "x" * 300  # real bot tokens are <= 64 chars
+
+        with pytest.raises(TokenStoreError):
+            store_patient_bot_token(db_session, oversized)
+        assert db_session.query(TelegramConfig).first() is None
+
     def test_store_rejects_empty_token(self, db_session):
         with pytest.raises(TokenStoreError):
             store_patient_bot_token(db_session, "")
@@ -853,6 +862,22 @@ class TestAdminSettingsEndpoints:
 
         assert result["bot_token_cleared"] is True
         assert result["environment_fallback_active"] is False
+
+    def test_put_oversized_token_returns_400(self, db_session, monkeypatch):
+        import pytest as _pytest
+        from fastapi import HTTPException as _HTTPException
+
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        payload = UpdateTelegramSettingsRequest(bot_token="1" + "x" * 300)
+
+        with _pytest.raises(_HTTPException) as exc_info:
+            admin_telegram_settings.update_telegram_settings(
+                payload, db_session, _user()
+            )
+
+        assert exc_info.value.status_code == 400
+        assert db_session.query(TelegramConfig).first() is None
 
     def test_put_masked_placeholder_is_ignored(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
