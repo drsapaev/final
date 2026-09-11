@@ -781,6 +781,37 @@ def test_webhook_identity_unavailable_delivery_is_deferred(
     assert db_session.query(TelegramWebhookDedup).count() == 0
 
 
+def test_webhook_claim_identity_binds_to_the_validated_credential(
+    client, db_session, monkeypatch
+):
+    """Codex round 31 (P1): the identity is derived from the credential
+    SNAPSHOT the secret authenticated (the config row the validation
+    read), not from a later re-read of the bot service — an admin
+    replacing the bot between the two reads cannot bind an old-bot
+    update to the replacement bot's identity."""
+    _add_secret_config(db_session)
+    fake = FakeTelegramBotService()
+    fake.bot_token = "123456789:replacement-bot-token"
+    monkeypatch.setattr(
+        telegram_webhook, "get_telegram_bot_service", AsyncMock(return_value=fake)
+    )
+
+    response = client.post(
+        WEBHOOK_URL, json={"update_id": 510}, headers=SECRET_HEADER
+    )
+
+    assert response.status_code == 200
+    (row,) = _dedup_rows(db_session, 510)
+    # Bound to the SECRET-validated config credential, not to the
+    # replacement token the (stale) bot service exposes.
+    assert row.bot_identity == telegram_webhook_dedup.ledger_bot_identity(
+        "bot-token"
+    )
+    assert row.bot_identity != telegram_webhook_dedup.ledger_bot_identity(
+        "123456789:replacement-bot-token"
+    )
+
+
 def test_webhook_update_schema_keeps_update_id_optional():
     """Contract pin: TelegramWebhookUpdateRequest.update_id feeds dedup."""
     assert TelegramWebhookUpdateRequest.model_fields["update_id"].default is None

@@ -558,7 +558,14 @@ class TelegramMiniAppPatientFormSubmissionRequest(BaseModel):
     status: str = Field(default="submitted")
 
 
-def _validate_webhook_secret(request: Request, db: Session) -> None:
+def _validate_webhook_secret(request: Request, db: Session):
+    """Validate the secret AND return the config row it authenticated.
+
+    PR-3 (round 31): the caller derives the dedup identity from THIS row's
+    credential — one snapshot read binds the secret validation and the
+    identity, so an admin replacing the bot between the two reads can no
+    longer claim an old-bot update under the replacement bot's identity.
+    """
     config = crud_telegram.get_telegram_config(db)
     expected_secret = getattr(config, "webhook_secret", None)
     if not expected_secret:
@@ -575,6 +582,7 @@ def _validate_webhook_secret(request: Request, db: Session) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid Telegram webhook secret",
         )
+    return config
 
 
 # TG-AUDIT-28 P0-8: webhook должен возвращать 200 даже при ошибке,

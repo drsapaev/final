@@ -733,7 +733,12 @@ async def telegram_webhook(
     claimed_bot_identity: str | None = None
     claimed_owner_token: str | None = None
     try:
-        _validate_webhook_secret(request, db)
+        # PR-3 (round 31): the secret validation returns the config row it
+        # authenticated — the dedup identity is derived from THAT row's
+        # credential snapshot, so a bot replacement landing between the
+        # validation and the claim can no longer bind an old-bot update to
+        # the replacement bot's identity.
+        validated_config = _validate_webhook_secret(request, db)
         update = body.model_dump(exclude_none=True)
         logger.info(
             "Telegram webhook update accepted",
@@ -757,8 +762,20 @@ async def telegram_webhook(
         # (codex round 20); Telegram retries the delivery instead.
         # UNAVAILABLE → fail open and process anyway (dedup must never
         # reduce delivery availability).
+        snapshot_token = (
+            getattr(validated_config, "decrypted_bot_token", None)
+            if validated_config is not None
+            else None
+        )
+        # A config row WITHOUT a stored credential means the token comes
+        # from the process-static env fallback — it cannot change
+        # mid-process, so falling back to the service's token there is
+        # race-free.
+        identity_source = snapshot_token or getattr(
+            bot_service, "bot_token", None
+        )
         claimed_bot_identity = await telegram_webhook_dedup.resolve_ledger_bot_identity(
-            getattr(bot_service, "bot_token", None)
+            identity_source
         )
         if claimed_bot_identity is None and body.update_id is not None:
             # PR-3 (round 26): without a SHARED identity a claim could
