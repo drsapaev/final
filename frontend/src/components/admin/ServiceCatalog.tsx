@@ -996,10 +996,14 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     const canonicalCode = normalizedCode || null;
     const apiData: Record<string, unknown> = {
       ...formData,
-      price: formData.price ? parseFloat(String(formData.code ?? '')) : null,
-      category_id: formData.category_id ? parseInt(String(formData.code ?? '')) : null,
-      doctor_id: formData.doctor_id ? parseInt(String(formData.code ?? '')) : null,
-      duration_minutes: parseInt(String(formData.code ?? '')) || 30,
+      // RQ-06.a: parse each field from its own formData value. The previous
+      // code parsed formData.code for price/category_id/doctor_id/duration,
+      // so every save turned price and foreign keys into NaN (null in JSON)
+      // and reset duration_minutes to 30 regardless of the user's input.
+      price: formData.price ? parseFloat(String(formData.price)) : null,
+      category_id: formData.category_id ? parseInt(String(formData.category_id), 10) : null,
+      doctor_id: formData.doctor_id ? parseInt(String(formData.doctor_id), 10) : null,
+      duration_minutes: parseInt(String(formData.duration_minutes ?? ''), 10) || 30,
       code: canonicalCode,
       service_code: canonicalCode, // Sync for backwards compatibility
       category_code: derivedCategoryCode || null // Auto-derived from code
