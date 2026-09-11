@@ -13,6 +13,8 @@ from .payme import PayMeProvider
 
 logger = logging.getLogger(__name__)
 
+_REGISTRAR_INVOICE_PAYMENT_PROVIDERS = frozenset({"click"})
+
 
 class PaymentProviderManager:
     """Менеджер для управления провайдерами платежей"""
@@ -71,6 +73,14 @@ class PaymentProviderManager:
     def get_available_providers(self) -> list[str]:
         """Получение списка доступных провайдеров"""
         return list(self.providers.keys())
+
+    def supports_registrar_invoice_payment(self, provider_name: str) -> bool:
+        """Whether a configured provider can reconcile registrar invoices."""
+        normalized_name = provider_name.lower()
+        return (
+            normalized_name in self.providers
+            and normalized_name in _REGISTRAR_INVOICE_PAYMENT_PROVIDERS
+        )
 
     def get_providers_for_currency(self, currency: str) -> list[str]:
         """
@@ -285,6 +295,9 @@ class PaymentProviderManager:
         """Получение поддерживаемых функций провайдера"""
         return {
             "create_payment": True,
+            "registrar_invoice_payment": self.supports_registrar_invoice_payment(
+                provider.provider_name
+            ),
             "check_status": bool(
                 getattr(provider, "supports_status_check", True)
             ),

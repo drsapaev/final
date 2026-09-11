@@ -15,14 +15,17 @@
 import {
   getPendingInvoices,
   createPaymentInvoice,
+  getPaymentProviders,
   formatUZS,
   normalizePaymentAmount,
   isValidPaymentAmount,
 } from '../api/payments';
+export type { PaymentProviderInfoDto } from '../api/payments';
 
 export interface UsePaymentsApiReturn {
   getPendingInvoices: typeof getPendingInvoices;
   createPaymentInvoice: typeof createPaymentInvoice;
+  getPaymentProviders: typeof getPaymentProviders;
   formatUZS: typeof formatUZS;
   normalizePaymentAmount: typeof normalizePaymentAmount;
   isValidPaymentAmount: typeof isValidPaymentAmount;
@@ -32,6 +35,7 @@ export function usePaymentsApi(): UsePaymentsApiReturn {
   return {
     getPendingInvoices,
     createPaymentInvoice,
+    getPaymentProviders,
     formatUZS,
     normalizePaymentAmount,
     isValidPaymentAmount,

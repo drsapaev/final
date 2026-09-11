@@ -35,3 +35,24 @@ def test_payme_checkout_advertises_only_supported_outbound_operations():
     }
     assert features["check_status"] is False
     assert features["cancel"] is False
+    assert features["registrar_invoice_payment"] is False
+
+
+@pytest.mark.unit
+def test_click_advertises_registrar_invoice_payment_capability():
+    manager = PaymentProviderManager(
+        {
+            "click": {
+                "enabled": True,
+                "service_id": "test-service",
+                "merchant_id": "test-merchant",
+                "secret_key": "test-secret",
+            }
+        }
+    )
+
+    features = manager.get_provider_info()["click"]["features"]
+
+    assert manager.supports_registrar_invoice_payment("CLICK") is True
+    assert features["registrar_invoice_payment"] is True
+    assert manager.supports_registrar_invoice_payment("payme") is False

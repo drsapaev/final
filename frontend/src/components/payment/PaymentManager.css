@@ -121,6 +121,13 @@
   gap: 16px;
 }
 
+.provider-state,
+.invoice-provider-warning {
+  color: var(--mac-warning);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .radio-option {
   display: flex;
   align-items: center;
@@ -255,6 +262,10 @@
   font-size: 13px;
   color: var(--mac-text-secondary);
   margin-top: 4px;
+}
+
+.invoice-provider-warning {
+  margin-top: 6px;
 }
 
 .pay-invoice-btn {

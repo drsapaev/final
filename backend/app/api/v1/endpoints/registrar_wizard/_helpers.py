@@ -755,6 +755,3 @@ class InvoicePaymentResponse(BaseModel):
     provider_payment_id: str | None = None
     error_message: str | None = None
 
-
-SUPPORTED_INVOICE_PAYMENT_PROVIDERS = {"click"}
-

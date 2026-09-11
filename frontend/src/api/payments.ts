@@ -26,6 +26,14 @@ import logger from '../utils/logger';
 import type { Invoice } from '../types/domain/billing';
 import { mapInvoiceDtos, mapInvoiceDto } from './mappers';
 
+export interface PaymentProviderInfoDto {
+  name: string;
+  code: string;
+  supported_currencies: string[];
+  is_active: boolean;
+  features: Record<string, boolean>;
+}
+
 // =====================================================================
 // INVOICES API
 // =====================================================================
@@ -62,6 +70,26 @@ export async function createPaymentInvoice(invoiceData: Record<string, unknown>)
       detail: (error as HttpApiError)?.response?.data?.detail,
     });
     throw createWrappedError(String((error as HttpApiError)?.response?.data?.detail || 'Ошибка создания счёта'), { status: (error as HttpApiError)?.response?.status as number | undefined, response: (error as HttpApiError)?.response });
+  }
+}
+
+/** Return configured providers and backend-owned operation capabilities. */
+export async function getPaymentProviders(): Promise<PaymentProviderInfoDto[]> {
+  try {
+    const response = await api.get('/payments/providers');
+    return Array.isArray(response.data?.providers) ? response.data.providers : [];
+  } catch (error) {
+    logger.error('[payments API] getPaymentProviders failed', {
+      status: (error as HttpApiError)?.response?.status,
+      detail: (error as HttpApiError)?.response?.data?.detail,
+    });
+    throw createWrappedError(
+      String((error as HttpApiError)?.response?.data?.detail || 'Ошибка загрузки платёжных провайдеров'),
+      {
+        status: (error as HttpApiError)?.response?.status as number | undefined,
+        response: (error as HttpApiError)?.response,
+      }
+    );
   }
 }
 
@@ -118,6 +146,7 @@ export function isValidPaymentAmount(amount: unknown): boolean {
 const paymentsAPI = {
   getPendingInvoices,
   createPaymentInvoice,
+  getPaymentProviders,
   formatUZS,
   normalizePaymentAmount,
   isValidPaymentAmount,
