@@ -230,6 +230,11 @@ const QueueCabinetManagement = () => {
   const tableRows = useMemo(
     () =>
       queues.map((queue) => {
+        // QD-2C (Codex round-31 P2): a 0059 bridge keeps its retained
+        // specialist_id while the backend classifies it resource-owned
+        // (sync_status="resource_owned") — classify by that flag, not
+        // by the nullable id, for both presentation decisions.
+        const resourceOwned = queue.sync_status === 'resource_owned';
         return {
           day: (
             <span className="admin-primary-fs-sm">
@@ -247,7 +252,7 @@ const QueueCabinetManagement = () => {
                   {queue.specialist_name || t('admin2.qcm_specialist_fallback', { id: queue.specialist_id })}
                 </div>
                 <div className="admin-fs-xs-tertiary-3">
-                  {queue.specialist_id === null
+                  {resourceOwned
                     ? t('admin2.qcm_resource_tag_line', { tag: queue.queue_tag || '—' })
                     : `ID ${queue.specialist_id}`}
                 </div>
@@ -264,7 +269,7 @@ const QueueCabinetManagement = () => {
               <div className="admin-primary-fw-600-1">
                 {queue.effective_cabinet || t('admin2.qcm_not_specified')}
               </div>
-              {queue.specialist_id === null ? null : (
+              {resourceOwned ? null : (
                 <div className="admin-fs-xs-tertiary-2">
                   {t('admin2.qcm_queue_doctor_line', { queue: queue.cabinet_number || '—', doctor: queue.doctor_cabinet || '—' })}
                 </div>

@@ -5688,3 +5688,132 @@ def test_department_snapshot_defaults_to_clinic_day(
         assert payload["total_waiting"] >= 1
     finally:
         _durable_cleanup(db_session)
+
+
+# ===================== OO. Codex round-31 pins =====================
+
+
+def test_registrar_payload_prefers_resource_metadata_for_bridges(
+    db_session: Session,
+) -> None:
+    """Codex round-31 P2: a BRIDGED queue (the 0059 backfill shape: both
+    specialist_id and queue_resource_id) presents the REGISTRY identity
+    in the registrar payload — the retained synthetic's user/full_name
+    and cabinet lose to the resource axis, and the doctor-cabinet
+    integrity warning does not fire for a resource-owned surface."""
+    from app.api.v1.endpoints.registrar_integration._queue_ops import (
+        _build_queue_payload,
+        _process_online_queue_entries,
+    )
+
+    try:
+        user = _make_user(db_session, username="lab_res_oo1", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        # the synthetic's stale legacy cabinet — must NOT leak into the
+        # bridged payload
+        synthetic.cabinet = "42"
+        db_session.commit()
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        resource = (
+            db_session.query(QueueResource)
+            .filter(QueueResource.queue_tag == "lab")
+            .first()
+        )
+        resource.default_cabinet = "7"
+        db_session.commit()
+
+        # the bridge: BOTH owners set
+        bridged = _make_queue(
+            db_session,
+            day=_DAY,
+            specialist_id=synthetic.id,
+            queue_tag="lab",
+            queue_resource_id=resource.id,
+        )
+        entry = _make_waiting_entry(db_session, bridged, number=31)
+
+        queues_by_specialty: dict = {}
+        _process_online_queue_entries(
+            db_session, [entry], [], queues_by_specialty, set()
+        )
+        bucket = queues_by_specialty["laboratory"]
+        assert "doctor_cabinet_missing" not in bucket.get("integrity_warnings", [])
+        assert bucket["resource_display_name"] == "Ресурс очереди"
+        assert bucket["resource_cabinet"] == "7"
+
+        payload = _build_queue_payload(
+            queue_data=bucket,
+            specialty="laboratory",
+            queue_number=1,
+            entries=[{"id": entry.id, "status": "waiting"}],
+        )
+        # the REGISTRY identity, not the retained synthetic's full_name
+        assert payload["specialist_name"] == "Ресурс очереди"
+        # the resource cabinet, not the synthetic's stale "42"
+        assert payload["cabinet"] == "7"
+        assert payload["queue_resource_id"] == resource.id
+    finally:
+        _durable_cleanup(db_session, "lab_res_oo1")
+
+
+def test_legacy_serializers_prefer_resource_owner_for_bridges(
+    db_session: Session,
+) -> None:
+    """Codex round-31 P2: the legacy serializers (GET /api/v1/queue/today
+    and GET /api/v1/queue/statistics) classify a bridged queue (both
+    owners set) by the RESOURCE axis first — the registry display_name
+    instead of the retained synthetic's full_name/username, which the
+    doctor-first condition previously reported."""
+    from app.api.v1.endpoints.queue import get_queue_statistics, get_today_queue
+
+    try:
+        user = _make_user(db_session, username="lab_res_oo2", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        resource = (
+            db_session.query(QueueResource)
+            .filter(QueueResource.queue_tag == "lab")
+            .first()
+        )
+        resource.display_name = "Лаборатория (OO)"
+        db_session.commit()
+
+        today = _dt_now_tashkent_day()
+        bridged = _make_queue(
+            db_session,
+            day=today,
+            specialist_id=synthetic.id,
+            queue_tag="lab",
+            queue_resource_id=resource.id,
+        )
+        _make_waiting_entry(db_session, bridged, number=1)
+
+        viewer = _make_user(db_session, username="adm_oo2", role="Admin")
+        today_resp = get_today_queue(
+            specialist_id=synthetic.id, db=db_session, current_user=viewer
+        )
+        assert today_resp.queue_id == bridged.id
+        assert today_resp.specialist_name == "Лаборатория (OO)"
+
+        stats_resp = get_queue_statistics(
+            specialist_id=synthetic.id, day=today, db=db_session, current_user=viewer
+        )
+        assert stats_resp["success"] is True
+        assert stats_resp["specialist"]["name"] == "Лаборатория (OO)"
+
+        # regression: a pure doctor queue keeps the doctor identity
+        doc_user = _make_user(db_session, username="dr_oo2", role="doctor")
+        doc_user.full_name = "Доктор Кардио"
+        db_session.commit()
+        doctor = _make_doctor(db_session, user_id=doc_user.id, specialty="cardio")
+        doctor_queue = _make_queue(
+            db_session, day=today, specialist_id=doctor.id, queue_tag="cardio"
+        )
+        _make_waiting_entry(db_session, doctor_queue, number=2)
+        doc_resp = get_today_queue(
+            specialist_id=doctor.id, db=db_session, current_user=viewer
+        )
+        assert doc_resp.queue_id == doctor_queue.id
+        assert doc_resp.specialist_name == "Доктор Кардио"
+    finally:
+        _durable_cleanup(db_session, "lab_res_oo2", "adm_oo2", "dr_oo2")

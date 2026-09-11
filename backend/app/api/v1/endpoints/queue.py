@@ -366,14 +366,22 @@ def get_queue_statistics(
         "specialist": {
             "id": specialist_id,
             "name": (
-                daily_queue.specialist.user.full_name
-                if (daily_queue.specialist and daily_queue.specialist.user)
-                else (
-                    # QD-2C (Codex round-6 P1 / round-10 P2): the resource
-                    # axis (bridged rows included) — the registry
-                    # display_name, not "Врач #None"
+                (
+                    # QD-2C (Codex round-31 P2): у 0059-моста (оба
+                    # владельца) поверхностью владеет ОСЬ РЕСУРСА —
+                    # реестровый display_name вместо пустого full_name
+                    # синтета; приоритет ДО doctor-условия
                     daily_queue.queue_resource.display_name
-                    if daily_queue.queue_resource_id is not None
+                    if daily_queue.queue_resource
+                    else f"Врач #{specialist_id}"
+                )
+                if daily_queue.queue_resource_id is not None
+                else (
+                    daily_queue.specialist.user.full_name
+                    if (
+                        daily_queue.specialist
+                        and daily_queue.specialist.user
+                    )
                     else f"Врач #{specialist_id}"
                 )
             ),
@@ -521,16 +529,21 @@ def get_today_queue(
         day=daily_queue.day,
         specialist_name=(
             (
-                daily_queue.specialist.user.full_name
-                or daily_queue.specialist.user.username
-            )
-            if (daily_queue.specialist and daily_queue.specialist.user)
-            else (
-                # QD-2C (Codex round-6 P1 / round-10 P2): the resource
-                # axis (bridged rows included) — the registry
-                # display_name, not "Врач #None"
+                # QD-2C (Codex round-31 P2): у 0059-моста (оба владельца)
+                # поверхностью владеет ОСЬ РЕСУРСА — реестровый
+                # display_name вместо username удержанного синтета
+                # (lab_resource); приоритет ДО doctor-условия
                 daily_queue.queue_resource.display_name
-                if daily_queue.queue_resource_id is not None
+                if daily_queue.queue_resource
+                else "Ресурс очереди"
+            )
+            if daily_queue.queue_resource_id is not None
+            else (
+                (
+                    daily_queue.specialist.user.full_name
+                    or daily_queue.specialist.user.username
+                )
+                if (daily_queue.specialist and daily_queue.specialist.user)
                 else f"Врач #{daily_queue.specialist_id}"
             )
         ),

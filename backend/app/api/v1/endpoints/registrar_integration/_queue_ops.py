@@ -535,6 +535,14 @@ def _process_online_queue_entries(
             integrity_warnings.append("doctor_inactive")
         if doctor and not doctor.cabinet:
             integrity_warnings.append("doctor_cabinet_missing")
+        # QD-2C (Codex round-31 P2): integrity-предупреждения врача —
+        # только для НЕ-ресурсных поверхностей: у 0059-моста синтет
+        # без кабинета по дизайну, а поверхность принадлежит оси
+        # ресурса (доктор — маршрутизируемый реликт до стадии E)
+        if resource_owned:
+            integrity_warnings = [
+                w for w in integrity_warnings if w != "doctor_cabinet_missing"
+            ]
 
         _ensure_specialty_queue(queues_by_specialty, specialty, doctor.id if doctor else daily_queue.specialist_id)
         bucket = queues_by_specialty[specialty]
@@ -811,22 +819,43 @@ def _build_queue_payload(
         "queue_resource_id": queue_data.get("queue_resource_id"),
         "routing_specialists": list(queue_data.get("routing_specialists", [])),
         "specialist_name": (
-            queue_data["doctor"].user.full_name
-            if queue_data.get("doctor") and queue_data["doctor"].user
-            else (
-                # QD-2C (Codex round-12 P2): resource-ось — display_name
-                # реестра вместо «Специалист #None»
+            (
+                # QD-2C (Codex round-31 P2): у 0059-моста (оба владельца)
+                # поверхностью владеет ОСЬ РЕСУРСА — реестровый
+                # display_name вместо пустого full_name удержанного
+                # синтета; приоритет до doctor-ветки
                 queue_data.get("resource_display_name")
                 or f"Специалист #{queue_data['doctor_id']}"
+            )
+            if queue_data.get("queue_resource_id") is not None
+            else (
+                queue_data["doctor"].user.full_name
+                if queue_data.get("doctor") and queue_data["doctor"].user
+                else (
+                    # QD-2C (Codex round-12 P2): resource-ось — display_name
+                    # реестра вместо «Специалист #None»
+                    queue_data.get("resource_display_name")
+                    or f"Специалист #{queue_data['doctor_id']}"
+                )
             )
         ),
         "specialists": specialists,
         "specialty": specialty,
         "timezone": "Asia/Tashkent",
         "cabinet": (
-            queue_data["doctor"].cabinet
-            if queue_data.get("doctor")
-            else (queue_data.get("resource_cabinet") or "N/A")
+            (
+                # QD-2C (Codex round-31 P2): кабинет ресурсной поверхности
+                # — из оси ресурса (кабинет очереди/реестра), не из
+                # удержанного синтета без кабинета
+                queue_data.get("resource_cabinet")
+                or "N/A"
+            )
+            if queue_data.get("queue_resource_id") is not None
+            else (
+                queue_data["doctor"].cabinet
+                if queue_data.get("doctor")
+                else (queue_data.get("resource_cabinet") or "N/A")
+            )
         ),
         "integrity_warnings": list(dict.fromkeys(queue_data.get("integrity_warnings", []))),
         "has_integrity_warnings": bool(queue_data.get("integrity_warnings")),
