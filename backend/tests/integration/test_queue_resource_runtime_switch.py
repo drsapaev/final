@@ -6700,3 +6700,206 @@ def test_transferred_shared_visit_keeps_its_day(
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== YY. Codex round-41 pins =====================
+
+
+def test_transferred_doctor_visit_follows_the_new_queue_day(
+    db_session: Session,
+) -> None:
+    """Codex round-41 P2 (doctor facet): force-majeure also transfers
+    ordinary doctor-owned entries while retaining their visit_id — the
+    retained-visit day validation must cover the DOCTOR surface as
+    well: a solo doctor visit follows the transferred ticket onto the
+    NEW queue day (the encounter is served there), so the start/
+    completion mutate the correctly dated visit instead of updating
+    yesterday's encounter."""
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        call_patient,
+        start_patient_visit,
+    )
+    from app.crud import visit as crud_visit
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+    from app.services.force_majeure_service import ForceMajeureService
+
+    patient = Patient(
+        last_name="Ресурсный9",
+        first_name="Пациент",
+        phone="+998901234542",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        original_day = _dt_now_tashkent_day()
+        # a REAL doctor whose specialty has no registry row — the
+        # transfer keeps the legacy doctor-owned surface (specialist
+        # queue), so the resolve site takes the doctor branch
+        doc_user = _make_user(db_session, username="doc_yy1", role="Doctor")
+        therapist = _make_doctor(db_session, user_id=doc_user.id, specialty="therapy")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=original_day, specialist_id=therapist.id
+        )
+
+        visit = crud_visit.create_visit(
+            db=db_session,
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            visit_date=original_day,
+            visit_time="10:00",
+            department="therapy",
+        )
+        entry = _make_waiting_entry(db_session, queue, number=96)
+        entry.patient_id = patient.id
+        entry.visit_id = visit.id
+        db_session.commit()
+
+        result = ForceMajeureService(db_session).transfer_entries_to_tomorrow(
+            entries=[entry],
+            specialist_id=therapist.id,
+            reason="round-41 pin",
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert result["success"] is True
+        new_day = date.fromisoformat(result["new_date"])
+        assert new_day == original_day + timedelta(days=1)
+
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        assert moved.visit_id == visit.id  # the link the transfer retained
+
+        admin = _make_user(db_session, username="adm_yy1", role="Admin")
+        assert call_patient(entry_id=moved.id, db=db_session, current_user=admin)[
+            "success"
+        ]
+        assert start_patient_visit(
+            entry_id=moved.id, db=db_session, current_user=admin
+        )["success"]
+
+        db_session.refresh(visit)
+        # the retained DOCTOR-owned solo visit follows the transferred
+        # ticket: the encounter is recorded on the NEW queue day
+        assert visit.visit_date == new_day
+        visits = db_session.query(Visit).filter(Visit.patient_id == patient.id).all()
+        assert len(visits) == 1
+    finally:
+        _durable_cleanup(db_session, "doc_yy1", "adm_yy1")
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
+
+
+def test_group_transferred_entries_share_one_relinked_visit(
+    db_session: Session,
+) -> None:
+    """Codex round-41 P2 (grouped facet): when several same-department
+    resource tickets sharing ONE visit are transferred together, the
+    transferred peers must not anchor the retained visit — every peer
+    rides on the new queue day, so the first ticket re-dates the solo
+    visit onto the new day and the rest resolve the SAME visit on the
+    fast path; otherwise the group transfer left TWO visits for the
+    same patient, department and new queue day."""
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        call_patient,
+        start_patient_visit,
+    )
+    from app.crud import visit as crud_visit
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+    from app.services.force_majeure_service import ForceMajeureService
+
+    patient = Patient(
+        last_name="Ресурсный10",
+        first_name="Пациент",
+        phone="+998901234543",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        original_day = _dt_now_tashkent_day()
+        res_user = _make_user(db_session, username="lab_res_yy2", role="Resource")
+        synthetic = _make_doctor(db_session, user_id=res_user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        lab_queue = queue_service.get_or_create_daily_queue(
+            db_session, day=original_day, specialist_id=None, queue_tag="lab"
+        )
+
+        # one registrar visit shared by BOTH same-day lab tickets
+        visit = crud_visit.create_visit(
+            db=db_session,
+            patient_id=patient.id,
+            doctor_id=None,
+            visit_date=original_day,
+            visit_time="11:00",
+            department="lab",
+        )
+        first = _make_waiting_entry(db_session, lab_queue, number=97)
+        first.patient_id = patient.id
+        first.visit_id = visit.id
+        second = _make_waiting_entry(db_session, lab_queue, number=98)
+        second.patient_id = patient.id
+        second.visit_id = visit.id
+        db_session.commit()
+
+        result = ForceMajeureService(db_session).transfer_entries_to_tomorrow(
+            entries=[first, second],
+            specialist_id=synthetic.id,
+            reason="round-41 pin",
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert result["success"] is True
+        new_day = date.fromisoformat(result["new_date"])
+        assert new_day == original_day + timedelta(days=1)
+
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .order_by(OnlineQueueEntry.id)
+            .all()
+        )
+        assert len(moved) == 2
+
+        admin = _make_user(db_session, username="adm_yy2", role="Admin")
+        for ticket in moved:
+            assert call_patient(entry_id=ticket.id, db=db_session, current_user=admin)[
+                "success"
+            ]
+            assert start_patient_visit(
+                entry_id=ticket.id, db=db_session, current_user=admin
+            )["success"]
+
+        db_session.refresh(visit)
+        db_session.refresh(moved[0])
+        db_session.refresh(moved[1])
+        # the transferred peers did NOT anchor the old-day visit: the
+        # first ticket re-dated the solo visit onto the new queue day
+        assert visit.visit_date == new_day
+        # both transferred tickets resolve THE SAME visit (no second
+        # visit for the patient/department on the new day)
+        assert moved[0].visit_id == visit.id
+        assert moved[1].visit_id == visit.id
+        visits = db_session.query(Visit).filter(Visit.patient_id == patient.id).all()
+        assert len(visits) == 1
+    finally:
+        _durable_cleanup(db_session, "lab_res_yy2", "adm_yy2")
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
