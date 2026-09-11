@@ -710,8 +710,15 @@ def check_queue_availability(
     current_time = datetime.now(timezone)
     queue_start_hour = queue_settings.get("queue_start_hour", 7)
 
+    # Codex round-33 P2: день сравнения — тоже КЛИНИК-локальный (из
+    # того же current_time): host date.today() в окне 19:00-24:00Z
+    # считал текущий клиник-день «будущим» и ПРОПУСКАЛ ограничение
+    # TOO_EARLY — /online-queue/status отвечал within_hours=true до
+    # открытия онлайн-записи.
+    today = current_time.date()
+
     # Проверяем дату
-    if day < date.today():
+    if day < today:
         return {
             "available": False,
             "reason": "DATE_PAST",
@@ -719,7 +726,7 @@ def check_queue_availability(
         }
 
     # Если сегодня, проверяем время
-    if day == date.today():
+    if day == today:
         if current_time.hour < queue_start_hour:
             return {
                 "available": False,

@@ -1277,10 +1277,11 @@ def test_online_queue_status_and_availability_resolve_resource(
     specialist-keyed lookups resolve the resource queue instead of
     reporting queue_exists=False / creating ghosts. The availability
     check rejects PAST days (DATE_PAST) — the world rides a dynamic
-    future day so the pin never rots with the wall clock."""
+    future CLINIC day (Codex round-33: the availability guards compare
+    on the clinic clock) so the pin never rots with the wall clock."""
     from app.crud.online_queue import check_queue_availability, get_queue_status
 
-    future_day = date.today() + timedelta(days=1)
+    future_day = _dt_now_tashkent_day() + timedelta(days=1)
     user = _make_user(db_session, username="lab_res7", role="Resource")
     synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
     _make_resource(db_session, code="lab", queue_tag="lab", max_online_per_day=2)
@@ -5913,3 +5914,99 @@ def test_online_queue_aggregate_prefers_resource_owner_for_bridges(
         assert doctor_row["specialist_name"] == "Доктор Кардио"
     finally:
         _durable_cleanup(db_session, "lab_res_pp2", "dr_pp2")
+
+
+# ===================== QQ. Codex round-33 pins =====================
+
+
+def test_analytics_department_resolves_profile_queue_tags(
+    db_session: Session,
+) -> None:
+    """Codex round-33 P2: department-filtered analytics resolves the
+    department's resource queue tags through its QueueProfile — the
+    canonical 0055 department keys ('laboratory', 'echokg') differ from
+    the registry tags ('lab', 'ecg') and specialty_variants alone
+    excluded the resource queues, reporting zero queue activity for the
+    department."""
+    from datetime import datetime as _dt
+
+    from app.models.department import Department
+    from app.models.queue_profile import QueueProfile
+    from app.services.analytics import AnalyticsService
+
+    today = _dt_now_tashkent_day()
+    start = _dt(today.year, today.month, today.day, 0, 0)
+    end = _dt(today.year, today.month, today.day, 23, 59)
+    try:
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=today, specialist_id=None, queue_tag="lab"
+        )
+        _make_waiting_entry(db_session, queue, number=1)
+        _make_waiting_entry(db_session, queue, number=2)
+
+        department = Department(key="laboratory_qq", name_ru="Лаборатория")
+        profile = QueueProfile(
+            key="laboratory_qq",
+            title="Лаборатория",
+            department_key="laboratory_qq",
+            queue_tags=["lab"],
+        )
+        db_session.add_all([department, profile])
+        db_session.commit()
+
+        stats = AnalyticsService.get_queue_statistics(
+            db_session, start, end, department="laboratory_qq"
+        )
+        assert stats["total_queues"] == 1
+        assert stats["total_entries"] == 2
+    finally:
+        _durable_cleanup(db_session)
+        db_session.query(QueueProfile).filter(
+            QueueProfile.key == "laboratory_qq"
+        ).delete(synchronize_session=False)
+        db_session.query(Department).filter(Department.key == "laboratory_qq").delete(
+            synchronize_session=False
+        )
+        db_session.commit()
+
+
+def test_availability_compares_dates_on_clinic_clock(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-33 P2: /online-queue/status availability compares the
+    requested day on the CLINIC clock — host date.today() classified
+    the current clinic day as future and skipped the pre-07:00
+    TOO_EARLY restriction (within_hours=true before online
+    registration opens). The clock is frozen on the next clinic day at
+    05:30 (guaranteed to differ from the host date)."""
+    from app.crud import online_queue as crud_online_queue
+
+    frozen_day = date.today() + timedelta(days=1)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            frozen = datetime.combine(frozen_day, datetime.min.time()).replace(
+                hour=5, minute=30
+            )
+            if tz is not None:
+                return frozen.replace(tzinfo=tz)
+            return frozen
+
+    monkeypatch.setattr(crud_online_queue, "datetime", FixedDateTime)
+
+    user = _make_user(db_session, username="lab_res_qq2", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    try:
+        availability = crud_online_queue.check_queue_availability(
+            db_session, frozen_day, specialist_id=synthetic.id
+        )
+        # the clinic-day TOO_EARLY guard applies — NOT the host clock's
+        # future-day availability
+        assert availability["available"] is False, availability
+        assert availability["reason"] == "TOO_EARLY"
+        assert availability["available_from"] == "7:00"
+    finally:
+        _durable_cleanup(db_session, "lab_res_qq2")
