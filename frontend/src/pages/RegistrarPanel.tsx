@@ -191,7 +191,7 @@ const RegistrarPanel = () => {
     setAppointments,
     dataSource,
     appointmentsLoading,
-    paginationInfo,
+    paginationInfo, stale: worklistStale,
     loadAppointments,
     loadMoreAppointments,
   } = useRegistrarWorklistData({
@@ -390,7 +390,7 @@ const RegistrarPanel = () => {
                 dataSource={dataSource}
                 count={appointments.length}
                 paginationInfo={paginationInfo}
-                onRetry={loadAppointments}
+                onRetry={loadAppointments} stale={worklistStale}
               />
             )}
           />
@@ -434,6 +434,7 @@ const RegistrarPanel = () => {
             onEmptyStateCta={() => setShowWizard(true)}
             // RQ-20.b: явный сброс активного статус-фильтра (владелец URL — useRegistrarNavigation).
             onClearStatusFilter={clearStatusFilter}
+            stale={worklistStale} onRetry={() => { void loadAppointments({ silent: false, source: 'worklist_retry' }); }}
             tI18n={tI18n}
           />
         }

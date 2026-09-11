@@ -19,7 +19,7 @@ import type { WorklistPaginationInfo } from '../useRegistrarWorklistData';
 // RQ-19: the tabpanel labelledby must reference the REAL id of the tab
 // button selected in navigation/Tabs — both sides share tabButtonIdFor.
 import { tabButtonIdFor } from '../../../components/navigation/Tabs';
-import { ArrowUpDown, FileText, Plus, Search, X } from 'lucide-react';
+import { ArrowUpDown, AlertTriangle, FileText, Plus, Search, X } from 'lucide-react';
 
 interface WorklistViewProps {
   // presentation inputs
@@ -48,6 +48,13 @@ interface WorklistViewProps {
   /** RQ-20.b: explicit reset of the active status filter (?status=) —
    *  optional for compat; when absent the badge stays display-only. */
   onClearStatusFilter?: () => void;
+  /** RQ-22 (F-18): true when the displayed rows are previously loaded data
+   *  kept after a failed refresh — shown with an explicit staleness banner
+   *  instead of silently pretending the sample is fresh. */
+  stale?: boolean;
+  /** RQ-22: explicit retry — refreshes the worklist (failed refresh and
+   *  the primary error state both reuse it). Optional for compat. */
+  onRetry?: () => void;
   tI18n: (key: string, options?: Record<string, unknown>) => string;
 }
 
@@ -71,6 +78,8 @@ const WorklistView = ({
   onNewAppointment,
   onEmptyStateCta,
   onClearStatusFilter,
+  stale,
+  onRetry,
   tI18n,
 }: WorklistViewProps) => (
   <div
@@ -145,9 +154,44 @@ const WorklistView = ({
 
       {/* QW-01 fix: bulk-action bar removed (was dead UI) */}
 
+      {/* RQ-22 (F-18): a failed refresh must never silently become a
+          "successfully empty" answer. When kept rows are stale they stay
+          visible under an explicit staleness banner with a retry; when
+          nothing was ever loaded the PRIMARY error is shown instead of the
+          misleading "no matches" empty state. */}
+      {stale && !appointmentsLoading && dataSource === 'api' && (
+        <div className="registrar-stale-banner" role="status" aria-live="polite">
+          <AlertTriangle size={16} aria-hidden="true" />
+          <span>{tI18n('registrarPanel.rp_worklist_stale_warning')}</span>
+          {onRetry && (
+            <button type="button" className="registrar-ds-retry-btn" onClick={onRetry}>
+              {tI18n('registrarPanel.ds_retry')}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Таблица записей */}
       {appointmentsLoading ?
     <AnimatedLoader.TableSkeleton rows={8} columns={10} /> :
+    filteredAppointments.length === 0 && dataSource === 'error' ?
+    <div className="registrar-empty-state">
+          <div className="registrar-empty-icon-lg">
+            <AlertTriangle size={24} aria-hidden="true" />
+          </div>
+          <h3 className="registrar-empty-heading registrar-empty-heading-text">
+            {tI18n('registrarPanel.ds_error_message')}
+          </h3>
+          {onRetry && (
+            <Button
+              variant="primary"
+              onClick={onRetry}
+              className="registrar-btn-cta">
+
+              {tI18n('registrarPanel.ds_retry')}
+            </Button>
+          )}
+        </div> :
     filteredAppointments.length === 0 && dataSource === 'api' ?
     <div className="registrar-empty-state">
           <div className="registrar-empty-icon-lg">
