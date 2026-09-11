@@ -1115,10 +1115,7 @@ export const buildAppointmentsTableColumns = ({
               })
             : [];
 
-          if (
-            queueTimestampDisplays.length > 1 &&
-            queueTimestampDisplays.every(({ display }) => Boolean(display.primaryValue))
-          ) {
+          if (queueTimestampDisplays.length > 1) {
             return (
               <div>
                 {queueTimestampDisplays.map(({ key, label, display }) => (
@@ -1126,11 +1123,11 @@ export const buildAppointmentsTableColumns = ({
                     <div className="eat-time-label">{label}</div>
                     <div className="eat-th-content">
                       <Calendar size={12} className="eat-calendar-icon" />
-                      {display.primaryDate}
+                      {display.primaryDate || '—'}
                     </div>
                     <div className="eat-time-row">
                       <Clock size={10} />
-                      {display.primaryTime}
+                      {display.primaryTime || '—'}
                     </div>
                     {display.showChanged &&
                       <div className="eat-time-changed">
