@@ -6435,3 +6435,64 @@ def test_queue_statistics_stamp_the_clinic_day(
         ).delete(synchronize_session=False)
         _durable_cleanup(db_session)
         db_session.commit()
+
+
+# ===================== WW. Codex round-39 pins =====================
+
+
+def test_analytics_default_range_rides_the_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-39 P2: the default analytics period (omitted
+    start/end) is derived from the CLINIC-local day — the
+    clinic_today SSOT the statistics rows are stamped with (round-38)
+    — so a default /admin/queue-analytics request keeps reporting the
+    current clinic day's newly recorded totals instead of excluding
+    them via the host date in the 19:00-24:00Z divergence window.
+    The clinic clock is forced onto a timezone whose local date
+    guaranteedly differs from the host date."""
+    from app.api.v1.endpoints.qr_queue._analytics import get_queue_analytics
+    from app.models.online_queue import QueueStatistics
+
+    tz_name, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()  # the divergence window is real
+    monkeypatch.setattr("app.crud.clinic.clinic_today", lambda db: clinic_day)
+
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+    )
+    db_session.add(
+        QueueStatistics(
+            queue_id=queue.id,
+            date=clinic_day,
+            online_joins=3,
+            desk_registrations=0,
+            telegram_joins=0,
+            confirmation_joins=0,
+            total_served=0,
+            total_no_show=0,
+        )
+    )
+    db_session.commit()
+
+    user = _make_user(db_session, username="lab_res_ww1", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    admin = _make_user(db_session, username="adm_ww1", role="Admin")
+
+    try:
+        payload = get_queue_analytics(synthetic.id, db=db_session, current_user=admin)
+        # the default period closes on the CLINIC day and keeps the
+        # freshly stamped resource row inside the report
+        assert payload["period"]["end_date"] == clinic_day.isoformat()
+        assert (
+            payload["period"]["start_date"]
+            == (clinic_day - timedelta(days=30)).isoformat()
+        )
+        assert payload["totals"]["online_joins"] == 3
+    finally:
+        db_session.query(QueueStatistics).filter(
+            QueueStatistics.queue_id == queue.id
+        ).delete(synchronize_session=False)
+        _durable_cleanup(db_session, "lab_res_ww1", "adm_ww1")
+        db_session.commit()
