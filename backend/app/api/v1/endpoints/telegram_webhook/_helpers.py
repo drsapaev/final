@@ -3,6 +3,7 @@ Telegram webhook helper functions, constants, and utilities.
 
 Split from telegram_webhook.py (5647 LOC → modular).
 """
+
 """
 Webhook endpoint для обработки входящих сообщений от Telegram
 """
@@ -50,6 +51,42 @@ from app.api.v1.endpoints.admin_telegram import (  # noqa: F401
     _normalize_staff_role,
     validate_staff_link_start_token,
 )
+
+
+async def _ensure_bot_service_fresh(db: Session):
+    """Return the clinic bot service, re-initialized whenever the canonical
+    SSOT token no longer matches the cached credential.
+
+    PR-2 (codex round 8): in a multi-worker deployment (Dockerfile starts
+    four workers) the admin request that rotated or revoked the token hit a
+    DIFFERENT worker; this process's singleton still holds the superseded
+    credential with active=True and the webhook/send paths only call
+    initialize() while inactive. Comparing the cached token against the
+    store resolver on every entry makes rotations/revocations visible
+    across processes without restarts.
+    """
+    # Resolve the service via the package binding at call time: unit tests
+    # monkeypatch telegram_webhook.get_telegram_bot_service; a direct
+    # services.telegram_bot import would bypass that patch.
+    from app.api.v1.endpoints import telegram_webhook as _tw_package
+    from app.services.telegram_token_store import resolve_patient_bot_token
+
+    bot_service = await _tw_package.get_telegram_bot_service()
+    try:
+        canonical = resolve_patient_bot_token(db)
+    except Exception as exc:
+        # Resolution unavailable (transient DB failure, non-session stub):
+        # keep the cached state rather than tearing down a working bot.
+        logger.warning(
+            "Telegram bot token freshness check failed error_type=%s",
+            type(exc).__name__,
+        )
+        return bot_service
+    if not bot_service.active or bot_service.bot_token != canonical:
+        await bot_service.initialize(db)
+    return bot_service
+
+
 from app.core.config import settings  # noqa: F401
 from app.crud import audit as crud_audit  # noqa: F401
 from app.crud import telegram_config as crud_telegram  # noqa: F401
@@ -136,7 +173,8 @@ async def _read_telegram_webhook_json(request: Request) -> dict[str, Any]:
     if len(body) > MAX_TELEGRAM_WEBHOOK_BODY_BYTES:
         logger.warning(
             "Telegram webhook body too large: %d bytes (max %d)",
-            len(body), MAX_TELEGRAM_WEBHOOK_BODY_BYTES,
+            len(body),
+            MAX_TELEGRAM_WEBHOOK_BODY_BYTES,
         )
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -150,6 +188,7 @@ async def _read_telegram_webhook_json(request: Request) -> dict[str, Any]:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid JSON body",
         ) from exc
+
 
 # TG-AUDIT-28 P1-4: body size limit for webhook (was unbounded — DoS risk).
 # Telegram webhook payloads are typically <10KB; 256KB is generous.
@@ -162,7 +201,8 @@ async def _read_telegram_webhook_json(request: Request) -> dict[str, Any]:
     if len(body) > MAX_TELEGRAM_WEBHOOK_BODY_BYTES:
         logger.warning(
             "Telegram webhook body too large: %d bytes (max %d)",
-            len(body), MAX_TELEGRAM_WEBHOOK_BODY_BYTES,
+            len(body),
+            MAX_TELEGRAM_WEBHOOK_BODY_BYTES,
         )
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -176,18 +216,18 @@ async def _read_telegram_webhook_json(request: Request) -> dict[str, Any]:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid JSON body",
         ) from exc
+
+
 WEBHOOK_SECRET_HEADER = "x-telegram-bot-api-secret-token"
 TELEGRAM_TICKET_QR_LINKED_MESSAGE = (
     "Ваш Telegram привязан к чеку клиники. "
     "Когда результаты будут готовы, откройте меню бота."
 )
 TELEGRAM_TICKET_QR_EXPIRED_MESSAGE = (
-    "Ссылка из чека истекла или уже использована. "
-    "Обратитесь в регистратуру."
+    "Ссылка из чека истекла или уже использована. " "Обратитесь в регистратуру."
 )
 TELEGRAM_TICKET_QR_LINK_FAILED_MESSAGE = (
-    "Не удалось привязать Telegram к чеку. "
-    "Попробуйте открыть QR еще раз."
+    "Не удалось привязать Telegram к чеку. " "Попробуйте открыть QR еще раз."
 )
 TELEGRAM_STAFF_LINKED_MESSAGE = (
     "Telegram привязан к учетной записи сотрудника. "
@@ -208,9 +248,7 @@ TELEGRAM_STAFF_MENU_UNLINKED_MESSAGE = (
 TELEGRAM_STAFF_MENU_FORBIDDEN_MESSAGE = (
     "Staff Telegram menu is not available for this account role."
 )
-TELEGRAM_STAFF_MENU_PLACEHOLDER_MESSAGE = (
-    "Read-only staff data is not connected in Telegram yet. Use the clinic app for live data."
-)
+TELEGRAM_STAFF_MENU_PLACEHOLDER_MESSAGE = "Read-only staff data is not connected in Telegram yet. Use the clinic app for live data."
 TELEGRAM_STAFF_ACTION_DENIED_MESSAGE = (
     "State-changing staff actions require confirmation in the clinic app. "
     "Telegram execution is disabled."
@@ -277,12 +315,16 @@ TELEGRAM_LANGUAGE_MENU = {
 }
 TELEGRAM_NOTIFICATION_CONSENT_MENUS = {
     TELEGRAM_LANGUAGE_RU: {
-        "keyboard": [[{"text": "🔔 Разрешить уведомления"}, {"text": "🔕 Без уведомлений"}]],
+        "keyboard": [
+            [{"text": "🔔 Разрешить уведомления"}, {"text": "🔕 Без уведомлений"}]
+        ],
         "resize_keyboard": True,
         "one_time_keyboard": True,
     },
     TELEGRAM_LANGUAGE_UZ: {
-        "keyboard": [[{"text": "🔔 Xabarnomalarga roziman"}, {"text": "🔕 Xabarnomasiz"}]],
+        "keyboard": [
+            [{"text": "🔔 Xabarnomalarga roziman"}, {"text": "🔕 Xabarnomasiz"}]
+        ],
         "resize_keyboard": True,
         "one_time_keyboard": True,
     },
@@ -367,8 +409,7 @@ TELEGRAM_SETTINGS_STATUS_LABELS = {
         "notifications_on": "включены",
         "notifications_off": "отключены",
         "template": (
-            "\n\nТекущий язык: {language_label}\n"
-            "Уведомления: {notification_label}"
+            "\n\nТекущий язык: {language_label}\n" "Уведомления: {notification_label}"
         ),
     },
     TELEGRAM_LANGUAGE_UZ: {
@@ -379,8 +420,7 @@ TELEGRAM_SETTINGS_STATUS_LABELS = {
         "notifications_on": "yoqilgan",
         "notifications_off": "o'chirilgan",
         "template": (
-            "\n\nJoriy til: {language_label}\n"
-            "Xabarnomalar: {notification_label}"
+            "\n\nJoriy til: {language_label}\n" "Xabarnomalar: {notification_label}"
         ),
     },
 }
@@ -406,8 +446,7 @@ TELEGRAM_LOCALIZED_TEXTS = {
     "ticket_qr_link_failed": {
         TELEGRAM_LANGUAGE_RU: TELEGRAM_TICKET_QR_LINK_FAILED_MESSAGE,
         TELEGRAM_LANGUAGE_UZ: (
-            "Telegramni chek bilan bog'lab bo'lmadi. "
-            "QR kodni yana ochib ko'ring."
+            "Telegramni chek bilan bog'lab bo'lmadi. " "QR kodni yana ochib ko'ring."
         ),
     },
     "share_contact": {
@@ -725,8 +764,7 @@ TELEGRAM_LOCALIZED_TEXTS = {
     },
     "lab_result_document_caption": {
         TELEGRAM_LANGUAGE_RU: (
-            "Результат анализа: {template_name}\n"
-            "Отчет #{report_id} от {report_date}"
+            "Результат анализа: {template_name}\n" "Отчет #{report_id} от {report_date}"
         ),
         TELEGRAM_LANGUAGE_UZ: (
             "Tahlil natijasi: {template_name}\n"
@@ -789,12 +827,10 @@ TELEGRAM_LOCALIZED_TEXTS = {
     },
     "payments_empty": {
         TELEGRAM_LANGUAGE_RU: (
-            "Пациент: {patient}\n"
-            "Активных начислений и оплат пока нет."
+            "Пациент: {patient}\n" "Активных начислений и оплат пока нет."
         ),
         TELEGRAM_LANGUAGE_UZ: (
-            "Bemor: {patient}\n"
-            "Hozircha faol hisob-kitoblar va to'lovlar yo'q."
+            "Bemor: {patient}\n" "Hozircha faol hisob-kitoblar va to'lovlar yo'q."
         ),
     },
     "payments_patient": {
@@ -1090,7 +1126,9 @@ def _extract_staff_link_start_payload(
 
 def _normalize_patient_language(language_code: Any) -> str:
     value = str(language_code or "").strip().lower().replace("_", "-")
-    if value in {"uz", "uz-latn", "uzbek", "o'zbekcha", "ozbekcha"} or value.startswith("uz-"):
+    if value in {"uz", "uz-latn", "uzbek", "o'zbekcha", "ozbekcha"} or value.startswith(
+        "uz-"
+    ):
         return TELEGRAM_LANGUAGE_UZ
     return TELEGRAM_LANGUAGE_RU
 
@@ -1169,9 +1207,7 @@ def _build_patient_mini_app_entry_token(chat_id: int, section: str) -> str:
             PATIENT_MINI_APP_ENTRY_TOKEN_PREFIX,
             _patient_mini_app_token_section(section),
             _base36_encode(int(chat_id)),
-            _base36_encode(
-                int(expires_at.replace(tzinfo=UTC).timestamp())
-            ),
+            _base36_encode(int(expires_at.replace(tzinfo=UTC).timestamp())),
             _base36_encode(secrets.randbits(48)),
         ]
     )
@@ -1179,7 +1215,9 @@ def _build_patient_mini_app_entry_token(chat_id: int, section: str) -> str:
     return f"{body}{PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR}{signature}"
 
 
-def _build_patient_onboarding_entry_token(chat_id: int, section: str = "appointments") -> str:
+def _build_patient_onboarding_entry_token(
+    chat_id: int, section: str = "appointments"
+) -> str:
     expires_at = datetime.now(UTC) + timedelta(
         seconds=_patient_mini_app_entry_token_ttl_seconds()
     )
@@ -1188,9 +1226,7 @@ def _build_patient_onboarding_entry_token(chat_id: int, section: str = "appointm
             PATIENT_ONBOARDING_ENTRY_TOKEN_PREFIX,
             _patient_mini_app_token_section(section),
             _base36_encode(int(chat_id)),
-            _base36_encode(
-                int(expires_at.replace(tzinfo=UTC).timestamp())
-            ),
+            _base36_encode(int(expires_at.replace(tzinfo=UTC).timestamp())),
             _base36_encode(secrets.randbits(48)),
         ]
     )
@@ -1208,7 +1244,9 @@ def _parse_patient_mini_app_entry_token(
         return None
 
     section = _patient_mini_app_token_section(parts[1])
-    if expected_section and section != _patient_mini_app_token_section(expected_section):
+    if expected_section and section != _patient_mini_app_token_section(
+        expected_section
+    ):
         return None
 
     body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(parts[:5])
@@ -1244,7 +1282,9 @@ def _parse_patient_onboarding_entry_token(
         return None
 
     section = _patient_mini_app_token_section(parts[1])
-    if expected_section and section != _patient_mini_app_token_section(expected_section):
+    if expected_section and section != _patient_mini_app_token_section(
+        expected_section
+    ):
         return None
 
     body = PATIENT_MINI_APP_ENTRY_TOKEN_SEPARATOR.join(parts[:5])
@@ -1324,7 +1364,9 @@ def _telegram_patient_frontend_url() -> str | None:
 
     port = parsed.port or 5173
     netloc = f"{local_ip}:{port}"
-    return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+    return urlunsplit(
+        (parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment)
+    )
 
 
 def _patient_entry_url(section: str | None = None) -> str | None:
@@ -1401,7 +1443,9 @@ def _telegram_service_entry_markup(
     }
 
 
-def _telegram_onboarding_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
+def _telegram_onboarding_entry_markup(
+    db: Session, chat_id: int
+) -> dict[str, Any] | None:
     entry_url = _patient_entry_url("booking")
     if not entry_url:
         return None
@@ -1479,7 +1523,9 @@ def _telegram_visits_entry_markup(db: Session, chat_id: int) -> dict[str, Any] |
     )
 
 
-def _telegram_patient_forms_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
+def _telegram_patient_forms_entry_markup(
+    db: Session, chat_id: int
+) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1488,7 +1534,9 @@ def _telegram_patient_forms_entry_markup(db: Session, chat_id: int) -> dict[str,
     )
 
 
-def _telegram_patient_documents_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
+def _telegram_patient_documents_entry_markup(
+    db: Session, chat_id: int
+) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1497,7 +1545,9 @@ def _telegram_patient_documents_entry_markup(db: Session, chat_id: int) -> dict[
     )
 
 
-def _telegram_patient_doctors_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
+def _telegram_patient_doctors_entry_markup(
+    db: Session, chat_id: int
+) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1506,7 +1556,9 @@ def _telegram_patient_doctors_entry_markup(db: Session, chat_id: int) -> dict[st
     )
 
 
-def _telegram_patient_cabinet_entry_markup(db: Session, chat_id: int) -> dict[str, Any] | None:
+def _telegram_patient_cabinet_entry_markup(
+    db: Session, chat_id: int
+) -> dict[str, Any] | None:
     return _telegram_protected_or_onboarding_markup(
         db,
         chat_id,
@@ -1564,14 +1616,20 @@ def _telegram_chat_menu(db: Session, chat_id: int) -> dict[str, Any]:
 
 def _telegram_settings_message(db: Session, chat_id: int) -> str:
     telegram_user = crud_telegram.get_telegram_user_by_chat_id(db, chat_id)
-    language = _normalize_patient_language(getattr(telegram_user, "language_code", None))
+    language = _normalize_patient_language(
+        getattr(telegram_user, "language_code", None)
+    )
     labels = TELEGRAM_SETTINGS_STATUS_LABELS.get(
         language, TELEGRAM_SETTINGS_STATUS_LABELS[TELEGRAM_LANGUAGE_RU]
     )
-    language_label = labels["language"].get(language, labels["language"][TELEGRAM_LANGUAGE_RU])
+    language_label = labels["language"].get(
+        language, labels["language"][TELEGRAM_LANGUAGE_RU]
+    )
     notifications_enabled = bool(getattr(telegram_user, "notifications_enabled", False))
     notification_label = (
-        labels["notifications_on"] if notifications_enabled else labels["notifications_off"]
+        labels["notifications_on"]
+        if notifications_enabled
+        else labels["notifications_off"]
     )
     return _localized_text("settings", language) + labels["template"].format(
         language_label=language_label,
@@ -1608,7 +1666,7 @@ def _normalize_patient_button_text(text: Any) -> str:
     value = value.replace("\ufe0f", "").strip()
     for prefix in TELEGRAM_PATIENT_BUTTON_ICON_PREFIXES:
         if value.startswith(prefix):
-            value = value[len(prefix):].strip()
+            value = value[len(prefix) :].strip()
             break
     return value
 
@@ -1626,4 +1684,3 @@ def _patient_text_handler_aliases(pairs: list[tuple[str, Any]]) -> dict[str, Any
         if normalized:
             aliases[normalized] = handler
     return aliases
-

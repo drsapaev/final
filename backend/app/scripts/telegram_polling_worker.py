@@ -88,7 +88,18 @@ class TelegramPollingWorker:
                     LOGGER.info("Telegram bot token changed — reloading")
                     token = canonical
                     if not self.keep_webhook:
-                        self._delete_webhook(session, token)
+                        try:
+                            self._delete_webhook(session, token)
+                        except Exception as exc:
+                            # Best-effort: a transient deleteWebhook failure
+                            # must not terminate an otherwise healthy worker
+                            # (codex round 8) — keep polling with the new
+                            # token.
+                            LOGGER.warning(
+                                "Telegram deleteWebhook after rotation failed "
+                                "error_type=%s",
+                                type(exc).__name__,
+                            )
                     offset = None
             try:
                 updates = self._get_updates(session, token, offset)
@@ -110,7 +121,14 @@ class TelegramPollingWorker:
                         LOGGER.info("Telegram bot token rotated — reloading")
                         token = refreshed
                         if not self.keep_webhook:
-                            self._delete_webhook(session, token)
+                            try:
+                                self._delete_webhook(session, token)
+                            except Exception as exc:
+                                LOGGER.warning(
+                                    "Telegram deleteWebhook after rotation "
+                                    "failed error_type=%s",
+                                    type(exc).__name__,
+                                )
                         continue
                     LOGGER.warning(
                         "Telegram getUpdates unauthorized error_status=%s",

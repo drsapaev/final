@@ -3,6 +3,7 @@ Telegram webhook routes.
 
 Split from telegram_webhook.py (5647 LOC → modular).
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -32,6 +33,7 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
     Depends,
     Request,
     Response,
+    _ensure_bot_service_fresh,
     _telegram_update_summary,
     get_db,
     logger,
@@ -54,9 +56,12 @@ def _is_duplicate_update(db, update_id: int | None) -> bool:
         return False
     try:
         from app.models.telegram_webhook_dedup import TelegramWebhookDedup
-        existing = db.query(TelegramWebhookDedup).filter(
-            TelegramWebhookDedup.update_id == update_id
-        ).first()
+
+        existing = (
+            db.query(TelegramWebhookDedup)
+            .filter(TelegramWebhookDedup.update_id == update_id)
+            .first()
+        )
         if existing:
             return True
         # Record this update_id
@@ -66,6 +71,7 @@ def _is_duplicate_update(db, update_id: int | None) -> bool:
         return False
     except Exception:
         return False  # Non-blocking: if dedup fails, process anyway
+
 
 @router.post(
     "/mini-app/onboarding/requests",
@@ -156,7 +162,7 @@ def get_registrar_patient_onboarding_analytics_summary(
 @router.get(
     "/onboarding/requests/export",
     operation_id="telegram_registrar_export_patient_onboarding_requests_csv",
-response_model=dict[str, Any],
+    response_model=dict[str, Any],
 )
 def export_registrar_patient_onboarding_requests_csv(
     status_filter: str = "",
@@ -478,8 +484,7 @@ def revoke_all_mini_app_patient_sessions(
     # Revoke all patient sessions (patient sessions use negative user_id)
     patient_session_user_id = -int(scope.patient_id)
     revoked_count = (
-        db.query(UserSession)
-        .filter(
+        db.query(UserSession).filter(
             UserSession.user_id == patient_session_user_id,
             UserSession.revoked == False,
         )
@@ -491,6 +496,7 @@ def revoke_all_mini_app_patient_sessions(
 
     # M4-P0-1: Audit log the session revocation
     from app.services.patient_access_audit import log_patient_access
+
     log_patient_access(
         db=db,
         scope=scope,
@@ -511,7 +517,7 @@ def revoke_all_mini_app_patient_sessions(
 @router.post(
     "/mini-app/appointments/preview",
     operation_id="telegram_mini_app_preview_appointment_booking",
-response_model=dict[str, Any],
+    response_model=dict[str, Any],
 )
 def preview_mini_app_appointment_booking(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
@@ -532,7 +538,7 @@ def preview_mini_app_appointment_booking(
 @router.post(
     "/mini-app/forms/submissions",
     operation_id="telegram_mini_app_submit_patient_form",
-response_model=dict[str, Any],
+    response_model=dict[str, Any],
 )
 def submit_mini_app_patient_form(
     request_body: TelegramMiniAppPatientFormSubmissionRequest,
@@ -552,7 +558,7 @@ def submit_mini_app_patient_form(
 @router.post(
     "/mini-app/cabinet/summary",
     operation_id="telegram_mini_app_patient_cabinet_summary",
-response_model=dict[str, Any],
+    response_model=dict[str, Any],
 )
 def preview_mini_app_patient_cabinet_summary(
     request_body: TelegramMiniAppPatientCabinetSummaryRequest,
@@ -571,7 +577,7 @@ def preview_mini_app_patient_cabinet_summary(
 @router.post(
     "/mini-app/reports/download",
     operation_id="telegram_mini_app_patient_report_download",
-response_model=dict[str, Any],
+    response_model=dict[str, Any],
 )
 def download_mini_app_patient_report(
     request_body: TelegramMiniAppPatientReportDownloadRequest,
@@ -590,7 +596,7 @@ def download_mini_app_patient_report(
 @router.post(
     "/mini-app/patient/manifest",
     operation_id="telegram_mini_app_patient_manifest",
-response_model=dict[str, Any],
+    response_model=dict[str, Any],
 )
 def preview_mini_app_patient_manifest(
     request_body: TelegramMiniAppPatientManifestRequest,
@@ -609,7 +615,7 @@ def preview_mini_app_patient_manifest(
 @router.post(
     "/mini-app/forms/preview",
     operation_id="telegram_mini_app_preview_patient_forms",
-response_model=dict[str, Any],
+    response_model=dict[str, Any],
 )
 def preview_mini_app_patient_forms(
     request_body: TelegramMiniAppPatientFormsPreviewRequest,
@@ -630,7 +636,7 @@ def preview_mini_app_patient_forms(
     "/mini-app/appointments",
     status_code=status.HTTP_201_CREATED,
     operation_id="telegram_mini_app_create_appointment_booking",
-response_model=dict[str, Any],
+    response_model=dict[str, Any],
 )
 def create_mini_app_appointment_booking(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
@@ -691,6 +697,7 @@ def create_mini_app_appointment_booking(
 
     # M4-P0-1: PHI audit trail — log appointment creation
     from app.services.patient_access_audit import log_patient_access
+
     log_patient_access(
         db=db,
         scope=preview.scope,
@@ -731,14 +738,7 @@ async def telegram_webhook(
         # Получаем сервис бота
         # Resolve via package namespace so monkeypatch of
         # telegram_webhook.get_telegram_bot_service takes effect.
-        from app.api.v1.endpoints.telegram_webhook import (
-            get_telegram_bot_service as _get_telegram_bot_service,
-        )
-        bot_service = await _get_telegram_bot_service()
-
-        # Инициализируем бота если нужно
-        if not bot_service.active:
-            await bot_service.initialize(db)
+        bot_service = await _ensure_bot_service_fresh(db)
 
         # Обрабатываем обновление
         if await _handle_clinic_bot_update(update, db, bot_service):
@@ -806,13 +806,7 @@ async def send_message_to_user(
         # call time. Unit tests monkeypatch ``telegram_webhook.get_telegram_bot_service``
         # (the package-level binding); looking the function up via the local
         # module import would bypass that patch.
-        from app.api.v1.endpoints.telegram_webhook import (
-            get_telegram_bot_service as _get_telegram_bot_service,
-        )
-        bot_service = await _get_telegram_bot_service()
-
-        if not bot_service.active:
-            await bot_service.initialize(db)
+        bot_service = await _ensure_bot_service_fresh(db)
 
         effective_reply_markup = body.reply_markup
         success = await bot_service._send_message(
@@ -837,7 +831,11 @@ async def send_message_to_user(
         )
 
 
-@router.get("/bot-info", operation_id="telegram_webhook_get_bot_info", response_model=dict[str, Any])
+@router.get(
+    "/bot-info",
+    operation_id="telegram_webhook_get_bot_info",
+    response_model=dict[str, Any],
+)
 async def get_bot_info(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
@@ -846,10 +844,7 @@ async def get_bot_info(
     Получить информацию о боте
     """
     try:
-        bot_service = await get_telegram_bot_service()
-
-        if not bot_service.active:
-            await bot_service.initialize(db)
+        bot_service = await _ensure_bot_service_fresh(db)
 
         if not bot_service.bot_token:
             return {"active": False, "message": "Бот не настроен"}

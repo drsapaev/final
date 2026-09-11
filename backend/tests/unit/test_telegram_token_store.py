@@ -23,6 +23,7 @@ from app.models.audit import AuditLog
 from app.models.clinic import ClinicSettings
 from app.models.telegram_config import TelegramConfig
 from app.schemas.notifications import UpdateTelegramSettingsRequest
+from app.services import telegram_bot as telegram_bot_module
 from app.services.telegram_token_store import (
     clear_patient_bot_token,
     decrypt_token,
@@ -544,6 +545,58 @@ class TestStaffBotServiceStaleState:
         # so it must clear the cached state itself.
         assert service.bot_token is None
         assert service.active is False
+
+
+@pytest.mark.unit
+class TestCrossProcessVisibility:
+    @pytest.mark.asyncio
+    async def test_webhook_entry_reinitializes_stale_singleton(
+        self, db_session, monkeypatch
+    ):
+        from app.api.v1.endpoints.telegram_webhook import _helpers
+
+        _clear_token_env(monkeypatch)
+        _set_fernet_key(monkeypatch)
+        config = TelegramConfig()
+        config.set_bot_token("123456789:rotated-token")
+        config.active = True
+        db_session.add(config)
+        db_session.commit()
+
+        service = telegram_bot_module.telegram_bot_service
+        service.bot_token = "123456789:stale-credential"
+        service.active = True
+        try:
+            fresh = await _helpers._ensure_bot_service_fresh(db_session)
+            # P1 pin (round 8): another worker's rotation must become
+            # visible to this process on the next webhook entry.
+            assert fresh is service
+            assert service.bot_token == "123456789:rotated-token"
+            assert service.active is True
+        finally:
+            service.bot_token = None
+            service.active = False
+
+    def test_integration_status_reports_fallback_configured(
+        self, db_session, monkeypatch
+    ):
+        from app.api.v1.endpoints import telegram_integration
+
+        _clear_token_env(monkeypatch)
+        _clear_fernet_key(monkeypatch)
+        monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456789:env-live")
+        config = TelegramConfig()
+        config.bot_token = "gAAAAA-undecryptable-without-key"
+        config.active = True
+        db_session.add(config)
+        db_session.commit()
+
+        user = _user()
+        result = telegram_integration.get_bot_status(db_session, user)
+
+        # P2 pin (round 8): an undecryptable row with a live env fallback
+        # must not read as unconfigured.
+        assert result["configured"] is True
 
 
 @pytest.mark.unit
