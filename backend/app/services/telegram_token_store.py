@@ -220,21 +220,25 @@ def store_patient_bot_token(
     token_text = str(token).strip()
 
     for attempt in range(2):
-        config = crud_telegram.get_telegram_config(db)
-        if config is None:
-            config = TelegramConfig()
-            db.add(config)
-        config.set_bot_token(token_text)
-
-        legacy_setting = crud_clinic.get_setting_by_key(
-            db, PATIENT_BOT_TOKEN_SETTING_KEY
-        )
-        legacy_removed = False
-        if legacy_setting is not None:
-            db.delete(legacy_setting)
-            legacy_removed = True
-
         try:
+            # Every ORM lookup below can autoflush a pending INSERT, so the
+            # whole body lives inside the retry block: a singleton-guard
+            # violation escaping via autoflush must roll back and re-resolve
+            # exactly like an explicit flush would (codex round 9).
+            config = crud_telegram.get_telegram_config(db)
+            if config is None:
+                config = TelegramConfig()
+                db.add(config)
+            config.set_bot_token(token_text)
+
+            legacy_setting = crud_clinic.get_setting_by_key(
+                db, PATIENT_BOT_TOKEN_SETTING_KEY
+            )
+            legacy_removed = False
+            if legacy_setting is not None:
+                db.delete(legacy_setting)
+                legacy_removed = True
+
             # Flush the pending config INSERT first so the audit row below
             # captures the real config id, and so a singleton-guard violation
             # (lost creation race) surfaces before the audit event is built.

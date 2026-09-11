@@ -53,7 +53,7 @@ from app.api.v1.endpoints.admin_telegram import (  # noqa: F401
 )
 
 
-async def _ensure_bot_service_fresh(db: Session):
+async def _ensure_bot_service_fresh(db: Session, bot_service=None):
     """Return the clinic bot service, re-initialized whenever the canonical
     SSOT token no longer matches the cached credential.
 
@@ -71,7 +71,8 @@ async def _ensure_bot_service_fresh(db: Session):
     from app.api.v1.endpoints import telegram_webhook as _tw_package
     from app.services.telegram_token_store import resolve_patient_bot_token
 
-    bot_service = await _tw_package.get_telegram_bot_service()
+    if bot_service is None:
+        bot_service = await _tw_package.get_telegram_bot_service()
     try:
         canonical = resolve_patient_bot_token(db)
     except Exception as exc:
