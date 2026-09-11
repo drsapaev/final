@@ -317,7 +317,7 @@ def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
 @router.get("/statistics/{specialist_id}", response_model=dict[str, Any])
 def get_queue_statistics(
     specialist_id: int,
-    day: date = Query(default_factory=date.today, description="День для статистики"),
+    day: date | None = Query(None, description="День для статистики"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -332,6 +332,17 @@ def get_queue_statistics(
     # Валидация specialist_id
     if not isinstance(specialist_id, int) or specialist_id <= 0:
         raise HTTPException(status_code=422, detail="Некорректный ID специалиста")
+
+    # Codex round-42 P2 (round-29 precedent, /today выше): опущенный
+    # день — clinic_today SSOT (таймзона настроек очередей): в окне
+    # 19:00-24:00Z host date.today() отстаёт от клиник-дня, и
+    # резолвер ресурс-поверхности видел вчерашний tag-surface —
+    # устаревшая статистика или «Очередь не найдена» для валидной
+    # текущей ресурсной очереди.
+    if day is None:
+        from app.crud.clinic import clinic_today
+
+        day = clinic_today(db)
 
     # Получаем очередь
     daily_queue = QueueApiService(db).get_daily_queue(

@@ -343,12 +343,33 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 department=department,
             )
     else:
-        visit = crud_visit.find_or_create_today_visit(
-            db=db,
-            patient_id=queue_entry.patient_id,
-            doctor_id=doctor.id,
-            department=department,
+        # Codex round-42 P2: врачебная поверхность резолвит свежий визит
+        # по ДНЮ ОЧЕРЕДИ записи (как ресурсная выше), а не host
+        # date.today(): find_or_create_today_visit возвращал открытый
+        # визит старого дня (всё ещё нужный оставшимся тикетам) или
+        # создавал визит под host-днём — перенесённый тикет линковался
+        # не на свой день обслуживания.
+        queue_day = getattr(queue_entry.queue, "day", None) or date.today()
+        visit = (
+            db.query(Visit)
+            .filter(
+                Visit.patient_id == queue_entry.patient_id,
+                Visit.visit_date == queue_day,
+                Visit.status == "open",
+                Visit.doctor_id == doctor.id,
+            )
+            .first()
         )
+        if visit is None:
+            visit = crud_visit.create_visit(
+                db=db,
+                patient_id=queue_entry.patient_id,
+                doctor_id=doctor.id,
+                visit_date=queue_day,
+                # Codex round-37 P2: время визита — клиник-локальные часы
+                visit_time=_clinic_now(db).strftime("%H:%M"),
+                department=department,
+            )
 
     if queue_entry.visit_id != visit.id:
         queue_entry.visit_id = visit.id

@@ -6903,3 +6903,143 @@ def test_group_transferred_entries_share_one_relinked_visit(
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== ZZ. Codex round-42 pins =====================
+
+
+def test_transferred_shared_doctor_visit_relinks_onto_queue_day(
+    db_session: Session,
+) -> None:
+    """Codex round-42 P2 (doctor shared facet): when one of several
+    same-day doctor tickets sharing a Visit is transferred, the
+    fall-through resolves a FRESH doctor visit on the QUEUE day — the
+    old find_or_create_today_visit (host date.today()) returned the
+    ORIGINAL still-anchored visit (the moved ticket kept mutating the
+    old-day encounter) or created the visit under the host day."""
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        call_patient,
+        start_patient_visit,
+    )
+    from app.crud import visit as crud_visit
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+    from app.services.force_majeure_service import ForceMajeureService
+
+    patient = Patient(
+        last_name="Ресурсный11",
+        first_name="Пациент",
+        phone="+998901234544",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        original_day = _dt_now_tashkent_day()
+        doc_user = _make_user(db_session, username="doc_zz1", role="Doctor")
+        therapist = _make_doctor(db_session, user_id=doc_user.id, specialty="therapy")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=original_day, specialist_id=therapist.id
+        )
+
+        # one doctor visit shared by BOTH same-day tickets
+        visit = crud_visit.create_visit(
+            db=db_session,
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            visit_date=original_day,
+            visit_time="12:00",
+            department="therapy",
+        )
+        first = _make_waiting_entry(db_session, queue, number=99)
+        first.patient_id = patient.id
+        first.visit_id = visit.id
+        second = _make_waiting_entry(db_session, queue, number=100)
+        second.patient_id = patient.id
+        second.visit_id = visit.id
+        db_session.commit()
+
+        # only ONE ticket moves — the shared visit stays anchored by
+        # the remaining same-day ticket
+        result = ForceMajeureService(db_session).transfer_entries_to_tomorrow(
+            entries=[first],
+            specialist_id=therapist.id,
+            reason="round-42 pin",
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert result["success"] is True
+        new_day = date.fromisoformat(result["new_date"])
+        assert new_day == original_day + timedelta(days=1)
+
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+
+        admin = _make_user(db_session, username="adm_zz1", role="Admin")
+        assert call_patient(entry_id=moved.id, db=db_session, current_user=admin)[
+            "success"
+        ]
+        assert start_patient_visit(
+            entry_id=moved.id, db=db_session, current_user=admin
+        )["success"]
+
+        db_session.refresh(visit)
+        db_session.refresh(moved)
+        # the shared doctor visit keeps its day for the remaining
+        # same-day ticket and stays open
+        assert visit.visit_date == original_day
+        assert visit.status == "open"
+        # the transferred ticket relinks onto a FRESH queue-day visit
+        # (not back onto the anchored original — the host-today lookup
+        # of find_or_create_today_visit found exactly that original)
+        assert moved.visit_id != visit.id
+        fresh = db_session.query(Visit).filter(Visit.id == moved.visit_id).first()
+        assert fresh is not None
+        assert fresh.visit_date == new_day
+        assert fresh.doctor_id == therapist.id
+    finally:
+        _durable_cleanup(db_session, "doc_zz1", "adm_zz1")
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
+
+
+def test_legacy_statistics_default_day_rides_the_clinic_day(
+    db_session: Session, monkeypatch
+) -> None:
+    """Codex round-42 P2: GET /queue/legacy/statistics/{specialist_id}
+    with the day omitted resolved host date.today() — in the evening
+    window the host lags the clinic day, so the registry resolver saw
+    the previous day's surface (stale statistics or «Очередь не
+    найдена» for the live clinic-day resource queue). The omitted day
+    now rides the clinic_today SSOT."""
+    from app.api.v1.endpoints.queue import get_queue_statistics
+
+    _, clinic_day = _divergent_clinic_day()
+    assert clinic_day != date.today()  # the divergence window is real
+    monkeypatch.setattr("app.crud.clinic.clinic_today", lambda db: clinic_day)
+
+    res_user = _make_user(db_session, username="lab_res_zz2", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=res_user.id, specialty="lab")
+    _make_resource(db_session, code="lab", queue_tag="lab")
+    queue = queue_service.get_or_create_daily_queue(
+        db_session, day=clinic_day, specialist_id=None, queue_tag="lab"
+    )
+    _make_waiting_entry(db_session, queue, number=101)
+
+    admin = _make_user(db_session, username="adm_zz2", role="Admin")
+    # the omitted day (None) must resolve the CLINIC-day surface, not
+    # the host date the old default_factory stamped
+    payload = get_queue_statistics(
+        synthetic.id, day=None, db=db_session, current_user=admin
+    )
+    assert payload["success"] is True, payload
+    assert payload["statistics"]["total_entries"] == 1
