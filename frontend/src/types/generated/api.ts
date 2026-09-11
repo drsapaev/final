@@ -393,6 +393,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/visits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Список визитов (мобильный алиас) */
+        get: operations["list_visits_api_v1_visits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/visits/visits/{visit_id}": {
         parameters: {
             query?: never;
@@ -1362,6 +1379,27 @@ export type paths = {
          * @description Получение информации о визите по токену (без подтверждения).
          */
         get: operations["get_visit_info_by_token_api_v1_visits_info__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/visits/{visit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Карточка визита (мобильный алиас)
+         * @description Мобильный контракт (Android-клиент): GET /api/v1/visits/{visit_id}.
+         *     Делегирует каноническому обработчику — ответ идентичен байт-в-байт.
+         */
+        get: operations["get_visit_mobile_alias_api_v1_visits__visit_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8261,6 +8299,31 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram-integration/send-notification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Mobile Self Test Notification
+         * @description Self-test Telegram delivery for the mobile client.
+         *
+         *     Sends a fixed server-side test message to the CURRENT user's own linked
+         *     chat. The chat is resolved server-side from the TelegramUser link; the
+         *     client-supplied chat_id/message/parse_mode are parsed for wire
+         *     compatibility and ignored (no arbitrary-recipient relay).
+         */
+        post: operations["send_mobile_self_test_notification_api_v1_telegram_integration_send_notification_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/display/call-patient": {
         parameters: {
             query?: never;
@@ -14771,6 +14834,27 @@ export type paths = {
          */
         get: operations["get_queue_status_api_v1_queue_reorder_status__queue_id__get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/move-entry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Move Queue Entry Mobile Alias
+         * @description Мобильный контракт (Android-клиент): PUT /api/v1/queue/move-entry.
+         *     Семантика и ответ идентичны каноническому /queue/reorder/move-entry.
+         */
+        put: operations["move_queue_entry_mobile_alias_api_v1_queue_move_entry_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -21298,6 +21382,220 @@ export type paths = {
          *     The restore is recorded in the revision history.
          */
         post: operations["restore_emr_api_v1_v2_emr__visit_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emr/doctor-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Doctor History
+         * @description Get doctor's previous EMR entries for a specific field.
+         *
+         *     Used to provide context to AI for better suggestions.
+         *     Doctor can only access their own history.
+         */
+        get: operations["get_doctor_history_api_v1_emr_doctor_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emr/{visit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Emr
+         * @description Get current EMR for visit.
+         *
+         *     Returns the latest version of the EMR for the specified visit.
+         *     Creates an audit log entry for the view action.
+         */
+        get: operations["get_emr_api_v1_emr__visit_id__get"];
+        put?: never;
+        /**
+         * Save Emr
+         * @description Save EMR with versioning.
+         *
+         *     Creates new EMR if none exists, otherwise updates with new version.
+         *     Uses optimistic locking via row_version to detect concurrent edits.
+         *
+         *     **Conflict Resolution:**
+         *     - If row_version mismatch and different user: returns 409 Conflict
+         *     - If row_version mismatch but same user/session: allows (autosave)
+         */
+        post: operations["save_emr_api_v1_emr__visit_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emr/{visit_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Emr History
+         * @description Get revision history for EMR.
+         *
+         *     Returns list of all revisions in descending order (newest first).
+         */
+        get: operations["get_emr_history_api_v1_emr__visit_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emr/{visit_id}/version/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Emr Version
+         * @description Get specific version of EMR.
+         *
+         *     Returns the complete data snapshot for the specified version.
+         */
+        get: operations["get_emr_version_api_v1_emr__visit_id__version__version__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emr/{visit_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare Versions
+         * @description Compare two EMR versions.
+         *
+         *     Returns list of field changes between the two versions.
+         */
+        get: operations["compare_versions_api_v1_emr__visit_id__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emr/patient/{patient_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Patient Emrs
+         * @description Get all EMRs for a patient.
+         *
+         *     Returns list of EMR summaries in descending order by creation date.
+         */
+        get: operations["get_patient_emrs_api_v1_emr_patient__patient_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emr/{visit_id}/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign Emr
+         * @description Sign and finalize EMR.
+         *
+         *     Changes status to 'signed' and records signing timestamp.
+         *     After signing, EMR can only be modified via the amend endpoint.
+         */
+        post: operations["sign_emr_api_v1_emr__visit_id__sign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emr/{visit_id}/amend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Amend Emr
+         * @description Amend a signed EMR.
+         *
+         *     Creates a new version with amendment, requires a reason (min 10 chars).
+         *     Only available for EMRs with status 'signed'.
+         */
+        post: operations["amend_emr_api_v1_emr__visit_id__amend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emr/{visit_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Emr
+         * @description Restore EMR to a specific version.
+         *
+         *     Creates a new version with data from the target version.
+         *     The restore is recorded in the revision history.
+         */
+        post: operations["restore_emr_api_v1_emr__visit_id__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -30382,6 +30680,23 @@ export type components = {
             pending_payments: number;
         };
         /**
+         * MobileTelegramSelfTestRequest
+         * @description Body of POST /api/v1/telegram-integration/send-notification as sent by
+         *     the Android client. Every field is accepted for wire compatibility and
+         *     deliberately IGNORED: the recipient chat is always the CURRENT user's own
+         *     TelegramUser link and the text is a fixed server-side string, so the
+         *     endpoint can never be used to relay arbitrary messages to arbitrary
+         *     chats (no spam/phishing relay surface).
+         */
+        MobileTelegramSelfTestRequest: {
+            /** Chat Id */
+            chat_id?: string | number | null;
+            /** Message */
+            message?: string | null;
+            /** Parse Mode */
+            parse_mode?: string | null;
+        };
+        /**
          * MonitoringThresholds
          * @description Пороговые значения для мониторинга
          */
@@ -37579,11 +37894,43 @@ export type components = {
              */
             qty: number;
         };
+        /**
+         * VisitServiceOut
+         * @description Row-level visit service. Exposes service_id (catalog Service.id) —
+         *     mobile-contract gap #8: the Android client re-books via the batch
+         *     queue-registration endpoint, which needs the catalog id, not the
+         *     visit-service row id. Additive fields are backward-compatible for
+         *     existing web consumers.
+         */
+        VisitServiceOut: {
+            /** Id */
+            id: number;
+            /** Visit Id */
+            visit_id: number;
+            /** Service Id */
+            service_id: number;
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Price
+             * @default 0
+             */
+            price: number;
+            /**
+             * Qty
+             * @default 1
+             */
+            qty: number;
+            /** Created At */
+            created_at?: string | null;
+        };
         /** VisitWithServices */
         VisitWithServices: {
             visit: components["schemas"]["VisitOut"];
             /** Services */
-            services: components["schemas"]["VisitServiceIn"][];
+            services: components["schemas"]["VisitServiceOut"][];
         };
         /**
          * WaitTimeAnalyticsResponse
@@ -39638,6 +39985,42 @@ export interface operations {
             };
         };
     };
+    list_visits_api_v1_visits_get: {
+        parameters: {
+            query?: {
+                patient_id?: number | null;
+                doctor_id?: number | null;
+                status_q?: string | null;
+                planned_date?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_visit_api_v1_visits_visits__visit_id__get: {
         parameters: {
             query?: never;
@@ -41278,6 +41661,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_visit_mobile_alias_api_v1_visits__visit_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitWithServices"];
                 };
             };
             /** @description Validation Error */
@@ -52652,6 +53066,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_mobile_self_test_notification_api_v1_telegram_integration_send_notification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileTelegramSelfTestRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -64130,6 +64579,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_queue_entry_mobile_alias_api_v1_queue_move_entry_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueEntryMoveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueReorderResponse"];
                 };
             };
             /** @description Validation Error */
@@ -75925,6 +76407,353 @@ export interface operations {
         };
     };
     restore_emr_api_v1_v2_emr__visit_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EMRRestoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EMRRecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_doctor_history_api_v1_emr_doctor_history_get: {
+        parameters: {
+            query: {
+                /** @description Doctor ID */
+                doctor_id: number;
+                /** @description Field name (complaints, diagnosis, etc.) */
+                field_name: string;
+                /** @description Doctor specialty */
+                specialty?: string;
+                /** @description Search text for similarity */
+                search_text?: string | null;
+                /** @description Max entries */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoctorHistoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_emr_api_v1_emr__visit_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EMRRecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_emr_api_v1_emr__visit_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EMRSaveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EMRRecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_emr_history_api_v1_emr__visit_id__history_get: {
+        parameters: {
+            query?: {
+                /** @description Maximum revisions to return */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EMRHistoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_emr_version_api_v1_emr__visit_id__version__version__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EMRRevisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_versions_api_v1_emr__visit_id__diff_get: {
+        parameters: {
+            query: {
+                /** @description First version number */
+                v1: number;
+                /** @description Second version number */
+                v2: number;
+            };
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EMRDiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_patient_emrs_api_v1_emr_patient__patient_id__get: {
+        parameters: {
+            query?: {
+                /** @description Maximum EMRs to return */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                patient_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EMRRecordSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sign_emr_api_v1_emr__visit_id__sign_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EMRSignRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EMRRecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    amend_emr_api_v1_emr__visit_id__amend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                visit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EMRAmendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EMRRecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_emr_api_v1_emr__visit_id__restore_post: {
         parameters: {
             query?: never;
             header?: never;

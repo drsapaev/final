@@ -1855,7 +1855,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ServiceCategoryOut"
+                    "$ref": "#/components/schemas/app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut"
                   },
                   "title": "Response List Service Categories Api V1 Services Categories Get"
                 }
@@ -1902,7 +1902,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ServiceCategoryOut"
+                  "$ref": "#/components/schemas/app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut"
                 }
               }
             }
@@ -1960,7 +1960,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ServiceCategoryOut"
+                  "$ref": "#/components/schemas/app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut"
                 }
               }
             }
@@ -2467,7 +2467,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/DoctorOut"
+                    "$ref": "#/components/schemas/app__api__v1__endpoints__services_ep___services__DoctorOut"
                   },
                   "title": "Response List Doctors Temp Api V1 Services Admin Doctors Get"
                 }
@@ -6137,7 +6137,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QRTokenResponse"
+                  "$ref": "#/components/schemas/app__api__v1__endpoints__qr_queue___helpers__QRTokenResponse"
                 }
               }
             }
@@ -8837,7 +8837,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/RoleResponse"
+                    "$ref": "#/components/schemas/app__api__v1__endpoints__group_permissions__RoleResponse"
                   },
                   "title": "Response Get Roles Api V1 Admin Permissions Roles Get"
                 }
@@ -14601,7 +14601,7 @@
                 "schema": {
                   "anyOf": [
                     {
-                      "$ref": "#/components/schemas/QueueJoinResponse"
+                      "$ref": "#/components/schemas/app__schemas__online_queue__QueueJoinResponse"
                     },
                     {
                       "$ref": "#/components/schemas/QueueJoinError"
@@ -36114,7 +36114,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "format": "binary",
+              "contentMediaType": "application/octet-stream",
               "title": "Zip Data"
             }
           }
@@ -44827,7 +44827,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/QueueJoinRequest"
+                "$ref": "#/components/schemas/app__api__v1__endpoints__queue__QueueJoinRequest"
               }
             }
           },
@@ -45086,7 +45086,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/QueueStatusResponse"
+                  "$ref": "#/components/schemas/app__api__v1__endpoints__queue__QueueStatusResponse"
                 }
               }
             }
@@ -46473,7 +46473,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PriceOverrideApprovalRequest"
+                "$ref": "#/components/schemas/app__api__v1__endpoints__dental__PriceOverrideApprovalRequest"
               }
             }
           }
@@ -51197,7 +51197,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotificationStatsResponse"
+                  "$ref": "#/components/schemas/app__schemas__notification__NotificationStatsResponse"
                 }
               }
             }
@@ -53339,7 +53339,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PasswordResetConfirmRequest"
+                "$ref": "#/components/schemas/app__schemas__authentication__PasswordResetConfirmRequest"
               }
             }
           },
@@ -54545,7 +54545,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserProfileResponse"
+                  "$ref": "#/components/schemas/app__schemas__user_management__UserProfileResponse"
                 }
               }
             }
@@ -54596,7 +54596,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserProfileResponse"
+                  "$ref": "#/components/schemas/app__schemas__user_management__UserProfileResponse"
                 }
               }
             }
@@ -58485,7 +58485,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaymentResponse"
+                  "$ref": "#/components/schemas/app__api__v1__endpoints__billing__PaymentResponse"
                 }
               }
             }
@@ -64216,7 +64216,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TelemetryResponse"
+                  "$ref": "#/components/schemas/app__api__v1__endpoints__telemetry__TelemetryResponse"
                 }
               }
             }
@@ -69776,7 +69776,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           },
           "metadata": {
@@ -69863,7 +69863,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "target_folder_id": {
@@ -69952,7 +69952,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           },
           "image_type": {
@@ -70004,7 +70004,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           },
           "lesion_info": {
@@ -70051,7 +70051,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "change_description": {
@@ -70102,7 +70102,7 @@
           },
           "audio_file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Audio File"
           }
         },
@@ -70179,7 +70179,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -70193,7 +70193,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -70207,7 +70207,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -70221,7 +70221,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "title": {
@@ -70349,7 +70349,7 @@
           },
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -70364,7 +70364,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "title": {
@@ -70389,7 +70389,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -70950,7 +70950,7 @@
         "properties": {
           "departments": {
             "items": {
-              "$ref": "#/components/schemas/DepartmentCreate"
+              "$ref": "#/components/schemas/app__schemas__department__DepartmentCreate"
             },
             "type": "array",
             "maxItems": 500,
@@ -73920,97 +73920,6 @@
         "title": "DentalTreatmentRequest",
         "description": "Request body for POST /dental/treatments.\n\nTreatment plan data for dental procedures."
       },
-      "DepartmentCreate": {
-        "properties": {
-          "key": {
-            "type": "string",
-            "maxLength": 50,
-            "pattern": "^[a-z][a-z0-9_]*$",
-            "title": "Key"
-          },
-          "name_ru": {
-            "type": "string",
-            "maxLength": 200,
-            "title": "Name Ru"
-          },
-          "name_uz": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name Uz"
-          },
-          "icon": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Icon",
-            "default": "folder"
-          },
-          "color": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Color"
-          },
-          "gradient": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Gradient"
-          },
-          "display_order": {
-            "type": "integer",
-            "title": "Display Order",
-            "default": 999
-          },
-          "active": {
-            "type": "boolean",
-            "title": "Active",
-            "default": true
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          }
-        },
-        "type": "object",
-        "required": [
-          "key",
-          "name_ru"
-        ],
-        "title": "DepartmentCreate",
-        "description": "Создание отделения"
-      },
       "DepartmentInfoResponse": {
         "properties": {
           "id": {
@@ -75461,7 +75370,7 @@
             "title": "Description"
           },
           "discount_type": {
-            "$ref": "#/components/schemas/DiscountType"
+            "$ref": "#/components/schemas/app__models__discount_benefits__DiscountType"
           },
           "value": {
             "type": "number",
@@ -75556,19 +75465,6 @@
           "value"
         ],
         "title": "DiscountCreate"
-      },
-      "DiscountType": {
-        "type": "string",
-        "enum": [
-          "percentage",
-          "fixed_amount",
-          "buy_x_get_y",
-          "loyalty_points",
-          "seasonal",
-          "referral"
-        ],
-        "title": "DiscountType",
-        "description": "Типы скидок"
       },
       "DiscountUpdate": {
         "properties": {
@@ -76403,40 +76299,6 @@
         ],
         "title": "DoctorListResponse",
         "description": "Схема списка врачей"
-      },
-      "DoctorOut": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "specialty": {
-            "type": "string",
-            "title": "Specialty"
-          },
-          "cabinet": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cabinet"
-          },
-          "active": {
-            "type": "boolean",
-            "title": "Active",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "specialty"
-        ],
-        "title": "DoctorOut"
       },
       "DoctorPerformanceReportRequest": {
         "properties": {
@@ -89341,58 +89203,6 @@
         ],
         "title": "NotificationStatsItem"
       },
-      "NotificationStatsResponse": {
-        "properties": {
-          "total_sent": {
-            "type": "integer",
-            "title": "Total Sent"
-          },
-          "successful": {
-            "type": "integer",
-            "title": "Successful"
-          },
-          "failed": {
-            "type": "integer",
-            "title": "Failed"
-          },
-          "pending": {
-            "type": "integer",
-            "title": "Pending"
-          },
-          "by_channel": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "By Channel"
-          },
-          "by_type": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "By Type"
-          },
-          "recent_activity": {
-            "items": {
-              "$ref": "#/components/schemas/NotificationStatsItem"
-            },
-            "type": "array",
-            "title": "Recent Activity"
-          }
-        },
-        "type": "object",
-        "required": [
-          "total_sent",
-          "successful",
-          "failed",
-          "pending",
-          "by_channel",
-          "by_type",
-          "recent_activity"
-        ],
-        "title": "NotificationStatsResponse"
-      },
       "NotificationTemplate": {
         "properties": {
           "name": {
@@ -90276,29 +90086,6 @@
         ],
         "title": "PasswordChangeRequest",
         "description": "Схема для смены пароля"
-      },
-      "PasswordResetConfirmRequest": {
-        "properties": {
-          "token": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 32,
-            "title": "Token"
-          },
-          "new_password": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 8,
-            "title": "New Password"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token",
-          "new_password"
-        ],
-        "title": "PasswordResetConfirmRequest",
-        "description": "Схема для подтверждения сброса пароля"
       },
       "PasswordResetInitiateRequest": {
         "properties": {
@@ -92466,98 +92253,6 @@
         "type": "object",
         "title": "PaymentProviderUpdate"
       },
-      "PaymentResponse": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "payment_number": {
-            "type": "string",
-            "title": "Payment Number"
-          },
-          "invoice_id": {
-            "type": "integer",
-            "title": "Invoice Id"
-          },
-          "patient_id": {
-            "type": "integer",
-            "title": "Patient Id"
-          },
-          "amount": {
-            "type": "number",
-            "title": "Amount"
-          },
-          "payment_method": {
-            "type": "string",
-            "title": "Payment Method"
-          },
-          "payment_date": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Payment Date"
-          },
-          "reference_number": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference Number"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "is_confirmed": {
-            "type": "boolean",
-            "title": "Is Confirmed"
-          },
-          "confirmed_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Confirmed At"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "payment_number",
-          "invoice_id",
-          "patient_id",
-          "amount",
-          "payment_method",
-          "payment_date",
-          "reference_number",
-          "description",
-          "is_confirmed",
-          "confirmed_at",
-          "created_at"
-        ],
-        "title": "PaymentResponse"
-      },
       "PaymentStatusResponse": {
         "properties": {
           "payment_id": {
@@ -93158,30 +92853,6 @@
         ],
         "title": "PriceChangeNotificationRequest",
         "description": "Схема для уведомления об изменении цены"
-      },
-      "PriceOverrideApprovalRequest": {
-        "properties": {
-          "action": {
-            "type": "string",
-            "title": "Action"
-          },
-          "rejection_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rejection Reason"
-          }
-        },
-        "type": "object",
-        "required": [
-          "action"
-        ],
-        "title": "PriceOverrideApprovalRequest"
       },
       "PriceOverrideListResponse": {
         "properties": {
@@ -95219,50 +94890,6 @@
         "title": "QRTokenInfoResponse",
         "description": "Информация о QR токене"
       },
-      "QRTokenResponse": {
-        "properties": {
-          "token": {
-            "type": "string",
-            "title": "Token"
-          },
-          "qr_url": {
-            "type": "string",
-            "title": "Qr Url"
-          },
-          "qr_code_base64": {
-            "type": "string",
-            "title": "Qr Code Base64"
-          },
-          "specialist_id": {
-            "type": "integer",
-            "title": "Specialist Id"
-          },
-          "department": {
-            "type": "string",
-            "title": "Department"
-          },
-          "expires_at": {
-            "type": "string",
-            "title": "Expires At"
-          },
-          "active": {
-            "type": "boolean",
-            "title": "Active"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token",
-          "qr_url",
-          "qr_code_base64",
-          "specialist_id",
-          "department",
-          "expires_at",
-          "active"
-        ],
-        "title": "QRTokenResponse",
-        "description": "Ответ с QR токеном"
-      },
       "QrData": {
         "properties": {
           "token": {
@@ -95706,124 +95333,6 @@
         ],
         "title": "QueueJoinError",
         "description": "Ошибка вступления в очередь"
-      },
-      "QueueJoinRequest": {
-        "properties": {
-          "token": {
-            "type": "string",
-            "title": "Token"
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone"
-          },
-          "telegram_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Telegram Id"
-          },
-          "patient_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token"
-        ],
-        "title": "QueueJoinRequest"
-      },
-      "QueueJoinResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success",
-            "description": "Успешность операции"
-          },
-          "number": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Number",
-            "description": "Номер в очереди"
-          },
-          "duplicate": {
-            "type": "boolean",
-            "title": "Duplicate",
-            "description": "Повторная запись (тот же номер)",
-            "default": false
-          },
-          "message": {
-            "type": "string",
-            "title": "Message",
-            "description": "Сообщение пользователю"
-          },
-          "specialist_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Specialist Name"
-          },
-          "cabinet": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cabinet"
-          },
-          "estimated_time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Estimated Time"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success",
-          "message"
-        ],
-        "title": "QueueJoinResponse",
-        "description": "Ответ на вступление в очередь"
       },
       "QueueLimitResponse": {
         "properties": {
@@ -96443,66 +95952,6 @@
         ],
         "title": "QueueStatusNotificationRequest",
         "description": "Схема для уведомления о статусе очереди"
-      },
-      "QueueStatusResponse": {
-        "properties": {
-          "queue_id": {
-            "type": "integer",
-            "title": "Queue Id"
-          },
-          "day": {
-            "type": "string",
-            "format": "date",
-            "title": "Day"
-          },
-          "specialist_name": {
-            "type": "string",
-            "title": "Specialist Name"
-          },
-          "is_open": {
-            "type": "boolean",
-            "title": "Is Open"
-          },
-          "opened_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Opened At"
-          },
-          "total_entries": {
-            "type": "integer",
-            "title": "Total Entries"
-          },
-          "waiting_entries": {
-            "type": "integer",
-            "title": "Waiting Entries"
-          },
-          "entries": {
-            "items": {
-              "$ref": "#/components/schemas/QueueEntryResponse"
-            },
-            "type": "array",
-            "title": "Entries"
-          }
-        },
-        "type": "object",
-        "required": [
-          "queue_id",
-          "day",
-          "specialist_name",
-          "is_open",
-          "opened_at",
-          "total_entries",
-          "waiting_entries",
-          "entries"
-        ],
-        "title": "QueueStatusResponse"
       },
       "QueueTestRequest": {
         "properties": {
@@ -98429,61 +97878,6 @@
         "title": "RoleOptionsListResponse",
         "description": "List of role options for dropdowns"
       },
-      "RoleResponse": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "display_name": {
-            "type": "string",
-            "title": "Display Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "level": {
-            "type": "integer",
-            "title": "Level"
-          },
-          "is_active": {
-            "type": "boolean",
-            "title": "Is Active"
-          },
-          "is_system": {
-            "type": "boolean",
-            "title": "Is System"
-          },
-          "permissions_count": {
-            "type": "integer",
-            "title": "Permissions Count"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "display_name",
-          "description",
-          "level",
-          "is_active",
-          "is_system",
-          "permissions_count"
-        ],
-        "title": "RoleResponse"
-      },
       "RoleUpdate": {
         "properties": {
           "display_name": {
@@ -100157,73 +99551,6 @@
           "code"
         ],
         "title": "ServiceCategoryCreate"
-      },
-      "ServiceCategoryOut": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "code": {
-            "type": "string",
-            "title": "Code"
-          },
-          "name_ru": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name Ru"
-          },
-          "name_uz": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name Uz"
-          },
-          "name_en": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name En"
-          },
-          "specialty": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Specialty"
-          },
-          "active": {
-            "type": "boolean",
-            "title": "Active",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "code"
-        ],
-        "title": "ServiceCategoryOut"
       },
       "ServiceCategoryUpdate": {
         "properties": {
@@ -103552,25 +102879,6 @@
         "title": "TelemetryRequest",
         "description": "Событие telemetry"
       },
-      "TelemetryResponse": {
-        "properties": {
-          "accepted": {
-            "type": "integer",
-            "title": "Accepted"
-          },
-          "rejected": {
-            "type": "integer",
-            "title": "Rejected"
-          }
-        },
-        "type": "object",
-        "required": [
-          "accepted",
-          "rejected"
-        ],
-        "title": "TelemetryResponse",
-        "description": "Response for telemetry submission"
-      },
       "TelemetryStatsResponse": {
         "properties": {
           "doctorId": {
@@ -106831,391 +106139,6 @@
         "title": "UserPreferencesUpdate",
         "description": "Схема обновления настроек пользователя"
       },
-      "UserProfileResponse": {
-        "properties": {
-          "full_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 100,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Full Name"
-          },
-          "first_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "First Name"
-          },
-          "last_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Name"
-          },
-          "middle_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Middle Name"
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 20,
-                "minLength": 10
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone"
-          },
-          "date_of_birth": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Date Of Birth"
-          },
-          "gender": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Gender"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "nationality": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Nationality"
-          },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 10
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
-          "timezone": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timezone"
-          },
-          "bio": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bio"
-          },
-          "website": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Website"
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "user_id": {
-            "type": "integer",
-            "title": "User Id"
-          },
-          "phone_verified": {
-            "type": "boolean",
-            "title": "Phone Verified"
-          },
-          "email_verified": {
-            "type": "boolean",
-            "title": "Email Verified"
-          },
-          "alternative_email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alternative Email"
-          },
-          "address_line1": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Address Line1"
-          },
-          "address_line2": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Address Line2"
-          },
-          "city": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "City"
-          },
-          "state": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "State"
-          },
-          "postal_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Postal Code"
-          },
-          "country": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Country"
-          },
-          "job_title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Job Title"
-          },
-          "department": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department"
-          },
-          "employee_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Employee Id"
-          },
-          "hire_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hire Date"
-          },
-          "avatar_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Avatar Url"
-          },
-          "social_links": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Social Links"
-          },
-          "status": {
-            "$ref": "#/components/schemas/UserStatus"
-          },
-          "last_login": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Login"
-          },
-          "last_activity": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Activity"
-          },
-          "login_count": {
-            "type": "integer",
-            "title": "Login Count"
-          },
-          "failed_login_attempts": {
-            "type": "integer",
-            "title": "Failed Login Attempts"
-          },
-          "locked_until": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Locked Until"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "user_id",
-          "phone_verified",
-          "email_verified",
-          "status",
-          "login_count",
-          "failed_login_attempts",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "UserProfileResponse",
-        "description": "Схема ответа профиля пользователя"
-      },
       "UserProfileUpdate": {
         "properties": {
           "full_name": {
@@ -107610,7 +106533,7 @@
           "profile": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UserProfileResponse"
+                "$ref": "#/components/schemas/app__schemas__user_management__UserProfileResponse"
               },
               {
                 "type": "null"
@@ -108098,6 +107021,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -110405,6 +109335,98 @@
         "title": "DepartmentCreate",
         "description": "Схема для создания отделения"
       },
+      "app__api__v1__endpoints__billing__PaymentResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "payment_number": {
+            "type": "string",
+            "title": "Payment Number"
+          },
+          "invoice_id": {
+            "type": "integer",
+            "title": "Invoice Id"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "payment_method": {
+            "type": "string",
+            "title": "Payment Method"
+          },
+          "payment_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Payment Date"
+          },
+          "reference_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Number"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_confirmed": {
+            "type": "boolean",
+            "title": "Is Confirmed"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "payment_number",
+          "invoice_id",
+          "patient_id",
+          "amount",
+          "payment_method",
+          "payment_date",
+          "reference_number",
+          "description",
+          "is_confirmed",
+          "confirmed_at",
+          "created_at"
+        ],
+        "title": "PaymentResponse"
+      },
       "app__api__v1__endpoints__cashier___helpers__PaymentResponse": {
         "properties": {
           "id": {
@@ -110486,6 +109508,85 @@
         "title": "PaymentResponse",
         "description": "Ответ при создании/получении платежа"
       },
+      "app__api__v1__endpoints__dental__PriceOverrideApprovalRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "rejection_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejection Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "PriceOverrideApprovalRequest"
+      },
+      "app__api__v1__endpoints__group_permissions__RoleResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "level": {
+            "type": "integer",
+            "title": "Level"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "is_system": {
+            "type": "boolean",
+            "title": "Is System"
+          },
+          "permissions_count": {
+            "type": "integer",
+            "title": "Permissions Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "display_name",
+          "description",
+          "level",
+          "is_active",
+          "is_system",
+          "permissions_count"
+        ],
+        "title": "RoleResponse"
+      },
       "app__api__v1__endpoints__password_reset__PasswordResetConfirmRequest": {
         "properties": {
           "token": {
@@ -110523,6 +109624,50 @@
         ],
         "title": "TelemetryResponse",
         "description": "Ответ на telemetry"
+      },
+      "app__api__v1__endpoints__qr_queue___helpers__QRTokenResponse": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "qr_url": {
+            "type": "string",
+            "title": "Qr Url"
+          },
+          "qr_code_base64": {
+            "type": "string",
+            "title": "Qr Code Base64"
+          },
+          "specialist_id": {
+            "type": "integer",
+            "title": "Specialist Id"
+          },
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "qr_url",
+          "qr_code_base64",
+          "specialist_id",
+          "department",
+          "expires_at",
+          "active"
+        ],
+        "title": "QRTokenResponse",
+        "description": "Ответ с QR токеном"
       },
       "app__api__v1__endpoints__qr_queue___helpers__QueueStatusResponse": {
         "properties": {
@@ -110563,6 +109708,52 @@
         ],
         "title": "QueueStatusResponse",
         "description": "Статус очереди"
+      },
+      "app__api__v1__endpoints__queue__QueueJoinRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id"
+          },
+          "patient_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "QueueJoinRequest"
       },
       "app__api__v1__endpoints__queue__QueueJoinResponse": {
         "properties": {
@@ -110609,6 +109800,66 @@
           "message"
         ],
         "title": "QueueJoinResponse"
+      },
+      "app__api__v1__endpoints__queue__QueueStatusResponse": {
+        "properties": {
+          "queue_id": {
+            "type": "integer",
+            "title": "Queue Id"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "specialist_name": {
+            "type": "string",
+            "title": "Specialist Name"
+          },
+          "is_open": {
+            "type": "boolean",
+            "title": "Is Open"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "total_entries": {
+            "type": "integer",
+            "title": "Total Entries"
+          },
+          "waiting_entries": {
+            "type": "integer",
+            "title": "Waiting Entries"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/QueueEntryResponse"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queue_id",
+          "day",
+          "specialist_name",
+          "is_open",
+          "opened_at",
+          "total_entries",
+          "waiting_entries",
+          "entries"
+        ],
+        "title": "QueueStatusResponse"
       },
       "app__api__v1__endpoints__queue_limits__QueueStatusResponse": {
         "properties": {
@@ -110748,6 +109999,139 @@
         ],
         "title": "PriceOverrideApprovalRequest"
       },
+      "app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Ru"
+          },
+          "name_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Uz"
+          },
+          "name_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name En"
+          },
+          "specialty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialty"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code"
+        ],
+        "title": "ServiceCategoryOut"
+      },
+      "app__api__v1__endpoints__services_ep___services__DoctorOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "specialty": {
+            "type": "string",
+            "title": "Specialty"
+          },
+          "cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "specialty"
+        ],
+        "title": "DoctorOut"
+      },
+      "app__api__v1__endpoints__telemetry__TelemetryResponse": {
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          },
+          "rejected": {
+            "type": "integer",
+            "title": "Rejected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accepted",
+          "rejected"
+        ],
+        "title": "TelemetryResponse",
+        "description": "Response for telemetry submission"
+      },
+      "app__models__discount_benefits__DiscountType": {
+        "type": "string",
+        "enum": [
+          "percentage",
+          "fixed_amount",
+          "buy_x_get_y",
+          "loyalty_points",
+          "seasonal",
+          "referral"
+        ],
+        "title": "DiscountType",
+        "description": "Типы скидок"
+      },
       "app__models__dynamic_pricing__DiscountType": {
         "type": "string",
         "enum": [
@@ -110758,6 +110142,29 @@
         ],
         "title": "DiscountType",
         "description": "Типы скидок"
+      },
+      "app__schemas__authentication__PasswordResetConfirmRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 32,
+            "title": "Token"
+          },
+          "new_password": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "PasswordResetConfirmRequest",
+        "description": "Схема для подтверждения сброса пароля"
       },
       "app__schemas__authentication__UserProfileResponse": {
         "properties": {
@@ -111243,6 +110650,149 @@
         ],
         "title": "ServiceCategoryOut"
       },
+      "app__schemas__department__DepartmentCreate": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 50,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Key"
+          },
+          "name_ru": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name Ru"
+          },
+          "name_uz": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Uz"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon",
+            "default": "folder"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "gradient": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gradient"
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order",
+            "default": 999
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name_ru"
+        ],
+        "title": "DepartmentCreate",
+        "description": "Создание отделения"
+      },
+      "app__schemas__notification__NotificationStatsResponse": {
+        "properties": {
+          "total_sent": {
+            "type": "integer",
+            "title": "Total Sent"
+          },
+          "successful": {
+            "type": "integer",
+            "title": "Successful"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "by_channel": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Channel"
+          },
+          "by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Type"
+          },
+          "recent_activity": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationStatsItem"
+            },
+            "type": "array",
+            "title": "Recent Activity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_sent",
+          "successful",
+          "failed",
+          "pending",
+          "by_channel",
+          "by_type",
+          "recent_activity"
+        ],
+        "title": "NotificationStatsResponse"
+      },
       "app__schemas__online_queue__QRTokenResponse": {
         "properties": {
           "token": {
@@ -111364,6 +110914,78 @@
         "title": "QueueJoinRequest",
         "description": "Запрос на вступление в очередь"
       },
+      "app__schemas__online_queue__QueueJoinResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Успешность операции"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number",
+            "description": "Номер в очереди"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate",
+            "description": "Повторная запись (тот же номер)",
+            "default": false
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Сообщение пользователю"
+          },
+          "specialist_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Name"
+          },
+          "cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet"
+          },
+          "estimated_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "QueueJoinResponse",
+        "description": "Ответ на вступление в очередь"
+      },
       "app__schemas__role__RoleResponse": {
         "properties": {
           "id": {
@@ -111448,6 +111070,391 @@
         ],
         "title": "RoleResponse",
         "description": "Schema for role response"
+      },
+      "app__schemas__user_management__UserProfileResponse": {
+        "properties": {
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "middle_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middle Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "minLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "date_of_birth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Birth"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nationality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nationality"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "phone_verified": {
+            "type": "boolean",
+            "title": "Phone Verified"
+          },
+          "email_verified": {
+            "type": "boolean",
+            "title": "Email Verified"
+          },
+          "alternative_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alternative Email"
+          },
+          "address_line1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Line1"
+          },
+          "address_line2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Line2"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "employee_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employee Id"
+          },
+          "hire_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hire Date"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "social_links": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Social Links"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus"
+          },
+          "last_login": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login"
+          },
+          "last_activity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Activity"
+          },
+          "login_count": {
+            "type": "integer",
+            "title": "Login Count"
+          },
+          "failed_login_attempts": {
+            "type": "integer",
+            "title": "Failed Login Attempts"
+          },
+          "locked_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked Until"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "phone_verified",
+          "email_verified",
+          "status",
+          "login_count",
+          "failed_login_attempts",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "UserProfileResponse",
+        "description": "Схема ответа профиля пользователя"
       }
     },
     "securitySchemes": {
