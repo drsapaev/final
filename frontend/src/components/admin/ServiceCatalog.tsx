@@ -1149,7 +1149,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               </label>
               <Select
               value={formData.category_id as string}
-              onChange={(value: unknown) => handleChange('category_id', String(value))}
+              // RQ-06.b: onValueChange is the canonical Select contract (see
+              // RQ-06 queue_tag). The legacy onChange emits an event object, so
+              // String(value) stored '[object Object]' and the save turned the
+              // category into NaN/null.
+              onValueChange={(value) => handleChange('category_id', String(value))}
               options={[
               { value: '', label: t('admin2.sc_form_category_ph') },
               ...categories.map((category) => ({
@@ -1174,7 +1178,10 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
                 <Select
                 value={formData.currency as string}
-                onChange={(value: unknown) => handleChange('currency', String(value))}
+                // RQ-06.b: canonical onValueChange — the legacy onChange emitted
+                // an event object, so String(value) sent the literal '[object
+                // Object]' currency to the API.
+                onValueChange={(value) => handleChange('currency', String(value))}
                 options={[
                 { value: 'UZS', label: 'UZS' },
                 { value: 'USD', label: 'USD' }]
@@ -1201,7 +1208,10 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               </label>
               <Select
               value={formData.doctor_id as string}
-              onChange={(value: unknown) => handleChange('doctor_id', String(value))}
+              // RQ-06.b: canonical onValueChange — the legacy onChange emitted
+              // an event object, so String(value) stored '[object Object]' and the
+              // save turned the doctor into NaN/null.
+              onValueChange={(value) => handleChange('doctor_id', String(value))}
               options={[
               { value: '', label: t('admin2.sc_form_doctor_all') },
               ...doctors.map((doctor) => ({
