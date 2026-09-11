@@ -1194,6 +1194,136 @@
         }
       }
     },
+    "/api/v1/visits": {
+      "get": {
+        "tags": [
+          "visits"
+        ],
+        "summary": "Список визитов (мобильный алиас)",
+        "operationId": "list_visits_api_v1_visits_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "name": "status_q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Q"
+            }
+          },
+          {
+            "name": "planned_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Planned Date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VisitOut"
+                  },
+                  "title": "Response List Visits Api V1 Visits Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/visits/visits/{visit_id}": {
       "get": {
         "tags": [
@@ -1725,7 +1855,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut"
+                    "$ref": "#/components/schemas/ServiceCategoryOut"
                   },
                   "title": "Response List Service Categories Api V1 Services Categories Get"
                 }
@@ -1772,7 +1902,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut"
+                  "$ref": "#/components/schemas/ServiceCategoryOut"
                 }
               }
             }
@@ -1830,7 +1960,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut"
+                  "$ref": "#/components/schemas/ServiceCategoryOut"
                 }
               }
             }
@@ -2337,7 +2467,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__api__v1__endpoints__services_ep___services__DoctorOut"
+                    "$ref": "#/components/schemas/DoctorOut"
                   },
                   "title": "Response List Doctors Temp Api V1 Services Admin Doctors Get"
                 }
@@ -3966,6 +4096,54 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Get Visit Info By Token Api V1 Visits Info  Token  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/visits/{visit_id}": {
+      "get": {
+        "tags": [
+          "visits-mobile-alias"
+        ],
+        "summary": "Карточка визита (мобильный алиас)",
+        "description": "Мобильный контракт (Android-клиент): GET /api/v1/visits/{visit_id}.\nДелегирует каноническому обработчику — ответ идентичен байт-в-байт.",
+        "operationId": "get_visit_mobile_alias_api_v1_visits__visit_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitWithServices"
                 }
               }
             }
@@ -5959,7 +6137,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__api__v1__endpoints__qr_queue___helpers__QRTokenResponse"
+                  "$ref": "#/components/schemas/QRTokenResponse"
                 }
               }
             }
@@ -8659,7 +8837,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__api__v1__endpoints__group_permissions__RoleResponse"
+                    "$ref": "#/components/schemas/RoleResponse"
                   },
                   "title": "Response Get Roles Api V1 Admin Permissions Roles Get"
                 }
@@ -14423,7 +14601,7 @@
                 "schema": {
                   "anyOf": [
                     {
-                      "$ref": "#/components/schemas/app__schemas__online_queue__QueueJoinResponse"
+                      "$ref": "#/components/schemas/QueueJoinResponse"
                     },
                     {
                       "$ref": "#/components/schemas/QueueJoinError"
@@ -23139,6 +23317,55 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/telegram-integration/send-notification": {
+      "post": {
+        "tags": [
+          "telegram-integration-mobile"
+        ],
+        "summary": "Send Mobile Self Test Notification",
+        "description": "Self-test Telegram delivery for the mobile client.\n\nSends a fixed server-side test message to the CURRENT user's own linked\nchat. The chat is resolved server-side from the TelegramUser link; the\nclient-supplied chat_id/message/parse_mode are parsed for wire\ncompatibility and ignored (no arbitrary-recipient relay).",
+        "operationId": "send_mobile_self_test_notification_api_v1_telegram_integration_send_notification_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileTelegramSelfTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Send Mobile Self Test Notification Api V1 Telegram Integration Send Notification Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/api/v1/display/call-patient": {
@@ -35887,7 +36114,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "contentMediaType": "application/octet-stream",
+              "format": "binary",
               "title": "Zip Data"
             }
           }
@@ -42071,6 +42298,53 @@
         }
       }
     },
+    "/api/v1/queue/move-entry": {
+      "put": {
+        "tags": [
+          "queue-reorder-mobile-alias"
+        ],
+        "summary": "Move Queue Entry Mobile Alias",
+        "description": "Мобильный контракт (Android-клиент): PUT /api/v1/queue/move-entry.\nСемантика и ответ идентичны каноническому /queue/reorder/move-entry.",
+        "operationId": "move_queue_entry_mobile_alias_api_v1_queue_move_entry_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueEntryMoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueReorderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/email-sms/send-appointment-reminder-enhanced": {
       "post": {
         "tags": [
@@ -44553,7 +44827,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__api__v1__endpoints__queue__QueueJoinRequest"
+                "$ref": "#/components/schemas/QueueJoinRequest"
               }
             }
           },
@@ -44812,7 +45086,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__api__v1__endpoints__queue__QueueStatusResponse"
+                  "$ref": "#/components/schemas/QueueStatusResponse"
                 }
               }
             }
@@ -46199,7 +46473,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__api__v1__endpoints__dental__PriceOverrideApprovalRequest"
+                "$ref": "#/components/schemas/PriceOverrideApprovalRequest"
               }
             }
           }
@@ -50923,7 +51197,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__notification__NotificationStatsResponse"
+                  "$ref": "#/components/schemas/NotificationStatsResponse"
                 }
               }
             }
@@ -53065,7 +53339,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__schemas__authentication__PasswordResetConfirmRequest"
+                "$ref": "#/components/schemas/PasswordResetConfirmRequest"
               }
             }
           },
@@ -54271,7 +54545,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__user_management__UserProfileResponse"
+                  "$ref": "#/components/schemas/UserProfileResponse"
                 }
               }
             }
@@ -54322,7 +54596,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__user_management__UserProfileResponse"
+                  "$ref": "#/components/schemas/UserProfileResponse"
                 }
               }
             }
@@ -58211,7 +58485,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__api__v1__endpoints__billing__PaymentResponse"
+                  "$ref": "#/components/schemas/PaymentResponse"
                 }
               }
             }
@@ -63150,6 +63424,656 @@
         }
       }
     },
+    "/api/v1/emr/doctor-history": {
+      "get": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "EMR v2"
+        ],
+        "summary": "Get Doctor History",
+        "description": "Get doctor's previous EMR entries for a specific field.\n\nUsed to provide context to AI for better suggestions.\nDoctor can only access their own history.",
+        "operationId": "get_doctor_history_api_v1_emr_doctor_history_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Doctor ID",
+              "title": "Doctor Id"
+            },
+            "description": "Doctor ID"
+          },
+          {
+            "name": "field_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Field name (complaints, diagnosis, etc.)",
+              "title": "Field Name"
+            },
+            "description": "Field name (complaints, diagnosis, etc.)"
+          },
+          {
+            "name": "specialty",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Doctor specialty",
+              "default": "general",
+              "title": "Specialty"
+            },
+            "description": "Doctor specialty"
+          },
+          {
+            "name": "search_text",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search text for similarity",
+              "title": "Search Text"
+            },
+            "description": "Search text for similarity"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Max entries",
+              "default": 10,
+              "title": "Limit"
+            },
+            "description": "Max entries"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/emr/{visit_id}": {
+      "get": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "EMR v2"
+        ],
+        "summary": "Get Emr",
+        "description": "Get current EMR for visit.\n\nReturns the latest version of the EMR for the specified visit.\nCreates an audit log entry for the view action.",
+        "operationId": "get_emr_api_v1_emr__visit_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EMRRecordOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "EMR v2"
+        ],
+        "summary": "Save Emr",
+        "description": "Save EMR with versioning.\n\nCreates new EMR if none exists, otherwise updates with new version.\nUses optimistic locking via row_version to detect concurrent edits.\n\n**Conflict Resolution:**\n- If row_version mismatch and different user: returns 409 Conflict\n- If row_version mismatch but same user/session: allows (autosave)",
+        "operationId": "save_emr_api_v1_emr__visit_id__post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EMRSaveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EMRRecordOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/emr/{visit_id}/history": {
+      "get": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "EMR v2"
+        ],
+        "summary": "Get Emr History",
+        "description": "Get revision history for EMR.\n\nReturns list of all revisions in descending order (newest first).",
+        "operationId": "get_emr_history_api_v1_emr__visit_id__history_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Maximum revisions to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum revisions to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EMRHistoryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/emr/{visit_id}/version/{version}": {
+      "get": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "EMR v2"
+        ],
+        "summary": "Get Emr Version",
+        "description": "Get specific version of EMR.\n\nReturns the complete data snapshot for the specified version.",
+        "operationId": "get_emr_version_api_v1_emr__visit_id__version__version__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EMRRevisionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/emr/{visit_id}/diff": {
+      "get": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "EMR v2"
+        ],
+        "summary": "Compare Versions",
+        "description": "Compare two EMR versions.\n\nReturns list of field changes between the two versions.",
+        "operationId": "compare_versions_api_v1_emr__visit_id__diff_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "v1",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "First version number",
+              "title": "V1"
+            },
+            "description": "First version number"
+          },
+          {
+            "name": "v2",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Second version number",
+              "title": "V2"
+            },
+            "description": "Second version number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EMRDiffOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/emr/patient/{patient_id}": {
+      "get": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "EMR v2"
+        ],
+        "summary": "Get Patient Emrs",
+        "description": "Get all EMRs for a patient.\n\nReturns list of EMR summaries in descending order by creation date.",
+        "operationId": "get_patient_emrs_api_v1_emr_patient__patient_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum EMRs to return",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum EMRs to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EMRRecordSummary"
+                  },
+                  "title": "Response Get Patient Emrs Api V1 Emr Patient  Patient Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/emr/{visit_id}/sign": {
+      "post": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "EMR v2"
+        ],
+        "summary": "Sign Emr",
+        "description": "Sign and finalize EMR.\n\nChanges status to 'signed' and records signing timestamp.\nAfter signing, EMR can only be modified via the amend endpoint.",
+        "operationId": "sign_emr_api_v1_emr__visit_id__sign_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EMRSignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EMRRecordOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/emr/{visit_id}/amend": {
+      "post": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "EMR v2"
+        ],
+        "summary": "Amend Emr",
+        "description": "Amend a signed EMR.\n\nCreates a new version with amendment, requires a reason (min 10 chars).\nOnly available for EMRs with status 'signed'.",
+        "operationId": "amend_emr_api_v1_emr__visit_id__amend_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EMRAmendRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EMRRecordOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/emr/{visit_id}/restore": {
+      "post": {
+        "tags": [
+          "emr-v2-mobile-alias",
+          "EMR v2"
+        ],
+        "summary": "Restore Emr",
+        "description": "Restore EMR to a specific version.\n\nCreates a new version with data from the target version.\nThe restore is recorded in the revision history.",
+        "operationId": "restore_emr_api_v1_emr__visit_id__restore_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EMRRestoreRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EMRRecordOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/global-search": {
       "get": {
         "tags": [
@@ -63292,7 +64216,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__api__v1__endpoints__telemetry__TelemetryResponse"
+                  "$ref": "#/components/schemas/TelemetryResponse"
                 }
               }
             }
@@ -68852,7 +69776,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "Image"
           },
           "metadata": {
@@ -68939,7 +69863,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           },
           "target_folder_id": {
@@ -69028,7 +69952,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "Image"
           },
           "image_type": {
@@ -69080,7 +70004,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "Image"
           },
           "lesion_info": {
@@ -69127,7 +70051,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           },
           "change_description": {
@@ -69178,7 +70102,7 @@
           },
           "audio_file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "Audio File"
           }
         },
@@ -69255,7 +70179,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           }
         },
@@ -69269,7 +70193,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           }
         },
@@ -69283,7 +70207,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           }
         },
@@ -69297,7 +70221,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           },
           "title": {
@@ -69425,7 +70349,7 @@
           },
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           }
         },
@@ -69440,7 +70364,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           },
           "title": {
@@ -69465,7 +70389,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           }
         },
@@ -70026,7 +70950,7 @@
         "properties": {
           "departments": {
             "items": {
-              "$ref": "#/components/schemas/app__schemas__department__DepartmentCreate"
+              "$ref": "#/components/schemas/DepartmentCreate"
             },
             "type": "array",
             "maxItems": 500,
@@ -72996,6 +73920,97 @@
         "title": "DentalTreatmentRequest",
         "description": "Request body for POST /dental/treatments.\n\nTreatment plan data for dental procedures."
       },
+      "DepartmentCreate": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 50,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Key"
+          },
+          "name_ru": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name Ru"
+          },
+          "name_uz": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Uz"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon",
+            "default": "folder"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "gradient": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gradient"
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order",
+            "default": 999
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name_ru"
+        ],
+        "title": "DepartmentCreate",
+        "description": "Создание отделения"
+      },
       "DepartmentInfoResponse": {
         "properties": {
           "id": {
@@ -74446,7 +75461,7 @@
             "title": "Description"
           },
           "discount_type": {
-            "$ref": "#/components/schemas/app__models__discount_benefits__DiscountType"
+            "$ref": "#/components/schemas/DiscountType"
           },
           "value": {
             "type": "number",
@@ -74541,6 +75556,19 @@
           "value"
         ],
         "title": "DiscountCreate"
+      },
+      "DiscountType": {
+        "type": "string",
+        "enum": [
+          "percentage",
+          "fixed_amount",
+          "buy_x_get_y",
+          "loyalty_points",
+          "seasonal",
+          "referral"
+        ],
+        "title": "DiscountType",
+        "description": "Типы скидок"
       },
       "DiscountUpdate": {
         "properties": {
@@ -75375,6 +76403,40 @@
         ],
         "title": "DoctorListResponse",
         "description": "Схема списка врачей"
+      },
+      "DoctorOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "specialty": {
+            "type": "string",
+            "title": "Specialty"
+          },
+          "cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "specialty"
+        ],
+        "title": "DoctorOut"
       },
       "DoctorPerformanceReportRequest": {
         "properties": {
@@ -87402,6 +88464,49 @@
         "title": "MobileQuickStats",
         "description": "Быстрая статистика для мобильного приложения"
       },
+      "MobileTelegramSelfTestRequest": {
+        "properties": {
+          "chat_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Id"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "parse_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parse Mode"
+          }
+        },
+        "type": "object",
+        "title": "MobileTelegramSelfTestRequest",
+        "description": "Body of POST /api/v1/telegram-integration/send-notification as sent by\nthe Android client. Every field is accepted for wire compatibility and\ndeliberately IGNORED: the recipient chat is always the CURRENT user's own\nTelegramUser link and the text is a fixed server-side string, so the\nendpoint can never be used to relay arbitrary messages to arbitrary\nchats (no spam/phishing relay surface)."
+      },
       "MonitoringThresholds": {
         "properties": {
           "cpu_usage": {
@@ -88235,6 +89340,58 @@
           "created_at"
         ],
         "title": "NotificationStatsItem"
+      },
+      "NotificationStatsResponse": {
+        "properties": {
+          "total_sent": {
+            "type": "integer",
+            "title": "Total Sent"
+          },
+          "successful": {
+            "type": "integer",
+            "title": "Successful"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "by_channel": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Channel"
+          },
+          "by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Type"
+          },
+          "recent_activity": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationStatsItem"
+            },
+            "type": "array",
+            "title": "Recent Activity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_sent",
+          "successful",
+          "failed",
+          "pending",
+          "by_channel",
+          "by_type",
+          "recent_activity"
+        ],
+        "title": "NotificationStatsResponse"
       },
       "NotificationTemplate": {
         "properties": {
@@ -89119,6 +90276,29 @@
         ],
         "title": "PasswordChangeRequest",
         "description": "Схема для смены пароля"
+      },
+      "PasswordResetConfirmRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 32,
+            "title": "Token"
+          },
+          "new_password": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "PasswordResetConfirmRequest",
+        "description": "Схема для подтверждения сброса пароля"
       },
       "PasswordResetInitiateRequest": {
         "properties": {
@@ -91286,6 +92466,98 @@
         "type": "object",
         "title": "PaymentProviderUpdate"
       },
+      "PaymentResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "payment_number": {
+            "type": "string",
+            "title": "Payment Number"
+          },
+          "invoice_id": {
+            "type": "integer",
+            "title": "Invoice Id"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "payment_method": {
+            "type": "string",
+            "title": "Payment Method"
+          },
+          "payment_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Payment Date"
+          },
+          "reference_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Number"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_confirmed": {
+            "type": "boolean",
+            "title": "Is Confirmed"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "payment_number",
+          "invoice_id",
+          "patient_id",
+          "amount",
+          "payment_method",
+          "payment_date",
+          "reference_number",
+          "description",
+          "is_confirmed",
+          "confirmed_at",
+          "created_at"
+        ],
+        "title": "PaymentResponse"
+      },
       "PaymentStatusResponse": {
         "properties": {
           "payment_id": {
@@ -91886,6 +93158,30 @@
         ],
         "title": "PriceChangeNotificationRequest",
         "description": "Схема для уведомления об изменении цены"
+      },
+      "PriceOverrideApprovalRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "rejection_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejection Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "PriceOverrideApprovalRequest"
       },
       "PriceOverrideListResponse": {
         "properties": {
@@ -93923,6 +95219,50 @@
         "title": "QRTokenInfoResponse",
         "description": "Информация о QR токене"
       },
+      "QRTokenResponse": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "qr_url": {
+            "type": "string",
+            "title": "Qr Url"
+          },
+          "qr_code_base64": {
+            "type": "string",
+            "title": "Qr Code Base64"
+          },
+          "specialist_id": {
+            "type": "integer",
+            "title": "Specialist Id"
+          },
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "qr_url",
+          "qr_code_base64",
+          "specialist_id",
+          "department",
+          "expires_at",
+          "active"
+        ],
+        "title": "QRTokenResponse",
+        "description": "Ответ с QR токеном"
+      },
       "QrData": {
         "properties": {
           "token": {
@@ -94366,6 +95706,124 @@
         ],
         "title": "QueueJoinError",
         "description": "Ошибка вступления в очередь"
+      },
+      "QueueJoinRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id"
+          },
+          "patient_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "QueueJoinRequest"
+      },
+      "QueueJoinResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Успешность операции"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number",
+            "description": "Номер в очереди"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate",
+            "description": "Повторная запись (тот же номер)",
+            "default": false
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Сообщение пользователю"
+          },
+          "specialist_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Name"
+          },
+          "cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet"
+          },
+          "estimated_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "QueueJoinResponse",
+        "description": "Ответ на вступление в очередь"
       },
       "QueueLimitResponse": {
         "properties": {
@@ -94985,6 +96443,66 @@
         ],
         "title": "QueueStatusNotificationRequest",
         "description": "Схема для уведомления о статусе очереди"
+      },
+      "QueueStatusResponse": {
+        "properties": {
+          "queue_id": {
+            "type": "integer",
+            "title": "Queue Id"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "specialist_name": {
+            "type": "string",
+            "title": "Specialist Name"
+          },
+          "is_open": {
+            "type": "boolean",
+            "title": "Is Open"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "total_entries": {
+            "type": "integer",
+            "title": "Total Entries"
+          },
+          "waiting_entries": {
+            "type": "integer",
+            "title": "Waiting Entries"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/QueueEntryResponse"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queue_id",
+          "day",
+          "specialist_name",
+          "is_open",
+          "opened_at",
+          "total_entries",
+          "waiting_entries",
+          "entries"
+        ],
+        "title": "QueueStatusResponse"
       },
       "QueueTestRequest": {
         "properties": {
@@ -96911,6 +98429,61 @@
         "title": "RoleOptionsListResponse",
         "description": "List of role options for dropdowns"
       },
+      "RoleResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "level": {
+            "type": "integer",
+            "title": "Level"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "is_system": {
+            "type": "boolean",
+            "title": "Is System"
+          },
+          "permissions_count": {
+            "type": "integer",
+            "title": "Permissions Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "display_name",
+          "description",
+          "level",
+          "is_active",
+          "is_system",
+          "permissions_count"
+        ],
+        "title": "RoleResponse"
+      },
       "RoleUpdate": {
         "properties": {
           "display_name": {
@@ -98584,6 +100157,73 @@
           "code"
         ],
         "title": "ServiceCategoryCreate"
+      },
+      "ServiceCategoryOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name_ru": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Ru"
+          },
+          "name_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Uz"
+          },
+          "name_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name En"
+          },
+          "specialty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialty"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code"
+        ],
+        "title": "ServiceCategoryOut"
       },
       "ServiceCategoryUpdate": {
         "properties": {
@@ -101912,6 +103552,25 @@
         "title": "TelemetryRequest",
         "description": "Событие telemetry"
       },
+      "TelemetryResponse": {
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          },
+          "rejected": {
+            "type": "integer",
+            "title": "Rejected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accepted",
+          "rejected"
+        ],
+        "title": "TelemetryResponse",
+        "description": "Response for telemetry submission"
+      },
       "TelemetryStatsResponse": {
         "properties": {
           "doctorId": {
@@ -105172,6 +106831,391 @@
         "title": "UserPreferencesUpdate",
         "description": "Схема обновления настроек пользователя"
       },
+      "UserProfileResponse": {
+        "properties": {
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "middle_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middle Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "minLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "date_of_birth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Birth"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nationality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nationality"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "phone_verified": {
+            "type": "boolean",
+            "title": "Phone Verified"
+          },
+          "email_verified": {
+            "type": "boolean",
+            "title": "Email Verified"
+          },
+          "alternative_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alternative Email"
+          },
+          "address_line1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Line1"
+          },
+          "address_line2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Line2"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "postal_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Code"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "employee_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employee Id"
+          },
+          "hire_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hire Date"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "social_links": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Social Links"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus"
+          },
+          "last_login": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login"
+          },
+          "last_activity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Activity"
+          },
+          "login_count": {
+            "type": "integer",
+            "title": "Login Count"
+          },
+          "failed_login_attempts": {
+            "type": "integer",
+            "title": "Failed Login Attempts"
+          },
+          "locked_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked Until"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "phone_verified",
+          "email_verified",
+          "status",
+          "login_count",
+          "failed_login_attempts",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "UserProfileResponse",
+        "description": "Схема ответа профиля пользователя"
+      },
       "UserProfileUpdate": {
         "properties": {
           "full_name": {
@@ -105566,7 +107610,7 @@
           "profile": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/app__schemas__user_management__UserProfileResponse"
+                "$ref": "#/components/schemas/UserProfileResponse"
               },
               {
                 "type": "null"
@@ -106054,13 +108098,6 @@
           "type": {
             "type": "string",
             "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
           }
         },
         "type": "object",
@@ -106721,6 +108758,68 @@
         ],
         "title": "VisitServiceIn"
       },
+      "VisitServiceOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "service_id": {
+            "type": "integer",
+            "title": "Service Id"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price",
+            "default": 0.0
+          },
+          "qty": {
+            "type": "integer",
+            "title": "Qty",
+            "default": 1
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "visit_id",
+          "service_id",
+          "name"
+        ],
+        "title": "VisitServiceOut",
+        "description": "Row-level visit service. Exposes service_id (catalog Service.id) —\nmobile-contract gap #8: the Android client re-books via the batch\nqueue-registration endpoint, which needs the catalog id, not the\nvisit-service row id. Additive fields are backward-compatible for\nexisting web consumers."
+      },
       "VisitWithServices": {
         "properties": {
           "visit": {
@@ -106728,7 +108827,7 @@
           },
           "services": {
             "items": {
-              "$ref": "#/components/schemas/VisitServiceIn"
+              "$ref": "#/components/schemas/VisitServiceOut"
             },
             "type": "array",
             "title": "Services"
@@ -108306,98 +110405,6 @@
         "title": "DepartmentCreate",
         "description": "Схема для создания отделения"
       },
-      "app__api__v1__endpoints__billing__PaymentResponse": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "payment_number": {
-            "type": "string",
-            "title": "Payment Number"
-          },
-          "invoice_id": {
-            "type": "integer",
-            "title": "Invoice Id"
-          },
-          "patient_id": {
-            "type": "integer",
-            "title": "Patient Id"
-          },
-          "amount": {
-            "type": "number",
-            "title": "Amount"
-          },
-          "payment_method": {
-            "type": "string",
-            "title": "Payment Method"
-          },
-          "payment_date": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Payment Date"
-          },
-          "reference_number": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference Number"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "is_confirmed": {
-            "type": "boolean",
-            "title": "Is Confirmed"
-          },
-          "confirmed_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Confirmed At"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "payment_number",
-          "invoice_id",
-          "patient_id",
-          "amount",
-          "payment_method",
-          "payment_date",
-          "reference_number",
-          "description",
-          "is_confirmed",
-          "confirmed_at",
-          "created_at"
-        ],
-        "title": "PaymentResponse"
-      },
       "app__api__v1__endpoints__cashier___helpers__PaymentResponse": {
         "properties": {
           "id": {
@@ -108479,85 +110486,6 @@
         "title": "PaymentResponse",
         "description": "Ответ при создании/получении платежа"
       },
-      "app__api__v1__endpoints__dental__PriceOverrideApprovalRequest": {
-        "properties": {
-          "action": {
-            "type": "string",
-            "title": "Action"
-          },
-          "rejection_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rejection Reason"
-          }
-        },
-        "type": "object",
-        "required": [
-          "action"
-        ],
-        "title": "PriceOverrideApprovalRequest"
-      },
-      "app__api__v1__endpoints__group_permissions__RoleResponse": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "display_name": {
-            "type": "string",
-            "title": "Display Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "level": {
-            "type": "integer",
-            "title": "Level"
-          },
-          "is_active": {
-            "type": "boolean",
-            "title": "Is Active"
-          },
-          "is_system": {
-            "type": "boolean",
-            "title": "Is System"
-          },
-          "permissions_count": {
-            "type": "integer",
-            "title": "Permissions Count"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "display_name",
-          "description",
-          "level",
-          "is_active",
-          "is_system",
-          "permissions_count"
-        ],
-        "title": "RoleResponse"
-      },
       "app__api__v1__endpoints__password_reset__PasswordResetConfirmRequest": {
         "properties": {
           "token": {
@@ -108595,50 +110523,6 @@
         ],
         "title": "TelemetryResponse",
         "description": "Ответ на telemetry"
-      },
-      "app__api__v1__endpoints__qr_queue___helpers__QRTokenResponse": {
-        "properties": {
-          "token": {
-            "type": "string",
-            "title": "Token"
-          },
-          "qr_url": {
-            "type": "string",
-            "title": "Qr Url"
-          },
-          "qr_code_base64": {
-            "type": "string",
-            "title": "Qr Code Base64"
-          },
-          "specialist_id": {
-            "type": "integer",
-            "title": "Specialist Id"
-          },
-          "department": {
-            "type": "string",
-            "title": "Department"
-          },
-          "expires_at": {
-            "type": "string",
-            "title": "Expires At"
-          },
-          "active": {
-            "type": "boolean",
-            "title": "Active"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token",
-          "qr_url",
-          "qr_code_base64",
-          "specialist_id",
-          "department",
-          "expires_at",
-          "active"
-        ],
-        "title": "QRTokenResponse",
-        "description": "Ответ с QR токеном"
       },
       "app__api__v1__endpoints__qr_queue___helpers__QueueStatusResponse": {
         "properties": {
@@ -108679,52 +110563,6 @@
         ],
         "title": "QueueStatusResponse",
         "description": "Статус очереди"
-      },
-      "app__api__v1__endpoints__queue__QueueJoinRequest": {
-        "properties": {
-          "token": {
-            "type": "string",
-            "title": "Token"
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone"
-          },
-          "telegram_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Telegram Id"
-          },
-          "patient_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token"
-        ],
-        "title": "QueueJoinRequest"
       },
       "app__api__v1__endpoints__queue__QueueJoinResponse": {
         "properties": {
@@ -108771,66 +110609,6 @@
           "message"
         ],
         "title": "QueueJoinResponse"
-      },
-      "app__api__v1__endpoints__queue__QueueStatusResponse": {
-        "properties": {
-          "queue_id": {
-            "type": "integer",
-            "title": "Queue Id"
-          },
-          "day": {
-            "type": "string",
-            "format": "date",
-            "title": "Day"
-          },
-          "specialist_name": {
-            "type": "string",
-            "title": "Specialist Name"
-          },
-          "is_open": {
-            "type": "boolean",
-            "title": "Is Open"
-          },
-          "opened_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Opened At"
-          },
-          "total_entries": {
-            "type": "integer",
-            "title": "Total Entries"
-          },
-          "waiting_entries": {
-            "type": "integer",
-            "title": "Waiting Entries"
-          },
-          "entries": {
-            "items": {
-              "$ref": "#/components/schemas/QueueEntryResponse"
-            },
-            "type": "array",
-            "title": "Entries"
-          }
-        },
-        "type": "object",
-        "required": [
-          "queue_id",
-          "day",
-          "specialist_name",
-          "is_open",
-          "opened_at",
-          "total_entries",
-          "waiting_entries",
-          "entries"
-        ],
-        "title": "QueueStatusResponse"
       },
       "app__api__v1__endpoints__queue_limits__QueueStatusResponse": {
         "properties": {
@@ -108970,139 +110748,6 @@
         ],
         "title": "PriceOverrideApprovalRequest"
       },
-      "app__api__v1__endpoints__services_ep___helpers__ServiceCategoryOut": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "code": {
-            "type": "string",
-            "title": "Code"
-          },
-          "name_ru": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name Ru"
-          },
-          "name_uz": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name Uz"
-          },
-          "name_en": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name En"
-          },
-          "specialty": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Specialty"
-          },
-          "active": {
-            "type": "boolean",
-            "title": "Active",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "code"
-        ],
-        "title": "ServiceCategoryOut"
-      },
-      "app__api__v1__endpoints__services_ep___services__DoctorOut": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "specialty": {
-            "type": "string",
-            "title": "Specialty"
-          },
-          "cabinet": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cabinet"
-          },
-          "active": {
-            "type": "boolean",
-            "title": "Active",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "specialty"
-        ],
-        "title": "DoctorOut"
-      },
-      "app__api__v1__endpoints__telemetry__TelemetryResponse": {
-        "properties": {
-          "accepted": {
-            "type": "integer",
-            "title": "Accepted"
-          },
-          "rejected": {
-            "type": "integer",
-            "title": "Rejected"
-          }
-        },
-        "type": "object",
-        "required": [
-          "accepted",
-          "rejected"
-        ],
-        "title": "TelemetryResponse",
-        "description": "Response for telemetry submission"
-      },
-      "app__models__discount_benefits__DiscountType": {
-        "type": "string",
-        "enum": [
-          "percentage",
-          "fixed_amount",
-          "buy_x_get_y",
-          "loyalty_points",
-          "seasonal",
-          "referral"
-        ],
-        "title": "DiscountType",
-        "description": "Типы скидок"
-      },
       "app__models__dynamic_pricing__DiscountType": {
         "type": "string",
         "enum": [
@@ -109113,29 +110758,6 @@
         ],
         "title": "DiscountType",
         "description": "Типы скидок"
-      },
-      "app__schemas__authentication__PasswordResetConfirmRequest": {
-        "properties": {
-          "token": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 32,
-            "title": "Token"
-          },
-          "new_password": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 8,
-            "title": "New Password"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token",
-          "new_password"
-        ],
-        "title": "PasswordResetConfirmRequest",
-        "description": "Схема для подтверждения сброса пароля"
       },
       "app__schemas__authentication__UserProfileResponse": {
         "properties": {
@@ -109621,149 +111243,6 @@
         ],
         "title": "ServiceCategoryOut"
       },
-      "app__schemas__department__DepartmentCreate": {
-        "properties": {
-          "key": {
-            "type": "string",
-            "maxLength": 50,
-            "pattern": "^[a-z][a-z0-9_]*$",
-            "title": "Key"
-          },
-          "name_ru": {
-            "type": "string",
-            "maxLength": 200,
-            "title": "Name Ru"
-          },
-          "name_uz": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name Uz"
-          },
-          "icon": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Icon",
-            "default": "folder"
-          },
-          "color": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Color"
-          },
-          "gradient": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Gradient"
-          },
-          "display_order": {
-            "type": "integer",
-            "title": "Display Order",
-            "default": 999
-          },
-          "active": {
-            "type": "boolean",
-            "title": "Active",
-            "default": true
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          }
-        },
-        "type": "object",
-        "required": [
-          "key",
-          "name_ru"
-        ],
-        "title": "DepartmentCreate",
-        "description": "Создание отделения"
-      },
-      "app__schemas__notification__NotificationStatsResponse": {
-        "properties": {
-          "total_sent": {
-            "type": "integer",
-            "title": "Total Sent"
-          },
-          "successful": {
-            "type": "integer",
-            "title": "Successful"
-          },
-          "failed": {
-            "type": "integer",
-            "title": "Failed"
-          },
-          "pending": {
-            "type": "integer",
-            "title": "Pending"
-          },
-          "by_channel": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "By Channel"
-          },
-          "by_type": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "By Type"
-          },
-          "recent_activity": {
-            "items": {
-              "$ref": "#/components/schemas/NotificationStatsItem"
-            },
-            "type": "array",
-            "title": "Recent Activity"
-          }
-        },
-        "type": "object",
-        "required": [
-          "total_sent",
-          "successful",
-          "failed",
-          "pending",
-          "by_channel",
-          "by_type",
-          "recent_activity"
-        ],
-        "title": "NotificationStatsResponse"
-      },
       "app__schemas__online_queue__QRTokenResponse": {
         "properties": {
           "token": {
@@ -109885,78 +111364,6 @@
         "title": "QueueJoinRequest",
         "description": "Запрос на вступление в очередь"
       },
-      "app__schemas__online_queue__QueueJoinResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success",
-            "description": "Успешность операции"
-          },
-          "number": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Number",
-            "description": "Номер в очереди"
-          },
-          "duplicate": {
-            "type": "boolean",
-            "title": "Duplicate",
-            "description": "Повторная запись (тот же номер)",
-            "default": false
-          },
-          "message": {
-            "type": "string",
-            "title": "Message",
-            "description": "Сообщение пользователю"
-          },
-          "specialist_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Specialist Name"
-          },
-          "cabinet": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cabinet"
-          },
-          "estimated_time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Estimated Time"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success",
-          "message"
-        ],
-        "title": "QueueJoinResponse",
-        "description": "Ответ на вступление в очередь"
-      },
       "app__schemas__role__RoleResponse": {
         "properties": {
           "id": {
@@ -110041,391 +111448,6 @@
         ],
         "title": "RoleResponse",
         "description": "Schema for role response"
-      },
-      "app__schemas__user_management__UserProfileResponse": {
-        "properties": {
-          "full_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 100,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Full Name"
-          },
-          "first_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "First Name"
-          },
-          "last_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Name"
-          },
-          "middle_name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Middle Name"
-          },
-          "phone": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 20,
-                "minLength": 10
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Phone"
-          },
-          "date_of_birth": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Date Of Birth"
-          },
-          "gender": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Gender"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "nationality": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Nationality"
-          },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 10
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
-          "timezone": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timezone"
-          },
-          "bio": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bio"
-          },
-          "website": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 200
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Website"
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "user_id": {
-            "type": "integer",
-            "title": "User Id"
-          },
-          "phone_verified": {
-            "type": "boolean",
-            "title": "Phone Verified"
-          },
-          "email_verified": {
-            "type": "boolean",
-            "title": "Email Verified"
-          },
-          "alternative_email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alternative Email"
-          },
-          "address_line1": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Address Line1"
-          },
-          "address_line2": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Address Line2"
-          },
-          "city": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "City"
-          },
-          "state": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "State"
-          },
-          "postal_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Postal Code"
-          },
-          "country": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Country"
-          },
-          "job_title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Job Title"
-          },
-          "department": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department"
-          },
-          "employee_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Employee Id"
-          },
-          "hire_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hire Date"
-          },
-          "avatar_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Avatar Url"
-          },
-          "social_links": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Social Links"
-          },
-          "status": {
-            "$ref": "#/components/schemas/UserStatus"
-          },
-          "last_login": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Login"
-          },
-          "last_activity": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Activity"
-          },
-          "login_count": {
-            "type": "integer",
-            "title": "Login Count"
-          },
-          "failed_login_attempts": {
-            "type": "integer",
-            "title": "Failed Login Attempts"
-          },
-          "locked_until": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Locked Until"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "user_id",
-          "phone_verified",
-          "email_verified",
-          "status",
-          "login_count",
-          "failed_login_attempts",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "UserProfileResponse",
-        "description": "Схема ответа профиля пользователя"
       }
     },
     "securitySchemes": {
