@@ -23,6 +23,7 @@ function createWrappedError(message: string, extras: { status?: number; detail?:
 
 import { api } from './client';
 import logger from '../utils/logger';
+import type { PaymentInvoiceCreateDto } from '../types/api';
 import type { Invoice } from '../types/domain/billing';
 import { mapInvoiceDtos, mapInvoiceDto } from './mappers';
 
@@ -60,7 +61,7 @@ export async function getPendingInvoices(): Promise<Invoice[]> {
  * @param invoiceData - { amount, currency, provider, description, patient_info }
  * @returns {Promise<Invoice>} Created invoice (домен)
  */
-export async function createPaymentInvoice(invoiceData: Record<string, unknown>): Promise<Invoice> {
+export async function createPaymentInvoice(invoiceData: PaymentInvoiceCreateDto): Promise<Invoice> {
   try {
     const response = await api.post('/payments/invoice/create', invoiceData);
     return mapInvoiceDto(response.data as Record<string, unknown>);

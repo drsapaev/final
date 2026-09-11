@@ -40,6 +40,7 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
         ("/api/v1/queue/join/complete", "post"),
         ("/api/v1/registrar/records/actions", "post"),
         ("/api/v1/payments/init", "post"),
+        ("/api/v1/payments/invoice/create", "post"),
         ("/api/v1/payments/{payment_id}", "get"),
         ("/api/v1/telegram/mini-app/onboarding/requests", "post"),
         ("/api/v1/telegram/mini-app/onboarding/status", "post"),
@@ -72,6 +73,25 @@ def test_openapi_queue_join_contract_has_request_and_responses(client: TestClien
     assert operation["requestBody"].get("required") is True
     assert "responses" in operation
     assert any(code in operation["responses"] for code in ("200", "201", "400", "422"))
+
+
+def test_openapi_payment_invoice_requires_positive_patient_reference(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/payments/invoice/create"]["post"]
+    request_schema = operation["requestBody"]["content"]["application/json"]["schema"]
+    request_name = request_schema["$ref"].rsplit("/", 1)[-1]
+    request_contract = schema["components"]["schemas"][request_name]
+
+    assert "patient_info" in request_contract["required"]
+    patient_ref = request_contract["properties"]["patient_info"]["$ref"]
+    patient_ref_name = patient_ref.rsplit("/", 1)[-1]
+    patient_contract = schema["components"]["schemas"][patient_ref_name]
+
+    assert patient_contract["required"] == ["patient_id"]
+    assert set(patient_contract["properties"]) == {"patient_id"}
+    assert patient_contract["properties"]["patient_id"]["exclusiveMinimum"] == 0
 
 
 def test_openapi_patient_appointment_history_is_an_explicit_list(

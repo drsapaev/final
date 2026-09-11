@@ -14,14 +14,14 @@ from app.services.payment_invoice_service import (
 
 @pytest.mark.unit
 class TestPaymentInvoiceService:
-    def test_create_invoice_success(self, db_session, admin_user):
+    def test_create_invoice_success(self, db_session, admin_user, test_patient):
         service = PaymentInvoiceService(db_session)
         result = service.create_invoice(
             amount=12_500.0,
             currency="UZS",
             provider="click",
             description="unit invoice",
-            patient_info=None,
+            patient_id=test_patient.id,
             created_by_id=admin_user.id,
         )
 
@@ -31,10 +31,10 @@ class TestPaymentInvoiceService:
             .first()
         )
         assert invoice is not None
-        assert invoice.patient_id == 0
+        assert invoice.patient_id == test_patient.id
         assert result["amount"] == 12_500.0
         assert result["description"] == "unit invoice"
-        assert invoice.provider_data["created_by_id"] == admin_user.id
+        assert invoice.provider_data == {"created_by_id": admin_user.id}
 
     def test_create_invoice_emits_safe_patient_telegram_unpaid_bill_event(
         self, db_session, admin_user, test_patient, monkeypatch
@@ -52,7 +52,7 @@ class TestPaymentInvoiceService:
             currency="UZS",
             provider="click",
             description="cardiology invoice",
-            patient_info={"patient_id": test_patient.id},
+            patient_id=test_patient.id,
             created_by_id=admin_user.id,
         )
 
@@ -72,8 +72,9 @@ class TestPaymentInvoiceService:
         assert "provider_payment_id" not in kwargs["metadata"]
         assert result["invoice_id"]
 
-    def test_create_invoice_without_patient_skips_patient_telegram_event(
-        self, db_session, admin_user, monkeypatch
+    @pytest.mark.parametrize("patient_id", [0, -1, True, "bad-id"])
+    def test_create_invoice_rejects_invalid_patient_id_without_notification(
+        self, db_session, admin_user, monkeypatch, patient_id
     ):
         telegram_mock = AsyncMock(return_value=True)
         monkeypatch.setattr(
@@ -83,18 +84,20 @@ class TestPaymentInvoiceService:
         )
 
         service = PaymentInvoiceService(db_session)
-        service.create_invoice(
-            amount=12_500.0,
-            currency="UZS",
-            provider="click",
-            description="unit invoice",
-            patient_info=None,
-            created_by_id=admin_user.id,
-        )
+        with pytest.raises(PaymentInvoiceDomainError) as exc_info:
+            service.create_invoice(
+                amount=12_500.0,
+                currency="UZS",
+                provider="click",
+                description="unit invoice",
+                patient_id=patient_id,  # type: ignore[arg-type]
+                created_by_id=admin_user.id,
+            )
 
+        assert exc_info.value.status_code == 400
         telegram_mock.assert_not_awaited()
 
-    def test_create_invoice_invalid_patient_id(self, db_session):
+    def test_create_invoice_rejects_unknown_patient(self, db_session):
         service = PaymentInvoiceService(db_session)
 
         with pytest.raises(PaymentInvoiceDomainError) as exc_info:
@@ -103,12 +106,33 @@ class TestPaymentInvoiceService:
                 currency="UZS",
                 provider="click",
                 description=None,
-                patient_info={"patient_id": "bad-id"},
+                patient_id=999_999_999,
                 created_by_id=None,
             )
 
-        assert exc_info.value.status_code == 400
-        assert "Некорректный patient_id" in exc_info.value.detail
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "Пациент не найден"
+        assert db_session.query(PaymentInvoice).count() == 0
+
+    def test_create_invoice_rejects_soft_deleted_patient(
+        self, db_session, test_patient
+    ):
+        test_patient.is_deleted = True
+        db_session.commit()
+        service = PaymentInvoiceService(db_session)
+
+        with pytest.raises(PaymentInvoiceDomainError) as exc_info:
+            service.create_invoice(
+                amount=10_000.0,
+                currency="UZS",
+                provider="click",
+                description=None,
+                patient_id=test_patient.id,
+                created_by_id=None,
+            )
+
+        assert exc_info.value.status_code == 404
+        assert db_session.query(PaymentInvoice).count() == 0
 
     def test_list_pending_invoices_filters_by_status(self, db_session):
         pending_invoice = PaymentInvoice(

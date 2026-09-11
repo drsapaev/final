@@ -5804,6 +5804,8 @@ const kk = {
     pay_mgr_close_aria: 'Закрыть окно оплаты',
     pay_mgr_close_title: 'Закрыть (Esc)',
     pay_mgr_new_payment: 'Новая оплата',
+    pay_mgr_patient_required: 'Жаңа шот үшін пациентті таңдаңыз',
+    pay_mgr_patient_required_hint: 'Жаңа шот пациенттің қабылдауынан жасалады. Мұнда бұрын шығарылған шоттарды төлеуге болады.',
     pay_mgr_amount_label: 'Сумма оплаты (сум)',
     pay_mgr_amount_aria: 'Сумма оплаты',
     pay_mgr_amount_placeholder: 'Введите сумму',

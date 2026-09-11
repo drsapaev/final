@@ -20,6 +20,12 @@ class PatientSummary(BaseModel):
 
 
 class PatientContract(Protocol):
+    def active_patient_exists(
+        self,
+        patient_id: int,
+        request_id: str | None = None,
+    ) -> bool: ...
+
     def get_patient_summary(
         self,
         patient_id: int,
@@ -40,6 +46,26 @@ class PatientContractFacade:
     def __init__(self, contract: PatientContract) -> None:
         self._contract = contract
         self._contract_logger = ContractMethodLogger(logger, "patient")
+
+    def active_patient_exists(
+        self,
+        patient_id: int,
+        request_id: str | None = None,
+    ) -> bool:
+        self._contract_logger.log_entry(
+            "active_patient_exists",
+            request_id,
+        )
+        exists = self._contract.active_patient_exists(
+            patient_id=patient_id,
+            request_id=request_id,
+        )
+        self._contract_logger.log_exit(
+            "active_patient_exists",
+            request_id,
+            exists=exists,
+        )
+        return exists
 
     def get_patient_summary(
         self,

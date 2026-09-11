@@ -19,6 +19,16 @@ class PatientServiceContractAdapter:
     def __init__(self, db: Session) -> None:
         self._db = db
 
+    def active_patient_exists(
+        self,
+        patient_id: int,
+        request_id: str | None = None,
+    ) -> bool:
+        _ = request_id
+        from app.crud import patient as crud_patient
+
+        return crud_patient.get(self._db, id=patient_id) is not None
+
     def get_patient_summary(
         self,
         patient_id: int,
@@ -54,6 +64,27 @@ class PatientContextFacade:
 
     def __init__(self, contract: PatientContract) -> None:
         self._contract = PatientContractFacade(contract)
+
+    def active_patient_exists(
+        self,
+        patient_id: int,
+        correlation_id: str | None = None,
+    ) -> bool:
+        logger.info(
+            "patient_facade.active_patient_exists correlation_id=%s",
+            correlation_id or "-",
+        )
+        try:
+            return self._contract.active_patient_exists(
+                patient_id=patient_id,
+                request_id=correlation_id,
+            )
+        except Exception:
+            logger.exception(
+                "patient_facade.active_patient_exists failed correlation_id=%s",
+                correlation_id or "-",
+            )
+            raise
 
     def lookup_patient_summary(
         self,
