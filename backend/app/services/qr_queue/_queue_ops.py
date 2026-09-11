@@ -5,6 +5,11 @@ Split from qr_queue_service.py.
 
 from __future__ import annotations
 
+from app.crud.clinic import clinic_today
+from app.crud.queue_resource_routing import (
+    prefer_registry_surface,
+    resolve_registry_tag_queue_for_specialist,
+)
 from app.services.qr_queue._base import *  # noqa: F401, F403
 from app.services.qr_queue._base import QRQueueServiceMixinBase, _now
 
@@ -26,7 +31,13 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             Статус очереди
         """
         if target_date is None:
-            target_date = date.today()
+            # Codex round-25 P2: день — по SSOT клиники (таймзона настроек
+            # очередей): host date.today() на UTC-хосте между 19:00 и
+            # полуночью уже «вчера» для Asia/Tashkent — живая очередь
+            # (штампованная следующим ЛОКАЛЬНЫМ днём) не находилась, и
+            # /queue/status/{specialist_id} отвечал «не активна» при
+            # ждущих пациентах.
+            target_date = clinic_today(self.db)
 
         daily_queue = (
             self.db.query(DailyQueue)
@@ -34,6 +45,16 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 DailyQueue.day == target_date, DailyQueue.specialist_id == specialist_id
             )
             .first()
+        )
+
+        # QD-2C (Codex round-2 P2): очередь тега реестра может быть
+        # resource-owned (specialist NULL) — тот же fallback, что и
+        # call_next_patient, иначе статус «не активна» при живой очереди
+        # (и вызываемом тем же specialist_id пациенте).
+        # Codex round-5 P1: НЕАКТИВНАЯ легаси-строка не затеняет живую
+        # ресурсную поверхность (lookup без active-предиката).
+        daily_queue = prefer_registry_surface(
+            self.db, daily_queue, target_date, specialist_id
         )
 
         if not daily_queue:
@@ -112,7 +133,11 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         Returns:
             Информация о вызванном пациенте
         """
-        queue_date = target_date if target_date else date.today()
+        # Codex round-25 P2: дефолт опущенной даты — день КЛИНИКИ по SSOT
+        # (таймзона настроек очередей), как в GQL/quick-call путях: иначе
+        # тот же ранний-вечернийUTC-хост искал вчерашнюю очередь и
+        # «Очередь не активна» при живом ресурсном пациенте.
+        queue_date = target_date if target_date else clinic_today(self.db)
         queue_query = self.db.query(DailyQueue).filter(
             DailyQueue.day == queue_date,
             DailyQueue.specialist_id == specialist_id,
@@ -121,6 +146,44 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         if queue_tag:
             queue_query = queue_query.filter(DailyQueue.queue_tag == queue_tag)
         candidate_queues = queue_query.all()
+
+        # QD-2C (Codex round-1 P1): очередь тега реестра может быть
+        # resource-owned (specialist NULL — утренний пре-креат или любой
+        # пост-свитч писатель), и doctor-keyed-поиск её не видит: "очередь
+        # не активна", waiting-пациенты не продвигаются канонической
+        # командой. Legacy-идентичность (synthetic Doctor id / явный тег)
+        # по-прежнему именует тег: резолвим (day, tag)-поверхность, когда
+        # тег имеет строку реестра; doctor-теги сохраняют контракт PR-26.
+        if not candidate_queues:
+            tag_queue = resolve_registry_tag_queue_for_specialist(
+                self.db, queue_date, specialist_id, queue_tag
+            )
+            if tag_queue is not None:
+                candidate_queues = [tag_queue]
+
+        # Codex P1 (round-14): поверхность реестра предпочитается ДО
+        # принятия doctor-keyed кандидатов — fallback выше срабатывал
+        # только на ПУСТОМ списке. На upgraded-клинике рядом с живой
+        # resource-очередью может остаться АКТИВНЫЙ untagged
+        # synthetic-shadow (легаси-писатели ещё смонтированы, round-6):
+        # выбор уходил shadow'у → «нет пациентов», пока пациенты ждут
+        # на поверхности. Поверхность возглавляет кандидатов; untagged
+        # строки (не на оси тега) выпадают; tagged doctor-строки
+        # (мост 0059) остаются сканируемыми. Doctor-теги без поверхности
+        # (surface is None) не тронуты — байт-идентично.
+        if candidate_queues:
+            surface = resolve_registry_tag_queue_for_specialist(
+                self.db, queue_date, specialist_id, queue_tag
+            )
+            if surface is not None:
+                surface_ids = {surface.id}
+                candidate_queues = [
+                    q
+                    for q in candidate_queues
+                    if q.queue_tag is not None or q.id in surface_ids
+                ]
+                if surface.id not in {q.id for q in candidate_queues}:
+                    candidate_queues = [surface] + candidate_queues
 
         # Codex P1 (round-12): без queue_tag у врача с несколькими активными
         # tagged-очередями неупорядоченный .first() выбирал произвольную —
@@ -297,7 +360,13 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
 
     def _update_queue_statistics(self, queue_id: int, stat_field: str):
         """Обновляет статистику очереди"""
-        today = date.today()
+        # Codex round-38 P2: штамп статистики — КЛИНИК-локальный день
+        # (clinic_today SSOT, таймзона настроек очередей): host
+        # date.today() на UTC-хосте между 19:00 и полуночью уже
+        # «вчера» для Asia/Tashkent — QR-join записывался под прошлым
+        # днём и выпадал из /admin/queue-analytics даже при явном
+        # запросе актуального клиник-дня.
+        today = clinic_today(self.db)
 
         stats = (
             self.db.query(QueueStatistics)
@@ -352,6 +421,22 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
         # ✅ ИСПРАВЛЕНИЕ: Используем дату из токена, а не сегодняшнюю
         target_date = qr_token.day
 
+        # Codex round-30 P2: и день QR-сессии, и текущее время — в
+        # таймзоне КЛИНИКИ (настройки очередей): resource-очереди
+        # создаются на КЛИНИК-локальном дне, и host date.today() в окне
+        # 19:00-24:00Z классифицировал текущий клиник-день как «будущий
+        # QR» — запись разрешалась до 07:00 клиник-времени, минуя окно
+        # старта онлайн-записи. Одни и те же now/today используются
+        # обеими ветками (общий и specialist QR); _now() сохраняет
+        # тестовую заморозку времени.
+        from zoneinfo import ZoneInfo
+
+        from app.crud.clinic import get_queue_settings
+
+        _tz_name = get_queue_settings(self.db).get("timezone", "Asia/Tashkent")
+        now = _now(ZoneInfo(_tz_name))
+        today = now.date()
+
         logger.debug("[_check_online_time_restrictions] Ищем DailyQueue:")
         logger.debug(f"  target_date: {target_date}")
         logger.debug(f"  specialist_id: {qr_token.specialist_id}")
@@ -369,8 +454,7 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
             # ✅ ИСПРАВЛЕНИЕ: Для общего QR разрешаем запись даже если очередей еще нет
             # (они могут быть созданы позже, или запись может быть на будущую дату)
             if not daily_queue:
-                # Проверяем, что дата не в прошлом
-                today = date.today()
+                # Проверяем, что дата не в прошлом (clinic-day SSOT)
                 if target_date < today:
                     logger.debug(
                         f"[_check_online_time_restrictions] ❌ Дата {target_date} в прошлом"
@@ -382,10 +466,10 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
 
                 # ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем время для сегодняшнего дня
                 # Используем ту же логику, что и в check_queue_time_window
+                # (now — клиник-локальное время, см. clinic-day SSOT выше)
                 if target_date == today:
                     from app.services.queue_service import QueueBusinessService
 
-                    now = _now()
                     current_time = now.time()
                     start_time = QueueBusinessService.ONLINE_QUEUE_START_TIME  # 07:00
 
@@ -447,6 +531,17 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                 )
                 .first()
             )
+            # QD-2C (Codex round-2 P1): resource-owned очередь тега реестра
+            # видна через fallback реестра — не только doctor-keyed lookup.
+            # Codex P2 (round-14): PREFER, а не только empty-fallback —
+            # активный doctor-keyed shadow (opened_at/capacity/window
+            # расходятся с поверхностью) не должен затенять живую
+            # поверхность в QR-проверках: скан QR может отклонить живую
+            # очередь или открыть сессию, которую аллокация затем
+            # отклонит. Врач-теги без поверхности не тронуты.
+            daily_queue = prefer_registry_surface(
+                self.db, daily_queue, target_date, qr_token.specialist_id
+            )
 
             logger.debug(f"  daily_queue найдена: {daily_queue is not None}")
             if daily_queue:
@@ -479,13 +574,8 @@ class QueueOpsMixin(QRQueueServiceMixinBase):
                     "status": "closed_reception_opened",
                 }
 
-        # ✅ ИСПРАВЛЕНИЕ: Проверяем время только если это сегодня
-        # ⚠️ ВАЖНО: Для общего QR daily_queue может быть None (если очереди еще не созданы)
-        # В этом случае мы уже вернули результат выше, так что здесь daily_queue всегда существует
-        now = _now()
-        today = date.today()
-
         # Если QR для будущей даты - разрешаем запись
+        # (day/today — клиник-локальные, см. clinic-day SSOT выше)
         if target_date > today:
             # ✅ Защита от None для общего QR (хотя мы уже вернули результат выше)
             if daily_queue:

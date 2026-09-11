@@ -68,15 +68,17 @@ async def restore_entry_to_next(
     try:
         from datetime import date as _date
 
-        from app.ws.queue_ws import broadcast_queue_update
+        from app.ws.queue_ws import broadcast_queue_update, queue_update_departments
         _date_str = entry.queue.day.strftime("%Y-%m-%d") if hasattr(entry.queue, "day") and entry.queue.day else _date.today().strftime("%Y-%m-%d")
-        _dept = f"specialist_{entry.queue.specialist_id}" if entry.queue else "unknown"
-        broadcast_queue_update(
-            department=_dept,
-            date=_date_str,
-            event_type="queue_update",
-            data={"action": "restore_next", "entry_id": entry_id},
-        )
+        # QD-2C (Codex round-17/18 P2): комната — маршрутизирующая
+        # идентичность (specialist_None не слушает никто)
+        for _dept in queue_update_departments(db, getattr(entry, "queue", None)):
+            broadcast_queue_update(
+                department=_dept,
+                date=_date_str,
+                event_type="queue_update",
+                data={"action": "restore_next", "entry_id": entry_id},
+            )
     except Exception as e:
         logger.warning(f"Failed to broadcast queue WS update for entry {entry_id}: {e}")
     # ----------------------------
@@ -142,15 +144,17 @@ async def mark_entry_no_show(
     try:
         from datetime import date as _date
 
-        from app.ws.queue_ws import broadcast_queue_update
+        from app.ws.queue_ws import broadcast_queue_update, queue_update_departments
         _date_str = entry.queue.day.strftime("%Y-%m-%d") if hasattr(entry.queue, "day") and entry.queue.day else _date.today().strftime("%Y-%m-%d")
-        _dept = f"specialist_{entry.queue.specialist_id}" if entry.queue else "unknown"
-        broadcast_queue_update(
-            department=_dept,
-            date=_date_str,
-            event_type="queue_update",
-            data={"action": "no_show", "entry_id": entry_id},
-        )
+        # QD-2C (Codex round-17/18 P2): комната — маршрутизирующая
+        # идентичность (specialist_None не слушает никто)
+        for _dept in queue_update_departments(db, getattr(entry, "queue", None)):
+            broadcast_queue_update(
+                department=_dept,
+                date=_date_str,
+                event_type="queue_update",
+                data={"action": "no_show", "entry_id": entry_id},
+            )
     except Exception as e:
         logger.warning(f"Failed to broadcast queue WS update for entry {entry_id}: {e}")
     # ----------------------------

@@ -7,6 +7,7 @@ from app.api.v1.endpoints.registrar_integration._helpers import (
     _normalize_registration_discount_mode,
     _serialize_registrar_datetime,
 )  # noqa: F401
+from app.crud import queue_resource_routing  # QD-2C (round-17 P1)
 from app.crud.clinic import clinic_today
 from app.services.queue_service import queue_service  # noqa: F401
 
@@ -509,7 +510,11 @@ def _process_online_queue_entries(
 
         doctor = db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
         integrity_warnings: list[str] = []
-        if not doctor:
+        # QD-2C (Codex round-12 P2): ресурсная очередь (queue_resource_id)
+        # — владелец по дизайну РЕЕСТР, не врач: без linked_doctor_missing-шума;
+        # карточка строится от оси ресурса (display_name + кабинет очереди)
+        resource_owned = daily_queue.queue_resource_id is not None
+        if not doctor and not resource_owned:
             integrity_warnings.append("linked_doctor_missing")
 
         specialty = None
@@ -530,6 +535,14 @@ def _process_online_queue_entries(
             integrity_warnings.append("doctor_inactive")
         if doctor and not doctor.cabinet:
             integrity_warnings.append("doctor_cabinet_missing")
+        # QD-2C (Codex round-31 P2): integrity-предупреждения врача —
+        # только для НЕ-ресурсных поверхностей: у 0059-моста синтет
+        # без кабинета по дизайну, а поверхность принадлежит оси
+        # ресурса (доктор — маршрутизируемый реликт до стадии E)
+        if resource_owned:
+            integrity_warnings = [
+                w for w in integrity_warnings if w != "doctor_cabinet_missing"
+            ]
 
         _ensure_specialty_queue(queues_by_specialty, specialty, doctor.id if doctor else daily_queue.specialist_id)
         bucket = queues_by_specialty[specialty]
@@ -542,6 +555,25 @@ def _process_online_queue_entries(
             bucket["doctor"] = doctor
             bucket["doctor_id"] = doctor.id
         _register_bucket_doctor(bucket, doctor)
+        if resource_owned:
+            resource = daily_queue.queue_resource
+            bucket["resource_display_name"] = (
+                resource.display_name if resource else "Ресурс очереди"
+            )
+            bucket["resource_cabinet"] = daily_queue.cabinet_number or (
+                resource.default_cabinet if resource else None
+            )
+            # QD-2C (Codex round-17 P1): стабильная идентичность ресурса
+            # (queue_resource_id) + маршрутизирующие легаси-специалисты:
+            # чистая ресурсная очередь имеет specialist_id NULL, и
+            # queue manager на фронте подбирает очередь по ID выбранного
+            # врача — routing_specialists дают ось сопоставления, не
+            # подменяя владение (specialist_id остаётся NULL)
+            bucket["queue_resource_id"] = daily_queue.queue_resource_id
+            bucket.setdefault(
+                "routing_specialists",
+                queue_resource_routing.routing_specialist_ids(db, daily_queue),
+            )
 
         entry_time = (
             online_entry.queue_time
@@ -779,15 +811,52 @@ def _build_queue_payload(
     return {
         "queue_id": queue_number,
         "specialist_id": queue_data["doctor_id"],
+        # QD-2C (Codex round-17 P1): стабильная идентичность ресурса и
+        # маршрутизирующие легаси-специалисты — фронтовый queue manager
+        # подбирает очередь по ID выбранного врача; для чистой ресурсной
+        # очереди (specialist_id NULL) сопоставление идёт по
+        # routing_specialists, владение остаётся на оси ресурса
+        "queue_resource_id": queue_data.get("queue_resource_id"),
+        "routing_specialists": list(queue_data.get("routing_specialists", [])),
         "specialist_name": (
-            queue_data["doctor"].user.full_name
-            if queue_data.get("doctor") and queue_data["doctor"].user
-            else f"Специалист #{queue_data['doctor_id']}"
+            (
+                # QD-2C (Codex round-31 P2): у 0059-моста (оба владельца)
+                # поверхностью владеет ОСЬ РЕСУРСА — реестровый
+                # display_name вместо пустого full_name удержанного
+                # синтета; приоритет до doctor-ветки
+                queue_data.get("resource_display_name")
+                or f"Специалист #{queue_data['doctor_id']}"
+            )
+            if queue_data.get("queue_resource_id") is not None
+            else (
+                queue_data["doctor"].user.full_name
+                if queue_data.get("doctor") and queue_data["doctor"].user
+                else (
+                    # QD-2C (Codex round-12 P2): resource-ось — display_name
+                    # реестра вместо «Специалист #None»
+                    queue_data.get("resource_display_name")
+                    or f"Специалист #{queue_data['doctor_id']}"
+                )
+            )
         ),
         "specialists": specialists,
         "specialty": specialty,
         "timezone": "Asia/Tashkent",
-        "cabinet": queue_data["doctor"].cabinet if queue_data.get("doctor") else "N/A",
+        "cabinet": (
+            (
+                # QD-2C (Codex round-31 P2): кабинет ресурсной поверхности
+                # — из оси ресурса (кабинет очереди/реестра), не из
+                # удержанного синтета без кабинета
+                queue_data.get("resource_cabinet")
+                or "N/A"
+            )
+            if queue_data.get("queue_resource_id") is not None
+            else (
+                queue_data["doctor"].cabinet
+                if queue_data.get("doctor")
+                else (queue_data.get("resource_cabinet") or "N/A")
+            )
+        ),
         "integrity_warnings": list(dict.fromkeys(queue_data.get("integrity_warnings", []))),
         "has_integrity_warnings": bool(queue_data.get("integrity_warnings")),
         "opened_at": datetime.now(UTC).isoformat(),

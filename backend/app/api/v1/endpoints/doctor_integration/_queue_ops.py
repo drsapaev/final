@@ -242,6 +242,178 @@ def get_doctor_queue_today(
 # ===================== УПРАВЛЕНИЕ СТАТУСАМИ ПАЦИЕНТОВ =====================
 
 
+# ============================================================================
+# QD-2C (Codex round-35 P1): visit resolution anchored to the queue entry
+# ============================================================================
+
+
+def _clinic_now(db: Session) -> datetime:
+    """Codex round-37 P2: клиник-локальное «сейчас» (таймзона настроек
+    очередей) для временных меток визитов — host-часы на UTC-хосте в
+    окне 19:00-24:00Z отстают от клиник-времени до 5 часов, и время
+    приёма записывалось «на пять часов раньше»."""
+    from zoneinfo import ZoneInfo
+
+    from app.crud.clinic import get_queue_settings
+
+    tz_name = get_queue_settings(db).get("timezone", "Asia/Tashkent")
+    return datetime.now(ZoneInfo(tz_name))
+
+
+def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
+    """Визит командной поверхности доктора привязан к САМОЙ записи очереди.
+
+    visit_id-first: подтверждённый визит записи (OnlineQueueEntry.visit_id)
+    резолвится раньше любого поиска. Ресурсная запись (врача нет) ищет
+    открытый визит пациента того же дня по ДЕПАРТАМЕНТУ — doctor_id=None
+    в find_or_create_today_visit искал ЛЮБОЙ открытый визит (чужую
+    кардиологию того же пациента). Созданный/найденный визит НЕМЕДЛЕННО
+    линкуется на запись (прецедент qr_queue/_online_entries): старт и
+    завершение мутируют ОДНО ресурсное событие, а не создают второй
+    визит с брошенным первым.
+    """
+    if queue_entry.visit_id:
+        visit = db.query(Visit).filter(Visit.id == queue_entry.visit_id).first()
+        if visit is not None:
+            # Codex round-40 P2 + round-41 P2: форс-мажор перенос
+            # копирует visit_id на завтрашнюю запись — валидируем
+            # удержанный визит против НОВОГО дня очереди записи на
+            # ОБОИХ поверхностях (ресурсной и врачебной): соло-визит
+            # следует за перенесённым тикетом (перештамповывается на
+            # день фактического обслуживания), визит, ещё шарящийся
+            # живыми записями СВОЕГО дня, дату сохраняет — запись
+            # резолвит свежий визит дня очереди ниже.
+            queue_day = getattr(queue_entry.queue, "day", None)
+            if queue_day is None or visit.visit_date == queue_day:
+                return visit
+            shared = (
+                db.query(OnlineQueueEntry.id)
+                .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+                .filter(
+                    OnlineQueueEntry.visit_id == visit.id,
+                    OnlineQueueEntry.id != queue_entry.id,
+                    # отозванные записи визит больше не якорят:
+                    # форс-мажор перенос оставляет visit_id на
+                    # отменённом оригинале — это не «шаринг»
+                    OnlineQueueEntry.status.not_in(["cancelled", "no_show"]),
+                    # Codex round-41 P2: якорят только записи ДНЯ
+                    # визита — пиры, уже перенесённые на новый день,
+                    # сами последуют за тикетом (первый перештампует
+                    # визит, остальные увидят его уже на своём дне);
+                    # без фильтра дня групповой перенос плодил два
+                    # визита одного пациента/департамента в новый день
+                    DailyQueue.day == visit.visit_date,
+                )
+                .first()
+                is not None
+            )
+            if not shared:
+                # Codex round-43 P2: парный appointment следует за
+                # перештампованным визитом — completion ищет аппойнтмент
+                # по НОВОЙ visit_date, а канонический паринг бьёт по
+                # patient/date/time/doctor: визит, переехавший без
+                # своего аппойнтмента, оставляет его запланированным на
+                # старом дне (и канонический резолв может родить под
+                # него второй визит). Паринг — тот же, что у
+                # CanonicalVisitRepository (время — оба написания).
+                appointment_filters = [
+                    Appointment.patient_id == visit.patient_id,
+                    Appointment.appointment_date == visit.visit_date,
+                    Appointment.status.not_in(["cancelled", "completed", "no_show"]),
+                ]
+                if visit.doctor_id is None:
+                    appointment_filters.append(Appointment.doctor_id.is_(None))
+                else:
+                    appointment_filters.append(Appointment.doctor_id == visit.doctor_id)
+                if visit.visit_time:
+                    _hhmm = visit.visit_time[:5]
+                    appointment_filters.append(
+                        Appointment.appointment_time.in_((_hhmm, f"{_hhmm}:00"))
+                    )
+                else:
+                    appointment_filters.append(Appointment.appointment_time.is_(None))
+                db.query(Appointment).filter(*appointment_filters).update(
+                    {"appointment_date": queue_day}, synchronize_session=False
+                )
+                visit.visit_date = queue_day
+                return visit
+            # shared by live same-day tickets: fall through to the
+            # branch-specific resolution below (fresh visit + relink)
+
+    if doctor is None:
+        # Codex round-36 P2: день визита — день ОЧЕРЕДИ записи
+        # (queue_entry.queue.day, клиник-локальный), не host
+        # date.today(): ресурс-очереди создаются на КЛИНИК-локальном
+        # дне, и в окне 19:00-24:00Z host-день искал/создавал визит со
+        # «вчерашней» датой — визит выпадал из клиник-дневных просмотров
+        # и записывался под неверным днём обслуживания.
+        queue_day = getattr(queue_entry.queue, "day", None) or date.today()
+        # ресурсная поверхность: пациент + день очереди + открыт + департамент
+        visit = (
+            db.query(Visit)
+            .filter(
+                Visit.patient_id == queue_entry.patient_id,
+                Visit.visit_date == queue_day,
+                Visit.status == "open",
+                Visit.department == department,
+            )
+            .first()
+        )
+        if visit is None:
+            visit = crud_visit.create_visit(
+                db=db,
+                patient_id=queue_entry.patient_id,
+                doctor_id=None,
+                visit_date=queue_day,
+                # Codex round-37 P2: время визита — клиник-локальные часы
+                visit_time=_clinic_now(db).strftime("%H:%M"),
+                department=department,
+            )
+    else:
+        # Codex round-42 P2: врачебная поверхность резолвит свежий визит
+        # по ДНЮ ОЧЕРЕДИ записи (как ресурсная выше), а не host
+        # date.today(): find_or_create_today_visit возвращал открытый
+        # визит старого дня (всё ещё нужный оставшимся тикетам) или
+        # создавал визит под host-днём — перенесённый тикет линковался
+        # не на свой день обслуживания.
+        queue_day = getattr(queue_entry.queue, "day", None) or date.today()
+        visit = (
+            db.query(Visit)
+            .filter(
+                Visit.patient_id == queue_entry.patient_id,
+                Visit.visit_date == queue_day,
+                Visit.status == "open",
+                Visit.doctor_id == doctor.id,
+                # Codex round-43 P2: департамент ОЧЕРЕДИ — врач может
+                # держать несколько активных очередей под разными
+                # тегами; без департамента .first() мог схватить
+                # чужой открытый визит того же врача/дня и
+                # перелинковать тикет на чужое событие. Легаси-визиты
+                # без департамента остаются резолвимыми — они не
+                # скоуплены ни под один тег
+                or_(
+                    Visit.department == department,
+                    Visit.department.is_(None),
+                ),
+            )
+            .first()
+        )
+        if visit is None:
+            visit = crud_visit.create_visit(
+                db=db,
+                patient_id=queue_entry.patient_id,
+                doctor_id=doctor.id,
+                visit_date=queue_day,
+                # Codex round-37 P2: время визита — клиник-локальные часы
+                visit_time=_clinic_now(db).strftime("%H:%M"),
+                department=department,
+            )
+
+    if queue_entry.visit_id != visit.id:
+        queue_entry.visit_id = visit.id
+    return visit
+
+
 @router.post("/doctor/queue/{entry_id}/call", response_model=dict[str, Any])
 def call_patient(
     entry_id: int,
@@ -288,10 +460,21 @@ def call_patient(
         doctor = daily_queue.specialist
 
         if not doctor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Врач не найден для этой очереди",
-            )
+            # QD-2C (Codex round-34 P2): чистая ресурсная очередь
+            # (specialist NULL) — валидный владелец этой командной
+            # поверхности (Admin-only, той же формой, что и
+            # completion-политика round-5): прежний безусловный 404 не
+            # давал вызвать тикет ресурсной поверхности lab/ECG.
+            if getattr(daily_queue, "queue_resource_id", None) is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Врач не найден для этой очереди",
+                )
+            if current_user.role != "Admin":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Нет прав для работы с этой очередью",
+                )
 
         # PR-26: Allow any doctor of the same specialty to call patients
         # from this queue. Previously, only the queue owner (doctor.user_id
@@ -347,10 +530,24 @@ def call_patient(
 
             async def send_to_display():
                 manager = get_display_manager()
-                doctor_name = (
-                    doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
-                )
-                cabinet = doctor.cabinet
+                if doctor is not None:
+                    doctor_name = (
+                        doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
+                    )
+                    cabinet = doctor.cabinet
+                else:
+                    # QD-2C (Codex round-34 P2): ресурс-ось — владелец из
+                    # реестра (round-12 паттерн), не AttributeError на
+                    # None-враче
+                    resource = daily_queue.queue_resource
+                    doctor_name = (
+                        resource.display_name
+                        if resource is not None
+                        else "Ресурс очереди"
+                    )
+                    cabinet = daily_queue.cabinet_number or (
+                        resource.default_cabinet if resource is not None else None
+                    )
 
                 await manager.broadcast_patient_call(
                     queue_entry=queue_entry, doctor_name=doctor_name, cabinet=cabinet
@@ -420,10 +617,23 @@ def start_patient_visit(
         daily_queue = queue_entry.queue
         doctor = daily_queue.specialist if daily_queue else None
         if not doctor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Врач не найден для этой очереди",
-            )
+            # QD-2C (Codex round-34 P2): чистая ресурсная очередь —
+            # валидный владелец этой командной поверхности (Admin-only,
+            # форма completion-политики round-5): прежний безусловный 404
+            # не давал начать приём по тикету ресурсной поверхности.
+            if (
+                daily_queue is None
+                or getattr(daily_queue, "queue_resource_id", None) is None
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Врач не найден для этой очереди",
+                )
+            if current_user.role != "Admin":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Нет прав для работы с этой очередью",
+                )
 
         # PR-26: same-specialty doctors can also work with this queue
         if current_user.role != "Admin" and doctor.user_id and doctor.user_id != current_user.id:
@@ -454,11 +664,15 @@ def start_patient_visit(
         queue_entry.updated_at = changed_at
 
         # Создаем или обновляем визит в таблице visits
-        visit = crud_visit.find_or_create_today_visit(
-            db=db,
-            patient_id=queue_entry.patient_id,
-            doctor_id=doctor.id,
-            department=getattr(daily_queue, "queue_tag", None) or "general",
+        # QD-2C (Codex round-35 P1): визит записи — visit_id-first и
+        # департаментный поиск у ресурсной поверхности (см. хелпер);
+        # ресурсный старт не хватает чужой открытый визит и не
+        # оставляет незалинкованный in_progress
+        visit = _resolve_entry_visit(
+            db,
+            queue_entry,
+            doctor,
+            getattr(daily_queue, "queue_tag", None) or "general",
         )
 
         # BUG 3 fix (Codex P1): transition visit open→in_progress when starting
@@ -473,8 +687,13 @@ def start_patient_visit(
             )
 
         # Обновляем время начала приема
-        visit.visit_time = datetime.now().strftime("%H:%M")
-        visit.notes = f"Прием начат в {datetime.now().strftime('%H:%M')}"
+        # Codex round-37 P2: время начала — ОДНИ клиник-локальные часы
+        # (таймзона настроек очередей): host-часы записывали «на пять
+        # часов раньше», и представления/уведомления показывали
+        # неверное время приёма
+        clinic_now = _clinic_now(db)
+        visit.visit_time = clinic_now.strftime("%H:%M")
+        visit.notes = f"Прием начат в {clinic_now.strftime('%H:%M')}"
 
         visit.updated_at = changed_at
 
@@ -644,10 +863,13 @@ def complete_patient_visit(
             # Проверяем права врача на эту очередь
             daily_queue = queue_entry.queue
             doctor = daily_queue.specialist if daily_queue else None
-            if (
-                doctor
-                and current_user.role != "Admin"
-                and doctor.user_id != current_user.id
+            # QD-2C (Codex round-5 P1): resource-owned очередь (specialist
+            # NULL) — явная политика той же формы, что до свитча у
+            # synthetic-владельца (владелец-врач не совпадал ни с одним
+            # человеком → проходил только Admin): этот доктор-командой
+            # ресурсную запись завершает ТОЛЬКО Admin.
+            if current_user.role != "Admin" and (
+                doctor is None or doctor.user_id != current_user.id
             ):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -679,16 +901,33 @@ def complete_patient_visit(
             # Создаем или обновляем визит на сегодня и помечаем как завершенный,
             # чтобы это отразилось в registrar/queues/today, который читает Visit/Appointment
             try:
-                visit = crud_visit.find_or_create_today_visit(
-                    db=db,
-                    patient_id=queue_entry.patient_id,
-                    doctor_id=doctor.id if doctor else None,
-                    department=(
-                        daily_queue.department
-                        if daily_queue and hasattr(daily_queue, 'department')
-                        else "cardiology"
-                    ),
+                # QD-2C (Codex round-34 P2): департамент визита — из оси
+                # ресурсной очереди (тег/реестр): у DailyQueue нет
+                # department-атрибута, и легаси-fallback писал «cardiology»
+                # — лабораторный/ЭКГ визит (specialist NULL) попадал в чужое
+                # отделение. Врач-очереди без ресурса сохраняют прежний
+                # fallback байт-идентично.
+                resource_department = None
+                if daily_queue is not None and (
+                    getattr(daily_queue, "queue_resource_id", None) is not None
+                ):
+                    resource = daily_queue.queue_resource
+                    resource_department = daily_queue.queue_tag or (
+                        resource.code if resource is not None else None
+                    )
+                # QD-2C (Codex round-35 P1): визит записи — visit_id-first
+                # и департаментный поиск у ресурсной поверхности (см.
+                # хелпер): завершение мутирует тот же визит, что старт
+                # Codex round-43 P2: департамент завершения врач-очереди —
+                # тот же канонический маппинг, что у старта (тег или
+                # «general»), а не легаси-«cardiology»: с департаментным
+                # lookup резолва (round-43) рассинхрон департаментов
+                # заставлял завершение создавать второй визит и
+                # оставлять исходный открытым
+                department_hint = resource_department or (
+                    getattr(daily_queue, "queue_tag", None) or "general"
                 )
+                visit = _resolve_entry_visit(db, queue_entry, doctor, department_hint)
                 # ✅ Issue #06 Phase 3: delegate to VisitLifecycleService
                 # for state machine validation + row lock.
                 from app.services.visit_lifecycle_service import VisitLifecycleService

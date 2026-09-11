@@ -13,6 +13,11 @@ class TestQueueApiService:
         created = SimpleNamespace(id=1)
 
         class Repository:
+            # QD-2C (round-6): the registry-first routing probes the
+            # doctor's specialty; None keeps the legacy doctor path.
+            def get_doctor(self, specialist_id):
+                return None
+
             def get_daily_queue(self, *, day, specialist_id):
                 return None
 

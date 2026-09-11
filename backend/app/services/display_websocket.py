@@ -12,10 +12,10 @@ from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
+from app.api.v1.endpoints.ws_token import accept_echoing_subprotocol
 from app.db.session import SessionLocal
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.services.ws_redis_pubsub import RedisPubSubBridge
-from app.api.v1.endpoints.ws_token import accept_echoing_subprotocol
 
 logger = logging.getLogger(__name__)
 
@@ -263,25 +263,42 @@ class DisplayWebSocketManager:
                     }
                 )
 
+            # Codex P2 (round-14): resource/bridged очередь — владелец и
+            # кабинет с оси ресурса (реестр), как в call-обёртках
+            # (round-11/12/13): реконнект/стейт-апдейт не должен
+            # перезаписывать корректное presentation-имя табло на «Врач»
+            # без кабинета. Врач-очереди байт-идентичны.
+            if daily_queue.queue_resource_id is not None:
+                resource = daily_queue.queue_resource
+                display_owner = (
+                    resource.display_name if resource is not None else "Ресурс очереди"
+                )
+                display_cabinet = daily_queue.cabinet_number or (
+                    resource.default_cabinet if resource is not None else None
+                )
+                specialty_label = daily_queue.queue_tag or "Специалист"
+            else:
+                display_owner = (
+                    daily_queue.specialist.user.full_name
+                    if daily_queue.specialist and daily_queue.specialist.user
+                    else "Врач"
+                )
+                display_cabinet = (
+                    daily_queue.specialist.cabinet if daily_queue.specialist else None
+                )
+                specialty_label = (
+                    daily_queue.specialist.specialty
+                    if daily_queue.specialist
+                    else "Специалист"
+                )
+
             update_message = {
                 "type": "queue_update",
                 **({"event_type": event_type} if event_type else {}),
                 "data": {
-                    "doctor_name": (
-                        daily_queue.specialist.user.full_name
-                        if daily_queue.specialist and daily_queue.specialist.user
-                        else "Врач"
-                    ),
-                    "specialty": (
-                        daily_queue.specialist.specialty
-                        if daily_queue.specialist
-                        else "Специалист"
-                    ),
-                    "cabinet": (
-                        daily_queue.specialist.cabinet
-                        if daily_queue.specialist
-                        else None
-                    ),
+                    "doctor_name": display_owner,
+                    "specialty": specialty_label,
+                    "cabinet": display_cabinet,
                     "queue_date": daily_queue.day.isoformat(),
                     "opened_at": (
                         daily_queue.opened_at.isoformat()
@@ -356,9 +373,14 @@ class DisplayWebSocketManager:
             # Получаем актуальные данные из базы
             db = SessionLocal()
             try:
-                from datetime import date
+                # Codex round-29 P2: день снапшота табло — clinic_today
+                # SSOT (таймзона настроек очередей): resource-очереди
+                # создаются на КЛИНИК-локальном дне, и host date.today()
+                # в окне 19:00-24:00Z отдавал пустой/вчерашний снапшот
+                # при (пере)подключении табло.
+                from app.crud.clinic import clinic_today
 
-                today = date.today()
+                today = clinic_today(db)
 
                 # Получаем активные очереди на сегодня
                 queues = (
@@ -369,6 +391,9 @@ class DisplayWebSocketManager:
 
                 queue_entries = []
                 for queue in queues:
+                    # Codex P2 (round-14): resource-ось — владелец из
+                    # реестра (display_name), не «Врач #None» при NULL
+                    # specialist; label считается на очередь, не на запись
                     entries = (
                         db.query(OnlineQueueEntry)
                         .filter(
@@ -378,6 +403,18 @@ class DisplayWebSocketManager:
                         .order_by(OnlineQueueEntry.number)
                         .all()
                     )
+
+                    if queue.queue_resource_id is not None:
+                        resource = queue.queue_resource
+                        owner_label = (
+                            resource.display_name
+                            if resource is not None
+                            else "Ресурс очереди"
+                        )
+                    elif queue.specialist and queue.specialist.user:
+                        owner_label = queue.specialist.user.full_name
+                    else:
+                        owner_label = f"Врач #{queue.specialist_id}"
 
                     for entry in entries:
                         queue_entries.append(
@@ -389,11 +426,7 @@ class DisplayWebSocketManager:
                                 ),
                                 "status": entry.status,
                                 "specialist_id": queue.specialist_id,
-                                "specialist_name": (
-                                    queue.specialist.user.full_name
-                                    if (queue.specialist and queue.specialist.user)
-                                    else f"Врач #{queue.specialist_id}"
-                                ),
+                                "specialist_name": owner_label,
                                 "created_at": (
                                     entry.created_at.isoformat()
                                     if entry.created_at

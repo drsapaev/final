@@ -2292,3 +2292,107 @@ def test_graphql_round16(gql_data, gql_session_factory, test_db, monkeypatch, ca
     assert (
         counter["selects"] <= 10
     ), f"N+1: {counter['selects']} SELECTs на страницу из {len(items)} строк"
+
+
+def test_graphql_join_registry_tag_lands_on_resource_queue(
+    gql_data, gql_session_factory, monkeypatch
+):
+    """QD-2C (Codex round-3 P1): the REACHABLE GQL path for a registry
+    tag — an eligible (real) doctor + queueTag — resolves onto the
+    resource-owned queue through the tag-first unification.
+
+    The synthetic Doctor id was never valid joinQueue input:
+    ensure_doctor_eligible_for_appointment rejects non-doctor roles
+    (the Resource role, by the QD-0/QD-1 contract) with 409
+    DOCTOR_INACTIVE — BEFORE and AFTER the runtime switch; the
+    registry-tag branch is reached through the real-doctor form."""
+    from app.graphql import mutations as gql_mutations
+    from app.models.online_queue import OnlineQueueEntry, QueueResource
+
+    # Time-of-day gotcha (#2992): фиксируем окно онлайн-набора.
+    monkeypatch.setattr(
+        gql_mutations,
+        "get_queue_settings",
+        lambda db: {"queue_start_hour": 0, "timezone": "Asia/Tashkent"},
+    )
+    d = gql_data
+    suffix = d["suffix"]
+    tag = f"gql-lab-{suffix}"  # unique per test: no UNIQUE(queue_tag) clash
+
+    resource_id = None
+    factory = gql_session_factory
+    try:
+        with factory() as s:
+            resource = QueueResource(
+                code=f"gql-lab-{suffix}",
+                queue_tag=tag,
+                display_name="Лаборатория (GQL pin)",
+                start_number_online=1,
+                max_online_per_day=15,
+            )
+            s.add(resource)
+            s.commit()
+            s.refresh(resource)
+            resource_id = resource.id
+
+        # свежий пациент (seed-пациент уже waiting на враче)
+        data = _execute(
+            """
+            mutation($input: PatientInput!) {
+              createPatient(input: $input) { success patient { id } }
+            }
+            """,
+            {
+                "input": {
+                    "lastName": f"SYNTHETIC-QD2C-{suffix}",
+                    "firstName": "SYNTHETIC",
+                }
+            },
+        )
+        patient_id = data["createPatient"]["patient"]["id"]
+
+        data = _execute(
+            """
+            mutation($input: QueueEntryInput!) {
+              joinQueue(input: $input) { success queueEntry { id number } }
+            }
+            """,
+            {
+                "input": {
+                    "patientId": patient_id,
+                    "doctorId": d["doctor"].id,
+                    "queueTag": tag,
+                }
+            },
+        )
+        join = data["joinQueue"]
+        assert join["success"] is True, join
+
+        with factory() as s:
+            entry = (
+                s.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.id == join["queueEntry"]["id"])
+                .first()
+            )
+            assert entry is not None
+            queue = entry.queue
+            # тег реестра → запись в RESOURCE-очереди (specialist NULL),
+            # а не в параллельной очереди врача
+            assert queue.queue_resource_id == resource_id
+            assert queue.specialist_id is None
+    finally:
+        with factory() as s:
+            if resource_id is not None:
+                resource = s.get(QueueResource, resource_id)
+                if resource is not None:
+                    for q in (
+                        s.query(DailyQueue)
+                        .filter(DailyQueue.queue_resource_id == resource_id)
+                        .all()
+                    ):
+                        s.query(OnlineQueueEntry).filter(
+                            OnlineQueueEntry.queue_id == q.id
+                        ).delete(synchronize_session=False)
+                        s.delete(q)
+                    s.delete(resource)
+                    s.commit()

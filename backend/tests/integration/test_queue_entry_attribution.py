@@ -92,16 +92,14 @@ def _login_headers(client, username: str, password: str) -> dict[str, str]:
 def _make_queue(
     db_session, doctor_id: int, tag: str = "procedures", day: date | None = None
 ) -> DailyQueue:
-    # Day convention per call surface (they differ, pinned by the QF-1
-    # suite): QRQueueService.call_next_patient (REST /queue/{id}/call-next)
-    # resolves the day as host date.today(), while queue_svc
-    # staff_call_next_patient resolves it via clinic_today (Asia/Tashkent
-    # SSOT — the two diverge in the 19:00-24:00Z window; the staff-call
-    # test hit that window in main CI red 2026-09-04 19:05Z and
-    # 2026-09-06 19:04Z). Default = host day (the REST convention);
-    # queue_svc-path tests pass clinic_today explicitly.
+    # Day convention (QD-2C round-25): BOTH call surfaces now resolve
+    # the day via clinic_today (Asia/Tashkent SSOT) — the REST default
+    # (host date.today()) was unified with the queue_svc/GQL/quick-call
+    # paths, so the default fixture day follows the SSOT too (the two
+    # diverge in the 19:00-24:00Z window; the staff-call test hit that
+    # window in main CI red 2026-09-04 19:05Z and 2026-09-06 19:04Z).
     queue = DailyQueue(
-        day=day or date.today(),
+        day=day or clinic_today(db_session),
         specialist_id=doctor_id,
         queue_tag=tag,
         active=True,

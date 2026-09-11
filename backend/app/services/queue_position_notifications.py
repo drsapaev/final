@@ -439,7 +439,22 @@ class QueuePositionNotificationService:
             }
 
             # Получаем имя специалиста
-            if queue.specialist:
+            # Codex P2 (round-14): resource-ось — by-number fallback
+            # (round-10) делает resource-тикеты достижимыми; ответ без
+            # имени назначения недопустим: владелец = реестр
+            # (display_name, как в QR-метаданных round-12), кабинет —
+            # queue.cabinet_number, затем default_cabinet реестра.
+            # Мост (оба владельца) классифицируется как resource.
+            if queue.queue_resource_id is not None:
+                resource = queue.queue_resource
+                queue_info["specialist_name"] = (
+                    resource.display_name
+                    if resource is not None
+                    else "Ресурс очереди"
+                )
+                if queue_info["cabinet_number"] is None and resource is not None:
+                    queue_info["cabinet_number"] = resource.default_cabinet
+            elif queue.specialist:
                 # Имя берём из связанного пользователя
                 if queue.specialist.user and queue.specialist.user.full_name:
                     queue_info["specialist_name"] = queue.specialist.user.full_name

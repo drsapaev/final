@@ -113,6 +113,13 @@ async def call_next_patient(
                 )
                 db.rollback()
 
+            # Codex round-25 P2: entry инициализируется ДО независимых
+            # side-effect-блоков — если блок уведомлений падает ДО своего
+            # присваивания (импорт/get_queue_position_service/запрос), WS-
+            # broadcast ловил UnboundLocalError и молча пропускал обновление,
+            # включая fallback-комнату вызвавшего.
+            entry = None
+
             # 1. User Notification (Mobile/PWA)
             try:
                 from app.models.online_queue import OnlineQueueEntry
@@ -127,10 +134,23 @@ async def call_next_patient(
 
                 if entry:
                     # Determine cabinet (optional)
+                    # QD-2C (Codex round-13 P2): resource/bridged очередь —
+                    # кабинет уведомления с оси ресурса (реестр), как в
+                    # QR-метаданных (round-12): queue.cabinet_number, затем
+                    # default_cabinet реестра, НЕ кабинет отсутствующего
+                    # специалиста
                     cabinet = None
                     if entry.queue and entry.queue.cabinet_number:
                         cabinet = entry.queue.cabinet_number
-                    elif entry.queue and entry.queue.specialist: # Fallback to doctor's cabinet
+                    elif (
+                        entry.queue
+                        and entry.queue.queue_resource_id is not None
+                        and entry.queue.queue_resource is not None
+                    ):
+                        cabinet = entry.queue.queue_resource.default_cabinet
+                    elif (
+                        entry.queue and entry.queue.specialist
+                    ):  # Fallback to doctor's cabinet
                         cabinet = entry.queue.specialist.cabinet
 
                     await notify_service.notify_patient_called(entry, cabinet_number=cabinet)
@@ -148,16 +168,36 @@ async def call_next_patient(
                      entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
 
                 if entry:
-                    specialist_name = (
-                        entry.queue.specialist.user.full_name
-                        if entry.queue.specialist and entry.queue.specialist.user
-                        else "Врач"
-                    )
+                    # QD-2C (Codex round-13 P2): resource/bridged очередь —
+                    # владелец объявления с оси ресурса (реестр), как
+                    # display и legacy call пути (round-11/12); иначе табло
+                    # говорит «Врач» без кабинета при живом реестровом
+                    # назначении
+                    queue = entry.queue
+                    if queue.queue_resource_id is not None:
+                        resource = queue.queue_resource
+                        specialist_name = (
+                            resource.display_name
+                            if resource is not None
+                            else "Ресурс очереди"
+                        )
+                        broadcast_cabinet = queue.cabinet_number or (
+                            resource.default_cabinet if resource is not None else None
+                        )
+                    else:
+                        specialist_name = (
+                            queue.specialist.user.full_name
+                            if queue.specialist and queue.specialist.user
+                            else "Врач"
+                        )
+                        broadcast_cabinet = (
+                            queue.cabinet_number
+                        )  # Pass cabinet if available
 
                     await manager.broadcast_patient_call(
                         queue_entry=entry,
                         doctor_name=specialist_name,
-                        cabinet=entry.queue.cabinet_number  # Pass cabinet if available
+                        cabinet=broadcast_cabinet,
                     )
             except Exception as e:
                 logger.warning(f"Failed to update display for entry {entry_id}: {e}")
@@ -166,15 +206,45 @@ async def call_next_patient(
             # Broadcast to /ws/queue admin panel subscribers (instant update
             # instead of 30s polling). Room: specialist_{id}::{date}.
             try:
-                from app.ws.queue_ws import broadcast_queue_update
-
-                queue_date_str = queue_date.strftime("%Y-%m-%d") if queue_date else ""
-                broadcast_queue_update(
-                    department=f"specialist_{specialist_id}",
-                    date=queue_date_str,
-                    event_type="queue_update",
-                    data={"action": "call_next", "entry_id": entry_id},
+                from app.ws.queue_ws import (
+                    broadcast_queue_update,
+                    queue_update_departments,
                 )
+
+                # Codex round-26 P2: дата broadcast'а — день ВЫБРАННОЙ
+                # очереди (entry.queue.day), а не опциональный параметр:
+                # при опущенном target_date сервис резолвит clinic_today,
+                # а queue_date здесь оставался None — пустая дата в
+                # комнате (specialist_X:: вместо specialist_X::{дата},
+                # useQueueWebSocket подписан на полную форму).
+                broadcast_day = (
+                    entry.queue.day
+                    if entry is not None and entry.queue is not None
+                    else queue_date
+                )
+                queue_date_str = (
+                    broadcast_day.strftime("%Y-%m-%d") if broadcast_day else ""
+                )
+                # QD-2C (Codex round-24 P2): комната — маршрутизирующая
+                # идентичность ВЫБРАННОЙ очереди: resource-очередь
+                # адресуема через ЛЮБОЙ same-specialty doctor id (менеджеры
+                # подписаны на свой выбранный id) — call_next достигает
+                # КАЖДУЮ routing-комнату, как join/restore/no-show
+                # (round-18/22). Doctor-очереди — легаси-комната
+                # байт-идентично; без entry (патологический случай) — прежняя
+                # комната вызвавшего.
+                call_rooms = (
+                    queue_update_departments(db, entry.queue)
+                    if entry is not None
+                    else [f"specialist_{specialist_id}"]
+                )
+                for _dept in call_rooms:
+                    broadcast_queue_update(
+                        department=_dept,
+                        date=queue_date_str,
+                        event_type="queue_update",
+                        data={"action": "call_next", "entry_id": entry_id},
+                    )
             except Exception as e:
                 logger.warning(f"Failed to broadcast queue WS update for entry {entry_id}: {e}")
         # --------------------------

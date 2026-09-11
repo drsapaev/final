@@ -229,6 +229,40 @@ deterministic backfill. Three clarifications the landing made explicit:
   display names from the canonical 0055 vocabulary; `default_cabinet` stays
   NULL because no canonical cabinet source exists.
 
+### Stage C landing note (2026-09-07, QD-2C — runtime switch)
+
+Stage C switched the runtime onto the resource axis. The switch is
+**conditional on live registry data** — a tag routes onto the resource axis
+ONLY while an ACTIVE `queue_resources` row exists for the exact tag
+(`laboratory` never resolves the `lab` resource). With no registry row
+(empty test DBs, the CI `alembic upgrade head` chain, `general`,
+`stomatology`, doctor specialties), every path keeps its legacy behavior
+byte-identical — the legacy synthetic fallbacks stay functional until
+stage E retires them. Four clarifications the landing made explicit:
+
+- **Tag-first unification** — `get_or_create_daily_queue` (queue_svc, the
+  crud wrapper and the visit-confirmation repository) resolves a registry
+  tag by `(day, queue_tag)` regardless of owner: the dual-ownership bridge
+  from 0059, a resource-owned row and a pre-switch synthetic-owned row are
+  ONE routing surface. A specialist-keyed caller (QR token, GQL joinQueue,
+  a visit with a doctor) is unified onto that queue instead of forking a
+  parallel doctor-owned queue — the pre-QD-2 fork hazard is closed for
+  registry tags; doctor tags keep the per-doctor PR-26 contract.
+- **New queues are resource-owned** — `specialist_id` NULL +
+  `queue_resource_id` + caps from the registry row; the synthetic Doctor is
+  no longer resolved by morning pre-create, morning assignment, batch
+  create, visit confirmation or the registrar wizard (the QD-2E direction:
+  a registry-only catalog no longer needs `general_resource` at all).
+- **Output contract** — `DailyQueueOut` grew `owner_kind` ("doctor" |
+  "resource"), `owner_display_name` and a `queue_resource` object; the GQL
+  `DailyQueueType.specialist` is now nullable with `queue_resource_id` +
+  `owner_kind`. The axis is derived from `queue_resource_id` — the bridge
+  classifies as resource (the axis that owns routing going forward).
+- **Numbering** — `calculate_next_number` floors a resource queue at
+  `QueueResource.start_number_online` (the LIVE values 0059 transferred;
+  identical to the synthetic's until E), and the GQL advisory lock for a
+  registry tag keys on `(tag, day)` instead of `(doctor, day, tag)`.
+
 ### Guidance for readers of this ADR
 
 Anything that routes, authorizes, or reports on queues must treat ownership

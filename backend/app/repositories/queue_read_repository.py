@@ -42,15 +42,54 @@ class QueueReadRepository:
         day_obj: date | None = None,
         specialist_id: int | None = None,
         cabinet_number: str | None = None,
+        registry_tag: str | None = None,
     ) -> list[DailyQueue]:
+        from sqlalchemy import and_, or_
+
         query = self.db.query(DailyQueue)
         if day_obj:
             query = query.filter(DailyQueue.day == day_obj)
         if specialist_id:
-            query = query.filter(DailyQueue.specialist_id == specialist_id)
+            if registry_tag:
+                # Codex round-44 P2 + round-46 P2: specialist-filtered
+                # reads must see the REGISTRY surface — the resource
+                # axis is matched by queue_resource_id + tag (INCLUDING
+                # the 0059 bridges, which retain a synthetic owner's
+                # specialist_id while queue_resource_id marks resource
+                # ownership), so the doctor-keyed filter alone no
+                # longer returns an empty list for the live lab/ECG
+                # queues the same identity addresses on every other
+                # surface.
+                query = query.filter(
+                    or_(
+                        DailyQueue.specialist_id == specialist_id,
+                        and_(
+                            DailyQueue.queue_resource_id.isnot(None),
+                            DailyQueue.queue_tag == registry_tag,
+                        ),
+                    )
+                )
+            else:
+                query = query.filter(DailyQueue.specialist_id == specialist_id)
         if cabinet_number:
             query = query.filter(DailyQueue.cabinet_number == cabinet_number)
         return query.order_by(DailyQueue.day.desc(), DailyQueue.specialist_id).all()
+
+    def has_resource_tag_queues(self, *, queue_tag: str) -> bool:
+        """Codex round-45 P2 + round-46 P2: any live queue of the tag on
+        the RESOURCE axis (queue_resource_id set — including the 0059
+        bridges with a retained synthetic owner) keeps the tag in scope
+        of the specialist-filtered cabinet reads — the
+        deactivation-proof surface check for the day-less filter."""
+        return (
+            self.db.query(DailyQueue.id)
+            .filter(
+                DailyQueue.queue_resource_id.isnot(None),
+                DailyQueue.queue_tag == queue_tag,
+            )
+            .first()
+            is not None
+        )
 
     def get_queue_by_specialist_day(
         self,

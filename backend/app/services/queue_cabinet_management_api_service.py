@@ -253,6 +253,14 @@ class QueueCabinetManagementApiService:
 
         for queue in queues:
             try:
+                # QD-2C (Codex round-16 P2): resource/bridged очередь —
+                # кабинет принадлежит оси реестра (строка очереди /
+                # default_cabinet), НЕ синтетику-врачу: sync не должен
+                # затирать ресурсное назначение кабинета моста 0059
+                # (retained specialist_id у моста — legacy-мост, не
+                # владелец). Врач-очереди — байт-идентично.
+                if getattr(queue, "queue_resource_id", None) is not None:
+                    continue
                 doctor = self.repository.get_doctor(queue.specialist_id)
                 if doctor and doctor.cabinet and queue.cabinet_number != doctor.cabinet:
                     queue.cabinet_number = doctor.cabinet

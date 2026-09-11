@@ -113,6 +113,27 @@ const pickQueueForDoctor = (
         return true;
       }
     }
+    // QD-2C (Codex round-17 P1): ресурсная ось — чистая очередь реестра
+    // (specialist_id null, queue_resource_id задан) маршрутизируется
+    // через routing_specialists: легаси-специалисты, чья специальность
+    // ведёт в тег реестра. Без этой оси выбор легаси lab/ЭКГ специалиста
+    // подменял живую ресурсную очередь пустой и скрывал ожидающих
+    // пациентов; владение остаётся на оси ресурса (specialist_id null).
+    const routing = queue.routing_specialists;
+    if (Array.isArray(routing) && routing.length > 0) {
+      const matched = routing.some(
+        (rid) => Number(rid) === doctorId || (doctor?.id && Number(rid) === Number(doctor.id))
+      );
+      if (matched) {
+        logger.debug('[useQueueManager] ✅ Найдена очередь по routing_specialists (ресурсная ось):', {
+          doctorId,
+          doctorIdFromDoctor: doctor?.id,
+          queueResourceId: queue.queue_resource_id,
+          specialty: queue.specialty
+        });
+        return true;
+      }
+    }
     return false;
   });
 

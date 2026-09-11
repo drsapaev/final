@@ -7,7 +7,11 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
-from app.crud.clinic import get_queue_settings, update_queue_settings
+from app.crud.clinic import clinic_today, get_queue_settings, update_queue_settings
+from app.crud.queue_resource_routing import (
+    resolve_registry_tag_queue_for_specialist,
+)
+from app.repositories.queue_api_repository import QueueApiRepository
 from app.repositories.queue_limits_repository import QueueLimitsRepository
 
 
@@ -39,22 +43,58 @@ class QueueLimitsApiService:
                 specialties[doctor.specialty] = {"doctors": [], "current_usage": 0}
             specialties[doctor.specialty]["doctors"].append(doctor)
 
-        today = date.today()
+        # Codex round-27 P2: день агрегации — clinic_today SSOT (таймзона
+        # настроек очередей): ресурсные очереди создаются на КЛИНИК-
+        # локальном дне, и host date.today() в окне 19:00-24:00Z резолвил
+        # вчерашнюю поверхность — current_usage=0 и неверный агрегатный
+        # кап при живой общей очереди. isinstance — unit-стабы с не-Session
+        # db держат легаси-путь (host-день, без поверхности).
+        today = (
+            clinic_today(self.db)
+            if isinstance(self.db, Session)
+            else date.today()
+        )
         for spec_data in specialties.values():
             total_usage = 0
             aggregate_cap = 0
+            # Codex round-11 P2: несколько активных врачей одной
+            # registry-backed специальности резолвят ОДНУ общую
+            # (today, tag)-поверхность — каждая считается в агрегат
+            # ровно один раз (usage/кап), счёт врачей остаётся
+            # раздельным (doctors_count).
+            counted_queue_ids: set[int] = set()
             for doctor in spec_data["doctors"]:
                 # Codex round-5 P2: a doctor may hold several ACTIVE queues
                 # for today under different tags (the quick-call surface
                 # supports that) — enumerate ALL of them, both for usage
                 # and for the aggregate capacity; get_daily_queue would
                 # silently pick only the lowest-id row.
-                queues = self.repository.list_active_daily_queues(
-                    day=today,
-                    specialist_id=doctor.id,
-                )
+                # QD-2C (Codex round-10 P2): registry-tag врач — usage и
+                # кап читаются с (today, tag)-ПОВЕРХНОСТИ (ресурсной
+                # очереди, куда пишут и joins, и лимит-райтер), а не с
+                # doctor-keyed строк; иначе отчёт показывает нулевую
+                # загрузку сразу после смены лимита. isinstance:
+                # unit-стабы могут передавать не-Session db — для них
+                # легаси-путь (repository без поверхности).
+                surface = None
+                if doctor.specialty and isinstance(self.db, Session):
+                    surface = resolve_registry_tag_queue_for_specialist(
+                        self.db, today, doctor.id, None
+                    )
+                if surface is not None:
+                    if surface.id in counted_queue_ids:
+                        continue  # the shared surface — already aggregated
+                    counted_queue_ids.add(surface.id)
+                    queues = [surface]
+                else:
+                    queues = self.repository.list_active_daily_queues(
+                        day=today,
+                        specialist_id=doctor.id,
+                    )
                 for daily_queue in queues:
-                    total_usage += self.repository.count_entries(queue_id=daily_queue.id)
+                    total_usage += self.repository.count_entries(
+                        queue_id=daily_queue.id
+                    )
                     # enforcement reads the persisted per-queue cap
                     # (check_queue_limits -> max_online_entries) — the
                     # admin aggregate must sum THAT. Falsy -> 15 mirrors
@@ -167,11 +207,27 @@ class QueueLimitsApiService:
         if not doctor:
             raise ValueError("DOCTOR_NOT_FOUND")
 
-        daily_queue = self.repository.get_or_create_daily_queue(
-            day=limit_data.day,
-            specialist_id=limit_data.doctor_id,
-            max_online_entries=limit_data.max_online_entries,
-        )
+        # QD-2C (Codex round-9 P1): registry-tag специалист (синтетик
+        # lab/ecg) — лимит применяется к (day, tag)-ПОВЕРХНОСТИ
+        # (resource-owned), а НЕ к doctor-keyed тени: иначе лимит
+        # устанавливается на неиспользуемую строку, пока присоединения
+        # живут с прежним ресурсным капом. Не-registry врачи — прежний
+        # путь байт-идентично.
+        registry_queue = None
+        if doctor.specialty:
+            registry_queue = QueueApiRepository(
+                self.repository.db
+            ).get_or_create_registry_queue(
+                day=limit_data.day, queue_tag=doctor.specialty
+            )
+        if registry_queue is not None:
+            daily_queue = registry_queue
+        else:
+            daily_queue = self.repository.get_or_create_daily_queue(
+                day=limit_data.day,
+                specialist_id=limit_data.doctor_id,
+                max_online_entries=limit_data.max_online_entries,
+            )
         daily_queue.max_online_entries = limit_data.max_online_entries
         self.repository.save()
 

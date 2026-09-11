@@ -4,6 +4,9 @@ Split from qr_queue_service.py.
 """
 from __future__ import annotations
 
+from app.crud.queue_resource_routing import (
+    prefer_registry_surface,
+)
 from app.services.qr_queue._base import *  # noqa: F401, F403
 from app.services.qr_queue._base import QRQueueServiceMixinBase
 
@@ -215,6 +218,13 @@ class TokensMixin(QRQueueServiceMixinBase):
                     )
                     .first()
                 )
+                # QD-2C (Codex round-2 P1): resource-owned очередь тега
+                # реестра — fallback через specialty синтетика;
+                # round-5 P1: неактивная легаси-строка не затеняет
+                # живую ресурсную поверхность
+                daily_queue = prefer_registry_surface(
+                    self.db, daily_queue, target_date, qr_token.specialist_id
+                )
 
             logger.debug(
                 f"[QRQueueService.get_qr_token_info] DailyQueue найдена: {daily_queue is not None}"
@@ -334,6 +344,12 @@ class TokensMixin(QRQueueServiceMixinBase):
                         )
                         .first()
                     )
+                    # QD-2C (Codex round-2 P1): resource-owned очередь
+                    # тега реестра — fallback (счётчик длины очереди);
+                    # round-5 P1: предпочтение активной поверхности
+                    daily_queue = prefer_registry_surface(
+                        self.db, daily_queue, target_date, specialist.id
+                    )
 
                     if daily_queue:
                         # Считаем OnlineQueueEntry записи в этой очереди (waiting/called)
@@ -374,6 +390,21 @@ class TokensMixin(QRQueueServiceMixinBase):
                     specialist_name = "Все специалисты"
                 else:
                     specialist_name = f"Врач ID {qr_token.specialist_id}"
+
+            # QD-2C (Codex round-18 P2): токен резолвится в ресурсную
+            # очередь — имя с оси ресурса (реестр): публичный экран
+            # QueueJoin показывает registry-назначение, а не «Врач ID ...»
+            # синтетика 0055 (без full_name); врач/clinic-wide токены
+            # байт-идентичны
+            if (
+                not (qr_token.is_clinic_wide or qr_token.specialist_id is None)
+                and daily_queue is not None
+                and daily_queue.queue_resource_id is not None
+            ):
+                resource = daily_queue.queue_resource
+                specialist_name = (
+                    resource.display_name if resource is not None else "Ресурс очереди"
+                )
 
             # Определяем target_date из токена
             target_date = qr_token.day

@@ -1342,10 +1342,18 @@ def _full_update_resolve_target_queue_id(
         "[full_update_online_entry] ⚠️ DailyQueue for queue_tag=%s not found, creating...",
         service.queue_tag,
     )
+    # Codex P2 (review on 89c6311bb): авто-создание очереди целевого
+    # тега наследовало specialist_id ИСХОДНОЙ очереди — у ресурс-очереди
+    # он None, и врач-ветка get_or_create_daily_queue (тег без строки
+    # реестра) поднимала ValueError вместо авто-создания. Резолвим
+    # врач-идентичность ЦЕЛЕВОГО сервиса — тот же прецедент, что у
+    # _resolve_daily_queue/quote-гейта мастера («item specialist or
+    # the service's default doctor»), а не владельца исходной очереди.
+    target_specialist_id = entry.queue.specialist_id or service.doctor_id
     new_queue = queue_service.get_or_create_daily_queue(
         db,
         day=entry.queue.day,
-        specialist_id=entry.queue.specialist_id,
+        specialist_id=target_specialist_id,
         queue_tag=service.queue_tag,
     )
     logger.info(
@@ -1371,16 +1379,18 @@ def _full_update_create_single_independent_entry(
     """
     import json
 
-    from sqlalchemy import text
-
-    from app.models.online_queue import OnlineQueueEntry
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
     target_queue_id = _full_update_resolve_target_queue_id(db, entry, service)
 
-    next_number = db.execute(
-        text("SELECT COALESCE(MAX(number), 0) + 1 FROM queue_entries WHERE queue_id = :qid"),
-        {"qid": target_queue_id},
-    ).scalar()
+    # QD-2C (Codex round-16 P2): SSOT нумерации — ресурсная очередь
+    # стартует с floor реестра (get_next_queue_number →
+    # max(per-queue MAX+1, QueueResource.start_number_online)), а не с
+    # сырого MAX+1: пустая очередь выдавала билет 1 вместо
+    # сконфигурированных 40. Врач-очереди — байт-идентично
+    # (per-queue MAX+1, floor=1).
+    target_queue = db.get(DailyQueue, target_queue_id)
+    next_number = queue_service.get_next_queue_number(db, daily_queue=target_queue)
 
     quantity = service_item_data.get("quantity", 1) if service_item_data else 1
     item_price = service.price * quantity

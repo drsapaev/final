@@ -274,20 +274,25 @@ def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
 
         # UX Audit Stage 3 (Queue WebSocket): broadcast to /ws/queue admin panel.
         try:
-            from app.ws.queue_ws import broadcast_queue_update
-            # Resolve specialist_id from the daily_queue (or queue_entry fallback)
-            # to avoid F821 undefined name in this join_queue scope.
-            _specialist_id = (
-                daily_queue.specialist_id
+            from app.ws.queue_ws import broadcast_queue_update, queue_update_departments
+            # QD-2C (Codex round-18 P2): комната — маршрутизирующая
+            # идентичность: legacy-join на ресурсной очереди (specialist
+            # NULL — конструктор/резолвер ресурсной оси) broadcast'ил бы
+            # в мёртвую specialist_None-комнату; routing-специалисты тега —
+            # та же ось, что restore/no-show (round-17) и подбор очереди в
+            # queue manager'е. Врач-очереди — легаси-комната байт-идентично.
+            _join_queue = (
+                daily_queue
                 if daily_queue
-                else getattr(getattr(queue_entry, "queue", None), "specialist_id", None)
+                else getattr(queue_entry, "queue", None)
             )
-            broadcast_queue_update(
-                department=f"specialist_{_specialist_id}",
-                date=queue_day.strftime("%Y-%m-%d") if hasattr(queue_day, "strftime") else str(queue_day),
-                event_type="queue_update",
-                data={"action": "entry_added", "entry_id": queue_entry.id, "number": queue_entry.number},
-            )
+            for _dept in queue_update_departments(db, _join_queue):
+                broadcast_queue_update(
+                    department=_dept,
+                    date=queue_day.strftime("%Y-%m-%d") if hasattr(queue_day, "strftime") else str(queue_day),
+                    event_type="queue_update",
+                    data={"action": "entry_added", "entry_id": queue_entry.id, "number": queue_entry.number},
+                )
         except Exception as ws_error:
             logger.warning("Queue WS broadcast failed: %s", ws_error, exc_info=True)
 
@@ -312,7 +317,7 @@ def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
 @router.get("/statistics/{specialist_id}", response_model=dict[str, Any])
 def get_queue_statistics(
     specialist_id: int,
-    day: date = Query(default_factory=date.today, description="День для статистики"),
+    day: date | None = Query(None, description="День для статистики"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -327,6 +332,17 @@ def get_queue_statistics(
     # Валидация specialist_id
     if not isinstance(specialist_id, int) or specialist_id <= 0:
         raise HTTPException(status_code=422, detail="Некорректный ID специалиста")
+
+    # Codex round-42 P2 (round-29 precedent, /today выше): опущенный
+    # день — clinic_today SSOT (таймзона настроек очередей): в окне
+    # 19:00-24:00Z host date.today() отстаёт от клиник-дня, и
+    # резолвер ресурс-поверхности видел вчерашний tag-surface —
+    # устаревшая статистика или «Очередь не найдена» для валидной
+    # текущей ресурсной очереди.
+    if day is None:
+        from app.crud.clinic import clinic_today
+
+        day = clinic_today(db)
 
     # Получаем очередь
     daily_queue = QueueApiService(db).get_daily_queue(
@@ -361,9 +377,24 @@ def get_queue_statistics(
         "specialist": {
             "id": specialist_id,
             "name": (
-                daily_queue.specialist.user.full_name
-                if (daily_queue.specialist and daily_queue.specialist.user)
-                else f"Врач #{specialist_id}"
+                (
+                    # QD-2C (Codex round-31 P2): у 0059-моста (оба
+                    # владельца) поверхностью владеет ОСЬ РЕСУРСА —
+                    # реестровый display_name вместо пустого full_name
+                    # синтета; приоритет ДО doctor-условия
+                    daily_queue.queue_resource.display_name
+                    if daily_queue.queue_resource
+                    else f"Врач #{specialist_id}"
+                )
+                if daily_queue.queue_resource_id is not None
+                else (
+                    daily_queue.specialist.user.full_name
+                    if (
+                        daily_queue.specialist
+                        and daily_queue.specialist.user
+                    )
+                    else f"Врач #{specialist_id}"
+                )
             ),
         },
         "day": day.isoformat(),
@@ -482,7 +513,13 @@ def get_today_queue(
     if not specialist:
         raise HTTPException(status_code=404, detail="Специалист не найден")
 
-    today = date.today()
+    # Codex round-29 P2: день «сегодня» — clinic_today SSOT (таймзона
+    # настроек очередей): resource-очереди создаются на КЛИНИК-локальном
+    # дне, и host date.today() в окне 19:00-24:00Z резолвил вчерашний
+    # tag-surface и отдавал 404 для валидной текущей ресурсной очереди.
+    from app.crud.clinic import clinic_today
+
+    today = clinic_today(db)
 
     # Получение очереди
     daily_queue = queue_api_service.get_daily_queue(
@@ -503,11 +540,23 @@ def get_today_queue(
         day=daily_queue.day,
         specialist_name=(
             (
-                daily_queue.specialist.user.full_name
-                or daily_queue.specialist.user.username
+                # QD-2C (Codex round-31 P2): у 0059-моста (оба владельца)
+                # поверхностью владеет ОСЬ РЕСУРСА — реестровый
+                # display_name вместо username удержанного синтета
+                # (lab_resource); приоритет ДО doctor-условия
+                daily_queue.queue_resource.display_name
+                if daily_queue.queue_resource
+                else "Ресурс очереди"
             )
-            if (daily_queue.specialist and daily_queue.specialist.user)
-            else f"Врач #{daily_queue.specialist_id}"
+            if daily_queue.queue_resource_id is not None
+            else (
+                (
+                    daily_queue.specialist.user.full_name
+                    or daily_queue.specialist.user.username
+                )
+                if (daily_queue.specialist and daily_queue.specialist.user)
+                else f"Врач #{daily_queue.specialist_id}"
+            )
         ),
         is_open=daily_queue.opened_at is not None,
         opened_at=daily_queue.opened_at,
@@ -576,16 +625,31 @@ def call_patient(
 
         async def send_to_display():
             manager = get_display_manager()
-            specialist_name = (
-                entry.queue.specialist.full_name
-                if entry.queue.specialist
-                else f"Специалист #{entry.queue.specialist_id}"
-            )
+            # QD-2C (Codex round-12 P1): resource/bridged очередь —
+            # владелец и кабинет объявления с оси ресурса (реестр),
+            # иначе табло и голосовое объявление показывают
+            # «Специалист #None» без кабинета при живом реестровом
+            queue = entry.queue
+            if queue.queue_resource_id is not None:
+                resource = queue.queue_resource
+                specialist_name = (
+                    resource.display_name if resource else "Ресурс очереди"
+                )
+                cabinet = queue.cabinet_number or (
+                    resource.default_cabinet if resource else None
+                )
+            else:
+                specialist_name = (
+                    queue.specialist.full_name
+                    if queue.specialist
+                    else f"Специалист #{queue.specialist_id}"
+                )
+                cabinet = None  # TODO: Добавить кабинет в модель
 
             await manager.broadcast_patient_call(
                 queue_entry=entry,
                 doctor_name=specialist_name,
-                cabinet=None,  # TODO: Добавить кабинет в модель
+                cabinet=cabinet,
             )
 
         # Запускаем асинхронную отправку в фоне
