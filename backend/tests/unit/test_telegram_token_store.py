@@ -386,6 +386,33 @@ class TestClearPatientBotToken:
         assert row.webhook_url is None
         assert row.active is False
 
+    def test_clear_covers_legacy_only_revocation(self, db_session, monkeypatch):
+        """P1 pin (round 14): a config row holding ONLY webhook metadata
+        while the token lives in legacy clinic_settings must have its
+        webhook auth state revoked too."""
+        _clear_token_env(monkeypatch)
+        _clear_fernet_key(monkeypatch)
+        config = TelegramConfig()
+        config.webhook_url = "https://example.com/webhook"
+        config.webhook_secret = "old-bot-secret"
+        config.active = True
+        db_session.add(config)
+        db_session.add(
+            ClinicSettings(
+                key="bot_token", value="123456789:legacy-only", category="telegram"
+            )
+        )
+        db_session.commit()
+
+        clear_patient_bot_token(db_session, actor_user_id=1)
+
+        db_session.expire_all()
+        row = db_session.query(TelegramConfig).one()
+        assert row.webhook_secret is None
+        assert row.webhook_url is None
+        assert row.active is False
+        assert crud_clinic.get_setting_by_key(db_session, "bot_token") is None
+
     def test_clear_is_noop_without_any_token(self, db_session, monkeypatch):
         _clear_token_env(monkeypatch)
         _clear_fernet_key(monkeypatch)
