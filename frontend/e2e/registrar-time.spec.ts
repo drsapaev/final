@@ -75,6 +75,15 @@ test.describe('Registrar queue time rendering', () => {
               color: '#ef4444',
               order: 1,
             },
+            {
+              key: 'dermatology',
+              title: 'Dermatology',
+              title_ru: 'Дерматология',
+              queue_tags: ['dermatology'],
+              icon: 'Activity',
+              color: '#3b82f6',
+              order: 2,
+            },
           ],
           source: 'database',
         }));
@@ -90,6 +99,12 @@ test.describe('Registrar queue time rendering', () => {
               specialty: 'cardiology',
               cabinet: '12',
             },
+            {
+              id: 2,
+              full_name: 'Dr Skin',
+              specialty: 'dermatology',
+              cabinet: '14',
+            },
           ],
         }));
         return;
@@ -100,6 +115,9 @@ test.describe('Registrar queue time rendering', () => {
           services_by_group: {
             cardio: [
               { id: 1, name: 'Consultation', service_code: 'K01' },
+            ],
+            dermatology: [
+              { id: 2, name: 'Skin consultation', service_code: 'D01' },
             ],
           },
         }));
@@ -115,6 +133,7 @@ test.describe('Registrar queue time rendering', () => {
         await route.fulfill(jsonResponse({
           data: [
             { key: 'cardio', title: 'Кардиология', active: true },
+            { key: 'dermatology', title: 'Дерматология', active: true },
           ],
         }));
         return;
@@ -147,6 +166,8 @@ test.describe('Registrar queue time rendering', () => {
                   status: 'waiting',
                   created_at: '2026-04-16T09:31:00+05:00',
                   queue_time: '2026-04-16T09:30:00+05:00',
+                  display_time_kind: 'queue_time',
+                  timezone: 'Asia/Tashkent',
                   discount_mode: 'none',
                   approval_status: null,
                   type: 'online_queue',
@@ -166,8 +187,53 @@ test.describe('Registrar queue time rendering', () => {
               },
               opened_at: '2026-04-16T09:00:00+05:00',
             },
+            {
+              queue_id: 2,
+              specialist_id: 2,
+              specialist_name: 'Dr Skin',
+              specialty: 'dermatology',
+              cabinet: '14',
+              entries: [
+                {
+                  id: 102,
+                  number: 3,
+                  patient_id: 1001,
+                  patient_name: 'Time Check Patient',
+                  patient_birth_year: 1990,
+                  phone: '+998900000000',
+                  address: 'Test address',
+                  services: ['Skin consultation'],
+                  service_codes: ['D01'],
+                  cost: 80000,
+                  payment_status: 'paid',
+                  payment_type: 'cash',
+                  source: 'desk',
+                  status: 'waiting',
+                  created_at: '2026-04-16T10:46:00+05:00',
+                  queue_time: '2026-04-16T10:45:00+05:00',
+                  display_time_kind: 'queue_time',
+                  timezone: 'Asia/Tashkent',
+                  discount_mode: 'none',
+                  approval_status: null,
+                  type: 'online_queue',
+                  record_type: 'online_queue',
+                  queue_entry_id: 102,
+                  department_key: 'dermatology',
+                  department: 'dermatology',
+                  session_id: 'sess-2',
+                },
+              ],
+              stats: {
+                total: 1,
+                waiting: 1,
+                called: 0,
+                served: 0,
+                online_entries: 0,
+              },
+              opened_at: '2026-04-16T09:00:00+05:00',
+            },
           ],
-          total_queues: 1,
+          total_queues: 2,
           date: '2026-04-16',
         }));
         return;
@@ -197,12 +263,13 @@ test.describe('Registrar queue time rendering', () => {
     });
   });
 
-  test('renders queue_time in clinic timezone for registrar rows', async ({ page }) => {
+  test('renders every backend queue_time in clinic timezone for an aggregated registrar row', async ({ page }) => {
     await page.goto('/registrar');
 
     const row = page.locator('tr', { hasText: 'Time Check Patient' }).first();
     await expect(row).toBeVisible({ timeout: 30_000 });
     await expect(row).toContainText('09:30:00');
+    await expect(row).toContainText('10:45:00');
     await expect(row).not.toContainText('04:30:00');
   });
 });

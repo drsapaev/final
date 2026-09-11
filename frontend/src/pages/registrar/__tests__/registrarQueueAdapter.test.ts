@@ -245,12 +245,21 @@ describe('adaptQueueEntry (PR-UI-13-1)', () => {
     expect(row.latest_lab_report).toEqual({ status: 'ready' });
   });
 
-  it('queue_time falls back to entry.queue_time → fullEntry.queue_time → fullEntry.created_at', () => {
+  it('preserves the backend timestamp contract in the row and nested queue entry', () => {
     const a = adaptQueueEntry({ id: 19, queue_time: '08:00' }, baseQueue, baseData, '2026-08-29', FALLBACK) as Record<string, unknown>;
     expect(a.queue_time).toBe('08:00');
     const b = adaptQueueEntry({ data: { id: 20, queue_time: '09:30' } }, baseQueue, baseData, '2026-08-29', FALLBACK) as Record<string, unknown>;
     expect(b.queue_time).toBe('09:30');
     const c = adaptQueueEntry({ data: { id: 21, created_at: '2026-08-29T07:15:00' } }, baseQueue, baseData, '2026-08-29', FALLBACK) as Record<string, unknown>;
     expect(c.queue_time).toBe('2026-08-29T07:15:00');
+    expect(c.display_time_kind).toBe('created_at');
+    expect(c.queue_numbers).toEqual([
+      expect.objectContaining({
+        created_at: '2026-08-29T07:15:00',
+        queue_time: '2026-08-29T07:15:00',
+        display_time_kind: 'created_at',
+        timezone: 'Asia/Tashkent',
+      }),
+    ]);
   });
 });

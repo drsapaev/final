@@ -36,7 +36,8 @@ export const adaptQueueEntry = (
   const queueNum = fullEntry.queue_position ?? fullEntry.number ?? 0;
   const queueTag = fullEntry.queue_tag ?? queue.queue_tag ?? queue.specialty ?? null;
   const queueName = fullEntry.queue_name ?? queue.specialist_name ?? queue.specialty ?? null;
-  const queueTime = entry.queue_time || fullEntry.queue_time || fullEntry.created_at || null;
+  const timeFields = adaptTimeFields(entry, data);
+  const queueTime = timeFields.queue_time ?? null;
   const canonicalStatus = fullEntry.canonical_status ?? fullEntry.queue_status ?? fullEntry.status ?? null;
 
   return {
@@ -72,7 +73,7 @@ export const adaptQueueEntry = (
     canonical_status: fullEntry.canonical_status ?? canonicalStatus,
     queue_status: fullEntry.queue_status ?? canonicalStatus,
     record_type: fullEntry.record_type ?? fullEntry.type ?? entry.record_type ?? entry.type ?? null,
-    ...adaptTimeFields(entry, data),
+    ...timeFields,
     // Keep queueTime (computed above) as queue_time fallback for backward compat
     queue_time: queueTime,
     discount_mode: fullEntry.discount_mode ?? null,
@@ -92,10 +93,12 @@ export const adaptQueueEntry = (
       queue_name: queueName,
       specialty: queueTag,
       status: canonicalStatus,
+      created_at: timeFields.created_at,
       queue_time: queueTime,
-      updated_at: fullEntry.updated_at || fullEntry.last_changed_at || null,
-      last_changed_at: fullEntry.last_changed_at || fullEntry.updated_at || null,
-      timezone: fullEntry.timezone || data.timezone || 'Asia/Tashkent'
+      updated_at: timeFields.updated_at,
+      last_changed_at: timeFields.last_changed_at,
+      display_time_kind: timeFields.display_time_kind,
+      timezone: timeFields.timezone,
     }],
     specialty: queueTag,
     queue_tag: queueTag,

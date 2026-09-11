@@ -1099,9 +1099,48 @@ export const buildAppointmentsTableColumns = ({
     title: <div className="eat-th-content eat-cell--center" style={{ minWidth: isDoctorView ? '9%' : '100px' }}>{t('misc.eat_date')}</div>,
     render: (_value: unknown, row: AppointmentRow) => (
       <div className="eat-cell eat-cell--center" style={{ minWidth: isDoctorView ? '9%' : '100px' }}>
-        {/* SSOT FIX: ONLY use queue_time. Compute earliest from all patient entries if needed. */}
+        {/* SSOT: aggregated registrar rows keep every backend queue timestamp visible. */}
         {(() => {
-          // SSOT: use row.queue_time directly — no aggregation
+          const queueTimestampDisplays = Array.isArray(row.queue_numbers) && row.queue_numbers.length > 1
+            ? row.queue_numbers.map((queueNumber, index) => {
+                const queueTimestamp = queueNumber as QueueNumberInfo & RegistrarTimestampRecord;
+                return {
+                  key: `${queueNumber.queue_tag || queueNumber.queue_name || queueNumber.number || 'queue'}-${index}`,
+                  label: t('misc.eat_queue_label', {
+                    queueName: queueNumber.queue_name || queueNumber.queue_tag || t('misc.eat_queue_default'),
+                    number: queueNumber.number ?? '—',
+                  }),
+                  display: getRegistrarTimestampDisplay(queueTimestamp),
+                };
+              })
+            : [];
+
+          if (queueTimestampDisplays.length > 1) {
+            return (
+              <div>
+                {queueTimestampDisplays.map(({ key, label, display }) => (
+                  <div key={key} title={t('misc.eat_timezone_label', { timeZone: display.timeZone })}>
+                    <div className="eat-time-label">{label}</div>
+                    <div className="eat-th-content">
+                      <Calendar size={12} className="eat-calendar-icon" />
+                      {display.primaryDate || '—'}
+                    </div>
+                    <div className="eat-time-row">
+                      <Clock size={10} />
+                      {display.primaryTime || '—'}
+                    </div>
+                    {display.showChanged &&
+                      <div className="eat-time-changed">
+                        {display.changedLabel}: {display.changedDate} {display.changedTime}
+                      </div>
+                    }
+                  </div>
+                ))}
+              </div>
+            );
+          }
+
+          // Non-aggregated registrar and doctor rows render their backend-owned fact directly.
           const timeDisplay = getRegistrarTimestampDisplay(row as unknown as RegistrarTimestampRecord);
 
           if (timeDisplay.primaryDate || timeDisplay.primaryTime) {
