@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const paymentApiMocks = vi.hoisted(() => ({
   getPendingInvoices: vi.fn(),
   createPaymentInvoice: vi.fn(),
-  getPaymentProviders: vi.fn(),
 }));
 
 vi.mock('../../../hooks/usePaymentsApi', () => ({
@@ -31,32 +30,20 @@ vi.mock('react-toastify', () => ({
 }));
 
 vi.mock('../PaymentClick', () => ({
-  default: ({ isOpen, invoiceId }: { isOpen: boolean; invoiceId: string | number }) =>
-    isOpen ? <div data-testid="click-payment">{String(invoiceId)}</div> : null,
+  default: ({ isOpen, invoiceId, totalAmount }: { isOpen: boolean; invoiceId: string | number; totalAmount: number }) =>
+    isOpen ? (
+      <div data-testid="click-payment">
+        {String(invoiceId)}:{String(totalAmount)}
+      </div>
+    ) : null,
 }));
 vi.mock('../PaymentPayMe', () => ({ default: () => null }));
 
 import PaymentManager from '../PaymentManager';
 
-describe('PaymentManager provider capabilities', () => {
+describe('PaymentManager backend-owned invoice actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    paymentApiMocks.getPaymentProviders.mockResolvedValue([
-      {
-        name: 'click',
-        code: 'click',
-        supported_currencies: ['UZS'],
-        is_active: true,
-        features: { registrar_invoice_payment: true },
-      },
-      {
-        name: 'payme',
-        code: 'payme',
-        supported_currencies: ['UZS'],
-        is_active: true,
-        features: { registrar_invoice_payment: false },
-      },
-    ]);
     paymentApiMocks.getPendingInvoices.mockResolvedValue([
       {
         invoice_id: 42,
@@ -64,6 +51,8 @@ describe('PaymentManager provider capabilities', () => {
         currency: 'UZS',
         provider: 'payme',
         status: 'pending',
+        available_actions: [],
+        online_payment_block_reason: 'provider_unavailable',
       },
     ]);
   });
@@ -72,7 +61,6 @@ describe('PaymentManager provider capabilities', () => {
     render(<PaymentManager isOpen />);
 
     await waitFor(() => {
-      expect(paymentApiMocks.getPaymentProviders).toHaveBeenCalledTimes(1);
       expect(paymentApiMocks.getPendingInvoices).toHaveBeenCalledTimes(1);
     });
 
@@ -80,7 +68,6 @@ describe('PaymentManager provider capabilities', () => {
       await new Promise((resolve) => setTimeout(resolve, 25));
     });
 
-    expect(paymentApiMocks.getPaymentProviders).toHaveBeenCalledTimes(1);
     expect(paymentApiMocks.getPendingInvoices).toHaveBeenCalledTimes(1);
 
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
@@ -96,22 +83,27 @@ describe('PaymentManager provider capabilities', () => {
     paymentApiMocks.getPendingInvoices.mockResolvedValue([{
       invoice_id: 73,
       amount: 50000,
+      remaining_amount: 32000,
       currency: 'UZS',
-      provider: 'click',
+      provider: null,
       status: 'pending',
+      available_actions: [
+        { action: 'start_online_payment', provider: 'click' },
+      ],
+      online_payment_block_reason: null,
     }]);
 
     render(<PaymentManager isOpen />);
 
     const payButton = await screen.findByRole('button', {
-      name: 'payment.pay_mgr_pay_btn',
+      name: 'payment.pay_mgr_provider_aria',
     });
     expect(payButton).toBeEnabled();
 
     fireEvent.click(payButton);
 
     await waitFor(() => {
-      expect(screen.getByTestId('click-payment')).toHaveTextContent('73');
+      expect(screen.getByTestId('click-payment')).toHaveTextContent('73:32000');
     });
     expect(paymentApiMocks.createPaymentInvoice).not.toHaveBeenCalled();
   });

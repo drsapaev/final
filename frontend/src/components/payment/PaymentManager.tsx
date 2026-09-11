@@ -5,8 +5,8 @@ import { CreditCard, Receipt, Clock, CheckCircle, X } from 'lucide-react';
 import PaymentClick from './PaymentClick';
 import PaymentPayMe from './PaymentPayMe';
 // ADR-0015: use usePaymentsApi hook instead of importing api/payments directly.
-import { usePaymentsApi, type PaymentProviderInfoDto } from '../../hooks/usePaymentsApi';
-import type { Invoice } from '../../types/domain/billing';
+import { usePaymentsApi } from '../../hooks/usePaymentsApi';
+import type { Invoice, PaymentInvoiceAction } from '../../types/domain/billing';
 import logger from '../../utils/logger';
 import './PaymentManager.css';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -26,13 +26,19 @@ interface PaymentManagerProps {
 const getInvoiceId = (invoice: Invoice | null | undefined): string | number | null =>
   (invoice?.invoice_id as string | number | undefined) ?? invoice?.id ?? null;
 
-const getProviderLabel = (provider: PaymentProviderInfoDto | string): string => {
-  const code = typeof provider === 'string' ? provider : provider.code;
+const getProviderLabel = (provider: string): string => {
+  const code = provider;
   if (code.toLowerCase() === 'payme') return 'PayMe';
   if (code.toLowerCase() === 'click') return 'Click';
   if (code.toLowerCase() === 'kaspi') return 'Kaspi';
-  return typeof provider === 'string' ? provider : provider.name;
+  return provider;
 };
+
+const getOnlinePaymentActions = (invoice: Invoice): PaymentInvoiceAction[] =>
+  (invoice.available_actions ?? []).filter((action) => {
+    const provider = action.provider.trim().toLowerCase();
+    return action.action === 'start_online_payment' && ['click', 'payme'].includes(provider);
+  });
 
 // UX Audit Stage 3 (Payment issue 8.2):
 // Локализация статусов счетов для русского UI.
@@ -64,13 +70,9 @@ const PaymentManager = ({
   // ADR-0015: payments API accessed via hook.
   const {
     getPendingInvoices,
-    getPaymentProviders,
     formatUZS,
   } = usePaymentsApi();
   // Состояние компонента
-  const [invoiceProviders, setInvoiceProviders] = useState<PaymentProviderInfoDto[]>([]);
-  const [providersLoading, setProvidersLoading] = useState(false);
-  const [providersLoadFailed, setProvidersLoadFailed] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState(initialAmount || 0);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
@@ -105,41 +107,16 @@ const PaymentManager = ({
     }
   }, [getPendingInvoices]);
 
-  const loadInvoiceProviders = useCallback(async () => {
-    try {
-      setProvidersLoading(true);
-      setProvidersLoadFailed(false);
-      const providers = await getPaymentProviders();
-      const supportedProviders = providers.filter(
-        (provider) =>
-          provider.is_active &&
-          provider.supported_currencies.includes('UZS') &&
-          provider.features?.registrar_invoice_payment === true
-      );
-      setInvoiceProviders(supportedProviders);
-    } catch (error) {
-      logger.error('Ошибка загрузки платёжных провайдеров:', error);
-      setInvoiceProviders([]);
-      setProvidersLoadFailed(true);
-      toast.error(tRef.current('payment.pay_mgr_provider_load_error'));
-    } finally {
-      setProvidersLoading(false);
-    }
-  }, [getPaymentProviders]);
-
   useEffect(() => {
     if (isOpen) {
       void loadPendingInvoices();
-      void loadInvoiceProviders();
     }
-  }, [isOpen, loadPendingInvoices, loadInvoiceProviders]);
+  }, [isOpen, loadPendingInvoices]);
 
-  const getProviderBlockReason = (providerCode: string): string =>
-    providersLoadFailed
-      ? t('payment.pay_mgr_provider_load_error')
-      : t('payment.pay_mgr_provider_unavailable', {
-          provider: getProviderLabel(providerCode || '—'),
-        });
+  const getProviderBlockReason = (invoice: Invoice): string =>
+    t('payment.pay_mgr_provider_unavailable', {
+      provider: getProviderLabel(String(invoice.provider || 'Online')),
+    });
 
   // UX Audit Stage 3 (Payment issue 8.2):
   // ESC-close для модального окна.
@@ -161,23 +138,17 @@ const PaymentManager = ({
   }, [isOpen, showClickPayment, showPayMePayment, onClose]);
 
   // Инициация оплаты существующего счета
-  const payExistingInvoice = (invoice: Invoice) => {
-    const providerCode = String(invoice.provider ?? '').toLowerCase();
-    const providerSupported = invoiceProviders.some(
-      (provider) => provider.code.toLowerCase() === providerCode
-    );
-    if (!providerSupported) {
-      toast.error(getProviderBlockReason(providerCode));
-      return;
-    }
-
+  const payExistingInvoice = (invoice: Invoice, action: PaymentInvoiceAction) => {
+    const providerCode = action.provider.trim().toLowerCase();
     setCreatedInvoiceId(getInvoiceId(invoice));
-    setPaymentAmount(invoice.amount ?? 0);
+    setPaymentAmount(invoice.remaining_amount ?? invoice.amount ?? 0);
 
     if (providerCode === 'click') {
       setShowClickPayment(true);
     } else if (providerCode === 'payme') {
       setShowPayMePayment(true);
+    } else {
+      toast.error(getProviderBlockReason(invoice));
     }
   };
 
@@ -269,10 +240,10 @@ const PaymentManager = ({
                 <div className="invoices-list">
                   {invoices.map((invoice) => {
                     const invoiceIdValue = getInvoiceId(invoice);
-                    const providerCode = String(invoice.provider ?? '').toLowerCase();
-                    const providerSupported = invoiceProviders.some(
-                      (provider) => provider.code.toLowerCase() === providerCode
-                    );
+                    const paymentActions = getOnlinePaymentActions(invoice);
+                    const providerLabels = paymentActions
+                      .map((action) => getProviderLabel(action.provider))
+                      .join(', ');
 
                     return (
                       <div key={invoiceIdValue} className="invoice-item">
@@ -280,11 +251,13 @@ const PaymentManager = ({
                           {/* UX Audit Stage 3 (Payment issue 8.2):
                               Заменён toLocaleString() без локали на formatUZS() с ru-RU. */}
                           <div className="invoice-amount">
-                            {formatUZS(invoice.amount ?? 0)}
+                            {formatUZS(invoice.remaining_amount ?? invoice.amount ?? 0)}
                           </div>
                           <div className="invoice-details">
                             <span className="invoice-id">№{String(invoiceIdValue ?? '')}</span>
-                            <span className="invoice-provider">{String(invoice.provider ?? '')}</span>
+                            <span className="invoice-provider">
+                              {String(invoice.provider || providerLabels)}
+                            </span>
                             {/* UX Audit Stage 3: локализация статуса */}
                             <span className="invoice-status">
                               {String(getInvoiceStatusLabel(invoice.status as string | undefined, t))}
@@ -295,24 +268,36 @@ const PaymentManager = ({
                               {String(invoice.description)}
                             </div>
                           )}
-                          {!providersLoading && !providerSupported && (
+                          {paymentActions.length === 0 && (
                             <div className="invoice-provider-warning">
-                              {getProviderBlockReason(providerCode)}
+                              {getProviderBlockReason(invoice)}
                             </div>
                           )}
                         </div>
 
-                        <button
-                          className="pay-invoice-btn"
-                          onClick={() => payExistingInvoice(invoice)}
-                          disabled={loading || providersLoading || !providerSupported}
-                          aria-label={providerSupported
-                            ? t('payment.pay_mgr_pay_btn')
-                            : getProviderBlockReason(providerCode)}
-                          type="button"
-                        >
-                          {t('payment.pay_mgr_pay_btn')}
-                        </button>
+                        {paymentActions.length === 0 ? (
+                          <button
+                            className="pay-invoice-btn"
+                            disabled
+                            aria-label={getProviderBlockReason(invoice)}
+                            type="button"
+                          >
+                            {t('payment.pay_mgr_pay_btn')}
+                          </button>
+                        ) : paymentActions.map((action) => (
+                          <button
+                            key={`${action.action}:${action.provider}`}
+                            className="pay-invoice-btn"
+                            onClick={() => payExistingInvoice(invoice, action)}
+                            disabled={loading}
+                            aria-label={t('payment.pay_mgr_provider_aria', {
+                              provider: getProviderLabel(action.provider),
+                            })}
+                            type="button"
+                          >
+                            {t('payment.pay_mgr_pay_btn')} · {getProviderLabel(action.provider)}
+                          </button>
+                        ))}
                       </div>
                     );
                   })}

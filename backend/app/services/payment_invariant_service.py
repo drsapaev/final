@@ -147,7 +147,52 @@ class PaymentInvariantService:
 
     def lock_visit_for_payment_change(self, visit_id: int) -> Visit:
         """Acquire the canonical visit lock before mutating its payment ledger."""
-        return self._load_visit_for_update(visit_id)
+        visit = self._load_visit_for_update(visit_id)
+        self.assert_no_processing_invoice_reservation([visit_id])
+        return visit
+
+    def assert_no_processing_invoice_reservation(
+        self,
+        visit_ids: list[int],
+        *,
+        exclude_invoice_id: int | None = None,
+    ) -> None:
+        """Reject ledger changes reserved by an in-flight invoice checkout.
+
+        Callers must lock the visits first. The additional invoice lock follows
+        the shared visit -> invoice order used by cashier and registrar payment
+        commands, so provider settlement and counter payments cannot cross.
+        """
+        query = (
+            self.db.query(PaymentInvoice)
+            .join(
+                PaymentInvoiceVisit,
+                PaymentInvoiceVisit.invoice_id == PaymentInvoice.id,
+            )
+            .filter(
+                PaymentInvoiceVisit.visit_id.in_(set(visit_ids)),
+                PaymentInvoiceVisit.visit_amount > 0,
+                PaymentInvoice.status == "processing",
+            )
+        )
+        if exclude_invoice_id is not None:
+            query = query.filter(PaymentInvoice.id != exclude_invoice_id)
+        reservation = (
+            query.order_by(PaymentInvoice.id)
+            .with_for_update(of=PaymentInvoice)
+            .first()
+        )
+        if reservation is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "reason": "invoice_payment_in_progress",
+                    "message": (
+                        "По визиту уже обрабатывается онлайн-оплата. "
+                        "Обновите данные платежа перед изменением расчёта."
+                    ),
+                },
+            )
 
     # ─── Calculations (single source of truth — remove duplication) ───
 
@@ -404,6 +449,7 @@ class PaymentInvariantService:
                 visit already fully paid and overpayment not allowed).
         """
         visit = self._load_visit_for_update(visit_id)
+        self.assert_no_processing_invoice_reservation([visit_id])
         total_cost = self.compute_total_cost(visit)
         paid_amount = self.compute_paid_amount(visit_id)
         remaining_debt = total_cost - paid_amount
@@ -448,6 +494,7 @@ class PaymentInvariantService:
         currency: str = "UZS",
         provider: str | None = None,
         allow_overpayment: bool = True,
+        settling_invoice_id: int | None = None,
         commit: bool = True,
     ) -> Payment:
         """Create a payment for a visit with race-condition protection.
@@ -469,6 +516,8 @@ class PaymentInvariantService:
             allow_overpayment: If True (default), allow ``amount >
                 remaining_debt`` as an advance/deposit (logged at
                 WARNING). If False, reject overpayment with 400.
+            settling_invoice_id: Processing invoice allowed to settle its own
+                reserved visits. Other processing invoices still block.
             commit: If True (default), commit the transaction before
                 returning. If False, the caller is responsible for
                 committing — the mutation is staged but NOT persisted.
@@ -497,6 +546,10 @@ class PaymentInvariantService:
         # that calls create_payment_for_visit on the same visit will
         # block here until this transaction commits.
         visit = self._load_visit_for_update(visit_id)
+        self.assert_no_processing_invoice_reservation(
+            [visit_id],
+            exclude_invoice_id=settling_invoice_id,
+        )
 
         total_cost = self.compute_total_cost(visit)
         paid_amount = self.compute_paid_amount(visit_id)
@@ -677,6 +730,7 @@ class PaymentInvariantService:
 
         # Acquire row lock — serializes concurrent pending payment attempts.
         visit = self._load_visit_for_update(visit_id)
+        self.assert_no_processing_invoice_reservation([visit_id])
 
         # B1/B4 coordination: check for existing pending payment with
         # the same provider. This prevents uncontrolled duplicates —

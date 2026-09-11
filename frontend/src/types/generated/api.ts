@@ -31630,6 +31630,16 @@ export type components = {
             /** Error Message */
             error_message?: string | null;
         };
+        /** PaymentInvoiceAction */
+        PaymentInvoiceAction: {
+            /**
+             * Action
+             * @constant
+             */
+            action: "start_online_payment";
+            /** Provider */
+            provider: string;
+        };
         /** PaymentInvoiceCreateRequest */
         PaymentInvoiceCreateRequest: {
             /**
@@ -31673,9 +31683,19 @@ export type components = {
             /** Currency */
             currency: string;
             /** Provider */
-            provider: string;
+            provider: string | null;
+            /** Payment Method */
+            payment_method: string;
             /** Status */
             status: string;
+            /** Paid Amount */
+            paid_amount: number;
+            /** Remaining Amount */
+            remaining_amount: number;
+            /** Available Actions */
+            available_actions: components["schemas"]["PaymentInvoiceAction"][];
+            /** Online Payment Block Reason */
+            online_payment_block_reason: string | null;
             /** Description */
             description: string | null;
             /**

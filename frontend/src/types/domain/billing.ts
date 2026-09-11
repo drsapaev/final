@@ -10,6 +10,11 @@ export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'click' | 'payme';
 export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed' | 'partial';
 export type DiscountMode = 'none' | 'repeat' | 'benefit' | 'all_free';
 
+export interface PaymentInvoiceAction {
+  action: 'start_online_payment';
+  provider: string;
+}
+
 export interface Invoice {
   id: InvoiceId;
   invoice_number?: string;
@@ -20,17 +25,21 @@ export interface Invoice {
   amount?: number;
   total_amount?: number;
   paid_amount?: number;
+  remaining_amount?: number;
   balance?: number;
   discount_amount?: number;
   status?: PaymentStatus;
   method?: PaymentMethod;
+  payment_method?: string;
   issue_date?: string;
   due_date?: string;
   created_at?: string;
   paid_at?: string;
   items?: InvoiceItem[];
   invoice_id?: InvoiceId;
-  provider?: string;
+  provider?: string | null;
+  available_actions?: PaymentInvoiceAction[];
+  online_payment_block_reason?: string | null;
   description?: string;
 }
 
