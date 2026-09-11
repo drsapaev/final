@@ -79,6 +79,72 @@ describe('PaymentManager backend-owned invoice actions', () => {
     ).toBeDisabled();
   });
 
+  it.each([
+    ['invoice_not_pending', 'payment.pay_mgr_block_refresh'],
+    ['invoice_settled', 'payment.pay_mgr_block_refresh'],
+    ['invoice_not_linked', 'payment.pay_mgr_block_support'],
+    ['invoice_allocation_mismatch', 'payment.pay_mgr_block_support'],
+    ['invoice_amount_mismatch', 'payment.pay_mgr_block_support'],
+    ['invoice_payment_in_progress', 'payment.pay_mgr_block_in_progress'],
+    ['role_not_allowed', 'payment.pay_mgr_block_role'],
+    ['partial_online_payment_not_supported', 'payment.pay_mgr_block_partial'],
+    ['future_backend_reason', 'payment.pay_mgr_block_unknown'],
+    [undefined, 'payment.pay_mgr_block_unknown'],
+  ])('explains blocked checkout reason %s', async (reason, messageKey) => {
+    paymentApiMocks.getPendingInvoices.mockResolvedValue([{
+      invoice_id: 43,
+      amount: 125000,
+      remaining_amount: 25000,
+      currency: 'UZS',
+      provider: null,
+      status: 'pending',
+      available_actions: [],
+      online_payment_block_reason: reason,
+    }]);
+
+    render(<PaymentManager isOpen />);
+
+    expect(await screen.findByText(messageKey)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: messageKey })).toBeDisabled();
+  });
+
+  it('does not show an English placeholder when no payment provider is configured', async () => {
+    paymentApiMocks.getPendingInvoices.mockResolvedValue([{
+      invoice_id: 44,
+      amount: 125000,
+      currency: 'UZS',
+      provider: null,
+      status: 'pending',
+      available_actions: [],
+      online_payment_block_reason: 'provider_unavailable',
+    }]);
+
+    render(<PaymentManager isOpen />);
+
+    expect(await screen.findByText('payment.pay_mgr_no_providers')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'payment.pay_mgr_no_providers' })
+    ).toBeDisabled();
+  });
+
+  it('preserves a legacy hosted-provider binding stored in payment_method', async () => {
+    paymentApiMocks.getPendingInvoices.mockResolvedValue([{
+      invoice_id: 45,
+      amount: 125000,
+      currency: 'UZS',
+      provider: null,
+      payment_method: 'payme',
+      status: 'pending',
+      available_actions: [],
+      online_payment_block_reason: 'provider_unavailable',
+    }]);
+
+    render(<PaymentManager isOpen />);
+
+    expect(await screen.findByText('payment.pay_mgr_provider_unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('payment.pay_mgr_no_providers')).not.toBeInTheDocument();
+  });
+
   it('opens checkout for an existing invoice with an authorized provider', async () => {
     paymentApiMocks.getPendingInvoices.mockResolvedValue([{
       invoice_id: 73,

@@ -34,11 +34,32 @@ const getProviderLabel = (provider: string): string => {
   return provider;
 };
 
+const getInvoiceHostedProvider = (invoice: Invoice): string | null => {
+  const provider = invoice.provider?.trim();
+  if (provider) return provider;
+
+  const paymentMethod = invoice.payment_method?.trim().toLowerCase();
+  return paymentMethod && ['click', 'payme'].includes(paymentMethod)
+    ? paymentMethod
+    : null;
+};
+
 const getOnlinePaymentActions = (invoice: Invoice): PaymentInvoiceAction[] =>
   (invoice.available_actions ?? []).filter((action) => {
     const provider = action.provider.trim().toLowerCase();
     return action.action === 'start_online_payment' && ['click', 'payme'].includes(provider);
   });
+
+const ONLINE_PAYMENT_BLOCK_REASON_KEYS: Record<string, string> = {
+  invoice_not_pending: 'payment.pay_mgr_block_refresh',
+  invoice_settled: 'payment.pay_mgr_block_refresh',
+  invoice_not_linked: 'payment.pay_mgr_block_support',
+  invoice_allocation_mismatch: 'payment.pay_mgr_block_support',
+  invoice_amount_mismatch: 'payment.pay_mgr_block_support',
+  invoice_payment_in_progress: 'payment.pay_mgr_block_in_progress',
+  role_not_allowed: 'payment.pay_mgr_block_role',
+  partial_online_payment_not_supported: 'payment.pay_mgr_block_partial',
+};
 
 // UX Audit Stage 3 (Payment issue 8.2):
 // Локализация статусов счетов для русского UI.
@@ -113,10 +134,22 @@ const PaymentManager = ({
     }
   }, [isOpen, loadPendingInvoices]);
 
-  const getProviderBlockReason = (invoice: Invoice): string =>
-    t('payment.pay_mgr_provider_unavailable', {
-      provider: getProviderLabel(String(invoice.provider || 'Online')),
-    });
+  const getProviderBlockReason = (invoice: Invoice): string => {
+    if (invoice.online_payment_block_reason === 'provider_unavailable') {
+      const boundProvider = getInvoiceHostedProvider(invoice);
+      if (!boundProvider) {
+        return t('payment.pay_mgr_no_providers');
+      }
+      return t('payment.pay_mgr_provider_unavailable', {
+        provider: getProviderLabel(boundProvider),
+      });
+    }
+
+    const messageKey = invoice.online_payment_block_reason
+      ? ONLINE_PAYMENT_BLOCK_REASON_KEYS[invoice.online_payment_block_reason]
+      : undefined;
+    return t(messageKey || 'payment.pay_mgr_block_unknown');
+  };
 
   // UX Audit Stage 3 (Payment issue 8.2):
   // ESC-close для модального окна.
