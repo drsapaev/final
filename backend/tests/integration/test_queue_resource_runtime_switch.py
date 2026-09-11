@@ -7259,3 +7259,82 @@ def test_doctor_fall_through_scopes_to_the_queue_department(
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== AC. Codex review pin (89c6311bb) =====================
+
+
+def test_full_update_cross_tag_auto_create_resolves_service_doctor(
+    db_session: Session,
+) -> None:
+    """Codex P2 (review on 89c6311bb): the full-update auto-create of a
+    missing target queue inherited the SOURCE queue's specialist_id —
+    for a resource-owned source (lab/ECG) that is None, so the doctor
+    branch of get_or_create_daily_queue raised ValueError and QR edits
+    could not add a cross-tag doctor service until some other process
+    pre-created its queue. The auto-create now resolves the TARGET
+    service's doctor identity (the wizard's «item specialist or the
+    service's default doctor» precedent)."""
+    from app.api.v1.endpoints.qr_queue._online_entries import (
+        _full_update_resolve_target_queue_id,
+    )
+    from app.models.patient import Patient
+    from app.models.service import Service
+
+    patient = Patient(
+        last_name="Ресурсный14",
+        first_name="Пациент",
+        phone="+998901234547",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        day = _dt_now_tashkent_day()
+        res_user = _make_user(db_session, username="lab_res_ac1", role="Resource")
+        _make_doctor(db_session, user_id=res_user.id, specialty="lab")
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        lab_queue = queue_service.get_or_create_daily_queue(
+            db_session, day=day, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, lab_queue, number=104)
+        entry.patient_id = patient.id
+        db_session.commit()
+
+        # a doctor-tag service with NO active queue on that day; the
+        # service names its default doctor (the wizard's resolution)
+        doc_user = _make_user(db_session, username="doc_ac1", role="Doctor")
+        therapist = _make_doctor(db_session, user_id=doc_user.id, specialty="therapy")
+        service = Service(
+            name="Приём терапевта",
+            queue_tag="therapy",
+            active=True,
+            price=1000,
+            requires_doctor=True,
+            doctor_id=therapist.id,
+        )
+        db_session.add(service)
+        db_session.commit()
+
+        # no therapy queue exists yet (the lab resource queue is the
+        # entry's surface) — the auto-create resolves the service's
+        # doctor instead of inheriting the resource queue's NULL owner
+        target_queue_id = _full_update_resolve_target_queue_id(
+            db_session, entry, service
+        )
+        created = (
+            db_session.query(DailyQueue).filter(DailyQueue.id == target_queue_id).one()
+        )
+        assert created.queue_tag == "therapy"
+        assert created.specialist_id == therapist.id
+        assert created.day == day
+    finally:
+        _durable_cleanup(db_session, "lab_res_ac1", "doc_ac1")
+        db_session.query(Service).filter(Service.id == service.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()

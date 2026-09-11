@@ -1342,10 +1342,18 @@ def _full_update_resolve_target_queue_id(
         "[full_update_online_entry] ⚠️ DailyQueue for queue_tag=%s not found, creating...",
         service.queue_tag,
     )
+    # Codex P2 (review on 89c6311bb): авто-создание очереди целевого
+    # тега наследовало specialist_id ИСХОДНОЙ очереди — у ресурс-очереди
+    # он None, и врач-ветка get_or_create_daily_queue (тег без строки
+    # реестра) поднимала ValueError вместо авто-создания. Резолвим
+    # врач-идентичность ЦЕЛЕВОГО сервиса — тот же прецедент, что у
+    # _resolve_daily_queue/quote-гейта мастера («item specialist or
+    # the service's default doctor»), а не владельца исходной очереди.
+    target_specialist_id = entry.queue.specialist_id or service.doctor_id
     new_queue = queue_service.get_or_create_daily_queue(
         db,
         day=entry.queue.day,
-        specialist_id=entry.queue.specialist_id,
+        specialist_id=target_specialist_id,
         queue_tag=service.queue_tag,
     )
     logger.info(
