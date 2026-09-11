@@ -50,3 +50,36 @@ def test_emr_facade_adapter_bridge_indexes_phrases(monkeypatch) -> None:
 
     assert indexed == 4
 
+
+def test_emr_facade_adapter_bridge_restores_visit_after_payment_change(
+    monkeypatch,
+) -> None:
+    calls = []
+    db = Mock()
+
+    class _LifecycleService:
+        def __init__(self, service_db):
+            assert service_db is db
+
+        def restore_operational_status_after_payment_change(
+            self,
+            visit_id,
+            *,
+            commit,
+        ):
+            calls.append((visit_id, commit))
+
+    monkeypatch.setattr(
+        "app.services.visit_lifecycle_service.VisitLifecycleService",
+        _LifecycleService,
+    )
+
+    facade = EmrContextFacade(EmrServiceContractAdapter(db=db))
+    facade.restore_operational_status_after_payment_change(
+        visit_id=41,
+        commit=False,
+        correlation_id="it-3",
+    )
+
+    assert calls == [(41, False)]
+

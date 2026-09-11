@@ -74,6 +74,32 @@ def test_openapi_queue_join_contract_has_request_and_responses(client: TestClien
     assert any(code in operation["responses"] for code in ("200", "201", "400", "422"))
 
 
+def test_openapi_patient_appointment_history_is_an_explicit_list(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    operation = schema["paths"]["/api/v1/patients/{patient_id}/appointments"][
+        "get"
+    ]
+    response_schema = operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
+
+    assert response_schema["type"] == "array"
+    item_schema_name = response_schema["items"]["$ref"].rsplit("/", 1)[-1]
+    item_schema = schema["components"]["schemas"][item_schema_name]
+    assert set(item_schema["properties"]) == {
+        "id",
+        "appointment_date",
+        "appointment_time",
+        "department",
+        "doctor_id",
+        "status",
+        "notes",
+    }
+    assert set(item_schema["required"]) == {"id", "appointment_date", "status"}
+
+
 def test_openapi_qr_token_info_exposes_join_read_contract(client: TestClient) -> None:
     schema = _get_openapi_schema(client)
     operation = schema["paths"]["/api/v1/queue/qr-tokens/{token}/info"]["get"]

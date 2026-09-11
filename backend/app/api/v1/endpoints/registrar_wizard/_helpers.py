@@ -744,7 +744,7 @@ def _create_queue_entries(
 
 class InvoicePaymentRequest(BaseModel):
     invoice_id: int
-    provider: str = Field(default="click")  # click|payme
+    provider: str = Field(default="click")  # click
     return_url: str | None = None
     cancel_url: str | None = None
 
@@ -756,5 +756,5 @@ class InvoicePaymentResponse(BaseModel):
     error_message: str | None = None
 
 
-SUPPORTED_INVOICE_PAYMENT_PROVIDERS = {"click", "payme"}
+SUPPORTED_INVOICE_PAYMENT_PROVIDERS = {"click"}
 

@@ -965,54 +965,32 @@ async def cancel_payment(
     """
     Отменить платеж.
     """
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Платеж не найден"
-        )
-
-    if _cashier_payment_status(payment) in {"cancelled", "refunded", "void"}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Платеж уже отменен"
-        )
-
     try:
-        # Issue #06 Phase 4b B2: Replaced direct payment.status = "cancelled"
-        # with billing_service.update_payment_status() to enforce payment
-        # state machine validation.
-        from app.services.billing_service import BillingService
+        from app.services.payment_cancel_service import (
+            PaymentCancelDomainError,
+            PaymentCancelService,
+        )
+        from app.services.payment_provider_manager_factory import get_payment_manager
 
         try:
-            payment = BillingService(db).update_payment_status(
-                payment_id=payment.id,
-                new_status="cancelled",
-                commit=False,
+            PaymentCancelService(db, get_payment_manager()).cancel_payment(
+                payment_id=payment_id,
+                reason=cancel_data.reason,
             )
-        except ValueError as ve:
+        except PaymentCancelDomainError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+        payment = db.query(Payment).filter(Payment.id == payment_id).first()
+        if not payment:
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Cannot cancel payment: {ve}",
-            ) from ve
-        if hasattr(payment, 'note') and cancel_data.reason:
-            payment.note = f"Отменён: {cancel_data.reason}"
-
-        # Issue #06 Phase 3: delegate visit status normalization to
-        # VisitLifecycleService. The service acquires FOR UPDATE lock
-        # and ensures terminal visits are NOT reopened by payment changes.
-        # The payment.status change above will be committed together with
-        # the visit status change (same SQLAlchemy session).
-        visit = None
-        if payment.visit_id:
-            from app.services.visit_lifecycle_service import VisitLifecycleService
-
-            visit = VisitLifecycleService(db).restore_operational_status_after_payment_change(
-                visit_id=payment.visit_id,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Платеж не найден после отмены",
             )
-
-        db.commit()
+        visit = (
+            db.query(Visit).filter(Visit.id == payment.visit_id).first()
+            if payment.visit_id
+            else None
+        )
 
         await _emit_payment_notification(
             db=db,
@@ -1030,6 +1008,9 @@ async def cancel_payment(
             "payment_id": payment_id
         }
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception:
         db.rollback()
         logger.exception("Unhandled cashier endpoint error")
@@ -1048,43 +1029,78 @@ async def confirm_payment(
     """
     Вручную подтвердить платеж.
     """
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    from app.services.payment_invariant_service import PaymentInvariantService
+
+    invariant_service = PaymentInvariantService(db)
+    payment_reference = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment_reference:
+        raise HTTPException(status_code=404, detail="Платеж не найден")
+
+    expected_visit_id = payment_reference.visit_id
+    visit = None
+    if expected_visit_id is not None:
+        visit = invariant_service.lock_visit_for_payment_change(expected_visit_id)
+
+    payment = (
+        db.query(Payment)
+        .filter(Payment.id == payment_id)
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
     if not payment:
-         raise HTTPException(status_code=404, detail="Платеж не найден")
+        raise HTTPException(status_code=404, detail="Платеж не найден")
+    if payment.visit_id != expected_visit_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Визит платежа изменился; повторите операцию",
+        )
 
     payment_status = _cashier_payment_status(payment)
+    already_paid = payment_status in {"paid", "completed"}
 
-    if payment_status in {'paid', 'completed'}:
-         return {"success": True, "message": "Платеж уже оплачен"}
-
-    if payment_status in {'cancelled', 'refunded', 'void'}:
-         raise HTTPException(status_code=400, detail="Нельзя подтвердить отмененный платеж")
+    if payment_status in {"cancelled", "refunded", "void"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Нельзя подтвердить отмененный платеж",
+        )
 
     # Issue #06 Phase 4b B2: Replaced direct payment.status = 'paid'
     # with billing_service.update_payment_status() to enforce payment
     # state machine validation.
     from app.services.billing_service import BillingService
 
-    payment = BillingService(db).update_payment_status(
-        payment_id=payment.id,
-        new_status="paid",
-        commit=False,
-    )
-    if not payment.provider_transaction_id:
-        from datetime import datetime
-        payment.provider_transaction_id = f"MANUAL-{payment_id}-{int(datetime.now(UTC).timestamp())}"
+    if not already_paid:
+        payment = BillingService(db).update_payment_status(
+            payment_id=payment.id,
+            new_status="paid",
+            commit=False,
+        )
+        if not payment.provider_transaction_id:
+            from datetime import datetime
+
+            payment.provider_transaction_id = (
+                f"MANUAL-{payment_id}-{int(datetime.now(UTC).timestamp())}"
+            )
 
     # Issue #06 Phase 3: delegate visit status normalization to
     # VisitLifecycleService (replaces _preserve_cashier_visit_status).
-    visit = None
     if payment.visit_id:
         from app.services.visit_lifecycle_service import VisitLifecycleService
 
         visit = VisitLifecycleService(db).restore_operational_status_after_payment_change(
             visit_id=payment.visit_id,
+            commit=False,
+        )
+        invariant_service.synchronize_linked_invoices(
+            visit_id=payment.visit_id,
+            payment_method=payment.method,
         )
 
     db.commit()
+    if already_paid:
+        return {"success": True, "message": "Платеж уже оплачен"}
+
     await _emit_payment_notification(
         db=db,
         payment=payment,
@@ -1122,21 +1138,32 @@ async def refund_payment(
                 detail=f"Невозможно выполнить возврат для платежа со статусом '{payment.status}'"
             )
 
+        from app.services.payment_invariant_service import PaymentInvariantService
+
+        invariant_service = PaymentInvariantService(db)
+        if payment.visit_id:
+            invariant_service.lock_visit_for_payment_change(payment.visit_id)
+
         # Atomic refund: use SQL UPDATE with WHERE guard to prevent race condition.
         # Two concurrent requests could both read refunded_amount=0 and both pass
         # the available_for_refund check. This atomic UPDATE ensures only one wins.
+        from sqlalchemy import DateTime, Numeric, bindparam
         from sqlalchemy import text as sql_text
 
         refund_amount_decimal = Decimal(str(refund_data.amount))
         atomic_update = sql_text("""
-            UPDATE payments
-            SET refunded_amount = COALESCE(refunded_amount, 0) + :refund_amount,
-                refund_reason = :reason,
-                refunded_at = :now,
-                refunded_by = :user_id
-            WHERE id = :payment_id
-              AND COALESCE(refunded_amount, 0) + :refund_amount <= amount
-        """)
+                UPDATE payments
+                SET refunded_amount = COALESCE(refunded_amount, 0) + :refund_amount,
+                    refund_reason = :reason,
+                    refunded_at = :now,
+                    refunded_by = :user_id
+                WHERE id = :payment_id
+                  AND status IN ('paid', 'completed')
+                  AND COALESCE(refunded_amount, 0) + :refund_amount <= amount
+            """).bindparams(
+                bindparam("refund_amount", type_=Numeric(12, 2)),
+                bindparam("now", type_=DateTime(timezone=True)),
+            )
         result = db.execute(atomic_update, {
             "refund_amount": refund_amount_decimal,
             "reason": refund_data.reason,
@@ -1146,8 +1173,14 @@ async def refund_payment(
         })
 
         if result.rowcount == 0:
-            # Either payment doesn't exist or refund would exceed amount (race lost)
+            # The payment status or refundable balance changed while waiting.
             db.rollback()
+            db.refresh(payment)
+            if payment.status not in ["paid", "completed"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Невозможно выполнить возврат для платежа со статусом '{payment.status}'",
+                )
             already_refunded = payment.refunded_amount or Decimal("0")
             available = payment.amount - already_refunded
             raise HTTPException(
@@ -1155,7 +1188,7 @@ async def refund_payment(
                 detail=f"Сумма возврата ({refund_data.amount}) превышает доступную ({available}). Возможно, возврат уже был выполнен."
             )
 
-        db.commit()
+        db.flush()
         db.refresh(payment)
 
         new_refunded_amount = payment.refunded_amount or Decimal("0")
@@ -1228,9 +1261,16 @@ async def refund_payment(
 
                 VisitLifecycleService(db).restore_operational_status_after_payment_change(
                     visit_id=payment.visit_id,
+                    commit=False,
                 )
-            db.commit()
-            db.refresh(payment)
+
+        if payment.visit_id:
+            invariant_service.synchronize_linked_invoices(
+                visit_id=payment.visit_id,
+            )
+
+        db.commit()
+        db.refresh(payment)
 
         refund_change_type = "full_refund" if payment.status == "refunded" else "partial_refund"
         refund_visit = db.query(Visit).filter(Visit.id == payment.visit_id).first() if payment.visit_id else None

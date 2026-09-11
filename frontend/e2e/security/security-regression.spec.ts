@@ -25,7 +25,8 @@
  *    15. Path traversal in file upload → blocked
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { installAuthenticatedQaHarness } from '../support/authenticatedQa';
 
 // === RBAC tests ===
 
@@ -70,24 +71,36 @@ test.describe('Security: RBAC', () => {
   });
 
   test('3. admin can access all patients → 200', async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'admin-token');
-      localStorage.setItem('auth_profile', JSON.stringify({ id: 1, role: 'Admin' }));
-    });
+    const { token } = await installAuthenticatedQaHarness(page, { role: 'Admin' });
 
-    let patientsRequested = false;
+    let authorizationHeader: string | undefined;
     await page.route('**/api/v1/patients**', async (route) => {
-      patientsRequested = true;
+      authorizationHeader = route.request().headers()['authorization'];
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([{ id: 1, first_name: 'A', last_name: 'B' }]),
+        body: JSON.stringify([{
+          id: 1,
+          first_name: 'SYNTHETIC',
+          last_name: 'PATIENT',
+        }]),
       });
     });
 
-    await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
-    expect(patientsRequested).toBe(true);
+    const patientsResponsePromise = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return response.request().method() === 'GET'
+        && url.pathname === '/api/v1/patients/'
+        && url.searchParams.get('limit') === '1000';
+    });
+
+    await page.goto('/admin/patients', { waitUntil: 'domcontentloaded' });
+    const patientsResponse = await patientsResponsePromise;
+
+    expect(patientsResponse.status()).toBe(200);
+    expect(authorizationHeader).toBe(`Bearer ${token}`);
+    await expect(page).toHaveURL(/\/admin\/patients$/);
+    await expect(page.getByRole('button', { name: /Добавить пациента|Add patient/i })).toBeVisible();
   });
 
   test('4. patient cannot access admin panel → 403', async ({ page }) => {

@@ -122,12 +122,20 @@ def _build_patient_access_entry(
             actor_telegram_user_id = scope.telegram_user_id
             actor_type = "staff"
     elif actor_user is not None:
-        # Staff-side endpoint access (JWT user, no Mini App scope):
-        # record the acting staff user explicitly so the audit row is
-        # not misattributed as patient self-access (threat model:
-        # "Audit log on every patient read" for staff/admin actors).
-        actor_staff_user_id = actor_user.id
-        actor_type = "staff"
+        # JWT endpoints serve both staff users and Patient self-access.
+        # Preserve the actor axis used by Mini App scopes instead of
+        # misclassifying every JWT principal as staff.
+        actor_patient = getattr(actor_user, "patient", None)
+        actor_patient_id_value = getattr(actor_patient, "id", None)
+        if (
+            str(getattr(actor_user, "role", "")).strip().casefold() == "patient"
+            and actor_patient_id_value is not None
+        ):
+            actor_patient_id = int(actor_patient_id_value)
+            actor_type = "self"
+        else:
+            actor_staff_user_id = actor_user.id
+            actor_type = "staff"
 
     # Bound request metadata to the audit columns' lengths BEFORE the
     # insert. The helper is deliberately non-blocking: if an oversized

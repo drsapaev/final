@@ -15,7 +15,9 @@ from app.models.clinic import Schedule
 from app.models.payment import Payment
 from app.models.visit import Visit
 from app.services.billing_service import BillingService
+from app.services.payment_invariant_service import PaymentInvariantService
 from app.services.queue_service import QueueBusinessService
+from app.services.visit_lifecycle_service import VisitLifecycleService
 
 
 class TelegramStaffActionAdapterError(ValueError):
@@ -167,6 +169,51 @@ class TelegramStaffActionAdapterService:
             self.db.commit()
         else:
             self.db.flush()
+
+    def _lock_payment_change_context(
+        self, payment_id: int
+    ) -> tuple[Payment | None, PaymentInvariantService]:
+        """Lock the parent visit before the payment mutation."""
+        invariant_service = PaymentInvariantService(self.db)
+        payment_reference = (
+            self.db.query(Payment).filter(Payment.id == payment_id).first()
+        )
+        if payment_reference is None:
+            return None, invariant_service
+
+        expected_visit_id = payment_reference.visit_id
+        if expected_visit_id is not None:
+            invariant_service.lock_visit_for_payment_change(expected_visit_id)
+
+        payment = (
+            self.db.query(Payment)
+            .filter(Payment.id == payment_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        if payment is not None and payment.visit_id != expected_visit_id:
+            raise TelegramStaffActionAdapterError("payment_visit_changed")
+        return payment, invariant_service
+
+    def _synchronize_payment_change(
+        self,
+        payment: Payment,
+        invariant_service: PaymentInvariantService,
+    ) -> None:
+        """Apply visit and invoice postconditions in the current transaction."""
+        if payment.visit_id is None:
+            return
+        self.db.flush()
+        VisitLifecycleService(self.db).restore_operational_status_after_payment_change(
+            visit_id=payment.visit_id,
+            commit=False,
+        )
+        invariant_service.synchronize_linked_invoices(
+            visit_id=payment.visit_id,
+            payment_method=payment.method,
+        )
+        self.db.flush()
 
     def staff_call_next_patient(
         self,
@@ -394,8 +441,89 @@ class TelegramStaffActionAdapterService:
             if new_visit_date < date.today():
                 raise TelegramStaffActionAdapterError("new_visit_date_in_past")
 
+            # PR-1 (Codex round 11+13, P1): same lease coordination as the
+            # HTTP/service reschedule paths — a schedule mutation must
+            # never COMMIT while a reminder delivery holds the lease, or
+            # the in-flight old-generation worker dispatches the obsolete
+            # details and the reminder is then sent again for the new
+            # generation. Wait for the dispatch to resolve; refuse when
+            # the lease survives the wait budget; and bind the mutation
+            # ITSELF to the no-live-lease predicate (round 13: the wait
+            # alone is not atomic — a claim can land between the last
+            # poll and the UPDATE). A no-op move preserves the reminder
+            # state and needs no coordination.
             previous_visit_date = visit.visit_date
-            visit.visit_date = new_visit_date
+            schedule_changed = new_visit_date != previous_visit_date
+            if schedule_changed:
+                from sqlalchemy import or_
+
+                from app.tasks.lease import (
+                    LEASE_TTL,
+                    wait_for_reminder_lease_clear,
+                )
+
+                # Read the generation BEFORE the wait and bind the
+                # UPDATE to it (Codex round 16, P2): two overlapping moves
+                # that both read generation N cannot both pass — the stale
+                # writer's UPDATE matches zero rows and is refused, so it
+                # can no longer silently restore an older schedule without
+                # advancing the generation. A concurrent move that commits
+                # DURING the wait invalidates the read and loses the race
+                # below.
+                generation = (
+                    self.db.query(Visit.reminder_generation)
+                    .filter(Visit.id == visit_id)
+                    .scalar()
+                    or 0
+                )
+                if not wait_for_reminder_lease_clear(self.db, visit_id):
+                    raise TelegramStaffActionAdapterError(
+                        "reminder_delivery_in_progress"
+                    )
+                claimed = (
+                    self.db.query(Visit)
+                    .filter(
+                        Visit.id == visit_id,
+                        Visit.reminder_generation == generation,
+                        or_(
+                            Visit.reminder_claimed_at.is_(None),
+                            Visit.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
+                        ),
+                    )
+                    .update(
+                        {
+                            "visit_date": new_visit_date,
+                            "reminder_sent_at": None,
+                            "reminder_generation": generation + 1,
+                        },
+                        synchronize_session=False,
+                    )
+                )
+                if claimed == 0:
+                    # The visit still exists — the conditional UPDATE lost
+                    # the race: either to a claim that landed after the
+                    # wait loop's last poll (live dispatch) or to a
+                    # concurrent move that already bumped the generation.
+                    current_gen = (
+                        self.db.query(Visit.reminder_generation)
+                        .filter(Visit.id == visit_id)
+                        .scalar()
+                    )
+                    if current_gen != generation:
+                        raise TelegramStaffActionAdapterError(
+                            "visit_schedule_changed_concurrently"
+                        )
+                    raise TelegramStaffActionAdapterError(
+                        "reminder_delivery_in_progress"
+                    )
+                # Sync the identity-map instance with the atomic UPDATE.
+                self.db.refresh(visit)
+            else:
+                visit.visit_date = new_visit_date
+            # The lease is never written by mutations — Codex round 8, P1
+            # (a delivery in flight keeps its finalize binding;
+            # new-generation jobs are deferred by the live lease instead
+            # of duplicating it).
             queue_result = self.queue_service.staff_move_visit_queue_link(
                 self.db,
                 visit_id=visit_id,
@@ -411,9 +539,7 @@ class TelegramStaffActionAdapterService:
                 telegram_chat_id=telegram_chat_id,
                 extra={
                     "previous_visit_date": (
-                        previous_visit_date.isoformat()
-                        if previous_visit_date
-                        else None
+                        previous_visit_date.isoformat() if previous_visit_date else None
                     ),
                     "visit_date": visit.visit_date.isoformat(),
                     "queue_entry_status": queue_result.get("status"),
@@ -463,15 +589,28 @@ class TelegramStaffActionAdapterService:
             telegram_chat_id=telegram_chat_id,
         )
         try:
+            payment, invariant_service = self._lock_payment_change_context(payment_id)
+            if payment is None:
+                raise ValueError(f"Платеж {payment_id} не найден")
+            target_status = str(new_status).strip().lower()
+            if target_status == "refunded":
+                raise TelegramStaffActionAdapterError(
+                    "payment_refund_requires_refund_action"
+                )
+            if payment.provider and target_status in {"cancelled", "void"}:
+                raise TelegramStaffActionAdapterError(
+                    "payment_provider_terminal_status_requires_cashier"
+                )
             payment = BillingService(self.db).update_payment_status(
                 payment_id,
-                new_status,
+                target_status,
                 meta={
                     "staff_action": "telegram_confirmed_payment_status_change",
                     "actor_user_id": actor_user_id,
                 },
                 commit=False,
             )
+            self._synchronize_payment_change(payment, invariant_service)
             self._completed(
                 actor_user_id=actor_user_id,
                 operation_key=operation_key,
@@ -523,11 +662,15 @@ class TelegramStaffActionAdapterService:
             telegram_chat_id=telegram_chat_id,
         )
         try:
-            payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
+            payment, invariant_service = self._lock_payment_change_context(payment_id)
             if not payment:
                 raise TelegramStaffActionAdapterError("payment_not_found")
             if payment.status not in {"paid", "completed"}:
                 raise TelegramStaffActionAdapterError("payment_status_not_refundable")
+            if payment.provider:
+                raise TelegramStaffActionAdapterError(
+                    "payment_provider_refund_requires_cashier"
+                )
 
             already_refunded = payment.refunded_amount or Decimal("0")
             available = payment.amount - already_refunded
@@ -552,6 +695,8 @@ class TelegramStaffActionAdapterService:
                     new_status="refunded",
                     commit=False,
                 )
+
+            self._synchronize_payment_change(payment, invariant_service)
 
             self._completed(
                 actor_user_id=actor_user_id,
@@ -613,19 +758,32 @@ class TelegramStaffActionAdapterService:
             telegram_chat_id=telegram_chat_id,
         )
         try:
-            schedule = self.db.query(Schedule).filter(Schedule.id == schedule_id).first()
+            schedule = (
+                self.db.query(Schedule).filter(Schedule.id == schedule_id).first()
+            )
             if not schedule:
                 raise TelegramStaffActionAdapterError("schedule_not_found")
-            if start_time is None and end_time is None and breaks is None and active is None:
+            if (
+                start_time is None
+                and end_time is None
+                and breaks is None
+                and active is None
+            ):
                 raise TelegramStaffActionAdapterError("schedule_change_empty")
-            if start_time is not None and end_time is not None and start_time >= end_time:
+            if (
+                start_time is not None
+                and end_time is not None
+                and start_time >= end_time
+            ):
                 raise TelegramStaffActionAdapterError("schedule_time_range_invalid")
 
             previous = {
-                "start_time": schedule.start_time.isoformat()
-                if schedule.start_time
-                else None,
-                "end_time": schedule.end_time.isoformat() if schedule.end_time else None,
+                "start_time": (
+                    schedule.start_time.isoformat() if schedule.start_time else None
+                ),
+                "end_time": (
+                    schedule.end_time.isoformat() if schedule.end_time else None
+                ),
                 "active": schedule.active,
             }
             if start_time is not None:
@@ -646,12 +804,12 @@ class TelegramStaffActionAdapterService:
                 telegram_chat_id=telegram_chat_id,
                 extra={
                     "previous": previous,
-                    "start_time": schedule.start_time.isoformat()
-                    if schedule.start_time
-                    else None,
-                    "end_time": schedule.end_time.isoformat()
-                    if schedule.end_time
-                    else None,
+                    "start_time": (
+                        schedule.start_time.isoformat() if schedule.start_time else None
+                    ),
+                    "end_time": (
+                        schedule.end_time.isoformat() if schedule.end_time else None
+                    ),
                     "active": schedule.active,
                 },
             )

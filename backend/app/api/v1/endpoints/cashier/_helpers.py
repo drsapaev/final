@@ -77,7 +77,7 @@ def _cashier_payment_available_amount(payment: Payment) -> Decimal:
 def _cashier_payment_action_contract(payment: Payment) -> dict[str, Any]:
     payment_status = _cashier_payment_status(payment)
     can_confirm = payment_status not in {"paid", "completed", "cancelled", "refunded", "void"}
-    can_cancel = payment_status not in {"cancelled", "refunded", "void"}
+    can_cancel = payment_status in {"pending", "processing"}
     can_refund = payment_status in {"paid", "completed"} and _cashier_payment_available_amount(payment) > 0
     can_print_receipt = True
 

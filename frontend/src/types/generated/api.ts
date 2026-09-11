@@ -22952,6 +22952,29 @@ export type components = {
             department: components["schemas"]["DepartmentInfoResponse"];
         };
         /**
+         * AppointmentHistoryItem
+         * @description Stable, minimal response item for patient appointment history.
+         */
+        AppointmentHistoryItem: {
+            /** Id */
+            id: number;
+            /**
+             * Appointment Date
+             * Format: date
+             */
+            appointment_date: string;
+            /** Appointment Time */
+            appointment_time?: string | null;
+            /** Department */
+            department?: string | null;
+            /** Doctor Id */
+            doctor_id?: number | null;
+            /** Status */
+            status: string;
+            /** Notes */
+            notes?: string | null;
+        };
+        /**
          * AppointmentNotificationRequest
          * @description Схема для уведомления о записи
          */
@@ -39028,7 +39051,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Appointment"][];
+                    "application/json": components["schemas"]["AppointmentHistoryItem"][];
                 };
             };
         };
@@ -39301,9 +39324,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AppointmentHistoryItem"][];
                 };
             };
             /** @description Validation Error */

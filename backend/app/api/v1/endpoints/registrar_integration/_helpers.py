@@ -185,7 +185,7 @@ def _registrar_available_actions(
     patient_id: int | None = None,
 ) -> list[str]:
     actions: list[str] = []
-    if _registrar_can_mark_paid(user, payment_status):
+    if visit_id is not None and _registrar_can_mark_paid(user, payment_status):
         actions.append("mark_paid")
     if _registrar_can_start_visit(user, queue_status):
         actions.append("start_visit")

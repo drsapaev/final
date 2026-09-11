@@ -485,6 +485,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "migration: Тесты миграций")
     config.addinivalue_line("markers", "confirmation: Тесты подтверждения визитов")
     config.addinivalue_line("markers", "queue: Тесты очередей")
+    config.addinivalue_line("markers", "redis: tests requiring a reachable Redis (skipped when absent)")
 
 
 @pytest.fixture(scope="function")
