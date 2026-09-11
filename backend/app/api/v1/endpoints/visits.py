@@ -14,7 +14,10 @@ from app.api.deps import get_db, require_roles
 from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, is_doctor_role_spelling
 from app.models.clinic import Doctor
 from app.models.visit import Visit
-from app.services.patient_access_audit import log_patient_access
+from app.services.patient_access_audit import (
+    log_patient_access,
+    log_patient_access_many,
+)
 from app.services.visit_state_checks import (
     ACCEPTED_VISIT_STATUSES,
     force_reopen_target_allowed,
@@ -242,6 +245,7 @@ def _ensure_doctor_can_create_visit_for_payload(
 @router.get("", response_model=list[VisitOut], summary="Список визитов (мобильный алиас)")
 @router.get("/visits", response_model=list[VisitOut], summary="Список визитов")
 def list_visits(
+    request: Request,
     patient_id: int | None = Query(default=None),
     doctor_id: int | None = Query(default=None),
     status_q: str | None = Query(default=None),
@@ -265,6 +269,24 @@ def list_visits(
         limit=limit,
         offset=offset,
     )
+
+    # Threat model (AGENTS.md "Threat model"): "Audit log on every patient
+    # read" — list rows carry patient_id + clinical notes, so each returned
+    # row is a per-patient PHI read by a staff actor. Batch trail covers both
+    # the canonical and the mobile alias route (one transaction).
+    subject_ids = sorted(
+        {row["patient_id"] for row in rows if row.get("patient_id") is not None}
+    )
+    if subject_ids:
+        log_patient_access_many(
+            db,
+            actor_user=current_user,
+            subject_patient_ids=subject_ids,
+            resource_type="visit",
+            action="view",
+            request=request,
+        )
+
     return [VisitOut(**row) for row in rows]  # type: ignore[arg-type]
 
 

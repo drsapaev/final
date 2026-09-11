@@ -135,6 +135,9 @@ from app.api.v1.endpoints import (
 from app.api.v1.endpoints import (
     settings as settings_ep,
 )
+from app.api.v1.endpoints.admin_security import (
+    router as admin_security_router,  # M5.6/M5.8/M5.9/M5.10
+)
 from app.api.v1.endpoints.migration_management import (
     router as migration_management_router,
 )
@@ -147,7 +150,6 @@ from app.api.v1.endpoints.security_management import (
 )
 from app.api.v1.endpoints.visit_confirmation import router as visit_confirmation_router
 from app.api.v1.endpoints.webauthn import router as webauthn_router  # M4-P1-4
-from app.api.v1.endpoints.admin_security import router as admin_security_router  # M5.6/M5.8/M5.9/M5.10
 from app.ws import cashier_ws
 
 try:
@@ -523,11 +525,11 @@ api_router.include_router(
     emr_v2.router, prefix="/v2", tags=["emr-v2"]
 )
 
-# Mobile-contract alias (Android client): GET/POST /api/v1/emr/{visit_id} and
-# its sub-routes re-mounted without the /v2 segment. Kept AFTER every static
-# /emr/* router (templates/versions/lab/export/ai/phrase-suggest) so those
-# literal paths keep winning over the parametric /{visit_id} routes.
-api_router.include_router(emr_v2.router, tags=["emr-v2-mobile-alias"])
+# Mobile-contract alias (Android client): GET/POST /api/v1/emr/{visit_id} via
+# a NARROW alias router. Kept AFTER every static /emr/* router so those
+# literal paths keep winning over the parametric /{visit_id} route. Full
+# sub-route surface (history/version/diff/patient) stays /v2-only.
+api_router.include_router(emr_v2.alias_router, tags=["emr-v2-mobile-alias"])
 
 # Global Search - агрегированный поиск по всем доменам
 api_router.include_router(

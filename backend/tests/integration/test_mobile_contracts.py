@@ -116,9 +116,8 @@ def test_mobile_contract_all_client_endpoints_resolve() -> None:
         # Non-int segments that a parametric alias would 422 on if it won:
         ("GET", "/api/v1/emr/templates", {404, 422}),
         ("GET", "/api/v1/emr/templates/user", {404, 422}),
-        ("GET", "/api/v1/emr/doctor-history", {404, 422}),
-        ("GET", "/api/v1/emr/patient/5", {404, 422}),
-        # Auth-gated alias/canonical details must be routed:
+        # Mobile EMR alias / visit routes must be routed (auth gate answers):
+        ("GET", "/api/v1/emr/123", {404, 422}),
         ("GET", "/api/v1/visits/123", {404, 422}),
         ("GET", "/api/v1/visits/visits/123", {404, 422}),
         # Public confirmation-info handler legitimately 404s on unknown
@@ -169,6 +168,32 @@ def test_visit_card_read_writes_patient_access_audit(
         .all()
     )
     assert rows, "patient-read audit trail must be written for the visit card"
+
+
+def test_visit_list_read_writes_batch_patient_access_audit(
+    client, db, test_visit, registrar_token
+) -> None:
+    """List reads carry patient_id + clinical notes — batch audit trail for
+    every returned subject on both canonical and mobile alias routes."""
+    from app.models.patient_access_audit import PatientAccessAuditLog
+
+    headers = {"Authorization": f"Bearer {registrar_token}"}
+    response = client.get(
+        f"/api/v1/visits?patient_id={test_visit.patient_id}", headers=headers
+    )
+    assert response.status_code == 200
+    assert response.json(), "fixture visit must be returned"
+
+    rows = (
+        db.query(PatientAccessAuditLog)
+        .filter(
+            PatientAccessAuditLog.subject_patient_id == test_visit.patient_id,
+            PatientAccessAuditLog.resource_type == "visit",
+            PatientAccessAuditLog.action == "view",
+        )
+        .all()
+    )
+    assert rows, "batch patient-read audit trail must be written for the list"
 
 
 def test_visits_detail_alias_exposes_service_id(

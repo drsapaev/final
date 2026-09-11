@@ -52,6 +52,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/emr", tags=["EMR v2"])
 
+# Mobile-contract alias router (Android client): publishes ONLY the two routes
+# the client actually calls (GET/POST /api/v1/emr/{visit_id}), delegating to
+# the canonical handlers incl. their audit trails. Deliberately NOT a
+# full-router remount: history/version/diff/patient listings would otherwise
+# become newly-published read surface without their own audit coverage
+# (codex round-4 P1).
+alias_router = APIRouter(prefix="/emr", tags=["emr-v2-mobile-alias"])
+
 # EMR-AUDIT-28 P0-1: "Lab"/"Laboratory" removed from ALLOWED_ROLES.
 # Lab role could read ANY patient's EMR by sequential visit_id enumeration
 # (ensure_emr_visit_access returned early without ownership check for
@@ -584,3 +592,45 @@ async def restore_emr(
         raise HTTPException(status_code=400, detail="Internal server error")
 
 
+
+
+# ─────────────── MOBILE CONTRACT ALIASES (Android client) ───────────────
+
+
+@alias_router.get("/{visit_id}", response_model=EMRRecordOut)
+async def get_emr_mobile_alias(
+    visit_id: int,
+    request: Request,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_ALLOWED_ROLES)),
+):
+    """Mobile contract (Android client): GET /api/v1/emr/{visit_id}.
+
+    Delegates to the canonical /v2/emr/{visit_id} handler (incl. its
+    audit trail) — response identical byte-for-byte.
+    """
+    return await get_emr(
+        visit_id=visit_id, request=request, db=db, current_user=current_user
+    )
+
+
+@alias_router.post("/{visit_id}", response_model=EMRRecordOut)
+async def save_emr_mobile_alias(
+    visit_id: int,
+    payload: EMRSaveRequest,
+    request: Request,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_roles(*EMR_V2_WRITE_ROLES)),
+):
+    """Mobile contract (Android client): POST /api/v1/emr/{visit_id}.
+
+    Delegates to the canonical /v2/emr/{visit_id} handler (incl. its
+    audit trail and row_version optimistic locking).
+    """
+    return await save_emr(
+        visit_id=visit_id,
+        payload=payload,
+        request=request,
+        db=db,
+        current_user=current_user,
+    )
