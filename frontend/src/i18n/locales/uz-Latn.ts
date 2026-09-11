@@ -6035,6 +6035,12 @@ const uzLatn = {
     mqm_qr_instruction: 'Navbatga yozilish uchun telefon kamerasini skanerlang',
     mqm_qr_valid_until: 'Amal qilish muddati: {time}',
     mqm_qr_valid_until_empty: 'Amal qilish muddati: —',
+    // RQ-11: honest QR expiry presentation (F-10)
+    mqm_qr_expired: 'Amal qilish muddati tugagan',
+    mqm_qr_expired_hint: 'Yangi QR kod yarating va bemorga amaldagi kodni bering',
+    mqm_qr_limited: 'Kodning amal qilish muddati cheklangan',
+    mqm_qr_download_note: 'Navbatga yozilish uchun vaqtinchalik kod — doimiy ruxsat emas',
+    mqm_qr_download_expired: 'Muddati tugagan — yangi kod yarating',
     mqm_download: 'Yuklab olish',
     mqm_close: 'Yopish',
     mqm_patient: 'Bemor',

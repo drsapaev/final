@@ -327,6 +327,18 @@
     color: var(--mac-text-tertiary);
 }
 
+/* RQ-11 (F-10): истекший QR объясняется явно, а не выглядит действующим. */
+.mqm-qr-expiry-expired {
+    color: var(--mac-danger);
+    font-weight: var(--mac-font-weight-semibold);
+}
+
+.mqm-qr-expiry-hint {
+    font-size: 12px;
+    margin: 4px 0 0 0;
+    color: var(--mac-danger);
+}
+
 .mqm-qr-actions {
     display: flex;
     gap: 12px;

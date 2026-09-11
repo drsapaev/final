@@ -57,4 +57,32 @@ describe('Queue manager command contract', () => {
     expect(tableSource).toContain('if (!effectiveDoctor) {');
     expect(tableSource).toContain('t?.selectDoctor || \'Выберите специалиста\'');
   });
+
+  // RQ-11 (F-10): скачанный QR воспринимался как плакат, но токен имеет
+  // ограниченный срок. Диалог обязан различать valid/expired/unspecified,
+  // а скачиваемый PNG — нести подпись срока и пометку временного кода.
+  it('keeps QR expiry honest in the dialog and on the downloaded PNG', () => {
+    const managerSource = read('components/queue/ModernQueueManager.tsx');
+    const helperSource = read('components/queue/qrExpiry.ts');
+
+    // Диалог: срок классифицируется по серверному expires_at через pure-хелпер.
+    expect(managerSource).toContain('resolveQrExpiryView');
+    expect(managerSource).toContain('mqm_qr_expired');
+    expect(managerSource).toContain('mqm_qr_limited');
+    expect(managerSource).toContain('mqm-qr-expiry-expired');
+
+    // Скачивание: PNG получает подписи срока/истечения и пометку временного кода.
+    expect(managerSource).toContain('buildQrDownloadCaptions');
+    expect(managerSource).toContain('mqm_qr_download_note');
+    expect(managerSource).toContain('mqm_qr_download_expired');
+
+    // Жесткая ru-RU локаль в expiry-строке заменена каноническими
+    // dateUtils-форматтерами (клиник-таймзона Asia/Tashkent).
+    expect(managerSource).not.toContain('toLocaleString(\'ru-RU\'');
+
+    // Хелпер — presentation-only: не меняет TTL/защиты/контракт сервера.
+    expect(helperSource).toContain('\'valid\' | \'expired\' | \'unspecified\'');
+    expect(helperSource).not.toContain('expires_hours');
+    expect(helperSource).not.toContain('single_use');
+  });
 });
