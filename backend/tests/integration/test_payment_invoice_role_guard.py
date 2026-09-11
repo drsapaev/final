@@ -12,6 +12,7 @@ from app.models.payment_invoice import PaymentInvoice
 def test_registrar_can_create_and_list_payment_invoices(
     client: TestClient,
     registrar_auth_headers: dict[str, str],
+    test_patient,
 ) -> None:
     create_response = client.post(
         "/api/v1/payments/invoice/create",
@@ -21,6 +22,7 @@ def test_registrar_can_create_and_list_payment_invoices(
             "currency": "UZS",
             "provider": "click",
             "description": "registrar payment invoice",
+            "patient_info": {"id": test_patient.id},
         },
     )
     list_response = client.get(
@@ -35,6 +37,52 @@ def test_registrar_can_create_and_list_payment_invoices(
         invoice["invoice_id"] == create_response.json()["invoice_id"]
         for invoice in list_response.json()
     )
+
+
+def test_registrar_cannot_create_payment_invoice_without_patient(
+    client: TestClient,
+    db_session: Session,
+    registrar_auth_headers: dict[str, str],
+) -> None:
+    before_count = db_session.query(PaymentInvoice).count()
+
+    response = client.post(
+        "/api/v1/payments/invoice/create",
+        headers=registrar_auth_headers,
+        json={
+            "amount": 100000,
+            "currency": "UZS",
+            "provider": "click",
+            "description": "orphan invoice",
+        },
+    )
+
+    assert response.status_code == 422
+    assert db_session.query(PaymentInvoice).count() == before_count
+
+
+def test_registrar_cannot_create_payment_invoice_for_unknown_patient(
+    client: TestClient,
+    db_session: Session,
+    registrar_auth_headers: dict[str, str],
+) -> None:
+    before_count = db_session.query(PaymentInvoice).count()
+
+    response = client.post(
+        "/api/v1/payments/invoice/create",
+        headers=registrar_auth_headers,
+        json={
+            "amount": 100000,
+            "currency": "UZS",
+            "provider": "click",
+            "description": "unknown patient invoice",
+            "patient_info": {"patient_id": 999999999},
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Пациент не найден"}
+    assert db_session.query(PaymentInvoice).count() == before_count
 
 
 def test_patient_cannot_create_payment_invoice_for_arbitrary_patient(

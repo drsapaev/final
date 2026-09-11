@@ -31653,13 +31653,16 @@ export type components = {
              * @description Описание платежа
              */
             description?: string | null;
+            /** @description Ссылка на пациента, для которого создаётся счёт */
+            patient_info: components["schemas"]["PaymentInvoicePatientReference"];
+        };
+        /** PaymentInvoicePatientReference */
+        PaymentInvoicePatientReference: {
             /**
-             * Patient Info
-             * @description Информация о пациенте
+             * Patient Id
+             * @description ID существующего активного пациента
              */
-            patient_info?: {
-                [key: string]: unknown;
-            } | null;
+            patient_id: number;
         };
         /** PaymentInvoiceResponse */
         PaymentInvoiceResponse: {

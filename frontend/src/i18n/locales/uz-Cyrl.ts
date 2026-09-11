@@ -5815,6 +5815,8 @@ const uzCyrl = {
     pay_mgr_close_aria: 'Закрыть окно оплаты',
     pay_mgr_close_title: 'Закрыть (Esc)',
     pay_mgr_new_payment: 'Новая оплата',
+    pay_mgr_patient_required: 'Янги ҳисоб учун беморни танланг',
+    pay_mgr_patient_required_hint: 'Янги ҳисоб бемор ташрифидан яратилади. Бу ерда аввал чиқарилган ҳисобларни тўлаш мумкин.',
     pay_mgr_amount_label: 'Сумма оплаты (сум)',
     pay_mgr_amount_aria: 'Сумма оплаты',
     pay_mgr_amount_placeholder: 'Введите сумму',

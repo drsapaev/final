@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api import deps
@@ -116,6 +116,15 @@ def _ensure_payment_read_access(db: Session, payment_id: int, current_user) -> N
     _ensure_visit_payment_access(db, payment.visit_id, current_user)
 
 
+class PaymentInvoicePatientReference(BaseModel):
+    patient_id: int = Field(
+        ...,
+        gt=0,
+        validation_alias=AliasChoices("patient_id", "id"),
+        description="ID существующего активного пациента",
+    )
+
+
 class PaymentInvoiceCreateRequest(BaseModel):
     amount: float = Field(..., gt=0, description="Сумма к оплате")
     currency: str = Field(default="UZS", description="Валюта")
@@ -123,8 +132,8 @@ class PaymentInvoiceCreateRequest(BaseModel):
         ..., pattern="^(click|payme)$", description="Платежный провайдер"
     )
     description: str | None = Field(None, description="Описание платежа")
-    patient_info: dict[str, Any] | None = Field(
-        None, description="Информация о пациенте"
+    patient_info: PaymentInvoicePatientReference = Field(
+        ..., description="Ссылка на пациента, для которого создаётся счёт"
     )
 
 
@@ -496,13 +505,13 @@ async def create_payment_invoice(
     try:
         return PaymentInvoiceResponse(
             **service.create_invoice(
-            amount=request.amount,
-            currency=request.currency,
-            provider=request.provider,
-            description=request.description,
-            patient_info=request.patient_info,
-            created_by_id=getattr(current_user, "id", None),
-        )
+                amount=request.amount,
+                currency=request.currency,
+                provider=request.provider,
+                description=request.description,
+                patient_id=request.patient_info.patient_id,
+                created_by_id=getattr(current_user, "id", None),
+            )
         )
     except PaymentInvoiceDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)

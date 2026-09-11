@@ -90807,25 +90807,32 @@
             "description": "Описание платежа"
           },
           "patient_info": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Patient Info",
-            "description": "Информация о пациенте"
+            "$ref": "#/components/schemas/PaymentInvoicePatientReference",
+            "description": "Ссылка на пациента, для которого создаётся счёт"
           }
         },
         "type": "object",
         "required": [
           "amount",
-          "provider"
+          "provider",
+          "patient_info"
         ],
         "title": "PaymentInvoiceCreateRequest"
+      },
+      "PaymentInvoicePatientReference": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id",
+            "description": "ID существующего активного пациента"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id"
+        ],
+        "title": "PaymentInvoicePatientReference"
       },
       "PaymentInvoiceResponse": {
         "properties": {

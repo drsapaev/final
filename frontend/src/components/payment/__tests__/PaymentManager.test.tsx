@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const paymentApiMocks = vi.hoisted(() => ({
@@ -65,7 +65,7 @@ describe('PaymentManager provider capabilities', () => {
     ]);
   });
 
-  it('loads once and disables a legacy invoice whose provider is unavailable', async () => {
+  it('loads once, hides orphan invoice creation, and disables an unavailable legacy invoice', async () => {
     render(<PaymentManager isOpen />);
 
     await waitFor(() => {
@@ -80,13 +80,48 @@ describe('PaymentManager provider capabilities', () => {
     expect(paymentApiMocks.getPaymentProviders).toHaveBeenCalledTimes(1);
     expect(paymentApiMocks.getPendingInvoices).toHaveBeenCalledTimes(1);
 
-    const providerOptions = screen.getAllByRole('radio');
-    expect(providerOptions).toHaveLength(1);
-    expect((providerOptions[0] as HTMLInputElement).value).toBe('click');
-    expect(providerOptions[0]).toBeChecked();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'payment.pay_mgr_create_btn' })).not.toBeInTheDocument();
+    expect(screen.getByText('payment.pay_mgr_patient_required_hint')).toBeInTheDocument();
     expect(screen.getByText('payment.pay_mgr_provider_unavailable')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'payment.pay_mgr_provider_unavailable' })
     ).toBeDisabled();
+  });
+
+  it('creates an invoice with only the canonical patient reference', async () => {
+    paymentApiMocks.getPendingInvoices.mockResolvedValue([]);
+    paymentApiMocks.createPaymentInvoice.mockResolvedValue({
+      invoice_id: 73,
+      amount: 50000,
+      currency: 'UZS',
+      provider: 'click',
+      status: 'pending',
+    });
+
+    render(
+      <PaymentManager
+        isOpen
+        patientInfo={{ id: 17, fio: 'SYNTHETIC Patient', phone: 'SYNTHETIC-PHONE' }}
+      />
+    );
+
+    const providerOption = await screen.findByRole('radio');
+    expect(providerOption).toBeChecked();
+
+    fireEvent.change(screen.getByLabelText('payment.pay_mgr_amount_aria'), {
+      target: { value: '50000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'payment.pay_mgr_create_btn' }));
+
+    await waitFor(() => {
+      expect(paymentApiMocks.createPaymentInvoice).toHaveBeenCalledWith({
+        amount: 50000,
+        currency: 'UZS',
+        provider: 'click',
+        description: 'payment.pay_mgr_description_with_patient',
+        patient_info: { patient_id: 17 },
+      });
+    });
   });
 });

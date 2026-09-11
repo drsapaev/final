@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -29,6 +30,25 @@ def test_patient_facade_adapter_bridge_reads_birth_date(monkeypatch) -> None:
     assert summary is not None
     assert summary.full_name == "Facade Patient"
     assert summary.birth_date == date(1988, 7, 7)
+
+
+def test_patient_facade_adapter_bridge_checks_active_patient(
+    monkeypatch,
+    caplog,
+) -> None:
+    monkeypatch.setattr(
+        "app.crud.patient.get",
+        lambda db, id: SimpleNamespace(id=id) if id == 11 else None,
+    )
+
+    facade = PatientContextFacade(PatientServiceContractAdapter(db=Mock()))
+    caplog.set_level(logging.INFO)
+
+    assert facade.active_patient_exists(patient_id=11, correlation_id="corr-safe")
+    assert not facade.active_patient_exists(patient_id=12, correlation_id="corr-safe")
+    assert "patient_id" not in caplog.text
+    assert "=11" not in caplog.text
+    assert "=12" not in caplog.text
 
 
 def test_emr_facade_adapter_bridge_indexes_phrases(monkeypatch) -> None:

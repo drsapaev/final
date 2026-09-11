@@ -5805,6 +5805,8 @@ const uzLatn = {
     pay_mgr_close_aria: 'Toʻlov oynasini yopish',
     pay_mgr_close_title: 'Yopish (Esc)',
     pay_mgr_new_payment: 'Yangi toʻlov',
+    pay_mgr_patient_required: 'Yangi hisob uchun bemorni tanlang',
+    pay_mgr_patient_required_hint: 'Yangi hisob bemor tashrifidan yaratiladi. Bu yerda avval chiqarilgan hisoblarni toʻlash mumkin.',
     pay_mgr_amount_label: 'Toʻlov summasi (soʻm)',
     pay_mgr_amount_aria: 'Toʻlov summasi',
     pay_mgr_amount_placeholder: 'Summani kiriting',

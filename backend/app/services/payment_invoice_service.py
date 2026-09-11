@@ -10,6 +10,10 @@ from typing import Any
 from app.models.enums import PaymentStatus
 from app.models.payment_invoice import PaymentInvoice
 from app.repositories.payment_invoice_repository import PaymentInvoiceRepository
+from app.services.context_facades.patient_facade import (
+    PatientContextFacade,
+    PatientServiceContractAdapter,
+)
 from app.services.notifications import notification_sender_service
 
 logger = logging.getLogger(__name__)
@@ -26,6 +30,9 @@ class PaymentInvoiceService:
 
     def __init__(self, db):  # type: ignore[no-untyped-def]
         self.repository = PaymentInvoiceRepository(db)
+        self.patient_facade = PatientContextFacade(
+            PatientServiceContractAdapter(db)
+        )
 
     def create_invoice(
         self,
@@ -34,12 +41,17 @@ class PaymentInvoiceService:
         currency: str,
         provider: str,
         description: str | None,
-        patient_info: dict[str, Any] | None,
+        patient_id: int,
         created_by_id: int | None,
     ) -> dict[str, Any]:
         try:
-            patient_id = self._resolve_patient_id(patient_info)
-            provider_data = dict(patient_info or {})
+            patient_id = self._validate_patient_id(patient_id)
+            if not self.patient_facade.active_patient_exists(patient_id):
+                raise PaymentInvoiceDomainError(
+                    status_code=404, detail="Пациент не найден"
+                )
+
+            provider_data: dict[str, Any] = {}
             if created_by_id is not None:
                 provider_data["created_by_id"] = created_by_id
 
@@ -79,21 +91,16 @@ class PaymentInvoiceService:
             )
 
     @staticmethod
-    def _resolve_patient_id(patient_info: dict[str, Any] | None) -> int:
-        if not patient_info:
-            return 0
-
-        for key in ("patient_id", "id"):
-            value = patient_info.get(key)
-            if value is None:
-                continue
-            try:
-                return int(value)
-            except (TypeError, ValueError):
-                raise PaymentInvoiceDomainError(
-                    status_code=400, detail=f"Некорректный patient_id: {value}"
-                )
-        return 0
+    def _validate_patient_id(patient_id: int) -> int:
+        if (
+            isinstance(patient_id, bool)
+            or not isinstance(patient_id, int)
+            or patient_id <= 0
+        ):
+            raise PaymentInvoiceDomainError(
+                status_code=400, detail="Некорректный patient_id"
+            )
+        return patient_id
 
     def _notify_unpaid_invoice_created(self, invoice: PaymentInvoice) -> None:
         patient_id = getattr(invoice, "patient_id", None)

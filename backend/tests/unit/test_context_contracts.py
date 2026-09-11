@@ -62,6 +62,20 @@ def test_patient_service_contract_adapter_maps_patient_summary(
     assert summary.birth_date == date(1990, 5, 12)
 
 
+def test_patient_service_contract_adapter_checks_active_patient(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.crud.patient.get",
+        lambda db, id: SimpleNamespace(id=id) if id == 10 else None,
+    )
+
+    adapter = PatientServiceContractAdapter(db=Mock())
+
+    assert adapter.active_patient_exists(patient_id=10) is True
+    assert adapter.active_patient_exists(patient_id=11) is False
+
+
 def test_iam_service_contract_adapter_permission_matrix() -> None:
     actor = SimpleNamespace(id=42, role="Doctor")
     adapter = IamServiceContractAdapter(actor=actor)

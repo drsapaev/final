@@ -13,6 +13,8 @@ import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface PatientInfo {
+  id?: number | string;
+  patient_id?: number | string;
   fio?: string;
   phone?: string;
   [key: string]: unknown;
@@ -33,6 +35,12 @@ interface PaymentManagerProps {
 
 const getInvoiceId = (invoice: Invoice | null | undefined): string | number | null =>
   (invoice?.invoice_id as string | number | undefined) ?? invoice?.id ?? null;
+
+const getPatientId = (patientInfo: PatientInfo | null): number | null => {
+  const value = patientInfo?.patient_id ?? patientInfo?.id;
+  const patientId = Number(value);
+  return Number.isInteger(patientId) && patientId > 0 ? patientId : null;
+};
 
 const getProviderLabel = (provider: PaymentProviderInfoDto | string): string => {
   const code = typeof provider === 'string' ? provider : provider.code;
@@ -88,6 +96,7 @@ const PaymentManager = ({
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [createdInvoiceId, setCreatedInvoiceId] = useState<string | number | null>(invoiceId);
+  const patientId = getPatientId(patientInfo);
 
   // Состояние диалогов оплаты
   const [showClickPayment, setShowClickPayment] = useState(false);
@@ -184,6 +193,11 @@ const PaymentManager = ({
   // - Заменён raw fetch() на createPaymentInvoice() из api/payments.
   // - Добавлена NaN-валидация через isValidPaymentAmount.
   const handleCreateInvoice = async () => {
+    if (patientId === null) {
+      toast.error(t('payment.pay_mgr_patient_required'));
+      return;
+    }
+
     // UX Audit Stage 3 (Payment issue 8.2):
     // Раньше было `if (!paymentAmount || paymentAmount <= 0)` — пропускало NaN.
     // Теперь используем isValidPaymentAmount с проверкой Number.isFinite.
@@ -202,7 +216,7 @@ const PaymentManager = ({
         description: patientInfo?.fio
           ? t('payment.pay_mgr_description_with_patient', { patient: patientInfo.fio })
           : t('payment.pay_mgr_description'),
-        patient_info: patientInfo,
+        patient_info: { patient_id: patientId },
       });
       setCreatedInvoiceId(result.invoice_id as string | number);
 
@@ -316,8 +330,11 @@ const PaymentManager = ({
             </button>
           </div>
 
-          <div className="payment-manager-content">
+          <div
+            className={`payment-manager-content${patientId === null ? ' payment-manager-content--settlement-only' : ''}`}
+          >
             {/* Создание новой оплаты */}
+            {patientId !== null && (
             <div className="payment-section">
               <h3>
                 <DollarSign size={20} aria-hidden="true" />
@@ -397,6 +414,7 @@ const PaymentManager = ({
                 </button>
               </div>
             </div>
+            )}
 
             {/* Список неоплаченных счетов */}
             <div className="invoices-section">
@@ -404,6 +422,12 @@ const PaymentManager = ({
                 <Receipt size={20} aria-hidden="true" />
                 {t('payment.pay_mgr_unpaid_invoices')}
               </h3>
+
+              {patientId === null && (
+                <div className="payment-context-note" role="note">
+                  {t('payment.pay_mgr_patient_required_hint')}
+                </div>
+              )}
 
               {loading ? (
                 <div className="loading-state">
