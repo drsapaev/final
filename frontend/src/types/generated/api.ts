@@ -1397,7 +1397,8 @@ export type paths = {
         /**
          * Карточка визита (мобильный алиас)
          * @description Мобильный контракт (Android-клиент): GET /api/v1/visits/{visit_id}.
-         *     Делегирует каноническому обработчику — ответ идентичен байт-в-байт.
+         *     Делегирует каноническому обработчику (включая PHI-аудит) — ответ
+         *     идентичен байт-в-байт.
          */
         get: operations["get_visit_mobile_alias_api_v1_visits__visit_id__get"];
         put?: never;

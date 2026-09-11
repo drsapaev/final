@@ -146,6 +146,31 @@ def test_visit_confirmation_info_route_is_published() -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_visit_card_read_writes_patient_access_audit(
+    client, db, test_visit, registrar_token
+) -> None:
+    """AGENTS.md threat model: 'Audit log on every patient read' — the mobile
+    alias delegates to the canonical handler, so the shared audit fires once
+    per request on both routes."""
+    from app.models.patient_access_audit import PatientAccessAuditLog
+
+    headers = {"Authorization": f"Bearer {registrar_token}"}
+    response = client.get(f"/api/v1/visits/{test_visit.id}", headers=headers)
+    assert response.status_code == 200
+
+    rows = (
+        db.query(PatientAccessAuditLog)
+        .filter(
+            PatientAccessAuditLog.subject_patient_id == test_visit.patient_id,
+            PatientAccessAuditLog.resource_type == "visit",
+            PatientAccessAuditLog.resource_id == str(test_visit.id),
+            PatientAccessAuditLog.action == "view",
+        )
+        .all()
+    )
+    assert rows, "patient-read audit trail must be written for the visit card"
+
+
 def test_visits_detail_alias_exposes_service_id(
     client, db, test_visit, registrar_token
 ) -> None:
@@ -347,12 +372,13 @@ def test_mobile_self_test_direct_link_beats_newer_patient_link(
     from app.models.patient import Patient
     from app.models.telegram_config import TelegramUser
 
+    # AGENTS.md Synthetic data policy: SYNTHETIC- marker + DEV-DEMO phone
+    # instead of a realistic name+phone pair (codex round-3 P1).
     patient = Patient(
-        first_name="П",
-        last_name="Тестовый",
-        phone="+998900000099",
+        last_name="SYNTHETIC-PR4-Precedence",
+        first_name="SYNTHETIC-Test",
+        phone="DEV-DEMO-PR4-1",
         birth_date=date(1990, 1, 1),
-        address="Тестовый адрес",
         user_id=patient_user.id,
     )
     db.add(patient)

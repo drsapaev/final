@@ -7,13 +7,14 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import MetaData, Table, or_, select, text, update
+from sqlalchemy import Table, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, is_doctor_role_spelling
 from app.models.clinic import Doctor
 from app.models.visit import Visit
+from app.services.patient_access_audit import log_patient_access
 from app.services.visit_state_checks import (
     ACCEPTED_VISIT_STATUSES,
     force_reopen_target_allowed,
@@ -298,6 +299,7 @@ def create_visit(
 )
 def get_visit(
     visit_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(*VISIT_READ_ROLES)),
 ):
@@ -307,6 +309,22 @@ def get_visit(
     _ensure_visit_doctor_access(db, visit, current_user)
 
     payload = VisitsApiService(db).get_visit(visit_id=visit_id)
+
+    # Threat model (AGENTS.md "Threat model"): "Audit log on every patient
+    # read" — the card carries patient name/phone/birth year/address, so the
+    # response is a per-patient PHI read by a staff actor. The mobile alias
+    # delegates here, so both routes share one attributable trail.
+    log_patient_access(
+        db,
+        actor_user=current_user,
+        subject_patient_id=visit.patient_id,
+        resource_type="visit",
+        resource_id=str(visit_id),
+        action="view",
+        request=request,
+        extra_data={"operation": "visit_card_view"},
+    )
+
     return VisitWithServices(
         visit=VisitOut(**payload["visit"]),
         services=[VisitServiceOut(**item) for item in payload["services"]],
@@ -320,12 +338,16 @@ def get_visit(
 )
 def get_visit_mobile_alias(
     visit_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(*VISIT_READ_ROLES)),
 ):
     """Мобильный контракт (Android-клиент): GET /api/v1/visits/{visit_id}.
-    Делегирует каноническому обработчику — ответ идентичен байт-в-байт."""
-    return get_visit(visit_id=visit_id, db=db, current_user=current_user)
+    Делегирует каноническому обработчику (включая PHI-аудит) — ответ
+    идентичен байт-в-байт."""
+    return get_visit(
+        visit_id=visit_id, request=request, db=db, current_user=current_user
+    )
 
 
 @router.post(

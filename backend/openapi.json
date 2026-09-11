@@ -4119,7 +4119,7 @@
           "visits-mobile-alias"
         ],
         "summary": "Карточка визита (мобильный алиас)",
-        "description": "Мобильный контракт (Android-клиент): GET /api/v1/visits/{visit_id}.\nДелегирует каноническому обработчику — ответ идентичен байт-в-байт.",
+        "description": "Мобильный контракт (Android-клиент): GET /api/v1/visits/{visit_id}.\nДелегирует каноническому обработчику (включая PHI-аудит) — ответ\nидентичен байт-в-байт.",
         "operationId": "get_visit_mobile_alias_api_v1_visits__visit_id__get",
         "security": [
           {
