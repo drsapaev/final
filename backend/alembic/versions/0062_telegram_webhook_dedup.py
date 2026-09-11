@@ -59,6 +59,11 @@ def upgrade() -> None:
         ["update_id"],
         unique=True,
     )
+    # RLS parity with the 0046/0050 sweeps — ops/scripts/check_public_rls.py
+    # (CI backend-tests job, right after `alembic upgrade head`) fails the
+    # build on any public table with relrowsecurity = false. The table holds
+    # no PII (only Telegram update_ids), but the guardrail is table-wide.
+    op.execute("ALTER TABLE public.telegram_webhook_dedup ENABLE ROW LEVEL SECURITY")
 
 
 def downgrade() -> None:
