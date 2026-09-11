@@ -742,10 +742,10 @@ async def telegram_webhook(
         bot_service = await _ensure_bot_service_fresh(db)
 
         # PR-3: claim the update_id before dispatching to any handler.
-        # Claims are scoped to a stable, non-secret per-credential identity
-        # (codex round 20): Telegram update_id sequences are per-bot, and
-        # both ingress paths resolve the SAME SSOT credential, so an
-        # old-bot row can never suppress a replacement bot's update.
+        # Claims are scoped to the STABLE per-bot identity (getMe bot id,
+        # codex round 22 — unchanged across same-bot token rotations): a
+        # replacement bot lands in a different key namespace and can never
+        # collide with the previous bot's retained rows.
         # DUPLICATE → ACK 200 without re-running handlers, so Telegram
         # stops retrying a delivery that was already processed.
         # IN_FLIGHT → 503: a live handler owns the update — acknowledging
@@ -753,7 +753,7 @@ async def telegram_webhook(
         # (codex round 20); Telegram retries the delivery instead.
         # UNAVAILABLE → fail open and process anyway (dedup must never
         # reduce delivery availability).
-        claimed_bot_identity = telegram_webhook_dedup.ledger_bot_identity(
+        claimed_bot_identity = await telegram_webhook_dedup.resolve_ledger_bot_identity(
             getattr(bot_service, "bot_token", None)
         )
         claim = telegram_webhook_dedup.claim_update(

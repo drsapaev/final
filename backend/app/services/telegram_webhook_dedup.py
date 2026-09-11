@@ -73,23 +73,72 @@ def _utcnow() -> datetime:
 
 
 def ledger_bot_identity(token: str | None) -> str | None:
-    """Stable, NON-SECRET per-credential identity for ledger keys.
+    """Credential-scoped fallback identity (used when getMe is unreachable).
 
-    Telegram update_id sequences are per-bot, so the dedup key must be
-    scoped to the bot identity. Deriving it from the resolved credential
-    keeps the binding deterministic and cheap: the same bot token always
-    yields the same identity (both ingress paths resolve the SAME SSOT
-    credential, so cross-path dedup holds), and a credential change
-    (replacement bot OR rotation) starts a fresh key namespace. A SHA-256
-    prefix is stored — never the token itself.
-
-    Returns None for an unresolvable credential: the claim is then keyed
-    with a NULL identity, which never collides (fail-open — dedup is off
-    for that delivery instead of risking a cross-bot suppression).
+    Deterministic per credential: the same bot token always yields the
+    same identity, so both ingress paths stay cross-consistent even in
+    the degraded mode. NEVER the token itself (one-way hash).
     """
     if not token:
         return None
-    return hashlib.sha256(str(token).encode("utf-8")).hexdigest()[:32]
+    return "cred:" + hashlib.sha256(str(token).encode("utf-8")).hexdigest()[:32]
+
+
+# Resolved identities per credential (per process). Telegram bot ids are
+# STABLE across token rotations — this is what keeps the dedup key
+# unchanged when the same bot's token is rotated (codex round 22) — so
+# the cache is keyed by the raw credential and never expires: the
+# identity of a given token cannot change.
+_IDENTITY_BY_TOKEN: dict[str, str] = {}
+
+
+async def _fetch_bot_id(token: str) -> str | None:
+    """Return the bot's numeric id via getMe, or None on any failure."""
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                f"https://api.telegram.org/bot{token}/getMe"
+            )
+            payload = response.json()
+            if payload.get("ok"):
+                return str(payload["result"]["id"])
+    except Exception as exc:  # noqa: BLE001 — identity resolution is best-effort
+        logger.warning(
+            "Telegram getMe identity lookup failed — falling back to the "
+            "credential-scoped identity error_type=%s",
+            type(exc).__name__,
+        )
+    return None
+
+
+async def resolve_ledger_bot_identity(token: str | None) -> str | None:
+    """STABLE per-bot ledger identity for the claim key.
+
+    Telegram update_id sequences belong to a BOT, not to a credential:
+    resolving the bot's numeric id via getMe keeps the key unchanged
+    across same-bot token rotations (codex round 22) while a replacement
+    bot (a different id) naturally gets a different namespace. The id is
+    public and non-secret; the token itself is never stored.
+
+    Resolutions are cached per credential (a token's bot id cannot
+    change). When getMe is unreachable the resolver degrades to the
+    deterministic credential-scoped identity (:func:`ledger_bot_identity`)
+    — cross-path consistent, and still a different namespace per
+    credential, so a replacement bot can never collide. None means no
+    credential at all (the claim lands in the "unknown" namespace).
+    """
+    if not token:
+        return None
+    token_text = str(token)
+    cached = _IDENTITY_BY_TOKEN.get(token_text)
+    if cached is not None:
+        return cached
+    bot_id = await _fetch_bot_id(token_text)
+    identity = f"tgbot:{bot_id}" if bot_id else ledger_bot_identity(token_text)
+    _IDENTITY_BY_TOKEN[token_text] = identity
+    return identity
 
 
 def _log_db_failure(operation: str, update_id: int | None, exc: Exception) -> None:

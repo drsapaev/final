@@ -26,6 +26,27 @@ WEBHOOK_URL = "/api/v1/telegram/webhook"
 SECRET_HEADER = {"x-telegram-bot-api-secret-token": "topsecret"}
 
 
+@pytest.fixture(autouse=True)
+def _deterministic_bot_identity(monkeypatch, request):
+    """Resolve identities deterministically (no real getMe) for every test
+    except the ones exercising the real resolver logic."""
+    if request.node.get_closest_marker("real_identity_resolver"):
+        return
+
+    async def fake_resolve(token):
+        return telegram_webhook_dedup.ledger_bot_identity(token)
+
+    monkeypatch.setattr(
+        telegram_webhook_dedup,
+        "resolve_ledger_bot_identity",
+        fake_resolve,
+    )
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.resolve_ledger_bot_identity",
+        fake_resolve,
+    )
+
+
 class FakeTelegramBotService:
     def __init__(self, active: bool = True):
         self.active = active
@@ -92,19 +113,61 @@ def test_claim_none_update_id_is_claimed_without_row(db_session):
 
 
 def test_ledger_bot_identity_is_stable_and_non_secret():
-    """The identity binds a claim to its credential without leaking it."""
+    """The fallback identity binds a claim to its credential without
+    leaking it."""
     token = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
     identity = telegram_webhook_dedup.ledger_bot_identity(token)
 
     assert identity is not None
     assert identity == telegram_webhook_dedup.ledger_bot_identity(token)
     assert token not in identity
-    assert len(identity) == 32  # sha256 hex prefix, fits String(64)
+    assert len(identity) == len("cred:") + 32  # sha256 hex prefix, String(64)
     # A different credential (replacement bot or rotation) gets a
-    # different identity; no credential at all gets NULL (fail-open).
+    # different identity; no credential at all gets None ("unknown" ns).
     assert identity != telegram_webhook_dedup.ledger_bot_identity("other-token")
     assert telegram_webhook_dedup.ledger_bot_identity(None) is None
     assert telegram_webhook_dedup.ledger_bot_identity("") is None
+
+
+@pytest.mark.real_identity_resolver
+@pytest.mark.asyncio
+async def test_resolve_prefers_stable_getme_bot_id_and_caches():
+    """Codex round 22: the key must survive same-bot token ROTATIONS —
+    resolve the bot's numeric id via getMe (cached per credential)."""
+    token = "123456789:resolve-stable-token"
+    telegram_webhook_dedup._IDENTITY_BY_TOKEN.pop(token, None)
+    calls = []
+
+    async def fake_fetch(t):
+        calls.append(t)
+        return "777000"
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(telegram_webhook_dedup, "_fetch_bot_id", fake_fetch)
+        first = await telegram_webhook_dedup.resolve_ledger_bot_identity(token)
+        second = await telegram_webhook_dedup.resolve_ledger_bot_identity(token)
+
+    assert first == second == "tgbot:777000"
+    assert calls == [token]  # cached — one getMe per credential
+    telegram_webhook_dedup._IDENTITY_BY_TOKEN.pop(token, None)
+
+
+@pytest.mark.real_identity_resolver
+@pytest.mark.asyncio
+async def test_resolve_falls_back_to_credential_hash_when_getme_fails():
+    """getMe unreachable → the deterministic credential-scoped identity
+    keeps both ingress paths cross-consistent (degraded mode)."""
+    token = "123456789:resolve-fallback-token"
+    telegram_webhook_dedup._IDENTITY_BY_TOKEN.pop(token, None)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            telegram_webhook_dedup, "_fetch_bot_id", AsyncMock(return_value=None)
+        )
+        identity = await telegram_webhook_dedup.resolve_ledger_bot_identity(token)
+
+    assert identity == telegram_webhook_dedup.ledger_bot_identity(token)
+    telegram_webhook_dedup._IDENTITY_BY_TOKEN.pop(token, None)
 
 
 def test_claims_of_different_bots_do_not_collide(db_session):
@@ -683,6 +746,153 @@ async def test_worker_failure_releases_claim(worker, db_session, monkeypatch):
 
 
 # ================ worker: credential-change ledger reset ================
+
+
+@pytest.mark.asyncio
+async def test_worker_same_bot_rotation_keeps_ledger(worker, db_session, monkeypatch):
+    """Codex round 22 (P2): the identity is the STABLE per-bot id — a
+    same-bot token rotation must NOT wipe the ledger, so an update that
+    was processed just before the rotation but not yet confirmed is
+    still deduplicated after it."""
+    identity = "tgbot:777000"
+    resolutions = {
+        "123456789:token-a": identity,
+        "123456789:token-b": identity,  # same bot, rotated token
+    }
+
+    async def fake_resolve(t):
+        return resolutions[t]
+
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.resolve_ledger_bot_identity",
+        fake_resolve,
+    )
+    telegram_webhook_dedup.claim_update(db_session, 850, identity)
+    telegram_webhook_dedup.mark_processed(db_session, 850, identity)
+
+    worker.once = False
+    polls = []
+
+    async def fake_load():
+        # initial: token-a; cycle-top: rotated to token-b; stay there.
+        return "123456789:token-a" if not polls else "123456789:token-b"
+
+    def fake_get_updates(session, token, offset):
+        polls.append((token, offset))
+        if len(polls) == 1:
+            return [{"update_id": 851}]
+        worker.request_stop()
+        return []
+
+    monkeypatch.setattr(worker, "_load_bot_token", fake_load)
+    monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
+
+    exit_code = await worker.run()
+
+    assert exit_code == 0
+    # The rotation reset the offset (superseded credential)...
+    assert polls[1] == ("123456789:token-b", None)
+    # ...but the ledger SURVIVED: update 851 (a fresh update) was claimed
+    # and processed under the SAME identity namespace.
+    db_session.expire_all()
+    (row,) = _dedup_rows(db_session, 850)
+    assert row.status == "processed"
+
+
+@pytest.mark.asyncio
+async def test_worker_cycle_top_identity_change_clears_ledger(
+    worker, db_session, monkeypatch
+):
+    """The cycle-top swap resets the offset and clears the ledger ONLY
+    when the resolved BOT IDENTITY changed (round 22)."""
+    identity_a, identity_b = "tgbot:111", "tgbot:222"
+    resolutions = {
+        "123456789:token-a": identity_a,
+        "123456789:token-b": identity_b,
+    }
+
+    async def fake_resolve(t):
+        return resolutions[t]
+
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.resolve_ledger_bot_identity",
+        fake_resolve,
+    )
+    telegram_webhook_dedup.claim_update(db_session, 801, identity_a)
+    telegram_webhook_dedup.mark_processed(db_session, 801, identity_a)
+    tokens = iter(
+        ["123456789:token-a", "123456789:token-b", "123456789:token-b"]
+    )
+    polls = []
+
+    async def fake_load():
+        return next(tokens)
+
+    def fake_get_updates(session, token, offset):
+        polls.append((token, offset))
+        return []
+
+    monkeypatch.setattr(worker, "_load_bot_token", fake_load)
+    monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
+
+    exit_code = await worker.run()
+
+    assert exit_code == 0
+    # The offset was reset — the replacement bot is polled from scratch.
+    assert polls == [("123456789:token-b", None)]
+    db_session.expire_all()
+    # The previous bot's retained rows do not suppress the new sequence.
+    assert db_session.query(TelegramWebhookDedup).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_worker_in_flight_update_is_left_unconfirmed(
+    worker, db_session, monkeypatch
+):
+    """Codex round 22 (P1): an IN_FLIGHT update must NOT be confirmed —
+    advancing the offset past it would ACK a crashed worker's orphaned
+    claim before the stale-reclaim path can run. The worker keeps the
+    offset and stops consuming the batch."""
+    identity = "tgbot:777000"
+    resolutions = {"123456789:token-a": identity}
+
+    async def fake_resolve(t):
+        return resolutions[t]
+
+    monkeypatch.setattr(
+        "app.scripts.telegram_polling_worker.resolve_ledger_bot_identity",
+        fake_resolve,
+    )
+    # An orphaned claim from a crashed previous instance: fresh
+    # 'processing' row → IN_FLIGHT for the whole stale window.
+    telegram_webhook_dedup.claim_update(db_session, 901, identity)
+
+    worker.once = False
+    polls = []
+
+    async def fake_load():
+        return "123456789:token-a"
+
+    def fake_get_updates(session, token, offset):
+        polls.append((token, offset))
+        if len(polls) == 1:
+            return [{"update_id": 901}]
+        worker.request_stop()
+        return []
+
+    monkeypatch.setattr(worker, "_load_bot_token", fake_load)
+    monkeypatch.setattr(worker, "_get_updates", fake_get_updates)
+
+    exit_code = await worker.run()
+
+    assert exit_code == 0
+    # The second poll still uses the OLD offset: update 901 was NOT
+    # confirmed, so Telegram keeps redelivering it until the orphaned
+    # claim is reclaimed (stale) or released.
+    assert polls == [("123456789:token-a", None), ("123456789:token-a", None)]
+    db_session.expire_all()
+    (row,) = _dedup_rows(db_session, 901)
+    assert row.status == "processing"  # untouched — the reclaim path stays available
 
 
 @pytest.mark.asyncio
