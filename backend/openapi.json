@@ -44611,8 +44611,15 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "format": "date",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "description": "День для статистики",
               "title": "Day"
             },
