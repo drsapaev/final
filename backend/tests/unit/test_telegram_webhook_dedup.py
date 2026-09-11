@@ -812,6 +812,38 @@ def test_webhook_claim_identity_binds_to_the_validated_credential(
     )
 
 
+def test_webhook_undecryptable_validated_credential_is_deferred(
+    client, db_session, monkeypatch
+):
+    """Codex round 32 (P2): a config token that FAILS to decrypt (key
+    misconfiguration) must not silently fall back to the service's env
+    token — the delivery is deferred (503) instead of being claimed
+    under another bot's identity."""
+    db_session.add(
+        TelegramConfig(
+            # Fernet-shaped ciphertext that cannot decrypt without a key.
+            bot_token="gAAAAAnot-a-real-ciphertext",
+            webhook_secret="topsecret",
+            active=True,
+        )
+    )
+    db_session.commit()
+    fake = FakeTelegramBotService()
+    fake.bot_token = "123456789:env-fallback-token"
+    monkeypatch.setattr(
+        telegram_webhook, "get_telegram_bot_service", AsyncMock(return_value=fake)
+    )
+
+    response = client.post(
+        WEBHOOK_URL, json={"update_id": 511}, headers=SECRET_HEADER
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"status": "identity_unavailable"}
+    fake.process_webhook_update.assert_not_awaited()
+    assert db_session.query(TelegramWebhookDedup).count() == 0
+
+
 def test_webhook_update_schema_keeps_update_id_optional():
     """Contract pin: TelegramWebhookUpdateRequest.update_id feeds dedup."""
     assert TelegramWebhookUpdateRequest.model_fields["update_id"].default is None

@@ -762,11 +762,27 @@ async def telegram_webhook(
         # (codex round 20); Telegram retries the delivery instead.
         # UNAVAILABLE → fail open and process anyway (dedup must never
         # reduce delivery availability).
-        snapshot_token = (
-            getattr(validated_config, "decrypted_bot_token", None)
-            if validated_config is not None
-            else None
-        )
+        snapshot_token = None
+        if validated_config is not None and getattr(
+            validated_config, "bot_token", None
+        ):
+            # A stored credential EXISTS (codex round 32): it must
+            # decrypt, or the delivery is deferred — silently falling
+            # back to the service's (possibly env) token would claim an
+            # update authenticated by THIS secret under ANOTHER bot's
+            # identity.
+            snapshot_token = getattr(
+                validated_config, "decrypted_bot_token", None
+            )
+            if not snapshot_token:
+                logger.warning(
+                    "Telegram webhook validated credential failed to "
+                    "decrypt — deferring the delivery"
+                )
+                return JSONResponse(
+                    status_code=503,
+                    content={"status": "identity_unavailable"},
+                )
         # A config row WITHOUT a stored credential means the token comes
         # from the process-static env fallback — it cannot change
         # mid-process, so falling back to the service's token there is
