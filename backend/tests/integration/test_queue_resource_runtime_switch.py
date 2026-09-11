@@ -6247,3 +6247,69 @@ def test_resource_start_and_complete_share_one_visit(db_session: Session) -> Non
             synchronize_session=False
         )
         db_session.commit()
+
+
+# ===================== TT. Codex round-36 pins =====================
+
+
+def test_resource_visit_dates_follow_the_queue_day(db_session: Session) -> None:
+    """Codex round-36 P2: an unlinked resource entry's Visit is looked
+    up and created on the ENTRY'S QUEUE day (the clinic-local day the
+    resource queue is stamped with), not host date.today() — in the
+    19:00-24:00Z window the host-day lookup missed the existing
+    clinic-day lab/ECG visit and created the replacement under the
+    previous service date."""
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        call_patient,
+        start_patient_visit,
+    )
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+
+    patient = Patient(
+        last_name="Ресурсный4",
+        first_name="Пациент",
+        phone="+998901234537",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        # the clinic-local day the resource queue is stamped with —
+        # guaranteed to differ from the host date
+        queue_day = date.today() + timedelta(days=1)
+        assert queue_day != date.today()
+
+        _make_resource(db_session, code="lab", queue_tag="lab")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=queue_day, specialist_id=None, queue_tag="lab"
+        )
+        entry = _make_waiting_entry(db_session, queue, number=1)
+        entry.patient_id = patient.id
+        db_session.commit()
+
+        admin = _make_user(db_session, username="adm_tt1", role="Admin")
+        assert call_patient(entry_id=entry.id, db=db_session, current_user=admin)[
+            "success"
+        ]
+        assert start_patient_visit(
+            entry_id=entry.id, db=db_session, current_user=admin
+        )["success"]
+
+        db_session.refresh(entry)
+        assert entry.visit_id is not None
+        visit = db_session.query(Visit).filter(Visit.id == entry.visit_id).first()
+        assert visit is not None
+        # the Visit follows the ENTRY'S QUEUE day, not the host clock
+        assert visit.visit_date == queue_day
+        assert visit.department == "lab"
+    finally:
+        _durable_cleanup(db_session, "adm_tt1")
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()

@@ -265,12 +265,19 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             return visit
 
     if doctor is None:
-        # ресурсная поверхность: пациент + сегодня + открыт + департамент
+        # Codex round-36 P2: день визита — день ОЧЕРЕДИ записи
+        # (queue_entry.queue.day, клиник-локальный), не host
+        # date.today(): ресурс-очереди создаются на КЛИНИК-локальном
+        # дне, и в окне 19:00-24:00Z host-день искал/создавал визит со
+        # «вчерашней» датой — визит выпадал из клиник-дневных просмотров
+        # и записывался под неверным днём обслуживания.
+        queue_day = getattr(queue_entry.queue, "day", None) or date.today()
+        # ресурсная поверхность: пациент + день очереди + открыт + департамент
         visit = (
             db.query(Visit)
             .filter(
                 Visit.patient_id == queue_entry.patient_id,
-                Visit.visit_date == date.today(),
+                Visit.visit_date == queue_day,
                 Visit.status == "open",
                 Visit.department == department,
             )
@@ -281,7 +288,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 db=db,
                 patient_id=queue_entry.patient_id,
                 doctor_id=None,
-                visit_date=date.today(),
+                visit_date=queue_day,
                 visit_time=datetime.now().strftime("%H:%M"),
                 department=department,
             )
