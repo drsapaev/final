@@ -50,20 +50,23 @@ class PayMeProvider(BasePaymentProvider):
             # Форматируем сумму (в тийинах)
             amount_tiyin = self.format_amount(amount, currency)
 
-            # Параметры для PayMe
-            params = {
-                "m": self.merchant_id,  # merchant_id
-                "ac.order_id": order_id,  # account параметр
-                "a": amount_tiyin,  # amount в тийинах
-                "c": return_url or "",  # callback URL
-                "cr": cancel_url or "",  # cancel/return URL
-                "l": "ru",  # язык интерфейса
-            }
+            # Payme Checkout GET принимает строку параметров, разделённых
+            # точкой с запятой, в виде Base64-сегмента URL. Параметр ``c``
+            # используется Payme и после оплаты, и после отмены; отдельного
+            # callback для отмены в этом протоколе нет.
+            params = [
+                f"m={self.merchant_id}",
+                f"ac.order_id={order_id}",
+                f"a={amount_tiyin}",
+                "l=ru",
+            ]
+            if return_url:
+                params.append(f"c={return_url}")
 
-            # Формируем URL для оплаты
-            payment_url = f"{self.base_url}/"
-            query_params = "&".join([f"{k}={v}" for k, v in params.items()])
-            full_payment_url = f"{payment_url}?{query_params}"
+            encoded_params = base64.b64encode(
+                ";".join(params).encode("utf-8")
+            ).decode("ascii")
+            full_payment_url = f"{self.base_url.rstrip('/')}/{encoded_params}"
 
             self.log_operation(
                 "create_payment",
