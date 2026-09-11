@@ -65515,7 +65515,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description День для статистики */
-                day?: string;
+                day?: string | null;
             };
             header?: never;
             path: {
