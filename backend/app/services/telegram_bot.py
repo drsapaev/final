@@ -23,6 +23,7 @@ from app.crud import (
     user as crud_user,
 )
 from app.models.telegram_config import TelegramUser
+from app.services.telegram_token_store import resolve_patient_bot_token
 
 logger = logging.getLogger(__name__)
 MAX_TELEGRAM_DOCUMENT_BYTES = 20 * 1024 * 1024
@@ -157,14 +158,33 @@ class TelegramBotService:
         """Инициализация бота"""
         try:
             config = crud_telegram.get_telegram_config(db)
-            if config and config.bot_token:
-                self.bot_token = config.decrypted_bot_token  # TG-AUDIT-28 P1: decrypt
-                self.bot_username = config.bot_username
-                self.webhook_url = config.webhook_url
-                self.active = config.active
+            # PR-2: presence + assignment both via decrypted (fail-closed)
+            token_value = config.decrypted_bot_token if config else None
+            if not token_value:
+                # PR-2 (round 5): the polling worker can legitimately run on
+                # the env/.env fallback (empty or undecryptable
+                # telegram_configs row) - the handler must resolve through
+                # the same SSOT chain, otherwise updates are consumed
+                # without replies.
+                token_value = resolve_patient_bot_token(db)
+            if token_value:
+                self.bot_token = token_value
+                self.bot_username = config.bot_username if config else None
+                self.webhook_url = config.webhook_url if config else None
+                self.active = config.active if config else True
                 return True
+            # PR-2 (round 3): never keep a previously resolved credential
+            # across a failed re-initialization - callers such as the
+            # polling worker read bot_service.bot_token directly.
+            self.bot_token = None
+            self.active = False
             return False
         except Exception as e:
+            # PR-2 (round 4): the exception path bypasses the in-try reset —
+            # a transient failure must not leave the previously resolved
+            # credential cached for callers that read bot_token directly.
+            self.bot_token = None
+            self.active = False
             logger.error(f"Ошибка инициализации бота: {e}")
             return False
 

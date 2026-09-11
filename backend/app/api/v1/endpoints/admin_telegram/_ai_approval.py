@@ -78,9 +78,14 @@ async def send_telegram_ai_approval_alert(
     from app.api.v1.endpoints.admin_telegram import (
         get_telegram_bot_service as _get_telegram_bot_service,
     )
+
     bot_service = await _get_telegram_bot_service()
-    if not bool(getattr(bot_service, "active", False)):
-        await bot_service.initialize(db)
+    # PR-2 (round 9): cross-process rotation/revocation visibility.
+    from app.api.v1.endpoints.telegram_webhook._helpers import (
+        _ensure_bot_service_fresh,
+    )
+
+    await _ensure_bot_service_fresh(db, bot_service)
     if not getattr(bot_service, "bot_token", None):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -113,7 +118,9 @@ async def send_telegram_ai_approval_alert(
             "workflow_key": workflow_key,
             "notification_type": workflow["notification_type"],
             "recipient_user_id": request.recipient_user_id,
-            "recipient_role": _normalize_staff_role(getattr(recipient_user, "role", None)),
+            "recipient_role": _normalize_staff_role(
+                getattr(recipient_user, "role", None)
+            ),
             "target_reference_hash": target_reference_hash,
             "safe_metric_keys": message["safe_metric_keys"],
             "telegram_user_id_hash": _staff_runtime_reference_hash(
@@ -215,4 +222,3 @@ def capture_telegram_ai_approval_outcome(
         "autonomous_mutation_allowed": False,
         "domain_mutation": False,
     }
-

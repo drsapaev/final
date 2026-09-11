@@ -22,6 +22,12 @@ from app.api.v1.endpoints.admin_telegram._staff_actions import (  # noqa: F401  
     webhook_info_error_response,
 )
 from app.schemas.notifications import UpdateTelegramSettingsRequest
+from app.services.telegram_token_store import (
+    TokenStoreError,
+    clear_patient_bot_token,
+    resolve_patient_bot_token,
+    store_patient_bot_token,
+)
 
 
 @router.get("/telegram/settings", response_model=dict[str, Any])
@@ -48,6 +54,11 @@ def get_telegram_settings(
         for setting in telegram_settings:
             if setting.key in result:
                 result[setting.key] = setting.value
+
+        # PR-2: the canonical token store is telegram_configs (encrypted at
+        # write); legacy clinic-settings rows still surface via the loop above.
+        if not result["bot_token"] and resolve_patient_bot_token(db):
+            result["bot_token"] = "***скрыт***"
 
         # Скрываем токен бота в ответе
         if result["bot_token"]:
@@ -81,16 +92,60 @@ def update_telegram_settings(
         if bt and isinstance(bt, str) and "***" in bt:
             settings_dict = {k: v for k, v in settings_dict.items() if k != "bot_token"}
 
+        # PR-2: bot_token never lands in clinic_settings plaintext — it is
+        # routed through the SSOT store into telegram_configs (encrypted at
+        # write). Masked placeholders are filtered out above.
+        bot_token_stored = False
+        bot_token_cleared = False
+        if "bot_token" in settings_dict:
+            token_value = settings_dict.pop("bot_token")
+            if isinstance(token_value, str) and token_value.strip():
+                # commit=False: update_settings_batch below commits the
+                # token, its audit event and the remaining settings in ONE
+                # transaction (codex round 2).
+                try:
+                    store_patient_bot_token(
+                        db,
+                        token_value,
+                        actor_user_id=current_user.id,
+                        commit=False,
+                    )
+                except TokenStoreError as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=str(exc),
+                    ) from exc
+                bot_token_stored = True
+            elif isinstance(token_value, str):
+                # PR-2 round 4: an explicitly emptied field revokes the
+                # stored credential (masked placeholders are filtered out
+                # above and never reach this branch).
+                clear_patient_bot_token(db, actor_user_id=current_user.id, commit=False)
+                bot_token_cleared = True
+
         # Обновляем настройки в категории "telegram"
         updated_settings = crud_clinic.update_settings_batch(
             db, "telegram", settings_dict, current_user.id
         )
 
+        # PR-2 (round 5): with TELEGRAM_BOT_TOKEN still configured in the
+        # environment, a cleared database credential does NOT stop the bot —
+        # the resolver keeps serving the environment token. Report that
+        # honestly instead of claiming a full revocation.
+        environment_fallback_active = False
+        if bot_token_cleared:
+            environment_fallback_active = resolve_patient_bot_token(db) is not None
+
         return {
             "success": True,
             "message": "Настройки Telegram обновлены",
             "updated_count": len(updated_settings),
+            "bot_token_stored": bot_token_stored,
+            "bot_token_cleared": bot_token_cleared,
+            "environment_fallback_active": environment_fallback_active,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise_admin_telegram_error(
             "settings-update",
@@ -132,16 +187,21 @@ def test_telegram_bot(
                     },
                     current_user.id,
                 )
-                config_payload = {
-                    "bot_token": bot_token,
-                    "bot_username": bot_data.get("username"),
-                    "bot_name": bot_data.get("first_name"),
-                    "active": True,
-                }
-                if crud_telegram.get_telegram_config(db):
-                    crud_telegram.update_telegram_config(db, config_payload)
-                else:
-                    crud_telegram.create_telegram_config(db, config_payload)
+                # PR-2: bot_token goes through the SSOT store (encrypted at
+                # write); non-secret fields stay on the regular crud path.
+                # commit=False: update_telegram_config below commits the
+                # pending token write together with its own fields.
+                store_patient_bot_token(
+                    db, bot_token, actor_user_id=current_user.id, commit=False
+                )
+                crud_telegram.update_telegram_config(
+                    db,
+                    {
+                        "bot_username": bot_data.get("username"),
+                        "bot_name": bot_data.get("first_name"),
+                        "active": True,
+                    },
+                )
 
                 return {
                     "success": True,
@@ -260,6 +320,7 @@ async def register_staff_bot_commands(
         from app.api.v1.endpoints.admin_telegram import (
             get_telegram_bot_service as _get_telegram_bot_service,
         )
+
         bot_service = await _get_telegram_bot_service()
         ok, error = await bot_service.set_staff_bot_commands(
             staff_bot_token, commands=commands
@@ -329,8 +390,14 @@ def set_telegram_webhook(
                 crud_clinic.update_setting(
                     db, "webhook_url", {"value": selected_webhook_url}, current_user.id
                 )
+                # PR-2: bot_token via the SSOT store (encrypted at write);
+                # webhook fields stay on the regular crud path.
+                # commit=False: the config update/create below commits the
+                # pending token write together with webhook fields.
+                store_patient_bot_token(
+                    db, bot_token, actor_user_id=current_user.id, commit=False
+                )
                 config_payload = {
-                    "bot_token": bot_token,
                     "bot_username": _get_configured_bot_username(db),
                     "webhook_url": selected_webhook_url,
                     "webhook_secret": secret_token,
@@ -634,4 +701,3 @@ def get_telegram_integration_status(
             "Ошибка получения статуса Telegram интеграции",
             e,
         )
-

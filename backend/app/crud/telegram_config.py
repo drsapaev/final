@@ -25,9 +25,23 @@ def get_telegram_config(db: Session) -> TelegramConfig | None:
     return db.query(TelegramConfig).first()
 
 
+def _apply_config_payload(config: TelegramConfig, config_data: dict[str, Any]) -> None:
+    """Apply a config payload; route bot_token through encrypted-at-write."""
+    for field, value in config_data.items():
+        if not hasattr(config, field):
+            continue
+        if field == "bot_token":
+            # PR-2: the column is only ever written encrypted (set_bot_token);
+            # raw setattr would store plaintext and break decrypt-on-read.
+            config.set_bot_token(value)
+        else:
+            setattr(config, field, value)
+
+
 def create_telegram_config(db: Session, config_data: dict[str, Any]) -> TelegramConfig:
     """Создать конфигурацию Telegram"""
-    config = TelegramConfig(**config_data)
+    config = TelegramConfig()
+    _apply_config_payload(config, config_data)
     db.add(config)
     db.commit()
     db.refresh(config)
@@ -42,9 +56,7 @@ def update_telegram_config(
     if not config:
         return None
 
-    for field, value in config_data.items():
-        if hasattr(config, field):
-            setattr(config, field, value)
+    _apply_config_payload(config, config_data)
 
     db.commit()
     db.refresh(config)

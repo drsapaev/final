@@ -15,16 +15,20 @@ import requests
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.telegram_webhook import _handle_clinic_bot_update
-from app.crud import clinic as crud_clinic, telegram_config as crud_telegram
 from app.db.session import SessionLocal
 from app.services.telegram_bot import get_telegram_bot_service
+from app.services.telegram_token_store import resolve_patient_bot_token
 
 LOGGER = logging.getLogger("telegram_polling_worker")
 DEFAULT_POLL_TIMEOUT_SECONDS = 25
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 35
 DEFAULT_RETRY_DELAY_SECONDS = 3
-DEFAULT_LOG_FILE = Path(__file__).resolve().parents[2] / "logs" / "telegram_polling_worker.log"
-DEFAULT_PID_FILE = Path(__file__).resolve().parents[2] / "logs" / "telegram_polling_worker.pid"
+DEFAULT_LOG_FILE = (
+    Path(__file__).resolve().parents[2] / "logs" / "telegram_polling_worker.log"
+)
+DEFAULT_PID_FILE = (
+    Path(__file__).resolve().parents[2] / "logs" / "telegram_polling_worker.pid"
+)
 
 
 class TelegramPollingWorker:
@@ -63,9 +67,53 @@ class TelegramPollingWorker:
 
         offset: int | None = None
         processed_updates = 0
+        # PR-2 (round 11): a deleteWebhook that failed after a token swap is
+        # retried on later cycles — without it Telegram keeps rejecting
+        # getUpdates (409, the stale webhook counts as another poller) and
+        # the worker can never resume.
+        pending_webhook_deletion = False
         LOGGER.info("Telegram polling worker started")
 
         while not self._stop_requested:
+            # PR-2 (round 7): a rotation keeps the old token VALID (200s
+            # forever), so the 401 branch alone never fires — re-resolve the
+            # canonical credential every cycle instead.
+            try:
+                canonical = await self._load_bot_token()
+            except Exception as exc:
+                # PR-2 (round 12): fail closed for this cycle - do NOT
+                # consume updates with an unverifiable credential; Telegram
+                # keeps them pending until the SSOT check succeeds.
+                LOGGER.warning(
+                    "Telegram token re-resolve failed error_type=%s — "
+                    "skipping cycle",
+                    type(exc).__name__,
+                )
+                time.sleep(self.retry_delay)
+                continue
+            else:
+                if not canonical:
+                    LOGGER.error("Telegram bot token was revoked — stopping")
+                    return 2
+                if canonical != token:
+                    LOGGER.info("Telegram bot token changed — reloading")
+                    token = canonical
+                    if not self.keep_webhook:
+                        # Retained as pending: retried on later cycles until
+                        # Telegram actually removes the webhook (codex
+                        # round 11).
+                        pending_webhook_deletion = True
+                    offset = None
+            if pending_webhook_deletion:
+                try:
+                    self._delete_webhook(session, token)
+                    pending_webhook_deletion = False
+                except Exception as exc:
+                    LOGGER.warning(
+                        "Telegram deleteWebhook retry failed error_type=%s",
+                        type(exc).__name__,
+                    )
+
             try:
                 updates = self._get_updates(session, token, offset)
             except requests.HTTPError as exc:
@@ -75,6 +123,34 @@ class TelegramPollingWorker:
                 if status_code == 409:
                     LOGGER.warning(
                         "Telegram polling conflict: another polling worker may be running"
+                    )
+                elif status_code == 401:
+                    # PR-2 (round 6): the credential may have been rotated or
+                    # revoked in the DB after this process started —
+                    # re-resolve through the SSOT chain instead of polling
+                    # with the stale token forever.
+                    try:
+                        refreshed = await self._load_bot_token()
+                    except Exception as exc:
+                        # PR-2 (round 13): a transient resolver failure must
+                        # not terminate run() — recover like the per-cycle
+                        # refresh does.
+                        LOGGER.warning(
+                            "Telegram token re-resolve failed error_type=%s "
+                            "— skipping cycle",
+                            type(exc).__name__,
+                        )
+                        time.sleep(self.retry_delay)
+                        continue
+                    if refreshed and refreshed != token:
+                        LOGGER.info("Telegram bot token rotated — reloading")
+                        token = refreshed
+                        if not self.keep_webhook:
+                            pending_webhook_deletion = True
+                        continue
+                    LOGGER.warning(
+                        "Telegram getUpdates unauthorized error_status=%s",
+                        status_code,
                     )
                 else:
                     LOGGER.warning(
@@ -105,6 +181,45 @@ class TelegramPollingWorker:
                 time.sleep(self.retry_delay)
                 continue
 
+            # PR-2 (round 17): the default 25-second getUpdates long poll
+            # can span a rotation or revocation — the batch returned by the
+            # poll must NOT be dispatched under the stale credential, or the
+            # old (possibly revoked/compromised) bot executes state-changing
+            # handlers one full cycle past the change. Re-resolve BEFORE
+            # dispatching; on any change/failure the batch is dropped
+            # (Telegram keeps unacked updates pending for the next cycle).
+            try:
+                post_poll = await self._load_bot_token()
+            except Exception as exc:
+                LOGGER.warning(
+                    "Telegram token re-resolve after long poll failed "
+                    "error_type=%s — dropping batch, skipping cycle",
+                    type(exc).__name__,
+                )
+                if self.once:
+                    return 1
+                time.sleep(self.retry_delay)
+                continue
+            if post_poll != token:
+                if not post_poll:
+                    LOGGER.error(
+                        "Telegram bot token was revoked during the long poll "
+                        "— stopping"
+                    )
+                    return 2
+                LOGGER.info(
+                    "Telegram bot token changed during the long poll — "
+                    "dropping the batch fetched with the superseded credential"
+                )
+                token = post_poll
+                if not self.keep_webhook:
+                    pending_webhook_deletion = True
+                offset = None
+                if self.once:
+                    return 0
+                time.sleep(self.retry_delay)
+                continue
+
             for update in updates:
                 update_id = update.get("update_id")
                 await self._handle_update(update)
@@ -112,7 +227,10 @@ class TelegramPollingWorker:
                     offset = int(update_id) + 1
 
                 processed_updates += 1
-                if self.max_updates is not None and processed_updates >= self.max_updates:
+                if (
+                    self.max_updates is not None
+                    and processed_updates >= self.max_updates
+                ):
                     LOGGER.info("Telegram polling worker reached max_updates")
                     return 0
 
@@ -131,13 +249,9 @@ class TelegramPollingWorker:
             if bot_service.bot_token:
                 return str(bot_service.bot_token)
 
-            config = crud_telegram.get_telegram_config(db)
-            if config and config.bot_token:
-                return str(config.bot_token)
-
-            token_setting = crud_clinic.get_setting_by_key(db, "bot_token")
-            token = getattr(token_setting, "value", None) if token_setting else None
-            return str(token) if token else None
+            # PR-2: SSOT fallback chain (config decrypted -> legacy settings
+            # -> env) instead of duplicated raw-column reads.
+            return resolve_patient_bot_token(db)
         finally:
             db.close()
 
@@ -188,7 +302,9 @@ class TelegramPollingWorker:
             handled = await _handle_clinic_bot_update(update, db, bot_service)
             if not handled:
                 await bot_service.process_webhook_update(update, db)
-            LOGGER.info("Telegram update handled update_id=%s handled=%s", update_id, handled)
+            LOGGER.info(
+                "Telegram update handled update_id=%s handled=%s", update_id, handled
+            )
         except Exception as exc:
             db.rollback()
             LOGGER.warning(
@@ -296,7 +412,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run the Kosmed Clinic Telegram bot in polling mode."
     )
-    parser.add_argument("--poll-timeout", type=int, default=DEFAULT_POLL_TIMEOUT_SECONDS)
+    parser.add_argument(
+        "--poll-timeout", type=int, default=DEFAULT_POLL_TIMEOUT_SECONDS
+    )
     parser.add_argument(
         "--request-timeout", type=int, default=DEFAULT_REQUEST_TIMEOUT_SECONDS
     )
