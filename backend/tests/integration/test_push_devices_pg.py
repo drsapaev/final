@@ -108,14 +108,20 @@ def _probe_connection(url: str):
         engine.dispose()
 
 
-def _alembic_upgrade(url: str, revision: str) -> None:
+def _alembic_run(url: str, revision: str, *, downgrade: bool = False) -> None:
     from alembic import command
     from alembic.config import Config
 
     alembic_cfg = Config(os.path.join(BACKEND_DIR, "alembic.ini"))
     alembic_cfg.set_main_option("script_location", os.path.join(BACKEND_DIR, "alembic"))
     os.environ["DATABASE_URL"] = url
-    command.upgrade(alembic_cfg, revision)
+    if downgrade:
+        # Relative NEGATIVE revisions ("-1") are a DOWNGRADE-only syntax:
+        # command.upgrade() rejects them ("Relative revision -1 didn't
+        # produce 1 migrations").
+        command.downgrade(alembic_cfg, revision)
+    else:
+        command.upgrade(alembic_cfg, revision)
 
 
 def _probe_connection(url: str):
@@ -127,7 +133,7 @@ def test_push_devices_rls_contract_on_disposable_pg():
     probe_url, probe_name = _make_probe_database()
     try:
         # --- upgrade head: the ONLY schema path (no create_all) ---------
-        _alembic_upgrade(probe_url, "head")
+        _alembic_run(probe_url, "head")
 
         with _probe_connection(probe_url) as conn:
             # relrowsecurity=true — the owner-mandated confirmation
@@ -210,7 +216,7 @@ def test_push_devices_rls_contract_on_disposable_pg():
             conn.rollback()  # aborted txn → clean state
 
         # --- downgrade removes the table, re-upgrade restores RLS -------
-        _alembic_upgrade(probe_url, "-1")
+        _alembic_run(probe_url, "-1", downgrade=True)
         with _probe_connection(probe_url) as conn:
             exists = conn.execute(
                 text(
@@ -220,7 +226,7 @@ def test_push_devices_rls_contract_on_disposable_pg():
             ).scalar()
             assert exists == 0
 
-        _alembic_upgrade(probe_url, "head")
+        _alembic_run(probe_url, "head")
         with _probe_connection(probe_url) as conn:
             relro = conn.execute(
                 text(
