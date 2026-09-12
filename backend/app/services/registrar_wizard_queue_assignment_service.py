@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.visit import Visit
 from app.services.morning_assignment import (
     MorningAssignmentCreateBranchHandoff,
@@ -111,6 +112,19 @@ class RegistrarWizardQueueAssignmentService:
                         visit.id,
                         source,
                     )
+            except QueueOwnerConfigurationError:
+                # QD-2E (RQ-15.b): конфигурационная ошибка владельца —
+                # не per-visit transient-сбой. Тишина (continue) вернула
+                # бы баг-класс QD-0: корзина отвечает success, визит
+                # создан, номера очереди нет. Пробиваем наверх — cart-эндпоинт
+                # откатит транзакцию и вернёт оператору 4xx с причиной (D-08).
+                logger.error(
+                    "QD-2E fail-closed: queue owner configuration error "
+                    "for visit %d (source=%s) — re-raise (D-08)",
+                    visit.id,
+                    source,
+                )
+                raise
             except Exception as exc:
                 logger.warning(
                     "REGISTRATION: Queue assignment failed for visit %d (source=%s): %s",

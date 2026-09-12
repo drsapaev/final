@@ -12,6 +12,11 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today as _clinic_today
+from app.crud.queue_owner_policy import (
+    QueueOwnerConfigurationError,
+    owner_configuration_error,
+    single_active_service_doctor,
+)
 from app.crud.queue_resource_routing import (
     find_active_tag_queue,
     resolve_tag_resource,
@@ -21,7 +26,6 @@ from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
-from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.queue_service import queue_service
 from app.services.service_mapping import get_service_code
@@ -113,38 +117,22 @@ class MorningAssignmentService:
 
         created_count = 0
 
-        # Get default resource doctor for fallback — QD-2C: resolved
-        # LAZILY: registry tags (lab/ecg) never need it, so a
-        # registry-only catalog must not abort when the synthetic is
-        # absent (the QD-2E direction).
-        default_doctor: Doctor | None = None
-        default_doctor_resolved = False
-
-        def _get_default_doctor() -> Doctor | None:
-            nonlocal default_doctor, default_doctor_resolved
-            if default_doctor_resolved:
-                return default_doctor
-            default_doctor_resolved = True
-            default_doctor = (
-                self.db.query(Doctor)
-                .join(User, Doctor.user_id == User.id)
-                .filter(User.username == "general_resource", User.is_active == True)
-                .first()
-            )
-            if not default_doctor:
-                # Fallback to any active doctor
-                default_doctor = self.db.query(Doctor).filter(Doctor.active == True).first()
-            if not default_doctor:
-                logger.warning("No default doctor found for pre-creating queues")
-            return default_doctor
+        # QD-2E (RQ-15.b): fail-closed pre-create. The general_resource
+        # default doctor (and its any-active-doctor fallback) is GONE —
+        # D-08 forbids both. A non-registry tag is pre-created ONLY when
+        # it proves an explicit owner: the single distinct doctor on
+        # the tag's active services. Zero owners (an undecided operator
+        # map surface) or two or more (the PR-26 per-doctor contract)
+        # means NO pre-created queue: the tag is skipped with a loud
+        # error log, and the booking surfaces raise the explicit
+        # configuration error when a patient actually arrives.
 
         for (queue_tag,) in unique_tags:
             try:
                 # QD-2C runtime switch: тег со строкой в queue_resources
                 # (сиды 0059 — lab/ecg) пре-создается на РЕСУРСНОЙ оси:
-                # specialist NULL + queue_resource_id. Теги без строки
-                # реестра (general и др.) идут по старому пути
-                # general_resource-синтетика байт-идентично (до QD-2E).
+                # specialist NULL + queue_resource_id. QD-2E: тегам БЕЗ
+                # строки реестра синтетик больше не назначается (D-08).
                 if resolve_tag_resource(self.db, queue_tag) is not None:
                     if find_active_tag_queue(self.db, target_date, queue_tag) is None:
                         # Codex round-24 P2: изоляция тега в SAVEPOINT — как
@@ -167,7 +155,21 @@ class MorningAssignmentService:
                         )
                     continue
 
-                if _get_default_doctor() is None:
+                # QD-2E (RQ-15.b): единственный явный владелец негегистрового
+                # тега — единственный врач его активных услуг (K01/K11 →
+                # кардиолог после применения operator map). 0 или ≥2 врачей
+                # → тег НЕ пре-создается, громкий лог ошибки (fail-closed).
+                tag_owner_id = single_active_service_doctor(self.db, queue_tag)
+                if tag_owner_id is None:
+                    logger.error(
+                        "QD-2E fail-closed: queue_tag=%s has no explicit owner "
+                        "(no ACTIVE queue_resources row, no single active "
+                        "service doctor) — the general_resource fallback is "
+                        "retired (D-08); the queue is NOT pre-created; assign "
+                        "a doctor, retag to an active resource or disable the "
+                        "service (operator map RQ-15.b)",
+                        queue_tag,
+                    )
                     continue
 
                 # Check if queue already exists for this tag on this day
@@ -194,11 +196,15 @@ class MorningAssignmentService:
                         queue_service.get_or_create_daily_queue(
                             self.db,
                             day=target_date,
-                            specialist_id=default_doctor.id,
+                            specialist_id=tag_owner_id,
                             queue_tag=queue_tag,
                         )
                     created_count += 1
-                    logger.info(f"✅ Pre-created DailyQueue for queue_tag={queue_tag}")
+                    logger.info(
+                        "✅ Pre-created DailyQueue for queue_tag=%s on doctor_id=%s",
+                        queue_tag,
+                        tag_owner_id,
+                    )
 
             except Exception as e:
                 # Codex R3 #3092 (P1): get_or_create_daily_queue no longer
@@ -470,6 +476,22 @@ class MorningAssignmentService:
                 )
                 if assignment:
                     queue_assignments.append(assignment)
+            except QueueOwnerConfigurationError:
+                # QD-2E (RQ-15.b): конфигурационная ошибка владельца —
+                # НЕ transient-сбой визита: тишина здесь возвращает
+                # корневую проблему QD-0 (пациент без номера, никто не
+                # знает почему). Ошибка пробивается наверх — утренняя
+                # сборка падает громко, оператор чинит конфигурацию
+                # (assign_doctor / retag_resource / disable_service)
+                # и перезапускает. Откат здесь не нужен: транзакцию
+                # откатит вызывающая поверхность.
+                logger.error(
+                    "QD-2E fail-closed: queue owner configuration error "
+                    "for queue_tag=%s visit_id=%s — re-raise (D-08)",
+                    queue_tag,
+                    visit.id,
+                )
+                raise
             except Exception as e:
                 logger.error(
                     f"Ошибка присвоения очереди {queue_tag} для визита {visit.id}: {e}",
@@ -559,8 +581,12 @@ class MorningAssignmentService:
         # 0059 — lab/ecg) маршрутизируется на РЕСУРСНУЮ ось без
         # резолва синтетика: get_or_create_daily_queue найдёт/создаст
         # ресурсную очередь (specialist_id для тегов реестра
-        # игнорируется — см. queue_svc/_operations.py). Теги без строки
-        # реестра идут по старому маппингу синтетиков байт-идентично.
+        # игнорируется — см. queue_svc/_operations.py).
+        # QD-2E (RQ-15.b): universal fallback на general_resource для
+        # тегов без реестра УДАЛЁН (D-08) — явные источники владельца
+        # ниже: (1) единственный врач услуг тега в ЭТОМ визите,
+        # (2) переиспользование уже открытой поверхности тега/дня;
+        # иначе — конфигурационная ошибка, не тихий None.
         registry_tag = False
         if not doctor_id:
             if resolve_tag_resource(self.db, queue_tag) is not None:
@@ -570,54 +596,51 @@ class MorningAssignmentService:
                     "queue_tag=%s routes to the queue resource axis (QD-2C)",
                     queue_tag,
                 )
-            else:
-                # Маппинг queue_tag → resource_username
-                resource_mapping = {
-                    "ecg": "ecg_resource",
-                    "lab": "lab_resource",
-                    "stomatology": "stomatology_resource",
-                    "general": "general_resource",
-                    "cardiology_common": "general_resource",  # Используем общий ресурс
-                    "dermatology": "general_resource",  # Используем общий ресурс
-                    "procedures": "general_resource",  # Используем общий ресурс
-                }
-
-                resource_username = resource_mapping.get(
-                    queue_tag, "general_resource"
-                )  # Fallback на general_resource
-
-                # ✅ ИСПРАВЛЕНИЕ: Ищем doctor_id через связь User → Doctor
-                resource_user = (
-                    self.db.query(User)
-                    .filter(User.username == resource_username, User.is_active == True)
-                    .first()
-                )
-
-                if resource_user:
-                    # Находим запись врача по user_id
-                    resource_doctor = (
-                        self.db.query(Doctor)
-                        .filter(Doctor.user_id == resource_user.id)
-                        .first()
-                    )
-
-                    if resource_doctor:
-                        doctor_id = resource_doctor.id  # Используем doctor_id, а не user_id
-                        doctor = resource_doctor
-                        logger.info(
-                            f"Для queue_tag={queue_tag} используется ресурс-врач: {resource_username} (Doctor ID: {doctor_id})"
-                        )
-                    else:
-                        logger.warning(
-                            f"У ресурс-пользователя {resource_username} (User ID: {resource_user.id}) нет записи в таблице doctors"
-                        )
-                else:
-                    logger.warning(
-                        f"Ресурс-врач {resource_username} не найден для queue_tag={queue_tag}"
-                    )
 
         if not doctor_id and not registry_tag:
-            # Last-resort fallback: reuse already opened queue for this tag/day.
+            # QD-2E (RQ-15.b): явный владелец из услуг ЭТОГО визита —
+            # единственный distinct врач среди активных услуг визита с
+            # этим тегом (K01 → кардиолог после применения operator
+            # map). Это метаданные услуги, не догадка по названию (D-08).
+            visit_service_doctor_ids = {
+                int(row[0])
+                for row in (
+                    self.db.query(Service.doctor_id)
+                    .join(VisitService, VisitService.service_id == Service.id)
+                    .filter(
+                        VisitService.visit_id == visit.id,
+                        Service.queue_tag == queue_tag,
+                        Service.doctor_id.isnot(None),
+                    )
+                    .distinct()
+                    .all()
+                )
+                if row[0] is not None
+            }
+            if len(visit_service_doctor_ids) == 1:
+                doctor_id = next(iter(visit_service_doctor_ids))
+                doctor = (
+                    self.db.query(Doctor)
+                    .filter(Doctor.id == doctor_id)
+                    .first()
+                )
+            elif len(visit_service_doctor_ids) > 1:
+                raise owner_configuration_error(
+                    queue_tag=queue_tag,
+                    detail=(
+                        f"visit_id={visit.id} carries multiple explicit "
+                        "service doctors for one tag — the operator must "
+                        "pick one per booking"
+                    ),
+                )
+
+        surface_reuse = None
+        if not doctor_id and not registry_tag:
+            # Surface reuse: already opened queue for this tag/day. Its
+            # owner was resolved explicitly when it was created (a real
+            # doctor, or the resource axis via a registry tag that has
+            # since been deactivated — tag_routes_to_resource in
+            # get_or_create_daily_queue returns that queue either way).
             existing_queue = (
                 self.db.query(DailyQueue)
                 .filter(
@@ -627,13 +650,28 @@ class MorningAssignmentService:
                 )
                 .first()
             )
-            if existing_queue:
-                doctor_id = existing_queue.specialist_id
-            else:
-                logger.warning(
-                    f"Не найден врач для queue_tag={queue_tag}, visit_id={visit.id}"
-                )
-                return None
+            if existing_queue is not None:
+                if existing_queue.specialist_id is not None:
+                    doctor_id = existing_queue.specialist_id
+                    doctor = (
+                        self.db.query(Doctor)
+                        .filter(Doctor.id == doctor_id)
+                        .first()
+                    )
+                elif existing_queue.queue_resource_id is not None:
+                    # resource-owned surface of a deactivated registry
+                    # row — get_or_create returns it below untouched
+                    surface_reuse = existing_queue
+
+        if not doctor_id and not registry_tag and surface_reuse is None:
+            # QD-2E (RQ-15.b): fail-closed. Раньше здесь возвращался
+            # None (тихая запись без номера — корневая причина QD-0) с
+            # general_resource-фолбэком выше; теперь неизвестный
+            # владелец = явная конфигурационная ошибка (D-08).
+            raise owner_configuration_error(
+                queue_tag=queue_tag,
+                detail=f"visit_id={visit.id} has no explicit owner surface",
+            )
 
         logger.info(
             f"Используем doctor_id={doctor_id} для queue_tag={queue_tag}, visit_id={visit.id}"
