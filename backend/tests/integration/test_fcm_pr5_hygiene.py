@@ -184,6 +184,93 @@ def test_send_notification_multicast_counters(client, db_session, monkeypatch):
     assert body["total_count"] == 2
 
 
+def test_admin_user_ids_broadcast_purges_unregistered_token(
+    client, db_session, monkeypatch
+):
+    """Codex round 4: registry-based admin broadcasts must also drop dead
+    tokens — the user_ids path maps each token back to its owner."""
+    dead_user = _make_user(db_session)
+    dead_user.device_token = "tok-dead"
+    dead_user.push_notifications_enabled = True
+    live_user = _make_user(db_session)
+    live_user.device_token = "tok-live"
+    live_user.push_notifications_enabled = True
+    db_session.commit()
+
+    stub = _StubFCMService()
+
+    async def _send_by_token(*args, **kwargs):
+        # send_multicast passes the token positionally; the single-send route
+        # passes it as a keyword argument — support both.
+        token = args[0] if args else kwargs.get("device_token")
+        if token == "tok-live":
+            return FCMResponse(success=True, message_id="m-live")
+        return FCMResponse(
+            success=False,
+            error="Requested entity was not found",
+            error_code="410",
+        )
+
+    stub.send_notification = AsyncMock(side_effect=_send_by_token)
+    _patch_route_service(monkeypatch, stub)
+
+    admin = _make_user(db_session, role="Admin")
+    headers = _admin_headers(client, admin)
+
+    response = client.post(
+        "/api/v1/fcm/send-notification",
+        headers=headers,
+        json={
+            "title": "Broadcast",
+            "body": "Hello",
+            "user_ids": [live_user.id, dead_user.id],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["sent_count"] == 1
+    assert response.json()["failed_count"] == 1
+
+    db_session.expire_all()
+    refreshed_live = db_session.query(User).filter(User.id == live_user.id).first()
+    refreshed_dead = db_session.query(User).filter(User.id == dead_user.id).first()
+    assert refreshed_live.device_token == "tok-live"  # untouched
+    assert refreshed_dead.device_token is None  # purged
+
+
+def test_send_test_notification_purges_own_unregistered_token(
+    client, db_session, monkeypatch
+):
+    """Codex round 4: the self-test is a registry-based send — a canonical
+    UNREGISTERED verdict drops the caller's own dead token."""
+    user = _make_user(db_session)
+    user.device_token = "tok-self-dead"
+    user.push_notifications_enabled = True
+    db_session.commit()
+
+    stub = _StubFCMService()
+    stub.send_notification = AsyncMock(
+        return_value=FCMResponse(
+            success=False,
+            error="Requested entity was not found",
+            error_code="410",
+        )
+    )
+    _patch_route_service(monkeypatch, stub)
+
+    headers = _admin_headers(client, user)
+    response = client.post(
+        "/api/v1/fcm/send-test-notification", headers=headers
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["success"] is False
+
+    db_session.expire_all()
+    refreshed = db_session.query(User).filter(User.id == user.id).first()
+    assert refreshed.device_token is None
+
+
 def test_send_notification_honest_400_when_disabled(client, db_session):
     """With FCM_ENABLED=false (default) the real service is inactive — the
     admin broadcast must fail honestly with 400, not pretend to send."""

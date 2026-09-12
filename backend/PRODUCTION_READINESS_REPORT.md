@@ -178,7 +178,7 @@ Total: 7/8 tests passed (87.5%)
 
 1. **Configure Environment Variables:**
    - `SECRET_KEY` - Generate secure key
-   - `FCM_SERVER_KEY` / `FCM_PROJECT_ID` - For push notifications
+   - `GOOGLE_APPLICATION_CREDENTIALS` / `FCM_PROJECT_ID` - For push notifications (HTTP v1 API; legacy `FCM_SERVER_KEY` removed in PR-5)
    - `AUTO_BACKUP_ENABLED=true` - Enable automated backups
    - `BACKUP_RETENTION_DAYS=30` - Set backup retention
 

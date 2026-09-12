@@ -21,7 +21,7 @@ from app.core.rate_limiter import limiter
 from app.crud import user as crud_user
 from app.db.session import get_db
 from app.models.user import User
-from app.services.fcm_service import get_fcm_service
+from app.services.fcm_service import FCMResponse, is_unregistered_token_response, get_fcm_service
 
 router = APIRouter()
 
@@ -65,7 +65,7 @@ class FCMNotificationRequest(BaseModel):
 
 
 @router.post("/register-token", response_model=dict[str, Any])
-@limiter.limit("10/minute")  # registration is client-initiated; keep blast radius tiny
+@limiter.limit("30/minute")  # registration is client-initiated; keyed by client IP (PR-34), so clinics behind shared egress (Wi-Fi/proxy) need headroom for distinct authenticated users
 async def register_fcm_token(  # P1-7: token ownership validated via current_user
     request: Request,
     payload: FCMTokenRequest,
@@ -148,6 +148,11 @@ async def send_fcm_notification(
             )
 
         device_tokens = []
+        # Registry-based send: map each user token back to its owner so a
+        # canonical UNREGISTERED verdict can purge exactly that registry row
+        # (PR-5 codex round 4). Directly supplied tokens have no registry
+        # linkage and are never purged here.
+        registry_owner_by_token: dict[str, int] = {}
 
         # Получаем токены по user_ids (PR-2: device_token is the real column)
         if request.user_ids:
@@ -157,6 +162,7 @@ async def send_fcm_notification(
                 push_on = getattr(user, "push_notifications_enabled", True)
                 if token and push_on:
                     device_tokens.append(token)
+                    registry_owner_by_token[token] = user.id
 
         # Добавляем прямо указанные токены
         if request.device_tokens:
@@ -182,6 +188,17 @@ async def send_fcm_notification(
                 badge=request.badge,
             )
 
+            if (
+                not result.success
+                and device_tokens[0] in registry_owner_by_token
+                and is_unregistered_token_response(result)
+            ):
+                crud_user.clear_device_token_if_unchanged(
+                    db,
+                    user_id=registry_owner_by_token[device_tokens[0]],
+                    expected_token=device_tokens[0],
+                )
+
             return {
                 "success": result.success,
                 "message": (
@@ -205,6 +222,25 @@ async def send_fcm_notification(
                 sound=request.sound,
                 badge=request.badge,
             )
+
+            for entry in result.get("results", []):
+                if entry.get("success"):
+                    continue
+                failed_token = device_tokens[entry.get("token_index", -1)]
+                if failed_token not in registry_owner_by_token:
+                    continue
+                if is_unregistered_token_response(
+                    FCMResponse(
+                        success=False,
+                        error=entry.get("error"),
+                        error_code=entry.get("error_code"),
+                    )
+                ):
+                    crud_user.clear_device_token_if_unchanged(
+                        db,
+                        user_id=registry_owner_by_token[failed_token],
+                        expected_token=failed_token,
+                    )
 
             return {
                 "success": result["success"],
@@ -262,12 +298,21 @@ async def send_test_fcm_notification(
                 "message": "Тестовое уведомление отправлено",
                 "message_id": result.message_id,
             }
-        else:
-            return {
-                "success": False,
-                "message": f"Ошибка отправки: {result.error}",
-                "error_code": result.error_code,
-            }
+
+        if is_unregistered_token_response(result):
+            # PR-5 codex round 4: registry-based send path — drop the dead
+            # self token so subsequent sends stop targeting this device.
+            crud_user.clear_device_token_if_unchanged(
+                db,
+                user_id=current_user.id,
+                expected_token=current_user.device_token,
+            )
+
+        return {
+            "success": False,
+            "message": f"Ошибка отправки: {result.error}",
+            "error_code": result.error_code,
+        }
 
     except HTTPException:
         raise

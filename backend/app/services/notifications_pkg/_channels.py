@@ -5,6 +5,7 @@ Split from notifications.py.
 from __future__ import annotations
 
 from app.core.pii_masker import mask_pii_text
+from app.crud import user as crud_user
 from app.services.email_sms_enhanced import build_from_header
 from app.services.fcm_service import is_unregistered_token_response
 from app.services.notifications_pkg._base import (
@@ -209,23 +210,13 @@ class ChannelsMixin(NotificationSenderMixinBase):
                     )
                     if is_unregistered_token_response(fcm_result):
                         # UNREGISTERED: drop the dead token from the registry
-                        # (codex round 3: atomic conditional update — clear the
-                        # registry only if it STILL holds the exact token that
-                        # failed, so a replacement token registered while this
-                        # request was in flight is never wiped).
-                        db.query(User).filter(
-                            User.id == user.id,
-                            User.device_token == failed_token,
-                        ).update(
-                            {
-                                "device_token": None,
-                                "device_type": None,
-                                "device_info": None,
-                                "push_notifications_enabled": False,
-                            },
-                            synchronize_session=False,
+                        # (atomic conditional update — clear the registry only
+                        # if it STILL holds the exact token that failed, so a
+                        # replacement token registered while this request was
+                        # in flight is never wiped).
+                        crud_user.clear_device_token_if_unchanged(
+                            db, user_id=user.id, expected_token=failed_token
                         )
-                        db.commit()
 
                 # Legacy audit trail remains for external/mobile channels —
                 # PR-5: honest now. The row is written only when the push was

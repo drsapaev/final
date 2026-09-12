@@ -277,10 +277,17 @@ class FCMService:
                     results.append({"token_index": i, "success": True, "message_id": response.message_id})
                 else:
                     failed_count += 1
-                    results.append({"token_index": i, "success": False, "error": response.error})
+                    results.append(
+                        {
+                            "token_index": i,
+                            "success": False,
+                            "error": response.error,
+                            "error_code": response.error_code,
+                        }
+                    )
             else:
                 failed_count += 1
-                results.append({"token_index": i, "success": False, "error": str(response)})
+                results.append({"token_index": i, "success": False, "error": str(response), "error_code": None})
 
         return {
             "success": sent_count > 0,
