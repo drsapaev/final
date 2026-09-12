@@ -474,50 +474,36 @@ async def test_transient_404_does_not_purge_token(db_session, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_unregistered_purge_skips_replacement_token(test_db, monkeypatch):
+async def test_unregistered_purge_skips_replacement_token(db_session, monkeypatch):
     """Codex round 3 (TOCTOU): a replacement token registered while the FCM
     request is in flight must survive the UNREGISTERED cleanup of the old
     token — the registry is cleared only when it still holds the exact
     failed token.
 
-    Uses two real connections on the shared test-database engine (the
-    db_session fixture wraps everything in an outer transaction that other
-    connections cannot see, so this test manages its own committed rows).
+    The in-flight registration is emulated on the same session (the guard
+    under test is the row-level conditional UPDATE, not cross-connection
+    visibility): by the time the stale UNREGISTERED verdict is processed,
+    the registry row already holds 'tok-new', so the cleanup's WHERE
+    (device_token == 'tok-old') matches zero rows.
     """
-    from sqlalchemy.orm import sessionmaker
-
-    SessionMaker = sessionmaker(bind=test_db)
-    s_main = SessionMaker()
-
-    user = User(
-        username=f"fcm5_toctou_{_suffix()}",
-        email=f"fcm5-toctou-{_suffix()}@test.local",
-        full_name="FCM5 TOCTOU",
-        hashed_password=get_password_hash("pass123"),
-        role="Patient",
-        is_active=True,
-    )
-    s_main.add(user)
-    s_main.commit()
-    s_main.refresh(user)
+    user = _make_user(db_session)
     user.device_token = "tok-old"
     user.device_type = "android"
     user.push_notifications_enabled = True
-    s_main.commit()
+    db_session.commit()
 
     def _register_replacement_token_midflight(*args, **kwargs):
-        # Simulate a concurrent register-token call on ANOTHER connection:
-        # the registry now holds the replacement token before the stale
+        # Simulate a concurrent register-token call landing BEFORE the stale
         # UNREGISTERED verdict for tok-old is processed.
-        s_reg = SessionMaker()
-        try:
-            row = s_reg.query(User).filter(User.id == user.id).first()
-            row.device_token = "tok-new"
-            row.device_type = "ios"
-            row.push_notifications_enabled = True
-            s_reg.commit()
-        finally:
-            s_reg.close()
+        db_session.query(User).filter(User.id == user.id).update(
+            {
+                "device_token": "tok-new",
+                "device_type": "ios",
+                "push_notifications_enabled": True,
+            },
+            synchronize_session=False,
+        )
+        db_session.commit()
         return FCMResponse(
             success=False,
             error="Requested entity was not found",
@@ -530,20 +516,17 @@ async def test_unregistered_purge_skips_replacement_token(test_db, monkeypatch):
     )
     monkeypatch.setattr(notification_sender_service, "fcm_service", stub)
 
-    try:
-        await notification_sender_service.send_push(
-            user_id=user.id,
-            title="Queue",
-            message="You are next",
-            db=s_main,
-        )
+    await notification_sender_service.send_push(
+        user_id=user.id,
+        title="Queue",
+        message="You are next",
+        db=db_session,
+    )
 
-        s_main.expire_all()
-        refreshed = s_main.query(User).filter(User.id == user.id).first()
-        assert refreshed.device_token == "tok-new"  # replacement survived
-        assert refreshed.push_notifications_enabled is True
-    finally:
-        s_main.close()
+    db_session.expire_all()
+    refreshed = db_session.query(User).filter(User.id == user.id).first()
+    assert refreshed.device_token == "tok-new"  # replacement survived
+    assert refreshed.push_notifications_enabled is True
 
 
 def test_unregistered_predicate_matrix():
