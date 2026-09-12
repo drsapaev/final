@@ -262,6 +262,21 @@
 .displayboard-queue-card[data-status="completed"] .displayboard-queue-badge { background: #0066d6; color: #ffffff; }
 .displayboard-queue-card[data-status="cancelled"] .displayboard-queue-badge { background: #6c757d; color: #ffffff; }
 
+/* RQ-24.a.2: owner/cabinet distinguish equal ticket numbers of different
+ * queues broadcast to the same board (tokens only, no new constants).
+ * Fallback = currentColor: both vars are set inline on the board root, so
+ * the fallback only covers the (non-existing) no-vars edge case. */
+.displayboard-queue-owner {
+  font-size: 0.9rem;
+  color: var(--board-text-primary, currentColor);
+  margin-bottom: 4px;
+}
+.displayboard-queue-cabinet {
+  font-size: 0.85rem;
+  color: var(--board-text-secondary, currentColor);
+  margin-bottom: 10px;
+}
+
 .displayboard-queue-time {
   font-size: 0.8rem;
   color: var(--board-text-secondary);
