@@ -1,6 +1,6 @@
 # ADR-001: Queue Ownership & Specialty Architecture
 
-**Status:** Accepted — amended 2026-09-07 (QD-2A: dual-owner axis for doctorless queues, see Addendum)
+**Status:** Accepted — amended 2026-09-12 (QD-2A..E: dual-owner axis and `general` retirement decision, see Addendum)
 **Date:** 2026-07-12
 **Deciders:** Backend team, Frontend team
 **Supersedes:** SSOT queue_tag-based shared queue (removed in PR-26)
@@ -279,9 +279,10 @@ landing made explicit:
   `specialist_id` → NULL on every canonical bridge (owner in the
   synthetic vocabulary, tag matching the linked resource), with the
   full per-row inventory printed to the migration log — the log is the
-  audit trail and a pre-D backup is the restore path. Stage E's paired
-  deletion of the synthetic pairs now faces zero `daily_queues`
-  references and only removes the bridge vocabulary (code + docs).
+  audit trail and a pre-D backup is the restore path. This proves zero
+  references for the canonical `lab`/`ecg` bridges converted by D; legacy
+  queues still owned only by `general_resource` remain a separate Stage E
+  inventory/cutover concern and must not be inferred away from the D log.
 - **The partial predicate is the contract.** Only ACTIVE resource rows
   participate in the uniqueness: inactive rows and NULL-resource rows
   stay duplicate-legal (history preservation first). The ORM model
@@ -300,6 +301,65 @@ landing made explicit:
   schema fails on the CHECK loudly; a full backup restore re-runs
   alembic head and the deterministic conversion is a clean no-op on
   the second pass.
+
+### Stage E `general` decision (2026-09-12)
+
+**Decision: retire `general` as a routing destination.** It is not a real
+standalone queue, a bookable specialty or an active `QueueResource`. The
+string remains supported only as the existing **incomplete Doctor profile
+sentinel** used during user onboarding. A real general-practice service, if
+the clinic adds one, must receive a distinct canonical specialty key (for
+example `family_medicine`) and a real Doctor; it must not reuse the sentinel.
+
+The terminal routing rule is fail-closed and exact:
+
+- `requires_doctor = true` requires an explicitly eligible real Doctor and
+  routes to that Doctor's queue;
+- `requires_doctor = false` requires an exact ACTIVE `QueueResource` for the
+  service's explicit `queue_tag` (`lab`, `ecg`, or another operator-created
+  resource tag);
+- a missing/mixed/unknown owner is a configuration error. Runtime must not
+  fall back to `general_resource`, an arbitrary active Doctor, or a frontend
+  alias table.
+
+Consequently Stage E must **not seed an active `general` resource**. Active
+doctorless services currently tagged `general` are inventoried and retagged
+one by one to an explicit resource selected by the operator; inference from
+service name/code is forbidden. Active doctor-required services and profiles
+using `general` must be assigned a real specialty/Doctor or disabled until
+configured. No queues or entries are merged, renumbered or moved silently.
+
+Historical `general` queues must remain auditable. If their synthetic Doctor
+foreign key prevents paired deletion, Stage E may create one INACTIVE,
+non-selectable archival `QueueResource` with `queue_tag = 'general'`, transfer
+only inactive historical queues to it, and then remove the exact
+`general_resource` User+Doctor pair. The archival row is an ownership record,
+not a routing option: active-resource resolution must continue to ignore it.
+Any `general` queue with waiting/called/in-service entries blocks the cutover
+until an operator resolves it explicitly.
+
+The production gate for deleting the three 0055 synthetic pairs
+(`lab_resource`, `ecg_resource`, `general_resource`) and the compatibility
+vocabulary is:
+
+1. the production Alembic head includes 0063 and both D constraints are
+   present;
+2. the D inventory/backup/restore evidence is retained and the post-D owner
+   XOR/active-resource uniqueness checks pass;
+3. no active service/profile/queue needs `general` routing, and every active
+   doctorless service resolves to exactly one active resource;
+4. no live queue entry depends on a synthetic owner, and all historical
+   queue foreign keys have an explicit preserved owner;
+5. runtime/code searches show no lookup or fallback by the three usernames;
+6. exact-ID dry-run deletion reports zero inbound references and targets only
+   the provisioned synthetic rows. It must never delete all Doctors whose
+   specialty is `general`, because ordinary incomplete onboarding profiles
+   intentionally keep that sentinel.
+
+Stage E is split into catalog cutover, historical-owner conversion, runtime
+fallback removal, and exact paired deletion. Each is a separate reviewed
+slice with PostgreSQL evidence and a forward-fix/restore plan; a green empty
+CI database is not production proof.
 
 ### Guidance for readers of this ADR
 
