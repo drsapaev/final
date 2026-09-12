@@ -162,7 +162,12 @@ def test_push_devices_rls_contract_on_disposable_pg():
             assert "invalidated_at IS NULL" in indexdef
             assert "UNIQUE" in indexdef
 
-            # CHECK enums actually enforce.
+            # CHECK enums actually enforce. SQLAlchemy 2.x connections
+            # AUTO-begin a transaction: statements run inside it, and every
+            # expected DB error must be followed by conn.rollback() — in
+            # PostgreSQL a failed statement aborts the whole transaction.
+            import sqlalchemy as sa
+
             conn.execute(
                 text(
                     "INSERT INTO users (username, hashed_password, role, "
@@ -170,30 +175,24 @@ def test_push_devices_rls_contract_on_disposable_pg():
                     "('push_rls_probe', 'x', 'Patient', true, false, false)"
                 )
             )
-            import sqlalchemy as sa
 
             def _register(token: str, provider: str = "fcm") -> None:
-                trans = conn.begin()
-                try:
-                    conn.execute(
-                        sa.text(
-                            "INSERT INTO push_devices (user_id, provider, "
-                            "platform, token, enabled) VALUES "
-                            "((SELECT id FROM users WHERE username = "
-                            "'push_rls_probe'), :provider, 'android', "
-                            ":token, true)"
-                        ),
-                        {"provider": provider, "token": token},
-                    )
-                    trans.commit()
-                except Exception:
-                    trans.rollback()
-                    raise
+                conn.execute(
+                    sa.text(
+                        "INSERT INTO push_devices (user_id, provider, "
+                        "platform, token, enabled) VALUES "
+                        "((SELECT id FROM users WHERE username = "
+                        "'push_rls_probe'), :provider, 'android', "
+                        ":token, true)"
+                    ),
+                    {"provider": provider, "token": token},
+                )
 
             _register("tok-probe-1")
             # Duplicate ACTIVE credential → partial unique index fires.
             with pytest.raises(Exception):
                 _register("tok-probe-1")
+            conn.rollback()  # aborted txn → clean state
             # Dead row frees the slot (partial index ignores it).
             conn.execute(
                 sa.text(
@@ -205,6 +204,7 @@ def test_push_devices_rls_contract_on_disposable_pg():
             # Closed enums enforce.
             with pytest.raises(Exception):
                 _register("tok-probe-2", provider="apns")
+            conn.rollback()  # aborted txn → clean state
 
         # --- downgrade removes the table, re-upgrade restores RLS -------
         _alembic_upgrade(probe_url, "-1")
