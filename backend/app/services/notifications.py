@@ -29,6 +29,7 @@ from typing import Any  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.crud import user as crud_user
+from app.services.fcm_service import is_unregistered_token_response
 from app.services.notifications_pkg import (  # noqa: F401
     NotificationSenderService,
     notification_sender_service,
@@ -173,7 +174,7 @@ async def send_push(
                     "FCM delivery failed",
                     extra={"error_code": fcm_result.error_code},
                 )
-                if fcm_result.error_code in {"404", "410"}:
+                if is_unregistered_token_response(fcm_result):
                     # UNREGISTERED: drop the dead token from the registry.
                     crud_user.update_user(
                         db,

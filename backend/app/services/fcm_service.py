@@ -28,6 +28,24 @@ class FCMResponse(BaseModel):
     error_code: str | None = None
 
 
+def is_unregistered_token_response(response: FCMResponse) -> bool:
+    """True only for a canonical FCM UNREGISTERED verdict.
+
+    PR-5 (codex round 1): ``error_code`` carries the generic HTTP status, so
+    a bare 404/410 (proxy/gateway hiccup, wrong fcm_url) must NOT wipe the
+    user's token. The token is dropped only when the v1 error body itself
+    reports the unregistered verdict: HTTP 410 with status UNREGISTERED, or
+    HTTP 404 with the canonical "Requested entity was not found" message.
+    """
+    if response.success or response.error_code not in {"404", "410"}:
+        return False
+    message = (response.error or "").lower()
+    return (
+        "unregistered" in message
+        or "requested entity was not found" in message
+    )
+
+
 class FCMService:
     """Сервис для работы с Firebase Cloud Messaging (HTTP v1 API)"""
 

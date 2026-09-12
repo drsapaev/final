@@ -319,6 +319,60 @@ async def test_send_push_records_failed_status_and_drops_unregistered_token(
 
 
 @pytest.mark.asyncio
+async def test_transient_404_does_not_purge_token(db_session, monkeypatch):
+    """Codex round 1: error_code carries the generic HTTP status — a bare 404
+    (proxy hiccup, wrong fcm_url) must NOT wipe the user's token."""
+    user = _make_user(db_session)
+    user.device_token = "tok-alive"
+    user.device_type = "android"
+    user.push_notifications_enabled = True
+    db_session.commit()
+
+    stub = _StubFCMService()
+    stub.send_notification = AsyncMock(
+        return_value=FCMResponse(
+            success=False, error="Route not found", error_code="404"
+        )
+    )
+    monkeypatch.setattr(notification_sender_service, "fcm_service", stub)
+
+    await notification_sender_service.send_push(
+        user_id=user.id,
+        title="Queue",
+        message="You are next",
+        db=db_session,
+    )
+
+    db_session.expire_all()
+    refreshed = db_session.query(User).filter(User.id == user.id).first()
+    assert refreshed.device_token == "tok-alive"  # token survives
+    assert refreshed.push_notifications_enabled is True
+
+    rows = _mobile_history_rows(db_session, user.id)
+    assert len(rows) == 1
+    assert rows[0].status == "failed"  # honest failure is still recorded
+
+
+def test_unregistered_predicate_matrix():
+    from app.services.fcm_service import is_unregistered_token_response as pred
+
+    # Canonical v1 UNREGISTERED verdicts (410 status / 404 not-found message).
+    assert pred(FCMResponse(success=False, error="Token is UNREGISTERED", error_code="410"))
+    assert pred(
+        FCMResponse(
+            success=False,
+            error="Requested entity was not found.",
+            error_code="404",
+        )
+    )
+    # Generic HTTP failures that look similar but must not purge.
+    assert not pred(FCMResponse(success=False, error="Route not found", error_code="404"))
+    assert not pred(FCMResponse(success=False, error="Requested entity was not found", error_code="429"))
+    assert not pred(FCMResponse(success=False, error=None, error_code="404"))
+    assert not pred(FCMResponse(success=True, message_id="m-1"))
+
+
+@pytest.mark.asyncio
 async def test_send_push_respects_opt_out_flag(db_session, monkeypatch):
     user = _make_user(db_session)
     user.device_token = "tok-opted-out"

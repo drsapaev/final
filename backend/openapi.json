@@ -79477,7 +79477,7 @@
         "properties": {
           "device_token": {
             "type": "string",
-            "maxLength": 4096,
+            "maxLength": 255,
             "minLength": 1,
             "title": "Device Token"
           },

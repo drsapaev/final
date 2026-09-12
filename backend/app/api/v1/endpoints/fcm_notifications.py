@@ -29,7 +29,11 @@ router = APIRouter()
 class FCMTokenRequest(BaseModel):
     """Запрос на регистрацию FCM токена"""
 
-    device_token: str = Field(min_length=1, max_length=4096)
+    # PR-5 (codex round 1): the contract matches the persisted column width
+    # (users.device_token is String(255)); real FCM registration tokens are
+    # well under this bound. Oversized values must 422 here instead of
+    # blowing up as a DataError on flush.
+    device_token: str = Field(min_length=1, max_length=255)
     device_type: Literal["web", "android", "ios"] = "web"
     device_info: dict[str, str] | None = None
 

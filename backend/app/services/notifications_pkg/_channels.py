@@ -7,6 +7,7 @@ from __future__ import annotations
 from app.core.pii_masker import mask_pii_text
 from app.crud import user as crud_user
 from app.services.email_sms_enhanced import build_from_header
+from app.services.fcm_service import is_unregistered_token_response
 from app.services.notifications_pkg._base import (
     UTC,
     Any,
@@ -206,7 +207,7 @@ class ChannelsMixin(NotificationSenderMixinBase):
                         "FCM delivery failed",
                         extra={"error_code": fcm_result.error_code},
                     )
-                    if fcm_result.error_code in {"404", "410"}:
+                    if is_unregistered_token_response(fcm_result):
                         # UNREGISTERED: drop the dead token from the registry
                         # so subsequent sends stop targeting a device that
                         # uninstalled the app or revoked the token.
