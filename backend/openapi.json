@@ -41333,6 +41333,224 @@
         ]
       }
     },
+    "/api/v1/push/devices/register": {
+      "post": {
+        "tags": [
+          "push-devices"
+        ],
+        "summary": "Register Push Device",
+        "description": "Register/refresh a push credential for ONE device (idempotent).\n\n- Same credential re-sent → refresh (last_seen_at), no duplicate.\n- New token for a known device_id → rotation (old row invalidated).\n- Credential registered by another account → moves to this account.\n- provider=\"fcm\" additionally mirrors into the DEPRECATED\n  users.device_token column so every legacy sender keeps working.",
+        "operationId": "register_push_device_api_v1_push_devices_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushDeviceRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceRegisterResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/push/devices": {
+      "get": {
+        "tags": [
+          "push-devices"
+        ],
+        "summary": "List Push Devices",
+        "description": "List the caller's own devices (including disabled/invalidated\nhistory rows). Credentials are never returned — fingerprints only.",
+        "operationId": "list_push_devices_api_v1_push_devices_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/push/devices/{device_id}/disable": {
+      "post": {
+        "tags": [
+          "push-devices"
+        ],
+        "summary": "Disable Push Device",
+        "description": "Logout ONE device: device-level ``enabled = False``. Other devices\nand the user-level master opt-out are untouched. The legacy mirror is\ncleared only when it points at exactly this credential.",
+        "operationId": "disable_push_device_api_v1_push_devices__device_id__disable_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/push/devices/{device_id}/enable": {
+      "post": {
+        "tags": [
+          "push-devices"
+        ],
+        "summary": "Enable Push Device",
+        "description": "Re-enable ONE device. An invalidated (dead) credential cannot be\nrevived — only a fresh registration returns it (409).",
+        "operationId": "enable_push_device_api_v1_push_devices__device_id__enable_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/push/devices/{device_id}": {
+      "delete": {
+        "tags": [
+          "push-devices"
+        ],
+        "summary": "Delete Push Device",
+        "description": "Hard-delete ONE own device row (full logout with credential\nremoval). Foreign device ids are 404 — never a cross-user deletion.",
+        "operationId": "delete_push_device_api_v1_push_devices__device_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/phone-verification/send-code": {
       "post": {
         "tags": [
@@ -93968,6 +94186,213 @@
         ],
         "title": "ProvidersResponse",
         "description": "Список доступных провайдеров"
+      },
+      "PushDeviceListResponse": {
+        "properties": {
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/PushDeviceOut"
+            },
+            "type": "array",
+            "title": "Devices"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "devices",
+          "total_count"
+        ],
+        "title": "PushDeviceListResponse"
+      },
+      "PushDeviceMutationResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "PushDeviceMutationResponse"
+      },
+      "PushDeviceOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "invalidated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidated At"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "token_fingerprint": {
+            "type": "string",
+            "title": "Token Fingerprint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "platform",
+          "enabled",
+          "active",
+          "token_fingerprint"
+        ],
+        "title": "PushDeviceOut",
+        "description": "API-safe projection — deliberately NO token / raw credential."
+      },
+      "PushDeviceRegisterRequest": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "fcm",
+              "webpush"
+            ],
+            "title": "Provider"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "web"
+            ],
+            "title": "Platform"
+          },
+          "token": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Token"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "credential": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "platform",
+          "token"
+        ],
+        "title": "PushDeviceRegisterRequest",
+        "description": "Register (or refresh) one device credential for the caller."
+      },
+      "PushDeviceRegisterResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "device": {
+            "$ref": "#/components/schemas/PushDeviceOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "created",
+          "message",
+          "device"
+        ],
+        "title": "PushDeviceRegisterResponse"
       },
       "QRTokenGenerateRequest": {
         "properties": {

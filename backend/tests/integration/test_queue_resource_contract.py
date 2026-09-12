@@ -749,8 +749,8 @@ def test_migration_data_statements_never_delete_or_invent() -> None:
     assert "UPDATE daily_queues SET specialist_id = NULL" in source
 
 
-def test_alembic_chain_single_head_0063() -> None:
-    """The chain stays single-headed with 0063 as the head (the
+def test_alembic_chain_single_head_0064() -> None:
+    """The chain stays single-headed with 0064 as the head (the
     sentinel-suite graph pattern)."""
     graph: dict[str, tuple[str, ...]] = {}
     for path in sorted((BACKEND_ROOT / "alembic" / "versions").glob("*.py")):
@@ -767,9 +767,10 @@ def test_alembic_chain_single_head_0063() -> None:
         graph[revision_match.group(1)] = parents
 
     assert graph["0063_queue_resource_contract"] == ("0062_telegram_webhook_dedup",)
+    assert graph["0064_push_devices_registry"] == ("0063_queue_resource_contract",)
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    assert heads == ["0063_queue_resource_contract"]
+    assert heads == ["0064_push_devices_registry"]
 
 
 # ===================== D. parity + ADR =====================

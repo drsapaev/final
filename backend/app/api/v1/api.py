@@ -89,6 +89,7 @@ from app.api.v1.endpoints import (
     phrase_suggest,
     print_api,
     print_templates,
+    push_devices,
     qr_queue,
     queue_auto_close,
     queue_cabinet_management,
@@ -380,6 +381,13 @@ api_router.include_router(
 )
 api_router.include_router(
     fcm_notifications.router, prefix="/fcm", tags=["fcm-notifications"]
+)
+
+# PR-6: Push device registry — canonical multi-device credential store.
+# Registry surface ONLY: no push activation (FCM_ENABLED stays off, no
+# VAPID, Telegram/SMS untouched, no topics).
+api_router.include_router(
+    push_devices.router, prefix="/push/devices", tags=["push-devices"]
 )
 api_router.include_router(
     phone_verification.router, prefix="/phone-verification", tags=["phone-verification"]

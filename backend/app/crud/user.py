@@ -312,13 +312,17 @@ def get_users_with_fcm_tokens(db: Session) -> list[User]:
 def clear_device_token_if_unchanged(
     db: Session, *, user_id: int, expected_token: str
 ) -> bool:
-    """PR-5: atomic conditional cleanup of a dead FCM token.
+    """PR-5/PR-6: purge a dead FCM credential from BOTH stores.
 
-    Clears the single-device registry only when it still holds
-    ``expected_token`` (codex rounds 3-4: a replacement token registered
-    while a failing send was in flight is never wiped, and only canonical
-    UNREGISTERED verdicts reach this point). Returns True when a row was
-    cleared.
+    1. Legacy mirror (users.device_token): atomic conditional clear — only
+       when it still holds ``expected_token`` (a replacement token
+       registered while a failing send was in flight is never wiped, and
+       only canonical UNREGISTERED verdicts reach this point).
+    2. PR-6 registry (push_devices): exact-credential invalidation of every
+       ACTIVE row holding precisely this token — a dead shared credential
+       is dead for ALL of its owners, mirrored or not.
+
+    Returns True when the legacy mirror was cleared.
     """
     updated = (
         db.query(User)
@@ -329,6 +333,38 @@ def clear_device_token_if_unchanged(
                 "device_type": None,
                 "device_info": None,
                 "push_notifications_enabled": False,
+            },
+            synchronize_session=False,
+        )
+    )
+    db.commit()
+    # PR-6: keep the multi-device registry in sync with the canonical
+    # UNREGISTERED verdict. Exact-token conditional (no-op when the token
+    # never lived in the registry); never touches other credentials.
+    from app.crud.push_device import invalidate_active_credential  # noqa: PLC0415
+
+    invalidate_active_credential(db, provider="fcm", token=expected_token)
+    return bool(updated)
+
+
+def clear_legacy_device_mirror(
+    db: Session, *, user_id: int, expected_token: str
+) -> bool:
+    """PR-6: MIRROR-ONLY conditional clear of users.device_token.
+
+    Device-level events (disable/delete in the push registry) use this to
+    stop the legacy column pointing at a muted/removed credential. It does
+    NOT touch the registry row (a disabled device is not a dead
+    credential) and does NOT flip the user-level master opt-out flag.
+    """
+    updated = (
+        db.query(User)
+        .filter(User.id == user_id, User.device_token == expected_token)
+        .update(
+            {
+                "device_token": None,
+                "device_type": None,
+                "device_info": None,
             },
             synchronize_session=False,
         )

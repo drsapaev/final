@@ -14460,6 +14460,117 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/push/devices/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register Push Device
+         * @description Register/refresh a push credential for ONE device (idempotent).
+         *
+         *     - Same credential re-sent → refresh (last_seen_at), no duplicate.
+         *     - New token for a known device_id → rotation (old row invalidated).
+         *     - Credential registered by another account → moves to this account.
+         *     - provider="fcm" additionally mirrors into the DEPRECATED
+         *       users.device_token column so every legacy sender keeps working.
+         */
+        post: operations["register_push_device_api_v1_push_devices_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Push Devices
+         * @description List the caller's own devices (including disabled/invalidated
+         *     history rows). Credentials are never returned — fingerprints only.
+         */
+        get: operations["list_push_devices_api_v1_push_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices/{device_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable Push Device
+         * @description Logout ONE device: device-level ``enabled = False``. Other devices
+         *     and the user-level master opt-out are untouched. The legacy mirror is
+         *     cleared only when it points at exactly this credential.
+         */
+        post: operations["disable_push_device_api_v1_push_devices__device_id__disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices/{device_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable Push Device
+         * @description Re-enable ONE device. An invalidated (dead) credential cannot be
+         *     revived — only a fresh registration returns it (409).
+         */
+        post: operations["enable_push_device_api_v1_push_devices__device_id__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Push Device
+         * @description Hard-delete ONE own device row (full logout with credential
+         *     removal). Foreign device ids are 404 — never a cross-user deletion.
+         */
+        delete: operations["delete_push_device_api_v1_push_devices__device_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/phone-verification/send-code": {
         parameters: {
             query?: never;
@@ -32926,6 +33037,80 @@ export type components = {
         ProvidersResponse: {
             /** Providers */
             providers: components["schemas"]["ProviderInfo"][];
+        };
+        /** PushDeviceListResponse */
+        PushDeviceListResponse: {
+            /** Devices */
+            devices: components["schemas"]["PushDeviceOut"][];
+            /** Total Count */
+            total_count: number;
+        };
+        /** PushDeviceMutationResponse */
+        PushDeviceMutationResponse: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
+        };
+        /**
+         * PushDeviceOut
+         * @description API-safe projection — deliberately NO token / raw credential.
+         */
+        PushDeviceOut: {
+            /** Id */
+            id: number;
+            /** Provider */
+            provider: string;
+            /** Platform */
+            platform: string;
+            /** Device Id */
+            device_id?: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Active */
+            active: boolean;
+            /** Last Seen At */
+            last_seen_at?: string | null;
+            /** Invalidated At */
+            invalidated_at?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Token Fingerprint */
+            token_fingerprint: string;
+        };
+        /**
+         * PushDeviceRegisterRequest
+         * @description Register (or refresh) one device credential for the caller.
+         */
+        PushDeviceRegisterRequest: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "fcm" | "webpush";
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "web";
+            /** Token */
+            token: string;
+            /** Device Id */
+            device_id?: string | null;
+            /** Credential */
+            credential?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** PushDeviceRegisterResponse */
+        PushDeviceRegisterResponse: {
+            /** Success */
+            success: boolean;
+            /** Created */
+            created: boolean;
+            /** Message */
+            message: string;
+            device: components["schemas"]["PushDeviceOut"];
         };
         /**
          * QRTokenGenerateRequest
@@ -63688,6 +63873,152 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    register_push_device_api_v1_push_devices_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushDeviceRegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceRegisterResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_push_devices_api_v1_push_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceListResponse"];
+                };
+            };
+        };
+    };
+    disable_push_device_api_v1_push_devices__device_id__disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceMutationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_push_device_api_v1_push_devices__device_id__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceMutationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_push_device_api_v1_push_devices__device_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceMutationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
