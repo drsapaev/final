@@ -117,9 +117,10 @@ class TestSanitizeEventPhoneScrubbing:
 
         Note: ``mask_pii()`` applies key-based redaction for dict values —
         vars with PII keys (``phone``, ``patient_phone``) are redacted.
-        Free-text PII in arbitrary string values (e.g. ``query="phone=..."``)
-        is NOT scrubbed by ``mask_pii`` — that's FOLLOWUP-4 (structural
-        free-text PHI approach).
+        Since PR-6 round 4, string values under ordinary keys also go
+        through the free-text scrub pass (phone/email/passport/IIN and
+        credential-shaped JSON); structurally arbitrary free-text PHI
+        remains a FOLLOWUP-4 concern.
         """
         event = {
             "exception": {
@@ -147,6 +148,44 @@ class TestSanitizeEventPhoneScrubbing:
         frame_vars = event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]
         assert frame_vars["phone"] != "+998901234567"
         assert frame_vars["user_id"] == 42  # non-PII preserved
+
+
+class TestSanitizeEventRawStringRequestData:
+    """PR-6 round 4 (codex P1): request.data as a RAW JSON string.
+
+    When Sentry represents the request body as a raw string under the
+    key "data", key-based redaction cannot see the credential inside —
+    string values must go through the free-text scrub pass so the
+    credential-shaped JSON regex redacts them.
+    """
+
+    def test_scrubs_push_credential_in_raw_string_request_data(self):
+        event = {
+            "request": {
+                "url": "https://api.example.com/api/v1/push/devices/register",
+                "method": "POST",
+                "data": '{"provider":"fcm","platform":"android",'
+                '"token":"pr6-secret-credential","previous_token":"pr6-old-credential"}',
+            }
+        }
+        sanitize_event(event)
+        data = event["request"]["data"]
+        assert "pr6-secret-credential" not in data
+        assert "pr6-old-credential" not in data
+        assert '"token":"[REDACTED]"' in data
+
+    def test_preserves_non_credential_fields_in_raw_string_request_data(self):
+        event = {
+            "request": {
+                "url": "https://api.example.com/api/v1/push/devices/register",
+                "method": "POST",
+                "data": '{"provider":"fcm","token":"pr6-secret-credential","device_id":"dev-1"}',
+            }
+        }
+        sanitize_event(event)
+        data = event["request"]["data"]
+        assert '"provider":"fcm"' in data
+        assert '"device_id":"dev-1"' in data
 
 
 class TestSanitizeEventEmailScrubbing:

@@ -574,15 +574,20 @@ def test_alembic_chain_single_head_0062() -> None:
     # XOR CHECK + partial active uniqueness; the bridge conversion is
     # data-only, the id fits the VARCHAR(32) version stamp).
     assert graph["0063_queue_resource_contract"] == ("0062_telegram_webhook_dedup",)
+    # PR-6: the chain head moved to 0064 (push_devices registry — the
+    # canonical multi-device store; write-maintained only, no push
+    # activation in this migration).
+    assert graph["0064_push_devices_registry"] == ("0063_queue_resource_contract",)
     # alembic_version.version_num is VARCHAR(32): both ends of the new
     # link must fit (CI on 40cec49 exploded on real PostgreSQL with a
     # 38-char id — scratch-SQLite ignores VARCHAR widths).
+    assert len("0064_push_devices_registry") <= 32
     assert len("0063_queue_resource_contract") <= 32
     assert len("0062_telegram_webhook_dedup") <= 32
     assert len("0061_telegram_config_singleton") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0063_queue_resource_contract"]
+    assert heads == ["0064_push_devices_registry"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============
