@@ -11,6 +11,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
     _load_registration_discount_settings,
     _resolve_effective_discount_mode,
 )  # noqa: F401
+from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.online_queue import DailyQueue
 
 
@@ -371,6 +372,17 @@ def create_cart_appointments(
         # путь ошибки обязан откатить частичные данные корзины.
         db.rollback()
         raise
+    except QueueOwnerConfigurationError as exc:
+        # QD-2E (RQ-15.b): fail-closed владелец очереди — это
+        # КОНФИГУРАЦИОННАЯ ошибка каталога (D-08), а не сбой сервера:
+        # откатываем корзину и возвращаем оператору 422 с причиной и
+        # тремя путями решения (assign_doctor / retag_resource /
+        # disable_service по operator map RQ-15.b).
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     except Exception as e:
         logger.exception(
             "REGISTRATION: cart creation failed",

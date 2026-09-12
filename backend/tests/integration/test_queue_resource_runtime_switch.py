@@ -480,12 +480,19 @@ def test_morning_precreate_registry_tags_go_resource_axis(
     assert ecg_queue.queue_resource_id is not None
 
 
-def test_morning_precreate_general_tag_keeps_synthetic_path(
+def test_morning_precreate_unowned_tag_skips_fail_closed(
     db_session: Session,
     monkeypatch,
+    caplog,
 ) -> None:
-    """Non-registry tags keep the legacy path: the general queue is
-    pre-created on the general_resource synthetic doctor."""
+    """QD-2E (RQ-15.b) deliberate-state pin FLIP: a non-registry tag
+    WITHOUT an explicit owner is NOT pre-created. The pre-2E pin held
+    the general_resource synthetic as the default owner; stage E
+    retired it (D-08) — zero owners means a loud error log and no
+    queue; the booking surfaces raise the explicit configuration
+    error when a patient actually arrives."""
+    import logging
+
     from app.services.morning_assignment import MorningAssignmentService
 
     # QD-2C (round-18 CI root-cause): see _neutralize_begin_nested.
@@ -493,16 +500,52 @@ def test_morning_precreate_general_tag_keeps_synthetic_path(
 
     _scope_morning_world(db_session, "general")
     gen_user = _make_user(db_session, username="general_resource", role="Resource")
-    gen_doctor = _make_doctor(db_session, user_id=gen_user.id, specialty="general")
+    _make_doctor(db_session, user_id=gen_user.id, specialty="general")
     _make_service(db_session, queue_tag="general", name="Приём")
+
+    with caplog.at_level(logging.ERROR, logger="app.services.morning_assignment"):
+        created = MorningAssignmentService(
+            db_session
+        ).ensure_daily_queues_for_all_tags(_DAY)
+    assert created == 0
+    queue = queue_resource_routing.find_active_tag_queue(db_session, _DAY, "general")
+    assert queue is None
+    # fail-closed is LOUD: the operator sees exactly what to decide
+    assert any(
+        "QD-2E fail-closed" in record.getMessage()
+        and "no explicit owner" in record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.ERROR
+    )
+
+
+def test_morning_precreate_single_doctor_tag_gets_doctor_queue(
+    db_session: Session,
+    monkeypatch,
+) -> None:
+    """QD-2E: a non-registry tag whose active services carry ONE
+    distinct doctor is pre-created on that doctor (K01/K11 → the
+    cardiologist after the operator map application)."""
+    from app.services.morning_assignment import MorningAssignmentService
+
+    _neutralize_begin_nested(monkeypatch, db_session)
+
+    _scope_morning_world(db_session, "cardio")
+    doc_user = _make_user(db_session, username="dr_cardio", role="doctor")
+    doc = _make_doctor(db_session, user_id=doc_user.id, specialty="cardio")
+    service = _make_service(
+        db_session, queue_tag="cardio", name="Консультация кардиолога"
+    )
+    service.doctor_id = doc.id
+    db_session.commit()
 
     created = MorningAssignmentService(db_session).ensure_daily_queues_for_all_tags(
         _DAY
     )
     assert created == 1
-    queue = queue_resource_routing.find_active_tag_queue(db_session, _DAY, "general")
+    queue = queue_resource_routing.find_active_tag_queue(db_session, _DAY, "cardio")
     assert queue is not None
-    assert queue.specialist_id == gen_doctor.id
+    assert queue.specialist_id == doc.id
     assert queue.queue_resource_id is None
 
 
@@ -556,8 +599,9 @@ def test_batch_resolve_returns_none_for_registry_tag(db_session: Session) -> Non
 def test_batch_resolve_keeps_legacy_chain_without_registry(
     db_session: Session,
 ) -> None:
-    """No registry row → the old chain: unique service doctor wins; the
-    synthetic map is still consulted for the synthetic-owned tags."""
+    """No registry row → the explicit chain: the unique service doctor
+    wins. QD-2E: the synthetic map (general_resource fallback) is GONE
+    — the chain now ends in the fail-closed configuration error."""
     from app.services.batch_patient_service import BatchPatientService, EntryAction
 
     doc_user = _make_user(db_session, username="dr_svc", role="doctor")

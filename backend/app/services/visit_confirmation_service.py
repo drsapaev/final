@@ -14,9 +14,14 @@ from typing import Any
 from app.core.config import settings
 from app.crud import clinic as crud_clinic
 from app.crud import telegram_config as crud_telegram
+from app.crud.queue_owner_policy import (
+    eligible_real_doctor,
+    owner_configuration_error,
+)
 from app.crud.queue_resource_routing import resolve_tag_resource
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.visit import Visit
+from app.models.service import Service
+from app.models.visit import Visit, VisitService
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
 from app.services.confirmation_security import ConfirmationSecurityService
 from app.services.context_facades.queue_facade import (
@@ -796,6 +801,7 @@ class VisitConfirmationService:
         today = _clinic_today(self.repository.db)
         queue_numbers: list[dict[str, Any]] = []
         print_tickets: list[dict[str, Any]] = []
+        unowned_queue_tags: list[str] = []
         patient = self.repository.get_patient(visit.patient_id)
         telegram_ticket_qr_payload: str | None = None
         telegram_ticket_qr_resolved = False
@@ -812,54 +818,83 @@ class VisitConfirmationService:
             # (сиды 0059 — lab/ecg) маршрутизируется на РЕСУРСНОЙ оси:
             # синтетик не резолвится (specialist остаётся None),
             # get_or_create_daily_queue ниже найдёт/создаст ресурсную
-            # очередь. Теги без строки реестра — старый путь.
+            # очередь.
+            # QD-2E (RQ-15.b): ветки резолва ecg_resource/lab_resource
+            # УДАЛЕНЫ (D-08) — теги покрываются реестром, а их
+            # деактивация — операторское решение, не синтетик.
             registry_tag = (
                 not specialist_doctor_id
                 and resolve_tag_resource(self.repository.db, queue_tag) is not None
             )
 
-            if queue_tag == "ecg" and not specialist_doctor_id and not registry_tag:
-                ecg_resource = self.repository.get_active_user_by_username(
-                    "ecg_resource"
-                )
-                if ecg_resource:
-                    ecg_doctor = self.repository.get_doctor_by_user_id(ecg_resource.id)
-                    if ecg_doctor:
-                        specialist_doctor_id = ecg_doctor.id
-                    else:
-                        logger.warning(
-                            "ECG resource user id=%s has no doctor row",
-                            ecg_resource.id,
+            if not specialist_doctor_id and not registry_tag:
+                # QD-2E (Codex round-1 P2): явный владелец из услуг визита —
+                # единственный distinct врач среди услуг визита с этим
+                # тегом (K01 → кардиолог после operator map), проверенный
+                # на пригодность (активный реальный владелец).
+                visit_service_doctor_ids = {
+                    int(row[0])
+                    for row in (
+                        self.repository.db.query(Service.doctor_id)
+                        .join(
+                            VisitService, VisitService.service_id == Service.id
                         )
-            elif queue_tag == "lab" and not specialist_doctor_id and not registry_tag:
-                lab_resource = self.repository.get_active_user_by_username(
-                    "lab_resource"
-                )
-                if lab_resource:
-                    lab_doctor = self.repository.get_doctor_by_user_id(lab_resource.id)
-                    if lab_doctor:
-                        specialist_doctor_id = lab_doctor.id
-                        logger.info(
-                            "For queue_tag=%s using lab resource doctor id=%s",
+                        .filter(
+                            VisitService.visit_id == visit.id,
+                            Service.queue_tag == queue_tag,
+                            Service.doctor_id.isnot(None),
+                        )
+                        .distinct()
+                        .all()
+                    )
+                    if row[0] is not None
+                }
+                if len(visit_service_doctor_ids) == 1:
+                    candidate_id = next(iter(visit_service_doctor_ids))
+                    if eligible_real_doctor(self.repository.db, candidate_id):
+                        specialist_doctor_id = candidate_id
+                    else:
+                        logger.error(
+                            "QD-2E fail-closed: visit_id=%s queue_tag=%s "
+                            "single service doctor_id=%s is not an "
+                            "eligible real owner (inactive/unlinked/"
+                            "synthetic) — treating the tag as unowned (D-08)",
+                            visit.id,
                             queue_tag,
-                            specialist_doctor_id,
+                            candidate_id,
                         )
-                    else:
-                        logger.warning(
-                            "Lab resource user id=%s has no doctor row",
-                            lab_resource.id,
-                        )
+                elif len(visit_service_doctor_ids) > 1:
+                    # QD-2E (Codex round-4 P2): и эта ветка — доменная
+                    # ошибка подтверждения (422 + причина), не голый
+                    # ValueError у PWA/Telegram-обёрток.
+                    config_error = owner_configuration_error(
+                        queue_tag=queue_tag,
+                        detail=(
+                            f"visit_id={visit.id} carries multiple explicit "
+                            "service doctors for one tag — the operator "
+                            "must pick one per booking"
+                        ),
+                    )
+                    raise VisitConfirmationDomainError(
+                        status_code=422,
+                        detail=str(config_error),
+                    ) from config_error
 
             if not specialist_doctor_id and not registry_tag:
                 daily_queue = self._get_active_daily_queue_by_tag(today, queue_tag)
                 if not daily_queue:
-                    logger.info(
-                        "No doctor profile or active daily queue for "
-                        "confirmation visit_id=%s doctor_id=%s queue_tag=%s",
+                    # QD-2E (RQ-15.b): тишина здесь = корневая причина
+                    # QD-0 (запись без номера). Тег без владельца —
+                    # конфигурационная ошибка: собираем и бросаем
+                    # ВМЕСТО тихого continue (D-08).
+                    logger.error(
+                        "QD-2E fail-closed: queue_tag=%s has no owner surface "
+                        "for confirmation visit_id=%s doctor_id=%s",
+                        queue_tag,
                         visit.id,
                         visit.doctor_id,
-                        queue_tag,
                     )
+                    unowned_queue_tags.append(queue_tag)
                     continue
 
             if daily_queue is None:
@@ -918,8 +953,15 @@ class VisitConfirmationService:
                 "lab": "Лаборатория",
                 "general": "Общая очередь",
             }
+            # QD-2E (Codex round-2 P2): талон строится от РЕШЁННОГО
+            # владельца записи — у doctorless-визита K01/K11 владельцем
+            # становится врач услуги (specialist_doctor_id), а не пустой
+            # visit.doctor_id (иначе талон печатал «Без врача»).
+            resolved_owner_id = specialist_doctor_id or visit.doctor_id
             doctor = (
-                self.repository.get_doctor(visit.doctor_id) if visit.doctor_id else None
+                self.repository.get_doctor(resolved_owner_id)
+                if resolved_owner_id
+                else None
             )
             patient = self.repository.get_patient(visit.patient_id)
 
@@ -956,6 +998,24 @@ class VisitConfirmationService:
                     **ticket_payload_extra,
                 }
             )
+
+        if unowned_queue_tags:
+            # Атомарно: ни один номер не закреплён — вызывающая транзакция
+            # откатывается целиком. QD-2E (Codex round-3 P2): ошибка
+            # владельца — ДОМЕННАЯ ошибка подтверждения (422 с причиной и
+            # путями решения), а не голый ValueError — PWA/Telegram-
+            # обёртки и регистраторский путь не превращают её в 500.
+            config_error = owner_configuration_error(
+                queue_tag=", ".join(sorted(set(unowned_queue_tags))),
+                detail=(
+                    f"visit_id={visit.id} confirmation cannot resolve an "
+                    "owner surface for the listed tag(s)"
+                ),
+            )
+            raise VisitConfirmationDomainError(
+                status_code=422,
+                detail=str(config_error),
+            ) from config_error
 
         return queue_numbers, print_tickets
 

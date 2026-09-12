@@ -19,12 +19,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.crud.queue_owner_policy import (
+    is_internal_resource_doctor,
+    owner_configuration_error,
+)
 from app.crud.queue_resource_routing import resolve_tag_resource
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
-from app.models.user import User
 from app.models.visit import Visit
 from app.services.queue_domain_service import QueueDomainService
 from app.services.queue_service import get_queue_service
@@ -38,17 +41,6 @@ from app.services.service_mapping import (
 logger = logging.getLogger(__name__)
 
 EntryActionType = Literal["online_queue", "visit"]
-
-_BATCH_CREATE_RESOURCE_MAPPING = {
-    "ecg": "ecg_resource",
-    "echokg": "ecg_resource",
-    "lab": "lab_resource",
-    "laboratory": "lab_resource",
-    "general": "general_resource",
-    "cardiology_common": "general_resource",
-    "dermatology": "general_resource",
-    "procedures": "general_resource",
-}
 
 
 # ============================================================================
@@ -711,9 +703,14 @@ class BatchPatientService:
         QD-2C runtime switch: тег со строкой в queue_resources (сиды
         0059 — lab/ecg) — докторлесс: возвращаем None, очередь создаёт
         get_or_create_daily_queue на ресурсной оси (см.
-        queue_svc/_operations.py). Порядок прежний для остальных
-        тегов: единственный врач услуг → синтетик по маппингу →
-        специальность → ошибка."""
+        queue_svc/_operations.py).
+
+        QD-2E (RQ-15.b): для остальных тегов порядок — единственный
+        врач услуг → специальность → конфигурационная ошибка.
+        Маппинг ``_BATCH_CREATE_RESOURCE_MAPPING`` (fallback на
+        general_resource для general/cardiology_common/dermatology/
+        procedures) УДАЛЁН: неизвестный владелец = явная ошибка
+        конфигурации (D-08), а не тихий маршрут на синтетика."""
         # QD-2C: тег реестра — ресурсная ось, врач не нужен
         if resolve_tag_resource(self.db, queue_tag) is not None:
             return None
@@ -739,21 +736,6 @@ class BatchPatientService:
                 f"(queue_tag={queue_tag})"
             )
 
-        resource_username = _BATCH_CREATE_RESOURCE_MAPPING.get(queue_tag)
-        if resource_username:
-            resource_doctor = (
-                self.db.query(Doctor)
-                .join(User, Doctor.user_id == User.id)
-                .filter(
-                    Doctor.active == True,
-                    User.username == resource_username,
-                    User.is_active == True,
-                )
-                .first()
-            )
-            if resource_doctor:
-                return int(resource_doctor.id)
-
         specialty_candidates = {
             candidate.lower()
             for candidate in {
@@ -767,8 +749,16 @@ class BatchPatientService:
         matching_doctors = [
             doctor
             for doctor in self.db.query(Doctor).filter(Doctor.active == True).all()
-            if (doctor.specialty or "").strip().lower() in specialty_candidates
-            or normalize_specialty((doctor.specialty or "").strip()) in specialty_candidates
+            # QD-2E (RQ-15.b): внутренние ресурсные аккаунты (роль
+            # Resource — 0056/0057: lab/ecg/general_resource) никогда
+            # не владельцы очередей: синтетик недостижим и через
+            # specialty-матчинг (D-08 — ни одного маршрута на
+            # синтетиков, каким бы путём он ни шёл).
+            if not is_internal_resource_doctor(doctor)
+            and (
+                (doctor.specialty or "").strip().lower() in specialty_candidates
+                or normalize_specialty((doctor.specialty or "").strip()) in specialty_candidates
+            )
         ]
 
         if len(matching_doctors) == 1:
@@ -779,10 +769,12 @@ class BatchPatientService:
                 f"(queue_tag={queue_tag}, specialty={action.specialty})"
             )
 
-        raise ValueError(
-            "Не удалось определить владельца очереди для create-action "
-            f"(queue_tag={queue_tag})"
-        )
+        # QD-2E (RQ-15.b): fail-closed — нет реестра, нет врача услуг,
+        # нет врача специальности. Раньше здесь молча вставал
+        # general_resource-синтетик; теперь это явная конфигурационная
+        # ошибка (D-08): оператор решает (assign_doctor / retag_resource
+        # / disable_service по operator map).
+        raise owner_configuration_error(queue_tag=queue_tag)
 
     def _build_create_action_service_codes(
         self,
