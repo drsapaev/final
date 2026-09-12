@@ -28,7 +28,6 @@ from typing import Any  # noqa: F401
 
 from sqlalchemy.orm import Session  # noqa: F401
 
-from app.crud import user as crud_user
 from app.services.fcm_service import is_unregistered_token_response
 from app.services.notifications_pkg import (  # noqa: F401
     NotificationSenderService,
@@ -154,6 +153,7 @@ async def send_push(
             # account + project). Producers no longer re-implement these.
             push_attempted = False
             fcm_result = None
+            failed_token = user.device_token
             if (
                 user.device_token
                 and getattr(user, "push_notifications_enabled", False)
@@ -175,17 +175,24 @@ async def send_push(
                     extra={"error_code": fcm_result.error_code},
                 )
                 if is_unregistered_token_response(fcm_result):
-                    # UNREGISTERED: drop the dead token from the registry.
-                    crud_user.update_user(
-                        db,
-                        user_id=user.id,
-                        user_data={
+                    # UNREGISTERED: drop the dead token from the registry
+                    # (codex round 3: atomic conditional update — clear the
+                    # registry only if it STILL holds the exact token that
+                    # failed, so a replacement token registered while this
+                    # request was in flight is never wiped).
+                    db.query(User).filter(
+                        User.id == user.id,
+                        User.device_token == failed_token,
+                    ).update(
+                        {
                             "device_token": None,
                             "device_type": None,
                             "device_info": None,
                             "push_notifications_enabled": False,
                         },
+                        synchronize_session=False,
                     )
+                    db.commit()
 
             # Legacy audit trail remains for external/mobile channels —
             # PR-5: honest. The row is written only when the push was actually

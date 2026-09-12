@@ -60,10 +60,10 @@ CLINIC_LOGO_PATH=
 PRINTER_TYPE=none
 
 # --- FCM (Firebase Cloud Messaging) для push уведомлений ---
-# Получите Server Key в Firebase Console: Project Settings > Cloud Messaging
-# Подробная инструкция: docs/FCM_SETUP_GUIDE.md
-# FCM_SERVER_KEY=your_fcm_server_key_here
-# FCM_SENDER_ID=your_fcm_sender_id_here
+# PR-5: только HTTP v1 API — аутентификация сервисным аккаунтом.
+# Firebase Console > Project Settings > Service accounts > "Generate new
+# private key"; роль аккаунта: Firebase Cloud Messaging API Admin.
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 # FCM_PROJECT_ID=your_fcm_project_id_here
 # FCM_ENABLED=true
 
