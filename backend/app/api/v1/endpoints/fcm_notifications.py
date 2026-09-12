@@ -1,19 +1,27 @@
 """
 API endpoints для Firebase Cloud Messaging (FCM) push уведомлений
+
+PR-5 (hygiene of a dead surface): the topic management endpoints were
+removed. They called FCMService methods that never existed and always
+returned HTTP 500, while no client could ever reach them in practice
+(topics require device-side SDK subscription; the mobile app removed
+Firebase on purpose). Group fan-outs, if ever needed, must go through
+the per-user token registry instead of FCM topics.
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
+from app.core.rate_limiter import limiter
 from app.crud import user as crud_user
 from app.db.session import get_db
 from app.models.user import User
-from app.services.fcm_service import get_fcm_service
+from app.services.fcm_service import FCMResponse, is_unregistered_token_response, get_fcm_service
 
 router = APIRouter()
 
@@ -21,9 +29,25 @@ router = APIRouter()
 class FCMTokenRequest(BaseModel):
     """Запрос на регистрацию FCM токена"""
 
-    device_token: str
-    device_type: str = "web"  # web, android, ios
+    # PR-5 (codex round 1): the contract matches the persisted column width
+    # (users.device_token is String(255)); real FCM registration tokens are
+    # well under this bound. Oversized values must 422 here instead of
+    # blowing up as a DataError on flush.
+    device_token: str = Field(min_length=1, max_length=255)
+    device_type: Literal["web", "android", "ios"] = "web"
     device_info: dict[str, str] | None = None
+
+    @field_validator("device_token")
+    @classmethod
+    def _token_not_blank(cls, value: str) -> str:
+        # PR-5 (codex round 2): whitespace-only tokens pass min_length=1 and
+        # would normalize to an empty string at the endpoint — i.e. persist a
+        # token every sender treats as absent while flipping push on. Strip
+        # at the contract layer and reject blanks with 422.
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("device_token must contain non-whitespace characters")
+        return stripped
 
 
 class FCMNotificationRequest(BaseModel):
@@ -40,40 +64,26 @@ class FCMNotificationRequest(BaseModel):
     badge: int | None = None
 
 
-class FCMTopicRequest(BaseModel):
-    """Запрос для работы с топиками FCM"""
-
-    topic: str
-    device_tokens: list[str]
-
-
-class FCMTopicNotificationRequest(BaseModel):
-    """Запрос на отправку уведомления по топику"""
-
-    topic: str
-    title: str
-    body: str
-    data: dict[str, Any] | None = None
-    image: str | None = None
-    condition: str | None = None
-
-
 @router.post("/register-token", response_model=dict[str, Any])
+@limiter.limit("30/minute")  # registration is client-initiated; keyed by client IP (PR-34), so clinics behind shared egress (Wi-Fi/proxy) need headroom for distinct authenticated users
 async def register_fcm_token(  # P1-7: token ownership validated via current_user
-    request: FCMTokenRequest,
+    request: Request,
+    payload: FCMTokenRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Регистрация FCM токена пользователя"""
     try:
+        # PR-5: the contract validator strips and rejects blank tokens, so
+        # this value is non-empty and within the column width already.
         # PR-2: persist to existing User.device_token + new mobile metadata columns
         crud_user.update_user(
             db,
             user_id=current_user.id,
             user_data={
-                "device_token": request.device_token,
-                "device_type": request.device_type,
-                "device_info": request.device_info,
+                "device_token": payload.device_token,
+                "device_type": payload.device_type,
+                "device_info": payload.device_info,
                 "push_notifications_enabled": True,
             },
         )
@@ -81,7 +91,7 @@ async def register_fcm_token(  # P1-7: token ownership validated via current_use
         return {
             "success": True,
             "message": "FCM токен успешно зарегистрирован",
-            "device_token": request.device_token,
+            "device_token": payload.device_token,
         }
 
     except HTTPException:
@@ -138,6 +148,13 @@ async def send_fcm_notification(
             )
 
         device_tokens = []
+        # Registry-based send: map each user token back to its owner(s) so a
+        # canonical UNREGISTERED verdict can purge exactly those registry rows
+        # (PR-5 codex rounds 4-5: the schema allows one token on several
+        # accounts — a dead shared token must be cleared for ALL of them).
+        # Directly supplied tokens have no registry linkage and are never
+        # purged here.
+        registry_owners_by_token: dict[str, list[int]] = {}
 
         # Получаем токены по user_ids (PR-2: device_token is the real column)
         if request.user_ids:
@@ -147,10 +164,16 @@ async def send_fcm_notification(
                 push_on = getattr(user, "push_notifications_enabled", True)
                 if token and push_on:
                     device_tokens.append(token)
+                    registry_owners_by_token.setdefault(token, []).append(user.id)
 
         # Добавляем прямо указанные токены
         if request.device_tokens:
             device_tokens.extend(request.device_tokens)
+
+        # PR-5 codex round 6: one physical device may be registered by several
+        # accounts — fan out each unique token once while keeping every owner
+        # mapped for the conditional cleanup.
+        device_tokens = list(dict.fromkeys(device_tokens))
 
         if not device_tokens:
             raise HTTPException(
@@ -171,6 +194,18 @@ async def send_fcm_notification(
                 sound=request.sound,
                 badge=request.badge,
             )
+
+            if (
+                not result.success
+                and device_tokens[0] in registry_owners_by_token
+                and is_unregistered_token_response(result)
+            ):
+                for owner_id in registry_owners_by_token[device_tokens[0]]:
+                    crud_user.clear_device_token_if_unchanged(
+                        db,
+                        user_id=owner_id,
+                        expected_token=device_tokens[0],
+                    )
 
             return {
                 "success": result.success,
@@ -195,6 +230,24 @@ async def send_fcm_notification(
                 sound=request.sound,
                 badge=request.badge,
             )
+
+            for entry in result.get("results", []):
+                if entry.get("success"):
+                    continue
+                failed_token = device_tokens[entry.get("token_index", -1)]
+                for owner_id in registry_owners_by_token.get(failed_token, []):
+                    if is_unregistered_token_response(
+                        FCMResponse(
+                            success=False,
+                            error=entry.get("error"),
+                            error_code=entry.get("error_code"),
+                        )
+                    ):
+                        crud_user.clear_device_token_if_unchanged(
+                            db,
+                            user_id=owner_id,
+                            expected_token=failed_token,
+                        )
 
             return {
                 "success": result["success"],
@@ -252,124 +305,20 @@ async def send_test_fcm_notification(
                 "message": "Тестовое уведомление отправлено",
                 "message_id": result.message_id,
             }
-        else:
-            return {
-                "success": False,
-                "message": f"Ошибка отправки: {result.error}",
-                "error_code": result.error_code,
-            }
 
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
-
-
-@router.post("/subscribe-topic", response_model=dict[str, Any])
-async def subscribe_to_topic(
-    request: FCMTopicRequest,
-    current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
-    db: Session = Depends(get_db),
-):
-    """Подписка устройств на топик"""
-    try:
-        fcm_service = get_fcm_service()
-
-        if not fcm_service.active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="FCM сервис не настроен"
+        if is_unregistered_token_response(result):
+            # PR-5 codex round 4: registry-based send path — drop the dead
+            # self token so subsequent sends stop targeting this device.
+            crud_user.clear_device_token_if_unchanged(
+                db,
+                user_id=current_user.id,
+                expected_token=current_user.device_token,
             )
 
-        result = await fcm_service.subscribe_to_topic(
-            device_tokens=request.device_tokens, topic=request.topic
-        )
-
         return {
-            "success": result["success"],
-            "message": f"Подписка на топик '{request.topic}' {'выполнена' if result['success'] else 'не выполнена'}",
-            "topic": request.topic,
-            "device_count": len(request.device_tokens),
-            "response": result.get("response"),
-        }
-
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
-
-
-@router.post("/unsubscribe-topic", response_model=dict[str, Any])
-async def unsubscribe_from_topic(
-    request: FCMTopicRequest,
-    current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
-    db: Session = Depends(get_db),
-):
-    """Отписка устройств от топика"""
-    try:
-        fcm_service = get_fcm_service()
-
-        if not fcm_service.active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="FCM сервис не настроен"
-            )
-
-        result = await fcm_service.unsubscribe_from_topic(
-            device_tokens=request.device_tokens, topic=request.topic
-        )
-
-        return {
-            "success": result["success"],
-            "message": f"Отписка от топика '{request.topic}' {'выполнена' if result['success'] else 'не выполнена'}",
-            "topic": request.topic,
-            "device_count": len(request.device_tokens),
-            "response": result.get("response"),
-        }
-
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
-
-
-@router.post("/send-topic-notification", response_model=dict[str, Any])
-async def send_topic_notification(
-    request: FCMTopicNotificationRequest,
-    current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
-    db: Session = Depends(get_db),
-):
-    """Отправка уведомления по топику"""
-    try:
-        fcm_service = get_fcm_service()
-
-        if not fcm_service.active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="FCM сервис не настроен"
-            )
-
-        result = await fcm_service.send_topic_notification(
-            topic=request.topic,
-            title=request.title,
-            body=request.body,
-            data=request.data,
-            image=request.image,
-            condition=request.condition,
-        )
-
-        return {
-            "success": result.success,
-            "message": f"Уведомление по топику '{request.topic}' {'отправлено' if result.success else 'не отправлено'}",
-            "topic": request.topic,
-            "message_id": result.message_id,
-            "error": result.error,
+            "success": False,
+            "message": f"Ошибка отправки: {result.error}",
+            "error_code": result.error_code,
         }
 
     except HTTPException:

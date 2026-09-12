@@ -18,7 +18,11 @@ from app.crud import (
 from app.crud import (
     user as crud_user,
 )
-from app.services.fcm_service import get_fcm_service
+from app.services.fcm_service import (
+    FCMResponse,
+    get_fcm_service,
+    is_unregistered_token_response,
+)
 from app.services.sms_providers import get_sms_manager
 from app.services.telegram_bot_enhanced import get_enhanced_telegram_bot
 
@@ -78,17 +82,23 @@ class MobileServiceEnhanced:
                 if telegram_success:
                     success_count += 1
 
-            # FCM Push уведомление (если есть fcm_token)
+            # FCM Push уведомление (если есть device_token)
             user = crud_user.get_user_by_patient_id(db, patient_id=patient.id)
-            if user and user.fcm_token and user.push_notifications_enabled:
+            if user and user.device_token and user.push_notifications_enabled:
+                fcm_token = user.device_token
                 fcm_result = await self.fcm_service.send_notification(
-                    device_token=user.fcm_token,
+                    device_token=fcm_token,
                     title="Напоминание о записи",
                     body=message,
                     data={"appointment_id": str(appointment_id), "type": "reminder"},
                 )
                 if fcm_result.success:
                     success_count += 1
+                elif is_unregistered_token_response(fcm_result):
+                    # PR-5: registry-based send — drop the dead token.
+                    crud_user.clear_device_token_if_unchanged(
+                        db, user_id=user.id, expected_token=fcm_token
+                    )
 
             return success_count > 0
 
@@ -141,14 +151,22 @@ class MobileServiceEnhanced:
 
             # FCM Push уведомление
             user = crud_user.get_user_by_patient_id(db, patient_id=patient_id)
-            if user and user.fcm_token and user.push_notifications_enabled:
+            if user and user.device_token and user.push_notifications_enabled:
+                fcm_token = user.device_token
                 fcm_result = await self.fcm_service.send_notification(
-                    device_token=user.fcm_token,
+                    device_token=fcm_token,
                     title="Очередь",
                     body=message,
                     data={"queue_position": str(queue_position), "type": "queue"},
                 )
                 success = success or fcm_result.success
+                if not fcm_result.success and is_unregistered_token_response(
+                    fcm_result
+                ):
+                    # PR-5: registry-based send — drop the dead token.
+                    crud_user.clear_device_token_if_unchanged(
+                        db, user_id=user.id, expected_token=fcm_token
+                    )
 
             return success
 
@@ -198,15 +216,21 @@ class MobileServiceEnhanced:
                     continue
 
                 # FCM Push уведомление
-                if user.fcm_token and user.push_notifications_enabled:
+                if user.device_token and user.push_notifications_enabled:
+                    fcm_token = user.device_token
                     fcm_result = await self.fcm_service.send_notification(
-                        device_token=user.fcm_token,
+                        device_token=fcm_token,
                         title=title,
                         body=message,
                         data={"type": "promotion", "promo_data": promo_data},
                     )
                     if fcm_result.success:
                         success_count += 1
+                    elif is_unregistered_token_response(fcm_result):
+                        # PR-5: registry-based send — drop the dead token.
+                        crud_user.clear_device_token_if_unchanged(
+                            db, user_id=user.id, expected_token=fcm_token
+                        )
 
                 # Небольшая задержка между отправками
                 await asyncio.sleep(0.1)
@@ -236,12 +260,22 @@ class MobileServiceEnhanced:
                     "failed_count": len(user_ids),
                 }
 
-            # Получаем FCM токены пользователей
+            # Получаем FCM токены пользователей (map back to owners so a
+            # canonical UNREGISTERED verdict can purge the registry row — PR-5;
+            # a shared token may belong to several accounts, clear all)
             device_tokens = []
+            registry_owners_by_token: dict[str, list[int]] = {}
             for user_id in user_ids:
                 user = crud_user.get_user(db, user_id=user_id)
-                if user and user.fcm_token and user.push_notifications_enabled:
-                    device_tokens.append(user.fcm_token)
+                if user and user.device_token and user.push_notifications_enabled:
+                    device_tokens.append(user.device_token)
+                    registry_owners_by_token.setdefault(user.device_token, []).append(
+                        user.id
+                    )
+
+            # PR-5 codex round 6: a shared device token must be fanned out
+            # exactly once, while every owner stays mapped for the cleanup.
+            device_tokens = list(dict.fromkeys(device_tokens))
 
             if not device_tokens:
                 return {
@@ -259,6 +293,22 @@ class MobileServiceEnhanced:
                 data=data,
                 image=image,
             )
+
+            for entry in result.get("results", []):
+                if entry.get("success"):
+                    continue
+                failed_token = device_tokens[entry.get("token_index", -1)]
+                for owner_id in registry_owners_by_token.get(failed_token, []):
+                    if is_unregistered_token_response(
+                        FCMResponse(
+                            success=False,
+                            error=entry.get("error"),
+                            error_code=entry.get("error_code"),
+                        )
+                    ):
+                        crud_user.clear_device_token_if_unchanged(
+                            db, user_id=owner_id, expected_token=failed_token
+                        )
 
             return result
 

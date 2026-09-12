@@ -37,9 +37,14 @@ DATABASE_URL=postgresql://<db_user>:<db_password>@localhost:5432/clinic
 BACKEND_CORS_ORIGINS=https://your-domain.com
 FRONTEND_URL=https://your-domain.com
 
-# FCM (Optional but recommended)
+# FCM (Optional but recommended) - PR-5: HTTP v1 API only
+# 1. Firebase Console > Project Settings > Service accounts >
+#    "Generate new private key" (role: Firebase Cloud Messaging API Admin)
+# 2. Place the JSON file on the server and point GOOGLE_APPLICATION_CREDENTIALS
+#    at it. FCM_SERVER_KEY/FCM_SENDER_ID (legacy Cloud Messaging API) are
+#    removed - the legacy API is shut down and topics are not used.
 FCM_ENABLED=true
-FCM_SERVER_KEY=your-fcm-server-key
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 FCM_PROJECT_ID=your-fcm-project-id
 
 # BACKUP (Recommended)

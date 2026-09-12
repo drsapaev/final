@@ -309,6 +309,34 @@ def get_users_with_fcm_tokens(db: Session) -> list[User]:
     return list(db.execute(stmt).scalars().all())
 
 
+def clear_device_token_if_unchanged(
+    db: Session, *, user_id: int, expected_token: str
+) -> bool:
+    """PR-5: atomic conditional cleanup of a dead FCM token.
+
+    Clears the single-device registry only when it still holds
+    ``expected_token`` (codex rounds 3-4: a replacement token registered
+    while a failing send was in flight is never wiped, and only canonical
+    UNREGISTERED verdicts reach this point). Returns True when a row was
+    cleared.
+    """
+    updated = (
+        db.query(User)
+        .filter(User.id == user_id, User.device_token == expected_token)
+        .update(
+            {
+                "device_token": None,
+                "device_type": None,
+                "device_info": None,
+                "push_notifications_enabled": False,
+            },
+            synchronize_session=False,
+        )
+    )
+    db.commit()
+    return bool(updated)
+
+
 # === PR-1: Mobile API wrappers ===
 
 from app.models.user_profile import UserNotificationSettings, UserProfile
