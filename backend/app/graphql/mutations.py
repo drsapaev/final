@@ -23,9 +23,6 @@ from strawberry import UNSET
 from app.core.audit import extract_model_changes, log_critical_change
 from app.core.i18n import t
 from app.core.pii_masker import mask_pii
-from app.crud import (
-    online_queue as crud_queue,
-)
 
 # NOTE: ``from app.crud import patient/appointment`` возвращает ИНСТАНСЫ
 # CRUD-классов (star-import в app/crud/__init__.py), поэтому module-level
@@ -38,8 +35,10 @@ from app.crud.appointment import (
 )
 from app.crud.clinic import get_queue_settings
 from app.crud.patient import soft_delete_patient
+
+# Backward-compatible monkeypatch seam for the registry deactivation regression.
 from app.crud.queue_resource_routing import (
-    resolve_tag_resource as _resolve_tag_resource,
+    resolve_tag_resource as _resolve_tag_resource,  # noqa: F401
 )
 from app.crud.queue_resource_routing import (
     resolve_tag_resource_locked as _resolve_tag_resource_locked,
@@ -57,7 +56,12 @@ from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.display_websocket import get_display_manager
 from app.services.patient_service import PatientService
 from app.services.qr_queue import QRQueueService
+from app.services.queue_claim_service import (
+    QueueClaimConflictError,
+    lock_and_resolve_active_tag_claim,
+)
 from app.services.queue_position_notifications import notify_patient_called_sync
+from app.services.queue_service import queue_service
 from app.services.services_api_service import ServicesApiService
 from app.services.visit_lifecycle_service import VisitLifecycleService
 
@@ -1003,19 +1007,14 @@ class Mutation:
                         errors=["PATIENT_NOT_FOUND"],
                     )
 
-                # Codex P1 (round-14): лочим строку врача на момент загрузки
-                # и обновляем атрибуты из БД (populate_existing) —
-                # параллельная деактивация блокируется до коммита мутации,
-                # а закоммиченная ДО лока видна свежими атрибутами; лок
-                # удерживается до финальной вставки (хелперы ниже не коммитят).
-                doctor = (
-                    db.query(Doctor)
-                    .filter(Doctor.id == input.doctor_id)
-                    .with_for_update()
-                    .populate_existing()
-                    .first()
+                # Preserve the public error precedence without taking a row
+                # lock yet: an unknown target still returns DOCTOR_NOT_FOUND
+                # before any patient-claim response. The fresh FOR UPDATE read
+                # remains below the common tag/day lock.
+                doctor_exists = (
+                    db.query(Doctor.id).filter(Doctor.id == input.doctor_id).first()
                 )
-                if not doctor:
+                if doctor_exists is None:
                     return QueueMutationResponse(
                         success=False,
                         message=t("doctor.not_found"),
@@ -1033,27 +1032,59 @@ class Mutation:
                 today = now_local.date()
                 queue_start_hour = queue_settings.get("queue_start_hour", 7)
 
-                # P1: сериализуем СОЗДАНИЕ очереди на ключе (doctor, day, tag) —
-                # get_or_create_daily_queue это query-then-insert без
-                # unique-констрейнта; advisory lock (Postgres) закрывает гонку
-                # двух первых joinQueue. SQLite (тесты) пропускает.
-                # QD-2C: тег реестра лочится по (tag, day) — ресурсная
-                # очередь одна на день независимо от переданного врача
-                # (унификация тег-первый в get_or_create_daily_queue).
-                if db.bind is not None and db.bind.dialect.name == "postgresql":
-                    if _resolve_tag_resource(db, input.queue_tag) is not None:
-                        lock_key = (
-                            f"daily_queue:tag:{input.queue_tag}:"
-                            f"{today.isoformat()}"
+                # QD-2E: один claim-lock на точный (day, queue_tag) берётся
+                # ДО row-lock врача/ресурса/очереди. Поэтому два writer-а,
+                # направляющие одного пациента к разным владельцам общего
+                # тега, не могут оба пройти проверку и создать два талона.
+                # Helper только читает и не завершает транзакцию; advisory
+                # xact-lock живёт до единственного commit после INSERT ниже.
+                active_tag_claim = None
+                if input.queue_tag:
+                    try:
+                        active_tag_claim = lock_and_resolve_active_tag_claim(
+                            db,
+                            day=today,
+                            queue_tag=input.queue_tag,
+                            patient_id=input.patient_id,
+                            phone=patient.phone,
                         )
-                    else:
-                        lock_key = (
-                            f"daily_queue:{input.doctor_id}:"
-                            f"{today.isoformat()}:{input.queue_tag or ''}"
+                    except QueueClaimConflictError:
+                        return QueueMutationResponse(
+                            success=False,
+                            message=(
+                                "У пациента уже есть активная запись в очереди "
+                                "этого направления"
+                            ),
+                            errors=["QUEUE_CONFLICT"],
                         )
+                elif db.bind is not None and db.bind.dialect.name == "postgresql":
+                    # Untagged doctor queues have no shared tag scope. Preserve
+                    # their original creation lock without collapsing every
+                    # NULL tag into one false cross-doctor claim scope.
                     db.execute(
                         text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
-                        {"k": lock_key},
+                        {
+                            "k": (
+                                f"daily_queue:{input.doctor_id}:"
+                                f"{today.isoformat()}:"
+                            )
+                        },
+                    )
+
+                # Row-lock follows the common tag/day lock. It keeps doctor
+                # eligibility stable through the final queue-entry commit.
+                doctor = (
+                    db.query(Doctor)
+                    .filter(Doctor.id == input.doctor_id)
+                    .with_for_update()
+                    .populate_existing()
+                    .first()
+                )
+                if not doctor:
+                    return QueueMutationResponse(
+                        success=False,
+                        message=t("doctor.not_found"),
+                        errors=["DOCTOR_NOT_FOUND"],
                     )
 
                 # QD-2C (Codex round-21 P1): joinQueue по тегу реестра
@@ -1081,10 +1112,73 @@ class Mutation:
                 # (day, tag) маршрутизирует и при деактивированной строке
                 # реестра (tag_routes_to_resource), новая — только при
                 # АКТИВНОЙ строке (locked-resolve).
-                registry_routed = bool(input.queue_tag) and (
-                    tag_routes_to_resource(db, input.queue_tag, today) is not None
-                    or _resolve_tag_resource_locked(db, input.queue_tag) is not None
+                registry_surface = None
+                registry_resource = None
+                if input.queue_tag:
+                    registry_surface = tag_routes_to_resource(
+                        db, input.queue_tag, today
+                    )
+                    # An existing resource-owned queue remains routable after
+                    # registry deactivation. Otherwise lock/re-read the active
+                    # registry row before deciding that this is a resource
+                    # claim. The common tag lock was already acquired above.
+                    if (
+                        registry_surface is None
+                        or getattr(registry_surface, "queue_resource_id", None) is None
+                    ):
+                        registry_resource = _resolve_tag_resource_locked(
+                            db, input.queue_tag
+                        )
+                registry_routed = (
+                    registry_surface is not None or registry_resource is not None
                 )
+
+                if active_tag_claim is not None:
+                    claim_queue = active_tag_claim.daily_queue
+                    if registry_routed:
+                        registry_surface_id = getattr(registry_surface, "id", None)
+                        requested_resource_id = (
+                            getattr(registry_surface, "queue_resource_id", None)
+                            if registry_surface is not None
+                            and getattr(
+                                registry_surface, "queue_resource_id", None
+                            )
+                            is not None
+                            else int(registry_resource.id)
+                            if registry_resource is not None
+                            else None
+                        )
+                        same_owner = (
+                            registry_surface_id is not None
+                            and claim_queue.id == registry_surface_id
+                        ) or (
+                            requested_resource_id is not None
+                            and claim_queue.queue_resource_id
+                            == requested_resource_id
+                        )
+                    else:
+                        same_owner = (
+                            claim_queue.specialist_id == input.doctor_id
+                            and claim_queue.queue_resource_id is None
+                        )
+
+                    if same_owner:
+                        return QueueMutationResponse(
+                            success=False,
+                            message=(
+                                "Пациент уже стоит в очереди к этому врачу сегодня"
+                            ),
+                            errors=["ALREADY_IN_QUEUE"],
+                        )
+                    return QueueMutationResponse(
+                        success=False,
+                        message=(
+                            "У пациента уже есть активная запись в другой "
+                            "очереди этого направления"
+                        ),
+                        errors=["QUEUE_CONFLICT"],
+                    )
+
                 if not registry_routed:
                     # Codex P1 (round-8): канонический eligibility-предикат (SSOT,
                     # тот же, что в createAppointment): Doctor.active + завершённый
@@ -1100,19 +1194,71 @@ class Mutation:
                             errors=["DOCTOR_INACTIVE"],
                         )
 
-                # SSOT: get_or_create_daily_queue (уникальность day+specialist+tag).
-                # Codex P1 (round-8): новая очередь получает сконфигурированную
-                # капу врача (max_online_per_day) вместо дефолта модели 15 —
-                # как канонический queue_svc flow (defaults).
-                daily_queue = crud_queue.get_or_create_daily_queue(
-                    db,
-                    day=today,
-                    specialist_id=input.doctor_id,
-                    queue_tag=input.queue_tag,
-                    defaults={
-                        "max_online_entries": doctor.max_online_per_day,
-                    },
-                )
+                # Preserve the legacy GraphQL response for an exact inactive
+                # doctor-owned queue. QueueBusinessService intentionally only
+                # reuses active doctor queues and would otherwise create a new
+                # row, changing QUEUE_INACTIVE into a successful join.
+                existing_doctor_queue = None
+                if not registry_routed:
+                    existing_doctor_queue_query = db.query(DailyQueue).filter(
+                        DailyQueue.day == today,
+                        DailyQueue.specialist_id == input.doctor_id,
+                    )
+                    if input.queue_tag:
+                        existing_doctor_queue_query = (
+                            existing_doctor_queue_query.filter(
+                                DailyQueue.queue_tag == input.queue_tag
+                            )
+                        )
+                    else:
+                        existing_doctor_queue_query = (
+                            existing_doctor_queue_query.filter(
+                                DailyQueue.queue_tag.is_(None)
+                            )
+                        )
+                    existing_doctor_queue = existing_doctor_queue_query.first()
+                    if (
+                        existing_doctor_queue is not None
+                        and not existing_doctor_queue.active
+                    ):
+                        return QueueMutationResponse(
+                            success=False,
+                            message=(
+                                "Очередь деактивирована. Обратитесь в регистратуру."
+                            ),
+                            errors=["QUEUE_INACTIVE"],
+                        )
+
+                # Reuse the exact doctor queue found above. For a new untagged
+                # queue, create locally without commit: QueueBusinessService's
+                # legacy doctor lookup deliberately omits a queue_tag filter
+                # when the value is NULL and could reuse an unrelated tagged
+                # queue. Tagged/resource creation uses the canonical service,
+                # which flushes without ending the transaction.
+                if existing_doctor_queue is not None:
+                    daily_queue = existing_doctor_queue
+                elif not input.queue_tag and not registry_routed:
+                    daily_queue = DailyQueue(
+                        day=today,
+                        specialist_id=input.doctor_id,
+                        queue_resource_id=None,
+                        queue_tag=None,
+                        cabinet_number=doctor.cabinet,
+                        active=True,
+                        max_online_entries=doctor.max_online_per_day,
+                    )
+                    db.add(daily_queue)
+                    db.flush()
+                else:
+                    daily_queue = queue_service.get_or_create_daily_queue(
+                        db,
+                        day=today,
+                        specialist_id=input.doctor_id,
+                        queue_tag=input.queue_tag,
+                        defaults={
+                            "max_online_entries": doctor.max_online_per_day,
+                        },
+                    )
 
                 # QD-2C (Codex round-22 P2, теперь пояс-надежности): даже при
                 # стабилизированном под локом registry_routed проверяем ФАКТ
@@ -1124,43 +1270,6 @@ class Mutation:
                 # иначе — канонический гвард врача задним числом (реальный
                 # врач прошёл бы его и раньше — семантика байт-идентична).
                 if registry_routed and daily_queue.queue_resource_id is None:
-                    try:
-                        ensure_doctor_eligible_for_appointment(db, input.doctor_id)
-                    except HTTPException:
-                        return QueueMutationResponse(
-                            success=False,
-                            message="Врач недоступен для онлайн-записи",
-                            errors=["DOCTOR_INACTIVE"],
-                        )
-
-                # Codex P1 (round-15): get_or_create_daily_queue КОММИТИТ при
-                # создании очереди (и при обновлении кабинета) — внутренний
-                # commit завершает транзакцию и ОТПУСКАЕТ лок строки врача и
-                # advisory-лок; параллельная деактивация врача может
-                # закоммититься в этом окне, и без повторной проверки пациент
-                # попал бы в очередь уже недоступного врача. Пере-захватываем
-                # лок строки врача (populate_existing -> свежие атрибуты) и
-                # повторяем канонический eligibility-предикат; лок держится до
-                # финального коммита вставки талона (порядок локов
-                # doctor -> queue сохраняется — дедлоков нет).
-                # QD-2C (Codex round-21 P1): только для ДОКТОРСКОЙ ветки —
-                # registry-routed join не гвардится врачом (см. выше); его
-                # doctor-строка используется лишь как fallback капы/старта,
-                # а ресурсная очередь несёт собственные значения реестра.
-                if not registry_routed:
-                    doctor = (
-                        db.query(Doctor)
-                        .filter(Doctor.id == input.doctor_id)
-                        .with_for_update()
-                        .populate_existing()
-                        .first()
-                    )
-                    if not doctor:
-                        return QueueMutationResponse(
-                            success=False,
-                            message=t("doctor.not_found"),
-                            errors=["DOCTOR_NOT_FOUND"],
-                        )
                     try:
                         ensure_doctor_eligible_for_appointment(db, input.doctor_id)
                     except HTTPException:

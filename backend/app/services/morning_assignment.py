@@ -28,36 +28,18 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.visit import Visit, VisitService
+from app.services.queue_claim_service import (
+    QueueClaimConflictError,
+    lock_and_resolve_active_tag_claim,
+)
 from app.services.queue_service import queue_service
 from app.services.service_mapping import get_service_code
 
 logger = logging.getLogger(__name__)
 
 
-WIZARD_DUPLICATE_ACTIVE_STATUSES = (
-    "waiting",
-    "called",
-    "in_service",
-    "diagnostics",
-)
-
-
-class MorningAssignmentClaimError(ValueError):
-    """Raised when a wizard-family queue claim cannot be resolved safely."""
-
-
-WIZARD_DUPLICATE_ACTIVE_STATUSES = (
-    "waiting",
-    "called",
-    "in_service",
-    "diagnostics",
-)
-
-
-class MorningAssignmentClaimError(
-    ValueError
-):  # noqa: F811  # manual-review: intentional redefinition for compatibility
-    """Raised when a wizard-family queue claim cannot be resolved safely."""
+class MorningAssignmentClaimError(QueueOwnerConfigurationError):
+    """A conflicting claim that must abort wizard and batch assignment."""
 
 
 @dataclass(frozen=True)
@@ -603,15 +585,18 @@ class MorningAssignmentService:
         # ниже: (1) единственный врач услуг тега в ЭТОМ визите,
         # (2) переиспользование уже открытой поверхности тега/дня;
         # иначе — конфигурационная ошибка, не тихий None.
-        registry_tag = False
-        if not doctor_id:
-            if resolve_tag_resource(self.db, queue_tag) is not None:
-                registry_tag = True
-                doctor = None
-                logger.info(
-                    "queue_tag=%s routes to the queue resource axis (QD-2C)",
-                    queue_tag,
-                )
+        registry_resource = resolve_tag_resource(self.db, queue_tag)
+        registry_tag = registry_resource is not None
+        if registry_tag:
+            # Resource routing is tag-owned even when the visit also carries a
+            # doctor.  ``get_or_create_daily_queue`` applies the same rule; do
+            # not validate a resource claim against the visit doctor first.
+            doctor_id = None
+            doctor = None
+            logger.info(
+                "queue_tag=%s routes to the queue resource axis (QD-2C)",
+                queue_tag,
+            )
 
         if not doctor_id and not registry_tag:
             # QD-2E (RQ-15.b): явный владелец из услуг ЭТОГО визита —
@@ -666,6 +651,53 @@ class MorningAssignmentService:
                     ),
                 )
 
+        patient = self.db.query(Patient).filter(Patient.id == visit.patient_id).first()
+        patient_name = None
+        phone = None
+        if patient:
+            if hasattr(patient, 'short_name'):
+                patient_name = patient.short_name()
+            elif hasattr(patient, 'last_name') and hasattr(patient, 'first_name'):
+                patient_name = f"{patient.last_name} {patient.first_name}".strip()
+            phone = patient.phone if hasattr(patient, 'phone') else None
+
+        try:
+            existing_claim = lock_and_resolve_active_tag_claim(
+                self.db,
+                day=target_date,
+                queue_tag=queue_tag,
+                patient_id=visit.patient_id,
+                phone=phone,
+            )
+        except QueueClaimConflictError as exc:
+            raise MorningAssignmentClaimError(
+                "Cannot safely resolve the active queue claim for "
+                f"queue_tag={queue_tag}"
+            ) from exc
+
+        # An already-open resource queue remains the routing surface for its
+        # day after registry deactivation.  The claim coordinator has already
+        # locked the exact (day, tag) scope, so this cannot race a competing
+        # claim creator in another wizard-family writer.
+        if (
+            existing_claim is not None
+            and existing_claim.daily_queue.queue_resource_id is not None
+        ):
+            registry_tag = True
+            doctor_id = None
+            doctor = None
+
+        if existing_claim is not None and doctor_id is not None and not registry_tag:
+            claim_queue = existing_claim.daily_queue
+            if (
+                claim_queue.specialist_id != doctor_id
+                or claim_queue.queue_resource_id is not None
+            ):
+                raise MorningAssignmentClaimError(
+                    "Active queue claim belongs to a different owner for "
+                    f"queue_tag={queue_tag}"
+                )
+
         surface_reuse = None
         if not doctor_id and not registry_tag:
             # Surface reuse: already opened queue for this tag/day. Its
@@ -674,13 +706,17 @@ class MorningAssignmentService:
             # since been deactivated — tag_routes_to_resource in
             # get_or_create_daily_queue returns that queue either way).
             existing_queue = (
-                self.db.query(DailyQueue)
-                .filter(
-                    DailyQueue.day == target_date,
-                    DailyQueue.queue_tag == queue_tag,
-                    DailyQueue.active == True,
+                existing_claim.daily_queue
+                if existing_claim is not None
+                else (
+                    self.db.query(DailyQueue)
+                    .filter(
+                        DailyQueue.day == target_date,
+                        DailyQueue.queue_tag == queue_tag,
+                        DailyQueue.active == True,
+                    )
+                    .first()
                 )
-                .first()
             )
             if existing_queue is not None:
                 if existing_queue.specialist_id is not None:
@@ -722,36 +758,12 @@ class MorningAssignmentService:
                 ),
             }
 
-        daily_queue, existing_entry = self._resolve_existing_queue_claim_or_raise(
-            patient_id=visit.patient_id,
-            target_date=target_date,
-            queue_tag=queue_tag,
-            resolved_specialist_id=(None if registry_tag else doctor_id),
+        existing_entry = existing_claim.entry if existing_claim is not None else None
+        daily_queue = (
+            existing_claim.daily_queue
+            if existing_claim is not None
+            else surface_reuse
         )
-
-        # QD-2E (Codex round-2 P1): у визита решён ЯВНЫЙ врач (визит или
-        # единственная услуга тега) — НОВАЯ запись создаётся в очереди
-        # ЭТОГО врача (PR-26 per-doctor), а не в чужой (day, tag)-очереди
-        # другого врача, которую вернул claim-резолв по тегу. Существующий
-        # claim пациента (existing_entry) остаётся где есть — дедуп per-tag
-        # сохранён; registry-теги и ресурсные поверхности не затронуты
-        # (их (day, tag)-очередь и есть единственная поверхность).
-        if (
-            existing_entry is None
-            and daily_queue is not None
-            and not registry_tag
-            and doctor_id is not None
-            and daily_queue.specialist_id != doctor_id
-        ):
-            logger.info(
-                "QD-2E: tag surface queue id=%s (specialist=%s) does not match "
-                "the resolved owner doctor_id=%s — creating the entry on the "
-                "owner's queue (PR-26 per-doctor contract)",
-                daily_queue.id,
-                daily_queue.specialist_id,
-                doctor_id,
-            )
-            daily_queue = None
 
         if not daily_queue:
             daily_queue = queue_service.get_or_create_daily_queue(
@@ -775,19 +787,6 @@ class MorningAssignmentService:
                     "status": "existing",
                 }
             )
-        # ✅ ИСПРАВЛЕНО: Используем SSOT queue_service для создания записи
-        # Получаем информацию о пациенте для передачи в create_queue_entry
-        patient = self.db.query(Patient).filter(Patient.id == visit.patient_id).first()
-        patient_name = None
-        phone = None
-        if patient:
-            # Формируем имя пациента
-            if hasattr(patient, 'short_name'):
-                patient_name = patient.short_name()
-            elif hasattr(patient, 'last_name') and hasattr(patient, 'first_name'):
-                patient_name = f"{patient.last_name} {patient.first_name}".strip()
-            phone = patient.phone if hasattr(patient, 'phone') else None
-
         # Получаем queue_time (бизнес-время регистрации)
         from zoneinfo import ZoneInfo
 
@@ -861,87 +860,6 @@ class MorningAssignmentService:
                 },
             )
         )
-
-    def _resolve_existing_queue_claim_or_raise(
-        self,
-        *,
-        patient_id: int,
-        target_date: date,
-        queue_tag: str,
-        resolved_specialist_id: int | None = None,
-    ) -> tuple[DailyQueue | None, OnlineQueueEntry | None]:
-        """Дедуп-резолв существующего claim'а пациента по тегу + выбор
-        поверхности для НОВОЙ записи.
-
-        QD-2E (Codex round-3 P1): ``resolved_specialist_id`` — явный
-        владелец визита (врач визита или единственная услуга тега).
-        PR-26 допускает НЕСКОЛЬКО активных (day, tag)-очередей разных
-        врачей — для пациента БЕЗ существующего claim'а поверхностью
-        является очередь РЕШЁННОГО владельца (или никакая — создаст
-        get_or_create); неоднозначность тега — только когда владелец
-        не решён (registry-поверхности передают None — их (day, tag)-
-        очередь единственна по контракту частичного UNIQUE).
-        """
-        active_queues = (
-            self.db.query(DailyQueue)
-            .filter(
-                DailyQueue.day == target_date,
-                DailyQueue.queue_tag == queue_tag,
-                DailyQueue.active == True,
-            )
-            .order_by(DailyQueue.id.asc())
-            .all()
-        )
-
-        if not active_queues:
-            return None, None
-
-        active_entries = (
-            self.db.query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.queue_id.in_([queue.id for queue in active_queues]),
-                OnlineQueueEntry.patient_id == patient_id,
-                OnlineQueueEntry.status.in_(WIZARD_DUPLICATE_ACTIVE_STATUSES),
-            )
-            .order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc())
-            .all()
-        )
-
-        if len(active_entries) > 1:
-            raise MorningAssignmentClaimError(
-                "Ambiguous active queue entry for " f"queue_tag={queue_tag}"
-            )
-
-        if len(active_entries) == 1:
-            queue_by_id = {queue.id: queue for queue in active_queues}
-            matched_queue = queue_by_id.get(active_entries[0].queue_id)
-            if matched_queue is None:
-                raise MorningAssignmentClaimError(
-                    "Could not safely match active queue entry for "
-                    f"queue_tag={queue_tag}"
-                )
-            return matched_queue, active_entries[0]
-
-        # нет существующего claim'а: у решённого владельца своя очередь —
-        # она и есть поверхность для новой записи (PR-26 multi-doctor);
-        # чужие (day, tag)-очереди того же тега неоднозначности не создают
-        if resolved_specialist_id is not None:
-            owner_queue = next(
-                (
-                    queue
-                    for queue in active_queues
-                    if queue.specialist_id == resolved_specialist_id
-                ),
-                None,
-            )
-            return owner_queue, None
-
-        if len(active_queues) > 1:
-            raise MorningAssignmentClaimError(
-                "Ambiguous active queue for " f"queue_tag={queue_tag}"
-            )
-
-        return active_queues[0], None
 
     def get_morning_assignment_stats(
         self, target_date: date | None = None

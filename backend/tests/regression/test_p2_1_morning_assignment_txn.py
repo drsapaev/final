@@ -179,7 +179,10 @@ def _setup_confirmed_visits(session, n: int = 3) -> tuple[list[int], int]:
             first_name="Reg",
             birth_date=date(1990, 1, 1),
             sex="M",
-            phone="+998900000000",
+            # PatientService treats phone as a unique patient identity. Keep
+            # this transaction-boundary fixture valid so the three visits do
+            # not intentionally exercise the queue identity-conflict path.
+            phone=f"+9989000000{i:02d}",
             email=f"patient{i}_{unique}@test.local",
             created_at=datetime.now(UTC),
             is_deleted=False,

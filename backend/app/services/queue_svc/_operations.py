@@ -4,10 +4,16 @@ Split from queue_service.py.
 """
 from __future__ import annotations
 
+from typing import NoReturn
+
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import expand_queue_tags
 from app.crud import queue_resource_routing
 from app.models.online_queue import QueueResource
+from app.services.queue_claim_service import (
+    QueueClaimConflictError,
+    lock_and_resolve_active_tag_claim,
+)
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase, _now
 from app.services.user_mgmt._base import (
@@ -100,43 +106,43 @@ def _unbookable_doctor_ids(
     return unbookable
 
 
-def _find_clinic_wide_duplicate(
+def _lock_and_resolve_tag_claim(
     db: Session,
-    doctors: list[Doctor],
     *,
     day,
     queue_tag: str,
+    patient_id: int | None,
     phone: str | None,
-    telegram_id: str | None,
-) -> tuple[OnlineQueueEntry | None, DailyQueue | None]:
-    """The patient's existing entry across ALL candidate doctors'
-    active same-day queues for ``queue_tag`` (Codex round-4 P1):
-    duplicates must be resolved BEFORE least-load routing — a retry or
-    double submit raises the first doctor's load, so routing would
-    pick a sibling and the per-queue ``check_uniqueness`` would let a
-    SECOND entry for the same patient through under another doctor."""
-    if not phone and not telegram_id:
-        return None, None
-    base = (
-        db.query(OnlineQueueEntry)
-        .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-        .filter(
-            DailyQueue.day == day,
-            DailyQueue.specialist_id.in_([d.id for d in doctors]),
-            DailyQueue.active.is_(True),
-            DailyQueue.queue_tag == queue_tag,
-            OnlineQueueEntry.status.in_(["waiting", "called"]),
+    telegram_id: int | str | None,
+):
+    """Acquire the tag/day claim lock and expose domain-safe conflicts."""
+    try:
+        return lock_and_resolve_active_tag_claim(
+            db,
+            day=day,
+            queue_tag=queue_tag,
+            patient_id=patient_id,
+            phone=phone,
+            telegram_id=telegram_id,
         )
+    except QueueClaimConflictError as exc:
+        raise QueueConflictError(
+            "У пациента уже есть неоднозначная активная запись в этом направлении"
+        ) from exc
+
+
+def _queue_owner_matches(left: DailyQueue, right: DailyQueue) -> bool:
+    """Return whether two queue rows name the same exact routing owner."""
+    return (
+        left.specialist_id == right.specialist_id
+        and left.queue_resource_id == right.queue_resource_id
     )
-    entry = None
-    if phone:
-        entry = base.filter(OnlineQueueEntry.phone == phone).first()
-    if entry is None and telegram_id:
-        entry = base.filter(OnlineQueueEntry.telegram_id == telegram_id).first()
-    if entry is None:
-        return None, None
-    queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
-    return entry, queue
+
+
+def _raise_cross_owner_claim_conflict() -> NoReturn:
+    raise QueueConflictError(
+        "У пациента уже есть активная запись в другую очередь этого направления"
+    )
 
 
 class OperationsMixin(QueueBusinessServiceMixinBase):
@@ -973,6 +979,8 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         daily_queue: DailyQueue | None = token_meta.get("daily_queue")
         specialist_name = token_meta.get("specialist_name")
         cabinet = token_meta.get("cabinet")
+        queue_tag = daily_queue.queue_tag if daily_queue is not None else None
+        resolved_claim_entry: OnlineQueueEntry | None = None
 
         # Поддержка общего QR (clinic-wide)
         if token_obj.is_clinic_wide:
@@ -1041,13 +1049,47 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     None,
                 )
                 if resource_tag is not None:
-                    daily_queue = self.get_or_create_daily_queue(
+                    tag_claim = _lock_and_resolve_tag_claim(
                         db,
                         day=day,
-                        specialist_id=None,
                         queue_tag=resource_tag,
+                        patient_id=patient_id,
+                        phone=phone,
+                        telegram_id=telegram_id,
                     )
                     queue_tag = resource_tag
+                    if tag_claim is not None:
+                        expected_surface = queue_resource_routing.tag_routes_to_resource(
+                            db, resource_tag, day
+                        )
+                        expected_resource = queue_resource_routing.resolve_tag_resource(
+                            db, resource_tag
+                        )
+                        expected_resource_id = (
+                            expected_surface.queue_resource_id
+                            if expected_surface is not None
+                            else (
+                                expected_resource.id
+                                if expected_resource is not None
+                                else None
+                            )
+                        )
+                        claim_queue = tag_claim.daily_queue
+                        if (
+                            expected_resource_id is None
+                            or claim_queue.specialist_id is not None
+                            or claim_queue.queue_resource_id != expected_resource_id
+                        ):
+                            _raise_cross_owner_claim_conflict()
+                        daily_queue = claim_queue
+                        resolved_claim_entry = tag_claim.entry
+                    else:
+                        daily_queue = self.get_or_create_daily_queue(
+                            db,
+                            day=day,
+                            specialist_id=None,
+                            queue_tag=resource_tag,
+                        )
                     # Round-18 pattern (validate_queue_token): the join
                     # metadata advertises the REGISTRY owner — display_name
                     # over the 0055 synthetic's «Врач ID ...» — and the
@@ -1067,6 +1109,14 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                         resource.default_cabinet if resource is not None else None
                     )
                 else:
+                    tag_claim = _lock_and_resolve_tag_claim(
+                        db,
+                        day=day,
+                        queue_tag=profile_key,
+                        patient_id=patient_id,
+                        phone=phone,
+                        telegram_id=telegram_id,
+                    )
                     # Ищем врачей с specialty из queue_tags профиля.
                     # Incomplete ("general" sentinel) profiles are explicitly
                     # excluded: they are not clinical-eligible for specialty QR
@@ -1098,19 +1148,18 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     # (waiting+called), ties break to the lowest Doctor.id.
                     # queue_tag scopes the bookability pre-check to the exact
                     # (day, doctor, tag) row the join will use (Codex round-1 P1).
-                    # Codex round-4 P1: resolve the patient's EXISTING entry
-                    # across the profile's candidate queues BEFORE least-load
-                    # routing (see _find_clinic_wide_duplicate) — otherwise a
-                    # retry lands a second entry under another doctor.
-                    existing_entry, existing_queue = _find_clinic_wide_duplicate(
-                        db,
-                        eligible_doctors,
-                        day=day,
-                        queue_tag=profile_key,
-                        phone=phone,
-                        telegram_id=telegram_id,
-                    )
-                    if existing_queue is not None:
+                    # Resolve an existing identity claim while the common
+                    # tag/day transaction lock is held, before least-load
+                    # routing can select a sibling owner.
+                    eligible_doctor_ids = {doctor.id for doctor in eligible_doctors}
+                    if tag_claim is not None:
+                        existing_queue = tag_claim.daily_queue
+                        if (
+                            existing_queue.queue_resource_id is not None
+                            or existing_queue.specialist_id not in eligible_doctor_ids
+                        ):
+                            _raise_cross_owner_claim_conflict()
+                        resolved_claim_entry = tag_claim.entry
                         doctor = existing_queue.specialist or (
                             db.query(Doctor)
                             .filter(Doctor.id == existing_queue.specialist_id)
@@ -1192,13 +1241,31 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     "max_online_entries": doctor.max_online_per_day,
                     "cabinet_number": doctor.cabinet,
                 }
-                daily_queue = self.get_or_create_daily_queue(
+                tag_claim = _lock_and_resolve_tag_claim(
                     db,
                     day=day,
-                    specialist_id=doctor.id,
                     queue_tag=queue_tag,
-                    defaults=defaults,
+                    patient_id=patient_id,
+                    phone=phone,
+                    telegram_id=telegram_id,
                 )
+                if tag_claim is not None:
+                    claim_queue = tag_claim.daily_queue
+                    if (
+                        claim_queue.specialist_id != doctor.id
+                        or claim_queue.queue_resource_id is not None
+                    ):
+                        _raise_cross_owner_claim_conflict()
+                    daily_queue = claim_queue
+                    resolved_claim_entry = tag_claim.entry
+                else:
+                    daily_queue = self.get_or_create_daily_queue(
+                        db,
+                        day=day,
+                        specialist_id=doctor.id,
+                        queue_tag=queue_tag,
+                        defaults=defaults,
+                    )
                 if doctor.user:
                     specialist_name = doctor.user.full_name or doctor.user.username
                 specialist_name = specialist_name or f"Врач #{doctor.id}"
@@ -1218,6 +1285,23 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     )
             if not daily_queue:
                 raise QueueNotFoundError("Очередь ещё не активна")
+            queue_tag = daily_queue.queue_tag
+            if queue_tag:
+                tag_claim = _lock_and_resolve_tag_claim(
+                    db,
+                    day=day,
+                    queue_tag=queue_tag,
+                    patient_id=patient_id,
+                    phone=phone,
+                    telegram_id=telegram_id,
+                )
+                if tag_claim is not None:
+                    if not _queue_owner_matches(
+                        tag_claim.daily_queue, daily_queue
+                    ):
+                        _raise_cross_owner_claim_conflict()
+                    daily_queue = tag_claim.daily_queue
+                    resolved_claim_entry = tag_claim.entry
 
         # Валидации пациента
         is_valid, validation_message = self.validate_queue_entry_data(
@@ -1226,19 +1310,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if not is_valid:
             raise QueueValidationError(validation_message)
 
-        time_allowed, time_message = self.check_queue_time_window(
-            day, daily_queue.opened_at
-        )
-        if not time_allowed:
-            raise QueueValidationError(time_message)
-
-        limits_ok, limits_message = self.check_queue_limits(db, daily_queue)
-        if not limits_ok:
-            raise QueueConflictError(limits_message)
-
-        existing_entry, duplicate_reason = self.check_uniqueness(
-            db, daily_queue, phone, telegram_id, source=source
-        )
+        if resolved_claim_entry is not None:
+            existing_entry = resolved_claim_entry
+            duplicate_reason = "существующей активной записи"
+        else:
+            existing_entry, duplicate_reason = self.check_uniqueness(
+                db, daily_queue, phone, telegram_id, source=source
+            )
 
         queue_length_before = (
             db.query(func.count(OnlineQueueEntry.id))
@@ -1265,6 +1343,16 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 "daily_queue": daily_queue,
                 "token": token_obj,
             }
+
+        time_allowed, time_message = self.check_queue_time_window(
+            day, daily_queue.opened_at
+        )
+        if not time_allowed:
+            raise QueueValidationError(time_message)
+
+        limits_ok, limits_message = self.check_queue_limits(db, daily_queue)
+        if not limits_ok:
+            raise QueueConflictError(limits_message)
 
         entry = self.create_queue_entry(
             db,

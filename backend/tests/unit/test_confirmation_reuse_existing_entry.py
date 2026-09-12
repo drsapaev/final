@@ -204,6 +204,7 @@ def test_assign_queue_numbers_on_confirmation_uses_domain_boundary_for_new_entry
                 "visit_id": test_visit.id,
                 "number": 4,
                 "source": "confirmation",
+                "commit": False,
             },
         }
     ]

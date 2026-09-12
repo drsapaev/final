@@ -40,7 +40,7 @@ from app.crud.queue_owner_policy import (
     single_active_service_doctor,
 )
 from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, QueueResource
+from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -1151,6 +1151,113 @@ def test_visit_confirmation_registry_tag_keeps_working(db_session: Session) -> N
     assert queue.specialist_id is None
 
 
+def test_confirmation_reuses_resource_claim_when_visit_has_doctor(
+    db_session: Session,
+) -> None:
+    """A visit doctor must not turn a registry tag into a doctor queue."""
+    from app.services.visit_confirmation_service import VisitConfirmationService
+
+    resource = QueueResource(code="lab", queue_tag="lab", display_name="Лаборатория")
+    doctor_user = _make_user(
+        db_session, username="dr_with_lab_visit", role="doctor"
+    )
+    doctor = _make_doctor(
+        db_session, user_id=doctor_user.id, specialty="cardiology"
+    )
+    db_session.add(resource)
+    db_session.commit()
+    service = _make_service(
+        db_session, code="L14", queue_tag="lab", name="Гемоглобин"
+    )
+    visit = _make_visit(db_session, doctor_id=doctor.id)
+    _link_visit_service(db_session, visit, service)
+    resource_queue = DailyQueue(
+        day=_DAY,
+        specialist_id=None,
+        queue_resource_id=resource.id,
+        queue_tag="lab",
+        active=True,
+    )
+    db_session.add(resource_queue)
+    db_session.commit()
+    existing_claim = OnlineQueueEntry(
+        queue_id=resource_queue.id,
+        number=8,
+        patient_id=visit.patient_id,
+        source="online",
+        status="waiting",
+    )
+    db_session.add(existing_claim)
+    db_session.commit()
+
+    numbers, _tickets = VisitConfirmationService(
+        db_session
+    )._assign_queue_numbers_on_confirmation(visit)
+
+    assert numbers == [
+        {"queue_tag": "lab", "number": 8, "queue_id": resource_queue.id}
+    ]
+    assert existing_claim.visit_id == visit.id
+    assert (
+        db_session.query(OnlineQueueEntry)
+        .join(DailyQueue, DailyQueue.id == OnlineQueueEntry.queue_id)
+        .filter(DailyQueue.day == _DAY, DailyQueue.queue_tag == "lab")
+        .count()
+        == 1
+    )
+
+
+def test_confirmation_reuses_resource_claim_after_registry_deactivation(
+    db_session: Session,
+) -> None:
+    """A live resource queue remains the routing surface for its day."""
+    from app.services.visit_confirmation_service import VisitConfirmationService
+
+    resource = QueueResource(code="lab", queue_tag="lab", display_name="Лаборатория")
+    db_session.add(resource)
+    db_session.commit()
+    service = _make_service(
+        db_session, code="L14", queue_tag="lab", name="Гемоглобин"
+    )
+    visit = _make_visit(db_session)
+    _link_visit_service(db_session, visit, service)
+    resource_queue = DailyQueue(
+        day=_DAY,
+        specialist_id=None,
+        queue_resource_id=resource.id,
+        queue_tag="lab",
+        active=True,
+    )
+    db_session.add(resource_queue)
+    db_session.commit()
+    resource.active = False
+    existing_claim = OnlineQueueEntry(
+        queue_id=resource_queue.id,
+        number=9,
+        patient_id=visit.patient_id,
+        source="online",
+        status="waiting",
+    )
+    db_session.add(existing_claim)
+    db_session.commit()
+
+    numbers, _tickets = VisitConfirmationService(
+        db_session
+    )._assign_queue_numbers_on_confirmation(visit)
+
+    assert numbers == [
+        {"queue_tag": "lab", "number": 9, "queue_id": resource_queue.id}
+    ]
+    assert existing_claim.visit_id == visit.id
+    assert (
+        db_session.query(OnlineQueueEntry)
+        .join(DailyQueue, DailyQueue.id == OnlineQueueEntry.queue_id)
+        .filter(DailyQueue.day == _DAY, DailyQueue.queue_tag == "lab")
+        .count()
+        == 1
+    )
+
+
 def test_visit_confirmation_resolves_mapped_service_doctor(
     db_session: Session,
 ) -> None:
@@ -1227,6 +1334,149 @@ def test_confirmation_new_entry_goes_to_resolved_doctors_queue(
     )
     assert queue.specialist_id == doc10.id
     assert queue.id != foreign_queue.id
+
+
+def test_confirmation_rejects_foreign_owner_claim_before_creating_queue(
+    db_session: Session,
+) -> None:
+    """A same-patient claim is found across the tag before queue creation.
+
+    The existing claim belongs to another doctor, so confirmation reports an
+    owner conflict instead of allocating a second active ticket or creating an
+    otherwise unused queue for the newly resolved doctor.
+    """
+    from app.services.visit_confirmation_service import (
+        VisitConfirmationDomainError,
+        VisitConfirmationService,
+    )
+
+    owner_user = _make_user(db_session, username="dr_kardio_r5", role="doctor")
+    resolved_owner = _make_doctor(
+        db_session, user_id=owner_user.id, specialty="cardio"
+    )
+    foreign_user = _make_user(
+        db_session, username="dr_kardio_r5b", role="doctor"
+    )
+    foreign_owner = _make_doctor(
+        db_session, user_id=foreign_user.id, specialty="cardio"
+    )
+    service = _make_service(
+        db_session,
+        code="K01",
+        queue_tag="cardio",
+        name="Консультация кардиолога",
+        requires_doctor=True,
+        doctor_id=resolved_owner.id,
+    )
+    foreign_queue = DailyQueue(
+        day=_DAY,
+        specialist_id=foreign_owner.id,
+        queue_tag="cardio",
+        active=True,
+    )
+    db_session.add(foreign_queue)
+    db_session.commit()
+
+    visit = _make_visit(db_session)  # NO visit doctor
+    _link_visit_service(db_session, visit, service)
+    existing_claim = OnlineQueueEntry(
+        queue_id=foreign_queue.id,
+        number=7,
+        patient_id=visit.patient_id,
+        source="online",
+        status="waiting",
+    )
+    db_session.add(existing_claim)
+    db_session.commit()
+
+    with pytest.raises(VisitConfirmationDomainError) as excinfo:
+        VisitConfirmationService(db_session)._assign_queue_numbers_on_confirmation(
+            visit
+        )
+
+    assert excinfo.value.status_code == 409
+    assert "different owner" in excinfo.value.detail
+    assert existing_claim.visit_id is None
+    assert (
+        db_session.query(OnlineQueueEntry)
+        .join(DailyQueue, DailyQueue.id == OnlineQueueEntry.queue_id)
+        .filter(
+            DailyQueue.day == _DAY,
+            DailyQueue.queue_tag == "cardio",
+            DailyQueue.active.is_(True),
+            OnlineQueueEntry.status.in_(
+                ("waiting", "called", "in_service", "diagnostics")
+            ),
+        )
+        .count()
+        == 1
+    )
+    assert (
+        db_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == _DAY,
+            DailyQueue.queue_tag == "cardio",
+            DailyQueue.specialist_id == resolved_owner.id,
+        )
+        .count()
+        == 0
+    )
+
+
+def test_confirmation_keeps_multi_tag_allocation_atomic_on_late_owner_error(
+    db_session: Session,
+) -> None:
+    """A later tag failure must leave the first flushed ticket rollbackable."""
+    from app.services.visit_confirmation_service import (
+        VisitConfirmationDomainError,
+        VisitConfirmationService,
+    )
+
+    owner_user = _make_user(db_session, username="dr_atomic_confirm", role="doctor")
+    owner = _make_doctor(
+        db_session, user_id=owner_user.id, specialty="cardiology"
+    )
+    owned_service = _make_service(
+        db_session,
+        code="K01",
+        queue_tag="a_cardio",
+        name="Консультация кардиолога",
+        requires_doctor=True,
+        doctor_id=owner.id,
+    )
+    unowned_service = _make_service(
+        db_session,
+        code="P08",
+        queue_tag="z_unowned",
+        name="Неразмеченная процедура",
+        requires_doctor=True,
+    )
+    visit = _make_visit(db_session)
+    _link_visit_service(db_session, visit, owned_service)
+    _link_visit_service(db_session, visit, unowned_service)
+
+    with pytest.raises(VisitConfirmationDomainError) as excinfo:
+        VisitConfirmationService(db_session)._assign_queue_numbers_on_confirmation(
+            visit
+        )
+
+    assert excinfo.value.status_code == 422
+    db_session.rollback()
+    assert (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == visit.patient_id)
+        .count()
+        == 0
+    )
+    assert (
+        db_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == _DAY,
+            DailyQueue.queue_tag.in_(("a_cardio", "z_unowned")),
+        )
+        .count()
+        == 0
+    )
 
 
 def test_confirmation_multiple_service_doctors_is_domain_error(

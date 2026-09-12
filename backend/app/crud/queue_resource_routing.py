@@ -137,8 +137,8 @@ def resource_queue_defaults(resource: QueueResource) -> dict:
     }
 
 
-def lock_registry_tag_creation(db: Session, queue_tag: str, day: date) -> None:
-    """Serialize the first creation of a registry-tag queue (QD-2C).
+def lock_queue_tag_claim_scope(db: Session, queue_tag: str, day: date) -> None:
+    """Serialize claim resolution and creation for one queue tag and day.
 
     query-then-insert with no unique constraint until QD-2D: two
     concurrent first-arrival writers (batch create, visit
@@ -155,6 +155,15 @@ def lock_registry_tag_creation(db: Session, queue_tag: str, day: date) -> None:
             sa.text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
             {"k": f"daily_queue:tag:{queue_tag}:{day.isoformat()}"},
         )
+
+
+def lock_registry_tag_creation(db: Session, queue_tag: str, day: date) -> None:
+    """Compatibility wrapper for the original registry creation lock name.
+
+    The neutral helper keeps the PostgreSQL ``pg_advisory_xact_lock`` key
+    ``daily_queue:tag:{queue_tag}:{day.isoformat()}`` used by existing callers.
+    """
+    lock_queue_tag_claim_scope(db, queue_tag, day)
 
 
 def resource_start_number(db: Session, daily_queue: DailyQueue) -> int | None:
