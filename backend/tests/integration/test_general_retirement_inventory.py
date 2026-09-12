@@ -159,6 +159,15 @@ CREATE TABLE telegram_config (
     doctor_id INTEGER REFERENCES doctors(id),
     user_id INTEGER REFERENCES users(id)
 );
+CREATE TABLE roles (id INTEGER PRIMARY KEY, name TEXT);
+-- the production association shape (role_permission.py): COMPOSITE
+-- primary key, NO id column — sampling must not assume one
+CREATE TABLE user_roles (
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    role_id INTEGER NOT NULL REFERENCES roles(id),
+    assigned_by INTEGER REFERENCES users(id),
+    PRIMARY KEY (user_id, role_id)
+);
 """
 
 # the same schema minus the two 0063 constraints (a pre-D database)
@@ -218,7 +227,10 @@ def _make_db(tmp_path: Path, variant: str = "canonical") -> str:
                 " active, start_number_online, max_online_per_day)"
                 " VALUES (1,'lab','lab','Лаборатория',1,1,15),"
                 " (2,'ecg','ecg','ЭКГ',1,1,15)",
-                # services on the general routing surface
+                # services on the general routing surface: S1/S2 legacy
+                # vocabulary, S3 inactive legacy, S4/S7 non-registry tags
+                # (the UNIVERSAL morning/batch fallback), S5 department,
+                # S6 synthetic doctor; S8 registry-tagged = clean control
                 "INSERT INTO services (id, code, name, active, requires_doctor,"
                 " queue_tag, department_key, doctor_id) VALUES"
                 " (1,'G1','Приём общий',1,0,'general',NULL,NULL),"
@@ -226,7 +238,9 @@ def _make_db(tmp_path: Path, variant: str = "canonical") -> str:
                 " (3,'G2','Старый общий',0,0,'general',NULL,NULL),"
                 " (4,'K1','Кардио',1,1,'cardio',NULL,NULL),"
                 " (5,'D1','Дерма',1,1,'derma2','general',NULL),"
-                " (6,'L1','Лаб анализ',1,0,'lab',NULL,2)",
+                " (6,'L1','Лаб анализ',1,0,'lab',NULL,2),"
+                " (7,'X1','Косметология',1,0,'cosmetology',NULL,NULL),"
+                " (8,'E1','ЭКГ снимок',1,0,'ecg',NULL,NULL)",
                 # profiles: exact-tag membership trap included
                 "INSERT INTO queue_profiles (id, key, title, is_active,"
                 " show_on_qr_page, queue_tags) VALUES"
@@ -256,6 +270,10 @@ def _make_db(tmp_path: Path, variant: str = "canonical") -> str:
                 "INSERT INTO schedules (id, doctor_id) VALUES (1,1)",
                 "INSERT INTO telegram_config (id, doctor_id, user_id)"
                 " VALUES (1,1,3)",
+                # a composite-PK association row referencing the general
+                # synthetic user — the count is the evidence, no id column
+                "INSERT INTO roles (id, name) VALUES (1,'resource')",
+                "INSERT INTO user_roles (user_id, role_id) VALUES (3,1)",
             ]
         elif variant == "no_general_user":
             seed += [
@@ -508,6 +526,11 @@ def test_inbound_references_expected_vs_blocking(canonical_db, tmp_path):
     assert ("telegram_config", "user_id") in blocking
     assert ("visits", "doctor_id") in blocking
     assert ("daily_queues", "specialist_id") not in blocking
+    # the COMPOSITE-PK association surface (user_roles: no id column —
+    # Codex round-1 P1): counted, blocking, and NO sample assumption
+    assert per[("user_roles", "user_id")]["count"] == 1
+    assert per[("user_roles", "user_id")]["sample_ids"] is None
+    assert ("user_roles", "user_id") in blocking
 
     lab = by_name["lab_resource"]
     lab_blocking = {(s["table"], s["column"]) for s in lab["blocking_surfaces"]}
@@ -526,12 +549,25 @@ def test_inbound_references_expected_vs_blocking(canonical_db, tmp_path):
 def test_routing_surfaces_services(canonical_db, tmp_path):
     _, report, _ = _run_tool(canonical_db, tmp_path)
     services = {s["id"]: s for s in report["routing_surfaces"]["services"]}
-    assert set(services) == {1, 2, 3, 5, 6}  # S4 (cardio) is not a surface
-    assert "queue_tag='general' (general fallback)" in services[1]["reasons"]
-    assert "queue_tag='cardiology_common' (general fallback)" in services[2]["reasons"]
+    # S4 (cardio) and S7 (cosmetology) ARE surfaces: the runtime
+    # fallback is UNIVERSAL — every non-registry tag lands on
+    # general_resource (Codex round-1 P1); S8 (ecg, an ACTIVE registry
+    # tag, no other reason) is NOT a surface
+    assert set(services) == {1, 2, 3, 4, 5, 6, 7}
+    assert "legacy general-fallback vocabulary" in services[1]["reasons"][0]
+    assert "no ACTIVE QueueResource" in services[4]["reasons"][0]
+    assert "universal fallback" in services[7]["reasons"][0]
     assert not services[3]["active"]
     assert "department_key='general'" in services[5]["reasons"]
     assert "doctor_id is a synthetic Doctor" in services[6]["reasons"]
+    routing = report["routing_surfaces"]
+    assert routing["active_registry_tags"] == ["ecg", "lab"]
+    assert routing["legacy_fallback_vocabulary"] == [
+        "general",
+        "cardiology_common",
+        "dermatology",
+        "procedures",
+    ]
 
 
 def test_routing_surfaces_profiles_department_specialty(canonical_db, tmp_path):
@@ -542,12 +578,6 @@ def test_routing_surfaces_profiles_department_specialty(canonical_db, tmp_path):
     assert profiles == ["general"]
     assert routing["department_general"][0]["key"] == "general"
     assert routing["medical_specialty_general_drift"] == []
-    assert routing["fallback_tags"] == [
-        "general",
-        "cardiology_common",
-        "dermatology",
-        "procedures",
-    ]
 
 
 def test_registry_general_row_is_reported_as_drift(tmp_path):
@@ -617,11 +647,12 @@ def test_sentinel_doctors_never_delete(canonical_db, tmp_path):
 def test_blockers_kinds(canonical_db, tmp_path):
     _, report, _ = _run_tool(canonical_db, tmp_path)
     kinds = [b["kind"] for b in report["blockers"]]
-    assert kinds.count("active_general_service") == 4  # S1 S2 S5 S6
+    assert kinds.count("active_general_service") == 6  # S1 S2 S4 S5 S6 S7
     assert kinds.count("live_general_queue") == 1  # Q1
-    assert kinds.count("inbound_reference") == 6
+    assert kinds.count("inbound_reference") == 7  # incl. composite-PK user_roles
     # drift kinds absent on the canonical fixture
     assert "stage_d_contract" not in kinds
+    assert "synthetic_pair_drift" not in kinds
     assert "general_registry_row" not in kinds
     assert "medical_specialty_drift" not in kinds
 
@@ -630,13 +661,15 @@ def test_operator_map_items_and_decisions(canonical_db, tmp_path):
     code, report, operator_map = _run_tool(canonical_db, tmp_path)
     items = operator_map["items"]
     surfaces = [(i["surface"], i["id"]) for i in items]
-    # active services S1/S2/S5/S6, active queues Q1/Q2/Q4, profile P1;
+    # active services S1/S2/S4/S5/S6/S7, active queues Q1/Q2/Q4, profile P1;
     # the inactive service S3 and the historical queue Q3 are excluded
     assert surfaces == [
         ("service", 1),
         ("service", 2),
+        ("service", 4),
         ("service", 5),
         ("service", 6),
+        ("service", 7),
         ("daily_queue", 1),
         ("daily_queue", 2),
         ("daily_queue", 4),
@@ -671,6 +704,82 @@ def test_clean_world_exit_0(tmp_path):
     assert report["schema_contract"]["stage_d_contract_ok"] is True
 
 
+# ------------------------------------------- round-1 finding pins
+
+
+def test_multi_head_alembic_exits_2(canonical_db, tmp_path):
+    engine = sa.create_engine(canonical_db)
+    with engine.begin() as conn:
+        conn.execute(
+            sa.text(
+                "INSERT INTO alembic_version (version_num) "
+                "VALUES ('0058_queue_resource_expand')"
+            )
+        )
+    engine.dispose()
+    code, report, _ = _run_tool(canonical_db, tmp_path)
+    assert code == 2
+    problems = " ".join(report["schema_contract"]["problems"])
+    assert "multiple heads" in problems
+
+
+def test_stale_alembic_head_exits_2(canonical_db, tmp_path):
+    # constraints EXIST (hand-repaired) but the head is stale — the
+    # Codex round-1 P2 scenario: must still exit 2
+    engine = sa.create_engine(canonical_db)
+    with engine.begin() as conn:
+        conn.execute(sa.text("DELETE FROM alembic_version"))
+        conn.execute(
+            sa.text(
+                "INSERT INTO alembic_version (version_num) "
+                "VALUES ('0059_resource_seed_backfill')"
+            )
+        )
+    engine.dispose()
+    code, report, _ = _run_tool(canonical_db, tmp_path)
+    assert code == 2
+    # a single (stale) head is still REPORTED, not hidden
+    assert report["schema_contract"]["alembic_version"] == "0059_resource_seed_backfill"
+    problems = " ".join(report["schema_contract"]["problems"])
+    assert "0059_resource_seed_backfill" in problems
+    assert "0063_queue_resource_contract" in problems
+
+
+def test_synthetic_role_drift_is_a_blocker(canonical_db, tmp_path):
+    # a hand-changed role is NOT the provisioned sentinel identity
+    # (Codex round-1 P2: 0056/0057 pin all three to 'Resource')
+    engine = sa.create_engine(canonical_db)
+    with engine.begin() as conn:
+        conn.execute(sa.text("UPDATE users SET role = 'Doctor' WHERE id = 3"))
+    engine.dispose()
+    code, report, _ = _run_tool(canonical_db, tmp_path)
+    assert code == 1
+    by_name = {p["username"]: p for p in report["synthetic_pairs"]["pairs"]}
+    general = by_name["general_resource"]
+    assert general["user"]["role_matches_sentinel"] is False
+    assert any("Doctor" in d for d in general["drift"])
+    kinds = {b["kind"] for b in report["blockers"]}
+    assert "synthetic_pair_drift" in kinds
+
+
+def test_output_paths_create_missing_parents(canonical_db, tmp_path):
+    nested = tmp_path / "evidence" / "stage_e" / "report.json"
+    nested_map = tmp_path / "evidence" / "stage_e" / "operator_map.json"
+    code = _TOOL.main(
+        [
+            "--database-url",
+            canonical_db,
+            "--json",
+            str(nested),
+            "--operator-map",
+            str(nested_map),
+        ]
+    )
+    assert code == 1
+    assert nested.exists()
+    assert nested_map.exists()
+
+
 # ---------------------------------------------------- unit pins
 
 
@@ -695,3 +804,5 @@ def test_expected_constant_identity():
         "general",
     ]
     assert _TOOL.DISABLED_PASSWORD_MARKER == "!disabled:queue-resource"
+    assert _TOOL.EXPECTED_SYNTHETIC_ROLE == "Resource"
+    assert _TOOL.EXPECTED_ALEMBIC_HEAD == "0063_queue_resource_contract"

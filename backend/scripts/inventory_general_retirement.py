@@ -20,9 +20,11 @@ output on stdout).
 
 The script NEVER writes to the target database. Safety is enforced, not
 promised: the connection is opened with SQLite ``PRAGMA query_only = ON``
-or PostgreSQL ``SET default_transaction_read_only = on`` — any accidental
-write raises. No statement outside SELECT / PRAGMA / SET introspection
-exists in this file (the precheck_doctors_user_id_unique precedent).
+or PostgreSQL ``default_transaction_read_only = on`` as a libpq connect
+OPTION (applied at session start, before any transaction) — any
+accidental write raises. No statement outside SELECT / PRAGMA /
+introspection exists in this file (the
+precheck_doctors_user_id_unique precedent).
 
 The report (JSON, ``report_version`` 1) covers every gate of the ADR
 production-gate list for deleting the three 0055 synthetic pairs:
@@ -38,12 +40,14 @@ production-gate list for deleting the three 0055 synthetic pairs:
     ``doctors`` or ``users``: the row count pointing at each synthetic
     user/doctor id (the exact-ID dry-run deletion proof, gate 6);
 4.  routing_surfaces — everything that still routes onto `general`:
-    services with a general-fallback queue_tag (general /
-    cardiology_common / dermatology / procedures — the morning-assignment
-    and batch-create fallback vocabulary) or department_key='general' or
-    doctor_id on a synthetic Doctor; queue profiles whose queue_tags
-    contain 'general'; the departments row; a medical_specialties
-    'general' row (a drift: the catalog never stores the sentinel);
+    services whose queue_tag has NO ACTIVE queue_resources row (the
+    runtime fallback is UNIVERSAL — morning_assignment pre-creates/batches
+    every non-registry tag under general_resource; the legacy vocabulary
+    general / cardiology_common / dermatology / procedures is only the
+    named part of it), or department_key='general', or doctor_id on a
+    synthetic Doctor; queue profiles whose queue_tags contain 'general';
+    the departments row; a medical_specialties 'general' row (a drift:
+    the catalog never stores the sentinel);
 5.  general_queues — every daily_queues row tagged 'general' or owned
     by a synthetic Doctor: entry totals, live-entry counts (waiting /
     called / in_service / diagnostics — the 0059 live contract) and the
@@ -92,11 +96,26 @@ SYNTHETIC_PAIR_SPECS = (
 # is drift worth reporting (the pair may have been hand-recreated).
 DISABLED_PASSWORD_MARKER = "!disabled:queue-resource"
 
+# The internal-only role all three synthetic users must carry at the
+# post-0063 schema: 0056 moved ecg_resource/general_resource from
+# 'Nurse' to 'Resource', 0057 moved lab_resource from 'Lab' to
+# 'Resource' (core/roles.py INTERNAL_ONLY_ROLE_SPELLINGS). A pair whose
+# user carries any other role is not the provisioned sentinel identity
+# and must not be approved for exact deletion (Codex round-1 P2).
+EXPECTED_SYNTHETIC_ROLE = "Resource"
+
 # The runtime fallback vocabulary that routes onto general_resource
 # (sources: app/services/batch_patient_service.py
 # _BATCH_CREATE_RESOURCE_MAPPING and the morning_assignment pre-create
 # map + universal fallback — RQ-15.b removes them; this inventory must
-# see every tag they would route).
+# see every tag they would route). NOTE: this list is only the NAMED
+# legacy vocabulary — the runtime fallback is UNIVERSAL: every service
+# tag WITHOUT an ACTIVE queue_resources row (general, cardio,
+# cosmetology, ...) is pre-created/batched under general_resource
+# (MorningAssignmentService.ensure_daily_queues_for_all_tags /
+# _assign_visit_to_queue), so the inventory derives the surface from
+# the ACTIVE registry contents, not from this list alone (Codex
+# round-1 P1).
 GENERAL_FALLBACK_TAGS = ("general", "cardiology_common", "dermatology", "procedures")
 
 # Live queue-entry statuses (the 0059 abort-inventory contract: a queue
@@ -104,8 +123,12 @@ GENERAL_FALLBACK_TAGS = ("general", "cardiology_common", "dermatology", "procedu
 LIVE_ENTRY_STATUSES = ("waiting", "called", "in_service", "diagnostics")
 
 # The Stage D schema contract this inventory assumes (ADR gate 1: the
-# production head must include 0063 and both constraints). Presence is
-# verified directly, so a later head that keeps the constraints passes.
+# production head must include 0063 and both constraints). The head
+# must be EXACTLY 0063 in this tool's lifecycle: stale (0059/0062
+# with manually-repaired constraints), multi-head and unrecognized
+# states all exit 2 (Codex round-1 P2). When a LATER revision is
+# deployed (RQ-15.d's 0064+), update EXPECTED_ALEMBIC_HEAD.
+EXPECTED_ALEMBIC_HEAD = "0063_queue_resource_contract"
 CHECK_CONSTRAINT_NAME = "ck_daily_queues_owner_xor"
 PARTIAL_UNIQUE_NAME = "uq_daily_queues_active_resource_day"
 
@@ -136,25 +159,44 @@ def _connect_read_only(url: str):
     """Open ONE engine+connection with writes disabled at the driver.
 
     SQLite gets ``PRAGMA query_only = ON`` (any INSERT/UPDATE/DELETE/
-    DDL raises); PostgreSQL gets ``SET default_transaction_read_only = on``
-    (any write statement raises). The caller keeps this connection for
-    the whole run — the enforcement is per-connection, not per-engine.
+    DDL raises). PostgreSQL gets ``default_transaction_read_only = on``
+    as a libpq connect OPTION (the app/db/session.py statement_timeout
+    precedent): the GUC applies at session start, BEFORE SQLAlchemy
+    autobegins any transaction — a ``SET`` issued through
+    ``conn.execute`` lands INSIDE the already-begun transaction and
+    leaves that first transaction writable (Codex round-1 P2). The
+    caller keeps this connection for the whole run — the enforcement
+    is per-connection, not per-engine.
     """
-    engine = sa.create_engine(url, echo=False)
-    conn = engine.connect()
-    dialect = engine.dialect.name
-    if dialect == "sqlite":
-        conn.execute(sa.text("PRAGMA query_only = ON"))
-    elif dialect == "postgresql":
-        conn.execute(sa.text("SET default_transaction_read_only = on"))
-    else:  # pragma: no cover - documented target dialects only
-        conn.close()
-        engine.dispose()
-        raise RuntimeError(
-            f"unsupported dialect {dialect!r} — this inventory targets "
-            "postgresql (production) and sqlite (tests)"
+    dialect_name = sa.engine.url.make_url(url).get_dialect().name
+    if dialect_name == "postgresql":
+        engine = sa.create_engine(
+            url,
+            echo=False,
+            connect_args={"options": "-c default_transaction_read_only=on"},
         )
-    return engine, conn
+        conn = engine.connect()
+        # hard invariant: the GUC must be visible on this very session
+        setting = conn.execute(
+            sa.text("SELECT current_setting('default_transaction_read_only')")
+        ).scalar()
+        if str(setting).lower() != "on":
+            conn.close()
+            engine.dispose()
+            raise RuntimeError(
+                "default_transaction_read_only is not 'on' on this "
+                "connection — refusing to run the inventory"
+            )
+        return engine, conn
+    if dialect_name == "sqlite":
+        engine = sa.create_engine(url, echo=False)
+        conn = engine.connect()
+        conn.execute(sa.text("PRAGMA query_only = ON"))
+        return engine, conn
+    raise RuntimeError(
+        f"unsupported dialect {dialect_name!r} — this inventory targets "
+        "postgresql (production) and sqlite (tests)"
+    )
 
 
 def _tags_list(value) -> list:
@@ -194,13 +236,19 @@ def _scalar(conn, sql: str, params: dict | None = None):
 
 
 def _introspect_fk_surfaces(conn) -> list[dict]:
-    """Every (table, column) with a foreign key to doctors or users.
+    """Every (table, column) with a foreign key to doctors or users,
+    plus each table's primary-key columns.
 
     Introspected from the live schema — not hardcoded — so surfaces
     added after this script was written still appear in the
     inbound-reference dry-run (ADR gate 6: "exact-ID dry-run deletion
     reports zero inbound references"). Single-column FKs only: every
     doctors/users reference in this schema is single-column.
+
+    The pk_columns ride along because association tables (user_roles,
+    role_permissions, group_roles, user_groups_members — the
+    role_permission.py models) carry COMPOSITE primary keys and no
+    ``id`` column: sampling must not assume one (Codex round-1 P1).
     """
     dialect = conn.dialect.name
     surfaces: list[dict] = []
@@ -246,7 +294,37 @@ def _introspect_fk_surfaces(conn) -> list[dict]:
                         }
                     )
         surfaces.sort(key=lambda s: (s["table"], s["column"]))
+
+    # attach the primary-key columns per referencing table (sampling
+    # uses them; a composite PK means NO single-column sample)
+    for surface in surfaces:
+        surface["pk_columns"] = _pk_columns(conn, surface["table"])
     return surfaces
+
+
+def _pk_columns(conn, table: str) -> list[str]:
+    """The table's primary-key column names (order-stable, may be [])."""
+    if conn.dialect.name == "postgresql":
+        return [
+            r["attname"]
+            for r in _rows(
+                conn,
+                """
+                SELECT a.attname
+                FROM pg_index i
+                JOIN pg_attribute a
+                  ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+                WHERE i.indrelid = :t::regclass AND i.indisprimary
+                ORDER BY a.attnum
+                """,
+                {"t": table},
+            )
+        ]
+    return [
+        r["name"]
+        for r in _rows(conn, f"PRAGMA table_info({_quote(conn, table)})")
+        if r["pk"]
+    ]
 
 
 # ============================================================================
@@ -258,11 +336,32 @@ def _collect_schema_contract(conn) -> tuple[dict, list[str]]:
     dialect = conn.dialect.name
     problems: list[str] = []
 
-    version = None
+    versions: list[str] = []
     try:
-        version = _scalar(conn, "SELECT version_num FROM alembic_version")
+        versions = [
+            str(r["version_num"])
+            for r in _rows(conn, "SELECT version_num FROM alembic_version")
+        ]
     except Exception:
         problems.append("alembic_version table missing (not an alembic DB?)")
+
+    version = versions[0] if len(versions) == 1 else None
+    # STRICT head validation (Codex round-1 P2): a stale head
+    # (0059/0062 with manually-repaired constraints) or a multi-head
+    # state must exit 2, not silently pass on the constraint names.
+    if len(versions) == 0 and "alembic_version table missing" not in " ".join(problems):
+        problems.append("alembic_version is empty")
+    elif len(versions) > 1:
+        problems.append(
+            "alembic_version has multiple heads: "
+            + ", ".join(repr(v) for v in versions)
+        )
+    elif len(versions) == 1 and versions[0] != EXPECTED_ALEMBIC_HEAD:
+        problems.append(
+            f"alembic head is {versions[0]!r}, expected exactly "
+            f"{EXPECTED_ALEMBIC_HEAD!r} (stale, unrecognized or newer "
+            "than this tool pins — see EXPECTED_ALEMBIC_HEAD)"
+        )
 
     check_present = False
     partial_unique_present = False
@@ -400,6 +499,15 @@ def _collect_synthetic_pairs(conn) -> tuple[dict, list[dict]]:
                 "hashed_password does not carry the '!disabled:' marker — "
                 "the row may not be the provisioned synthetic"
             )
+        # the internal-only role sentinel (Codex round-1 P2): 0056
+        # moved ecg_resource/general_resource to 'Resource', 0057 moved
+        # lab_resource — any other role is not the provisioned identity
+        u["role_matches_sentinel"] = u.get("role") == EXPECTED_SYNTHETIC_ROLE
+        if not u["role_matches_sentinel"]:
+            pair["drift"].append(
+                f"user role is {u.get('role')!r}, expected the internal-only "
+                f"{EXPECTED_SYNTHETIC_ROLE!r} sentinel (0056/0057)"
+            )
         pair["user"] = u
         if not u["is_active"]:
             pair["drift"].append("user row is inactive")
@@ -477,14 +585,20 @@ def _collect_inbound_references(conn, pairs: list[dict]) -> tuple[dict, list[dic
                 )
                 or 0
             )
-            sample: list[int] = []
-            if count:
+            # sample via the table's OWN primary key; association tables
+            # (user_roles, role_permissions, group_roles,
+            # user_groups_members) carry composite PKs and no id column
+            # — there the count is the evidence and samples are None
+            # (Codex round-1 P1)
+            sample: list | None = None if count else []
+            if count and len(surface.get("pk_columns") or []) == 1:
+                pk_q = _quote(conn, surface["pk_columns"][0])
                 sample = [
-                    int(r["sid"])
+                    r["sid"]
                     for r in _rows(
                         conn,
-                        f"SELECT id AS sid FROM {table_q} "
-                        f"WHERE {column_q} = :rid ORDER BY id LIMIT 5",
+                        f"SELECT {pk_q} AS sid FROM {table_q} "
+                        f"WHERE {column_q} = :rid ORDER BY {pk_q} LIMIT 5",
                         {"rid": row_id},
                     )
                 ]
@@ -524,38 +638,74 @@ def _collect_inbound_references(conn, pairs: list[dict]) -> tuple[dict, list[dic
 
 
 def _collect_routing_surfaces(conn, pairs: list[dict]) -> tuple[dict, list[dict]]:
-    """Everything still routing onto `general` or a synthetic Doctor."""
+    """Everything still routing onto `general` or a synthetic Doctor.
+
+    The fallback surface is derived from the COMPLETE runtime behavior,
+    not just the named legacy vocabulary (Codex round-1 P1):
+    MorningAssignmentService.ensure_daily_queues_for_all_tags and
+    _assign_visit_to_queue write EVERY service tag WITHOUT an ACTIVE
+    queue_resources row under general_resource (the universal
+    fallback). So an active service is on the general-fallback surface
+    when its queue_tag is non-NULL and NOT resolvable by an ACTIVE
+    registry row — 'cardio' and 'cosmetology' exactly as much as
+    'general' itself. Plus department_key='general' and services whose
+    doctor_id IS a synthetic Doctor.
+    """
     synthetic_doctor_ids = [(p.get("doctor") or {}).get("id") for p in pairs]
     synthetic_doctor_ids = [i for i in synthetic_doctor_ids if i is not None]
 
-    tag_list = ", ".join(f":t{i}" for i in range(len(GENERAL_FALLBACK_TAGS)))
-    tag_params = {f"t{i}": tag for i, tag in enumerate(GENERAL_FALLBACK_TAGS)}
-    service_sql = f"""
+    active_registry_tags = {
+        r["queue_tag"]
+        for r in _rows(
+            conn,
+            "SELECT queue_tag FROM queue_resources WHERE active = true",
+        )
+    }
+
+    stmt = sa.text("""
         SELECT id, code, name, active, requires_doctor, queue_tag,
                department_key, doctor_id
         FROM services
-        WHERE queue_tag IN ({tag_list})
+        WHERE queue_tag IS NOT NULL
            OR department_key = 'general'
            OR doctor_id IN :doc_ids
         ORDER BY id
-    """
-    stmt = sa.text(service_sql).bindparams(sa.bindparam("doc_ids", expanding=True))
+        """).bindparams(sa.bindparam("doc_ids", expanding=True))
     services = [
         dict(r)
-        for r in conn.execute(
-            stmt, {**tag_params, "doc_ids": synthetic_doctor_ids or [0]}
-        ).mappings()
+        for r in conn.execute(stmt, {"doc_ids": synthetic_doctor_ids or [0]}).mappings()
     ]
-    # classify each service's reason
+    # classify each service's reason against the complete fallback
+    services = [
+        s
+        for s in services
+        if s["queue_tag"] is not None
+        or s["department_key"] == "general"
+        or s["doctor_id"] in synthetic_doctor_ids
+    ]
     for s in services:
         reasons = []
-        if s["queue_tag"] in GENERAL_FALLBACK_TAGS:
-            reasons.append(f"queue_tag={s['queue_tag']!r} (general fallback)")
+        if s["queue_tag"] is not None and s["queue_tag"] not in active_registry_tags:
+            if s["queue_tag"] in GENERAL_FALLBACK_TAGS:
+                reasons.append(
+                    f"queue_tag={s['queue_tag']!r} (legacy general-fallback "
+                    "vocabulary, no ACTIVE QueueResource)"
+                )
+            else:
+                reasons.append(
+                    f"queue_tag={s['queue_tag']!r} has no ACTIVE QueueResource "
+                    "— the morning pre-create/batch universal fallback "
+                    "writes it under general_resource"
+                )
         if s["department_key"] == "general":
             reasons.append("department_key='general'")
         if s["doctor_id"] in synthetic_doctor_ids:
             reasons.append("doctor_id is a synthetic Doctor")
         s["reasons"] = reasons
+
+    # a service whose tag resolves to an ACTIVE registry row (and with no
+    # department/doctor reason) is NOT a general surface — keep it out
+    services = [s for s in services if s["reasons"]]
 
     profiles = [
         dict(r)
@@ -585,7 +735,8 @@ def _collect_routing_surfaces(conn, pairs: list[dict]) -> tuple[dict, list[dict]
     ]
 
     section = {
-        "fallback_tags": list(GENERAL_FALLBACK_TAGS),
+        "legacy_fallback_vocabulary": list(GENERAL_FALLBACK_TAGS),
+        "active_registry_tags": sorted(active_registry_tags),
         "services": services,
         "queue_profiles_with_general_tag": profiles,
         "department_general": department,
@@ -1045,11 +1196,13 @@ def main(argv=None) -> int:
     _print_summary(report, exit_code)
 
     if args.json:
+        Path(args.json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.json).write_text(
             json.dumps(report, indent=2, default=str), encoding="utf-8"
         )
         print(f"report written to {args.json}")
     if args.operator_map:
+        Path(args.operator_map).parent.mkdir(parents=True, exist_ok=True)
         Path(args.operator_map).write_text(
             json.dumps(operator_map, indent=2, default=str), encoding="utf-8"
         )
