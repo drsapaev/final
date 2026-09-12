@@ -49,13 +49,40 @@ interface BoardState {
 }
 
 interface QueueEntryDto {
+  // RQ-24.a.2: identity/owner fields delivered by the WS channels
+  // (initial_state carries id/specialist_name per entry; queue_update
+  // attaches doctor_name/specialty/cabinet per queue message).
+  id?: number | string;
+  queue_id?: number | string;
   number: number | string;
   patient_name?: string;
   status: string;
   called_at?: string;
   created_at?: string;
   source?: string;
+  doctor_name?: string;
+  specialist_name?: string;
+  specialty?: string;
+  cabinet?: string;
 }
+
+// RQ-24.a.2: rows from different queues can share one board (every queue is
+// broadcast to every board), so a bare ticket number is not a unique/stable
+// React key. Scope the key by any available queue identity, keep it stable
+// across re-renders, and fall back to a deterministic index key only when the
+// payload carries no scope fields at all.
+export const resolveBoardEntryKey = (entry: QueueEntryDto, index: number): string => {
+  const scopeParts = [
+    entry.id !== undefined && entry.id !== null ? String(entry.id) : '',
+    entry.queue_id !== undefined && entry.queue_id !== null ? String(entry.queue_id) : '',
+    entry.doctor_name ?? entry.specialist_name ?? '',
+    entry.cabinet ?? '',
+  ].filter((part) => part !== '');
+  if (scopeParts.length === 0) {
+    return `board-entry-${index}-${entry.number}`;
+  }
+  return `${scopeParts.join('|')}#${entry.number}`;
+};
 
 interface CurrentCall {
   queue_number?: number | string;
@@ -355,6 +382,12 @@ export default function DisplayBoardUnified({
         if (message.event_type === 'queue.created') {
           // Добавляем новую запись в очередь
           const newEntry: QueueEntryDto = {
+            id: typeof data.queue_entry_id === 'number' || typeof data.queue_entry_id === 'string'
+              ? data.queue_entry_id
+              : undefined,
+            queue_id: typeof data.queue_id === 'number' || typeof data.queue_id === 'string'
+              ? data.queue_id
+              : undefined,
             number: Number(data.number ?? 0),
             patient_name: typeof data.patient_name === 'string' ? data.patient_name : undefined,
             status: typeof data.status === 'string' ? data.status : '',
@@ -365,8 +398,20 @@ export default function DisplayBoardUnified({
           setQueueData((prev) => [...prev, newEntry]);
           logger.log(`➕ Новая запись в очереди: №${data.number ?? ''}`);
         } else {
-          // Обновляем всю очередь
-          setQueueData(Array.isArray(data.queue_entries) ? data.queue_entries : []);
+          // Обновляем всю очередь; RQ-24.a.2: владелец/кабинет приходят
+          // на уровне сообщения очереди — прикрепляем к строкам, чтобы
+          // одинаковые номера разных очередей были различимы на борде.
+          const queueDoctor = typeof data.doctor_name === 'string' ? data.doctor_name : undefined;
+          const queueSpecialty = typeof data.specialty === 'string' ? data.specialty : undefined;
+          const queueCabinet = typeof data.cabinet === 'string' ? data.cabinet : undefined;
+          setQueueData(
+            (Array.isArray(data.queue_entries) ? data.queue_entries : []).map((entry) => ({
+              ...entry,
+              doctor_name: entry.doctor_name ?? queueDoctor,
+              specialty: entry.specialty ?? queueSpecialty,
+              cabinet: entry.cabinet ?? queueCabinet,
+            })),
+          );
         }
         break;
       }
@@ -837,9 +882,9 @@ export default function DisplayBoardUnified({
 
       {/* Очередь */}
       <div className="displayboard-queue-grid">
-        {queueData.slice(0, boardSettings.displayCount).map((entry) =>
+        {queueData.slice(0, boardSettings.displayCount).map((entry, entryIndex) =>
         <div
-          key={entry.number}
+          key={resolveBoardEntryKey(entry, entryIndex)}
           className="displayboard-queue-card"
           data-status={entry.status}>
           
@@ -847,6 +892,18 @@ export default function DisplayBoardUnified({
               {entry.number}
             </div>
             
+            {/* RQ-24.a.2: владелец/кабинет отличают одинаковые номера разных очередей. */}
+            {(entry.doctor_name || entry.specialist_name) &&
+          <div className="displayboard-queue-owner">
+                👨‍⚕️ {entry.doctor_name ?? entry.specialist_name}
+              </div>
+          }
+            {entry.cabinet &&
+          <div className="displayboard-queue-cabinet">
+                🚪 {entry.cabinet}
+              </div>
+          }
+
             {boardSettings.showPatientNames !== 'none' &&
           <div className="displayboard-queue-patient">
                 {entry.patient_name}
