@@ -2,6 +2,8 @@
 """
 from __future__ import annotations
 
+from sqlalchemy.exc import IntegrityError
+
 from app.api.v1.endpoints.admin_departments._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.admin_departments._helpers import (
     _ensure_department_integrations,
@@ -104,7 +106,12 @@ def create_department(
 
     payload = department_data.dict(exclude={"integration"})
 
-    # Создаем новое отделение
+    # RQ-04: весь onboarding (отделение + интеграции + настройки очереди
+    # и регистрации) — ОДНА транзакция с одним финальным commit.
+    # Прежний код коммитил отделение ДО создания настроек и создавал их
+    # повторно (сверх guarded-создания в _ensure_department_integrations):
+    # сбой между commit'ами оставлял навсегда «полунастроенное» отделение,
+    # а повтор блокировался «already exists».
     department = Department(**payload)
     db.add(department)
     db.flush()
@@ -113,21 +120,18 @@ def create_department(
         db, department, department_data.integration
     )
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Гонка с параллельным созданием того же key: уникальный индекс
+        # departments.key — финальная инстанция после предварительной
+        # проверки выше; откат и согласованный конфликт.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Department with key '{department_data.key}' already exists",
+        )
     db.refresh(department)
-
-    # Создаем дефолтные настройки очереди
-    queue_settings = DepartmentQueueSettings(
-        department_id=department.id,
-        queue_prefix=department.key.upper()[0] if department.key else "Q",
-    )
-    db.add(queue_settings)
-
-    # Создаем дефолтные настройки регистрации
-    reg_settings = DepartmentRegistrationSettings(department_id=department.id)
-    db.add(reg_settings)
-
-    db.commit()
 
     return {
         "success": True,
