@@ -1,0 +1,3652 @@
+{
+  "report_version": 1,
+  "tool": "inventory_general_retirement.py",
+  "generated_at": "2026-09-12T11:10:17",
+  "database_dialect": "postgresql",
+  "schema_contract": {
+    "alembic_version": "0063_queue_resource_contract",
+    "check_constraint": {
+      "name": "ck_daily_queues_owner_xor",
+      "present": true
+    },
+    "partial_unique": {
+      "name": "uq_daily_queues_active_resource_day",
+      "present": true
+    },
+    "owner_xor_violations": 0,
+    "active_resource_day_duplicate_groups": 0,
+    "stage_d_contract_ok": true,
+    "problems": []
+  },
+  "synthetic_pairs": {
+    "pairs": [
+      {
+        "username": "ecg_resource",
+        "expected_doctor_specialty": "ecg",
+        "seed_role": "Nurse",
+        "user_rows": 1,
+        "user": {
+          "id": 23,
+          "username": "ecg_resource",
+          "role": "Resource",
+          "is_active": true,
+          "disabled_marker_ok": true,
+          "role_matches_sentinel": true
+        },
+        "doctor": {
+          "id": 12,
+          "specialty": "ecg",
+          "active": true,
+          "start_number_online": 1,
+          "max_online_per_day": 15
+        },
+        "drift": [],
+        "doctor_rows": 1
+      },
+      {
+        "username": "lab_resource",
+        "expected_doctor_specialty": "lab",
+        "seed_role": "Lab",
+        "user_rows": 1,
+        "user": {
+          "id": 24,
+          "username": "lab_resource",
+          "role": "Resource",
+          "is_active": true,
+          "disabled_marker_ok": true,
+          "role_matches_sentinel": true
+        },
+        "doctor": {
+          "id": 13,
+          "specialty": "lab",
+          "active": true,
+          "start_number_online": 1,
+          "max_online_per_day": 15
+        },
+        "drift": [],
+        "doctor_rows": 1
+      },
+      {
+        "username": "general_resource",
+        "expected_doctor_specialty": "general",
+        "seed_role": "Nurse",
+        "user_rows": 1,
+        "user": {
+          "id": 25,
+          "username": "general_resource",
+          "role": "Resource",
+          "is_active": true,
+          "disabled_marker_ok": true,
+          "role_matches_sentinel": true
+        },
+        "doctor": {
+          "id": 14,
+          "specialty": "general",
+          "active": true,
+          "start_number_online": 1,
+          "max_online_per_day": 15
+        },
+        "drift": [],
+        "doctor_rows": 1
+      }
+    ],
+    "drift_notes": []
+  },
+  "inbound_references": {
+    "surfaces_introspected": 103,
+    "pairs": [
+      {
+        "username": "ecg_resource",
+        "user_id": 23,
+        "doctor_id": 12,
+        "surfaces": [
+          {
+            "table": "ai_chat_feedback",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "ai_chat_sessions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "ai_usage_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "appointments",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "backups",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "benefit_applications",
+            "column": "applied_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "benefits",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "billing_rules",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "billing_settings",
+            "column": "updated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "branches",
+            "column": "manager_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "cardio_blood_tests",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "cardio_ecg_records",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "clinic_settings",
+            "column": "updated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "daily_queues",
+            "column": "specialist_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "deposit_transactions",
+            "column": "performed_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "derma_examinations",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "derma_procedures",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "discount_applications",
+            "column": "applied_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "discounts",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_phrase_history",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_price_overrides",
+            "column": "approved_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_price_overrides",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_section_templates",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_treatment_templates",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctors",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 1,
+            "sample_ids": [
+              12
+            ],
+            "expected": true
+          },
+          {
+            "table": "email_verification_tokens",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "emergency_access_tokens",
+            "column": "issued_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "family_relations",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_access_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_folders",
+            "column": "owner_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_quotas",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_shares",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_shares",
+            "column": "shared_with_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_versions",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "files",
+            "column": "owner_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "finance_transactions",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "global_search_audit",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "group_roles",
+            "column": "assigned_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "invoice_templates",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "invoices",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "license_activations",
+            "column": "activated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "login_attempts",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 1,
+            "sample_ids": [
+              179
+            ],
+            "expected": false
+          },
+          {
+            "table": "loyalty_point_transactions",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "loyalty_programs",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "message_reactions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "messages",
+            "column": "recipient_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "messages",
+            "column": "sender_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "password_reset_tokens",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_benefits",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_benefits",
+            "column": "verified_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_onboarding_requests",
+            "column": "desired_doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_onboarding_requests",
+            "column": "reviewed_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_relationships",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_relationships",
+            "column": "deactivated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patients",
+            "column": "deleted_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patients",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "permission_audit_log",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "price_history",
+            "column": "changed_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "pricing_rules",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "print_jobs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_entries",
+            "column": "called_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_entries",
+            "column": "served_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_tokens",
+            "column": "generated_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_tokens",
+            "column": "specialist_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "refresh_tokens",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "refund_requests",
+            "column": "processed_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "role_hierarchy",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "role_permissions",
+            "column": "granted_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_history",
+            "column": "changed_by_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_history",
+            "column": "confirmed_by_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_history",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_payments",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "schedule_templates",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "schedules",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "security_events",
+            "column": "resolved_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "security_events",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "service_audit_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "service_packages",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "services",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_messages",
+            "column": "sent_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_staff_confirmation_tokens",
+            "column": "staff_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_staff_link_tokens",
+            "column": "issued_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_staff_link_tokens",
+            "column": "staff_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_users",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "token_blacklist",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "two_factor_auth",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "two_factor_devices",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "two_factor_sessions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_activities",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_audit_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_groups",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_groups_members",
+            "column": "added_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_groups_members",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_notification_settings",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_permission_overrides",
+            "column": "granted_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_permission_overrides",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_preferences",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_profiles",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_roles",
+            "column": "assigned_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_roles",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_sessions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "visits",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "webhooks",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          }
+        ],
+        "blocking_surfaces": [
+          {
+            "table": "login_attempts",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 1,
+            "sample_ids": [
+              179
+            ],
+            "expected": false
+          }
+        ]
+      },
+      {
+        "username": "lab_resource",
+        "user_id": 24,
+        "doctor_id": 13,
+        "surfaces": [
+          {
+            "table": "ai_chat_feedback",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "ai_chat_sessions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "ai_usage_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "appointments",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "backups",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "benefit_applications",
+            "column": "applied_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "benefits",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "billing_rules",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "billing_settings",
+            "column": "updated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "branches",
+            "column": "manager_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "cardio_blood_tests",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "cardio_ecg_records",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "clinic_settings",
+            "column": "updated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "daily_queues",
+            "column": "specialist_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "deposit_transactions",
+            "column": "performed_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "derma_examinations",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "derma_procedures",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "discount_applications",
+            "column": "applied_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "discounts",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_phrase_history",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_price_overrides",
+            "column": "approved_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_price_overrides",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_section_templates",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_treatment_templates",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctors",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 1,
+            "sample_ids": [
+              13
+            ],
+            "expected": true
+          },
+          {
+            "table": "email_verification_tokens",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "emergency_access_tokens",
+            "column": "issued_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "family_relations",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_access_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_folders",
+            "column": "owner_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_quotas",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_shares",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_shares",
+            "column": "shared_with_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_versions",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "files",
+            "column": "owner_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "finance_transactions",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "global_search_audit",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "group_roles",
+            "column": "assigned_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "invoice_templates",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "invoices",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "license_activations",
+            "column": "activated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "login_attempts",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "loyalty_point_transactions",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "loyalty_programs",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "message_reactions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "messages",
+            "column": "recipient_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "messages",
+            "column": "sender_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "password_reset_tokens",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_benefits",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_benefits",
+            "column": "verified_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_onboarding_requests",
+            "column": "desired_doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_onboarding_requests",
+            "column": "reviewed_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_relationships",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_relationships",
+            "column": "deactivated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patients",
+            "column": "deleted_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patients",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "permission_audit_log",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "price_history",
+            "column": "changed_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "pricing_rules",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "print_jobs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_entries",
+            "column": "called_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_entries",
+            "column": "served_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_tokens",
+            "column": "generated_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_tokens",
+            "column": "specialist_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "refresh_tokens",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "refund_requests",
+            "column": "processed_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "role_hierarchy",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "role_permissions",
+            "column": "granted_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_history",
+            "column": "changed_by_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_history",
+            "column": "confirmed_by_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_history",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_payments",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "schedule_templates",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "schedules",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "security_events",
+            "column": "resolved_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "security_events",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "service_audit_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "service_packages",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "services",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_messages",
+            "column": "sent_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_staff_confirmation_tokens",
+            "column": "staff_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_staff_link_tokens",
+            "column": "issued_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_staff_link_tokens",
+            "column": "staff_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_users",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "token_blacklist",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "two_factor_auth",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "two_factor_devices",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "two_factor_sessions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_activities",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_audit_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_groups",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_groups_members",
+            "column": "added_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_groups_members",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_notification_settings",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_permission_overrides",
+            "column": "granted_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_permission_overrides",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_preferences",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_profiles",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_roles",
+            "column": "assigned_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_roles",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_sessions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "visits",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "webhooks",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          }
+        ],
+        "blocking_surfaces": []
+      },
+      {
+        "username": "general_resource",
+        "user_id": 25,
+        "doctor_id": 14,
+        "surfaces": [
+          {
+            "table": "ai_chat_feedback",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "ai_chat_sessions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "ai_usage_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "appointments",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "backups",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "benefit_applications",
+            "column": "applied_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "benefits",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "billing_rules",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "billing_settings",
+            "column": "updated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "branches",
+            "column": "manager_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "cardio_blood_tests",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "cardio_ecg_records",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "clinic_settings",
+            "column": "updated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "daily_queues",
+            "column": "specialist_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": true
+          },
+          {
+            "table": "deposit_transactions",
+            "column": "performed_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "derma_examinations",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "derma_procedures",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "discount_applications",
+            "column": "applied_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "discounts",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_phrase_history",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_price_overrides",
+            "column": "approved_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_price_overrides",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_section_templates",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctor_treatment_templates",
+            "column": "doctor_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "doctors",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 1,
+            "sample_ids": [
+              14
+            ],
+            "expected": true
+          },
+          {
+            "table": "email_verification_tokens",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "emergency_access_tokens",
+            "column": "issued_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "family_relations",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_access_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_folders",
+            "column": "owner_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_quotas",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_shares",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_shares",
+            "column": "shared_with_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "file_versions",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "files",
+            "column": "owner_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "finance_transactions",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "global_search_audit",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "group_roles",
+            "column": "assigned_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "invoice_templates",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "invoices",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "license_activations",
+            "column": "activated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "login_attempts",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "loyalty_point_transactions",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "loyalty_programs",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "message_reactions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "messages",
+            "column": "recipient_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "messages",
+            "column": "sender_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "password_reset_tokens",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_benefits",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_benefits",
+            "column": "verified_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_onboarding_requests",
+            "column": "desired_doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_onboarding_requests",
+            "column": "reviewed_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_relationships",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patient_relationships",
+            "column": "deactivated_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patients",
+            "column": "deleted_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "patients",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "permission_audit_log",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "price_history",
+            "column": "changed_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "pricing_rules",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "print_jobs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_entries",
+            "column": "called_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_entries",
+            "column": "served_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_tokens",
+            "column": "generated_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "queue_tokens",
+            "column": "specialist_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "refresh_tokens",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "refund_requests",
+            "column": "processed_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "role_hierarchy",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "role_permissions",
+            "column": "granted_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_history",
+            "column": "changed_by_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_history",
+            "column": "confirmed_by_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_history",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "salary_payments",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "schedule_templates",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "schedules",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "security_events",
+            "column": "resolved_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "security_events",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "service_audit_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "service_packages",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "services",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_messages",
+            "column": "sent_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_staff_confirmation_tokens",
+            "column": "staff_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_staff_link_tokens",
+            "column": "issued_by_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_staff_link_tokens",
+            "column": "staff_user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "telegram_users",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "token_blacklist",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "two_factor_auth",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "two_factor_devices",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "two_factor_sessions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_activities",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_audit_logs",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_groups",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_groups_members",
+            "column": "added_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_groups_members",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_notification_settings",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_permission_overrides",
+            "column": "granted_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_permission_overrides",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_preferences",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_profiles",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_roles",
+            "column": "assigned_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_roles",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "user_sessions",
+            "column": "user_id",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "visits",
+            "column": "doctor_id",
+            "ref_table": "doctors",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          },
+          {
+            "table": "webhooks",
+            "column": "created_by",
+            "ref_table": "users",
+            "count": 0,
+            "sample_ids": [],
+            "expected": false
+          }
+        ],
+        "blocking_surfaces": []
+      }
+    ]
+  },
+  "routing_surfaces": {
+    "legacy_fallback_vocabulary": [
+      "general",
+      "cardiology_common",
+      "dermatology",
+      "procedures"
+    ],
+    "active_registry_tags": [
+      "ecg",
+      "lab"
+    ],
+    "services": [
+      {
+        "id": 1,
+        "code": "D01",
+        "name": "\u041a\u043e\u043d\u0441\u0443\u043b\u044c\u0442\u0430\u0446\u0438\u044f \u0434\u0435\u0440\u043c\u0430\u0442\u043e\u043b\u043e\u0433\u0430-\u043a\u043e\u0441\u043c\u0435\u0442\u043e\u043b\u043e\u0433\u0430",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "dermatology",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='dermatology' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 2,
+        "code": "K01",
+        "name": "\u041a\u043e\u043d\u0441\u0443\u043b\u044c\u0442\u0430\u0446\u0438\u044f \u043a\u0430\u0440\u0434\u0438\u043e\u043b\u043e\u0433\u0430",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "cardio",
+        "department_key": "cardiology",
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='cardio' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource"
+        ]
+      },
+      {
+        "id": 3,
+        "code": "S01",
+        "name": "\u041a\u043e\u043d\u0441\u0443\u043b\u044c\u0442\u0430\u0446\u0438\u044f \u0441\u0442\u043e\u043c\u0430\u0442\u043e\u043b\u043e\u0433\u0430",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "stomatology",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='stomatology' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource"
+        ]
+      },
+      {
+        "id": 11,
+        "code": "L14",
+        "name": "\u0413\u0435\u043c\u043e\u0433\u043b\u043e\u0431\u0438\u043d",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 12,
+        "code": "L25",
+        "name": "\u0412\u0440\u0435\u043c\u044f \u0441\u0432\u0435\u0440\u0442\u044b\u0432\u0430\u0435\u043c\u043e\u0441\u0442\u0438 \u043a\u0440\u043e\u0432\u0438",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 20,
+        "code": "L19",
+        "name": "\u041e\u0431\u0449\u0438\u0439 \u0431\u0435\u043b\u043e\u043a",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 21,
+        "code": "L03",
+        "name": "\u0413\u043b\u044e\u043a\u043e\u0437\u0430",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 22,
+        "code": "L16",
+        "name": "\u0425\u043e\u043b\u0435\u0441\u0442\u0435\u0440\u0438\u043d",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 23,
+        "code": "L18",
+        "name": "\u041c\u043e\u0447\u0435\u0432\u0438\u043d\u0430",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 24,
+        "code": "L17",
+        "name": "\u041a\u0440\u0435\u0430\u0442\u0438\u043d\u0438\u043d",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 25,
+        "code": "LAB_ALT",
+        "name": "\u0410\u043b\u0410\u0422 (\u0430\u043b\u0430\u043d\u0438\u043d\u0430\u043c\u0438\u043d\u043e\u0442\u0440\u0430\u043d\u0441\u0444\u0435\u0440\u0430\u0437\u0430)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 26,
+        "code": "LAB_AST",
+        "name": "\u0410\u0441\u0410\u0422 (\u0430\u0441\u043f\u0430\u0440\u0442\u043e\u0442\u0430\u043c\u0438\u043d\u043e\u0442\u0440\u0430\u043d\u0441\u0444\u0435\u0440\u0430\u0437\u0430)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 27,
+        "code": "L15",
+        "name": "\u0411\u0438\u043b\u0438\u0440\u0443\u0431\u0438\u043d (\u043e\u0431\u0449, \u043f\u0440\u044f\u043c, \u043d\u0435\u043f\u0440\u044f\u043c)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 28,
+        "code": "L20",
+        "name": "\u0429\u0435\u043b\u043e\u0447\u043d\u0430\u044f \u0444\u043e\u0441\u0444\u0430\u0442\u0430\u0437\u0430",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 29,
+        "code": "L21",
+        "name": "\u0410\u043b\u044c\u0444\u0430-\u0430\u043c\u0438\u043b\u0430\u0437\u0430",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 30,
+        "code": "L27",
+        "name": "\u041a\u0430\u043b\u0438\u0439",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 31,
+        "code": "LAB_CA",
+        "name": "\u041a\u0430\u043b\u044c\u0446\u0438\u0439",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 32,
+        "code": "L28",
+        "name": "\u041d\u0430\u0442\u0440\u0438\u0439",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 33,
+        "code": "L35",
+        "name": "\u0412\u0438\u0442\u0430\u043c\u0438\u043d \u0414",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 34,
+        "code": "LAB_HBA1C",
+        "name": "\u0413\u043b\u0438\u043a\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0439 \u0433\u0435\u043c\u043e\u0433\u043b\u043e\u0431\u0438\u043d (\u041d\u042c\u04101C)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 36,
+        "code": "LAB_BILE_URINE",
+        "name": "\u0416\u0435\u043b\u0447\u043d\u044b\u0435 \u043f\u0438\u0433\u043c\u0435\u043d\u0442\u044b \u043d\u0430 \u043c\u043e\u0447\u0435",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 44,
+        "code": "L30",
+        "name": "\u0421\u043f\u0435\u0440\u043c\u043e\u0433\u0440\u0430\u043c\u043c\u0430",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 50,
+        "code": "LAB_RF",
+        "name": "\u0420\u0435\u0432\u043c\u0430\u0442\u043e\u0438\u0434\u043d\u044b\u0439 \u0444\u0430\u043a\u0442\u043e\u0440 (RF)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 51,
+        "code": "LAB_CRP",
+        "name": "\u0421-\u0440\u0435\u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0439 \u0431\u0435\u043b\u043e\u043a (CRP)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 52,
+        "code": "L22",
+        "name": "\u0410\u043d\u0442\u0438\u0441\u0442\u0440\u0435\u043f\u0442\u043e\u043b\u0438\u0437\u0438\u043d-\u041e (ASlO)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 53,
+        "code": "L24",
+        "name": "\u0411\u0440\u0443\u0446\u0435\u043b\u043b\u0435\u0437 (Rose Bengal)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 60,
+        "code": "L34",
+        "name": "\u0422\u0422\u0413 (\u0442\u0438\u0440\u0435\u043e\u0442\u0440\u043e\u043f\u043d\u044b\u0439 \u0433\u043e\u0440\u043c\u043e\u043d)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 61,
+        "code": "L33",
+        "name": "\u04224 (\u0442\u0438\u0440\u043e\u043a\u0441\u0438\u043d)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 62,
+        "code": "L32",
+        "name": "\u04223 (\u0442\u0440\u0438\u0439\u043e\u0434\u0442\u0438\u0440\u043e\u043d\u0438\u043d)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 63,
+        "code": "L23",
+        "name": "\u0410\u0422-\u0422\u041f\u041e (\u0430\u0443\u0442\u043e\u0430\u043d\u0442\u0438\u0442\u0435\u043b\u043e \u043a \u0442\u0438\u0440\u0435\u043e\u043f\u0435\u0440\u043e\u043a\u0441\u0438\u0434\u0430\u0437\u0435)",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 70,
+        "code": "LAB_FUNGI",
+        "name": "\u041d\u0438\u0442\u0438 \u0433\u0440\u0438\u0431\u043a\u0438",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 71,
+        "code": "LAB_MALAS",
+        "name": "Malassezia furfur",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 72,
+        "code": "L26",
+        "name": "\u0414\u0435\u043c\u043e\u0434\u0435\u043a\u043e\u0437",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 73,
+        "code": "L29",
+        "name": "\u041c\u0430\u0437\u043e\u043a \u043d\u0430 \u0441\u0442\u0435\u043f\u0435\u043d\u044c \u0447\u0438\u0441\u0442\u043e\u0442\u044b",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 74,
+        "code": "L31",
+        "name": "\u041a\u0430\u043b \u043d\u0430 \u044f/\u0433",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 75,
+        "code": "LAB_IGE",
+        "name": "\u0418\u043c\u043c\u0443\u043d\u043e\u0433\u043b\u043e\u0431\u0443\u043b\u0438\u043d \u0415",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "general",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 90,
+        "code": "S10",
+        "name": "\u0420\u0435\u043d\u0442\u0433\u0435\u043d\u043e\u0433\u0440\u0430\u0444\u0438\u044f \u0437\u0443\u0431\u0430",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "stomatology",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='stomatology' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource"
+        ]
+      },
+      {
+        "id": 100,
+        "code": "P08",
+        "name": "\u0414\u0430\u0440\u0441\u043e\u043d\u0432\u0430\u043b\u044c",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 101,
+        "code": "P03",
+        "name": "\u0423\u0424\u041e \u0442\u0435\u0440\u0430\u043f\u0438\u044f",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 102,
+        "code": "P09",
+        "name": "\u0414\u0438\u043e\u0434\u043d\u0430\u044f \u043c\u0430\u0441\u043a\u0430 \u043b\u0438\u0446\u0430",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 103,
+        "code": "P07",
+        "name": "\u0411\u0438\u043e\u043f\u0442\u0440\u043e\u043d - \u0441\u0432\u0435\u0442\u043e\u0442\u0435\u0440\u0430\u043f\u0438\u044f",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 104,
+        "code": "P10",
+        "name": "\u042d\u043a\u0441\u0438\u043c\u0435\u0440 \u043b\u0430\u0437\u0435\u0440",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 110,
+        "code": "C07",
+        "name": "\u041f\u043b\u0430\u0437\u043c\u043e\u043b\u0438\u0444\u0442\u0438\u043d\u0433 \u043b\u0438\u0446\u0430",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 111,
+        "code": "C08",
+        "name": "\u041f\u043b\u0430\u0437\u043c\u043e\u043b\u0438\u0444\u0442\u0438\u043d\u0433 \u0432\u043e\u043b\u043e\u0441",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 112,
+        "code": "C03",
+        "name": "\u041c\u0435\u0437\u043e\u0442\u0435\u0440\u0430\u043f\u0438\u044f",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 113,
+        "code": "C06",
+        "name": "\u0427\u0438\u0441\u0442\u043a\u0430 \u043b\u0438\u0446\u0430",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 114,
+        "code": "C09",
+        "name": "\u0411\u0435\u0437\u043e\u043f\u0435\u0440\u0430\u0446\u0438\u043e\u043d\u043d\u0430\u044f \u0431\u043b\u0435\u0444\u0430\u0440\u043e\u043f\u043b\u0430\u0441\u0442\u0438\u043a\u0430",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 115,
+        "code": "C12",
+        "name": "\u0423\u0434\u0430\u043b\u0435\u043d\u0438\u0435 \u0436\u0438\u0440\u043e\u0432\u0438\u043a",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 116,
+        "code": "C11",
+        "name": "\u041b\u0430\u0437\u0435\u0440\u043d\u043e\u0435 \u0443\u0434\u0430\u043b\u0435\u043d\u0438\u0435 \u0442\u0430\u0442\u0443\u0430\u0436 \u0438 \u0442\u0430\u0442\u0443\u0438\u0440\u043e\u0432\u043e\u043a",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 117,
+        "code": "C10",
+        "name": "\u041a\u0430\u0440\u0431\u043e\u043d\u043e\u0432\u044b\u0439 \u043f\u0438\u043b\u0438\u043d\u0433",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 120,
+        "code": "D06",
+        "name": "\u041a\u0440\u0438\u043e\u0434\u0435\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u044f \u0431\u043e\u0440\u043e\u0434\u0430\u0432\u043e\u043a",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 121,
+        "code": "D05",
+        "name": "\u041a\u0440\u0438\u043e\u0434\u0435\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u044f \u043f\u0430\u043f\u0438\u043b\u043b\u043e\u043c",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 122,
+        "code": "D07",
+        "name": "\u041c\u0435\u0437\u043e\u0442\u0435\u0440\u0430\u043f\u0438\u044f \u043a\u0435\u043b\u043b\u043e\u0438\u0434\u043d\u044b\u0445 \u0440\u0443\u0431\u0446\u043e\u0432",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "procedures",
+        "department_key": null,
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+        ]
+      },
+      {
+        "id": 125,
+        "code": "O10",
+        "name": "\u0423\u0417\u0418",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "ultrason",
+        "department_key": "ultrason",
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='ultrason' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource"
+        ]
+      },
+      {
+        "id": 126,
+        "code": "O20",
+        "name": "\u041d\u0435\u0432\u0440\u043e\u043f\u0430\u0442\u043e\u043b\u043e\u0433",
+        "active": true,
+        "requires_doctor": false,
+        "queue_tag": "neurology",
+        "department_key": "neurology",
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='neurology' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource"
+        ]
+      },
+      {
+        "id": 127,
+        "code": "K11",
+        "name": "\u042d\u0445\u043e\u041a\u0413",
+        "active": true,
+        "requires_doctor": true,
+        "queue_tag": "cardio",
+        "department_key": "cardiology",
+        "doctor_id": null,
+        "reasons": [
+          "queue_tag='cardio' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource"
+        ]
+      }
+    ],
+    "queue_profiles_with_general_tag": [
+      {
+        "id": 6,
+        "key": "general",
+        "title": "\u041e\u0431\u0449\u0430\u044f \u043e\u0447\u0435\u0440\u0435\u0434\u044c",
+        "is_active": true,
+        "show_on_qr_page": false,
+        "queue_tags": [
+          "general"
+        ]
+      }
+    ],
+    "department_general": [
+      {
+        "id": 5,
+        "key": "general",
+        "name_ru": "\u041e\u0431\u0449\u0430\u044f \u043e\u0447\u0435\u0440\u0435\u0434\u044c",
+        "name_uz": null,
+        "icon": null,
+        "color": null,
+        "gradient": null,
+        "display_order": 5,
+        "active": true,
+        "description": null
+      }
+    ],
+    "medical_specialty_general_drift": []
+  },
+  "general_queues": {
+    "total": 0,
+    "classifications": {
+      "active_live_blocker": 0,
+      "active_empty": 0,
+      "inactive_historical": 0
+    },
+    "queues": []
+  },
+  "sentinel_doctors": {
+    "total_specialty_general": 1,
+    "synthetic_among_them": 1,
+    "sentinel_doctors": [],
+    "policy": "these rows are the incomplete-Doctor onboarding sentinel (INCOMPLETE_DOCTOR_SPECIALTY) \u2014 RQ-15.d never deletes them; only the exact 0055 synthetic pairs are deleted"
+  },
+  "registry": {
+    "rows": [
+      {
+        "id": 1,
+        "code": "lab",
+        "queue_tag": "lab",
+        "display_name": "\u041b\u0430\u0431\u043e\u0440\u0430\u0442\u043e\u0440\u0438\u044f",
+        "active": true,
+        "default_cabinet": null
+      },
+      {
+        "id": 2,
+        "code": "ecg",
+        "queue_tag": "ecg",
+        "display_name": "\u042d\u041a\u0413",
+        "active": true,
+        "default_cabinet": null
+      }
+    ],
+    "general_resource_rows": [],
+    "note": "Stage E must not seed an active general resource; any general row (active or not) is drift against the D-08 decision until the RQ-15.c archival row is created deliberately"
+  },
+  "blockers": [
+    {
+      "kind": "inbound_reference",
+      "detail": "table login_attempts.user_id holds 1 row(s) referencing the synthetic ecg_resource (user)"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=1 code='D01' name='\u041a\u043e\u043d\u0441\u0443\u043b\u044c\u0442\u0430\u0446\u0438\u044f \u0434\u0435\u0440\u043c\u0430\u0442\u043e\u043b\u043e\u0433\u0430-\u043a\u043e\u0441\u043c\u0435\u0442\u043e\u043b\u043e\u0433\u0430' still routes via queue_tag='dermatology' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=2 code='K01' name='\u041a\u043e\u043d\u0441\u0443\u043b\u044c\u0442\u0430\u0446\u0438\u044f \u043a\u0430\u0440\u0434\u0438\u043e\u043b\u043e\u0433\u0430' still routes via queue_tag='cardio' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=3 code='S01' name='\u041a\u043e\u043d\u0441\u0443\u043b\u044c\u0442\u0430\u0446\u0438\u044f \u0441\u0442\u043e\u043c\u0430\u0442\u043e\u043b\u043e\u0433\u0430' still routes via queue_tag='stomatology' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=11 code='L14' name='\u0413\u0435\u043c\u043e\u0433\u043b\u043e\u0431\u0438\u043d' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=12 code='L25' name='\u0412\u0440\u0435\u043c\u044f \u0441\u0432\u0435\u0440\u0442\u044b\u0432\u0430\u0435\u043c\u043e\u0441\u0442\u0438 \u043a\u0440\u043e\u0432\u0438' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=20 code='L19' name='\u041e\u0431\u0449\u0438\u0439 \u0431\u0435\u043b\u043e\u043a' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=21 code='L03' name='\u0413\u043b\u044e\u043a\u043e\u0437\u0430' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=22 code='L16' name='\u0425\u043e\u043b\u0435\u0441\u0442\u0435\u0440\u0438\u043d' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=23 code='L18' name='\u041c\u043e\u0447\u0435\u0432\u0438\u043d\u0430' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=24 code='L17' name='\u041a\u0440\u0435\u0430\u0442\u0438\u043d\u0438\u043d' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=25 code='LAB_ALT' name='\u0410\u043b\u0410\u0422 (\u0430\u043b\u0430\u043d\u0438\u043d\u0430\u043c\u0438\u043d\u043e\u0442\u0440\u0430\u043d\u0441\u0444\u0435\u0440\u0430\u0437\u0430)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=26 code='LAB_AST' name='\u0410\u0441\u0410\u0422 (\u0430\u0441\u043f\u0430\u0440\u0442\u043e\u0442\u0430\u043c\u0438\u043d\u043e\u0442\u0440\u0430\u043d\u0441\u0444\u0435\u0440\u0430\u0437\u0430)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=27 code='L15' name='\u0411\u0438\u043b\u0438\u0440\u0443\u0431\u0438\u043d (\u043e\u0431\u0449, \u043f\u0440\u044f\u043c, \u043d\u0435\u043f\u0440\u044f\u043c)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=28 code='L20' name='\u0429\u0435\u043b\u043e\u0447\u043d\u0430\u044f \u0444\u043e\u0441\u0444\u0430\u0442\u0430\u0437\u0430' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=29 code='L21' name='\u0410\u043b\u044c\u0444\u0430-\u0430\u043c\u0438\u043b\u0430\u0437\u0430' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=30 code='L27' name='\u041a\u0430\u043b\u0438\u0439' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=31 code='LAB_CA' name='\u041a\u0430\u043b\u044c\u0446\u0438\u0439' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=32 code='L28' name='\u041d\u0430\u0442\u0440\u0438\u0439' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=33 code='L35' name='\u0412\u0438\u0442\u0430\u043c\u0438\u043d \u0414' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=34 code='LAB_HBA1C' name='\u0413\u043b\u0438\u043a\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0439 \u0433\u0435\u043c\u043e\u0433\u043b\u043e\u0431\u0438\u043d (\u041d\u042c\u04101C)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=36 code='LAB_BILE_URINE' name='\u0416\u0435\u043b\u0447\u043d\u044b\u0435 \u043f\u0438\u0433\u043c\u0435\u043d\u0442\u044b \u043d\u0430 \u043c\u043e\u0447\u0435' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=44 code='L30' name='\u0421\u043f\u0435\u0440\u043c\u043e\u0433\u0440\u0430\u043c\u043c\u0430' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=50 code='LAB_RF' name='\u0420\u0435\u0432\u043c\u0430\u0442\u043e\u0438\u0434\u043d\u044b\u0439 \u0444\u0430\u043a\u0442\u043e\u0440 (RF)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=51 code='LAB_CRP' name='\u0421-\u0440\u0435\u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0439 \u0431\u0435\u043b\u043e\u043a (CRP)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=52 code='L22' name='\u0410\u043d\u0442\u0438\u0441\u0442\u0440\u0435\u043f\u0442\u043e\u043b\u0438\u0437\u0438\u043d-\u041e (ASlO)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=53 code='L24' name='\u0411\u0440\u0443\u0446\u0435\u043b\u043b\u0435\u0437 (Rose Bengal)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=60 code='L34' name='\u0422\u0422\u0413 (\u0442\u0438\u0440\u0435\u043e\u0442\u0440\u043e\u043f\u043d\u044b\u0439 \u0433\u043e\u0440\u043c\u043e\u043d)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=61 code='L33' name='\u04224 (\u0442\u0438\u0440\u043e\u043a\u0441\u0438\u043d)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=62 code='L32' name='\u04223 (\u0442\u0440\u0438\u0439\u043e\u0434\u0442\u0438\u0440\u043e\u043d\u0438\u043d)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=63 code='L23' name='\u0410\u0422-\u0422\u041f\u041e (\u0430\u0443\u0442\u043e\u0430\u043d\u0442\u0438\u0442\u0435\u043b\u043e \u043a \u0442\u0438\u0440\u0435\u043e\u043f\u0435\u0440\u043e\u043a\u0441\u0438\u0434\u0430\u0437\u0435)' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=70 code='LAB_FUNGI' name='\u041d\u0438\u0442\u0438 \u0433\u0440\u0438\u0431\u043a\u0438' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=71 code='LAB_MALAS' name='Malassezia furfur' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=72 code='L26' name='\u0414\u0435\u043c\u043e\u0434\u0435\u043a\u043e\u0437' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=73 code='L29' name='\u041c\u0430\u0437\u043e\u043a \u043d\u0430 \u0441\u0442\u0435\u043f\u0435\u043d\u044c \u0447\u0438\u0441\u0442\u043e\u0442\u044b' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=74 code='L31' name='\u041a\u0430\u043b \u043d\u0430 \u044f/\u0433' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=75 code='LAB_IGE' name='\u0418\u043c\u043c\u0443\u043d\u043e\u0433\u043b\u043e\u0431\u0443\u043b\u0438\u043d \u0415' still routes via queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=90 code='S10' name='\u0420\u0435\u043d\u0442\u0433\u0435\u043d\u043e\u0433\u0440\u0430\u0444\u0438\u044f \u0437\u0443\u0431\u0430' still routes via queue_tag='stomatology' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=100 code='P08' name='\u0414\u0430\u0440\u0441\u043e\u043d\u0432\u0430\u043b\u044c' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=101 code='P03' name='\u0423\u0424\u041e \u0442\u0435\u0440\u0430\u043f\u0438\u044f' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=102 code='P09' name='\u0414\u0438\u043e\u0434\u043d\u0430\u044f \u043c\u0430\u0441\u043a\u0430 \u043b\u0438\u0446\u0430' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=103 code='P07' name='\u0411\u0438\u043e\u043f\u0442\u0440\u043e\u043d - \u0441\u0432\u0435\u0442\u043e\u0442\u0435\u0440\u0430\u043f\u0438\u044f' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=104 code='P10' name='\u042d\u043a\u0441\u0438\u043c\u0435\u0440 \u043b\u0430\u0437\u0435\u0440' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=110 code='C07' name='\u041f\u043b\u0430\u0437\u043c\u043e\u043b\u0438\u0444\u0442\u0438\u043d\u0433 \u043b\u0438\u0446\u0430' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=111 code='C08' name='\u041f\u043b\u0430\u0437\u043c\u043e\u043b\u0438\u0444\u0442\u0438\u043d\u0433 \u0432\u043e\u043b\u043e\u0441' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=112 code='C03' name='\u041c\u0435\u0437\u043e\u0442\u0435\u0440\u0430\u043f\u0438\u044f' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=113 code='C06' name='\u0427\u0438\u0441\u0442\u043a\u0430 \u043b\u0438\u0446\u0430' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=114 code='C09' name='\u0411\u0435\u0437\u043e\u043f\u0435\u0440\u0430\u0446\u0438\u043e\u043d\u043d\u0430\u044f \u0431\u043b\u0435\u0444\u0430\u0440\u043e\u043f\u043b\u0430\u0441\u0442\u0438\u043a\u0430' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=115 code='C12' name='\u0423\u0434\u0430\u043b\u0435\u043d\u0438\u0435 \u0436\u0438\u0440\u043e\u0432\u0438\u043a' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=116 code='C11' name='\u041b\u0430\u0437\u0435\u0440\u043d\u043e\u0435 \u0443\u0434\u0430\u043b\u0435\u043d\u0438\u0435 \u0442\u0430\u0442\u0443\u0430\u0436 \u0438 \u0442\u0430\u0442\u0443\u0438\u0440\u043e\u0432\u043e\u043a' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=117 code='C10' name='\u041a\u0430\u0440\u0431\u043e\u043d\u043e\u0432\u044b\u0439 \u043f\u0438\u043b\u0438\u043d\u0433' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=120 code='D06' name='\u041a\u0440\u0438\u043e\u0434\u0435\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u044f \u0431\u043e\u0440\u043e\u0434\u0430\u0432\u043e\u043a' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=121 code='D05' name='\u041a\u0440\u0438\u043e\u0434\u0435\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u044f \u043f\u0430\u043f\u0438\u043b\u043b\u043e\u043c' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=122 code='D07' name='\u041c\u0435\u0437\u043e\u0442\u0435\u0440\u0430\u043f\u0438\u044f \u043a\u0435\u043b\u043b\u043e\u0438\u0434\u043d\u044b\u0445 \u0440\u0443\u0431\u0446\u043e\u0432' still routes via queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource) \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=125 code='O10' name='\u0423\u0417\u0418' still routes via queue_tag='ultrason' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=126 code='O20' name='\u041d\u0435\u0432\u0440\u043e\u043f\u0430\u0442\u043e\u043b\u043e\u0433' still routes via queue_tag='neurology' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    },
+    {
+      "kind": "active_general_service",
+      "detail": "service id=127 code='K11' name='\u042d\u0445\u043e\u041a\u0413' still routes via queue_tag='cardio' has no ACTIVE QueueResource \u2014 the morning pre-create/batch universal fallback writes it under general_resource \u2014 assign an explicit owner (Doctor or resource tag) or disable it"
+    }
+  ],
+  "operator_map_items": 57
+}

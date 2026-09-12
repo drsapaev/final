@@ -1,0 +1,1063 @@
+{
+ "report_version": 1,
+ "how_to_fill": "For every item set decision to one of decision_options (plus the accompanying target fields). No inference from service names is allowed (D-08). RQ-15.b consumes the completed map; an item with decision=null blocks it.",
+ "items": [
+  {
+   "surface": "service",
+   "id": 1,
+   "code": "D01",
+   "name": "Консультация дерматолога-косметолога",
+   "queue_tag": "dermatology",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='dermatology' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 2,
+   "code": "K01",
+   "name": "Консультация кардиолога",
+   "queue_tag": "cardio",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='cardio' has no ACTIVE QueueResource — the morning pre-create/batch universal fallback writes it under general_resource"
+   ],
+   "decision": "assign_doctor",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_doctor_id": 10
+  },
+  {
+   "surface": "service",
+   "id": 3,
+   "code": "S01",
+   "name": "Консультация стоматолога",
+   "queue_tag": "stomatology",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='stomatology' has no ACTIVE QueueResource — the morning pre-create/batch universal fallback writes it under general_resource"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 11,
+   "code": "L14",
+   "name": "Гемоглобин",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 12,
+   "code": "L25",
+   "name": "Время свертываемости крови",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 20,
+   "code": "L19",
+   "name": "Общий белок",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 21,
+   "code": "L03",
+   "name": "Глюкоза",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 22,
+   "code": "L16",
+   "name": "Холестерин",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 23,
+   "code": "L18",
+   "name": "Мочевина",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 24,
+   "code": "L17",
+   "name": "Креатинин",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 25,
+   "code": "LAB_ALT",
+   "name": "АлАТ (аланинаминотрансфераза)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 26,
+   "code": "LAB_AST",
+   "name": "АсАТ (аспартотаминотрансфераза)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 27,
+   "code": "L15",
+   "name": "Билирубин (общ, прям, непрям)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 28,
+   "code": "L20",
+   "name": "Щелочная фосфатаза",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 29,
+   "code": "L21",
+   "name": "Альфа-амилаза",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 30,
+   "code": "L27",
+   "name": "Калий",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 31,
+   "code": "LAB_CA",
+   "name": "Кальций",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 32,
+   "code": "L28",
+   "name": "Натрий",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 33,
+   "code": "L35",
+   "name": "Витамин Д",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 34,
+   "code": "LAB_HBA1C",
+   "name": "Гликированный гемоглобин (НЬА1C)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 36,
+   "code": "LAB_BILE_URINE",
+   "name": "Желчные пигменты на моче",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 44,
+   "code": "L30",
+   "name": "Спермограмма",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 50,
+   "code": "LAB_RF",
+   "name": "Ревматоидный фактор (RF)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 51,
+   "code": "LAB_CRP",
+   "name": "С-реактивный белок (CRP)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 52,
+   "code": "L22",
+   "name": "Антистрептолизин-О (ASlO)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 53,
+   "code": "L24",
+   "name": "Бруцеллез (Rose Bengal)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 60,
+   "code": "L34",
+   "name": "ТТГ (тиреотропный гормон)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 61,
+   "code": "L33",
+   "name": "Т4 (тироксин)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 62,
+   "code": "L32",
+   "name": "Т3 (трийодтиронин)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 63,
+   "code": "L23",
+   "name": "АТ-ТПО (аутоантитело к тиреопероксидазе)",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 70,
+   "code": "LAB_FUNGI",
+   "name": "Нити грибки",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 71,
+   "code": "LAB_MALAS",
+   "name": "Malassezia furfur",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 72,
+   "code": "L26",
+   "name": "Демодекоз",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 73,
+   "code": "L29",
+   "name": "Мазок на степень чистоты",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 74,
+   "code": "L31",
+   "name": "Кал на я/г",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 75,
+   "code": "LAB_IGE",
+   "name": "Иммуноглобулин Е",
+   "queue_tag": "general",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='general' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": "retag_resource",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_queue_tag": "lab"
+  },
+  {
+   "surface": "service",
+   "id": 90,
+   "code": "S10",
+   "name": "Рентгенография зуба",
+   "queue_tag": "stomatology",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='stomatology' has no ACTIVE QueueResource — the morning pre-create/batch universal fallback writes it under general_resource"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 100,
+   "code": "P08",
+   "name": "Дарсонваль",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 101,
+   "code": "P03",
+   "name": "УФО терапия",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 102,
+   "code": "P09",
+   "name": "Диодная маска лица",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 103,
+   "code": "P07",
+   "name": "Биоптрон - светотерапия",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 104,
+   "code": "P10",
+   "name": "Эксимер лазер",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 110,
+   "code": "C07",
+   "name": "Плазмолифтинг лица",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 111,
+   "code": "C08",
+   "name": "Плазмолифтинг волос",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 112,
+   "code": "C03",
+   "name": "Мезотерапия",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 113,
+   "code": "C06",
+   "name": "Чистка лица",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 114,
+   "code": "C09",
+   "name": "Безоперационная блефаропластика",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 115,
+   "code": "C12",
+   "name": "Удаление жировик",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 116,
+   "code": "C11",
+   "name": "Лазерное удаление татуаж и татуировок",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 117,
+   "code": "C10",
+   "name": "Карбоновый пилинг",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 120,
+   "code": "D06",
+   "name": "Криодеструкция бородавок",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 121,
+   "code": "D05",
+   "name": "Криодеструкция папиллом",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 122,
+   "code": "D07",
+   "name": "Мезотерапия келлоидных рубцов",
+   "queue_tag": "procedures",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='procedures' (legacy general-fallback vocabulary, no ACTIVE QueueResource)"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 125,
+   "code": "O10",
+   "name": "УЗИ",
+   "queue_tag": "ultrason",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='ultrason' has no ACTIVE QueueResource — the morning pre-create/batch universal fallback writes it under general_resource"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 126,
+   "code": "O20",
+   "name": "Невропатолог",
+   "queue_tag": "neurology",
+   "requires_doctor": false,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='neurology' has no ACTIVE QueueResource — the morning pre-create/batch universal fallback writes it under general_resource"
+   ],
+   "decision": null,
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ]
+  },
+  {
+   "surface": "service",
+   "id": 127,
+   "code": "K11",
+   "name": "ЭхоКГ",
+   "queue_tag": "cardio",
+   "requires_doctor": true,
+   "doctor_id": null,
+   "reasons": [
+    "queue_tag='cardio' has no ACTIVE QueueResource — the morning pre-create/batch universal fallback writes it under general_resource"
+   ],
+   "decision": "assign_doctor",
+   "decision_options": [
+    "assign_doctor",
+    "retag_resource",
+    "disable_service"
+   ],
+   "target_doctor_id": 10
+  },
+  {
+   "surface": "queue_profile",
+   "id": 6,
+   "key": "general",
+   "queue_tags": [
+    "general"
+   ],
+   "show_on_qr_page": false,
+   "decision": "keep_profile",
+   "decision_options": [
+    "retire_profile",
+    "keep_profile"
+   ]
+  }
+ ]
+}
