@@ -198,36 +198,45 @@ def test_resolve_tag_resource_none_for_unknown_and_empty(db_session: Session) ->
 
 
 def test_find_active_tag_queue_finds_any_owner_shape(db_session: Session) -> None:
-    """Tag-first unification: bridged, resource-owned and legacy
-    synthetic-owned rows are all 'the queue for the day+tag'."""
+    """Tag-first unification: resource-owned and legacy synthetic-owned
+    rows are both 'the queue for the day+tag' (the dual-ownership
+    bridge — the third pre-0063 shape — was consumed by the QD-2D XOR
+    contract; the both-set classification stays pinned at the
+    Pydantic/GQL-mapper level)."""
     user = _make_user(db_session, username="lab_resource", role="Resource")
     synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
     resource = _make_resource(db_session, code="lab", queue_tag="lab")
-    bridged = _make_queue(
-        db_session,
-        specialist_id=synthetic.id,
-        queue_tag="lab",
-        queue_resource_id=resource.id,
-    )
-    found = queue_resource_routing.find_active_tag_queue(db_session, _DAY, "lab")
-    assert found is bridged
-
-    other_day = _DAY + timedelta(days=1)
     resource_owned = _make_queue(
         db_session,
-        day=other_day,
         specialist_id=None,
         queue_tag="lab",
         queue_resource_id=resource.id,
     )
+    found = queue_resource_routing.find_active_tag_queue(db_session, _DAY, "lab")
+    assert found is resource_owned
+
+    other_day = _DAY + timedelta(days=1)
+    synthetic_owned = _make_queue(
+        db_session,
+        day=other_day,
+        specialist_id=synthetic.id,
+        queue_tag="lab",
+    )
     assert (
         queue_resource_routing.find_active_tag_queue(db_session, other_day, "lab")
-        is resource_owned
+        is synthetic_owned
     )
 
 
 def test_find_active_tag_queue_ignores_inactive_rows(db_session: Session) -> None:
-    _make_queue(db_session, specialist_id=None, queue_tag="lab", active=False)
+    resource = _make_resource(db_session, code="lab", queue_tag="lab")
+    _make_queue(
+        db_session,
+        specialist_id=None,
+        queue_tag="lab",
+        queue_resource_id=resource.id,
+        active=False,
+    )
     assert queue_resource_routing.find_active_tag_queue(db_session, _DAY, "lab") is None
 
 
@@ -252,15 +261,19 @@ def test_get_or_create_registry_tag_creates_resource_owned_queue(
     assert queue.max_online_entries == 11
 
 
-def test_get_or_create_registry_tag_reuses_bridged_queue(db_session: Session) -> None:
-    """The dual-ownership bridge (0059 backfill shape: BOTH owners) IS
-    the tag queue — no parallel fork, no mutation of the bridge."""
-    user = _make_user(db_session, username="lab_resource", role="Resource")
-    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+def test_get_or_create_registry_tag_reuses_existing_resource_queue(
+    db_session: Session,
+) -> None:
+    """The pre-existing (day, tag) queue IS the tag queue — no
+    parallel fork, no mutation of the row. Pre-0063 this pinned the
+    0059 dual-ownership bridge (BOTH owners); the QD-2D conversion
+    consumed the specialist link, so the same no-fork scenario now
+    runs against the converted resource-owned row the migration
+    produced."""
     resource = _make_resource(db_session, code="lab", queue_tag="lab")
-    bridged = _make_queue(
+    existing = _make_queue(
         db_session,
-        specialist_id=synthetic.id,
+        specialist_id=None,
         queue_tag="lab",
         queue_resource_id=resource.id,
     )
@@ -268,8 +281,9 @@ def test_get_or_create_registry_tag_reuses_bridged_queue(db_session: Session) ->
     queue = queue_service.get_or_create_daily_queue(
         db_session, day=_DAY, specialist_id=None, queue_tag="lab"
     )
-    assert queue.id == bridged.id
-    assert queue.specialist_id == synthetic.id  # bridge untouched
+    assert queue.id == existing.id
+    assert queue.specialist_id is None
+    assert queue.queue_resource_id == resource.id
     assert len(_tag_queues(db_session, _DAY, "lab")) == 1
 
 
@@ -495,17 +509,17 @@ def test_morning_precreate_general_tag_keeps_synthetic_path(
 def test_morning_precreate_existing_queues_not_duplicated(
     db_session: Session,
 ) -> None:
-    """The bridged queue from the 0059 backfill IS the tag queue:
-    pre-create finds it and creates nothing."""
+    """The existing queue for the tag IS the tag queue: pre-create
+    finds it and creates nothing (pre-0063 this pinned the 0059
+    bridge; the QD-2D conversion leaves the same surface as a
+    resource-owned row)."""
     from app.services.morning_assignment import MorningAssignmentService
 
     _scope_morning_world(db_session, "lab")
-    user = _make_user(db_session, username="lab_resource", role="Resource")
-    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
     resource = _make_resource(db_session, code="lab", queue_tag="lab")
     _make_queue(
         db_session,
-        specialist_id=synthetic.id,
+        specialist_id=None,
         queue_tag="lab",
         queue_resource_id=resource.id,
     )
@@ -687,20 +701,22 @@ def test_daily_queue_out_owner_kinds(db_session: Session) -> None:
 
 
 def test_daily_queue_out_from_attributes(db_session: Session) -> None:
-    """from_attributes ORM hydration carries the QD-2C fields."""
-    user = _make_user(db_session, username="lab_resource", role="Resource")
-    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
+    """from_attributes ORM hydration carries the QD-2C fields on the
+    resource-owned row (the post-0063 shape of the 0059 backfill:
+    the QD-2D conversion consumed the specialist link — the both-set
+    hydration input stays pinned at the Pydantic level in
+    test_daily_queue_out_owner_kinds)."""
     resource = _make_resource(db_session, code="lab", queue_tag="lab")
     queue = _make_queue(
         db_session,
-        specialist_id=synthetic.id,
+        specialist_id=None,
         queue_tag="lab",
         queue_resource_id=resource.id,
     )
     payload = DailyQueueOut.model_validate(queue)
     assert payload.owner_kind == "resource"
     assert payload.queue_resource_id == resource.id
-    assert payload.specialist_id == synthetic.id
+    assert payload.specialist_id is None
 
 
 # ===================== H. GQL contract =====================
@@ -740,24 +756,37 @@ def test_gql_daily_queue_type_doctor_queue(db_session: Session) -> None:
     assert gql_queue.queue_resource_id is None
 
 
-def test_gql_daily_queue_type_bridge_classifies_resource(
+def test_gql_daily_queue_type_bridge_input_classifies_resource(
     db_session: Session,
 ) -> None:
-    """The dual-ownership bridge (0059 backfill) reports the resource
-    axis — the same rule as DailyQueueOut."""
+    """The both-set input (the pre-0063 dual-ownership bridge) still
+    classifies as the resource axis — the same rule as DailyQueueOut.
+    Post-0063 the XOR CHECK makes the shape uncreatable through the
+    ORM, so the mapper rule is pinned on a namespace input (the
+    defensive branch stays until QD-2E removes the bridge
+    vocabulary); the ORM-level shape lives in the contract suite."""
+    from types import SimpleNamespace
+
     from app.graphql.resolvers import daily_queue_to_type
 
     user = _make_user(db_session, username="lab_resource", role="Resource")
     synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
     resource = _make_resource(db_session, code="lab", queue_tag="lab")
-    queue = _make_queue(
-        db_session,
-        specialist_id=synthetic.id,
+    bridge_input = SimpleNamespace(
+        id=1,
+        specialist=synthetic,
+        day=_DAY,
         queue_tag="lab",
+        active=True,
         queue_resource_id=resource.id,
+        opened_at=None,
+        cabinet_number=None,
+        cabinet_floor=None,
+        cabinet_building=None,
+        created_at=None,
     )
-    gql_queue = daily_queue_to_type(queue)
-    assert gql_queue.specialist is not None  # bridge keeps the doctor
+    gql_queue = daily_queue_to_type(bridge_input)
+    assert gql_queue.specialist is not None  # the bridge input keeps the doctor
     assert gql_queue.owner_kind == "resource"
     assert gql_queue.queue_resource_id == resource.id
 
@@ -816,25 +845,26 @@ def test_confirmation_repository_non_registry_keeps_guard(
         repo.get_or_create_daily_queue(_DAY, None, "general")
 
 
-def test_confirmation_repository_reuses_bridged_queue(db_session: Session) -> None:
+def test_confirmation_repository_reuses_existing_resource_queue(
+    db_session: Session,
+) -> None:
     from app.repositories.visit_confirmation_repository import (
         VisitConfirmationRepository,
     )
 
-    user = _make_user(db_session, username="lab_resource", role="Resource")
-    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
     resource = _make_resource(db_session, code="lab", queue_tag="lab")
-    bridged = _make_queue(
+    existing = _make_queue(
         db_session,
-        specialist_id=synthetic.id,
+        specialist_id=None,
         queue_tag="lab",
         queue_resource_id=resource.id,
     )
     repo = VisitConfirmationRepository(db_session)
 
     queue = repo.get_or_create_daily_queue(_DAY, None, "lab")
-    assert queue.id == bridged.id
-    assert queue.specialist_id == synthetic.id
+    assert queue.id == existing.id
+    assert queue.specialist_id is None
+    assert queue.queue_resource_id == resource.id
 
 
 # ===================== J. empty-registry regression =====================
@@ -2324,43 +2354,42 @@ def _test_display_call_body(db_session: Session, async_mock_cls) -> None:
     assert kwargs["doctor_name"] == "Ресурс очереди"
 
 
-def test_cabinet_info_bridged_queue_classifies_resource(
+def test_cabinet_info_resource_queue_classifies_resource(
     db_session: Session,
 ) -> None:
-    """Codex round-10 P2: a BRIDGED queue (the 0059 backfill shape —
-    specialist_id AND queue_resource_id both set) classifies as the
-    resource axis (the DailyQueueOut/GQL contract): the cabinet UI
-    gets resource_owned semantics, not doctor warnings."""
+    """Codex round-10 P2: a resource-axis queue classifies as
+    resource_owned (the DailyQueueOut/GQL contract): the cabinet UI
+    gets resource_owned semantics, not doctor warnings. Pre-0063 this
+    pinned the 0059 bridge (both owners); the QD-2D conversion
+    leaves the same axis as a resource-owned row."""
     from app.api.v1.endpoints.queue_cabinet_management import QueueCabinetResponse
     from app.services.queue_domain_service import QueueDomainService
 
     resource = _make_resource(db_session, code="lab", queue_tag="lab")
     resource.default_cabinet = "7"
     db_session.commit()
-    user = _make_user(db_session, username="lab_res23", role="Resource")
-    synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
-    # the bridge: BOTH owners set (carrying the live cabinet the
-    # backfilled row would have)
-    bridged = _make_queue(
+    # the resource-axis row (the post-0063 shape of the backfill),
+    # carrying the live cabinet
+    resource_queue = _make_queue(
         db_session,
-        specialist_id=synthetic.id,
+        specialist_id=None,
         queue_tag="lab",
         queue_resource_id=resource.id,
         active=True,
     )
-    bridged.cabinet_number = "7"
+    resource_queue.cabinet_number = "7"
     db_session.commit()
 
     payloads = QueueDomainService(db_session).list_queue_cabinet_info(
         day=_DAY, specialist_id=None, cabinet_number=None
     )
     items = [QueueCabinetResponse(**item) for item in payloads]
-    bridged_item = next(i for i in items if i.id == bridged.id)
-    assert bridged_item.specialist_id == synthetic.id  # the bridge keeps both
-    assert bridged_item.sync_status == "resource_owned"
-    assert bridged_item.specialist_name == "Ресурс очереди"
-    assert bridged_item.effective_cabinet == "7"
-    assert "linked_doctor_missing" not in bridged_item.integrity_warnings
+    resource_item = next(i for i in items if i.id == resource_queue.id)
+    assert resource_item.specialist_id is None
+    assert resource_item.sync_status == "resource_owned"
+    assert resource_item.specialist_name == "Ресурс очереди"
+    assert resource_item.effective_cabinet == "7"
+    assert "linked_doctor_missing" not in resource_item.integrity_warnings
 
 
 def test_queue_limits_reads_surface_usage(db_session: Session) -> None:
@@ -3155,13 +3184,13 @@ def test_qr_time_restrictions_prefer_surface_over_shadow(
             day=future_day,
             specialist_id=None,
             queue_tag="lab",
+            queue_resource_id=(
+                db_session.query(QueueResource)
+                .filter(QueueResource.queue_tag == "lab")
+                .first()
+                .id
+            ),
             active=True,
-        )
-        surface.queue_resource_id = (
-            db_session.query(QueueResource)
-            .filter(QueueResource.queue_tag == "lab")
-            .first()
-            .id
         )
         db_session.commit()
 
@@ -3599,26 +3628,25 @@ def test_full_update_independent_entry_uses_resource_floor(
 
 def test_cabinet_sync_skips_resource_rows(db_session: Session) -> None:
     """Codex round-16 P2: POST /admin/queues/sync-cabinet-info does not
-    overwrite a bridged (0059) queue's registry-sourced cabinet with
-    the synthetic doctor's stale one; doctor queues still sync. The
-    service COMMITs — durable rows cleaned in the finally."""
+    overwrite a resource queue's registry-sourced cabinet with a
+    doctor's stale one; doctor queues still sync. Pre-0063 the pin ran
+    against the 0059 bridge (whose synthetic specialist carried the
+    stale cabinet 42); the QD-2D conversion leaves the same protection
+    on the resource-owned row. The service COMMITs — durable rows
+    cleaned in the finally."""
     try:
         from app.services.queue_cabinet_management_api_service import (
             QueueCabinetManagementApiService,
         )
 
-        user = _make_user(db_session, username="lab_res_z3", role="Resource")
-        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
-        synthetic.cabinet = "42"  # the STALE synthetic cabinet
-        db_session.commit()
         resource = _make_resource(db_session, code="lab", queue_tag="lab")
-        bridged = _make_queue(
+        resource_queue = _make_queue(
             db_session,
-            specialist_id=synthetic.id,
+            specialist_id=None,
             queue_tag="lab",
             queue_resource_id=resource.id,
         )
-        bridged.cabinet_number = "7"  # the resource destination in use
+        resource_queue.cabinet_number = "7"  # the resource destination in use
         db_session.commit()
 
         doc_user = _make_user(db_session, username="dr_z3", role="Doctor")
@@ -3636,15 +3664,15 @@ def test_cabinet_sync_skips_resource_rows(db_session: Session) -> None:
         ).sync_cabinet_info_from_doctors(
             day=_DAY.isoformat(), specialist_id=None, synced_by="admin"
         )
-        db_session.refresh(bridged)
+        db_session.refresh(resource_queue)
         db_session.refresh(doc_queue)
         assert result["success"] is True
-        # the bridged resource destination survives the sync
-        assert bridged.cabinet_number == "7"  # NOT the synthetic's 42
+        # the resource destination survives the sync
+        assert resource_queue.cabinet_number == "7"
         # the doctor queue still syncs from its doctor
         assert doc_queue.cabinet_number == "5"
     finally:
-        _durable_cleanup(db_session, "lab_res_z3", "dr_z3")
+        _durable_cleanup(db_session, "dr_z3")
 
 
 # ===================== AA. Codex round-17 pins =====================
@@ -5480,14 +5508,15 @@ def test_legacy_today_endpoint_defaults_to_clinic_day(
 # ===================== NN. Codex round-30 pins =====================
 
 
-def test_bridged_queue_broadcasts_routing_rooms(db_session: Session) -> None:
-    """Codex round-30 P2: a BRIDGED queue (the 0059 backfill rows carry
-    BOTH specialist_id and queue_resource_id) is addressable through
-    EVERY routing sibling id — each queue manager subscribes to its own
-    selected specialist room, so the early legacy-only return starved
-    sibling subscribers of join/call/restore/no-show updates until
-    polling. Pure doctor queues keep the single legacy room;
-    pure resource queues keep the routing rooms."""
+def test_queue_update_departments_rooms_by_owner_kind(db_session: Session) -> None:
+    """Codex round-30 P2: every queue is addressable through EVERY
+    routing sibling id of its tag — each queue manager subscribes to
+    its own selected specialist room, so the early legacy-only return
+    starved sibling subscribers of join/call/restore/no-show updates
+    until polling. Pure doctor queues keep the single legacy room;
+    pure resource queues keep the routing rooms. (Pre-0063 the bridged
+    shape was the third case; the QD-2D XOR contract consumed it and
+    the resource-owned row pins the identical rooms.)"""
     from app.ws.queue_ws import queue_update_departments
 
     try:
@@ -5498,20 +5527,9 @@ def test_bridged_queue_broadcasts_routing_rooms(db_session: Session) -> None:
         resource = _make_resource(db_session, code="lab", queue_tag="lab")
         today = _dt_now_tashkent_day()
 
-        # the bridged shape (0059 backfill): BOTH ids set
-        bridged = _make_queue(
-            db_session,
-            day=today,
-            specialist_id=synth_a.id,
-            queue_tag="lab",
-            queue_resource_id=resource.id,
-        )
-        rooms = queue_update_departments(db_session, bridged)
-        assert set(rooms) == {
-            f"specialist_{synth_a.id}",
-            f"specialist_{synth_b.id}",
-        }, rooms
-        assert "specialist_None" not in rooms
+        # (pre-0063 the bridged shape was pinned here as a third case;
+        # the QD-2D XOR contract consumed it — the resource-owned row
+        # below pins the identical routing rooms)
 
         # regression: the pure doctor queue keeps the single legacy room
         doc_user = _make_user(db_session, username="dr_nn1", role="doctor")
@@ -5531,10 +5549,12 @@ def test_bridged_queue_broadcasts_routing_rooms(db_session: Session) -> None:
             queue_tag="lab",
             queue_resource_id=resource.id,
         )
-        assert set(queue_update_departments(db_session, pure_resource)) == {
+        resource_rooms = queue_update_departments(db_session, pure_resource)
+        assert set(resource_rooms) == {
             f"specialist_{synth_a.id}",
             f"specialist_{synth_b.id}",
         }
+        assert "specialist_None" not in resource_rooms
     finally:
         _durable_cleanup(db_session, "lab_res_nn1a", "lab_res_nn1b", "dr_nn1")
 
@@ -5694,26 +5714,22 @@ def test_department_snapshot_defaults_to_clinic_day(
 # ===================== OO. Codex round-31 pins =====================
 
 
-def test_registrar_payload_prefers_resource_metadata_for_bridges(
+def test_registrar_payload_prefers_resource_metadata_for_resource_queues(
     db_session: Session,
 ) -> None:
-    """Codex round-31 P2: a BRIDGED queue (the 0059 backfill shape: both
-    specialist_id and queue_resource_id) presents the REGISTRY identity
-    in the registrar payload — the retained synthetic's user/full_name
-    and cabinet lose to the resource axis, and the doctor-cabinet
-    integrity warning does not fire for a resource-owned surface."""
+    """Codex round-31 P2: a resource-axis queue presents the REGISTRY
+    identity in the registrar payload — no doctor full_name/username
+    and no doctor cabinet leak into the payload, and the
+    doctor-cabinet integrity warning does not fire for a
+    resource-owned surface. (Pre-0063 the pin ran against the 0059
+    bridge; the QD-2D conversion leaves the same registry identity
+    on the resource-owned row.)"""
     from app.api.v1.endpoints.registrar_integration._queue_ops import (
         _build_queue_payload,
         _process_online_queue_entries,
     )
 
     try:
-        user = _make_user(db_session, username="lab_res_oo1", role="Resource")
-        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
-        # the synthetic's stale legacy cabinet — must NOT leak into the
-        # bridged payload
-        synthetic.cabinet = "42"
-        db_session.commit()
         _make_resource(db_session, code="lab", queue_tag="lab")
         resource = (
             db_session.query(QueueResource)
@@ -5723,15 +5739,15 @@ def test_registrar_payload_prefers_resource_metadata_for_bridges(
         resource.default_cabinet = "7"
         db_session.commit()
 
-        # the bridge: BOTH owners set
-        bridged = _make_queue(
+        # the resource-owned row (the post-0063 shape of the backfill)
+        resource_queue = _make_queue(
             db_session,
             day=_DAY,
-            specialist_id=synthetic.id,
+            specialist_id=None,
             queue_tag="lab",
             queue_resource_id=resource.id,
         )
-        entry = _make_waiting_entry(db_session, bridged, number=31)
+        entry = _make_waiting_entry(db_session, resource_queue, number=31)
 
         queues_by_specialty: dict = {}
         _process_online_queue_entries(
@@ -5748,23 +5764,25 @@ def test_registrar_payload_prefers_resource_metadata_for_bridges(
             queue_number=1,
             entries=[{"id": entry.id, "status": "waiting"}],
         )
-        # the REGISTRY identity, not the retained synthetic's full_name
+        # the REGISTRY identity, no doctor identity leaks
         assert payload["specialist_name"] == "Ресурс очереди"
-        # the resource cabinet, not the synthetic's stale "42"
+        # the resource cabinet
         assert payload["cabinet"] == "7"
         assert payload["queue_resource_id"] == resource.id
     finally:
-        _durable_cleanup(db_session, "lab_res_oo1")
+        _durable_cleanup(db_session)
 
 
-def test_legacy_serializers_prefer_resource_owner_for_bridges(
+def test_legacy_serializers_prefer_resource_owner_for_resource_queues(
     db_session: Session,
 ) -> None:
     """Codex round-31 P2: the legacy serializers (GET /api/v1/queue/today
-    and GET /api/v1/queue/statistics) classify a bridged queue (both
-    owners set) by the RESOURCE axis first — the registry display_name
-    instead of the retained synthetic's full_name/username, which the
-    doctor-first condition previously reported."""
+    and GET /api/v1/queue/statistics) resolve the staff identity onto
+    the resource-owned surface and report the RESOURCE axis — the
+    registry display_name instead of a doctor full_name/username
+    (the doctor-first condition previously reported). Pre-0063 the
+    surface was the 0059 bridge; post-QD-2D it is the converted
+    resource-owned row reached through the same staff fallback."""
     from app.api.v1.endpoints.queue import get_queue_statistics, get_today_queue
 
     try:
@@ -5780,20 +5798,20 @@ def test_legacy_serializers_prefer_resource_owner_for_bridges(
         db_session.commit()
 
         today = _dt_now_tashkent_day()
-        bridged = _make_queue(
+        resource_queue = _make_queue(
             db_session,
             day=today,
-            specialist_id=synthetic.id,
+            specialist_id=None,
             queue_tag="lab",
             queue_resource_id=resource.id,
         )
-        _make_waiting_entry(db_session, bridged, number=1)
+        _make_waiting_entry(db_session, resource_queue, number=1)
 
         viewer = _make_user(db_session, username="adm_oo2", role="Admin")
         today_resp = get_today_queue(
             specialist_id=synthetic.id, db=db_session, current_user=viewer
         )
-        assert today_resp.queue_id == bridged.id
+        assert today_resp.queue_id == resource_queue.id
         assert today_resp.specialist_name == "Лаборатория (OO)"
 
         stats_resp = get_queue_statistics(
@@ -5862,19 +5880,19 @@ def test_online_queue_today_defaults_to_clinic_day(
         _durable_cleanup(db_session, "lab_res_pp1", "adm_pp1")
 
 
-def test_online_queue_aggregate_prefers_resource_owner_for_bridges(
+def test_online_queue_aggregate_prefers_resource_owner_for_resource_queues(
     db_session: Session,
 ) -> None:
     """Codex round-32 P2: the online-queue aggregate (the no-specialist
-    form of GET /api/v1/online-queue/today) classifies a 0059 bridge
-    (both owners set) by the RESOURCE axis first — the registry
-    display_name instead of the retained synthetic's name/«Врач #id»,
-    consistent with the round-31 legacy serializers."""
+    form of GET /api/v1/online-queue/today) classifies a resource-axis
+    queue by the RESOURCE axis — the registry display_name instead of
+    a doctor name/«Врач #id», consistent with the round-31 legacy
+    serializers. (Pre-0063 the pin ran against the 0059 bridge; the
+    QD-2D conversion leaves the same registry identity on the
+    resource-owned row.)"""
     from app.crud.online_queue import get_queue_statistics
 
     try:
-        user = _make_user(db_session, username="lab_res_pp2", role="Resource")
-        synthetic = _make_doctor(db_session, user_id=user.id, specialty="lab")
         _make_resource(db_session, code="lab", queue_tag="lab")
         resource = (
             db_session.query(QueueResource)
@@ -5885,14 +5903,14 @@ def test_online_queue_aggregate_prefers_resource_owner_for_bridges(
         db_session.commit()
 
         today = _dt_now_tashkent_day()
-        bridged = _make_queue(
+        resource_queue = _make_queue(
             db_session,
             day=today,
-            specialist_id=synthetic.id,
+            specialist_id=None,
             queue_tag="lab",
             queue_resource_id=resource.id,
         )
-        _make_waiting_entry(db_session, bridged, number=1)
+        _make_waiting_entry(db_session, resource_queue, number=1)
 
         doc_user = _make_user(db_session, username="dr_pp2", role="doctor")
         doc_user.full_name = "Доктор Кардио"
@@ -5904,16 +5922,16 @@ def test_online_queue_aggregate_prefers_resource_owner_for_bridges(
         _make_waiting_entry(db_session, doctor_queue, number=1)
 
         stats = get_queue_statistics(db_session, today)
-        bridged_row = next(
+        resource_row = next(
             q for q in stats["queues"] if q["queue_resource_id"] == resource.id
         )
-        assert bridged_row["specialist_id"] == synthetic.id  # the bridge keeps it
-        assert bridged_row["specialist_name"] == "Лаборатория (PP)"
+        assert resource_row["specialist_id"] is None
+        assert resource_row["specialist_name"] == "Лаборатория (PP)"
 
         doctor_row = next(q for q in stats["queues"] if q["specialist_id"] == doctor.id)
         assert doctor_row["specialist_name"] == "Доктор Кардио"
     finally:
-        _durable_cleanup(db_session, "lab_res_pp2", "dr_pp2")
+        _durable_cleanup(db_session, "dr_pp2")
 
 
 # ===================== QQ. Codex round-33 pins =====================
@@ -7412,47 +7430,44 @@ def test_cabinet_filter_survives_registry_deactivation(db_session: Session) -> N
 # ===================== AF. Codex round-46 pin =====================
 
 
-def test_cabinet_specialist_filter_includes_bridged_queues(
+def test_cabinet_specialist_filter_includes_resource_queues(
     db_session: Session,
 ) -> None:
-    """Codex round-46 P2: a 0059 bridge (queue_resource_id set) may
-    retain a DIFFERENT synthetic owner — e.g. a general_resource-owned
-    lab queue — and the specialist-filtered cabinet reads must match
-    the resource axis by queue_resource_id + tag rather than by a NULL
-    specialist, or the bridge drops out of the lab identity's filter."""
+    """Codex round-46 P2: the specialist-filtered cabinet reads must
+    match the resource axis by queue_resource_id + tag rather than by
+    a NULL specialist, or the resource queue drops out of the lab
+    identity's filter. Pre-0063 the pin ran against the 0059
+    cross-owner bridge (a general_resource-owned lab queue with
+    queue_resource_id set); the QD-2D conversion leaves the same
+    resource-arm match on the resource-owned row."""
     from app.services.queue_domain_service import QueueDomainService
 
     day = _dt_now_tashkent_day()
     lab_user = _make_user(db_session, username="lab_res_af1", role="Resource")
     lab_synthetic = _make_doctor(db_session, user_id=lab_user.id, specialty="lab")
-    gen_user = _make_user(db_session, username="gen_res_af1", role="Resource")
-    general_synthetic = _make_doctor(
-        db_session, user_id=gen_user.id, specialty="general"
-    )
     lab_resource = _make_resource(db_session, code="lab", queue_tag="lab")
 
-    # the 0059 bridge shape: the lab-tag queue keeps its ORIGINAL
-    # synthetic owner (general_resource) while queue_resource_id marks
-    # resource ownership — exact-tag-wins cross-owner bridge
-    bridge = _make_queue(
+    # the resource-owned lab queue (the post-0063 shape of the 0059
+    # cross-owner bridge — exact-tag-wins)
+    resource_queue = _make_queue(
         db_session,
         day=day,
-        specialist_id=general_synthetic.id,
+        specialist_id=None,
         queue_tag="lab",
         active=True,
         queue_resource_id=lab_resource.id,
     )
-    _make_waiting_entry(db_session, bridge, number=107)
+    _make_waiting_entry(db_session, resource_queue, number=107)
 
     payload = QueueDomainService(db_session).list_queue_cabinet_info(
         day=day, specialist_id=lab_synthetic.id, cabinet_number=None
     )
-    # the LAB identity's filter sees the bridge (resource axis by
-    # queue_resource_id + tag, not by a NULL specialist)
-    assert [item["id"] for item in payload] == [bridge.id]
+    # the LAB identity's filter sees the resource queue (the resource
+    # axis by queue_resource_id + tag, not by a NULL specialist)
+    assert [item["id"] for item in payload] == [resource_queue.id]
 
-    # the day-less filter keeps the bridge in scope as well
+    # the day-less filter keeps the resource queue in scope as well
     payload_all = QueueDomainService(db_session).list_queue_cabinet_info(
         day=None, specialist_id=lab_synthetic.id, cabinet_number=None
     )
-    assert bridge.id in [item["id"] for item in payload_all]
+    assert resource_queue.id in [item["id"] for item in payload_all]
