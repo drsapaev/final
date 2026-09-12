@@ -151,6 +151,7 @@ from .payment import Payment
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from .payment_webhook import PaymentProvider, PaymentTransaction, PaymentWebhook
 from .print_config import PrinterConfig, PrintJob, PrintTemplate
+from .push_device import PUSH_PLATFORMS, PUSH_PROVIDERS, PushDevice  # PR-6
 from .queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
 from .refund_deposit import (
     DepositTransaction,

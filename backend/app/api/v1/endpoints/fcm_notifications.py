@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
 from app.core.rate_limiter import limiter
+from app.crud import push_device as crud_push_device
 from app.crud import user as crud_user
 from app.db.session import get_db
 from app.models.user import User
@@ -88,6 +89,21 @@ async def register_fcm_token(  # P1-7: token ownership validated via current_use
             },
         )
 
+        # PR-6: dual-write into the canonical multi-device registry. The
+        # legacy column stays as the DEPRECATED mirror (last registration
+        # wins) so every existing sender keeps working. Registry platforms
+        # are android|web only — legacy "ios" registrations stay
+        # mirror-only (documented transitional behavior; apkfinal removed
+        # Firebase and no iOS push client exists).
+        if payload.device_type in ("android", "web"):
+            crud_push_device.register_device(
+                db,
+                user_id=current_user.id,
+                provider="fcm",
+                platform=payload.device_type,
+                token=payload.device_token,
+            )
+
         return {
             "success": True,
             "message": "FCM токен успешно зарегистрирован",
@@ -109,7 +125,14 @@ async def unregister_fcm_token(
 ):
     """Отмена регистрации FCM токена"""
     try:
-        # PR-2: clear device_token + mobile metadata
+        # PR-6: capture the mirrored credential BEFORE clearing — the exact
+        # registry row for THIS credential is invalidated; the user's other
+        # registry devices stay untouched (device-level isolation).
+        legacy_token = current_user.device_token
+
+        # PR-2: clear device_token + mobile metadata (legacy global opt-out
+        # contract preserved: this endpoint is the user's explicit
+        # "turn push off" act in the single-device world).
         crud_user.update_user(
             db,
             user_id=current_user.id,
@@ -120,6 +143,12 @@ async def unregister_fcm_token(
                 "push_notifications_enabled": False,
             },
         )
+
+        # PR-6: invalidate the exact registry credential that was mirrored.
+        if legacy_token:
+            crud_push_device.invalidate_active_credential(
+                db, provider="fcm", token=legacy_token
+            )
 
         return {"success": True, "message": "FCM токен успешно удален"}
 
