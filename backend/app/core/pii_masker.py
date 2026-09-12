@@ -18,8 +18,10 @@ DO NOT send unmasked PII to:
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
+from urllib.parse import parse_qsl, unquote_plus
 
 # ---------------------------------------------------------------------------
 # Field-name list — backend source of truth.
@@ -88,6 +90,50 @@ PASSPORT_REGEX = re.compile(r"\b([A-Z]{2})\d{6,8}\b")
 
 # IIN (Uzbek 14-digit): 12345678901234 → 1234••••••••34
 IIN_REGEX = re.compile(r"\b(\d{4})\d{6}(\d{4})\b")
+
+# PR-6: push device credentials inside FREE-TEXT payloads (raw JSON request
+# bodies captured by the Sentry integration, log lines, breadcrumbs).
+# Dict-shaped payloads are covered by SECRET_FIELD_PATTERNS below; this
+# regex catches the string form: {"token": "..."} etc. Conservative by
+# design — only credential-looking JSON keys are redacted, never prose.
+#
+# PR-6 round 4 (codex P1): the value part is ESCAPE-AWARE —
+# (?:[^"\\]|\\.)* — because a webpush credential is a serialized
+# subscription object whose quotes arrive escaped in raw bodies
+# ("token":"{\"endpoint\":...}"). A plain [^"]+ stopped at the first
+# escaped quote and left the endpoint and key material exposed. The two
+# alternation branches start with disjoint character classes (non-quote-
+# non-backslash vs backslash), so the scan stays linear (no ReDoS).
+JSON_CREDENTIAL_REGEX = re.compile(
+    r'("(?:token|previous_token|device_token|fcm_token|push_token'
+    r'|web_push_subscription|vapid_private_key)"\s*:\s*")((?:[^"\\]|\\.)*)(")'
+)
+
+# PR-6 round 10 (codex P1): FORM / urlencoded credential assignments —
+# raw request bodies with content types like application/x-www-form-urlencoded
+# arrive as "token=<credential>&..." with NO quotes, so the JSON regex above
+# cannot see them. Conservative: only credential-looking keys, never prose.
+FORM_CREDENTIAL_REGEX = re.compile(
+    r'\b(token|previous_token|device_token|fcm_token|push_token'
+    r'|web_push_subscription|vapid_private_key)=([^\s&]+)'
+)
+
+# ---------------------------------------------------------------------------
+# Secret fields (PR-6): provider credentials must never leave the
+# infrastructure through Sentry captures or structured logs. Exact-match
+# key redaction, same style as full_redact_patterns in _mask_key_value.
+# ---------------------------------------------------------------------------
+SECRET_FIELD_PATTERNS = (
+    # push device registry credentials (PR-6) — request bodies of
+    # /api/v1/push/devices/* attach to Sentry events on unhandled 5xx
+    "token",
+    "previous_token",
+    "device_token",
+    "fcm_token",
+    "push_token",
+    "web_push_subscription",
+    "vapid_private_key",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +254,11 @@ def _mask_key_value(key: str, value: Any) -> Any:
         return None
     key_lower = key.lower()
 
+    # Secret credentials first (PR-6): never partially masked, never
+    # recursed into — a credential is a credential in any shape.
+    if key_lower in SECRET_FIELD_PATTERNS:
+        return "[REDACTED]"
+
     # Full-redact fields (identifiers, medical content)
     full_redact_patterns = {
         "iin", "passport_number", "passport_series", "ssn", "national_id",
@@ -234,15 +285,76 @@ def _mask_key_value(key: str, value: Any) -> Any:
     # Recurse into nested structures
     if isinstance(value, (dict, list)):
         return mask_pii(value)
+    if isinstance(value, str):
+        # PR-6 round 4 (codex P1): a string under an ordinary dict key
+        # still gets the free-text scrubbing pass. Fresh evidence: Sentry
+        # may represent request bodies as raw JSON strings under keys
+        # like "data" — key-based redaction misses them, and without
+        # this pass JSON_CREDENTIAL_REGEX (credential-shaped JSON inside
+        # the string) is never reached, leaking the full credential.
+        return _mask_string_inplace(value)
     return value
 
 
 def _mask_string_inplace(s: str) -> str:
     """Apply all regex maskers to a free-text string."""
+    # PR-6 round 5 (codex P2): a string that IS a JSON document is parsed
+    # and re-scrubbed STRUCTURALLY — valid JSON can spell a key as a
+    # unicode escape (e.g. "\u0074oken"), which the literal-key regex
+    # below would never match while Pydantic happily accepts it. Parsing
+    # routes every key spelling (and nested shapes) through the key-based
+    # redaction; re-serialization is compact so already-compact inputs
+    # stay stable (idempotent). If the string does not parse, fall
+    # through to the regex pass (log lines, truncated bodies, prose).
+    if s.lstrip()[:1] in ("{", "["):
+        try:
+            parsed = json.loads(s)
+        except Exception:
+            parsed = None
+        if isinstance(parsed, (dict, list)):
+            try:
+                return json.dumps(
+                    mask_pii(parsed), ensure_ascii=False, separators=(",", ":")
+                )
+            except Exception:
+                # Never let masking itself break the caller — fall back
+                # to the regex pass below.
+                pass
+    # PR-6 rounds 10-12: form/urlencoded credential redaction. When the
+    # text is percent-escaped, parse it into RAW-delimited key/value pairs
+    # FIRST (parse_qsl splits before decoding), so an encoded delimiter
+    # (%26) inside a value cannot split it and leak the remainder: a pair
+    # whose DECODED key is a credential name gets its whole value redacted.
+    # Plain (non-escaped) forms fall through to FORM_CREDENTIAL_REGEX.
+    if "%" in s:
+        try:
+            pairs = parse_qsl(s, keep_blank_values=True)
+        except Exception:
+            pairs = []
+        if pairs:
+            rebuilt = []
+            for k, v in pairs:
+                lk = k.lower()
+                if lk in SECRET_FIELD_PATTERNS or lk.endswith("token"):
+                    rebuilt.append(f"{k}=[REDACTED]")
+                else:
+                    rebuilt.append(f"{k}={v}")
+            s = "&".join(rebuilt)
+        else:
+            try:
+                decoded = unquote_plus(s)
+            except Exception:
+                decoded = s
+            if decoded != s:
+                s = decoded
     s = PHONE_REGEX.sub(r"\1•••\2", s)
     s = EMAIL_REGEX.sub(r"\1•••@\2", s)
     s = PASSPORT_REGEX.sub(r"\1••••••", s)
     s = IIN_REGEX.sub(r"\1••••••\2", s)
+    # PR-6: credential-shaped JSON keys inside raw bodies / log lines
+    s = JSON_CREDENTIAL_REGEX.sub(r"\1[REDACTED]\3", s)
+    # PR-6 round 10: form-style credential assignments (token=...)
+    s = FORM_CREDENTIAL_REGEX.sub(r"\1=[REDACTED]", s)
     return s
 
 
