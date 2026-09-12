@@ -47,6 +47,12 @@ import {
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 import { notify } from '../../services/notify';
+import {
+  QUEUE_PROFILES_CSV_BLOCKING_ISSUES,
+  buildQueueProfilesCsv,
+  parseQueueProfilesCsv,
+  queueProfileToCsvPayload,
+} from './queueProfilesCsv';
 
 interface QueueProfileDto {
     key: string;
@@ -322,23 +328,10 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
         }
     };
 
-    // ⭐ New: Export to CSV
+    // ⭐ New: Export to CSV — RQ-26.a: full current contract (F-22), all fields quoted.
     const handleExport = () => {
         try {
-            const headers = ['key', 'title', 'title_ru', 'queue_tags', 'icon', 'color', 'display_order', 'is_active'];
-            const csvContent = [
-                headers.join(','),
-                ...profiles.map((p: QueueProfileDto) => [
-                    `"${(p.key || '').replace(/"/g, '""')}"`,
-                    `"${(p.title || '').replace(/"/g, '""')}"`,
-                    `"${(p.title_ru || '').replace(/"/g, '""')}"`,
-                    `"${(p.queue_tags || []).join(';').replace(/"/g, '""')}"`,
-                    `"${(p.icon || '').replace(/"/g, '""')}"`,
-                    `"${(p.color || '').replace(/"/g, '""')}"`,
-                    p.order || 0,
-                    p.is_active !== false ? 'true' : 'false'
-                ].join(','))
-            ].join('\n');
+            const csvContent = buildQueueProfilesCsv(profiles);
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
@@ -353,50 +346,32 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
         }
     };
 
-    // ⭐ New: Import from CSV
+    // ⭐ New: Import from CSV — RQ-26.a: RFC-4180 parser + validation BEFORE
+    // any API call (F-22). Blocking issues abort the whole import; per-profile
+    // API failures and unknown-department warnings are reported visibly.
     const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
         try {
             const text = await file.text();
-            const lines = text.split('\n').filter((line: string) => line.trim());
+            const knownDepartmentKeys = new Set(
+                departments
+                    .map((d: DepartmentDto) => String(d.key ?? '').trim())
+                    .filter(Boolean)
+            );
+            const { rows, issues } = parseQueueProfilesCsv(text, { knownDepartmentKeys });
 
-            if (lines.length < 2) {
-                setError(t('admin2.qp_import_csv_invalid'));
+            const blockingIssues = issues.filter((issue) => QUEUE_PROFILES_CSV_BLOCKING_ISSUES.has(issue.code));
+            if (blockingIssues.length > 0) {
+                const rowList = Array.from(new Set(blockingIssues.map((issue) => issue.row).filter((row) => row > 0)))
+                    .slice(0, 8)
+                    .join(', ');
+                setError(t('admin2.qp_import_row_issues', { count: blockingIssues.length, rows: rowList }));
                 return;
             }
 
-            const headers = lines[0].split(',').map((h: string) => h.replace(/"/g, '').trim());
-            const importedProfiles: Record<string, unknown>[] = [];
-
-            for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map((v: string) => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
-                const profile: Record<string, unknown> = {};
-
-                headers.forEach((header: unknown, index: number) => {
-                    const value = values[index];
-                    switch (header) {
-                        case 'queue_tags':
-                            profile[header as string] = value ? value.split(';').filter(Boolean) : [];
-                            break;
-                        case 'display_order':
-                            profile[header as string] = parseInt(value) || 0;
-                            break;
-                        case 'is_active':
-                            profile[header as string] = value !== 'false';
-                            break;
-                        default:
-                            profile[header as string] = value || '';
-                    }
-                });
-
-                if (profile.key && profile.title) {
-                    importedProfiles.push(profile);
-                }
-            }
-
-            if (importedProfiles.length === 0) {
+            if (rows.length === 0) {
                 setError(t('admin2.qp_import_no_valid'));
                 return;
             }
@@ -404,19 +379,22 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             setSaving(true);
             let imported = 0;
             let updated = 0;
+            let failed = 0;
 
-            for (const profile of importedProfiles) {
+            for (const row of rows) {
                 try {
-                    const existing = profiles.find((p: QueueProfileDto) => p.key === profile.key);
+                    const payload = queueProfileToCsvPayload(row);
+                    const existing = profiles.find((p: QueueProfileDto) => p.key === row.key);
                     if (existing) {
-                        await api.put(`/queues/profiles/${profile.key}`, profile);
+                        await api.put(`/queues/profiles/${row.key}`, payload);
                         updated++;
                     } else {
-                        await api.post('/queues/profiles', profile);
+                        await api.post('/queues/profiles', payload);
                         imported++;
                     }
                 } catch (err) {
-                    logger.error(`Error importing profile ${profile.key}:`, err);
+                    failed++;
+                    logger.error(`Error importing profile ${row.key}:`, err);
                 }
             }
 
@@ -424,6 +402,13 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
             setError(null);
             notify.success(t('admin2.qp_import_success', { imported, updated }));
+
+            const unknownDepartments = issues.filter((issue) => issue.code === 'unknown_department').length;
+            if (failed > 0) {
+                setError(t('admin2.qp_import_failed_count', { count: failed }));
+            } else if (unknownDepartments > 0) {
+                setError(t('admin2.qp_import_unknown_department', { count: unknownDepartments }));
+            }
 
         } catch (err) {
             logger.error('Error importing profiles:', err);
