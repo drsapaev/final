@@ -13,6 +13,11 @@ class MobileApiRepository:
 
     def update_device_token(self, *, user, device_token: str):  # type: ignore[no-untyped-def]
         user.device_token = device_token
+        # PR-5: registering a token on the single-device registry is an
+        # explicit opt-in act. Without this, a login-time registration would
+        # leave push_notifications_enabled=False and the sender-level flag
+        # gate would silently skip every login-registered device.
+        user.push_notifications_enabled = True
         self.db.commit()
         self.db.refresh(user)
         return user

@@ -346,8 +346,9 @@ class Settings(BaseSettings):
     SMS_DEFAULT_PROVIDER: str = "mock"  # eskiz, playmobile, mock
 
     # --- Firebase Cloud Messaging (FCM) ---
-    FCM_SERVER_KEY: str | None = Field(default=None, description="FCM Server Key for push notifications")
-    FCM_SENDER_ID: str | None = Field(default=None, description="FCM Sender ID")
+    # PR-5: FCM_SERVER_KEY/FCM_SENDER_ID removed — the HTTP v1 API used here
+    # authenticates with a service account (GOOGLE_APPLICATION_CREDENTIALS),
+    # and FCM topics/iid are not used (topic endpoints removed in PR-5).
     FCM_PROJECT_ID: str | None = Field(default=None, description="FCM Project ID")
     FCM_ENABLED: bool = Field(default=False, description="Enable FCM push notifications")
 

@@ -14420,66 +14420,6 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/fcm/subscribe-topic": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Subscribe To Topic
-         * @description Подписка устройств на топик
-         */
-        post: operations["subscribe_to_topic_api_v1_fcm_subscribe_topic_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/fcm/unsubscribe-topic": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Unsubscribe From Topic
-         * @description Отписка устройств от топика
-         */
-        post: operations["unsubscribe_from_topic_api_v1_fcm_unsubscribe_topic_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/fcm/send-topic-notification": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Send Topic Notification
-         * @description Отправка уведомления по топику
-         */
-        post: operations["send_topic_notification_api_v1_fcm_send_topic_notification_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/fcm/status": {
         parameters: {
             query?: never;
@@ -27437,42 +27377,13 @@ export type components = {
             /**
              * Device Type
              * @default web
+             * @enum {string}
              */
-            device_type: string;
+            device_type: "web" | "android" | "ios";
             /** Device Info */
             device_info?: {
                 [key: string]: string;
             } | null;
-        };
-        /**
-         * FCMTopicNotificationRequest
-         * @description Запрос на отправку уведомления по топику
-         */
-        FCMTopicNotificationRequest: {
-            /** Topic */
-            topic: string;
-            /** Title */
-            title: string;
-            /** Body */
-            body: string;
-            /** Data */
-            data?: {
-                [key: string]: unknown;
-            } | null;
-            /** Image */
-            image?: string | null;
-            /** Condition */
-            condition?: string | null;
-        };
-        /**
-         * FCMTopicRequest
-         * @description Запрос для работы с топиками FCM
-         */
-        FCMTopicRequest: {
-            /** Topic */
-            topic: string;
-            /** Device Tokens */
-            device_tokens: string[];
         };
         /**
          * FeatureFlagCreateRequest
@@ -63733,111 +63644,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
-                };
-            };
-        };
-    };
-    subscribe_to_topic_api_v1_fcm_subscribe_topic_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FCMTopicRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    unsubscribe_from_topic_api_v1_fcm_unsubscribe_topic_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FCMTopicRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    send_topic_notification_api_v1_fcm_send_topic_notification_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FCMTopicNotificationRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

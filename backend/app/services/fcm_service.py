@@ -28,6 +28,24 @@ class FCMResponse(BaseModel):
     error_code: str | None = None
 
 
+def is_unregistered_token_response(response: FCMResponse) -> bool:
+    """True only for a canonical FCM UNREGISTERED verdict.
+
+    PR-5 (codex round 1): ``error_code`` carries the generic HTTP status, so
+    a bare 404/410 (proxy/gateway hiccup, wrong fcm_url) must NOT wipe the
+    user's token. The token is dropped only when the v1 error body itself
+    reports the unregistered verdict: HTTP 410 with status UNREGISTERED, or
+    HTTP 404 with the canonical "Requested entity was not found" message.
+    """
+    if response.success or response.error_code not in {"404", "410"}:
+        return False
+    message = (response.error or "").lower()
+    return (
+        "unregistered" in message
+        or "requested entity was not found" in message
+    )
+
+
 class FCMService:
     """Сервис для работы с Firebase Cloud Messaging (HTTP v1 API)"""
 
@@ -39,6 +57,15 @@ class FCMService:
         self.credentials = None
         self.access_token = None
         self.token_expiry = 0
+
+        # Concurrency cap for multicast fan-out (bounded, unlike a bare gather).
+        self._send_semaphore = asyncio.Semaphore(10)
+
+        # PR-5 (codex round 2): serialize OAuth refreshes — concurrent sends
+        # on a cold/expired cache must not refresh the shared credentials
+        # object in parallel (redundant token-endpoint calls, throttling,
+        # racing failures).
+        self._refresh_lock = asyncio.Lock()
 
         self._load_credentials()
 
@@ -80,9 +107,40 @@ class FCMService:
             logger.error(f"Failed to refresh FCM token: {e}")
             return None
 
+    async def _get_access_token_async(self) -> str | None:
+        """Off-loop token fetch with single-flight refresh (codex round 2).
+
+        Fast path: a still-valid cached token returns without touching the
+        lock. Otherwise the refresh runs in a worker thread while the lock
+        guarantees exactly one concurrent refresh; waiters re-check the cache
+        and reuse the freshly minted token.
+        """
+        if not self.credentials:
+            return None
+
+        now = time.time()
+        if self.access_token and now < self.token_expiry - 60:
+            return self.access_token
+
+        async with self._refresh_lock:
+            now = time.time()
+            if self.access_token and now < self.token_expiry - 60:
+                return self.access_token
+            return await asyncio.to_thread(self._get_access_token)
+
     @property
     def active(self) -> bool:
-        return bool(self.credentials and self.project_id)
+        """True only when the feature flag AND credentials AND project are set.
+
+        PR-5: previously ``FCM_ENABLED=false`` did not actually disable the
+        service (the flag was read by nothing), so /fcm/status reported the
+        service as usable while push could never be honestly attempted.
+        """
+        return bool(
+            getattr(settings, "FCM_ENABLED", False)
+            and self.credentials is not None
+            and bool(self.project_id)
+        )
 
     async def send_notification(
         self,
@@ -93,13 +151,17 @@ class FCMService:
         image: str | None = None,
         sound: str = "default",
         badge: int | None = None,
+        click_action: str | None = None,
     ) -> FCMResponse:
         """Отправка push уведомления (HTTP v1)"""
 
         if not self.active:
             return FCMResponse(success=False, error="FCM service not configured")
 
-        token = self._get_access_token()
+        # PR-5: credentials.refresh() is a blocking network call — keep it
+        # off the event loop (same class of issue as the PR-4 blocking-send
+        # fix); single-flight lock prevents parallel refreshes.
+        token = await self._get_access_token_async()
         if not token:
             return FCMResponse(success=False, error="Failed to get access token")
 
@@ -127,6 +189,9 @@ class FCMService:
                 }
             }
 
+            if click_action:
+                message["android"]["notification"]["click_action"] = click_action
+
             if image:
                 message["notification"]["image"] = image
 
@@ -146,21 +211,33 @@ class FCMService:
                     self.fcm_url, json=payload, headers=headers
                 )
 
-                response_data = response.json()
-
-                if response.status_code == 200:
-                    # Успешный ответ v1 содержит name (message_id)
-                    return FCMResponse(
-                        success=True,
-                        message_id=response_data.get("name"),
-                    )
-                else:
+                if response.status_code != 200:
+                    # Guard against non-JSON error bodies (proxies, HTML pages).
+                    try:
+                        response_data = response.json()
+                    except ValueError:
+                        response_data = {}
                     error_data = response_data.get("error", {})
+                    raw_code = error_data.get("code")
                     return FCMResponse(
                         success=False,
                         error=error_data.get("message", "Unknown error"),
-                        error_code=str(error_data.get("code")),
+                        error_code=str(raw_code) if raw_code is not None else str(response.status_code),
                     )
+
+                try:
+                    response_data = response.json()
+                except ValueError:
+                    return FCMResponse(
+                        success=False,
+                        error="FCM returned a non-JSON success response",
+                    )
+
+                # Успешный ответ v1 содержит name (message_id)
+                return FCMResponse(
+                    success=True,
+                    message_id=response_data.get("name"),
+                )
 
         except Exception as e:
             logger.error(f"FCM send error: {e}")
@@ -181,13 +258,16 @@ class FCMService:
         sent_count = 0
         failed_count = 0
 
-        # Отправляем параллельно
-        tasks = [
-            self.send_notification(token, title, body, data, **kwargs)
-            for token in device_tokens
-        ]
+        # Ограничиваем concurrency семафором (bare gather заливает FCM при
+        # больших списках токенов)
+        async def _bounded_send(single_token: str) -> FCMResponse:
+            async with self._send_semaphore:
+                return await self.send_notification(
+                    single_token, title, body, data, **kwargs
+                )
 
-        # Ограничиваем concurrency если нужно, но пока просто gather
+        tasks = [_bounded_send(token) for token in device_tokens]
+
         responses = await asyncio.gather(*tasks, return_exceptions=True)
 
         for i, response in enumerate(responses):
@@ -197,10 +277,17 @@ class FCMService:
                     results.append({"token_index": i, "success": True, "message_id": response.message_id})
                 else:
                     failed_count += 1
-                    results.append({"token_index": i, "success": False, "error": response.error})
+                    results.append(
+                        {
+                            "token_index": i,
+                            "success": False,
+                            "error": response.error,
+                            "error_code": response.error_code,
+                        }
+                    )
             else:
                 failed_count += 1
-                results.append({"token_index": i, "success": False, "error": str(response)})
+                results.append({"token_index": i, "success": False, "error": str(response), "error_code": None})
 
         return {
             "success": sent_count > 0,
@@ -218,6 +305,7 @@ class FCMService:
         """
         return {
             "active": self.active,
+            "enabled": bool(getattr(settings, "FCM_ENABLED", False)),
             "project_id": self.project_id,
             "credentials_loaded": self.credentials is not None,
             "fcm_url": self.fcm_url if self.active else None,

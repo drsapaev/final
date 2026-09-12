@@ -43,14 +43,12 @@ def test_secret_key_required():
 
 
 def test_fcm_settings_optional():
-    """Test that FCM settings are optional"""
+    """Test that FCM settings are optional (PR-5: legacy keys removed)"""
     settings = Settings(
         SECRET_KEY="a" * 32,
-        FCM_SERVER_KEY=None,
         FCM_PROJECT_ID=None,
         FCM_ENABLED=False
     )
-    assert settings.FCM_SERVER_KEY is None
     assert settings.FCM_PROJECT_ID is None
     assert settings.FCM_ENABLED is False
 
