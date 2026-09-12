@@ -68,6 +68,7 @@ class _StubFCMService(FCMService):
         self.access_token = "stub-access-token"
         self.token_expiry = 0
         self._send_semaphore = asyncio.Semaphore(10)
+        self._refresh_lock = asyncio.Lock()
 
     @property
     def active(self) -> bool:  # noqa: D102
@@ -236,6 +237,38 @@ def test_register_token_rejects_unknown_device_type(client, db_session):
         json={"device_token": "tok", "device_type": "toaster"},
     )
     assert response.status_code == 422, response.text
+
+
+def test_register_token_rejects_whitespace_only_token(client, db_session):
+    """Codex round 2: whitespace-only tokens pass min_length=1 and would be
+    stripped to an empty string at the endpoint — the contract rejects them."""
+    user = _make_user(db_session)
+    headers = _admin_headers(client, user)
+
+    response = client.post(
+        "/api/v1/fcm/register-token",
+        headers=headers,
+        json={"device_token": "   ", "device_type": "web"},
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_register_token_strips_surrounding_whitespace(client, db_session):
+    """Contract-level normalization: the stored token is the stripped value."""
+    user = _make_user(db_session)
+    headers = _admin_headers(client, user)
+
+    response = client.post(
+        "/api/v1/fcm/register-token",
+        headers=headers,
+        json={"device_token": "  tok-spaced  ", "device_type": "web"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["device_token"] == "tok-spaced"
+
+    db_session.expire_all()
+    refreshed = db_session.query(User).filter(User.id == user.id).first()
+    assert refreshed.device_token == "tok-spaced"
 
 
 # ---------------------------------------------------------------------------
@@ -461,9 +494,11 @@ class _StubCredentials:
     def __init__(self):
         self.token = "refreshed-token"
         self.refresh_thread_ident: int | None = None
+        self.refresh_count = 0
 
     def refresh(self, request):
         self.refresh_thread_ident = threading.get_ident()
+        self.refresh_count += 1
 
 
 def _fresh_service(monkeypatch, *, enabled: bool) -> tuple[FCMService, _StubCredentials]:
@@ -480,6 +515,7 @@ def _fresh_service(monkeypatch, *, enabled: bool) -> tuple[FCMService, _StubCred
     service.access_token = None
     service.token_expiry = 0
     service._send_semaphore = asyncio.Semaphore(10)
+    service._refresh_lock = asyncio.Lock()
     return service, credentials
 
 
@@ -500,6 +536,25 @@ async def test_send_notification_refreshes_token_off_event_loop(monkeypatch):
     assert result.message_id == "projects/p/messages/ok"
     assert credentials.refresh_thread_ident is not None
     assert credentials.refresh_thread_ident != main_ident
+
+
+@pytest.mark.asyncio
+async def test_multicast_cold_cache_refreshes_exactly_once(monkeypatch):
+    """Codex round 2: concurrent sends on a cold cache must not race the
+    OAuth refresh on the shared credentials object."""
+    service, credentials = _fresh_service(monkeypatch, enabled=True)
+    monkeypatch.setattr(
+        "app.services.fcm_service.httpx.AsyncClient",
+        lambda **kw: _FakeClient(_FakeResponse(200, {"name": "projects/p/messages/ok"})),
+    )
+
+    tokens = [f"tok-{i}" for i in range(25)]
+    result = await service.send_multicast(
+        device_tokens=tokens, title="t", body="b"
+    )
+
+    assert result["sent_count"] == 25
+    assert credentials.refresh_count == 1
 
 
 @pytest.mark.asyncio

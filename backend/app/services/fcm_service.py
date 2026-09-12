@@ -61,6 +61,12 @@ class FCMService:
         # Concurrency cap for multicast fan-out (bounded, unlike a bare gather).
         self._send_semaphore = asyncio.Semaphore(10)
 
+        # PR-5 (codex round 2): serialize OAuth refreshes — concurrent sends
+        # on a cold/expired cache must not refresh the shared credentials
+        # object in parallel (redundant token-endpoint calls, throttling,
+        # racing failures).
+        self._refresh_lock = asyncio.Lock()
+
         self._load_credentials()
 
     def _load_credentials(self):
@@ -101,6 +107,27 @@ class FCMService:
             logger.error(f"Failed to refresh FCM token: {e}")
             return None
 
+    async def _get_access_token_async(self) -> str | None:
+        """Off-loop token fetch with single-flight refresh (codex round 2).
+
+        Fast path: a still-valid cached token returns without touching the
+        lock. Otherwise the refresh runs in a worker thread while the lock
+        guarantees exactly one concurrent refresh; waiters re-check the cache
+        and reuse the freshly minted token.
+        """
+        if not self.credentials:
+            return None
+
+        now = time.time()
+        if self.access_token and now < self.token_expiry - 60:
+            return self.access_token
+
+        async with self._refresh_lock:
+            now = time.time()
+            if self.access_token and now < self.token_expiry - 60:
+                return self.access_token
+            return await asyncio.to_thread(self._get_access_token)
+
     @property
     def active(self) -> bool:
         """True only when the feature flag AND credentials AND project are set.
@@ -131,9 +158,10 @@ class FCMService:
         if not self.active:
             return FCMResponse(success=False, error="FCM service not configured")
 
-        # PR-5: credentials.refresh() is a blocking network call — keep it off
-        # the event loop (same class of issue as the PR-4 blocking-send fix).
-        token = await asyncio.to_thread(self._get_access_token)
+        # PR-5: credentials.refresh() is a blocking network call — keep it
+        # off the event loop (same class of issue as the PR-4 blocking-send
+        # fix); single-flight lock prevents parallel refreshes.
+        token = await self._get_access_token_async()
         if not token:
             return FCMResponse(success=False, error="Failed to get access token")
 

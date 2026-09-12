@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -36,6 +36,18 @@ class FCMTokenRequest(BaseModel):
     device_token: str = Field(min_length=1, max_length=255)
     device_type: Literal["web", "android", "ios"] = "web"
     device_info: dict[str, str] | None = None
+
+    @field_validator("device_token")
+    @classmethod
+    def _token_not_blank(cls, value: str) -> str:
+        # PR-5 (codex round 2): whitespace-only tokens pass min_length=1 and
+        # would normalize to an empty string at the endpoint — i.e. persist a
+        # token every sender treats as absent while flipping push on. Strip
+        # at the contract layer and reject blanks with 422.
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("device_token must contain non-whitespace characters")
+        return stripped
 
 
 class FCMNotificationRequest(BaseModel):
@@ -62,16 +74,14 @@ async def register_fcm_token(  # P1-7: token ownership validated via current_use
 ):
     """Регистрация FCM токена пользователя"""
     try:
-        # PR-5: normalise once; empty/oversized tokens are rejected by the
-        # request model before we ever touch the registry.
-        device_token = payload.device_token.strip()
-
+        # PR-5: the contract validator strips and rejects blank tokens, so
+        # this value is non-empty and within the column width already.
         # PR-2: persist to existing User.device_token + new mobile metadata columns
         crud_user.update_user(
             db,
             user_id=current_user.id,
             user_data={
-                "device_token": device_token,
+                "device_token": payload.device_token,
                 "device_type": payload.device_type,
                 "device_info": payload.device_info,
                 "push_notifications_enabled": True,
@@ -81,7 +91,7 @@ async def register_fcm_token(  # P1-7: token ownership validated via current_use
         return {
             "success": True,
             "message": "FCM токен успешно зарегистрирован",
-            "device_token": device_token,
+            "device_token": payload.device_token,
         }
 
     except HTTPException:
