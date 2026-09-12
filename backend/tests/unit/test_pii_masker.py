@@ -319,3 +319,197 @@ class TestPIIMaskingFilter:
         original = record.msg
         self.filter.filter(record)
         assert record.msg == original
+
+
+# ---------------------------------------------------------------------------
+# PR-6: secret credential fields (push device registry)
+# Provider credentials must never leave the infrastructure through Sentry
+# captures or structured logs — codex P1 on the PR-6 registry.
+# ---------------------------------------------------------------------------
+
+
+class TestSecretFieldRedaction:
+    def test_redacts_push_credential_keys(self):
+        from app.core.pii_masker import SECRET_FIELD_PATTERNS
+
+        for key in ("token", "previous_token", "device_token", "fcm_token", "push_token"):
+            assert key in SECRET_FIELD_PATTERNS
+            result = mask_pii({key: "super-secret-credential-value"})
+            assert result[key] == "[REDACTED]", f"{key!r} leaked: {result[key]!r}"
+
+    def test_redacts_token_inside_nested_request_body(self):
+        # Sentry attaches the request body of /push/devices/* on a 5xx
+        body = {
+            "provider": "fcm",
+            "platform": "android",
+            "token": "pr6-secret-credential",
+            "previous_token": "pr6-old-credential",
+            "device_id": "dev-1",
+        }
+        result = mask_pii(body)
+        assert result["token"] == "[REDACTED]"
+        assert result["previous_token"] == "[REDACTED]"
+        assert result["provider"] == "fcm"  # non-secret metadata survives
+        assert result["device_id"] == "dev-1"
+
+    def test_redacts_credential_shaped_json_in_raw_string(self):
+        # Raw string request bodies (not parsed into a dict) — the JSON
+        # credential regex must catch the string form.
+        raw = '{"provider":"fcm","token":"pr6-secret-credential","device_id":"dev-1"}'
+        masked = mask_pii(raw)
+        assert "pr6-secret-credential" not in masked
+        assert '"token":"[REDACTED]"' in masked or '"token": "[REDACTED]"' in masked
+        assert '"device_id":"dev-1"' in masked or '"device_id": "dev-1"' in masked
+
+    def test_redacts_previous_token_json_in_raw_string(self):
+        raw = '{"token":"new-cred","previous_token":"old-secret-cred"}'
+        masked = mask_pii(raw)
+        assert "old-secret-cred" not in masked
+
+    def test_prose_word_token_is_not_redacted(self):
+        # Conservative by design: only credential-shaped JSON keys are
+        # redacted, never prose.
+        prose = "The token refresh happened at noon"
+        assert mask_pii(prose) == prose
+
+    def test_token_fingerprint_key_survives(self):
+        # The non-secret fingerprint is the intended identifier — it must
+        # NOT be redacted by the secret-field list. Value is deliberately
+        # low-entropy prose so secret scanners never flag this test file.
+        result = mask_pii({"token_fingerprint": "sample-fingerprint-value"})
+        assert result["token_fingerprint"] == "sample-fingerprint-value"
+
+    def test_nested_dict_credential_redacted_recursively(self):
+        data = {"request": {"data": {"token": "pr6-secret", "keep": 1}}}
+        result = mask_pii(data)
+        assert result["request"]["data"]["token"] == "[REDACTED]"
+        assert result["request"]["data"]["keep"] == 1
+
+
+# ---------------------------------------------------------------------------
+# PR-6 round 4 (codex P1): string values under ordinary dict keys must go
+# through the free-text scrub pass. Fresh evidence: Sentry may represent
+# request.data as a RAW JSON STRING under the key "data" — key-based
+# redaction leaves ordinary string-valued fields unchanged, so the
+# credential-shaped JSON regex was never reached and the full credential
+# survived in the outbound event.
+# ---------------------------------------------------------------------------
+
+
+class TestNestedStringValueScrubbing:
+    def test_raw_json_string_under_data_key_is_scrubbed(self):
+        raw = '{"provider":"fcm","token":"pr6-secret-credential","device_id":"dev-1"}'
+        result = mask_pii({"data": raw})
+        assert "pr6-secret-credential" not in result["data"]
+        assert '"token":"[REDACTED]"' in result["data"]
+
+    def test_raw_json_string_in_sentry_request_shape(self):
+        # The exact shape codex flagged: event["request"] with data as a
+        # raw JSON string instead of a parsed dict.
+        event_request = {
+            "url": "https://clinic.invalid/api/v1/push/devices/register",
+            "method": "POST",
+            "data": '{"token":"pr6-secret-credential","previous_token":"pr6-old-credential"}',
+        }
+        result = mask_pii(event_request)
+        assert "pr6-secret-credential" not in result["data"]
+        assert "pr6-old-credential" not in result["data"]
+
+    def test_plain_string_values_keep_free_text_masking(self):
+        # Phone/email inside string values are still scrubbed, prose and
+        # diagnostic values survive untouched.
+        result = mask_pii(
+            {"data": "call +998901234567", "model": "iPhone 15 Pro"}
+        )
+        assert "+998901•••567" in result["data"]
+        assert result["model"] == "iPhone 15 Pro"
+
+    def test_nested_string_inside_lists_is_scrubbed(self):
+        result = mask_pii({"frames": [{'body': '{"token":"pr6-secret-credential"}'}]})
+        assert "pr6-secret-credential" not in result["frames"][0]["body"]
+
+    def test_scrubbing_is_idempotent_on_string_values(self):
+        raw = '{"token":"pr6-secret-credential"}'
+        once = mask_pii({"data": raw})
+        twice = mask_pii(once)
+        assert twice == once
+
+    def test_redacts_escaped_webpush_subscription_in_raw_string(self):
+        # A webpush credential is a serialized subscription object: in a
+        # raw request body its quotes arrive ESCAPED. A plain [^"]+ value
+        # matcher stopped at the first escaped quote and left the endpoint
+        # and key material exposed — the value part must be escape-aware.
+        raw = (
+            '{"token":"{\\"endpoint\\":\\"https://push.example.com/send/abc\\",'
+            '\\"keys\\":{\\"p256dh\\":\\"key-material\\",\\"auth\\":\\"auth-material\\"}}"}'
+        )
+        result = mask_pii({"data": raw})
+        assert "endpoint" not in result["data"]
+        assert "key-material" not in result["data"]
+        assert "auth-material" not in result["data"]
+        assert "push.example.com" not in result["data"]
+        assert '"token":"[REDACTED]"' in result["data"]
+
+    def test_escape_aware_matcher_keeps_plain_tokens_working(self):
+        # The escape-aware value part must still redact ordinary tokens
+        # that contain no escapes at all.
+        result = mask_pii({"data": '{"token":"pr6-plain-credential"}'})
+        assert "pr6-plain-credential" not in result["data"]
+        assert '"token":"[REDACTED]"' in result["data"]
+
+    def test_redacts_json_unicode_escaped_credential_key(self):
+        # Valid JSON may spell the key itself as a unicode escape
+        # ("\u0074oken" == "token") — Pydantic accepts it after decoding,
+        # but a literal-key regex would miss it. JSON-aware parsing
+        # routes every key spelling through key-based redaction.
+        raw = '{"\\u0074oken":"pr6-secret-credential"}'
+        result = mask_pii({"data": raw})
+        assert "pr6-secret-credential" not in result["data"]
+        assert '"token":"[REDACTED]"' in result["data"]
+
+    def test_json_document_string_is_reserialized_compactly(self):
+        # Structural scrubbing re-serializes compactly: non-secret fields
+        # survive with stable key order and compact separators.
+        raw = '{"provider":"fcm","token":"pr6-secret-credential","device_id":"dev-1"}'
+        result = mask_pii({"data": raw})
+        assert '"provider":"fcm"' in result["data"]
+        assert '"device_id":"dev-1"' in result["data"]
+        assert '"token":"[REDACTED]"' in result["data"]
+
+    def test_non_json_prose_still_uses_regex_pass(self):
+        # Prose that merely starts with a brace but does not parse as JSON
+        # must still go through the free-text regex pass.
+        prose = '{"not json here — call +998901234567'
+        result = mask_pii({"data": prose})
+        assert "+998901•••567" in result["data"]
+
+    def test_form_encoded_credential_assignment_is_scrubbed(self):
+        # Round 10 (codex P1): form/urlencoded bodies carry credentials as
+        # UNQUOTED assignments — invisible to the quoted-JSON regex.
+        raw = "token=pr6-secret-credential&provider=fcm"
+        result = mask_pii({"data": raw})
+        assert "pr6-secret-credential" not in result["data"]
+        assert "token=[REDACTED]" in result["data"]
+        assert "provider=fcm" in result["data"]
+
+    def test_percent_encoded_form_credential_is_scrubbed(self):
+        # Round 11 (codex P1): valid form bodies may percent-encode the KEY
+        # itself ("%74oken" == "token") — the masker must decode before
+        # applying credential redaction.
+        raw = "%74oken=pr6-secret-credential&provider=fcm"
+        result = mask_pii({"data": raw})
+        assert "pr6-secret-credential" not in result["data"]
+        assert "token=[REDACTED]" in result["data"]
+
+    def test_encoded_delimiter_inside_value_is_fully_redacted(self):
+        # Round 12 (codex P1): an encoded & (%26) INSIDE the credential
+        # value must not split it — pairs are parsed on RAW delimiters and
+        # the credential field redacted WHOLE before any value decoding.
+        raw = (
+            "token=https%3A%2F%2Fpush.example%2Fsend%3Fa%3D1%26key%3Dsecret"
+            "&provider=fcm"
+        )
+        result = mask_pii({"data": raw})
+        assert "secret" not in result["data"]
+        assert "key=" not in result["data"].replace("send?a=1", "")
+        assert "provider=fcm" in result["data"]
