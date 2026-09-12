@@ -78,17 +78,20 @@ def _doctor_allowed_visit_ids(
 
 
 def _ensure_doctor_can_read_lab_instance(db: Session, instance, current_user) -> None:
-    """LAB-AUDIT-28 P0-1: ранее non-Doctor roles (Lab) bypassed ownership check
-    (early return). Теперь все non-Admin роли без Doctor profile получают 403.
-    Lab role could read ANY patient's lab results by sequential instance_id
-    enumeration — patient_snapshot (full_name, phone, address, DOB, sex),
-    all lab values, critical findings.
+    """Read/PDF guard for lab report instances.
+
+    Роль Lab обслуживает всю лабораторную очередь: она создаёт бланки
+    (POST /lab/report-instances разрешён Admin/Lab) и читает их (list
+    endpoint отдаёт Lab неразмеченный список), поэтому Doctor ownership
+    к Lab не применяется. LAB-AUDIT-28 P0-1 остаётся в силе для остальных
+    ролей: Doctor и любые другие роли, добравшиеся до endpoint, проходят
+    doctor ownership check — без него sequential instance_id enumeration
+    открывает patient_snapshot, values и critical findings чужих пациентов.
     """
     if getattr(current_user, "is_superuser", False):
         return
-    if getattr(current_user, "role", None) == "Admin":
+    if getattr(current_user, "role", None) in ("Admin", "Lab"):
         return
-    # All other roles (including Lab) must go through Doctor ownership check
     if not instance.visit_id:
         raise HTTPException(status_code=403, detail="Access denied")
     _doctor_allowed_visit_ids(db, current_user, requested_visit_ids=[instance.visit_id])

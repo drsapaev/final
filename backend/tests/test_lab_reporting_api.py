@@ -21,6 +21,22 @@ def _suffix() -> str:
     return uuid4().hex[:10]
 
 
+def _mint_access_token(user) -> str:
+    """Mint the stateless access token directly (same as conftest fixtures):
+    no plaintext fixture password is needed to authorize endpoint requests."""
+    from app.services.authentication_service import authentication_service
+
+    return authentication_service.create_access_token(
+        {
+            "sub": str(user.id),
+            "username": user.username,
+            "role": user.role,
+            "is_active": user.is_active,
+            "is_superuser": user.is_superuser,
+        }
+    )
+
+
 def _create_doctor_user(db_session, *, label: str) -> tuple[User, Doctor]:
     suffix = _suffix()
     user = User(
@@ -45,6 +61,25 @@ def _create_doctor_user(db_session, *, label: str) -> tuple[User, Doctor]:
     db_session.commit()
     db_session.refresh(doctor)
     return user, doctor
+
+
+def _create_lab_user(db_session, *, label: str) -> User:
+    suffix = _suffix()
+    user = User(
+        username=f"lab_report_labstaff_{suffix}",
+        email=f"lab-report-labstaff-{suffix}@test.local",
+        full_name=f"Lab Report LabStaff {suffix}",
+        # The hash value is irrelevant: API tests authorize via minted tokens,
+        # so no plaintext fixture password is introduced here.
+        hashed_password=get_password_hash(f"labstaff-{suffix}"),
+        role="Lab",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
 
 
 def _create_patient(db_session) -> Patient:
@@ -478,6 +513,60 @@ def test_doctor_lab_report_reads_are_limited_to_own_visits(
         headers=doctor_headers,
     )
     assert other_pdf.status_code == 403
+
+
+@pytest.mark.integration
+def test_lab_role_without_doctor_profile_reads_created_instance_and_pdf(
+    client,
+    db_session,
+    registrar_user,
+) -> None:
+    """PR1: Lab создаёт бланк через POST (разрешено Admin/Lab), поэтому роль Lab
+    без Doctor-профиля должна читать этот instance и его PDF. Doctor ownership
+    guard остаётся для Doctor (см. test_doctor_lab_report_reads_...), остальные
+    роли отсекаются зависимостью endpoint.
+
+    PDF guard доказывается запросом по DRAFT-бланку: guard стоит до проверки
+    статуса, поэтому Lab получает 409 (а не 403), и рендерер не вызывается.
+    Энд-ту-энд 200 блокирует отдельный pre-existing дефект рендера
+    (NameError _load_weasyprint_components в lab_report_pdf/_core.py, падает
+    для всех ролей) — вне first-touch файлов PR1.
+    """
+    _doctor_user, doctor = _create_doctor_user(db_session, label="labstaff_visit")
+    patient = _create_patient(db_session)
+    visit = _create_visit(db_session, patient_id=patient.id, doctor_id=doctor.id)
+    lab_user = _create_lab_user(db_session, label="read")
+    lab_headers = {"Authorization": f"Bearer {_mint_access_token(lab_user)}"}
+
+    instance = _create_lab_report_instance(
+        client,
+        auth_headers=lab_headers,
+        patient_id=patient.id,
+        visit_id=visit.id,
+    )
+
+    detail_response = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}",
+        headers=lab_headers,
+    )
+    assert detail_response.status_code == 200, detail_response.text
+
+    # Guard is checked before the finalized-status gate and before rendering,
+    # so a DRAFT instance must yield 409 (status gate), never 403 (RBAC).
+    draft_pdf_response = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}/pdf",
+        headers=lab_headers,
+    )
+    assert draft_pdf_response.status_code == 409, draft_pdf_response.text
+
+    registrar_headers = {
+        "Authorization": f"Bearer {_mint_access_token(registrar_user)}"
+    }
+    registrar_read = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}",
+        headers=registrar_headers,
+    )
+    assert registrar_read.status_code == 403
 
 
 @pytest.mark.integration
