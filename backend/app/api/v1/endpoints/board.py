@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
+from app.models.display_config import DisplayBoard
 from app.services.online_queue import load_stats
 
 router = APIRouter(prefix="/board", tags=["board"])
@@ -28,8 +29,18 @@ def board_state(
     stats-only contract be verified without auth headers.
     """
     s = load_stats(db, department=department, date_str=date)
+    # RQ-24.a.1: sync the board privacy setting so the frontend can gate
+    # patient names (rows + current call) exactly like the WS channel.
+    board = (
+        db.query(DisplayBoard)
+        .filter(DisplayBoard.board_id == "main_board")
+        .first()
+    )
     return {
         "department": s.department,
+        "show_patient_names": (
+            board.show_patient_names if board else "initials"
+        ),
         "date_str": s.date_str,
         "is_open": s.is_open,
         "start_number": s.start_number,

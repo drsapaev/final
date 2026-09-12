@@ -14,6 +14,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from app.api.v1.endpoints.ws_token import accept_echoing_subprotocol
 from app.db.session import SessionLocal
+from app.models.display_config import DisplayBoard
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.services.ws_redis_pubsub import RedisPubSubBridge
 
@@ -32,7 +33,11 @@ class DisplayWebSocketManager:
             channel_prefix="display_ws",
             redis_url=(os.getenv("WS_REDIS_URL") or os.getenv("REDIS_URL")),
         )
-        self._redis_handlers: dict[str, Any] = {}
+        # RQ-24.a.1: формат имени пациента борда (DisplayBoard.
+        # show_patient_names: full/initials/none), кэш на board_id —
+        # без чтения конфига на каждое сообщение. Меняется только
+        # после рестарта (документировано в PR).
+        self._name_format_cache: dict[str, str] = {}
 
     async def connect(self, websocket: WebSocket, board_id: str, user=None) -> None:
         """Подключение нового WebSocket с опциональной аутентификацией"""
@@ -144,6 +149,7 @@ class DisplayWebSocketManager:
         queue_entry: OnlineQueueEntry,
         doctor_name: str,
         cabinet: str = None,
+        board_ids: list[str] | None = None,
     ) -> dict:
         """Собрать payload вызова пациента (синхронно, может обращаться к
         lazy-отношениям queue_entry — вызывать при открытой сессии).
@@ -152,13 +158,17 @@ class DisplayWebSocketManager:
         GraphQL-мутация могла собрать сообщение в worker-треде (сессия
         открыта там), а на event loop осталась только network-отправка.
         """
+        # RQ-24.a.1: формат имён по show_patient_names целевых табло
+        name_format = self._resolve_name_format(board_ids)
         return {
             "type": "patient_call",
             "data": {
                 "id": queue_entry.id,
                 "queue_entry_id": queue_entry.id,
                 "queue_number": queue_entry.number,
-                "patient_name": self._format_patient_name(queue_entry.patient_name),
+                "patient_name": self._format_patient_name(
+                    queue_entry.patient_name, name_format
+                ),
                 "doctor_name": doctor_name,
                 "cabinet": cabinet or "Каб. не указан",
                 "specialty": (
@@ -210,13 +220,15 @@ class DisplayWebSocketManager:
     ) -> None:
         """Трансляция вызова пациента на табло"""
         try:
+            # RQ-24.a.1: формат имён по настройке show_patient_names табло
+            if not board_ids:
+                board_ids = list(self.connections.keys())
+            name_format = self._resolve_name_format(board_ids)
             call_message = self.build_patient_call_message(
-                queue_entry, doctor_name, cabinet
+                queue_entry, doctor_name, cabinet, name_format=name_format
             )
 
             # Если не указаны конкретные табло, отправляем на все активные
-            if not board_ids:
-                board_ids = list(self.connections.keys())
 
             # Отправляем на указанные табло
             for board_id in board_ids:
@@ -248,12 +260,16 @@ class DisplayWebSocketManager:
             )
 
             # Формируем данные очереди
+            # RQ-24.a.1: формат имён по show_patient_names целевых табло
+            name_format = self._resolve_name_format(board_ids)
             queue_data = []
             for entry in queue_entries:
                 queue_data.append(
                     {
                         "number": entry.number,
-                        "patient_name": self._format_patient_name(entry.patient_name),
+                        "patient_name": self._format_patient_name(
+                            entry.patient_name, name_format
+                        ),
                         "status": entry.status,
                         "source": entry.source,
                         "created_at": entry.created_at.isoformat(),
@@ -416,13 +432,15 @@ class DisplayWebSocketManager:
                     else:
                         owner_label = f"Врач #{queue.specialist_id}"
 
+                    # RQ-24.a.1: формат имён по настройке этого табло
+                    name_format = self._resolve_name_format([board_id])
                     for entry in entries:
                         queue_entries.append(
                             {
                                 "id": entry.id,
                                 "number": entry.number,
                                 "patient_name": self._format_patient_name(
-                                    entry.patient_name or "Пациент"
+                                    entry.patient_name or "Пациент", name_format
                                 ),
                                 "status": entry.status,
                                 "specialist_id": queue.specialist_id,
@@ -486,6 +504,42 @@ class DisplayWebSocketManager:
             except Exception:
                 pass
 
+    def _resolve_name_format(self, board_ids: list[str] | None) -> str:
+        """Строгий формат имён среди целевых табло (PHI: none ⊂ initials ⊂ full).
+
+        Нет целевых табло / нет строки борда → 'initials' (прежнее
+        поведение). Кэш на board_id; обновляется после рестарта.
+        """
+        ids = board_ids if board_ids else list(self.connections.keys())
+        if not ids:
+            return "initials"
+        formats: list[str] = []
+        missing: list[str] = []
+        db = SessionLocal()
+        try:
+            for b in ids:
+                cached = self._name_format_cache.get(b)
+                if cached is None:
+                    row = (
+                        db.query(DisplayBoard)
+                        .filter(DisplayBoard.name == b)
+                        .first()
+                    )
+                    cached = (
+                        row.show_patient_names
+                        if row and row.show_patient_names in ("full", "initials", "none")
+                        else "initials"
+                    )
+                    self._name_format_cache[b] = cached
+                formats.append(cached)
+        finally:
+            db.close()
+        if any(f == "none" for f in formats):
+            return "none"
+        if any(f == "initials" for f in formats):
+            return "initials"
+        return "full"
+
     def _format_patient_name(
         self, full_name: str, format_type: str = "initials"
     ) -> str:
@@ -537,6 +591,8 @@ class DisplayWebSocketManager:
                     )
                     return
 
+            # RQ-24.a.1: формат имён по show_patient_names целевых табло
+            name_format = self._resolve_name_format(None)
             message = {
                 "type": "queue_update",
                 "event_type": event_type,
@@ -544,7 +600,7 @@ class DisplayWebSocketManager:
                     "queue_entry_id": queue_entry.id,
                     "number": queue_entry.number,
                     "patient_name": self._format_patient_name(
-                        queue_entry.patient_name
+                        queue_entry.patient_name, name_format
                     ),
                     "status": queue_entry.status,
                     "source": queue_entry.source,
