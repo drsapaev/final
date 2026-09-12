@@ -864,7 +864,10 @@ class VisitConfirmationService:
                             candidate_id,
                         )
                 elif len(visit_service_doctor_ids) > 1:
-                    raise owner_configuration_error(
+                    # QD-2E (Codex round-4 P2): и эта ветка — доменная
+                    # ошибка подтверждения (422 + причина), не голый
+                    # ValueError у PWA/Telegram-обёрток.
+                    config_error = owner_configuration_error(
                         queue_tag=queue_tag,
                         detail=(
                             f"visit_id={visit.id} carries multiple explicit "
@@ -872,6 +875,10 @@ class VisitConfirmationService:
                             "must pick one per booking"
                         ),
                     )
+                    raise VisitConfirmationDomainError(
+                        status_code=422,
+                        detail=str(config_error),
+                    ) from config_error
 
             if not specialist_doctor_id and not registry_tag:
                 daily_queue = self._get_active_daily_queue_by_tag(today, queue_tag)

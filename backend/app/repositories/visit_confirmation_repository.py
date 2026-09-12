@@ -144,26 +144,12 @@ class VisitConfirmationRepository:
 
         actual_specialist_id = doctor.id
 
-        if queue_tag:
-            existing_by_tag = (
-                self.db.query(DailyQueue)
-                .filter(
-                    DailyQueue.day == day,
-                    DailyQueue.queue_tag == queue_tag,
-                    DailyQueue.active == True,
-                )
-                .first()
-            )
-            if existing_by_tag:
-                logger.info(
-                    "[FIX] Reusing existing DailyQueue id=%s day=%s specialist=%s queue_tag=%s",
-                    existing_by_tag.id,
-                    day,
-                    actual_specialist_id,
-                    queue_tag,
-                )
-                return existing_by_tag
-
+        # QD-2E (Codex round-4 P1): поверхность для записи с решённым
+        # врачом — очередь ЭТОГО врача (PR-26 per-doctor), не tag-only
+        # очередь другого врача того же тега (doctor 10 не должен
+        # попадать в очередь doctor 11). tag-only reuse из doctor-ветки
+        # удален: врач здесь всегда решён (registry-теги вернулись
+        # раньше ресурсной осью); зеркалит фикс morning-SSOT round-3.
         query = self.db.query(DailyQueue).filter(
             DailyQueue.day == day,
             DailyQueue.specialist_id == actual_specialist_id,

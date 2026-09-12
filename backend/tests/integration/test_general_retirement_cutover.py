@@ -1186,6 +1186,98 @@ def test_visit_confirmation_resolves_mapped_service_doctor(
     assert queue.queue_resource_id is None
 
 
+def test_confirmation_new_entry_goes_to_resolved_doctors_queue(
+    db_session: Session,
+) -> None:
+    """Codex round-4 P1: the doctorless K01 confirmation with doctor 11
+    holding the only active (day, tag) cardio queue — the new entry
+    lands on the resolved cardiologist's (doctor 10's) queue, never
+    piggybacked onto a foreign doctor's tag-only surface."""
+    from app.services.visit_confirmation_service import VisitConfirmationService
+
+    doc_user = _make_user(db_session, username="dr_kardio_r4", role="doctor")
+    doc10 = _make_doctor(db_session, user_id=doc_user.id, specialty="cardio")
+    other_user = _make_user(db_session, username="dr_kardio_r4b", role="doctor")
+    doc11 = _make_doctor(db_session, user_id=other_user.id, specialty="cardio")
+    service = _make_service(
+        db_session,
+        code="K01",
+        queue_tag="cardio",
+        name="Консультация кардиолога",
+        requires_doctor=True,
+        doctor_id=doc10.id,
+    )
+    foreign_queue = DailyQueue(
+        day=_DAY, specialist_id=doc11.id, queue_tag="cardio", active=True
+    )
+    db_session.add(foreign_queue)
+    db_session.commit()
+
+    visit = _make_visit(db_session)  # NO visit doctor
+    _link_visit_service(db_session, visit, service)
+
+    numbers, _tickets = VisitConfirmationService(
+        db_session
+    )._assign_queue_numbers_on_confirmation(visit)
+    assert len(numbers) == 1
+    queue = (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.id == numbers[0]["queue_id"])
+        .one()
+    )
+    assert queue.specialist_id == doc10.id
+    assert queue.id != foreign_queue.id
+
+
+def test_confirmation_multiple_service_doctors_is_domain_error(
+    db_session: Session,
+) -> None:
+    """Codex round-4 P2: the multiple-explicit-owner branch raises the
+    confirmation DOMAIN error (422 + the D-08 message), not the bare
+    ValueError the PWA/Telegram wrappers would render as a 500."""
+    from app.services.visit_confirmation_service import (
+        VisitConfirmationDomainError,
+        VisitConfirmationService,
+    )
+
+    doc_user = _make_user(db_session, username="dr_cosm_a", role="doctor")
+    doc_a = _make_doctor(db_session, user_id=doc_user.id, specialty="procedures")
+    doc_user_b = _make_user(db_session, username="dr_cosm_b", role="doctor")
+    doc_b = _make_doctor(db_session, user_id=doc_user_b.id, specialty="procedures")
+    _make_service(
+        db_session,
+        code="C03",
+        queue_tag="procedures",
+        name="Мезотерапия",
+        requires_doctor=True,
+        doctor_id=doc_a.id,
+    )
+    _make_service(
+        db_session,
+        code="C06",
+        queue_tag="procedures",
+        name="Чистка лица",
+        requires_doctor=True,
+        doctor_id=doc_b.id,
+    )
+    visit = _make_visit(db_session)  # NO visit doctor
+    svc_a = (
+        db_session.query(Service).filter(Service.code == "C03").one()
+    )
+    svc_b = (
+        db_session.query(Service).filter(Service.code == "C06").one()
+    )
+    _link_visit_service(db_session, visit, svc_a)
+    _link_visit_service(db_session, visit, svc_b)
+
+    with pytest.raises(VisitConfirmationDomainError) as excinfo:
+        VisitConfirmationService(db_session)._assign_queue_numbers_on_confirmation(
+            visit
+        )
+    assert excinfo.value.status_code == 422
+    assert "procedures" in excinfo.value.detail
+
+
 def test_morning_assignment_job_aborts_on_config_error(db_session: Session) -> None:
     """Codex round-1 P2: the automated morning job cannot bury the
     configuration error as a per-visit 'Внутренняя ошибка' with
