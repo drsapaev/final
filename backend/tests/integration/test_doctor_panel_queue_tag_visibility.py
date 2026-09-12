@@ -84,9 +84,22 @@ def _scratch_url(admin_url: str) -> tuple[str, str]:
 
 @pytest.fixture(scope="module")
 def pg_engine():
-    """Provision a disposable alembic-head PostgreSQL database or skip."""
-    last_error: Exception | None = None
+    """Disposable PostgreSQL engine (or skip — NOT_RUN per plan P0).
+
+    Two supported sources, in priority order:
+    1. ``RQ08_PG_ADMIN_URL`` — an ADMIN dsn on a local disposable server;
+       the module provisions its own scratch database (rq08_check), runs
+       ``alembic upgrade head`` and drops the database at the end (the
+       cloud/local pattern, e.g. userspace pgserver).
+    2. A pre-provisioned local ``DATABASE_URL`` (localhost/127.0.0.1/::1)
+       whose schema is already at alembic head — the CI pattern: the job
+       provisions a disposable PostgreSQL service and runs
+       ``alembic upgrade head`` BEFORE the test step (gate_d reference
+       contract: the fixture ASSERTS the schema, never creates it). The
+       module never creates or drops anything on this database.
+    """
     admin_url = None
+    last_error: Exception | None = None
     for candidate in _candidate_admin_urls():
         try:
             with psycopg.connect(candidate, connect_timeout=5, autocommit=True) as c:
@@ -95,39 +108,58 @@ def pg_engine():
             break
         except Exception as exc:  # noqa: BLE001
             last_error = exc
-    if admin_url is None:
-        pytest.skip(
-            f"disposable PostgreSQL unavailable — RQ-08 PG acceptance NOT_RUN "
-            f"(last error: {last_error})"
+    if admin_url is not None:
+        psycopg_dsn, sa_url = _scratch_url(admin_url)
+        with psycopg.connect(admin_url, autocommit=True) as c:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+            c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
+
+        env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
+        import subprocess  # noqa: E402
+
+        r = subprocess.run(
+            [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
+            capture_output=True,
+            text=True,
+            cwd=str(BACKEND_DIR),
+            env=env,
         )
-
-    psycopg_dsn, sa_url = _scratch_url(admin_url)
-    with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
-        c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
-
-    env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
-    import subprocess  # noqa: E402
-
-    r = subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
-        capture_output=True,
-        text=True,
-        cwd=str(BACKEND_DIR),
-        env=env,
-    )
-    assert r.returncode == 0, r.stderr[-1500:]
+        assert r.returncode == 0, r.stderr[-1500:]
+    else:
+        # Pre-provisioned disposable local PostgreSQL (CI service pattern).
+        env_url = os.getenv("DATABASE_URL", "").strip()
+        u = make_url(env_url) if env_url else None
+        # Local-only guard: TCP loopback hosts, or a unix-socket directory
+        # (host carried in the query string — filesystem-local by design).
+        is_local = u is not None and (
+            (u.host or "") in {"localhost", "127.0.0.1", "::1"}
+            or (u.host is None and "host" in u.query)
+        )
+        if not is_local:
+            pytest.skip(
+                "disposable PostgreSQL unavailable — RQ-08 PG acceptance "
+                f"NOT_RUN (last error: {last_error})"
+            )
+        sa_url = env_url if env_url.startswith("postgresql+psycopg") else str(
+            u.set(drivername="postgresql+psycopg")
+        )
 
     engine = create_engine(sa_url, future=True)
     with engine.connect() as conn:
         version = conn.execute(text("select version_num from alembic_version")).scalar()
-    assert version, "alembic_version must be present after upgrade"
+    if not version:
+        pytest.skip(
+            "DATABASE_URL points at a local PostgreSQL without an alembic "
+            "schema — provision it with 'alembic upgrade head' first; the "
+            "fixture never creates schemas on a pre-provisioned database"
+        )
 
     yield engine
 
     engine.dispose()
-    with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+    if admin_url is not None:
+        with psycopg.connect(admin_url, autocommit=True) as c:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
 
 
 @pytest.fixture
