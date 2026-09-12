@@ -311,11 +311,11 @@ class BackupService:
                 except Exception as off_err:  # noqa: BLE001 — сигнал, не сбой
                     backup_info["offsite"] = {
                         "status": "error",
-                        "error": str(off_err)[:200],
+                        "error": "Offsite upload failed",
                     }
                     logger.warning(
-                        "Offsite R2 upload failed: %s",
-                        backup_info["offsite"]["error"],
+                        "Offsite R2 upload failed",
+                        exc_info=True,
                     )
 
             # Cleanup old backups
