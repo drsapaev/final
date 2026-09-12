@@ -211,9 +211,35 @@ const Tabs = ({
     // Также слушаем старое событие для обратной совместимости
     window.addEventListener('departments:updated', handleProfilesUpdate);
 
+    // RQ-27.a (F-23): window events never cross browser contexts — a profile
+    // created/renamed/disabled by an administrator in ANOTHER session used to
+    // stay invisible on this tab strip until a full page reload. Understandable
+    // revalidation without polling: refresh silently when the user returns to
+    // this tab/window (visibilitychange → visible / window focus). The 5s
+    // throttle collapses the focus+visibilitychange burst into one refresh
+    // (extra-requests budget per ACCEPTANCE S-28). loadQueueProfiles already
+    // replaces state only on success, so a failed refresh keeps current tabs.
+    let lastFocusRefreshAt = 0;
+    const FOCUS_REFRESH_MIN_INTERVAL_MS = 5000;
+    const refreshIfDue = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastFocusRefreshAt < FOCUS_REFRESH_MIN_INTERVAL_MS) return;
+      lastFocusRefreshAt = now;
+      logger.log('Tabs: RQ-27.a silent queue-profiles revalidation on return to the session');
+      void loadQueueProfiles();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshIfDue();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', refreshIfDue);
+
     return () => {
       window.removeEventListener('queue-profiles:updated', handleProfilesUpdate);
       window.removeEventListener('departments:updated', handleProfilesUpdate);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', refreshIfDue);
     };
   }, [loadQueueProfiles]);
 

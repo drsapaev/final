@@ -18,7 +18,7 @@
  * NOT extracted (remain in useRegistrarWorklistData — PR-UI-13-1):
  * - loadAppointments / loadMoreAppointments.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 // UX Audit Registrar #1: getPatient() — централизованный доступ к /patients/{id}.
 // Раньше здесь был raw fetch() с ручным Authorization-хедером.
@@ -37,21 +37,36 @@ import {
 
 export const useRegistrarData = () => {
   // PR-UI-13-4: reference-data state owned by the hook (former panel
-  // useState + external setters — same reset semantics inside
-  // loadIntegratedData: cleared before fetch, set only on success).
+  // useState + external setters). Non-silent loads keep the original reset
+  // semantics: cleared before fetch, set only on success. RQ-27.a adds a
+  // silent focus/visibility revalidation that keeps previous data instead.
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [services, setServices] = useState<Record<string, unknown>>({});
   const [dynamicDepartments, setDynamicDepartments] = useState<unknown[]>([]);
+  // RQ-27.a (F-23): silent-refresh flag for the focus/visibility revalidation
+  // below. Set right before the call, consumed inside loadIntegratedData —
+  // the public signature stays `async ()` (pinned by the panel contract
+  // test's source-block marker).
+  const silentRefreshRef = useRef(false);
   // ───────────────────────────────────────────────────────────
   // loadIntegratedData: parallel fetch of doctors + services + departments
   // ───────────────────────────────────────────────────────────
   const loadIntegratedData = useCallback(async () => {
+    // RQ-27.a (F-23): a focus/visibility revalidation must behave like the
+    // RQ-22 worklist silent refresh — previous data stays on screen while
+    // the fetch is in flight AND after a failure (no wipe, no error toast).
+    // The non-silent paths (initial load, departments:updated, post-wizard)
+    // keep the original cleared-before-fetch semantics byte-for-byte.
+    const silent = silentRefreshRef.current;
+    silentRefreshRef.current = false;
     logger.info('🔧 loadIntegratedData called at:', new Date().toISOString());
     try {
-      // Сбрасываем устаревшие значения перед загрузкой truth из API.
-      setDoctors([]);
-      setServices({});
-      setDynamicDepartments([]);
+      if (!silent) {
+        // Сбрасываем устаревшие значения перед загрузкой truth из API.
+        setDoctors([]);
+        setServices({});
+        setDynamicDepartments([]);
+      }
 
       try {
         const token = tokenManager.getAccessToken();
@@ -150,9 +165,44 @@ export const useRegistrarData = () => {
       }
     } catch (error) {
       logger.error('Ошибка загрузки интегрированных данных:', error);
-      notify.error('Ошибка загрузки данных из админ панели');
+      // RQ-27.a (F-23): a failed silent revalidation keeps previous data and
+      // stays quiet for the user (logger only) — same philosophy as RQ-22.
+      if (!silent) {
+        notify.error('Ошибка загрузки данных из админ панели');
+      }
     }
   }, [setDoctors, setServices, setDynamicDepartments]);
+
+  // RQ-27.a (F-23): cross-session catalog revalidation. `departments:updated`
+  // / `queue-profiles:updated` are window events — they never cross browser
+  // contexts, so a catalog change made by an administrator in ANOTHER session
+  // (window, tab, device) used to stay invisible here until a full reload.
+  // Understandable refresh without polling: when the user returns to this
+  // tab/window, revalidate the reference data silently. A 5s throttle
+  // collapses the focus+visibilitychange burst browsers fire together into
+  // one refresh (extra-requests budget per ACCEPTANCE S-28).
+  const lastFocusRefreshAtRef = useRef(0);
+  useEffect(() => {
+    const FOCUS_REFRESH_MIN_INTERVAL_MS = 5000;
+    const refreshIfDue = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastFocusRefreshAtRef.current < FOCUS_REFRESH_MIN_INTERVAL_MS) return;
+      lastFocusRefreshAtRef.current = now;
+      logger.info('🔄 RQ-27.a: silent reference-data revalidation on return to the session');
+      silentRefreshRef.current = true;
+      void loadIntegratedData();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshIfDue();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', refreshIfDue);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', refreshIfDue);
+    };
+  }, [loadIntegratedData]);
 
   // ───────────────────────────────────────────────────────────
   // fetchPatientData: fetch single patient by ID
