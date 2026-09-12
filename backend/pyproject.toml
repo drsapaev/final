@@ -81,7 +81,7 @@ dependencies = [
   # Database
   "SQLAlchemy>=2.0,<2.1",
   "psycopg[binary]>=3.1,<4.0",
-  "alembic>=1.13,<1.19",
+  "alembic>=1.13,<1.20",
   "redis>=5.0,<8.0",
 
   # Auth & security
