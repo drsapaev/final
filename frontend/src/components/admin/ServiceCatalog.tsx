@@ -590,7 +590,10 @@ const ServiceCatalog = () => {
               options={[
               { value: 'all', label: t('admin2.sc_filter_category_all') },
               ...categories.map((category) => ({
-                value: category.id,
+                // RQ-06.d: string option value — the canonical Select trigger
+                // matches its value with strict === against the string filter
+                // state, so a numeric id here resets the trigger label.
+                value: String(category.id),
                 label: category.name_ru
               }))]
               } />
@@ -888,11 +891,15 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
   const [formData, setFormData] = useState<Record<string, unknown>>({
     name: service?.name || '',
     code: service?.code || service?.service_code || '', // Unified: use code as primary
-    category_id: service?.category_id || '',
+    // RQ-06.d: the select value contract is string ('' | '3'). Stringify the
+    // incoming numeric ids at init, otherwise the edit form reopens with a
+    // numeric value that cannot match its string option values and the trigger
+    // falls back to the placeholder.
+    category_id: service?.category_id ? String(service.category_id) : '',
     price: service?.price || '',
     currency: service?.currency || 'UZS',
     duration_minutes: service?.duration_minutes || 30,
-    doctor_id: service?.doctor_id || '',
+    doctor_id: service?.doctor_id ? String(service.doctor_id) : '',
     active: service?.active !== undefined ? service.active : true,
     department_key: service?.department_key || '',
     queue_tag: service?.queue_tag || '',
@@ -1167,7 +1174,10 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               options={[
               { value: '', label: t('admin2.sc_form_category_ph') },
               ...categories.map((category) => ({
-                value: category.id,
+                // RQ-06.d: string option value — the canonical Select trigger
+                // matches its value with strict === against the string form
+                // state, so a numeric id here resets the trigger label.
+                value: String(category.id),
                 label: `${category.name_ru} (${category.specialty})`
               }))]
               } />
@@ -1225,7 +1235,9 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               options={[
               { value: '', label: t('admin2.sc_form_doctor_all') },
               ...doctors.map((doctor) => ({
-                value: doctor.id,
+                // RQ-06.d: string option value — same trigger-label contract
+                // as the category select above.
+                value: String(doctor.id),
                 label: `${doctor.user?.full_name || t('admin2.sc_cell_doctor_default', { id: doctor.id })} (${doctor.specialty})`
               }))]
               } />
