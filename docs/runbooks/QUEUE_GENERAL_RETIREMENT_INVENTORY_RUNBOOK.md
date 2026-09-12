@@ -33,32 +33,47 @@ PostgreSQL `SET default_transaction_read_only`).
 
 ## Inventory Command
 
-Run from the repository root (Windows PowerShell or bash):
+The database URL carries production credentials — NEVER paste it into a
+command line (shell history, process list) and never store it in the
+evidence files. Set `DATABASE_URL` in the environment from the
+deployment's own env file instead, and let the tool read the fallback:
+
+Run from the repository root (bash):
 
 ```bash
 cd backend
+# load the SAME DATABASE_URL the deployment uses — no credentials typed
+# into the command line, nothing secret in shell history
+set -a; source ../.env 2>/dev/null || source .env; set +a
+
 python scripts/inventory_general_retirement.py \
-    --database-url "postgresql+psycopg://user:pass@host:5432/clinic" \
     --json ../evidence/stage_e_inventory_$(date +%Y%m%d).json \
     --operator-map ../evidence/stage_e_operator_map_$(date +%Y%m%d).json
 ```
 
-PowerShell variant:
+PowerShell variant (the deployment host):
 
 ```powershell
 cd backend
 . .\.venv\Scripts\Activate.ps1
+# read DATABASE_URL from the deployment env file — do not type it inline
+Get-Content ..\.env | Where-Object { $_ -match '^DATABASE_URL=' } | ForEach-Object {
+    $null, $v = $_ -split '=', 2
+    $env:DATABASE_URL = $v.Trim()
+}
 $stamp = Get-Date -Format 'yyyyMMdd'
 python scripts\inventory_general_retirement.py `
-    --database-url $env:DATABASE_URL `
     --json ("..\evidence\stage_e_inventory_" + $stamp + ".json") `
     --operator-map ("..\evidence\stage_e_operator_map_" + $stamp + ".json")
 ```
 
-`--database-url` may be omitted when `DATABASE_URL` is exported. `--pretty`
-additionally prints the full JSON to stdout. The script connects, disables
-writes on its connection, runs only SELECT/introspection, prints a
-human summary and exits.
+`DATABASE_URL` must be exported before the run (both variants above do
+this from the deployment's env file; adjust the path to wherever the
+host keeps it). `--pretty` additionally prints the full JSON to stdout.
+The script connects, disables writes on its connection, runs only
+SELECT/introspection, prints a human summary and exits. A
+`--database-url` flag exists for non-secret URLs (tests, throwaway
+containers) — do not use it for production.
 
 ## Exit Codes
 
@@ -130,11 +145,12 @@ what the map says, nothing more.
 
 ## Evidence Retention
 
-- Keep the JSON report, the operator map (original + completed) and the
-  command line used (the report stores only the target DIALECT, never the
-  database URL — record the exact target database yourself next to the
-  evidence), next to the pre-D backup evidence (ADR gate 2: "the D
-  inventory/backup/restore evidence is retained").
+- Keep the JSON report and the operator map (original + completed), next
+  to the pre-D backup evidence (ADR gate 2: "the D inventory/backup/
+  restore evidence is retained"). Record the target as a NON-SECRET
+  identifier you control (for example "production clinic DB, 2026-09-12")
+  — the artifacts themselves store only the database DIALECT, never the
+  URL or any credential.
 - Re-run the inventory after each operator intervention (service
   retagging, queue resolution) — the report is cheap and the final
   pre-cutover run is the proof that no active `general` surface remains.

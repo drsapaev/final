@@ -305,6 +305,10 @@ def _introspect_fk_surfaces(conn) -> list[dict]:
 def _pk_columns(conn, table: str) -> list[str]:
     """The table's primary-key column names (order-stable, may be [])."""
     if conn.dialect.name == "postgresql":
+        # a bindable CAST — SQLAlchemy's text() bind parser does not
+        # recognize a bind immediately followed by the double-colon
+        # cast syntax and would leave the placeholder unresolved
+        # (Codex round-2 P1)
         return [
             r["attname"]
             for r in _rows(
@@ -314,7 +318,7 @@ def _pk_columns(conn, table: str) -> list[str]:
                 FROM pg_index i
                 JOIN pg_attribute a
                   ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-                WHERE i.indrelid = :t::regclass AND i.indisprimary
+                WHERE i.indrelid = CAST(:t AS regclass) AND i.indisprimary
                 ORDER BY a.attnum
                 """,
                 {"t": table},

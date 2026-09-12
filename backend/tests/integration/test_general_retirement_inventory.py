@@ -806,3 +806,12 @@ def test_expected_constant_identity():
     assert _TOOL.DISABLED_PASSWORD_MARKER == "!disabled:queue-resource"
     assert _TOOL.EXPECTED_SYNTHETIC_ROLE == "Resource"
     assert _TOOL.EXPECTED_ALEMBIC_HEAD == "0063_queue_resource_contract"
+
+
+def test_pg_pk_query_uses_bindable_cast():
+    # the PostgreSQL branch cannot be exercised on the SQLite fixture —
+    # pin the bindable CAST form instead: ':t::regclass' leaves SQLAlchemy
+    # text() with an unresolved placeholder (Codex round-2 P1)
+    source = TOOL_PATH.read_text(encoding="utf-8")
+    assert "CAST(:t AS regclass)" in source
+    assert ":t::regclass" not in source
