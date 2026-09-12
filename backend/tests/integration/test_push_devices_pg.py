@@ -175,6 +175,7 @@ def test_push_devices_rls_contract_on_disposable_pg():
                     "('push_rls_probe', 'x', 'Patient', true, false, false)"
                 )
             )
+            conn.commit()  # persist the probe user across the rollbacks below
 
             def _register(token: str, provider: str = "fcm") -> None:
                 conn.execute(
@@ -189,6 +190,7 @@ def test_push_devices_rls_contract_on_disposable_pg():
                 )
 
             _register("tok-probe-1")
+            conn.commit()
             # Duplicate ACTIVE credential → partial unique index fires.
             with pytest.raises(Exception):
                 _register("tok-probe-1")
@@ -201,6 +203,7 @@ def test_push_devices_rls_contract_on_disposable_pg():
                 )
             )
             _register("tok-probe-1")
+            conn.commit()
             # Closed enums enforce.
             with pytest.raises(Exception):
                 _register("tok-probe-2", provider="apns")
