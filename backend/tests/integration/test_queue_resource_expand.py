@@ -10,9 +10,13 @@ switch — so the pins here protect BOTH halves of that contract:
 
 - the EXPAND half: the registry exists with its shape (code/queue_tag
   UNIQUE, numbering config equivalent to the Doctor columns, nullable
-  default_cabinet), the dual-owner columns accept every stored shape
-  (doctor-only — the only production shape today — resource-only,
-  both, neither), and duplicates stay legal;
+  default_cabinet), the dual-owner columns accept the single-axis stored
+  shapes (doctor-only — the only production shape today — and
+  resource-only). The expand-era DELIBERATE states (both owners,
+  neither owner, duplicate ACTIVE (day, resource) rows) were closed by
+  the QD-2D contract (0063: ck_daily_queues_owner_xor +
+  uq_daily_queues_active_resource_day) — the flipped pins live here
+  and the full contract suite in test_queue_resource_contract.py;
 - the COMPAT half: old-shape rows behave exactly as before
   (specialist relationship, no resource leakage), the read schema
   serializes both shapes, and the doctor-queue mutation guard rejects
@@ -246,33 +250,51 @@ def test_daily_queue_specialist_id_stores_null(db_session: Session) -> None:
     assert _raw_owners(db_session, queue.id) == (None, resource.id)
 
 
-def test_no_xor_in_expand_stage(db_session: Session) -> None:
-    """DELIBERATE expand semantics: both owners AND neither owner are
-    legal stored states. The XOR CHECK is the QD-2D contract step —
-    pinning its absence here guards the staged rollout order (a
-    premature constraint would break the QD-2B backfill)."""
+def test_xor_owner_contract_enforced(db_session: Session) -> None:
+    """QD-2D (0063): exactly one owner per queue. The DELIBERATE
+    expand-stage states (both owners / neither owner — pinned here
+    until stage D as test_no_xor_in_expand_stage) are closed by the
+    ck_daily_queues_owner_xor contract; each single axis stays a
+    legal stored shape (the successor pin for the flipped expand
+    semantics)."""
     user = _make_user(db_session, username="dr_xor", role="doctor")
     doctor = _make_doctor(db_session, user_id=user.id, specialty="cardio")
     resource = _make_resource(db_session, code="lab", queue_tag="lab")
 
-    both = _make_queue(
-        db_session,
+    both = DailyQueue(
         day=date(2026, 9, 7),
         specialist_id=doctor.id,
         queue_resource_id=resource.id,
     )
-    neither = _make_queue(db_session, day=date(2026, 9, 7), specialist_id=None)
+    db_session.add(both)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
 
-    assert _raw_owners(db_session, both.id) == (doctor.id, resource.id)
-    assert _raw_owners(db_session, neither.id) == (None, None)
+    neither = DailyQueue(day=date(2026, 9, 7))
+    db_session.add(neither)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+    doctor_only = _make_queue(db_session, day=date(2026, 9, 7), specialist_id=doctor.id)
+    resource_only = _make_queue(
+        db_session,
+        day=date(2026, 9, 7),
+        specialist_id=None,
+        queue_resource_id=resource.id,
+    )
+    assert _raw_owners(db_session, doctor_only.id) == (doctor.id, None)
+    assert _raw_owners(db_session, resource_only.id) == (None, resource.id)
 
 
-def test_no_active_uniqueness_in_expand_stage(db_session: Session) -> None:
-    """DELIBERATE expand semantics: duplicate ACTIVE (day, resource)
-    rows stay legal. The exact-tag-wins dedup is QD-2B and the partial
-    unique index (`WHERE active AND queue_resource_id IS NOT NULL`)
-    is QD-2D — this pin protects the historical duplicates until the
-    operator-approved migration handles them."""
+def test_active_resource_day_uniqueness_enforced(db_session: Session) -> None:
+    """QD-2D (0063): duplicate ACTIVE (day, resource) rows are rejected
+    by uq_daily_queues_active_resource_day — the flipped successor of
+    test_no_active_uniqueness_in_expand_stage. The PARTIAL predicate is
+    the contract: inactive rows and NULL-resource rows stay
+    duplicate-legal (history preservation; the operator-approved
+    migration handles the active ones)."""
     resource = _make_resource(db_session, code="lab", queue_tag="lab")
     first = _make_queue(
         db_session,
@@ -281,17 +303,32 @@ def test_no_active_uniqueness_in_expand_stage(db_session: Session) -> None:
         queue_resource_id=resource.id,
         queue_tag="lab",
     )
-    second = _make_queue(
-        db_session,
+    assert first.active
+
+    second = DailyQueue(
         day=date(2026, 9, 7),
         specialist_id=None,
         queue_resource_id=resource.id,
         queue_tag="lab",
     )
+    db_session.add(second)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
 
-    assert first.active and second.active
-    assert _raw_owners(db_session, first.id) == (None, resource.id)
-    assert _raw_owners(db_session, second.id) == (None, resource.id)
+    # the predicate is ACTIVE-only: an inactive same-(day, resource)
+    # row stays legal, and NULL-resource rows never conflict
+    inactive = DailyQueue(
+        day=date(2026, 9, 7),
+        specialist_id=None,
+        queue_resource_id=resource.id,
+        queue_tag="lab",
+        active=False,
+    )
+    db_session.add(inactive)
+    db_session.commit()
+    db_session.refresh(inactive)
+    assert _raw_owners(db_session, inactive.id) == (None, resource.id)
 
 
 def test_old_shape_doctor_owned_row_unchanged(db_session: Session) -> None:

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.db.base_class import Base
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
 from app.models.service import Service
 from app.services.registrar_edit_delta_service import RegistrarEditDeltaService
@@ -126,7 +126,22 @@ def version_engine():
 @pytest.fixture
 def entry_version(version_engine):
     with Session(version_engine) as session:
-        queue = DailyQueue(day=date.today(), queue_tag="SYNTH-V")
+        # QD-2D (0063): every queue carries exactly one owner
+        # (ck_daily_queues_owner_xor) — the version-lock fixture owns
+        # its container queue through the resource axis (no User/Doctor
+        # fixture chain needed for an entry-serialization test).
+        resource = QueueResource(
+            code="synth-v",
+            queue_tag="SYNTH-V",
+            display_name="SYNTH-V",
+            start_number_online=1,
+            max_online_per_day=15,
+        )
+        session.add(resource)
+        session.flush()
+        queue = DailyQueue(
+            day=date.today(), queue_tag="SYNTH-V", queue_resource_id=resource.id
+        )
         session.add(queue)
         session.flush()
         entry = OnlineQueueEntry(

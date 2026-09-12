@@ -570,14 +570,19 @@ def test_alembic_chain_single_head_0062() -> None:
     assert graph["0062_telegram_webhook_dedup"] == (
         "0061_telegram_config_singleton",
     )
+    # QD-2D: the chain head moved to 0063 (daily_queues owner contract —
+    # XOR CHECK + partial active uniqueness; the bridge conversion is
+    # data-only, the id fits the VARCHAR(32) version stamp).
+    assert graph["0063_queue_resource_contract"] == ("0062_telegram_webhook_dedup",)
     # alembic_version.version_num is VARCHAR(32): both ends of the new
     # link must fit (CI on 40cec49 exploded on real PostgreSQL with a
     # 38-char id — scratch-SQLite ignores VARCHAR widths).
+    assert len("0063_queue_resource_contract") <= 32
     assert len("0062_telegram_webhook_dedup") <= 32
     assert len("0061_telegram_config_singleton") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0062_telegram_webhook_dedup"]
+    assert heads == ["0063_queue_resource_contract"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============
