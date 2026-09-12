@@ -994,14 +994,21 @@ class VisitConfirmationService:
 
         if unowned_queue_tags:
             # Атомарно: ни один номер не закреплён — вызывающая транзакция
-            # откатывается целиком, оператор видит явную причину (D-08).
-            raise owner_configuration_error(
+            # откатывается целиком. QD-2E (Codex round-3 P2): ошибка
+            # владельца — ДОМЕННАЯ ошибка подтверждения (422 с причиной и
+            # путями решения), а не голый ValueError — PWA/Telegram-
+            # обёртки и регистраторский путь не превращают её в 500.
+            config_error = owner_configuration_error(
                 queue_tag=", ".join(sorted(set(unowned_queue_tags))),
                 detail=(
                     f"visit_id={visit.id} confirmation cannot resolve an "
                     "owner surface for the listed tag(s)"
                 ),
             )
+            raise VisitConfirmationDomainError(
+                status_code=422,
+                detail=str(config_error),
+            ) from config_error
 
         return queue_numbers, print_tickets
 

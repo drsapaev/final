@@ -172,12 +172,15 @@ _RETAG_DECISIONS: tuple[tuple[str, str, str], ...] = (
     ("LAB_RF", "general", "lab"),
 )
 
-# (service_code, target_doctor_id, original_doctor_id) — the single
-# real cardiologist (production id 10; validated against the LIVE
-# database below — never re-pointed by the migration).
-_ASSIGN_DOCTOR_DECISIONS: tuple[tuple[str, int, int | None], ...] = (
-    ("K01", 10, None),
-    ("K11", 10, None),
+# (service_code, target_doctor_id, original_doctor_id, snapshot_tag) —
+# the single real cardiologist (production id 10; validated against
+# the LIVE database below — never re-pointed by the migration). The
+# snapshot tag is part of the stale-map contract: an active mapped
+# service sitting on ANY other tag is drift, not an inert decision
+# (Codex round-3 P1).
+_ASSIGN_DOCTOR_DECISIONS: tuple[tuple[str, int, int | None, str], ...] = (
+    ("K01", 10, None, "cardio"),
+    ("K11", 10, None, "cardio"),
 )
 
 # (service_code,) — none in the 2026-09-12 map; supported for the
@@ -356,7 +359,7 @@ def _inventory_and_assert_coverage(conn) -> dict:
     decided_codes: set[str] = set()
     for code, _from_tag, _to_tag in _RETAG_DECISIONS:
         decided_codes.add(code)
-    for code, _target, _original in _ASSIGN_DOCTOR_DECISIONS:
+    for code, _target, _original, _snapshot_tag in _ASSIGN_DOCTOR_DECISIONS:
         decided_codes.add(code)
     decided_codes.update(_DISABLE_DECISIONS)
 
@@ -514,9 +517,23 @@ def _assert_decision_pre_states(conn, surfaces: dict) -> None:
                     "rows changed"
                 )
 
-    for code, target_doctor_id, original_doctor_id in _ASSIGN_DOCTOR_DECISIONS:
+    for (
+        code,
+        target_doctor_id,
+        original_doctor_id,
+        snapshot_tag,
+    ) in _ASSIGN_DOCTOR_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
         for row in rows:
+            if row.queue_tag != snapshot_tag:
+                _abort(
+                    f"stale operator map for {code!r}: the live service "
+                    f"(id={row.id}) carries queue_tag={row.queue_tag!r} "
+                    f"but the embedded map decided it on {snapshot_tag!r} "
+                    "— a newer operator change must not be overwritten "
+                    "by the cutover; re-run the inventory and update the "
+                    "decision tables; aborting with no rows changed"
+                )
             if row.doctor_id not in (original_doctor_id, target_doctor_id):
                 _abort(
                     f"stale operator map for {code!r}: the live service "
@@ -543,7 +560,7 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
     for code, _from_tag, to_tag in _RETAG_DECISIONS:
         if surfaces.get(code) is not None:
             _assert_registry_target(conn, to_tag)
-    for code, target_doctor_id, _original in _ASSIGN_DOCTOR_DECISIONS:
+    for code, target_doctor_id, _original, _snapshot_tag in _ASSIGN_DOCTOR_DECISIONS:
         if surfaces.get(code) is not None:
             _assert_target_doctor(conn, target_doctor_id)
 
@@ -568,7 +585,7 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
         counts["retag_resource"] += 1
         _verify_service_state(conn, service_id=row.id, queue_tag=to_tag)
 
-    for code, target_doctor_id, _original in _ASSIGN_DOCTOR_DECISIONS:
+    for code, target_doctor_id, _original, _snapshot_tag in _ASSIGN_DOCTOR_DECISIONS:
         row = surfaces.get(code)
         if row is None:
             continue
@@ -688,7 +705,12 @@ def downgrade_with_conn(conn) -> None:
                     "(see the upgrade log inventory; restore manually or "
                     "from the pre-E backup if required)"
                 )
-    for code, target_doctor_id, original_doctor_id in _ASSIGN_DOCTOR_DECISIONS:
+    for (
+        code,
+        target_doctor_id,
+        original_doctor_id,
+        _snapshot_tag,
+    ) in _ASSIGN_DOCTOR_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE_ANY, {"code": code}).fetchall()
         for row in rows:
             if row.doctor_id == target_doctor_id:

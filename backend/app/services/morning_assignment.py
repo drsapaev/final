@@ -726,6 +726,7 @@ class MorningAssignmentService:
             patient_id=visit.patient_id,
             target_date=target_date,
             queue_tag=queue_tag,
+            resolved_specialist_id=(None if registry_tag else doctor_id),
         )
 
         # QD-2E (Codex round-2 P1): у визита решён ЯВНЫЙ врач (визит или
@@ -867,7 +868,20 @@ class MorningAssignmentService:
         patient_id: int,
         target_date: date,
         queue_tag: str,
+        resolved_specialist_id: int | None = None,
     ) -> tuple[DailyQueue | None, OnlineQueueEntry | None]:
+        """Дедуп-резолв существующего claim'а пациента по тегу + выбор
+        поверхности для НОВОЙ записи.
+
+        QD-2E (Codex round-3 P1): ``resolved_specialist_id`` — явный
+        владелец визита (врач визита или единственная услуга тега).
+        PR-26 допускает НЕСКОЛЬКО активных (day, tag)-очередей разных
+        врачей — для пациента БЕЗ существующего claim'а поверхностью
+        является очередь РЕШЁННОГО владельца (или никакая — создаст
+        get_or_create); неоднозначность тега — только когда владелец
+        не решён (registry-поверхности передают None — их (day, tag)-
+        очередь единственна по контракту частичного UNIQUE).
+        """
         active_queues = (
             self.db.query(DailyQueue)
             .filter(
@@ -907,6 +921,20 @@ class MorningAssignmentService:
                     f"queue_tag={queue_tag}"
                 )
             return matched_queue, active_entries[0]
+
+        # нет существующего claim'а: у решённого владельца своя очередь —
+        # она и есть поверхность для новой записи (PR-26 multi-doctor);
+        # чужие (day, tag)-очереди того же тега неоднозначности не создают
+        if resolved_specialist_id is not None:
+            owner_queue = next(
+                (
+                    queue
+                    for queue in active_queues
+                    if queue.specialist_id == resolved_specialist_id
+                ),
+                None,
+            )
+            return owner_queue, None
 
         if len(active_queues) > 1:
             raise MorningAssignmentClaimError(

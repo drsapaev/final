@@ -495,6 +495,30 @@ def test_upgrade_aborts_on_mapped_service_moved_to_active_resource_tag() -> None
     assert tag == "general"  # nothing applied at all
 
 
+def test_upgrade_aborts_on_assign_code_moved_to_active_resource_tag() -> None:
+    """Codex round-3 P1: a mapped assign code (K01, snapshot tag
+    'cardio') hand-moved onto ANOTHER ACTIVE resource tag while staying
+    doctorless is invisible to the surface inventory (the tag resolves)
+    and passes the doctor check (None == original) — the snapshot-tag
+    validation must abort it as a stale map."""
+    conn = _scratch()
+    _seed_synthetic_world(conn)
+    _seed_decided_services(conn)
+    conn.execute(
+        sa.text(
+            "INSERT INTO queue_resources (code, queue_tag, display_name, active)"
+            " VALUES ('ecg', 'ecg', 'ЭКГ', 1)"
+        )
+    )
+    conn.execute(sa.text("UPDATE services SET queue_tag = 'ecg' WHERE code = 'K01'"))
+
+    _assert_abort(conn, "stale operator map for 'K01'")
+    tag, _, _ = _service_state(conn, "K01")
+    assert tag == "ecg"  # the newer operator decision survives
+    tag, _, _ = _service_state(conn, "L14")
+    assert tag == "general"  # nothing applied at all
+
+
 def test_upgrade_aborts_on_active_general_queue() -> None:
     conn = _scratch()
     _seed_synthetic_world(conn)
@@ -720,7 +744,7 @@ def test_embedded_decisions_match_the_operator_map_evidence() -> None:
         if item["surface"] == "service" and item["decision"] == "retag_resource"
     }
     map_assigns = {
-        item["code"]: (item["target_doctor_id"], item["doctor_id"])
+        item["code"]: (item["target_doctor_id"], item["doctor_id"], item["queue_tag"])
         for item in items
         if item["surface"] == "service" and item["decision"] == "assign_doctor"
     }
@@ -735,8 +759,8 @@ def test_embedded_decisions_match_the_operator_map_evidence() -> None:
         code: (from_tag, to_tag) for code, from_tag, to_tag in module._RETAG_DECISIONS
     } == map_retags
     assert {
-        code: (target, original)
-        for code, target, original in module._ASSIGN_DOCTOR_DECISIONS
+        code: (target, original, snapshot_tag)
+        for code, target, original, snapshot_tag in module._ASSIGN_DOCTOR_DECISIONS
     } == map_assigns
     assert module._DISABLE_DECISIONS == ()
     assert module._PROFILE_DECISIONS == map_profiles
@@ -997,6 +1021,51 @@ def test_prepare_new_entry_goes_to_resolved_doctors_queue(
     assert queue.id != foreign_queue.id
 
 
+def test_prepare_multiple_tag_surfaces_prefer_owners_queue(
+    db_session: Session,
+) -> None:
+    """Codex round-3 P1: the PR-26 multi-doctor topology (BOTH doctors
+    hold active (day, tag) cardio queues) must not raise the ambiguity
+    error for a patient without an existing claim — the resolved owner's
+    queue is the surface for the new entry."""
+    from app.services.morning_assignment import MorningAssignmentService
+
+    doc_user = _make_user(db_session, username="dr_kardio_a", role="doctor")
+    doc10 = _make_doctor(db_session, user_id=doc_user.id, specialty="cardio")
+    other_user = _make_user(db_session, username="dr_kardio_b", role="doctor")
+    doc11 = _make_doctor(db_session, user_id=other_user.id, specialty="cardio")
+    service = _make_service(
+        db_session,
+        code="K01",
+        queue_tag="cardio",
+        name="Консультация кардиолога",
+        requires_doctor=True,
+        doctor_id=doc10.id,
+    )
+    db_session.add_all(
+        [
+            DailyQueue(
+                day=_DAY, specialist_id=doc10.id, queue_tag="cardio", active=True
+            ),
+            DailyQueue(
+                day=_DAY, specialist_id=doc11.id, queue_tag="cardio", active=True
+            ),
+        ]
+    )
+    db_session.commit()
+
+    visit = _make_visit(db_session)  # NO visit doctor
+    _link_visit_service(db_session, visit, service)
+
+    prepared = MorningAssignmentService(db_session).prepare_wizard_queue_assignment(
+        visit, "cardio", _DAY
+    )
+    assert prepared is not None
+    assert prepared.create_handoff is not None
+    queue = prepared.create_handoff.create_entry_kwargs["daily_queue"]
+    assert queue.specialist_id == doc10.id
+
+
 def test_confirmation_ticket_carries_resolved_owner(
     db_session: Session,
 ) -> None:
@@ -1029,7 +1098,10 @@ def test_confirmation_ticket_carries_resolved_owner(
 def test_visit_confirmation_raises_on_unowned_tag(db_session: Session) -> None:
     """The pre-2E silent ``continue`` (a confirmed visit with NO queue
     number, nobody knows why) is now an explicit configuration error."""
-    from app.services.visit_confirmation_service import VisitConfirmationService
+    from app.services.visit_confirmation_service import (
+        VisitConfirmationDomainError,
+        VisitConfirmationService,
+    )
 
     gen_user = _make_user(db_session, username="general_resource", role="Resource")
     _make_doctor(db_session, user_id=gen_user.id, specialty="general")
@@ -1044,8 +1116,13 @@ def test_visit_confirmation_raises_on_unowned_tag(db_session: Session) -> None:
     _link_visit_service(db_session, visit, service)
 
     svc = VisitConfirmationService(db_session)
-    with pytest.raises(QueueOwnerConfigurationError, match="ultrason"):
+    # QD-2E (Codex round-3 P2): ошибка владельца — ДОМЕННАЯ ошибка
+    # подтверждения (422 + причина), не голый ValueError/500 у обёрток
+    with pytest.raises(VisitConfirmationDomainError) as excinfo:
         svc._assign_queue_numbers_on_confirmation(visit)
+    assert excinfo.value.status_code == 422
+    assert "ultrason" in excinfo.value.detail
+    assert "D-08" in excinfo.value.detail
 
 
 def test_visit_confirmation_registry_tag_keeps_working(db_session: Session) -> None:
