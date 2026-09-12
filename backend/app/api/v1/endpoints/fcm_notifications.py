@@ -148,11 +148,13 @@ async def send_fcm_notification(
             )
 
         device_tokens = []
-        # Registry-based send: map each user token back to its owner so a
-        # canonical UNREGISTERED verdict can purge exactly that registry row
-        # (PR-5 codex round 4). Directly supplied tokens have no registry
-        # linkage and are never purged here.
-        registry_owner_by_token: dict[str, int] = {}
+        # Registry-based send: map each user token back to its owner(s) so a
+        # canonical UNREGISTERED verdict can purge exactly those registry rows
+        # (PR-5 codex rounds 4-5: the schema allows one token on several
+        # accounts — a dead shared token must be cleared for ALL of them).
+        # Directly supplied tokens have no registry linkage and are never
+        # purged here.
+        registry_owners_by_token: dict[str, list[int]] = {}
 
         # Получаем токены по user_ids (PR-2: device_token is the real column)
         if request.user_ids:
@@ -162,7 +164,7 @@ async def send_fcm_notification(
                 push_on = getattr(user, "push_notifications_enabled", True)
                 if token and push_on:
                     device_tokens.append(token)
-                    registry_owner_by_token[token] = user.id
+                    registry_owners_by_token.setdefault(token, []).append(user.id)
 
         # Добавляем прямо указанные токены
         if request.device_tokens:
@@ -190,14 +192,15 @@ async def send_fcm_notification(
 
             if (
                 not result.success
-                and device_tokens[0] in registry_owner_by_token
+                and device_tokens[0] in registry_owners_by_token
                 and is_unregistered_token_response(result)
             ):
-                crud_user.clear_device_token_if_unchanged(
-                    db,
-                    user_id=registry_owner_by_token[device_tokens[0]],
-                    expected_token=device_tokens[0],
-                )
+                for owner_id in registry_owners_by_token[device_tokens[0]]:
+                    crud_user.clear_device_token_if_unchanged(
+                        db,
+                        user_id=owner_id,
+                        expected_token=device_tokens[0],
+                    )
 
             return {
                 "success": result.success,
@@ -227,20 +230,19 @@ async def send_fcm_notification(
                 if entry.get("success"):
                     continue
                 failed_token = device_tokens[entry.get("token_index", -1)]
-                if failed_token not in registry_owner_by_token:
-                    continue
-                if is_unregistered_token_response(
-                    FCMResponse(
-                        success=False,
-                        error=entry.get("error"),
-                        error_code=entry.get("error_code"),
-                    )
-                ):
-                    crud_user.clear_device_token_if_unchanged(
-                        db,
-                        user_id=registry_owner_by_token[failed_token],
-                        expected_token=failed_token,
-                    )
+                for owner_id in registry_owners_by_token.get(failed_token, []):
+                    if is_unregistered_token_response(
+                        FCMResponse(
+                            success=False,
+                            error=entry.get("error"),
+                            error_code=entry.get("error_code"),
+                        )
+                    ):
+                        crud_user.clear_device_token_if_unchanged(
+                            db,
+                            user_id=owner_id,
+                            expected_token=failed_token,
+                        )
 
             return {
                 "success": result["success"],

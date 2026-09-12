@@ -261,14 +261,17 @@ class MobileServiceEnhanced:
                 }
 
             # Получаем FCM токены пользователей (map back to owners so a
-            # canonical UNREGISTERED verdict can purge the registry row — PR-5)
+            # canonical UNREGISTERED verdict can purge the registry row — PR-5;
+            # a shared token may belong to several accounts, clear all)
             device_tokens = []
-            registry_owner_by_token: dict[str, int] = {}
+            registry_owners_by_token: dict[str, list[int]] = {}
             for user_id in user_ids:
                 user = crud_user.get_user(db, user_id=user_id)
                 if user and user.device_token and user.push_notifications_enabled:
                     device_tokens.append(user.device_token)
-                    registry_owner_by_token[user.device_token] = user.id
+                    registry_owners_by_token.setdefault(user.device_token, []).append(
+                        user.id
+                    )
 
             if not device_tokens:
                 return {
@@ -291,19 +294,17 @@ class MobileServiceEnhanced:
                 if entry.get("success"):
                     continue
                 failed_token = device_tokens[entry.get("token_index", -1)]
-                owner_id = registry_owner_by_token.get(failed_token)
-                if owner_id is None:
-                    continue
-                if is_unregistered_token_response(
-                    FCMResponse(
-                        success=False,
-                        error=entry.get("error"),
-                        error_code=entry.get("error_code"),
-                    )
-                ):
-                    crud_user.clear_device_token_if_unchanged(
-                        db, user_id=owner_id, expected_token=failed_token
-                    )
+                for owner_id in registry_owners_by_token.get(failed_token, []):
+                    if is_unregistered_token_response(
+                        FCMResponse(
+                            success=False,
+                            error=entry.get("error"),
+                            error_code=entry.get("error_code"),
+                        )
+                    ):
+                        crud_user.clear_device_token_if_unchanged(
+                            db, user_id=owner_id, expected_token=failed_token
+                        )
 
             return result
 
