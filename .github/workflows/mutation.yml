@@ -90,6 +90,9 @@ jobs:
           mkdir -p mutants
           cp -r alembic mutants/alembic
           cp openapi.json mutants/openapi.json
+          # the atomicity-test fixture (pg_engine) shells out to
+          # python -m alembic -c alembic.ini upgrade head with cwd = sandbox
+          cp alembic.ini mutants/alembic.ini
           cp -r scripts mutants/scripts
           cp -r ../ops ops
           # nurse-retirement mirror tests read frontend/src/{types,routing}
