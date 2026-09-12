@@ -32,7 +32,9 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from app.models.clinic import Doctor
 from app.models.service import Service
+from app.models.user import User
 
 
 class QueueOwnerConfigurationError(ValueError):
@@ -69,16 +71,23 @@ def owner_configuration_error(
 
 
 def single_active_service_doctor(db: Session, queue_tag: str) -> int | None:
-    """The single distinct doctor carried by the tag's ACTIVE services.
+    """The single ELIGIBLE distinct doctor carried by the tag's ACTIVE
+    services.
 
     Returns the doctor id only when exactly one distinct non-NULL
-    ``Service.doctor_id`` exists among the tag's active services — the
-    explicit-owner shortcut the morning pre-create and the assignment
-    paths use for non-registry doctor specialties (K01/K11 → the
-    cardiologist after the RQ-15.b map application). ``None`` for zero
-    owners (a fail-closed surface) and for two or more owners (an
+    ``Service.doctor_id`` exists among the tag's active services AND
+    that doctor is an eligible real owner (Codex round-1 P2):
+    active, user-linked, active User, not an internal 'Resource'
+    sentinel — a stale catalog assignment to an inactive or synthetic
+    doctor must fail closed (None), not silently build a queue on it.
+
+    The explicit-owner shortcut the morning pre-create and the
+    assignment paths use for non-registry doctor specialties (K01/K11
+    → the cardiologist after the RQ-15.b map application). ``None``
+    for zero owners (a fail-closed surface), two or more owners (an
     explicit doctor must be chosen per booking — the PR-26 per-doctor
-    queue contract, never a migration/runtime guess).
+    queue contract) and ineligible owners — never a migration/runtime
+    guess.
     """
     rows = (
         db.query(Service.doctor_id)
@@ -90,10 +99,13 @@ def single_active_service_doctor(db: Session, queue_tag: str) -> int | None:
         .distinct()
         .all()
     )
-    doctor_ids = [int(row[0]) for row in rows if row[0] is not None]
-    if len(doctor_ids) == 1:
-        return doctor_ids[0]
-    return None
+    doctor_ids = {int(row[0]) for row in rows if row[0] is not None}
+    if len(doctor_ids) != 1:
+        return None
+    doctor_id = next(iter(doctor_ids))
+    if not eligible_real_doctor(db, doctor_id):
+        return None
+    return doctor_id
 
 
 def is_internal_resource_doctor(doctor) -> bool:
@@ -117,3 +129,26 @@ def is_internal_resource_doctor(doctor) -> bool:
     if role is None:
         return False
     return is_internal_only_role_spelling(role)
+
+
+def eligible_real_doctor(db: Session, doctor_id: int) -> bool:
+    """An explicit SERVICE doctor is an eligible queue owner only when
+    the Doctor row exists, is active, is user-linked, the linked User
+    is active and the account is not an internal 'Resource' sentinel
+    (Codex round-1 P2 — a stale catalog assignment must fail closed,
+    not silently build a queue on an ineligible owner)."""
+    from app.core.roles import is_internal_only_role_spelling
+
+    row = (
+        db.query(Doctor.active, User.is_active, User.role)
+        .outerjoin(User, User.id == Doctor.user_id)
+        .filter(Doctor.id == doctor_id)
+        .first()
+    )
+    if row is None or not row[0]:
+        return False
+    if row[1] is None or not row[1]:
+        return False
+    if row[2] is not None and is_internal_only_role_spelling(row[2]):
+        return False
+    return True

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.crud.clinic import clinic_today as _clinic_today
 from app.crud.queue_owner_policy import (
     QueueOwnerConfigurationError,
+    eligible_real_doctor,
     owner_configuration_error,
     single_active_service_doctor,
 )
@@ -307,6 +308,21 @@ class MorningAssignmentService:
                         logger.warning(
                             f"⚠️ Визит {visit.id}: не удалось присвоить номера"
                         )
+
+                except QueueOwnerConfigurationError as config_error:
+                    # QD-2E (Codex round-1 P2): конфиг-ошибка владельца —
+                    # НЕ «внутренняя ошибка»: собиравшаяся тишина (errors +=
+                    # generic + success: True) вернула бы баг-класс QD-0
+                    # пакетно. Джоба падает громко: внешний except делает
+                    # rollback и возвращает success=False с причиной —
+                    # оператор чинит конфигурацию и перезапускает сборку.
+                    logger.error(
+                        "QD-2E fail-closed: queue owner configuration error "
+                        "for visit %s: %s — aborting the morning assignment",
+                        visit.id,
+                        config_error,
+                    )
+                    raise
 
                 except Exception:
                     error_msg = "Внутренняя ошибка"
@@ -618,12 +634,28 @@ class MorningAssignmentService:
                 if row[0] is not None
             }
             if len(visit_service_doctor_ids) == 1:
-                doctor_id = next(iter(visit_service_doctor_ids))
-                doctor = (
-                    self.db.query(Doctor)
-                    .filter(Doctor.id == doctor_id)
-                    .first()
-                )
+                candidate_id = next(iter(visit_service_doctor_ids))
+                # QD-2E (Codex round-1 P2): единственный кандидат обязан
+                # быть пригодным реальным владельцем (активный Doctor +
+                # активный User + не внутренний Resource) — стухшая
+                # привязка услуги к врачу не строит тихую очередь.
+                if eligible_real_doctor(self.db, candidate_id):
+                    doctor_id = candidate_id
+                    doctor = (
+                        self.db.query(Doctor)
+                        .filter(Doctor.id == doctor_id)
+                        .first()
+                    )
+                else:
+                    logger.error(
+                        "QD-2E fail-closed: visit_id=%s queue_tag=%s single "
+                        "service doctor_id=%s is not an eligible real owner "
+                        "(inactive/unlinked/synthetic) — treating the tag "
+                        "as unowned (D-08)",
+                        visit.id,
+                        queue_tag,
+                        candidate_id,
+                    )
             elif len(visit_service_doctor_ids) > 1:
                 raise owner_configuration_error(
                     queue_tag=queue_tag,

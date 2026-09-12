@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -427,6 +427,48 @@ def test_upgrade_aborts_on_undecided_surface() -> None:
     assert (tag, doctor_id) == ("cardio", None)
 
 
+def test_upgrade_aborts_on_stale_from_tag() -> None:
+    """Codex round-1 P1: a service hand-moved to a THIRD tag after the
+    snapshot must abort the cutover (stale map), not be silently
+    retagged onto the map's target."""
+    conn = _scratch()
+    _seed_synthetic_world(conn)
+    _seed_decided_services(conn)
+    # the operator moved L03 from 'general' to 'procedures' after the map
+    conn.execute(
+        sa.text("UPDATE services SET queue_tag = 'procedures' WHERE code = 'L03'")
+    )
+
+    _assert_abort(conn, "stale operator map for 'L03'")
+    tag, _, _ = _service_state(conn, "L03")
+    assert tag == "procedures"  # the newer operator decision survives
+    tag, _, _ = _service_state(conn, "L14")
+    assert tag == "general"  # nothing applied at all
+
+
+def test_upgrade_aborts_on_foreign_doctor_assignment() -> None:
+    """Codex round-1 P1: K01 hand-assigned to another real doctor after
+    the snapshot aborts the cutover — the newer assignment is never
+    overwritten with the embedded target."""
+    conn = _scratch()
+    _seed_synthetic_world(conn)
+    _seed_decided_services(conn)
+    # another real doctor (id 11) was assigned to K01 after the map
+    other_user = _seed_user(conn, "dr_other", role="doctor")
+    conn.execute(
+        sa.text(
+            "INSERT INTO doctors (id, user_id, specialty, active)"
+            " VALUES (11, :u, 'cardio', 1)"
+        ),
+        {"u": other_user},
+    )
+    conn.execute(sa.text("UPDATE services SET doctor_id = 11 WHERE code = 'K01'"))
+
+    _assert_abort(conn, "stale operator map for 'K01'")
+    _, doctor_id, _ = _service_state(conn, "K01")
+    assert doctor_id == 11  # the newer operator assignment survives
+
+
 def test_upgrade_aborts_on_active_general_queue() -> None:
     conn = _scratch()
     _seed_synthetic_world(conn)
@@ -589,42 +631,46 @@ def test_inert_decision_proceeds_with_a_log() -> None:
     assert doctor_id == _TARGET_DOCTOR_ID
 
 
-def test_downgrade_restores_the_exact_pre_state() -> None:
+def test_downgrade_is_validate_only_and_writes_nothing() -> None:
+    """Codex round-1 P1 (the 0059 round-2 / 0063 ruling): the data
+    downgrade cannot prove WHICH rows the upgrade changed — a mapped
+    code on the post-state tag may be an inert no-op (hand-applied
+    before the cutover) — so the downgrade validates and explains,
+    restores NOTHING, and a pre-E backup / the upgrade log are the
+    recovery paths."""
     conn = _scratch()
     _seed_synthetic_world(conn)
     _seed_decided_services(conn)
     module = _load_migration_0064()
     module.upgrade_with_conn(conn)
-    module.downgrade_with_conn(conn)
 
+    module.downgrade_with_conn(conn)  # must not raise and must not write
+
+    # the catalog stays in the post-upgrade state — untouched
     for code in _RETAG_CODES:
-        tag, doctor_id, _ = _service_state(conn, code)
-        assert (tag, doctor_id) == ("general", None)
+        tag, _, _ = _service_state(conn, code)
+        assert tag == "lab"
     for code in _ASSIGN_CODES:
-        tag, doctor_id, _ = _service_state(conn, code)
-        assert (tag, doctor_id) == ("cardio", None)
-    (profile_active,) = conn.execute(
-        sa.text("SELECT is_active FROM queue_profiles WHERE key = 'general'")
-    ).fetchone()
-    assert profile_active == 1
+        _, doctor_id, _ = _service_state(conn, code)
+        assert doctor_id == _TARGET_DOCTOR_ID
 
 
-def test_downgrade_never_clobbers_operator_post_changes() -> None:
-    """The 0059 conservative ruling: only rows STILL in the upgraded
-    state are restored — a hand-applied change survives the downgrade."""
+def test_downgrade_never_clobbers_a_pre_existing_post_state() -> None:
+    """The exact corruption scenario codex flagged: an L03 service
+    ALREADY on 'lab' before the upgrade (a hand-applied decision the
+    upgrade treats as an inert no-op) — the validate-only downgrade
+    leaves it untouched."""
     conn = _scratch()
     _seed_synthetic_world(conn)
     _seed_decided_services(conn)
+    conn.execute(sa.text("UPDATE services SET queue_tag = 'lab' WHERE code = 'L03'"))
     module = _load_migration_0064()
-    module.upgrade_with_conn(conn)
-    # the operator hand-retags L03 onto ecg AFTER the upgrade
-    conn.execute(sa.text("UPDATE services SET queue_tag = 'ecg' WHERE code = 'L03'"))
+    module.upgrade_with_conn(conn)  # L03 inert — idempotent no-op pass
+
     module.downgrade_with_conn(conn)
 
     tag, _, _ = _service_state(conn, "L03")
-    assert tag == "ecg"  # the operator's change survives
-    tag, _, _ = _service_state(conn, "L14")
-    assert tag == "general"  # the migration's own rows are restored
+    assert tag == "lab"  # neither the upgrade nor the downgrade moved it
 
 
 def test_migration_source_never_deletes_or_inserts() -> None:
@@ -693,8 +739,10 @@ def test_owner_configuration_error_is_a_value_error() -> None:
 
 
 def test_single_active_service_doctor_semantics(db_session: Session) -> None:
-    """Zero owners -> None (fail-closed surface), one owner -> the id,
-    two owners -> None (the PR-26 per-doctor contract, never a guess)."""
+    """Zero owners -> None (fail-closed surface), one eligible owner ->
+    the id, two owners -> None (the PR-26 per-doctor contract, never a
+    guess). The ineligible-owner rejection is pinned separately (the
+    Codex round-1 P2 stale-assignment test below)."""
     # zero owners
     _make_service(db_session, code="P03", queue_tag="procedures", name="УФО терапия")
     assert single_active_service_doctor(db_session, "procedures") is None
@@ -718,6 +766,44 @@ def test_single_active_service_doctor_semantics(db_session: Session) -> None:
     service2.doctor_id = doc2.id
     db_session.commit()
     assert single_active_service_doctor(db_session, "procedures") is None
+
+
+def test_single_active_service_doctor_rejects_stale_assignment(
+    db_session: Session,
+) -> None:
+    """Codex round-1 P2: the single candidate must be an ELIGIBLE real
+    owner — an inactive Doctor row or an internal 'Resource' sentinel
+    fails closed (None), so no queue is silently built on it."""
+    from app.crud.queue_owner_policy import eligible_real_doctor
+
+    # an inactive doctor
+    doc_user = _make_user(db_session, username="dr_stale", role="doctor")
+    doc = _make_doctor(db_session, user_id=doc_user.id, specialty="cardio")
+    doc.active = False
+    db_session.commit()
+    service = _make_service(
+        db_session,
+        code="K09",
+        queue_tag="cardio",
+        name="Старая привязка",
+        doctor_id=doc.id,
+    )
+    assert service.doctor_id == doc.id
+    assert single_active_service_doctor(db_session, "cardio") is None
+    assert not eligible_real_doctor(db_session, doc.id)
+
+    # an internal Resource sentinel assigned to a service (drift shape)
+    res_user = _make_user(db_session, username="lab_resource", role="Resource")
+    res_doc = _make_doctor(db_session, user_id=res_user.id, specialty="cardio")
+    _make_service(
+        db_session,
+        code="K099",
+        queue_tag="cardio",
+        name="Дрейф",
+        doctor_id=res_doc.id,
+    )
+    db_session.commit()
+    assert not eligible_real_doctor(db_session, res_doc.id)
 
 
 def test_batch_resolver_fails_closed_with_synthetics_present(
@@ -890,6 +976,97 @@ def test_visit_confirmation_registry_tag_keeps_working(db_session: Session) -> N
     )
     assert queue.queue_resource_id == resource.id
     assert queue.specialist_id is None
+
+
+def test_visit_confirmation_resolves_mapped_service_doctor(
+    db_session: Session,
+) -> None:
+    """Codex round-1 P2: a doctorless visit whose service carries the
+    operator-map doctor (K01 -> the cardiologist) confirms on THAT
+    doctor's queue — the ownership entry points stay consistent."""
+    from app.services.visit_confirmation_service import VisitConfirmationService
+
+    doc_user = _make_user(db_session, username="dr_kardio_c", role="doctor")
+    doc = _make_doctor(db_session, user_id=doc_user.id, specialty="cardio")
+    service = _make_service(
+        db_session,
+        code="K01",
+        queue_tag="cardio",
+        name="Консультация кардиолога",
+        requires_doctor=True,
+        doctor_id=doc.id,
+    )
+    visit = _make_visit(db_session)  # NO visit doctor
+    _link_visit_service(db_session, visit, service)
+
+    numbers, _tickets = VisitConfirmationService(
+        db_session
+    )._assign_queue_numbers_on_confirmation(visit)
+    assert len(numbers) == 1
+    assert numbers[0]["queue_tag"] == "cardio"
+    queue = (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.id == numbers[0]["queue_id"])
+        .one()
+    )
+    assert queue.specialist_id == doc.id
+    assert queue.queue_resource_id is None
+
+
+def test_morning_assignment_job_aborts_on_config_error(db_session: Session) -> None:
+    """Codex round-1 P2: the automated morning job cannot bury the
+    configuration error as a per-visit 'Внутренняя ошибка' with
+    success: True — the job returns success: False carrying the D-08
+    message (the operator fixes the catalog and re-runs)."""
+    from app.services.morning_assignment import MorningAssignmentService
+
+    gen_user = _make_user(db_session, username="general_resource", role="Resource")
+    _make_doctor(db_session, user_id=gen_user.id, specialty="general")
+    service = _make_service(
+        db_session,
+        code="O20",
+        queue_tag="neurology",
+        name="Невропатолог",
+        requires_doctor=False,
+    )
+    visit = _make_visit(db_session)
+    _link_visit_service(db_session, visit, service)
+
+    visit.confirmed_at = datetime(2026, 9, 12, 7, 0, 0)
+    db_session.commit()
+
+    result = MorningAssignmentService(db_session).run_morning_assignment(_DAY)
+    assert result["success"] is False
+    assert "neurology" in str(result)
+
+
+def test_wizard_assignment_service_propagates_config_error(
+    db_session: Session,
+) -> None:
+    """Codex round-1 P1: the PER-TAG loop of the wizard assignment
+    re-raises before its compensating cleanup — the cart endpoint sees
+    the error (422), never a 200 with visits minus queue numbers."""
+    from app.crud.queue_owner_policy import QueueOwnerConfigurationError
+    from app.services.registrar_wizard_queue_assignment_service import (
+        RegistrarWizardQueueAssignmentService,
+    )
+
+    gen_user = _make_user(db_session, username="general_resource", role="Resource")
+    _make_doctor(db_session, user_id=gen_user.id, specialty="general")
+    service = _make_service(
+        db_session,
+        code="O30",
+        queue_tag="ultrason",
+        name="УЗИ",
+        requires_doctor=False,
+    )
+    visit = _make_visit(db_session)
+    _link_visit_service(db_session, visit, service)
+
+    with pytest.raises(QueueOwnerConfigurationError, match="ultrason"):
+        RegistrarWizardQueueAssignmentService(db_session).assign_same_day_queue_numbers(
+            [visit], target_day=_DAY, source="desk"
+        )
 
 
 def test_wizard_helpers_general_default_is_gone() -> None:

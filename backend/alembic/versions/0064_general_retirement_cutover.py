@@ -77,19 +77,20 @@ transaction; PG DDL/DML is transactional):
    — retagged services left the fallback surface, assigned services
    carry an explicit doctor, disabled services are inactive).
 
-Downgrade is STRICT-RESTORE (the exact-row mirror of the upgrade):
-every decision the upgrade applied is reverted — and ONLY rows still
-in the upgraded state (``WHERE queue_tag = :to_tag`` /
-``doctor_id = :target`` guards), so an operator change made AFTER the
-upgrade is never clobbered. The restore re-creates the pre-E catalog
-shape (services back on the ``general`` fallback tag, explicit doctors
-cleared) which the ROLLED-BACK runtime serves exactly as before: the
-synthetic pairs still exist until RQ-15.d, the legacy fallback code
-returns with the deployed revision, and the resource axis (lab/ecg)
-works in both revisions. A service deliberately re-disabled by the
-operator after the upgrade must be re-disabled manually after the
-downgrade — the guard cannot distinguish the two deactivations (the
-0059 conservative-downgrade ruling philosophy, documented here).
+Downgrade is CONSERVATIVE, VALIDATE-ONLY (Codex round-1 P1; the 0059
+round-2 ruling and the 0063 downgrade philosophy): it writes NOTHING.
+A data downgrade cannot prove which rows THIS revision changed — a
+mapped code sitting on the post-state tag is either a row the upgrade
+retagged (restorable) or one the operator hand-moved to the same tag
+before the cutover (the upgrade treated it as an inert no-op and must
+not be clobbered), and the database carries no marker distinguishing
+the two. The downgrade therefore validates the state and prints the
+exact per-code pre-E values; the recovery paths are the upgrade's
+per-row inventory (the migration log is the audit trail) and a pre-E
+backup (the full restore). Re-upgrading after the downgrade is a
+clean no-op, and the rolled-back runtime serves the retagged catalog
+identically (the lab/ecg resource axis predates this revision; the
+pre-E fallback code returns with the rolled-back revision).
 
 The data logic lives in module-level functions so tests can run them
 against a scratch SQLite connection without an alembic context (the
@@ -478,15 +479,53 @@ def _verify_service_state(
         )
 
 
+def _assert_decision_pre_states(conn, surfaces: dict) -> None:
+    """Codex round-1 P1 (source-tag + source-doctor validation): every
+    mapped service must be in the EMBEDDED pre-state or in the exact
+    post-state (the idempotent second pass — the 0057 ruling); anything
+    else is a stale map / foreign state and aborts BEFORE any
+    mutation, so a newer operator decision is never overwritten."""
+    for code, from_tag, to_tag in _RETAG_DECISIONS:
+        row = surfaces.get(code)
+        if row is None:
+            continue
+        if row.queue_tag not in (from_tag, to_tag):
+            _abort(
+                f"stale operator map for {code!r}: the live service "
+                f"(id={row.id}) carries queue_tag={row.queue_tag!r} but "
+                f"the embedded map says from {from_tag!r} to {to_tag!r} — "
+                "a newer operator change must not be overwritten by the "
+                "cutover; re-run the inventory and update the decision "
+                "tables; aborting with no rows changed"
+            )
+
+    for code, target_doctor_id, original_doctor_id in _ASSIGN_DOCTOR_DECISIONS:
+        row = surfaces.get(code)
+        if row is None:
+            continue
+        if row.doctor_id not in (original_doctor_id, target_doctor_id):
+            _abort(
+                f"stale operator map for {code!r}: the live service "
+                f"(id={row.id}) carries doctor_id={row.doctor_id!r} but "
+                f"the embedded map assigns from {original_doctor_id!r} to "
+                f"{target_doctor_id!r} — a newer operator assignment must "
+                "not be overwritten by the cutover; re-run the inventory "
+                "and update the decision tables; aborting with no rows "
+                "changed"
+            )
+
+
 def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
     """Apply the embedded operator map, exact-row, deterministic.
 
-    Pre-flight ordering (the 0063 no-rows-changed contract): EVERY
-    decision is validated BEFORE the first mutation — a stale doctor
-    target or a deactivated retag resource aborts with the catalog
-    untouched, not half-converted."""
+    Pre-flight ordering (the 0063 no-rows-changed contract): the
+    coverage, pre-state and target validations (registry resource,
+    real doctor) ALL run BEFORE the first mutation — a stale map or
+    an invalid target aborts with the catalog untouched, not
+    half-converted."""
     counts = {"retag_resource": 0, "assign_doctor": 0, "disable_service": 0}
 
+    _assert_decision_pre_states(conn, surfaces)
     for code, _from_tag, to_tag in _RETAG_DECISIONS:
         if surfaces.get(code) is not None:
             _assert_registry_target(conn, to_tag)
@@ -497,6 +536,13 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
     for code, _from_tag, to_tag in _RETAG_DECISIONS:
         row = surfaces.get(code)
         if row is None:
+            continue
+        if row.queue_tag == to_tag:
+            # idempotent second pass — the decision is already applied
+            print(
+                f"{_MIGRATION_NAME}: retag_resource service id={row.id} "
+                f"code={code!r} already on {to_tag!r} — no-op"
+            )
             continue
         print(
             f"{_MIGRATION_NAME}: retag_resource service id={row.id} "
@@ -511,6 +557,13 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
     for code, target_doctor_id, _original in _ASSIGN_DOCTOR_DECISIONS:
         row = surfaces.get(code)
         if row is None:
+            continue
+        if row.doctor_id == target_doctor_id:
+            # idempotent second pass — the decision is already applied
+            print(
+                f"{_MIGRATION_NAME}: assign_doctor service id={row.id} "
+                f"code={code!r} already on doctor_id={target_doctor_id} — no-op"
+            )
             continue
         print(
             f"{_MIGRATION_NAME}: assign_doctor service id={row.id} "
@@ -586,65 +639,62 @@ def upgrade() -> None:
 
 
 def downgrade_with_conn(conn) -> None:
-    """Strict-restore, exact-row, guarded (see the module docstring):
-    only rows still in the state the upgrade left them are reverted."""
+    """Conservative validate-only downgrade — writes NOTHING (Codex
+    round-1 P1; the 0059 round-2 ruling and the 0063 downgrade
+    philosophy verbatim).
+
+    A data downgrade CANNOT prove which rows THIS revision changed: a
+    mapped code sitting on the post-state tag is either a row the
+    upgrade retagged (restorable) or one the operator hand-moved to
+    the same tag before the cutover (the upgrade treated it as an
+    inert no-op and MUST NOT touch it) — the database carries no
+    marker distinguishing the two, so a blanket restore would corrupt
+    pre-existing catalog state. The downgrade therefore only VALIDATES
+    the state and prints the exact per-code original values; the
+    recovery paths are the upgrade's per-row inventory (the migration
+    log is the audit trail) and a pre-E backup (the full restore).
+    Re-upgrading after this downgrade is a clean no-op (every mapped
+    code is on its post-state) and the rolled-back runtime serves the
+    retagged catalog identically (the lab/ecg resource axis predates
+    this revision; the pre-E fallback code returns with the
+    rolled-back revision)."""
+    print(
+        f"{_MIGRATION_NAME} downgrade: validate-only, NO catalog writes "
+        "(the 0059/0063 conservative ruling — the upgrade log inventory "
+        "and a pre-E backup are the restore paths)"
+    )
     for code, from_tag, to_tag in _RETAG_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
         for row in rows:
-            if row.queue_tag != to_tag:
-                continue
-            print(
-                f"{_MIGRATION_NAME} downgrade: restoring service "
-                f"id={row.id} code={code!r} queue_tag {to_tag!r} -> "
-                f"{from_tag!r}"
-            )
-            conn.execute(
-                _UPDATE_SERVICE_QUEUE_TAG,
-                {"id": row.id, "to_tag": from_tag},
-            )
-            _verify_service_state(conn, service_id=row.id, queue_tag=from_tag)
-
+            if row.queue_tag == to_tag:
+                print(
+                    f"{_MIGRATION_NAME} downgrade: service id={row.id} "
+                    f"code={code!r} sits on the retagged state "
+                    f"{to_tag!r} — the pre-E value was {from_tag!r} "
+                    "(see the upgrade log inventory; restore manually or "
+                    "from the pre-E backup if required)"
+                )
     for code, target_doctor_id, original_doctor_id in _ASSIGN_DOCTOR_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
         for row in rows:
-            if row.doctor_id != target_doctor_id:
-                continue
-            print(
-                f"{_MIGRATION_NAME} downgrade: restoring service "
-                f"id={row.id} code={code!r} doctor_id {target_doctor_id} "
-                f"-> {original_doctor_id!r}"
-            )
-            conn.execute(
-                _UPDATE_SERVICE_DOCTOR,
-                {"id": row.id, "doctor_id": original_doctor_id},
-            )
-            _verify_service_state(conn, service_id=row.id, doctor_id=original_doctor_id)
-
+            if row.doctor_id == target_doctor_id:
+                print(
+                    f"{_MIGRATION_NAME} downgrade: service id={row.id} "
+                    f"code={code!r} sits on the assigned doctor "
+                    f"{target_doctor_id} — the pre-E value was "
+                    f"{original_doctor_id!r} (see the upgrade log "
+                    "inventory; restore manually or from the pre-E "
+                    "backup if required)"
+                )
     for code in _DISABLE_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
         for row in rows:
-            if bool(row.active):
-                continue
-            print(
-                f"{_MIGRATION_NAME} downgrade: re-activating service "
-                f"id={row.id} code={code!r} (disable_service restore; a "
-                "service deliberately re-disabled by the operator after "
-                "the upgrade must be re-disabled manually)"
-            )
-            conn.execute(_UPDATE_SERVICE_ACTIVE, {"id": row.id, "active": True})
-            _verify_service_state(conn, service_id=row.id, active=True)
-
-    for profile_key, decision in _PROFILE_DECISIONS.items():
-        if decision != "retire_profile":
-            continue
-        row = conn.execute(_SELECT_PROFILE_BY_KEY, {"key": profile_key}).fetchone()
-        if row is None or bool(row.is_active):
-            continue
-        print(
-            f"{_MIGRATION_NAME} downgrade: re-activating profile "
-            f"id={row.id} key={profile_key!r}"
-        )
-        conn.execute(_UPDATE_PROFILE_ACTIVE, {"id": row.id, "active": True})
+            if not bool(row.active):
+                print(
+                    f"{_MIGRATION_NAME} downgrade: service id={row.id} "
+                    f"code={code!r} is disabled by the cutover decision "
+                    "— re-activate manually if the rollback requires it"
+                )
 
 
 def downgrade() -> None:

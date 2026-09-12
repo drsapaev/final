@@ -14,10 +14,14 @@ from typing import Any
 from app.core.config import settings
 from app.crud import clinic as crud_clinic
 from app.crud import telegram_config as crud_telegram
-from app.crud.queue_owner_policy import owner_configuration_error
+from app.crud.queue_owner_policy import (
+    eligible_real_doctor,
+    owner_configuration_error,
+)
 from app.crud.queue_resource_routing import resolve_tag_resource
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.visit import Visit
+from app.models.service import Service
+from app.models.visit import Visit, VisitService
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
 from app.services.confirmation_security import ConfirmationSecurityService
 from app.services.context_facades.queue_facade import (
@@ -822,6 +826,52 @@ class VisitConfirmationService:
                 not specialist_doctor_id
                 and resolve_tag_resource(self.repository.db, queue_tag) is not None
             )
+
+            if not specialist_doctor_id and not registry_tag:
+                # QD-2E (Codex round-1 P2): явный владелец из услуг визита —
+                # единственный distinct врач среди услуг визита с этим
+                # тегом (K01 → кардиолог после operator map), проверенный
+                # на пригодность (активный реальный владелец).
+                visit_service_doctor_ids = {
+                    int(row[0])
+                    for row in (
+                        self.repository.db.query(Service.doctor_id)
+                        .join(
+                            VisitService, VisitService.service_id == Service.id
+                        )
+                        .filter(
+                            VisitService.visit_id == visit.id,
+                            Service.queue_tag == queue_tag,
+                            Service.doctor_id.isnot(None),
+                        )
+                        .distinct()
+                        .all()
+                    )
+                    if row[0] is not None
+                }
+                if len(visit_service_doctor_ids) == 1:
+                    candidate_id = next(iter(visit_service_doctor_ids))
+                    if eligible_real_doctor(self.repository.db, candidate_id):
+                        specialist_doctor_id = candidate_id
+                    else:
+                        logger.error(
+                            "QD-2E fail-closed: visit_id=%s queue_tag=%s "
+                            "single service doctor_id=%s is not an "
+                            "eligible real owner (inactive/unlinked/"
+                            "synthetic) — treating the tag as unowned (D-08)",
+                            visit.id,
+                            queue_tag,
+                            candidate_id,
+                        )
+                elif len(visit_service_doctor_ids) > 1:
+                    raise owner_configuration_error(
+                        queue_tag=queue_tag,
+                        detail=(
+                            f"visit_id={visit.id} carries multiple explicit "
+                            "service doctors for one tag — the operator "
+                            "must pick one per booking"
+                        ),
+                    )
 
             if not specialist_doctor_id and not registry_tag:
                 daily_queue = self._get_active_daily_queue_by_tag(today, queue_tag)

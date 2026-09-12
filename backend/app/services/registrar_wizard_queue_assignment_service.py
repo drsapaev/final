@@ -215,6 +215,22 @@ class RegistrarWizardQueueAssignmentService:
                 assignment = self._materialize_prepared_assignment(prepared_assignment)
                 if assignment:
                     queue_assignments.append(assignment)
+            except QueueOwnerConfigurationError:
+                # QD-2E (Codex round-1 P1): re-raise ДО generic-ветки —
+                # компенсирующая зачистка ниже вернула бы пустой список,
+                # верхний цикл продолжил бы другие визиты, и cart-эндпоинт
+                # закоммитил бы 200 с визитами без номеров (тихий QD-0).
+                # Конфиг-ошибка — не transient-сбой визита: пробиваем
+                # наверх до except QueueOwnerConfigurationError в
+                # assign_same_day_queue_numbers → 422 оператору (D-08).
+                logger.error(
+                    "QD-2E fail-closed: queue owner configuration error "
+                    "for visit %d queue_tag=%s (source=%s) — re-raise (D-08)",
+                    visit_id,
+                    queue_tag,
+                    source,
+                )
+                raise
             except Exception as exc:
                 logger.error(
                     "Ошибка присвоения очередей для визита %d: %s",
