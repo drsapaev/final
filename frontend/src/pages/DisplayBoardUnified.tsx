@@ -46,6 +46,7 @@ interface BoardState {
   contrast_default: boolean;
   kiosk_default: boolean;
   sound_default: boolean;
+  show_patient_names?: string;
 }
 
 interface QueueEntryDto {
@@ -275,6 +276,13 @@ export default function DisplayBoardUnified({
         });
         if (soundInitial === undefined && typeof st.sound_default !== 'undefined') {
           setBoardSettings((prev) => ({ ...prev, soundEnabled: st.sound_default !== false }));
+        }
+        // RQ-24.a.1: sync the board privacy setting (full/initials/none)
+        if (typeof st.show_patient_names === 'string') {
+          const fmt = st.show_patient_names;
+          if (fmt === 'none' || fmt === 'initials' || fmt === 'full') {
+            setBoardSettings((prev) => ({ ...prev, showPatientNames: fmt }));
+          }
         }
         try {localStorage.setItem('board.state', JSON.stringify(st));} catch {
 
@@ -840,9 +848,11 @@ export default function DisplayBoardUnified({
             <div className="displayboard-call-number">
               № {currentCall.queue_number}
             </div>
+            {/* RQ-24.a.1: тот же PHI-гейт, что и у строк очереди */}
+            {boardSettings.showPatientNames !== 'none' &&
             <div className="displayboard-call-patient">
               {currentCall.patient_name}
-            </div>
+            </div>}
             <div className="displayboard-call-doctor">
               👨‍⚕️ {currentCall.doctor_name}
             </div>
