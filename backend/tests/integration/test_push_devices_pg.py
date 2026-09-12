@@ -28,6 +28,7 @@ Run locally (needs a reachable PostgreSQL):
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 import uuid
@@ -79,10 +80,32 @@ def _make_probe_database() -> tuple[str, str]:
 def _drop_probe_database(probe_name: str) -> None:
     base_url = make_url(os.environ["DATABASE_URL"])
     admin_url = base_url.set(database="postgres")
+    # Terminate any lingering backend on the probe DB first — an undisposed
+    # pooled connection would make DROP DATABASE fail with ObjectInUse.
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
-    with admin_engine.connect() as conn:
-        conn.execute(text(f'DROP DATABASE IF EXISTS "{probe_name}"'))
-    admin_engine.dispose()
+    try:
+        with admin_engine.connect() as conn:
+            conn.execute(
+                text(
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                    "WHERE datname = :probe AND pid <> pg_backend_pid()"
+                ),
+                {"probe": probe_name},
+            )
+            conn.execute(text(f'DROP DATABASE IF EXISTS "{probe_name}"'))
+    finally:
+        admin_engine.dispose()
+
+
+@contextlib.contextmanager
+def _probe_connection(url: str):
+    """Connection whose ENGINE is always disposed (no leaked pools)."""
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            yield conn
+    finally:
+        engine.dispose()
 
 
 def _alembic_upgrade(url: str, revision: str) -> None:
@@ -143,8 +166,8 @@ def test_push_devices_rls_contract_on_disposable_pg():
             conn.execute(
                 text(
                     "INSERT INTO users (username, hashed_password, role, "
-                    "is_active, is_superuser) VALUES "
-                    "('push_rls_probe', 'x', 'Patient', true, false)"
+                    "is_active, is_superuser, must_change_password) VALUES "
+                    "('push_rls_probe', 'x', 'Patient', true, false, false)"
                 )
             )
             import sqlalchemy as sa
