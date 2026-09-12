@@ -186,7 +186,19 @@ def pg_engine():
 
     engine = create_engine(sa_url, future=True)
     with engine.connect() as conn:
-        version = conn.execute(text("select version_num from alembic_version")).scalar()
+        try:
+            version = conn.execute(
+                text("select version_num from alembic_version")
+            ).scalar()
+        except Exception:  # noqa: BLE001
+            # Lesson 23: a schema-less pre-provisioned database is a SKIP
+            # (NOT_RUN), never an ERROR.
+            pytest.skip(
+                "DATABASE_URL points at a local PostgreSQL without an "
+                "alembic schema — provision it with 'alembic upgrade head' "
+                "first; the fixture never creates schemas on a "
+                "pre-provisioned database"
+            )
     if not version:
         pytest.skip(
             "DATABASE_URL points at a local PostgreSQL without an alembic "
@@ -212,6 +224,106 @@ def pg_session(pg_engine):
     yield session
     session.rollback()
     session.close()
+
+
+@pytest.fixture(autouse=True)
+def _rq09_cleanup(pg_session):
+    """Remove every row this module COMMITTED into the database.
+
+    On source 2 (pre-provisioned CI database shared by the whole suite)
+    leaked synthetic rows are fatal: a committed ``queue_statistics`` row
+    referencing a ``daily_queues`` row breaks OTHER modules' fixtures
+    (FK violation on their cleanup, seen as record_payment/webhook setup
+    ERRORs). Teardown order is FK-safe.
+    """
+    yield
+    from app.models.clinic import Doctor
+    from app.models.online_queue import (
+        DailyQueue,
+        OnlineQueueEntry,
+        QueueJoinSession,
+        QueueStatistics,
+        QueueToken,
+    )
+    from app.models.patient import Patient
+    from app.models.queue_profile import QueueProfile
+    from app.models.user import User
+
+    pg_session.rollback()
+
+    rq09_user_ids = [
+        u.id
+        for u in pg_session.query(User).filter(User.username.like("rq09_%")).all()
+    ]
+    rq09_doctor_ids = (
+        [
+            d.id
+            for d in pg_session.query(Doctor)
+            .filter(Doctor.user_id.in_(rq09_user_ids))
+            .all()
+        ]
+        if rq09_user_ids
+        else []
+    )
+    queue_ids = (
+        [
+            q.id
+            for q in pg_session.query(DailyQueue)
+            .filter(DailyQueue.specialist_id.in_(rq09_doctor_ids))
+            .all()
+        ]
+        if rq09_doctor_ids
+        else []
+    )
+
+    if queue_ids:
+        pg_session.query(QueueStatistics).filter(
+            QueueStatistics.queue_id.in_(queue_ids)
+        ).delete(synchronize_session=False)
+        pg_session.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.queue_id.in_(queue_ids)
+        ).delete(synchronize_session=False)
+        pg_session.query(DailyQueue).filter(
+            DailyQueue.id.in_(queue_ids)
+        ).delete(synchronize_session=False)
+    pg_session.query(QueueJoinSession).filter(
+        QueueJoinSession.qr_token.like("rq09-%")
+    ).delete(synchronize_session=False)
+    pg_session.query(QueueToken).filter(
+        QueueToken.token.like("rq09-%")
+    ).delete(synchronize_session=False)
+    pg_session.query(Patient).filter(
+        Patient.phone == "+998900000901"
+    ).delete(synchronize_session=False)
+    pg_session.query(QueueProfile).filter(
+        QueueProfile.key.like("rq09_%")
+    ).delete(synchronize_session=False)
+    if rq09_doctor_ids:
+        pg_session.query(Doctor).filter(
+            Doctor.id.in_(rq09_doctor_ids)
+        ).delete(synchronize_session=False)
+    if rq09_user_ids:
+        pg_session.query(User).filter(User.id.in_(rq09_user_ids)).delete(
+            synchronize_session=False
+        )
+    pg_session.commit()
+    # profile visibility restore is owned by test 1's finally-block;
+    # guard it here too for the shared-database case
+    from app.models.queue_profile import QueueProfile as _QP
+
+    for key, show in {
+        "cardiology": True,
+        "echokg": True,
+        "laboratory": True,
+        "stomatology": True,
+        "specialists": False,
+        "general": False,
+        "dermatology": False,
+    }.items():
+        pg_session.query(_QP).filter(_QP.key == key).update(
+            {_QP.show_on_qr_page: show}
+        )
+    pg_session.commit()
 
 
 @pytest.fixture
@@ -488,15 +600,24 @@ def test_ghost_incomplete_and_resource_owners_not_selectable(
     )
     pg_session.commit()
 
-    # (c) the seeded 0055 resource synthetics: lab_resource (owner role
-    # «Lab») — Doctor rows active with active owners, but not doctor-family
-    # roles; they belong to the RESOURCE surface, not doctor cards.
+    # (c) resource synthetics must not surface as doctor cards: the owner
+    # role is NOT doctor-family. Prefer the seeded 0055 lab_resource row;
+    # on a polluted shared database (another module already deleted the
+    # seeds) fall back to an equivalent synthetic.
     lab_resource = (
         pg_session.query(Doctor)
         .filter(Doctor.specialty == "lab", Doctor.active == True)  # noqa: E712
         .first()
     )
-    assert lab_resource is not None, "seeded lab_resource doctor expected"
+    if lab_resource is None:
+        _user3, lab_resource = _doctor_with_user(
+            pg_session,
+            specialty="lab",
+            label="lab_equiv",
+            role="Lab",
+            doctor_id=9204,
+        )
+    assert lab_resource is not None, "lab resource doctor fixture expected"
 
     _clinic_wide_token(pg_session, "rq09-token-ghosts")
     pg_session.expire_all()
