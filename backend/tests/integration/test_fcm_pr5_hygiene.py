@@ -271,6 +271,54 @@ def test_send_test_notification_purges_own_unregistered_token(
     assert refreshed.device_token is None
 
 
+def test_shared_token_fans_out_once_and_purges_all_owners(
+    client, db_session, monkeypatch
+):
+    """Codex round 6: two accounts may share one physical device token —
+    the broadcast fans it out exactly once, and a canonical UNREGISTERED
+    verdict clears every owner whose registry row still holds it."""
+    owner_a = _make_user(db_session)
+    owner_b = _make_user(db_session)
+    for owner in (owner_a, owner_b):
+        owner.device_token = "tok-shared"
+        owner.push_notifications_enabled = True
+    db_session.commit()
+
+    stub = _StubFCMService()
+    stub.send_notification = AsyncMock(
+        return_value=FCMResponse(
+            success=False,
+            error="Requested entity was not found",
+            error_code="410",
+        )
+    )
+    _patch_route_service(monkeypatch, stub)
+
+    admin = _make_user(db_session, role="Admin")
+    headers = _admin_headers(client, admin)
+
+    response = client.post(
+        "/api/v1/fcm/send-notification",
+        headers=headers,
+        json={
+            "title": "Broadcast",
+            "body": "Hello",
+            "user_ids": [owner_a.id, owner_b.id],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["sent_count"] == 0
+    assert response.json()["failed_count"] == 1  # deduplicated fan-out
+    stub.send_notification.assert_awaited_once()
+
+    db_session.expire_all()
+    refreshed_a = db_session.query(User).filter(User.id == owner_a.id).first()
+    refreshed_b = db_session.query(User).filter(User.id == owner_b.id).first()
+    assert refreshed_a.device_token is None
+    assert refreshed_b.device_token is None
+
+
 def test_send_notification_honest_400_when_disabled(client, db_session):
     """With FCM_ENABLED=false (default) the real service is inactive — the
     admin broadcast must fail honestly with 400, not pretend to send."""

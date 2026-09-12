@@ -170,6 +170,11 @@ async def send_fcm_notification(
         if request.device_tokens:
             device_tokens.extend(request.device_tokens)
 
+        # PR-5 codex round 6: one physical device may be registered by several
+        # accounts — fan out each unique token once while keeping every owner
+        # mapped for the conditional cleanup.
+        device_tokens = list(dict.fromkeys(device_tokens))
+
         if not device_tokens:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

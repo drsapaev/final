@@ -273,6 +273,10 @@ class MobileServiceEnhanced:
                         user.id
                     )
 
+            # PR-5 codex round 6: a shared device token must be fanned out
+            # exactly once, while every owner stays mapped for the cleanup.
+            device_tokens = list(dict.fromkeys(device_tokens))
+
             if not device_tokens:
                 return {
                     "success": False,
