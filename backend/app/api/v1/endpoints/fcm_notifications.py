@@ -1,15 +1,23 @@
 """
 API endpoints для Firebase Cloud Messaging (FCM) push уведомлений
+
+PR-5 (hygiene of a dead surface): the topic management endpoints were
+removed. They called FCMService methods that never existed and always
+returned HTTP 500, while no client could ever reach them in practice
+(topics require device-side SDK subscription; the mobile app removed
+Firebase on purpose). Group fan-outs, if ever needed, must go through
+the per-user token registry instead of FCM topics.
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
+from app.core.rate_limiter import limiter
 from app.crud import user as crud_user
 from app.db.session import get_db
 from app.models.user import User
@@ -21,8 +29,8 @@ router = APIRouter()
 class FCMTokenRequest(BaseModel):
     """Запрос на регистрацию FCM токена"""
 
-    device_token: str
-    device_type: str = "web"  # web, android, ios
+    device_token: str = Field(min_length=1, max_length=4096)
+    device_type: Literal["web", "android", "ios"] = "web"
     device_info: dict[str, str] | None = None
 
 
@@ -40,40 +48,28 @@ class FCMNotificationRequest(BaseModel):
     badge: int | None = None
 
 
-class FCMTopicRequest(BaseModel):
-    """Запрос для работы с топиками FCM"""
-
-    topic: str
-    device_tokens: list[str]
-
-
-class FCMTopicNotificationRequest(BaseModel):
-    """Запрос на отправку уведомления по топику"""
-
-    topic: str
-    title: str
-    body: str
-    data: dict[str, Any] | None = None
-    image: str | None = None
-    condition: str | None = None
-
-
 @router.post("/register-token", response_model=dict[str, Any])
+@limiter.limit("10/minute")  # registration is client-initiated; keep blast radius tiny
 async def register_fcm_token(  # P1-7: token ownership validated via current_user
-    request: FCMTokenRequest,
+    request: Request,
+    payload: FCMTokenRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Регистрация FCM токена пользователя"""
     try:
+        # PR-5: normalise once; empty/oversized tokens are rejected by the
+        # request model before we ever touch the registry.
+        device_token = payload.device_token.strip()
+
         # PR-2: persist to existing User.device_token + new mobile metadata columns
         crud_user.update_user(
             db,
             user_id=current_user.id,
             user_data={
-                "device_token": request.device_token,
-                "device_type": request.device_type,
-                "device_info": request.device_info,
+                "device_token": device_token,
+                "device_type": payload.device_type,
+                "device_info": payload.device_info,
                 "push_notifications_enabled": True,
             },
         )
@@ -81,7 +77,7 @@ async def register_fcm_token(  # P1-7: token ownership validated via current_use
         return {
             "success": True,
             "message": "FCM токен успешно зарегистрирован",
-            "device_token": request.device_token,
+            "device_token": device_token,
         }
 
     except HTTPException:
@@ -258,119 +254,6 @@ async def send_test_fcm_notification(
                 "message": f"Ошибка отправки: {result.error}",
                 "error_code": result.error_code,
             }
-
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
-
-
-@router.post("/subscribe-topic", response_model=dict[str, Any])
-async def subscribe_to_topic(
-    request: FCMTopicRequest,
-    current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
-    db: Session = Depends(get_db),
-):
-    """Подписка устройств на топик"""
-    try:
-        fcm_service = get_fcm_service()
-
-        if not fcm_service.active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="FCM сервис не настроен"
-            )
-
-        result = await fcm_service.subscribe_to_topic(
-            device_tokens=request.device_tokens, topic=request.topic
-        )
-
-        return {
-            "success": result["success"],
-            "message": f"Подписка на топик '{request.topic}' {'выполнена' if result['success'] else 'не выполнена'}",
-            "topic": request.topic,
-            "device_count": len(request.device_tokens),
-            "response": result.get("response"),
-        }
-
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
-
-
-@router.post("/unsubscribe-topic", response_model=dict[str, Any])
-async def unsubscribe_from_topic(
-    request: FCMTopicRequest,
-    current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
-    db: Session = Depends(get_db),
-):
-    """Отписка устройств от топика"""
-    try:
-        fcm_service = get_fcm_service()
-
-        if not fcm_service.active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="FCM сервис не настроен"
-            )
-
-        result = await fcm_service.unsubscribe_from_topic(
-            device_tokens=request.device_tokens, topic=request.topic
-        )
-
-        return {
-            "success": result["success"],
-            "message": f"Отписка от топика '{request.topic}' {'выполнена' if result['success'] else 'не выполнена'}",
-            "topic": request.topic,
-            "device_count": len(request.device_tokens),
-            "response": result.get("response"),
-        }
-
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
-
-
-@router.post("/send-topic-notification", response_model=dict[str, Any])
-async def send_topic_notification(
-    request: FCMTopicNotificationRequest,
-    current_user: User = Depends(require_roles(["Admin", "SuperAdmin"])),
-    db: Session = Depends(get_db),
-):
-    """Отправка уведомления по топику"""
-    try:
-        fcm_service = get_fcm_service()
-
-        if not fcm_service.active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="FCM сервис не настроен"
-            )
-
-        result = await fcm_service.send_topic_notification(
-            topic=request.topic,
-            title=request.title,
-            body=request.body,
-            data=request.data,
-            image=request.image,
-            condition=request.condition,
-        )
-
-        return {
-            "success": result.success,
-            "message": f"Уведомление по топику '{request.topic}' {'отправлено' if result.success else 'не отправлено'}",
-            "topic": request.topic,
-            "message_id": result.message_id,
-            "error": result.error,
-        }
 
     except HTTPException:
         raise

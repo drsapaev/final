@@ -41275,153 +41275,6 @@
         ]
       }
     },
-    "/api/v1/fcm/subscribe-topic": {
-      "post": {
-        "tags": [
-          "fcm-notifications"
-        ],
-        "summary": "Subscribe To Topic",
-        "description": "Подписка устройств на топик",
-        "operationId": "subscribe_to_topic_api_v1_fcm_subscribe_topic_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FCMTopicRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Subscribe To Topic Api V1 Fcm Subscribe Topic Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/fcm/unsubscribe-topic": {
-      "post": {
-        "tags": [
-          "fcm-notifications"
-        ],
-        "summary": "Unsubscribe From Topic",
-        "description": "Отписка устройств от топика",
-        "operationId": "unsubscribe_from_topic_api_v1_fcm_unsubscribe_topic_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FCMTopicRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Unsubscribe From Topic Api V1 Fcm Unsubscribe Topic Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/fcm/send-topic-notification": {
-      "post": {
-        "tags": [
-          "fcm-notifications"
-        ],
-        "summary": "Send Topic Notification",
-        "description": "Отправка уведомления по топику",
-        "operationId": "send_topic_notification_api_v1_fcm_send_topic_notification_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FCMTopicNotificationRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Send Topic Notification Api V1 Fcm Send Topic Notification Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
-      }
-    },
     "/api/v1/fcm/status": {
       "get": {
         "tags": [
@@ -79624,10 +79477,17 @@
         "properties": {
           "device_token": {
             "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
             "title": "Device Token"
           },
           "device_type": {
             "type": "string",
+            "enum": [
+              "web",
+              "android",
+              "ios"
+            ],
             "title": "Device Type",
             "default": "web"
           },
@@ -79652,86 +79512,6 @@
         ],
         "title": "FCMTokenRequest",
         "description": "Запрос на регистрацию FCM токена"
-      },
-      "FCMTopicNotificationRequest": {
-        "properties": {
-          "topic": {
-            "type": "string",
-            "title": "Topic"
-          },
-          "title": {
-            "type": "string",
-            "title": "Title"
-          },
-          "body": {
-            "type": "string",
-            "title": "Body"
-          },
-          "data": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Data"
-          },
-          "image": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Image"
-          },
-          "condition": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Condition"
-          }
-        },
-        "type": "object",
-        "required": [
-          "topic",
-          "title",
-          "body"
-        ],
-        "title": "FCMTopicNotificationRequest",
-        "description": "Запрос на отправку уведомления по топику"
-      },
-      "FCMTopicRequest": {
-        "properties": {
-          "topic": {
-            "type": "string",
-            "title": "Topic"
-          },
-          "device_tokens": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Device Tokens"
-          }
-        },
-        "type": "object",
-        "required": [
-          "topic",
-          "device_tokens"
-        ],
-        "title": "FCMTopicRequest",
-        "description": "Запрос для работы с топиками FCM"
       },
       "FeatureFlagCreateRequest": {
         "properties": {

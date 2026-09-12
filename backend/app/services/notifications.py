@@ -28,6 +28,7 @@ from typing import Any  # noqa: F401
 
 from sqlalchemy.orm import Session  # noqa: F401
 
+from app.crud import user as crud_user
 from app.services.notifications_pkg import (  # noqa: F401
     NotificationSenderService,
     notification_sender_service,
@@ -147,41 +148,73 @@ async def send_push(
                 transport_type=notification_type,
             )
 
-            # Legacy audit trail remains for external/mobile channels.
-            try:
-                from app.crud.notification import crud_notification_history
-                from app.schemas.notification import NotificationHistoryCreate
-
-                notification_data = {
-                    "recipient_type": "patient",
-                    "recipient_id": user_id,
-                    "recipient_contact": "mobile_app",
-                    "notification_type": notification_type,
-                    "channel": "mobile",
-                    "subject": title,
-                    "content": message,
-                    "status": "sent",
-                }
-                crud_notification_history.create(
-                    db, obj_in=NotificationHistoryCreate(**notification_data)
-                )
-            except Exception as hist_e:
-                # PII-safe: only the error type is logged.
-                logger.error(
-                    "Failed to save notification history",
-                    extra={
-                        "error_type": type(hist_e).__name__,
-                    },
-                )
-
-            # Отправляем FCM только если есть токен
-            if user.device_token:
-                await notification_sender_service.fcm_service.send_notification(
+            # Sender-level gates (PR-5): registry = users.device_token,
+            # user opt-out flag, and FCM availability (FCM_ENABLED + service
+            # account + project). Producers no longer re-implement these.
+            push_attempted = False
+            fcm_result = None
+            if (
+                user.device_token
+                and getattr(user, "push_notifications_enabled", False)
+                and notification_sender_service.fcm_service.active
+            ):
+                push_attempted = True
+                fcm_result = await notification_sender_service.fcm_service.send_notification(
                     device_token=user.device_token,
                     title=title,
                     body=message,
                     data=data or {},
                 )
+
+            push_sent = bool(fcm_result is not None and fcm_result.success)
+            if push_attempted and not push_sent:
+                # PII-safe: numeric error code only, never the token/body.
+                logger.warning(
+                    "FCM delivery failed",
+                    extra={"error_code": fcm_result.error_code},
+                )
+                if fcm_result.error_code in {"404", "410"}:
+                    # UNREGISTERED: drop the dead token from the registry.
+                    crud_user.update_user(
+                        db,
+                        user_id=user.id,
+                        user_data={
+                            "device_token": None,
+                            "device_type": None,
+                            "device_info": None,
+                            "push_notifications_enabled": False,
+                        },
+                    )
+
+            # Legacy audit trail remains for external/mobile channels —
+            # PR-5: honest. The row is written only when the push was actually
+            # attempted, with the real delivery outcome.
+            if push_attempted:
+                try:
+                    from app.crud.notification import crud_notification_history
+                    from app.schemas.notification import NotificationHistoryCreate
+
+                    notification_data = {
+                        "recipient_type": "patient",
+                        "recipient_id": user_id,
+                        "recipient_contact": "mobile_app",
+                        "notification_type": notification_type,
+                        "channel": "mobile",
+                        "subject": title,
+                        "content": message,
+                        "status": "sent" if push_sent else "failed",
+                    }
+                    crud_notification_history.create(
+                        db, obj_in=NotificationHistoryCreate(**notification_data)
+                    )
+                except Exception as hist_e:
+                    # PII-safe: only the error type is logged.
+                    logger.error(
+                        "Failed to save notification history",
+                        extra={
+                            "error_type": type(hist_e).__name__,
+                        },
+                    )
         else:
             try:
                 from app.services.notification_websocket import (

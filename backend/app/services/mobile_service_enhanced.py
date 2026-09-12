@@ -78,11 +78,11 @@ class MobileServiceEnhanced:
                 if telegram_success:
                     success_count += 1
 
-            # FCM Push уведомление (если есть fcm_token)
+            # FCM Push уведомление (если есть device_token)
             user = crud_user.get_user_by_patient_id(db, patient_id=patient.id)
-            if user and user.fcm_token and user.push_notifications_enabled:
+            if user and user.device_token and user.push_notifications_enabled:
                 fcm_result = await self.fcm_service.send_notification(
-                    device_token=user.fcm_token,
+                    device_token=user.device_token,
                     title="Напоминание о записи",
                     body=message,
                     data={"appointment_id": str(appointment_id), "type": "reminder"},
@@ -141,9 +141,9 @@ class MobileServiceEnhanced:
 
             # FCM Push уведомление
             user = crud_user.get_user_by_patient_id(db, patient_id=patient_id)
-            if user and user.fcm_token and user.push_notifications_enabled:
+            if user and user.device_token and user.push_notifications_enabled:
                 fcm_result = await self.fcm_service.send_notification(
-                    device_token=user.fcm_token,
+                    device_token=user.device_token,
                     title="Очередь",
                     body=message,
                     data={"queue_position": str(queue_position), "type": "queue"},
@@ -198,9 +198,9 @@ class MobileServiceEnhanced:
                     continue
 
                 # FCM Push уведомление
-                if user.fcm_token and user.push_notifications_enabled:
+                if user.device_token and user.push_notifications_enabled:
                     fcm_result = await self.fcm_service.send_notification(
-                        device_token=user.fcm_token,
+                        device_token=user.device_token,
                         title=title,
                         body=message,
                         data={"type": "promotion", "promo_data": promo_data},
@@ -240,8 +240,8 @@ class MobileServiceEnhanced:
             device_tokens = []
             for user_id in user_ids:
                 user = crud_user.get_user(db, user_id=user_id)
-                if user and user.fcm_token and user.push_notifications_enabled:
-                    device_tokens.append(user.fcm_token)
+                if user and user.device_token and user.push_notifications_enabled:
+                    device_tokens.append(user.device_token)
 
             if not device_tokens:
                 return {

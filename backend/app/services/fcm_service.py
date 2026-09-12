@@ -40,6 +40,9 @@ class FCMService:
         self.access_token = None
         self.token_expiry = 0
 
+        # Concurrency cap for multicast fan-out (bounded, unlike a bare gather).
+        self._send_semaphore = asyncio.Semaphore(10)
+
         self._load_credentials()
 
     def _load_credentials(self):
@@ -82,7 +85,17 @@ class FCMService:
 
     @property
     def active(self) -> bool:
-        return bool(self.credentials and self.project_id)
+        """True only when the feature flag AND credentials AND project are set.
+
+        PR-5: previously ``FCM_ENABLED=false`` did not actually disable the
+        service (the flag was read by nothing), so /fcm/status reported the
+        service as usable while push could never be honestly attempted.
+        """
+        return bool(
+            getattr(settings, "FCM_ENABLED", False)
+            and self.credentials is not None
+            and bool(self.project_id)
+        )
 
     async def send_notification(
         self,
@@ -93,13 +106,16 @@ class FCMService:
         image: str | None = None,
         sound: str = "default",
         badge: int | None = None,
+        click_action: str | None = None,
     ) -> FCMResponse:
         """Отправка push уведомления (HTTP v1)"""
 
         if not self.active:
             return FCMResponse(success=False, error="FCM service not configured")
 
-        token = self._get_access_token()
+        # PR-5: credentials.refresh() is a blocking network call — keep it off
+        # the event loop (same class of issue as the PR-4 blocking-send fix).
+        token = await asyncio.to_thread(self._get_access_token)
         if not token:
             return FCMResponse(success=False, error="Failed to get access token")
 
@@ -127,6 +143,9 @@ class FCMService:
                 }
             }
 
+            if click_action:
+                message["android"]["notification"]["click_action"] = click_action
+
             if image:
                 message["notification"]["image"] = image
 
@@ -146,21 +165,33 @@ class FCMService:
                     self.fcm_url, json=payload, headers=headers
                 )
 
-                response_data = response.json()
-
-                if response.status_code == 200:
-                    # Успешный ответ v1 содержит name (message_id)
-                    return FCMResponse(
-                        success=True,
-                        message_id=response_data.get("name"),
-                    )
-                else:
+                if response.status_code != 200:
+                    # Guard against non-JSON error bodies (proxies, HTML pages).
+                    try:
+                        response_data = response.json()
+                    except ValueError:
+                        response_data = {}
                     error_data = response_data.get("error", {})
+                    raw_code = error_data.get("code")
                     return FCMResponse(
                         success=False,
                         error=error_data.get("message", "Unknown error"),
-                        error_code=str(error_data.get("code")),
+                        error_code=str(raw_code) if raw_code is not None else str(response.status_code),
                     )
+
+                try:
+                    response_data = response.json()
+                except ValueError:
+                    return FCMResponse(
+                        success=False,
+                        error="FCM returned a non-JSON success response",
+                    )
+
+                # Успешный ответ v1 содержит name (message_id)
+                return FCMResponse(
+                    success=True,
+                    message_id=response_data.get("name"),
+                )
 
         except Exception as e:
             logger.error(f"FCM send error: {e}")
@@ -181,13 +212,16 @@ class FCMService:
         sent_count = 0
         failed_count = 0
 
-        # Отправляем параллельно
-        tasks = [
-            self.send_notification(token, title, body, data, **kwargs)
-            for token in device_tokens
-        ]
+        # Ограничиваем concurrency семафором (bare gather заливает FCM при
+        # больших списках токенов)
+        async def _bounded_send(single_token: str) -> FCMResponse:
+            async with self._send_semaphore:
+                return await self.send_notification(
+                    single_token, title, body, data, **kwargs
+                )
 
-        # Ограничиваем concurrency если нужно, но пока просто gather
+        tasks = [_bounded_send(token) for token in device_tokens]
+
         responses = await asyncio.gather(*tasks, return_exceptions=True)
 
         for i, response in enumerate(responses):
@@ -218,6 +252,7 @@ class FCMService:
         """
         return {
             "active": self.active,
+            "enabled": bool(getattr(settings, "FCM_ENABLED", False)),
             "project_id": self.project_id,
             "credentials_loaded": self.credentials is not None,
             "fcm_url": self.fcm_url if self.active else None,
