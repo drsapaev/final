@@ -484,15 +484,19 @@ def _collect_synthetic_pairs(conn) -> tuple[dict, list[dict]]:
             continue
 
         u = dict(users[0])
-        password_marker_ok = None
-        # hashed_password is opaque; only the marker prefix is knowable
-        # without verification (the value is a disabled hash, not a
-        # secret comparison).
-        stored_hash = _scalar(
-            conn, "SELECT hashed_password FROM users WHERE id = :i", {"i": u["id"]}
+        # hashed_password NEVER crosses into Python (CodeQL clear-text
+        # taint killed at the source): the '!disabled:' marker is computed
+        # SQL-side and only a boolean arrives
+        password_marker_ok = _scalar(
+            conn,
+            "SELECT (hashed_password IS NOT NULL"
+            " AND hashed_password LIKE '!disabled:%')"
+            " FROM users WHERE id = :i",
+            {"i": u["id"]},
         )
-        if isinstance(stored_hash, str) and stored_hash:
-            password_marker_ok = stored_hash.startswith("!disabled:")
+        password_marker_ok = (
+            bool(password_marker_ok) if password_marker_ok is not None else None
+        )
         u["disabled_marker_ok"] = password_marker_ok
         if password_marker_ok is False:
             pair["drift"].append(
@@ -1198,12 +1202,13 @@ def main(argv=None) -> int:
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
         # inventory rows only (ids/tags/counts/display names); no
-        # credentials: the database URL is excluded (database_dialect
-        # only) and hashed passwords are never read beyond the
-        # '!disabled:' boolean prefix marker
+        # credentials reach this file: the database URL is excluded
+        # (database_dialect only) and hashed passwords are never read
+        # into Python at all (SQL-side boolean marker)
         Path(args.json).write_text(
-            # codeql[py/clear-text-storage-sensitive-data] — see note above
-            json.dumps(report, indent=2, default=str),
+            json.dumps(
+                report, indent=2, default=str
+            ),  # codeql[py/clear-text-storage-sensitive-data]
             encoding="utf-8",
         )
         print(f"report written to {args.json}")
@@ -1212,16 +1217,17 @@ def main(argv=None) -> int:
         # decision scaffold over the same non-secret inventory rows;
         # decision fields are null until the operator fills them
         Path(args.operator_map).write_text(
-            # codeql[py/clear-text-storage-sensitive-data] — see note above
-            json.dumps(operator_map, indent=2, default=str),
+            json.dumps(
+                operator_map, indent=2, default=str
+            ),  # codeql[py/clear-text-storage-sensitive-data]
             encoding="utf-8",
         )
         print(f"operator map written to {args.operator_map}")
     if args.pretty:
-        # same non-secret inventory payload as the report file, printed on
-        # an explicit operator request
-        # codeql[py/clear-text-logging-sensitive-data]
-        print(json.dumps(report, indent=2, default=str))
+        # same non-secret payload, printed on an explicit operator request
+        print(
+            json.dumps(report, indent=2, default=str)
+        )  # codeql[py/clear-text-logging-sensitive-data]
 
     return exit_code
 
