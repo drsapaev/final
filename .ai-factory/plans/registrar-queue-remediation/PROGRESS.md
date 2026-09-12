@@ -49,7 +49,7 @@ DONE требует: критерий из плана выполнен; узки
 | RQ-01 | Актуальный базис | — | DONE | codex/rq-01-baseline-verification / [#3159](https://github.com/drsapaev/final/pull/3159) merged `84f561dff3f4d95b32e19cadc0a2c3b4f87ce2cb` | E-003 |
 | RQ-02 | Поиск пациента | RQ-01 | DONE | codex/rq-02-registrar-search / [#3160](https://github.com/drsapaev/final/pull/3160) merged `11e6ab69d5921a4e667748d99de6131f5c2e65dc` | E-004 |
 | RQ-03 | Услуги мастера | RQ-01 | DONE | codex/rq-03-wizard-services / [#3163](https://github.com/drsapaev/final/pull/3163) merged `2cf108cace3432690fb20843dfaa347c4b3ac121` | E-005 |
-| RQ-04 | Атомарное отделение | RQ-01; проверить #3114 | TODO | — | — |
+| RQ-04 | Атомарное отделение | RQ-01; сверено с merged QD-2C/#3114 | PR_OPEN | fix/rq04-department-atomicity | E-020 (частичное; DONE после merge) |
 | RQ-05 | Обязательный врач | RQ-01 | TODO | — | — |
 | RQ-06 | Профиль/тег/отделение | RQ-01 | DONE | codex/rq-06-profile-tag-department / [#3167](https://github.com/drsapaev/final/pull/3167) merged `17b94ec4409e3dcc3578d4b53f6c084cf4dc676e` | E-006 |
 | RQ-07 | Категории корзины | RQ-03, RQ-05 | TODO | — | — |
