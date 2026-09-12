@@ -469,6 +469,32 @@ def test_upgrade_aborts_on_foreign_doctor_assignment() -> None:
     assert doctor_id == 11  # the newer operator assignment survives
 
 
+def test_upgrade_aborts_on_mapped_service_moved_to_active_resource_tag() -> None:
+    """Codex round-2 P1: a mapped L03 the operator moved onto ANOTHER
+    ACTIVE resource tag ('ecg') is invisible to the fallback-surface
+    inventory (the tag resolves) — the by-code pre-state check must
+    still abort the cutover instead of treating the decision as inert
+    and mutating the other mapped rows on a stale map."""
+    conn = _scratch()
+    _seed_synthetic_world(conn)
+    _seed_decided_services(conn)
+    # an ACTIVE ecg registry row (the 0059 seed shape)
+    conn.execute(
+        sa.text(
+            "INSERT INTO queue_resources (code, queue_tag, display_name, active)"
+            " VALUES ('ecg', 'ecg', 'ЭКГ', 1)"
+        )
+    )
+    # the operator hand-moved L03 onto the resolvable 'ecg' tag
+    conn.execute(sa.text("UPDATE services SET queue_tag = 'ecg' WHERE code = 'L03'"))
+
+    _assert_abort(conn, "stale operator map for 'L03'")
+    tag, _, _ = _service_state(conn, "L03")
+    assert tag == "ecg"  # the newer operator decision survives
+    tag, _, _ = _service_state(conn, "L14")
+    assert tag == "general"  # nothing applied at all
+
+
 def test_upgrade_aborts_on_active_general_queue() -> None:
     conn = _scratch()
     _seed_synthetic_world(conn)
@@ -928,6 +954,76 @@ def test_morning_assign_reuses_existing_owner_surface(db_session: Session) -> No
     assert prepared.create_handoff is not None
     queue = prepared.create_handoff.create_entry_kwargs["daily_queue"]
     assert queue.id == existing.id
+
+
+def test_prepare_new_entry_goes_to_resolved_doctors_queue(
+    db_session: Session,
+) -> None:
+    """Codex round-2 P1: with an explicit owner resolved from the visit's
+    services (K01 -> doctor 10), a NEW entry is created on THAT doctor's
+    queue even when the tag surface already holds another doctor's
+    (day, tag) queue — never piggybacked onto doctor 11's queue."""
+    from app.services.morning_assignment import MorningAssignmentService
+
+    doc_user = _make_user(db_session, username="dr_kardio_10", role="doctor")
+    doc10 = _make_doctor(db_session, user_id=doc_user.id, specialty="cardio")
+    other_user = _make_user(db_session, username="dr_kardio_11", role="doctor")
+    doc11 = _make_doctor(db_session, user_id=other_user.id, specialty="cardio")
+    service = _make_service(
+        db_session,
+        code="K01",
+        queue_tag="cardio",
+        name="Консультация кардиолога",
+        requires_doctor=True,
+        doctor_id=doc10.id,
+    )
+    # doctor 11 already opened the sole (day, tag) cardio queue
+    foreign_queue = DailyQueue(
+        day=_DAY, specialist_id=doc11.id, queue_tag="cardio", active=True
+    )
+    db_session.add(foreign_queue)
+    db_session.commit()
+
+    visit = _make_visit(db_session)  # NO visit doctor
+    _link_visit_service(db_session, visit, service)
+
+    prepared = MorningAssignmentService(db_session).prepare_wizard_queue_assignment(
+        visit, "cardio", _DAY
+    )
+    assert prepared is not None
+    assert prepared.create_handoff is not None
+    queue = prepared.create_handoff.create_entry_kwargs["daily_queue"]
+    assert queue.specialist_id == doc10.id
+    assert queue.id != foreign_queue.id
+
+
+def test_confirmation_ticket_carries_resolved_owner(
+    db_session: Session,
+) -> None:
+    """Codex round-2 P2: the doctorless K01 confirmation ticket names the
+    resolved service doctor (the cardiologist), not «Без врача»."""
+    from app.services.visit_confirmation_service import VisitConfirmationService
+
+    doc_user = _make_user(db_session, username="dr_kardio_t", role="doctor")
+    doc_user.full_name = "Кардиолог Тест"
+    db_session.commit()
+    doc = _make_doctor(db_session, user_id=doc_user.id, specialty="cardio")
+    service = _make_service(
+        db_session,
+        code="K01",
+        queue_tag="cardio",
+        name="Консультация кардиолога",
+        requires_doctor=True,
+        doctor_id=doc.id,
+    )
+    visit = _make_visit(db_session)  # NO visit doctor
+    _link_visit_service(db_session, visit, service)
+
+    _numbers, tickets = VisitConfirmationService(
+        db_session
+    )._assign_queue_numbers_on_confirmation(visit)
+    assert len(tickets) == 1
+    assert tickets[0]["doctor_name"] == "Кардиолог Тест"
 
 
 def test_visit_confirmation_raises_on_unowned_tag(db_session: Session) -> None:

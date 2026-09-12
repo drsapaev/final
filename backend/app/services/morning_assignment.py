@@ -728,6 +728,30 @@ class MorningAssignmentService:
             queue_tag=queue_tag,
         )
 
+        # QD-2E (Codex round-2 P1): у визита решён ЯВНЫЙ врач (визит или
+        # единственная услуга тега) — НОВАЯ запись создаётся в очереди
+        # ЭТОГО врача (PR-26 per-doctor), а не в чужой (day, tag)-очереди
+        # другого врача, которую вернул claim-резолв по тегу. Существующий
+        # claim пациента (existing_entry) остаётся где есть — дедуп per-tag
+        # сохранён; registry-теги и ресурсные поверхности не затронуты
+        # (их (day, tag)-очередь и есть единственная поверхность).
+        if (
+            existing_entry is None
+            and daily_queue is not None
+            and not registry_tag
+            and doctor_id is not None
+            and daily_queue.specialist_id != doctor_id
+        ):
+            logger.info(
+                "QD-2E: tag surface queue id=%s (specialist=%s) does not match "
+                "the resolved owner doctor_id=%s — creating the entry on the "
+                "owner's queue (PR-26 per-doctor contract)",
+                daily_queue.id,
+                daily_queue.specialist_id,
+                doctor_id,
+            )
+            daily_queue = None
+
         if not daily_queue:
             daily_queue = queue_service.get_or_create_daily_queue(
                 self.db,

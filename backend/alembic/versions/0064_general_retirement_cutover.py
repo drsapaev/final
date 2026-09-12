@@ -252,8 +252,15 @@ _SELECT_SURFACES = sa.text("""
     """).bindparams(sa.bindparam("synthetic_usernames", expanding=True))
 
 _SELECT_SERVICE_BY_CODE = sa.text("""
-    SELECT id, code, name, queue_tag, department_key, doctor_id, active,
-           requires_doctor
+    SELECT id, code, queue_tag, department_key, doctor_id, active
+    FROM services
+    WHERE code = :code AND active = true
+    ORDER BY id
+    """)
+
+# the downgrade's read-only reporting variant (any active state)
+_SELECT_SERVICE_BY_CODE_ANY = sa.text("""
+    SELECT id, code, queue_tag, department_key, doctor_id, active
     FROM services
     WHERE code = :code
     ORDER BY id
@@ -480,39 +487,46 @@ def _verify_service_state(
 
 
 def _assert_decision_pre_states(conn, surfaces: dict) -> None:
-    """Codex round-1 P1 (source-tag + source-doctor validation): every
-    mapped service must be in the EMBEDDED pre-state or in the exact
-    post-state (the idempotent second pass — the 0057 ruling); anything
-    else is a stale map / foreign state and aborts BEFORE any
-    mutation, so a newer operator decision is never overwritten."""
+    """Codex round-1 P1 + round-2 P1 (source-tag / source-doctor
+    validation): every EXTANT ACTIVE service carrying a mapped code
+    must sit on the EMBEDDED pre-state or on the exact post-state (the
+    idempotent no-op — the 0057 ruling); anything else is a stale map
+    / foreign state and aborts BEFORE any mutation, so a newer
+    operator decision is never overwritten.
+
+    The check reads the catalog BY CODE — deliberately NOT via the
+    fallback-surface inventory: a mapped service the operator moved
+    onto ANOTHER ACTIVE resource tag ('L03' -> 'ecg') is invisible to
+    _SELECT_SURFACES (the tag resolves), and treating it as inert
+    would let the cutover mutate the other mapped rows despite the
+    stale map."""
     for code, from_tag, to_tag in _RETAG_DECISIONS:
-        row = surfaces.get(code)
-        if row is None:
-            continue
-        if row.queue_tag not in (from_tag, to_tag):
-            _abort(
-                f"stale operator map for {code!r}: the live service "
-                f"(id={row.id}) carries queue_tag={row.queue_tag!r} but "
-                f"the embedded map says from {from_tag!r} to {to_tag!r} — "
-                "a newer operator change must not be overwritten by the "
-                "cutover; re-run the inventory and update the decision "
-                "tables; aborting with no rows changed"
-            )
+        rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
+        for row in rows:
+            if row.queue_tag not in (from_tag, to_tag):
+                _abort(
+                    f"stale operator map for {code!r}: the live service "
+                    f"(id={row.id}) carries queue_tag={row.queue_tag!r} "
+                    f"but the embedded map says from {from_tag!r} to "
+                    f"{to_tag!r} — a newer operator change must not be "
+                    "overwritten by the cutover; re-run the inventory "
+                    "and update the decision tables; aborting with no "
+                    "rows changed"
+                )
 
     for code, target_doctor_id, original_doctor_id in _ASSIGN_DOCTOR_DECISIONS:
-        row = surfaces.get(code)
-        if row is None:
-            continue
-        if row.doctor_id not in (original_doctor_id, target_doctor_id):
-            _abort(
-                f"stale operator map for {code!r}: the live service "
-                f"(id={row.id}) carries doctor_id={row.doctor_id!r} but "
-                f"the embedded map assigns from {original_doctor_id!r} to "
-                f"{target_doctor_id!r} — a newer operator assignment must "
-                "not be overwritten by the cutover; re-run the inventory "
-                "and update the decision tables; aborting with no rows "
-                "changed"
-            )
+        rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
+        for row in rows:
+            if row.doctor_id not in (original_doctor_id, target_doctor_id):
+                _abort(
+                    f"stale operator map for {code!r}: the live service "
+                    f"(id={row.id}) carries doctor_id={row.doctor_id!r} "
+                    f"but the embedded map assigns from "
+                    f"{original_doctor_id!r} to {target_doctor_id!r} — a "
+                    "newer operator assignment must not be overwritten "
+                    "by the cutover; re-run the inventory and update the "
+                    "decision tables; aborting with no rows changed"
+                )
 
 
 def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
@@ -664,7 +678,7 @@ def downgrade_with_conn(conn) -> None:
         "and a pre-E backup are the restore paths)"
     )
     for code, from_tag, to_tag in _RETAG_DECISIONS:
-        rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
+        rows = conn.execute(_SELECT_SERVICE_BY_CODE_ANY, {"code": code}).fetchall()
         for row in rows:
             if row.queue_tag == to_tag:
                 print(
@@ -675,7 +689,7 @@ def downgrade_with_conn(conn) -> None:
                     "from the pre-E backup if required)"
                 )
     for code, target_doctor_id, original_doctor_id in _ASSIGN_DOCTOR_DECISIONS:
-        rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
+        rows = conn.execute(_SELECT_SERVICE_BY_CODE_ANY, {"code": code}).fetchall()
         for row in rows:
             if row.doctor_id == target_doctor_id:
                 print(
@@ -687,7 +701,7 @@ def downgrade_with_conn(conn) -> None:
                     "backup if required)"
                 )
     for code in _DISABLE_DECISIONS:
-        rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
+        rows = conn.execute(_SELECT_SERVICE_BY_CODE_ANY, {"code": code}).fetchall()
         for row in rows:
             if not bool(row.active):
                 print(

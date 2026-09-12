@@ -946,8 +946,15 @@ class VisitConfirmationService:
                 "lab": "Лаборатория",
                 "general": "Общая очередь",
             }
+            # QD-2E (Codex round-2 P2): талон строится от РЕШЁННОГО
+            # владельца записи — у doctorless-визита K01/K11 владельцем
+            # становится врач услуги (specialist_doctor_id), а не пустой
+            # visit.doctor_id (иначе талон печатал «Без врача»).
+            resolved_owner_id = specialist_doctor_id or visit.doctor_id
             doctor = (
-                self.repository.get_doctor(visit.doctor_id) if visit.doctor_id else None
+                self.repository.get_doctor(resolved_owner_id)
+                if resolved_owner_id
+                else None
             )
             patient = self.repository.get_patient(visit.patient_id)
 
