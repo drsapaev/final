@@ -131,8 +131,10 @@ what the map says, nothing more.
 ## Evidence Retention
 
 - Keep the JSON report, the operator map (original + completed) and the
-  command line used, next to the pre-D backup evidence (ADR gate 2:
-  "the D inventory/backup/restore evidence is retained").
+  command line used (the report stores only the target DIALECT, never the
+  database URL — record the exact target database yourself next to the
+  evidence), next to the pre-D backup evidence (ADR gate 2: "the D
+  inventory/backup/restore evidence is retained").
 - Re-run the inventory after each operator intervention (service
   retagging, queue resolution) — the report is cheap and the final
   pre-cutover run is the proof that no active `general` surface remains.

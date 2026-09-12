@@ -128,11 +128,8 @@ TOOL_NAME = "inventory_general_retirement.py"
 # ============================================================================
 
 
-def _redact(url: str) -> str:
-    try:
-        return sa.engine.url.make_url(url).render_as_string(hide_password=True)
-    except Exception:  # pragma: no cover - defensive
-        return "<unparseable-url>"
+REPORT_VERSION = 1
+TOOL_NAME = "inventory_general_retirement.py"
 
 
 def _connect_read_only(url: str):
@@ -896,6 +893,7 @@ def _build_operator_map(
 def run_inventory(database_url: str) -> tuple[dict, dict, int]:
     """Produce (report, operator_map, exit_code) — 0/1/2, module docstring."""
     engine, conn = _connect_read_only(database_url)
+    dialect = engine.dialect.name
     try:
         schema, schema_problems = _collect_schema_contract(conn)
         pairs_section, pairs = _collect_synthetic_pairs(conn)
@@ -927,7 +925,11 @@ def run_inventory(database_url: str) -> tuple[dict, dict, int]:
         "report_version": REPORT_VERSION,
         "tool": TOOL_NAME,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
-        "database": _redact(database_url),
+        # the DIALECT only, never the URL: these files are retained as
+        # Stage E evidence and a database URL (even password-redacted)
+        # must not land in evidence files or logs; the operator records
+        # the exact target via the runbook's command line
+        "database_dialect": dialect,
         "schema_contract": schema,
         "synthetic_pairs": pairs_section,
         "inbound_references": inbound_section,
@@ -951,7 +953,7 @@ def run_inventory(database_url: str) -> tuple[dict, dict, int]:
 def _print_summary(report: dict, exit_code: int) -> None:
     schema = report["schema_contract"]
     print(f"[{TOOL_NAME}] Stage E general retirement inventory")
-    print(f"  database: {report['database']}")
+    print(f"  database dialect: {report['database_dialect']}")
     print(f"  alembic_version: {schema['alembic_version']}")
     print(
         f"  stage D contract: "

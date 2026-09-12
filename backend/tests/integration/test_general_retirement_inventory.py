@@ -392,7 +392,10 @@ def test_canonical_exit_code_and_report_shape(canonical_db, tmp_path):
     assert code == 1  # blockers + open decisions, contract itself OK
     assert report["report_version"] == 1
     assert report["tool"] == "inventory_general_retirement.py"
-    assert report["database"].startswith("sqlite:///")
+    # the dialect only — a database URL must never reach the report
+    # (CodeQL clear-text-storage pin)
+    assert report["database_dialect"] == "sqlite"
+    assert "database" not in report
 
 
 def test_schema_contract_section_ok(canonical_db, tmp_path):
