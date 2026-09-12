@@ -14,7 +14,7 @@ import { useMemo, useCallback } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import { Button, Tooltip,
   Checkbox } from '../ui/macos';
-import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
+import { normalizeCategoryCode, parseServiceCode } from '../../utils/serviceCodeUtils';
 import { MIXED_REPEAT_WARNING, categories, filterDoctorsForService } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './CartStepV2.css';
@@ -52,6 +52,7 @@ export interface CartService {
   category_code?: string;
   service_code?: string;
   code?: string;
+  is_consultation?: boolean;
   price?: number;
   duration?: number;
   [key: string]: unknown;
@@ -170,39 +171,36 @@ const CartStepV2 = ({
     // 2. Фильтрация по категории (если нет поиска)
     // Edit mode loads every service, but category tabs still filter what is displayed.
     return filtered.filter((service) => {
-      const normalizedCategory = service.category_code ? normalizeCategoryCode(service.category_code) : 'other';
-      const isConsultation = service.name.toLowerCase().includes(t('misc.csv_konsultatsiya'));
+      const normalizedCategory = service.category_code
+        ? normalizeCategoryCode(service.category_code)
+        : parseServiceCode(service.service_code).category;
+      const isConsultation = Boolean(service.is_consultation);
 
-      // ✅ Проверка на ЭКГ, ЭхоКГ и рентгенографию по service_code и названию
-      const serviceCode = service.service_code ? String(service.service_code).toUpperCase() : '';
-      const serviceName = service.name ? service.name.toLowerCase() : '';
-
-      const isECG = serviceCode === 'K10' ||
-      serviceCode.includes('ECG') ||
-      serviceName.includes(t('misc.csv_ekg'));
-
-      const isEchoCG = serviceCode === 'K11' ||
-      serviceCode.includes('ECHO') ||
-      serviceName.includes(t('misc.csv_ehokg')) ||
-      serviceName.includes(t('misc.csv_eho_kg'));
-
-      // ✅ Рентгенография зубов: S-коды (стоматология) + название содержит "рентген"
-      const isDentalXRay = serviceCode.startsWith('S') && serviceCode.match(/^S\d+$/) && (
-      serviceName.includes(t('misc.csv_rentgen')) || serviceName.includes(t('misc.csv_rentgeno')) || serviceName.includes('x-ray') || serviceName.includes('xray') || serviceName.includes(t('misc.csv_rentgenografiya')));
+      // RQ-07 / S-05: классификация — ТОЛЬКО по каноническим метаданным DTO:
+      // category_code (SSOT-нормализация serviceCodeUtils) и is_consultation.
+      // Прежние эвристики по тексту названия (name.includes('консультация'/
+      // 'экг'/'эхокг'/'рентген')) и по legacy-кодам (K10/K11/'ECG'/^S\d+$)
+      // убраны: смена локали или новый код услуги не должны прятать услугу
+      // и не должны менять её группу (услуга категории K с переводным
+      // названием исчезала из всех вкладок; услуга категории P со словом
+      // «консультация» уезжала в «Специалистов»). Название участвует только
+      // в поиске выше. При неизвестном category_code — fallback на канонический
+      // префикс service_code (parseServiceCode), не на текст названия.
 
       switch (activeCategory) {
         case 'specialists':
-          // ✅ Консультации + ЭКГ + ЭхоКГ + рентгенография зубов
-          return isConsultation || isECG || isEchoCG || isDentalXRay;
+          // Специалисты: каноническая категория (K/S/D → specialists) или
+          // явный is_consultation из DTO. Legacy ЭКГ/ЭхоКГ (категория K)
+          // остаются здесь без текстовых эвристик.
+          return normalizedCategory === 'specialists' || isConsultation;
         case 'laboratory':
           return normalizedCategory === 'laboratory';
         case 'procedures':
-          // Процедуры (нормализованные значения: 'procedures')
-          // ✅ Исключаем ЭКГ, ЭхоКГ и рентгенографию из процедур
-          return normalizedCategory === 'procedures' && !isConsultation && !isECG && !isEchoCG && !isDentalXRay;
+          return normalizedCategory === 'procedures' && !isConsultation;
         case 'other':
-          // Всё остальное (не консультации и не лаборатория и не процедуры и не ЭКГ/ЭхоКГ/рентген)
-          return !isConsultation && normalizedCategory === 'other' && !isECG && !isEchoCG && !isDentalXRay;
+          // Неклассифицированные услуги (категория не распознана) остаются
+          // видимыми явно на «Прочем» — не исчезают.
+          return normalizedCategory === 'other' && !isConsultation;
         default:
           return true;
       }
