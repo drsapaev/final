@@ -1197,26 +1197,30 @@ def main(argv=None) -> int:
 
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
-        # codeql[py/clear-text-storage-sensitive-data] — inventory rows only
-        # (ids/tags/counts/display names); no credentials: the database URL
-        # is deliberately excluded (database_dialect only) and passwords are
-        # never read beyond the '!disabled:' prefix marker (boolean)
+        # inventory rows only (ids/tags/counts/display names); no
+        # credentials: the database URL is excluded (database_dialect
+        # only) and hashed passwords are never read beyond the
+        # '!disabled:' boolean prefix marker
         Path(args.json).write_text(
-            json.dumps(report, indent=2, default=str), encoding="utf-8"
+            # codeql[py/clear-text-storage-sensitive-data] — see note above
+            json.dumps(report, indent=2, default=str),
+            encoding="utf-8",
         )
         print(f"report written to {args.json}")
     if args.operator_map:
         Path(args.operator_map).parent.mkdir(parents=True, exist_ok=True)
-        # codeql[py/clear-text-storage-sensitive-data] — decision scaffold
-        # over the same non-secret inventory rows; decision fields are null
-        # until the operator fills them
+        # decision scaffold over the same non-secret inventory rows;
+        # decision fields are null until the operator fills them
         Path(args.operator_map).write_text(
-            json.dumps(operator_map, indent=2, default=str), encoding="utf-8"
+            # codeql[py/clear-text-storage-sensitive-data] — see note above
+            json.dumps(operator_map, indent=2, default=str),
+            encoding="utf-8",
         )
         print(f"operator map written to {args.operator_map}")
     if args.pretty:
-        # codeql[py/clear-text-logging-sensitive-data] — same non-secret
-        # inventory payload as the report file, explicit operator request
+        # same non-secret inventory payload as the report file, printed on
+        # an explicit operator request
+        # codeql[py/clear-text-logging-sensitive-data]
         print(json.dumps(report, indent=2, default=str))
 
     return exit_code
