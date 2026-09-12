@@ -882,12 +882,7 @@ const QueueJoin = () => {
               margin: '0 auto 20px'
             }} aria-hidden="true" />
           ) : (
-            <AlertCircle style={{
-              width: '64px',
-              height: '64px',
-              color: 'var(--mac-error)',
-              margin: '0 auto 20px'
-            }} aria-hidden="true" />
+            <AlertCircle className="qj-failed-icon" aria-hidden="true" />
           )}
           <h2 id="queue-join-success-title" className="qj-title-success">
             {successTitle}
@@ -998,12 +993,7 @@ const QueueJoin = () => {
           )}
 
           {successCount > 0 && (
-            <div style={{
-              fontSize: 'var(--mac-font-size-sm)',
-              color: 'var(--mac-text-tertiary)',
-              marginBottom: 'var(--mac-spacing-6)',
-              lineHeight: '1.5'
-            }}>
+            <div className="qj-success-footer">
               <p>{t('misc.qj_be_ready')}</p>
               <p>{t('misc.qj_we_will_notify')}</p>
               <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
@@ -1015,39 +1005,18 @@ const QueueJoin = () => {
           {failedEntries.length > 0 && (
             // RQ-10 (S-08): неудачные направления — отдельно, с причиной;
             // частичный результат не выглядит полным успехом.
-            <div className="qj-failed-box" style={{
-              width: '100%',
-              marginTop: successCount > 0 ? '0' : 'var(--mac-spacing-4)',
-              marginBottom: 'var(--mac-spacing-6)',
-              padding: 'var(--mac-spacing-4)',
-              background: 'color-mix(in srgb, var(--mac-warning), transparent 92%)',
-              border: '1px solid color-mix(in srgb, var(--mac-warning), transparent 60%)',
-              borderRadius: 'var(--mac-radius-lg)',
-              textAlign: 'left'
-            }}>
-              <p style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                marginBottom: 'var(--mac-spacing-2)'
-              }}>
+            <div className="qj-failed-box">
+              <p className="qj-failed-title">
                 {t('misc.qj_partial_failed_title')}
               </p>
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
+              <ul className="qj-failed-list">
                 {failedEntries.map((failedEntry, idx) => (
-                  <li
-                    key={idx}
-                    style={{
-                      background: 'color-mix(in srgb, var(--mac-warning), transparent 84%)',
-                      borderRadius: 'var(--mac-radius-md)',
-                      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)'
-                    }}
-                  >
-                    <div style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
+                  <li key={idx} className="qj-failed-item">
+                    <div className="qj-failed-direction">
                       {failedDirectionLabel(failedEntry.specialist_id)}
                     </div>
                     {failedEntry.error ? (
-                      <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', marginTop: 'var(--mac-spacing-1)' }}>
+                      <div className="qj-failed-reason">
                         {String(failedEntry.error)}
                       </div>
                     ) : null}
@@ -1606,14 +1575,14 @@ const QueueJoin = () => {
                   </div>
                   {submitResultUnknown && (
                     // RQ-10 (S-08): ответ потерян — честный статус повтора.
-                    <p style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)', marginTop: 'var(--mac-spacing-2)', textAlign: 'left' }}>
+                    <p className="qj-error-hint">
                       {t('misc.qj_result_unknown_hint')}
                     </p>
                   )}
                   {showSessionConsumedAdvisory && (
                     // RQ-10 (S-08): повтор отклонен после потери ответа —
                     // запись могла быть создана первой попыткой.
-                    <p style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)', marginTop: 'var(--mac-spacing-2)', textAlign: 'left' }}>
+                    <p className="qj-error-advisory">
                       {t('misc.qj_session_consumed_advisory')}
                     </p>
                   )}
