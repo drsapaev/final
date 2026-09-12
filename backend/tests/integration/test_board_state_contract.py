@@ -29,6 +29,11 @@ def test_board_state_is_stats_only_contract(client, db_session):
     payload = response.json()
     assert payload == {
         "department": department,
+        # RQ-24.a.1: contract gains one additive settings key — board
+        # privacy synced from DisplayBoard.main_board ('initials' fallback
+        # when the row is absent). Stats-only guarantee kept: the three
+        # "not in payload" asserts below stay unchanged.
+        "show_patient_names": "initials",
         "date_str": date_str,
         "is_open": True,
         "start_number": 1,

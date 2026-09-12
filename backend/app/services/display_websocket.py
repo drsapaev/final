@@ -38,6 +38,10 @@ class DisplayWebSocketManager:
         # без чтения конфига на каждое сообщение. Меняется только
         # после рестарта (документировано в PR).
         self._name_format_cache: dict[str, str] = {}
+        # Redis pubsub-обработчики по board_id (connect/disconnect):
+        # восстановлено — черновик PR #3214 заменил эту строку кэшем
+        # вместо добавления, что ломало connect() (CI RED HEAD).
+        self._redis_handlers: dict[str, Any] = {}
 
     async def connect(self, websocket: WebSocket, board_id: str, user=None) -> None:
         """Подключение нового WebSocket с опциональной аутентификацией"""
@@ -220,15 +224,15 @@ class DisplayWebSocketManager:
     ) -> None:
         """Трансляция вызова пациента на табло"""
         try:
-            # RQ-24.a.1: формат имён по настройке show_patient_names табло
+            # RQ-24.a.1: формат имён резолвится внутри
+            # build_patient_call_message по show_patient_names целевых
+            # табло (board_ids передается явно; kwarg name_format не
+            # существует в сигнатуре — CI RED HEAD был TypeError).
             if not board_ids:
                 board_ids = list(self.connections.keys())
-            name_format = self._resolve_name_format(board_ids)
             call_message = self.build_patient_call_message(
-                queue_entry, doctor_name, cabinet, name_format=name_format
+                queue_entry, doctor_name, cabinet, board_ids=board_ids
             )
-
-            # Если не указаны конкретные табло, отправляем на все активные
 
             # Отправляем на указанные табло
             for board_id in board_ids:
@@ -510,30 +514,41 @@ class DisplayWebSocketManager:
         Нет целевых табло / нет строки борда → 'initials' (прежнее
         поведение). Кэш на board_id; обновляется после рестарта.
         """
-        ids = board_ids if board_ids else list(self.connections.keys())
-        if not ids:
-            return "initials"
-        formats: list[str] = []
-        missing: list[str] = []
-        db = SessionLocal()
         try:
-            for b in ids:
-                cached = self._name_format_cache.get(b)
-                if cached is None:
-                    row = (
-                        db.query(DisplayBoard)
-                        .filter(DisplayBoard.name == b)
-                        .first()
-                    )
-                    cached = (
-                        row.show_patient_names
-                        if row and row.show_patient_names in ("full", "initials", "none")
-                        else "initials"
-                    )
-                    self._name_format_cache[b] = cached
-                formats.append(cached)
-        finally:
-            db.close()
+            ids = board_ids if board_ids else list(self.connections.keys())
+            if not ids:
+                return "initials"
+            cache = getattr(self, "_name_format_cache", None)
+            if cache is None:
+                # Минимальные инстансы (тесты строят менеджер через
+                # __new__ в обход __init__) — кэш инициализируется лениво.
+                cache = {}
+                self._name_format_cache = cache
+            formats: list[str] = []
+            db = SessionLocal()
+            try:
+                for b in ids:
+                    cached = cache.get(b)
+                    if cached is None:
+                        row = (
+                            db.query(DisplayBoard)
+                            .filter(DisplayBoard.name == b)
+                            .first()
+                        )
+                        cached = (
+                            row.show_patient_names
+                            if row and row.show_patient_names in ("full", "initials", "none")
+                            else "initials"
+                        )
+                        cache[b] = cached
+                    formats.append(cached)
+            finally:
+                db.close()
+        except Exception:
+            # PHI-осторожность: любой сбой резолва (БД недоступна,
+            # минимальный инстанс без соединений) деградирует к прежнему
+            # поведению — 'initials' — не роняя broadcast-путь.
+            return "initials"
         if any(f == "none" for f in formats):
             return "none"
         if any(f == "initials" for f in formats):

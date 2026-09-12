@@ -31,9 +31,10 @@ def board_state(
     s = load_stats(db, department=department, date_str=date)
     # RQ-24.a.1: sync the board privacy setting so the frontend can gate
     # patient names (rows + current call) exactly like the WS channel.
+    # DisplayBoard keyed by `name` (no board_id column — CI RED HEAD).
     board = (
         db.query(DisplayBoard)
-        .filter(DisplayBoard.board_id == "main_board")
+        .filter(DisplayBoard.name == "main_board")
         .first()
     )
     return {
