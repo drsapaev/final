@@ -67,7 +67,13 @@ def _make_probe_database() -> tuple[str, str]:
     with admin_engine.connect() as conn:
         conn.execute(text(f'CREATE DATABASE "{probe_name}"'))
     admin_engine.dispose()
-    return str(base_url.set(database=probe_name)), probe_name
+    # render_as_string(hide_password=False): str(URL) MASKS the password in
+    # SQLAlchemy 2.x — a masked URL would authenticate with an empty
+    # password and fail as "password authentication failed for user".
+    probe_url = base_url.set(database=probe_name).render_as_string(
+        hide_password=False
+    )
+    return probe_url, probe_name
 
 
 def _drop_probe_database(probe_name: str) -> None:
