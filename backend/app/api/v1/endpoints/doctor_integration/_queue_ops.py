@@ -102,15 +102,27 @@ def get_doctor_queue_today(
             )
         )
 
-        if allowed_queue_tags:
+        # RQ-08 (F-07): the base query is OWNERSHIP-scoped (specialist_id —
+        # the PR-26/D-5 contract «queue is owned by DOCTOR, not by
+        # queue_tag»), so the legacy queue_tag allow-list must not
+        # subtract the doctor's OWN queues: wizard/QR writers stamp the
+        # free-string Service.queue_tag (or profile tag, e.g.
+        # 'cardiology_diagnostics', 'cardio_echo', a brand-new specialty's
+        # tag) onto DailyQueue, while DOCTOR_QUEUE_ALLOWED_TAGS is a fixed
+        # vocabulary — the owner's panel answered queue_exists=false while
+        # patients waited in a queue only they could serve. New
+        # specialties and arbitrary valid profiles must not require
+        # another alias entry anywhere.
+        # The general sentinel path keeps its restricted contract
+        # (tag 'general' or NULL only).
+        if normalized_specialty == "general" and allowed_queue_tags:
             queue_tag_filters = [DailyQueue.queue_tag.in_(allowed_queue_tags)]
-            if normalized_specialty == "general":
-                queue_tag_filters.append(DailyQueue.queue_tag.is_(None))
+            queue_tag_filters.append(DailyQueue.queue_tag.is_(None))
             daily_queue_query = daily_queue_query.filter(or_(*queue_tag_filters))
 
         daily_queues = daily_queue_query.order_by(DailyQueue.id.asc()).all()
 
-        if not daily_queues:
+        if not daily_queues and normalized_specialty == "general":
             legacy_queue = (
                 db.query(DailyQueue)
                 .filter(
@@ -122,11 +134,7 @@ def get_doctor_queue_today(
                 .order_by(DailyQueue.id.asc())
                 .first()
             )
-            if legacy_queue and (
-                normalized_specialty == "general"
-                or legacy_queue.queue_tag in allowed_queue_tags
-                or legacy_queue.queue_tag is None
-            ):
+            if legacy_queue:
                 daily_queues = [legacy_queue]
 
         if not daily_queues:
