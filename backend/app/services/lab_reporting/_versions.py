@@ -76,6 +76,7 @@ class VersionsMixin(LabReportingServiceMixinBase):
         logger.info("[LAB] update_template_version version_id=%s", version_id)
         self.ensure_default_catalog()
         self._validate_catalog_links(payload.get("sections") or [])
+        self._validate_version_rules(payload.get("sections") or [])
         version = self.repository.get_template_version(version_id)
         if not version:
             raise LabReportingDomainError(404, "Template version not found")
@@ -119,5 +120,35 @@ class VersionsMixin(LabReportingServiceMixinBase):
         version.status = "ARCHIVED"
         self.repository.commit()
         return self.repository.get_template_version(version.id)
+
+    # PR4: структурная валидация правил. Rule engine читает
+    # rule.get("cases") на dict-шейпе ({cases: [...], default: {...}}) —
+    # строка/список вместо dict роняет рендер отчёта с AttributeError.
+    # Клиенту не доверяем: проверяем форму, не семантику.
+    _RULE_FIELD_KEYS = ("reference_rule", "visibility_rule", "highlight_rule")
+
+    def _validate_version_rules(self, sections: list[dict[str, Any]]) -> None:
+        for section_index, section in enumerate(sections or []):
+            for field in section.get("fields") or []:
+                field_title = field.get("label") or field.get("field_key") or f"#{section_index + 1}"
+                for rule_key in self._RULE_FIELD_KEYS:
+                    rule = field.get(rule_key)
+                    if rule is None:
+                        continue
+                    if not isinstance(rule, dict):
+                        raise LabReportingDomainError(
+                            400,
+                            f"Field '{field_title}': '{rule_key}' must be null or a JSON object",
+                        )
+                    cases = rule.get("cases")
+                    if cases is None:
+                        continue
+                    if not isinstance(cases, list) or any(
+                        not isinstance(case, dict) for case in cases
+                    ):
+                        raise LabReportingDomainError(
+                            400,
+                            f"Field '{field_title}': '{rule_key}.cases' must be a list of objects",
+                        )
 
 
