@@ -679,24 +679,17 @@ class BatchPatientService:
                 queue_tag=queue_tag,
             )
 
-        active_queues = (
-            self.db.query(DailyQueue)
-            .filter(
-                DailyQueue.day == target_date,
-                DailyQueue.queue_tag == queue_tag,
-                DailyQueue.active == True,
-            )
-            .order_by(DailyQueue.id.asc())
-            .all()
-        )
-        if len(active_queues) == 1:
-            return active_queues[0]
-        if len(active_queues) > 1:
-            raise ValueError(
-                "Неоднозначная очередь для create-action "
-                f"(queue_tag={queue_tag}, date={target_date})"
-            )
-
+        # QD-2E surface-reuse ruling (PR review thread 3995689410, P1 —
+        # the FINAL business decision): the owner of a NEW record is
+        # NEVER derived from the existence of queues with the same
+        # queue_tag/day. The former block returned the single existing
+        # (day, tag) queue as this patient's queue — adopting a foreign
+        # doctor's surface — and raised on multiple doctor queues of one
+        # tag (which is NOT an error per se: PR-26 keeps them separate).
+        # The owner comes from the action/service contract above or from
+        # the resolver's shared contracts (registry resource axis / the
+        # tag's single service doctor / the specialty fallback); anything
+        # else is the D-08 configuration error.
         resolved_specialist_id = self._resolve_create_action_specialist_id(
             action=action,
             queue_tag=queue_tag,

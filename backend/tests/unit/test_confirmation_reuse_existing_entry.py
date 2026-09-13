@@ -216,3 +216,42 @@ def test_assign_queue_numbers_on_confirmation_uses_domain_boundary_for_new_entry
         }
     ]
     assert print_tickets[0]["queue_number"] == 4
+
+
+@pytest.mark.unit
+@pytest.mark.queue
+@pytest.mark.confirmation
+def test_assign_queue_numbers_on_confirmation_unowned_visit_never_borrows_an_existing_queue(
+    db_session,
+    test_visit,
+    test_daily_queue,
+    test_service,
+    test_patient,
+):
+    """QD-2E surface-reuse ruling (PR review thread 3995689410, P1):
+    an unowned visit (no visit doctor, no service doctor) with an
+    already-opened queue for the same tag/day must NOT adopt that
+    queue's owner — the confirmation fails closed with the D-08 domain
+    error (422) and issues no number (cross-path consistency with the
+    morning ruling; the claim coordinator is untouched)."""
+    _attach_visit_service(db_session, test_visit, test_service)
+    # an unowned visit: no visit doctor and the service carries none
+    test_visit.doctor_id = None
+    db_session.commit()
+
+    service = VisitConfirmationService(db_session)
+    with pytest.raises(VisitConfirmationDomainError) as excinfo:
+        service.assign_queue_numbers_on_confirmation(
+            test_visit,
+            confirmation_telegram_id="123456789",
+        )
+
+    assert excinfo.value.status_code == 422
+    assert "Конфигурационная ошибка владельца очереди" in str(excinfo.value.detail)
+    # no number was issued for the patient
+    assert (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == test_patient.id)
+        .count()
+        == 0
+    )

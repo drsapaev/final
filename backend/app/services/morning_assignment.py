@@ -860,11 +860,27 @@ class MorningAssignmentService:
 
         surface_reuse = None
         if not doctor_id and not registry_tag:
-            # Surface reuse: already opened queue for this tag/day. Its
-            # owner was resolved explicitly when it was created (a real
-            # doctor, or the resource axis via a registry tag that has
-            # since been deactivated — tag_routes_to_resource in
-            # get_or_create_daily_queue returns that queue either way).
+            # QD-2E surface-reuse ruling (PR review thread 3995689410,
+            # P1 — the FINAL business decision): the doctor of a NEW
+            # record is NEVER derived from the existence of a queue with
+            # the same queue_tag/day. A doctor-owned queue opened for
+            # another flow/patient is shared ROUTING metadata, not an
+            # owner assignment for THIS unowned visit — borrowing its
+            # specialist silently sent the patient to an unrelated
+            # doctor (a dentist's queue does not own an unresolved S01
+            # visit). The owner comes from the visit/service contract
+            # above or from an explicitly configured QueueResource;
+            # anything else is the D-08 configuration error below.
+            # Multiple doctor queues of one tag are likewise NOT an
+            # error by themselves — the per-doctor queue contract (PR-26)
+            # keeps them separate and this resolution simply never
+            # consults them.
+            # The ONE sanctioned reuse of an existing (day, tag) surface
+            # is the RESOURCE axis — a queue created by an explicitly
+            # configured QueueResource stays the tag's surface even
+            # after the registry row is deactivated (the QD-2C
+            # deactivation-resilient surface; get_or_create returns it
+            # below untouched).
             existing_queue = (
                 existing_claim.daily_queue
                 if existing_claim is not None
@@ -878,18 +894,11 @@ class MorningAssignmentService:
                     .first()
                 )
             )
-            if existing_queue is not None:
-                if existing_queue.specialist_id is not None:
-                    doctor_id = existing_queue.specialist_id
-                    doctor = (
-                        self.db.query(Doctor)
-                        .filter(Doctor.id == doctor_id)
-                        .first()
-                    )
-                elif existing_queue.queue_resource_id is not None:
-                    # resource-owned surface of a deactivated registry
-                    # row — get_or_create returns it below untouched
-                    surface_reuse = existing_queue
+            if (
+                existing_queue is not None
+                and existing_queue.queue_resource_id is not None
+            ):
+                surface_reuse = existing_queue
 
         if not doctor_id and not registry_tag and surface_reuse is None:
             # QD-2E (RQ-15.b): fail-closed. Раньше здесь возвращался

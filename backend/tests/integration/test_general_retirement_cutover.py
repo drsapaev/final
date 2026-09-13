@@ -1266,10 +1266,15 @@ def test_morning_assign_resolves_visit_service_doctor(db_session: Session) -> No
     assert queue.queue_resource_id is None
 
 
-def test_morning_assign_reuses_existing_owner_surface(db_session: Session) -> None:
-    """An already-opened queue for the tag/day (created by the pre-create
-    or an earlier booking with an explicit owner) IS the surface —
-    surface reuse, not a general fallback."""
+def test_morning_assign_reuses_the_resolved_owners_existing_surface(
+    db_session: Session,
+) -> None:
+    """QD-2E surface-reuse ruling (PR review thread 3995689410 — the
+    FINAL decision supersedes the old borrowing): an already-opened
+    queue is the surface ONLY for its OWN owner. The visit resolves
+    dr_stom (the visit doctor) and the per-doctor get_or_create returns
+    that doctor's existing queue; an UNOWNED visit never adopts the
+    queue's specialist — it fails closed with the D-08 error instead."""
     from app.services.morning_assignment import MorningAssignmentService
 
     doc_user = _make_user(db_session, username="dr_stom", role="doctor")
@@ -1287,7 +1292,7 @@ def test_morning_assign_reuses_existing_owner_surface(db_session: Session) -> No
     db_session.add(existing)
     db_session.commit()
 
-    visit = _make_visit(db_session)
+    visit = _make_visit(db_session, doctor_id=doc.id)
     _link_visit_service(db_session, visit, service)
     prepared = MorningAssignmentService(db_session).prepare_wizard_queue_assignment(
         visit, "stomatology", _DAY
@@ -1296,6 +1301,15 @@ def test_morning_assign_reuses_existing_owner_surface(db_session: Session) -> No
     assert prepared.create_handoff is not None
     queue = prepared.create_handoff.create_entry_kwargs["daily_queue"]
     assert queue.id == existing.id
+
+    # the superseded borrowing: an unowned visit (no visit doctor, the
+    # service carries none) must NOT adopt the dentist's queue
+    unowned_visit = _make_visit(db_session)
+    _link_visit_service(db_session, unowned_visit, service)
+    with pytest.raises(QueueOwnerConfigurationError):
+        MorningAssignmentService(db_session).prepare_wizard_queue_assignment(
+            unowned_visit, "stomatology", _DAY
+        )
 
 
 def test_prepare_new_entry_goes_to_resolved_doctors_queue(
