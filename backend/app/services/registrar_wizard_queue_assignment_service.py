@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
+from app.crud.queue_resource_routing import lock_queue_tag_claim_scope
 from app.models.visit import Visit
 from app.services.morning_assignment import (
     MorningAssignmentCreateBranchHandoff,
@@ -76,6 +77,22 @@ class RegistrarWizardQueueAssignmentService:
         queue_numbers: dict[int, list[dict[str, Any]]] = {}
         assignment_service = self._assignment_service_factory(self.db)
 
+        # QD-2E P1 (wizard/cart atomicity): корзина живёт в ОДНОЙ внешней
+        # транзакции с ОДНИМ commit-ом владельца вызова (атомарный
+        # /registrar/cart) — коммитить её по одному визиту нельзя. Поэтому
+        # ДО первого prepare_wizard_queue_assignment (т.е. до любого
+        # routing/owner lookup/write) собираем ВСЕ (day, queue_tag) ключи
+        # корзины, сортируем точные ключи и берём lock_queue_tag_claim_scope
+        # ровно один раз на ключ. Повторное взятие того же transaction-scoped
+        # lock внутри claim-координатора idempotent, зато две конкурирующие
+        # корзины (или корзина и любой single-tag writer — QR/GraphQL/
+        # подтверждение) не могут держать пересекающиеся scope-ы во взаимно
+        # обратном порядке (deadlock) и не видят полуматериализованную
+        # корзину.
+        self._lock_cart_tag_claim_scopes(
+            assignment_service, visits, target_day
+        )
+
         for visit in visits:
             if visit.visit_date != target_day or visit.status != "confirmed":
                 continue
@@ -136,6 +153,29 @@ class RegistrarWizardQueueAssignmentService:
                 continue
 
         return queue_numbers
+
+    def _lock_cart_tag_claim_scopes(
+        self,
+        assignment_service: MorningAssignmentService,
+        visits: Sequence[Visit],
+        target_day: date,
+    ) -> None:
+        """Take the claim lock for EVERY (day, tag) scope of the whole cart.
+
+        QD-2E P1: scope mirrors the per-visit eligibility below (same-day
+        confirmed visits). The exact ``(day, queue_tag)`` keys are sorted,
+        and each scope is taken exactly ONCE before any visit is prepared —
+        the deterministic order is what keeps overlapping carts/writers
+        deadlock-free (see lock_queue_tag_claim_scope).
+        """
+        cart_scope: set[tuple[date, str]] = set()
+        for visit in visits:
+            if visit.visit_date != target_day or visit.status != "confirmed":
+                continue
+            for queue_tag in assignment_service._get_visit_queue_tags(visit):
+                cart_scope.add((target_day, queue_tag))
+        for day, queue_tag in sorted(cart_scope):
+            lock_queue_tag_claim_scope(self.db, queue_tag, day)
 
     def _assign_same_day_queues_for_visit(
         self,
@@ -204,7 +244,11 @@ class RegistrarWizardQueueAssignmentService:
         # (её строки даже не перечитываются), контракт P2-1c «после сбоя в БД
         # не остаётся ни одной записи очереди визита» выполняется, частичное
         # присвоение по-прежнему невозможно (queue_assignments.clear() + break).
-        for queue_tag in unique_queue_tags:
+        # QD-2E P1: перебор только sorted-порядком — cart-scope-ы уже
+        # взяты _lock_cart_tag_claim_scopes в начале корзины; здесь порядок
+        # детерминирован для воспроизводимости материала корзины.
+        ordered_queue_tags = sorted(unique_queue_tags)
+        for queue_tag in ordered_queue_tags:
             try:
                 prepared_assignment = assignment_service.prepare_wizard_queue_assignment(
                     visit,

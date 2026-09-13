@@ -238,3 +238,41 @@ def test_registry_creation_lock_delegates_to_neutral_claim_scope(
     )
 
     assert calls == [(db_session, "cardiology_common", target_day)]
+
+
+@pytest.mark.unit
+@pytest.mark.queue
+def test_no_internal_transaction_boundary_in_coordinator_cart_and_allocator() -> None:
+    """Source pin (QD-2E P1): the claim coordinator, the wizard cart
+    helpers and the allocator facade never own the transaction
+    boundary — no ``.commit()``/``.rollback()`` call may appear in their
+    code (comments/docstrings are fine; the AST scan ignores them).
+
+    The single commit of the cart belongs to the calling endpoint, and
+    the morning batch owns its per-visit commits; a commit inside any
+    of these helpers would release the (day, tag) advisory locks early
+    and let a competing claim creator interleave.
+    """
+    import ast
+    from pathlib import Path
+
+    backend_root = Path(__file__).resolve().parents[2]
+    targets = [
+        "app/services/queue_claim_service.py",
+        "app/services/registrar_wizard_queue_assignment_service.py",
+        "app/services/queue_domain_service.py",
+    ]
+    for relative in targets:
+        source = (backend_root / relative).read_text(encoding="utf-8")
+        offenders: list[str] = []
+        for node in ast.walk(ast.parse(source)):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr in {"commit", "rollback"}
+            ):
+                offenders.append(f"L{node.lineno}:{node.func.attr}")
+        assert offenders == [], (
+            f"{relative} must not own the transaction boundary — found "
+            f"{offenders}"
+        )

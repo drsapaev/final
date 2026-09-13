@@ -1153,9 +1153,17 @@ def test_visit_confirmation_registry_tag_keeps_working(db_session: Session) -> N
 
 def test_confirmation_reuses_resource_claim_when_visit_has_doctor(
     db_session: Session,
+    monkeypatch,
 ) -> None:
     """A visit doctor must not turn a registry tag into a doctor queue."""
+    from app.services import visit_confirmation_service as confirmation_module
     from app.services.visit_confirmation_service import VisitConfirmationService
+
+    # The service resolves the queue day internally (clinic_today); the
+    # file's fixed _DAY world must stay date-stable (the QD-2A timezone
+    # flake precedent — same monkeypatch pattern as
+    # test_queue_resource_runtime_switch.py).
+    monkeypatch.setattr(confirmation_module, "_clinic_today", lambda _db: _DAY)
 
     resource = QueueResource(code="lab", queue_tag="lab", display_name="Лаборатория")
     doctor_user = _make_user(
@@ -1209,9 +1217,13 @@ def test_confirmation_reuses_resource_claim_when_visit_has_doctor(
 
 def test_confirmation_reuses_resource_claim_after_registry_deactivation(
     db_session: Session,
+    monkeypatch,
 ) -> None:
     """A live resource queue remains the routing surface for its day."""
+    from app.services import visit_confirmation_service as confirmation_module
     from app.services.visit_confirmation_service import VisitConfirmationService
+
+    monkeypatch.setattr(confirmation_module, "_clinic_today", lambda _db: _DAY)
 
     resource = QueueResource(code="lab", queue_tag="lab", display_name="Лаборатория")
     db_session.add(resource)
@@ -1338,6 +1350,7 @@ def test_confirmation_new_entry_goes_to_resolved_doctors_queue(
 
 def test_confirmation_rejects_foreign_owner_claim_before_creating_queue(
     db_session: Session,
+    monkeypatch,
 ) -> None:
     """A same-patient claim is found across the tag before queue creation.
 
@@ -1345,10 +1358,13 @@ def test_confirmation_rejects_foreign_owner_claim_before_creating_queue(
     owner conflict instead of allocating a second active ticket or creating an
     otherwise unused queue for the newly resolved doctor.
     """
+    from app.services import visit_confirmation_service as confirmation_module
     from app.services.visit_confirmation_service import (
         VisitConfirmationDomainError,
         VisitConfirmationService,
     )
+
+    monkeypatch.setattr(confirmation_module, "_clinic_today", lambda _db: _DAY)
 
     owner_user = _make_user(db_session, username="dr_kardio_r5", role="doctor")
     resolved_owner = _make_doctor(
@@ -1425,12 +1441,16 @@ def test_confirmation_rejects_foreign_owner_claim_before_creating_queue(
 
 def test_confirmation_keeps_multi_tag_allocation_atomic_on_late_owner_error(
     db_session: Session,
+    monkeypatch,
 ) -> None:
     """A later tag failure must leave the first flushed ticket rollbackable."""
+    from app.services import visit_confirmation_service as confirmation_module
     from app.services.visit_confirmation_service import (
         VisitConfirmationDomainError,
         VisitConfirmationService,
     )
+
+    monkeypatch.setattr(confirmation_module, "_clinic_today", lambda _db: _DAY)
 
     owner_user = _make_user(db_session, username="dr_atomic_confirm", role="doctor")
     owner = _make_doctor(

@@ -20,6 +20,7 @@ from app.crud.queue_owner_policy import (
 )
 from app.crud.queue_resource_routing import (
     find_active_tag_queue,
+    lock_queue_tag_claim_scope,
     resolve_tag_resource,
 )
 from app.db.session import SessionLocal
@@ -90,13 +91,19 @@ class MorningAssignmentService:
 
         Returns: number of queues created/verified
         """
-        # Get all unique non-null queue_tags from active services
+        # Get all unique non-null queue_tags from active services.
+        # QD-2E P1: the DISTINCT result order is not defined (PostgreSQL
+        # returns an arbitrary order), and pre-create takes a (day, tag)
+        # advisory lock per created queue — the tags MUST be processed in
+        # sorted order so two concurrent pre-create phases can never take
+        # the scopes A→B and B→A (deadlock).
         unique_tags = (
             self.db.query(Service.queue_tag)
             .filter(Service.active == True, Service.queue_tag.isnot(None))
             .distinct()
             .all()
         )
+        ordered_tags = sorted(tag for (tag,) in unique_tags)
 
         created_count = 0
 
@@ -110,7 +117,7 @@ class MorningAssignmentService:
         # error log, and the booking surfaces raise the explicit
         # configuration error when a patient actually arrives.
 
-        for (queue_tag,) in unique_tags:
+        for queue_tag in ordered_tags:
             try:
                 # QD-2C runtime switch: тег со строкой в queue_resources
                 # (сиды 0059 — lab/ecg) пре-создается на РЕСУРСНОЙ оси:
@@ -200,9 +207,13 @@ class MorningAssignmentService:
                 logger.error(f"Error pre-creating queue for {queue_tag}: {e}")
 
         if created_count > 0:
+            # Keep the explicit flush: direct (non-run_morning_assignment)
+            # callers rely on the rows being visible in their session with
+            # autoflush off; run_morning_assignment commits right after
+            # this anyway (QD-2E P1 short pre-create transaction).
             self.db.flush()
             logger.info(
-                f"🏗️ Pre-created {created_count} DailyQueues for {len(unique_tags)} unique queue_tags"
+                f"🏗️ Pre-created {created_count} DailyQueues for {len(ordered_tags)} unique queue_tags"
             )
 
         return created_count
@@ -211,23 +222,57 @@ class MorningAssignmentService:
         """
         Основная функция утренней сборки
         Присваивает номера всем подтвержденным визитам на указанную дату
+
+        QD-2E P1 (транзакционная граница; заменяет прежний P2-1 контракт
+        «один commit на весь batch»):
+
+        1. Pre-create — отдельная КОРОТКАЯ транзакция: теги в sorted-порядке,
+           commit (или rollback) выполняется НЕМЕДЛЕННО после фазы, поэтому
+           (day, tag) advisory-lock-и pre-create не переживают фазу визитов
+           и не блокируют QR/GraphQL/подтверждение на всё время сборки.
+        2. Визиты — одна атомарная транзакция НА ВИЗИТ: визит перечитывается
+           под with_for_update, покрытие перепроверяется, все его (day, tag)
+           scope-ы берутся в sorted-порядке ДО routing/owner lookup/write,
+           успешный визит коммитится сразу, ошибка откатывает ТОЛЬКО его.
+           Счётчики результата описывают durable-состояние БД: визиты,
+           закоммиченные до сбоя, остаются закоммиченными и посчитанными.
         """
         if not target_date:
             target_date = _clinic_today(self.db)
 
         logger.info(f"🌅 Запуск утренней сборки для {target_date}")
 
+        processed_count = 0
+        assigned_queues_count = 0
+        errors: list[str] = []
+
         try:
-            # ⭐ PHASE 2: Pre-create DailyQueues for all Service.queue_tag values
-            # This prevents silent fallbacks during QR editing and manual registration
-            precreated_count = self.ensure_daily_queues_for_all_tags(target_date)
+            # ⭐ PHASE 2 + QD-2E P1: pre-create DailyQueues for all
+            # Service.queue_tag values in a SHORT dedicated transaction,
+            # committed (or rolled back) BEFORE any visit is processed.
+            # Pre-create takes (day, tag) advisory locks inside
+            # get_or_create_daily_queue; holding them until a single
+            # end-of-batch commit (the old P2-1 boundary) blocked every
+            # QR/GraphQL/confirmation writer on those tags for the whole
+            # batch. The unconditional commit also ends the phase
+            # deterministically even when nothing was created.
+            try:
+                precreated_count = self.ensure_daily_queues_for_all_tags(target_date)
+                self.db.commit()
+            except Exception:
+                self.db.rollback()
+                raise
             if precreated_count > 0:
                 logger.info(f"🏗️ Pre-created {precreated_count} missing DailyQueues")
 
-            # Получаем все подтвержденные визиты на сегодня без номеров в очередях
-            confirmed_visits = self._get_confirmed_visits_without_queues(target_date)
+            # QD-2E P1: read-only ID worklist — NO with_for_update here.
+            # Every visit is re-locked and re-checked inside its own
+            # transaction by _process_visit_in_own_transaction.
+            candidate_visit_ids = self._get_confirmed_visit_ids_without_queues(
+                target_date
+            )
 
-            if not confirmed_visits:
+            if not candidate_visit_ids:
                 logger.info(
                     f"✅ Нет подтвержденных визитов без номеров на {target_date}"
                 )
@@ -243,76 +288,74 @@ class MorningAssignmentService:
                 }
 
             logger.info(
-                f"📋 Найдено {len(confirmed_visits)} подтвержденных визитов для обработки"
+                f"📋 Найдено {len(candidate_visit_ids)} подтвержденных визитов для обработки"
             )
 
-            processed_count = 0
-            assigned_queues_count = 0
-            errors = []
+            config_error_message: str | None = None
 
-            for visit in confirmed_visits:
+            for visit_id in candidate_visit_ids:
                 try:
-                    queue_assignments = self._assign_queues_for_visit(
-                        visit, target_date
+                    queue_assignments = self._process_visit_in_own_transaction(
+                        visit_id, target_date
                     )
                     if queue_assignments:
                         processed_count += 1
                         assigned_queues_count += len(queue_assignments)
 
-                        # Issue #06 Phase 3: delegate to VisitLifecycleService.
-                        # activate_confirmed_visit() does confirmed → open.
-                        # This is a system-initiated transition (batch job),
-                        # so current_user is None.
-                        #
-                        # P2-1 (post-merge stabilization): commit=False is
-                        # MANDATORY here. The default commit=True fires
-                        # db.commit() per-visit inside this batch loop,
-                        # breaking the commit=False composition contract
-                        # established by Issue #06. With commit=True the
-                        # top-level rollback at L253 cannot undo visits
-                        # processed before a mid-batch failure, leaving
-                        # partial state (some visits 'open' with queue
-                        # entries, others 'confirmed' without).
-                        # See tests/regression/test_p2_1_morning_assignment_txn.py.
-                        from app.services.visit_lifecycle_service import (
-                            VisitLifecycleService,
-                        )
-
-                        VisitLifecycleService(self.db).activate_confirmed_visit(
-                            visit_id=visit.id,
-                            commit=False,
-                        )
-
                         logger.info(
-                            f"✅ Визит {visit.id}: присвоено {len(queue_assignments)} номеров"
+                            f"✅ Визит {visit_id}: присвоено {len(queue_assignments)} номеров"
                         )
                     else:
                         logger.warning(
-                            f"⚠️ Визит {visit.id}: не удалось присвоить номера"
+                            f"⚠️ Визит {visit_id}: не удалось присвоить номера"
                         )
 
                 except QueueOwnerConfigurationError as config_error:
-                    # QD-2E (Codex round-1 P2): конфиг-ошибка владельца —
-                    # НЕ «внутренняя ошибка»: собиравшаяся тишина (errors +=
+                    # QD-2E (RQ-15.b + P1): конфиг-ошибка владельца — НЕ
+                    # «внутренняя ошибка»: собиравшаяся тишина (errors +=
                     # generic + success: True) вернула бы баг-класс QD-0
-                    # пакетно. Джоба падает громко: внешний except делает
-                    # rollback и возвращает success=False с причиной —
-                    # оператор чинит конфигурацию и перезапускает сборку.
+                    # пакетно. Откатывается ТОЛЬКО транзакция текущего
+                    # визита; визиты, закоммиченные до него, остаются
+                    # durable — счётчики ниже честные. Сборка падает
+                    # громко: оператор чинит конфигурацию (assign_doctor /
+                    # retag_resource / disable_service) и перезапускает.
+                    self.db.rollback()
                     logger.error(
                         "QD-2E fail-closed: queue owner configuration error "
                         "for visit %s: %s — aborting the morning assignment",
-                        visit.id,
+                        visit_id,
                         config_error,
                     )
-                    raise
+                    config_error_message = str(config_error)
+                    break
 
                 except Exception:
+                    # QD-2E P1: generic failure rolls back ONLY the current
+                    # visit's transaction and records a sanitized error
+                    # (no patient identifiers); the batch continues.
+                    self.db.rollback()
                     error_msg = "Внутренняя ошибка"
                     logger.error(error_msg)
                     errors.append(error_msg)
 
-            # Сохраняем изменения
-            self.db.commit()
+            if config_error_message is not None:
+                # Честный fail-closed отчёт: success=False с причиной, но
+                # счётчики описывают durable DB state (что реально
+                # закоммичено до сбоя), а не нули.
+                return {
+                    "success": False,
+                    "message": (
+                        "QD-2E fail-closed: queue owner configuration error "
+                        f"— {config_error_message} (почините владельца и "
+                        "перезапустите сборку)"
+                    ),
+                    "processed_visits": processed_count,
+                    "assigned_visits": processed_count,
+                    "assigned_queues": assigned_queues_count,
+                    "total_queue_entries": assigned_queues_count,
+                    "errors": [config_error_message],
+                    "date": target_date.isoformat(),
+                }
 
             result = {
                 "success": True,
@@ -331,17 +374,22 @@ class MorningAssignmentService:
             return result
 
         except Exception as e:
+            # Катастрофический сбой вне per-visit цикла (commit pre-create,
+            # worklist-снапшот, ...). QD-2E P1: счётчики описывают durable
+            # DB state — визиты, закоммиченные до сбоя, остаются
+            # закоммиченными и посчитанными.
             self.db.rollback()
             error_msg = f"Критическая ошибка утренней сборки: {str(e)}"
             logger.error(error_msg)
+            errors.append(error_msg)
             return {
                 "success": False,
                 "message": error_msg,
-                "processed_visits": 0,
-                "assigned_visits": 0,
-                "assigned_queues": 0,
-                "total_queue_entries": 0,
-                "errors": [error_msg],
+                "processed_visits": processed_count,
+                "assigned_visits": processed_count,
+                "assigned_queues": assigned_queues_count,
+                "total_queue_entries": assigned_queues_count,
+                "errors": errors,
                 "date": target_date.isoformat(),
             }
 
@@ -354,61 +402,161 @@ class MorningAssignmentService:
         result.setdefault("total_queue_entries", result.get("assigned_queues", 0))
         return result
 
-    def _get_confirmed_visits_without_queues(self, target_date: date) -> list[Visit]:
-        """Получает подтвержденные визиты на указанную дату без номеров в очередях"""
+    def _get_confirmed_visit_ids_without_queues(self, target_date: date) -> list[int]:
+        """Read-only worklist of confirmed visit IDs missing queue coverage.
 
-        # Находим визиты со статусом "confirmed" на указанную дату
-        # REG-AUDIT-28 P0-1: with_for_update() — защита от race condition.
-        # Раньше два Registrar'а могли одновременно запустить morning assignment
-        # и создать дубликаты OnlineQueueEntry для одних и тех же визитов.
-        confirmed_visits = (
+        QD-2E P1: the morning batch no longer opens ONE transaction with
+        with_for_update() over every confirmed visit (those row locks
+        lived until the final batch commit and blocked concurrent
+        operators for the whole run). This snapshot takes NO locks;
+        each visit is re-locked and re-checked inside its own
+        transaction by ``_process_visit_in_own_transaction``.
+        """
+        visits = self._get_confirmed_visits_without_queues(
+            target_date, for_update=False
+        )
+        return [visit.id for visit in visits]
+
+    def _process_visit_in_own_transaction(
+        self,
+        visit_id: int,
+        target_date: date,
+        *,
+        source: str = "morning_assignment",
+    ) -> list[dict[str, any]]:
+        """One atomic transaction for exactly one morning-batch visit.
+
+        QD-2E P1 contract (see run_morning_assignment):
+
+        - the visit row is re-read with FOR UPDATE inside THIS
+          transaction (the concurrent-run protection REG-AUDIT-28 P0-1
+          moved from the old whole-batch lock);
+        - the coverage condition is re-checked under that row lock;
+        - a visit that yields no assignments is rolled back and never
+          activated;
+        - a successful visit (queue entries + activate_confirmed_visit)
+          is committed immediately — one commit per visit;
+        - any error propagates: the caller rolls back only this visit's
+          transaction and keeps the already-committed visits durable.
+        """
+        visit = (
             self.db.query(Visit)
             .filter(
-                and_(
-                    Visit.visit_date == target_date,
-                    Visit.status == "confirmed",
-                    Visit.confirmed_at.isnot(None),
-                )
+                Visit.id == visit_id,
+                Visit.visit_date == target_date,
+                Visit.status == "confirmed",
+                Visit.confirmed_at.isnot(None),
             )
             .with_for_update()
+            .first()
+        )
+        if visit is None:
+            # Обработан конкурирующим запуском или состояние изменилось
+            # после снятия worklist-снапшота — тихий пропуск.
+            self.db.rollback()
+            logger.info(
+                "Визит %s больше не подтвержден на %s — пропуск",
+                visit_id,
+                target_date,
+            )
+            return []
+        if not self._visit_needs_queue_coverage(visit, target_date):
+            # Полное покрытие уже создано конкурирующим писателем.
+            self.db.rollback()
+            return []
+
+        queue_assignments = self._assign_queues_for_visit(
+            visit, target_date, source=source
+        )
+        if not queue_assignments:
+            # Ничего не создано (внутренний per-tag catch уже откатил
+            # транзакцию визита) — завершаем её без записи.
+            self.db.rollback()
+            return []
+
+        # Issue #06 Phase 3: delegate to VisitLifecycleService.
+        # activate_confirmed_visit() does confirmed → open.
+        # This is a system-initiated transition (batch job),
+        # so current_user is None.
+        #
+        # P2-1: commit=False is MANDATORY — the QD-2E P1 per-visit commit
+        # below persists entries + activation atomically; a commit inside
+        # the lifecycle service would break the composition contract.
+        from app.services.visit_lifecycle_service import (
+            VisitLifecycleService,
+        )
+
+        VisitLifecycleService(self.db).activate_confirmed_visit(
+            visit_id=visit.id,
+            commit=False,
+        )
+
+        # QD-2E P1: один commit на успешный визит — записи очереди и
+        # активация становятся durable вместе или никак.
+        self.db.commit()
+        return queue_assignments
+
+    def _visit_needs_queue_coverage(self, visit: Visit, target_date: date) -> bool:
+        """Проверяет, что у визита ещё нет записей в очередях на дату.
+
+        Тот же предикат, что использовал batch-фильтр: записей нет вовсе
+        или существующие записи не покрывают все queue_tag визита.
+        """
+        existing_queue_entries = (
+            self.db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.patient_id == visit.patient_id)
+            .join(DailyQueue)
+            .filter(DailyQueue.day == target_date)
             .all()
         )
 
+        if not existing_queue_entries:
+            return True
+
+        visit_queue_tags = self._get_visit_queue_tags(visit)
+        existing_queue_tags = set()
+
+        for entry in existing_queue_entries:
+            queue = (
+                self.db.query(DailyQueue)
+                .filter(DailyQueue.id == entry.queue_id)
+                .first()
+            )
+            if queue and queue.queue_tag:
+                existing_queue_tags.add(queue.queue_tag)
+
+        return not visit_queue_tags.issubset(existing_queue_tags)
+
+    def _get_confirmed_visits_without_queues(
+        self, target_date: date, *, for_update: bool = True
+    ) -> list[Visit]:
+        """Получает подтвержденные визиты на указанную дату без номеров в очередях
+
+        REG-AUDIT-28 P0-1: ``with_for_update()`` (default) protects the
+        read-modify-write callers (the manual API listing) from duplicate
+        entries when two operators run the assignment concurrently.
+        QD-2E P1: the morning batch itself passes ``for_update=False`` —
+        it only builds the ID worklist and re-locks each visit inside
+        its own per-visit transaction.
+        """
+
+        # Находим визиты со статусом "confirmed" на указанную дату
+        query = self.db.query(Visit).filter(
+            and_(
+                Visit.visit_date == target_date,
+                Visit.status == "confirmed",
+                Visit.confirmed_at.isnot(None),
+            )
+        )
+        if for_update:
+            query = query.with_for_update()
+        confirmed_visits = query.all()
+
         # Фильтруем визиты, у которых еще нет записей в очередях
         visits_without_queues = []
-
         for visit in confirmed_visits:
-            # Проверяем есть ли уже записи в очередях для этого визита
-            existing_queue_entries = (
-                self.db.query(OnlineQueueEntry)
-                .filter(OnlineQueueEntry.patient_id == visit.patient_id)
-                .join(DailyQueue)
-                .filter(DailyQueue.day == target_date)
-                .all()
-            )
-
-            # Если нет записей в очередях или они не покрывают все услуги визита
-            if not existing_queue_entries:
+            if self._visit_needs_queue_coverage(visit, target_date):
                 visits_without_queues.append(visit)
-                continue
-
-            # Проверяем покрывают ли существующие записи все queue_tag визита
-            visit_queue_tags = self._get_visit_queue_tags(visit)
-            existing_queue_tags = set()
-
-            for entry in existing_queue_entries:
-                queue = (
-                    self.db.query(DailyQueue)
-                    .filter(DailyQueue.id == entry.queue_id)
-                    .first()
-                )
-                if queue and queue.queue_tag:
-                    existing_queue_tags.add(queue.queue_tag)
-
-            # Если не все queue_tag покрыты, добавляем визит для обработки
-            if not visit_queue_tags.issubset(existing_queue_tags):
-                visits_without_queues.append(visit)
-
         return visits_without_queues
 
     def _get_visit_queue_tags(self, visit: Visit) -> set:
@@ -453,6 +601,14 @@ class MorningAssignmentService:
         with test infrastructure that uses begin_nested() for test
         isolation. Partial assignment support can be added later with
         proper savepoint-aware test infrastructure.
+
+        QD-2E P1: все (day, queue_tag) scope-ы визита берутся В SORTED
+        порядке ДО первого routing/owner lookup/write — место, где раньше
+        начинался перебор неупорядоченного set. Claim-координатор внутри
+        prepare берёт тот же transaction-scoped lock повторно (idempotent
+        пока держится), поэтому обработка тегов визита ниже не может
+        взять два scope-а в порядке, который конкурирующий single-tag
+        writer (QR/GraphQL/подтверждение) инвертирует в deadlock.
         """
 
         # Получаем уникальные queue_tag из услуг визита
@@ -462,9 +618,13 @@ class MorningAssignmentService:
             logger.warning(f"Визит {visit.id}: нет queue_tag в услугах")
             return []
 
+        ordered_queue_tags = sorted(unique_queue_tags)
+        for queue_tag in ordered_queue_tags:
+            lock_queue_tag_claim_scope(self.db, queue_tag, target_date)
+
         queue_assignments = []
 
-        for queue_tag in unique_queue_tags:
+        for queue_tag in ordered_queue_tags:
             try:
                 assignment = self._assign_single_queue(
                     visit,
