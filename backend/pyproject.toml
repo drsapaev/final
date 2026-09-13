@@ -283,6 +283,9 @@ pytest_add_cli_args_test_selection = [
     # reads repo frontend/src/types/roles.ts - a repo artifact outside the
     # mutmut sandbox (zero mutation value: mutmut mutates app/ only)
     "--deselect", "tests/integration/test_nurse_retirement.py::test_frontend_roles_mirror_dropped_nurse",
+    # test_queue_resource_contract audits repo artifacts (docs/adr/ADR-001,
+    # alembic versions) — zero mutation value under the sandbox.
+    "--deselect", "tests/integration/test_queue_resource_contract.py",
     # tests/unit/test_idempotency_distributed_claim.py — whole-file deselect:
     # the fixture patches MODULE GLOBALS of app.middleware.idempotency_middleware,
     # which is structurally incompatible with the mutmut sandbox (module-identity

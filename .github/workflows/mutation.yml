@@ -90,8 +90,17 @@ jobs:
           mkdir -p mutants
           cp -r alembic mutants/alembic
           cp openapi.json mutants/openapi.json
+          # the atomicity-test fixture (pg_engine) shells out to
+          # python -m alembic -c alembic.ini upgrade head with cwd = sandbox
+          cp alembic.ini mutants/alembic.ini
           cp -r scripts mutants/scripts
           cp -r ../ops ops
+          # REPO_ROOT/BACKEND_ROOT-style readers (test_queue_resource_contract,
+          # test_lab_resource_internal_role, ...) resolve parents[3] from the
+          # sandbox to backend/ and then read <REPO_ROOT>/backend/alembic —
+          # i.e. backend/backend/alembic. Provide that depth too.
+          mkdir -p backend
+          cp -r alembic backend/alembic
           # nurse-retirement mirror tests read frontend/src/{types,routing}
           #/*.ts via parents-traversal resolving to backend/frontend/src.
           mkdir -p frontend/src
