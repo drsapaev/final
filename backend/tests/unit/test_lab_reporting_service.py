@@ -1219,3 +1219,105 @@ class TestLabReportingService:
         assert send_mock.await_args.kwargs["recipient"].id == lab_user.id
         assert send_mock.await_args.kwargs["metadata"]["patient_id"] == test_patient.id
         assert send_mock.await_args.kwargs["metadata"]["visit_id"] == test_visit.id
+
+    def test_update_template_version_rejects_structurally_invalid_rules(
+        self, db_session
+    ):
+        """PR4: backend не доверяет клиенту в структуре правил —
+        reference/visibility/highlight rule обязаны быть null или dict
+        (rule engine читает rule.get("cases") и падает AttributeError
+        на строке/списке при рендере отчёта)."""
+        service = LabReportingService(db_session)
+        template = service.create_template(
+            {
+                "code": "rule_validation_demo",
+                "name": "Rule Validation Demo",
+                "family": "chemistry",
+                "description": "PR4 structural rule validation",
+                "initial_version": {
+                    "layout_preset": "lab_table_classic_v1",
+                    "page_settings": {"paper_size": "A4", "orientation": "portrait"},
+                    "branding_overrides": {},
+                    "signer_defaults": {},
+                    "footer_notes": "",
+                    "sections": [
+                        {
+                            "key": "demo",
+                            "title": "Demo",
+                            "sort_order": 10,
+                            "fields": [
+                                {
+                                    "field_key": "glucose",
+                                    "label": "Glucose",
+                                    "value_type": "numeric",
+                                    "unit": "mmol/L",
+                                    "reference_mode": "static_text",
+                                    "reference_text": "3.3-5.5",
+                                    "reference_rule": None,
+                                    "visibility_rule": None,
+                                    "highlight_rule": None,
+                                }
+                            ],
+                        }
+                    ],
+                },
+            }
+        )
+        # create_template создаёт initial_version в статусе DRAFT — правим его.
+        draft = next(version for version in template.versions if version.status == "DRAFT")
+
+        def _payload(rule_value):
+            return {
+                "layout_preset": "lab_table_classic_v1",
+                "page_settings": {"paper_size": "A4", "orientation": "portrait"},
+                "branding_overrides": {},
+                "signer_defaults": {},
+                "footer_notes": "",
+                "sections": [
+                    {
+                        "key": "demo",
+                        "title": "Demo",
+                        "sort_order": 10,
+                        "fields": [
+                            {
+                                "field_key": "glucose",
+                                "label": "Glucose",
+                                "value_type": "numeric",
+                                "unit": "mmol/L",
+                                "reference_mode": "static_text",
+                                "reference_text": "3.3-5.5",
+                                "reference_rule": rule_value,
+                                "visibility_rule": None,
+                                "highlight_rule": None,
+                            }
+                        ],
+                    }
+                ],
+            }
+
+        with pytest.raises(LabReportingDomainError) as string_exc:
+            service.update_template_version(draft.id, _payload("{oops"))
+        assert string_exc.value.status_code == 400
+
+        with pytest.raises(LabReportingDomainError) as cases_exc:
+            service.update_template_version(draft.id, _payload({"cases": "not-a-list"}))
+        assert cases_exc.value.status_code == 400
+
+        # Корректные формы проходят: dict с cases-списком и null.
+        service.update_template_version(
+            draft.id,
+            _payload(
+                {
+                    "cases": [
+                        {
+                            "when": {"source": "patient.sex", "op": "eq", "value": "M"},
+                            "text": "4-6",
+                            "low": 4,
+                            "high": 6,
+                        }
+                    ],
+                    "default": {"text": "4-6", "low": 4, "high": 6},
+                }
+            ),
+        )
+        service.update_template_version(draft.id, _payload(None))
