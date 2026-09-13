@@ -22,6 +22,12 @@ _TEMP_ALLOWED_CROSS_CONTEXT_IMPORTS: set[tuple[str, str]] = {
     ("app.services.billing_service_pkg._base", "app.services.queue_service"),
     ("app.services.billing_service_pkg._core", "app.services.queue_service"),
     ("app.services.morning_assignment", "app.services.queue_service"),
+    # QD-2E: the shared queue-claim coordinator (transaction-scoped
+    # identity claims across queues sharing a routing tag) is consumed
+    # directly by the scheduling and EMR flows — same rationale as the
+    # queue_service entries above; pending context-facade extraction.
+    ("app.services.morning_assignment", "app.services.queue_claim_service"),
+    ("app.services.visit_confirmation_service", "app.services.queue_claim_service"),
     ("app.services.payment_init_service", "app.services.queue_service"),
     ("app.services.payment_webhook", "app.services.visit_payment_integration"),
     ("app.services.visit_confirmation_service", "app.services.queue_service"),
