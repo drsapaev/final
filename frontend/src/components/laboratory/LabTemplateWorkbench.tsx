@@ -662,12 +662,12 @@ export default function LabTemplateWorkbench({
               {/* PR4: inline-ошибки валидации текущего draft — видны до
                   нажатия Save/Publish, без ожидания toast-уведомления. */}
               {draftValidationErrors.length > 0 && (
-                <div role="alert" className="ltw-text-13" style={{ color: 'var(--mac-text-critical, #c0392b)' }}>
+                <Alert severity="error" role="alert">
                   {draftValidationErrors.slice(0, 5).map((errorText: string) => (
                     <div key={errorText}>{errorText}</div>
                   ))}
                   {draftValidationErrors.length > 5 && <div>… +{draftValidationErrors.length - 5}</div>}
-                </div>
+                </Alert>
               )}
               <div className="ltw-badges-row">
                 <Badge variant="info">{String(selectedTemplate.code ?? "")}</Badge>
