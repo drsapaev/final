@@ -495,21 +495,28 @@ def test_desk_then_qr_aligned_tags_share_queue_row(pg_engine, pg_session):
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_concurrent_desk_and_qr_numbering_can_duplicate_within_one_queue(
+def test_concurrent_desk_and_qr_numbering_is_serialized_by_the_claim_coordinator(
     pg_engine, pg_session
 ):
-    """Pins RQ-14.a (numbering race): same queue row, two writers, one number.
+    """QD-2E reconciliation of the RQ-14.a numbering-race characterization.
 
-    Deterministic interleaving: both writers compute the next number via
-    ``calculate_next_number`` (plain SELECT MAX — no row lock on the
-    already-loaded queue, no unique constraint on (queue_id, number));
-    a barrier AFTER the read releases both inserts simultaneously.
+    The original pin (main #3243) aligned two writers with a barrier
+    AFTER ``calculate_next_number`` and proved both committed the SAME
+    number (the numbering gap). On this branch that gap is CLOSED
+    architecturally: the tag-wide claim coordinator serializes every
+    claim-taking writer on (day, tag) with a transaction-scoped advisory
+    lock, so the second writer only computes its number after the first
+    commits — distinct numbers, no duplicate. The barrier-based race is
+    also a self-deadlock now (a writer waiting inside the barrier holds
+    the (day, tag) advisory lock while the other blocks on it), so the
+    concurrent pin runs without a barrier and asserts the serialized
+    outcome: both writers land on the shared queue row with DIFFERENT
+    numbers.
     """
     _patch_online_window()
     world = _seed_join_world(pg_session, suffix="race", service_tag="cardiology_race")
 
     from app.models.online_queue import DailyQueue
-    from app.services.queue_service import QueueBusinessService
 
     # Pre-create the shared queue row so both writers RESOLVE it instead of
     # racing in get_or_create (that separate race is out of this slice's scope).
@@ -526,15 +533,6 @@ def test_concurrent_desk_and_qr_numbering_can_duplicate_within_one_queue(
     queue_id = queue_row.id
     seed_session.close()
 
-    orig_calc = QueueBusinessService.calculate_next_number.__func__
-    barrier = threading.Barrier(2, timeout=20)
-
-    def _raced_calc(cls, db, daily_queue):
-        number = orig_calc(cls, db, daily_queue)
-        barrier.wait()
-        return number
-
-    QueueBusinessService.calculate_next_number = classmethod(_raced_calc)
     results: dict[str, dict] = {}
 
     def desk_worker():
@@ -549,17 +547,14 @@ def test_concurrent_desk_and_qr_numbering_can_duplicate_within_one_queue(
             "+998901000002",
         )
 
-    try:
-        threads = [
-            threading.Thread(target=desk_worker),
-            threading.Thread(target=qr_worker),
-        ]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join(timeout=60)
-    finally:
-        QueueBusinessService.calculate_next_number = classmethod(orig_calc)
+    threads = [
+        threading.Thread(target=desk_worker),
+        threading.Thread(target=qr_worker),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=60)
 
     assert "desk" in results and "qr" in results
     assert results["desk"]["error"] is None, results["desk"]
@@ -568,9 +563,11 @@ def test_concurrent_desk_and_qr_numbering_can_duplicate_within_one_queue(
     entries = _entries(pg_engine, queue_id)
     assert len(entries) == 2, f"both writers must land on the shared row: {entries}"
     numbers = sorted(e["number"] for e in entries)
-    # THE GAP: two concurrent writers committed the SAME number in ONE queue.
-    assert len(set(numbers)) == 1, (
-        f"expected duplicate number (current behavior, RQ-14.a), got {numbers}"
+    # SERIALIZED: the claim coordinator orders the two writers on (day,
+    # tag); the second number is computed after the first commit — the
+    # RQ-14.a duplicate-number gap is closed on this branch.
+    assert numbers == [1, 2], (
+        f"expected the serialized distinct numbers 1 and 2, got {numbers}"
     )
 
 

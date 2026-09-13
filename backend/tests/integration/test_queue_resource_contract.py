@@ -767,9 +767,15 @@ def test_alembic_chain_single_head_0063() -> None:
         graph[revision_match.group(1)] = parents
 
     assert graph["0063_queue_resource_contract"] == ("0062_telegram_webhook_dedup",)
+    # QD-2E (RQ-15.b): the chain head moved to 0064 — the `general`
+    # retirement catalog cutover (operator-map application, data-only).
+    assert graph["0064_general_retirement_cutover"] == (
+        "0063_queue_resource_contract",
+    )
+    assert len("0064_general_retirement_cutover") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    assert heads == ["0063_queue_resource_contract"]
+    assert heads == ["0064_general_retirement_cutover"]
 
 
 # ===================== D. parity + ADR =====================

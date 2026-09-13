@@ -137,8 +137,21 @@ def resource_queue_defaults(resource: QueueResource) -> dict:
     }
 
 
-def lock_registry_tag_creation(db: Session, queue_tag: str, day: date) -> None:
-    """Serialize the first creation of a registry-tag queue (QD-2C).
+def _bound_dialect_name(db: Session) -> str | None:
+    """Dialect name of the session bind, robust to test doubles.
+
+    Real sessions expose ``bind`` (an Engine) with a ``dialect``; unit
+    fakes may be bare objects or Mocks without a bind. Those are never
+    PostgreSQL, so they resolve to ``None`` and the advisory lock below
+    stays a no-op — the same parity the helper gives SQLite sessions.
+    """
+    bind = getattr(db, "bind", None)
+    dialect = getattr(bind, "dialect", None)
+    return getattr(dialect, "name", None)
+
+
+def lock_queue_tag_claim_scope(db: Session, queue_tag: str, day: date) -> None:
+    """Serialize claim resolution and creation for one queue tag and day.
 
     query-then-insert with no unique constraint until QD-2D: two
     concurrent first-arrival writers (batch create, visit
@@ -149,12 +162,28 @@ def lock_registry_tag_creation(db: Session, queue_tag: str, day: date) -> None:
     takes: ``daily_queue:tag:{tag}:{day}``) serializes the
     check-then-insert window; SQLite (tests) has no advisory locks
     and skips — the sequential no-duplicate pins cover that path.
+
+    QD-2E P1: multi-tag callers MUST acquire their scopes through this
+    helper in sorted ``(day, queue_tag)`` order — the lock is
+    transaction-scoped and idempotent while held, so pre-acquiring a
+    scope and re-taking it through the claim coordinator inside the
+    same transaction is free, while inverting the order of two scopes
+    across concurrent transactions can deadlock PostgreSQL.
     """
-    if db.bind is not None and db.bind.dialect.name == "postgresql":
+    if _bound_dialect_name(db) == "postgresql":
         db.execute(
             sa.text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
             {"k": f"daily_queue:tag:{queue_tag}:{day.isoformat()}"},
         )
+
+
+def lock_registry_tag_creation(db: Session, queue_tag: str, day: date) -> None:
+    """Compatibility wrapper for the original registry creation lock name.
+
+    The neutral helper keeps the PostgreSQL ``pg_advisory_xact_lock`` key
+    ``daily_queue:tag:{queue_tag}:{day.isoformat()}`` used by existing callers.
+    """
+    lock_queue_tag_claim_scope(db, queue_tag, day)
 
 
 def resource_start_number(db: Session, daily_queue: DailyQueue) -> int | None:
