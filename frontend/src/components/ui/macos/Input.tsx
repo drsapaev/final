@@ -187,8 +187,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
       {showClearButton && (
         <button
           type="button"
-          aria-label={t('common.clear', 'Clear input')}
-          title={t('common.clear', 'Clear input')}
+          aria-label={t('common.clear', { defaultValue: 'Clear input' })}
+          title={t('common.clear', { defaultValue: 'Clear input' })}
           style={clearButtonStyle}
           onClick={(e: MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
