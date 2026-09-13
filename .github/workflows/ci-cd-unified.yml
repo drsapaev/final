@@ -1054,6 +1054,11 @@ jobs:
         cd backend
         pytest tests/integration/test_reminder_pipeline_pg.py -m gate_d --noconftest
 
+    - name: 🧪 Push device registry RLS probe (gate_d)
+      run: |
+        cd backend
+        pytest tests/integration/test_push_devices_pg.py -m gate_d --noconftest
+
     - name: 🧪 Critical E2E Smoke
       run: |
         cd backend
