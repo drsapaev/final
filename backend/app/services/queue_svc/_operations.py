@@ -108,14 +108,23 @@ def _find_clinic_wide_duplicate(
     queue_tag: str,
     phone: str | None,
     telegram_id: str | None,
+    patient_id: int | None = None,
+    patient_name: str | None = None,
 ) -> tuple[OnlineQueueEntry | None, DailyQueue | None]:
     """The patient's existing entry across ALL candidate doctors'
     active same-day queues for ``queue_tag`` (Codex round-4 P1):
     duplicates must be resolved BEFORE least-load routing — a retry or
     double submit raises the first doctor's load, so routing would
     pick a sibling and the per-queue ``check_uniqueness`` would let a
-    SECOND entry for the same patient through under another doctor."""
-    if not phone and not telegram_id:
+    SECOND entry for the same patient through under another doctor.
+
+    RQ-25.a.1 (S-22): identity scope is the PATIENT, not the phone.
+    A shared family phone must not hand the first member's ticket to
+    the second: primary match is ``entry.patient_id`` (always filled by
+    the QR join path); the phone match applies only to legacy entries
+    that carry no ``patient_id``, narrowed by the typed entry name so
+    family members on legacy rows still stay separate."""
+    if not phone and not telegram_id and not patient_id:
         return None, None
     base = (
         db.query(OnlineQueueEntry)
@@ -129,8 +138,19 @@ def _find_clinic_wide_duplicate(
         )
     )
     entry = None
-    if phone:
-        entry = base.filter(OnlineQueueEntry.phone == phone).first()
+    if patient_id:
+        entry = base.filter(OnlineQueueEntry.patient_id == patient_id).first()
+    if entry is None and phone:
+        legacy = base.filter(
+            OnlineQueueEntry.phone == phone,
+            OnlineQueueEntry.patient_id.is_(None),
+        )
+        if patient_name:
+            legacy = legacy.filter(
+                func.lower(func.trim(OnlineQueueEntry.patient_name))
+                == patient_name.strip().casefold()
+            )
+        entry = legacy.first()
     if entry is None and telegram_id:
         entry = base.filter(OnlineQueueEntry.telegram_id == telegram_id).first()
     if entry is None:
@@ -224,14 +244,23 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         phone: str | None = None,
         telegram_id: str | None = None,
         source: str = "online",  # ✅ Added source parameter
+        patient_id: int | None = None,
+        patient_name: str | None = None,
     ) -> tuple[OnlineQueueEntry | None, str]:
         """
         Проверить уникальность записи
 
+        RQ-25.a.1 (S-22): дедуп скоупится на ПАЦИЕНТА, а не на телефон.
+        Первичный матч — ``entry.patient_id`` (QR-путь заполняет его
+        всегда); телефонный матч остается только для легаси-записей без
+        ``patient_id`` и сужается введенным именем записи, чтобы члены
+        семьи с общим телефоном не получали талоны друг друга.
+        Telegram-матч не изменен.
+
         Returns:
             (existing_entry, duplicate_reason)
         """
-        if not phone and not telegram_id:
+        if not phone and not telegram_id and not patient_id:
             return None, ""
 
         # ✅ SKIP CHECK for trusted sources (desk, morning_assignment)
@@ -242,19 +271,54 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if source in ["desk", "morning_assignment"]:
             return None, ""
 
+        # RQ-25.a.1: primary identity match — the patient record itself.
+        if patient_id:
+            patient_entry = (
+                db.query(OnlineQueueEntry)
+                .filter(
+                    OnlineQueueEntry.queue_id == daily_queue.id,
+                    OnlineQueueEntry.patient_id == patient_id,
+                    OnlineQueueEntry.status.in_(["waiting", "called"]),
+                )
+                .first()
+            )
+            if patient_entry:
+                return patient_entry, "повторная запись этого пациента"
+
         if phone:
-            phone_entry = (
+            phone_query = (
                 db.query(OnlineQueueEntry)
                 .filter(
                     OnlineQueueEntry.queue_id == daily_queue.id,
                     OnlineQueueEntry.phone == phone,
                     OnlineQueueEntry.status.in_(["waiting", "called"]),
                 )
-                .first()
             )
-
-            if phone_entry:
-                return phone_entry, f"телефону {phone}"
+            if patient_id:
+                # RQ-25.a.1: the caller carries a resolved patient
+                # identity — the primary patient_id match above already
+                # covers THIS patient. A phone match against an entry
+                # owned by a DIFFERENT patient_id is another family
+                # member, not a duplicate; only legacy rows without a
+                # patient link may still dedup (narrowed by the typed
+                # entry name so family members stay separate).
+                legacy_query = phone_query.filter(
+                    OnlineQueueEntry.patient_id.is_(None)
+                )
+                if patient_name:
+                    legacy_query = legacy_query.filter(
+                        func.lower(func.trim(OnlineQueueEntry.patient_name))
+                        == patient_name.strip().casefold()
+                    )
+                legacy_entry = legacy_query.first()
+                if legacy_entry:
+                    return legacy_entry, f"телефону {phone}"
+            else:
+                # Legacy callers without a resolved patient: keep the
+                # historical phone-only spam guard untouched.
+                phone_entry = phone_query.first()
+                if phone_entry:
+                    return phone_entry, f"телефону {phone}"
 
         # Проверяем по Telegram ID
         if telegram_id:
@@ -1109,6 +1173,8 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                         queue_tag=profile_key,
                         phone=phone,
                         telegram_id=telegram_id,
+                        patient_id=patient_id,
+                        patient_name=patient_name,
                     )
                     if existing_queue is not None:
                         doctor = existing_queue.specialist or (
@@ -1237,7 +1303,13 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             raise QueueConflictError(limits_message)
 
         existing_entry, duplicate_reason = self.check_uniqueness(
-            db, daily_queue, phone, telegram_id, source=source
+            db,
+            daily_queue,
+            phone,
+            telegram_id,
+            source=source,
+            patient_id=patient_id,
+            patient_name=patient_name,
         )
 
         queue_length_before = (
