@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useId } from 'react';
+import { useEffect, useMemo, useState, useId, useRef } from 'react';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle } from '../ui/macos';
 import { useConfirm } from '../common/ConfirmDialog';
 // ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
@@ -35,12 +35,14 @@ export default function LabTemplateWorkbench({
   selectedTemplate = null,
   onSelectTemplate,
   onTemplatesChanged,
+  registerDirtySource,
   notify
 }: {
   templates?: unknown[];
   selectedTemplate?: Record<string, unknown> | null;
   onSelectTemplate?: (template: Record<string, unknown>) => void;
-  onTemplatesChanged?: () => Promise<void>;
+  onTemplatesChanged?: (preferredTemplateId?: string | number | null) => Promise<void>;
+  registerDirtySource?: (source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => void;
   notify?: (type: string, message: string) => void;
   [k: string]: unknown;
 }) {
@@ -155,13 +157,19 @@ export default function LabTemplateWorkbench({
     }
     setSaving(true);
     try {
-      await labReportingApi.createTemplate({
+      const created = await labReportingApi.createTemplate({
         ...formData,
         initial_version: blankVersion
-      });
+      }) as Record<string, unknown> | undefined;
       notify?.('success', t('success.template_created'));
       setShowNewTemplateDialog(false);
-      await onTemplatesChanged?.();
+      // PR5: используем возвращённый id — обновляем список с выбором
+      // созданного шаблона и сразу открываем его в редакторе.
+      const createdId = (created as { id?: string | number })?.id ?? null;
+      await onTemplatesChanged?.(createdId);
+      if (createdId != null && created) {
+        onSelectTemplate?.(created);
+      }
     } catch (error) {
       notify?.('error', getErrorMessage(error));
     } finally {
@@ -257,18 +265,20 @@ export default function LabTemplateWorkbench({
     return errors;
   }
 
-  async function handleSaveTemplate() {
+  // PR5: ядро сохранения draft шаблона — бросает исключение при неудаче,
+  // чтобы dirty-guard не продолжал переход после неуспешного сохранения.
+  async function attemptSaveTemplate() {
     if (!selectedTemplate) {
-      notify?.('error', t('errors.select_template_first'));
-      return;
+      throw new Error(t('errors.select_template_first'));
     }
     const rangeErrors = validateReferenceRanges();
     const jsonErrors = validateRuleJsonErrors();
     const keyErrors = validateFieldKeyUniqueness();
     if (rangeErrors.length > 0 || jsonErrors.length > 0 || keyErrors.length > 0) {
       const allErrors = [...rangeErrors, ...jsonErrors, ...keyErrors];
-      notify?.('error', `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
-      return;
+      const message = `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`;
+      notify?.('error', message);
+      throw new Error(message);
     }
     setSaving(true);
     try {
@@ -277,10 +287,16 @@ export default function LabTemplateWorkbench({
       await labReportingApi.updateTemplateVersion(versionId, payload);
       notify?.('success', t('success.template_draft_saved'));
       await onTemplatesChanged?.();
-    } catch (error) {
-      notify?.('error', getErrorMessage(error));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveTemplate() {
+    try {
+      await attemptSaveTemplate();
+    } catch (error) {
+      notify?.('error', getErrorMessage(error));
     }
   }
 
@@ -524,6 +540,26 @@ export default function LabTemplateWorkbench({
   // L-H-6 fix: render-tab функции заменены на подкомпоненты ContentTab /
   // DesignTab / SignersTab / PreviewTab. Это убирает ~700 строк из этого файла
   // и позволяет независимо тестировать каждый tab.
+
+  // PR5: dirty-state draft шаблона — черновик отличается от hydrate(activeVersion).
+  const templateDirty = useMemo(() => {
+    if (!selectedTemplate || !activeVersion) return false;
+    return JSON.stringify(draftVersion) !== JSON.stringify(hydrateVersion(activeVersion));
+  }, [draftVersion, selectedTemplate, activeVersion]);
+
+  const isTemplateDirtyRef = useRef(templateDirty);
+  useEffect(() => {
+    isTemplateDirtyRef.current = templateDirty;
+  });
+  const registerDirtySourceRef = useRef(registerDirtySource);
+  useEffect(() => {
+    if (!registerDirtySourceRef.current) return;
+    return registerDirtySourceRef.current({
+      id: 'template',
+      isDirty: () => isTemplateDirtyRef.current,
+      save: () => attemptSaveTemplate(),
+    });
+  }, []);
 
   // PR4: единый список ошибок валидации текущего draft для inline-блока;
   // хендлеры Save/Publish используют те же проверки перед любым запросом.

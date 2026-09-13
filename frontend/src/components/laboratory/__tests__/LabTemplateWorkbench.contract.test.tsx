@@ -309,3 +309,39 @@ describe('LabTemplateWorkbench draft rule validation (PR4)', () => {
     expect((screen.getByLabelText('JSON правил нормы') as HTMLTextAreaElement).value).toBe('{invalid');
   });
 });
+
+describe('LabTemplateWorkbench create template flow (PR5)', () => {
+  it('selects the created template using the returned id and refreshes the list', async () => {
+    const onSelectTemplate = vi.fn();
+    const onTemplatesChanged = vi.fn(async (_preferredTemplateId?: string | number | null) => {});
+    mockedApi.createTemplate.mockResolvedValue({
+      id: 9,
+      code: 'new_rule_t',
+      name: 'Новый шаблон правил',
+      family: 'chemistry',
+    });
+
+    render(
+      <ThemeProvider>
+        <LabTemplateWorkbenchRaw
+          templates={[]}
+          selectedTemplate={null}
+          onSelectTemplate={onSelectTemplate}
+          onTemplatesChanged={onTemplatesChanged}
+          notify={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Новый' }));
+    fireEvent.change(screen.getByLabelText('Код шаблона'), { target: { value: 'new_rule_t' } });
+    fireEvent.change(screen.getByLabelText('Название шаблона'), { target: { value: 'Новый шаблон правил' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+
+    await waitFor(() => expect(mockedApi.createTemplate).toHaveBeenCalled());
+    await waitFor(() => expect(onSelectTemplate).toHaveBeenCalled());
+
+    expect(onTemplatesChanged).toHaveBeenCalledWith(9);
+    expect(onSelectTemplate.mock.calls[0][0]).toMatchObject({ id: 9, code: 'new_rule_t' });
+  });
+});
