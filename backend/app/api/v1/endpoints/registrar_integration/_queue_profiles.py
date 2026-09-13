@@ -418,7 +418,25 @@ def delete_queue_profile(
         # PR-22: cascade cleanup — clear queue_tag from services that
         # matched this profile's tags. Without this, services keep
         # orphaned queue_tags that silently disappear from registrar.
-        tags_to_clean = profile.queue_tags or []
+        #
+        # RQ-12.a (F-11 / ACCEPTANCE S-10): a tag that is STILL owned by
+        # another (remaining) profile must keep its services — deleting
+        # one profile must not silently untag services from the remaining
+        # profile's tab. Compute the remaining owners' tags BEFORE the
+        # delete; only exclusively-owned tags are cleaned.
+        other_tags: set[str] = set()
+        for other in (
+            db.query(QueueProfile)
+            .filter(QueueProfile.key != profile_key)
+            .all()
+        ):
+            other_tags.update(other.queue_tags or [])
+
+        tags_to_clean = [
+            tag
+            for tag in (profile.queue_tags or [])
+            if tag not in other_tags
+        ]
         services_cleaned = 0
         if tags_to_clean:
             services = db.query(Service).filter(

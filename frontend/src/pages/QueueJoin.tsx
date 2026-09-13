@@ -64,11 +64,28 @@ interface QueueJoinResultLocal {
   success?: boolean;
   message?: string;
   entries?: QueueJoinResultEntry[];
+  // RQ-10 (S-08): неуспешные направления из complete_join_session_multiple
+  // (backend: errors — список { specialist_id, error } рядом с entries).
+  errors?: Array<{
+    specialist_id?: number | string;
+    error?: string;
+    [key: string]: unknown;
+  }>;
   queue_number?: number;
   estimated_wait_time?: number;
   specialist_name?: string;
   [key: string]: unknown;
 }
+
+// RQ-10 (S-08): сетевой класс сбоя при завершении join — ответ не получен
+// (обрыв соединения/таймаут) либо прокси-ошибка 502/503/504, когда запрос
+// мог быть уже обработан сервером. Только для этого класса показывается
+// «результат неизвестен» и последующий честный совет; обычная серверная
+// ошибка 4xx при первой попытке поведение не меняет.
+const isNetworkClassSubmitError = (err: unknown): boolean => {
+  const status = Number((err as HttpApiError | null)?.response?.status ?? 0);
+  return status === 0 || status === 502 || status === 503 || status === 504;
+};
 
 const QueueJoin = () => {
   const { token: paramToken } = useParams();
@@ -133,6 +150,9 @@ const QueueJoin = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  // RQ-10 (S-08): потеря ответа при завершении join — честный статус повторной отправки.
+  const [submitResultUnknown, setSubmitResultUnknown] = useState(false);
+  const [showSessionConsumedAdvisory, setShowSessionConsumedAdvisory] = useState(false);
 
   const getApiErrorMessage = useCallback((err: unknown, fallbackMessage: string): string => {
     const responseData = (err as HttpApiError)?.response?.data;
@@ -476,10 +496,21 @@ const QueueJoin = () => {
         }));
       }
 
+      setSubmitResultUnknown(false);
+      setShowSessionConsumedAdvisory(false);
       setStep('success');
 
     } catch (error: unknown) {
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.joinFailed));
+      if (isNetworkClassSubmitError(error)) {
+        // RQ-10 (S-08): ответ потерян — результат отправки неизвестен.
+        setSubmitResultUnknown(true);
+      } else if (submitResultUnknown) {
+        // Повтор после потери ответа отклонен сервером (сессия уже использована
+        // или истекла): запись могла быть создана первой попыткой — показываем
+        // честный путь обращения вместо вводящего «сессия не найдена».
+        setShowSessionConsumedAdvisory(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -788,10 +819,46 @@ const QueueJoin = () => {
 
   // Компонент успешного присоединения - macOS стиль
   if (step === 'success') {
-    // Проверяем, множественная ли регистрация
-    const isMultiple = !!(result?.entries && Array.isArray(result.entries) && result.entries.length > 1);
+    // RQ-10 (S-08): честное разделение успешных талонов и неудачных направлений.
+    // Backend complete_join_session_multiple: success = len(entries) > 0,
+    // errors — список { specialist_id, error } для неуспешных направлений.
+    const hasEntriesShape = Array.isArray(result?.entries);
+    const successEntries: QueueJoinResultEntry[] = hasEntriesShape
+      ? ((result?.entries ?? []) as QueueJoinResultEntry[])
+      : [];
+    const failedEntries = result?.errors ?? [];
+    // Частичный результат (успех + ошибки) и >1 талона рендерятся списком;
+    // одиночный талон без ошибок сохраняет прежний крупный номер.
+    const isMultiple = successEntries.length > 1 || failedEntries.length > 0;
+    // Одиночный талон из entries: top-level queue_number в multi-ответе
+    // отсутствует — берем номер из первой записи.
+    const singleEntryNumber =
+      result?.queue_number ??
+      successEntries[0]?.queue_number ??
+      successEntries[0]?.number;
 
-    // Определяем название вкладки для подсказки пользователю
+    // Подпись неудачного направления: по выбранному специалисту, иначе по id.
+    const failedDirectionLabel = (specialistId: number | string | undefined): string => {
+      const match = availableSpecialists.find(
+        (s) => s.id !== undefined && Number(s.id) === Number(specialistId)
+      );
+      if (match) {
+        return formatSpecialistLabel(match);
+      }
+      return t('misc.qj_failed_direction_fallback', { id: String(specialistId ?? '—') });
+    };
+
+    // RQ-10 (S-08): 0 успешных записей не называется успехом.
+    const successCount = successEntries.length;
+    const successTitle =
+      successCount === 0
+        ? t('misc.qj_join_failed')
+        : failedEntries.length > 0
+          ? t('misc.qj_success_partial_title')
+          : successCount > 1
+            ? t('misc.qj_success_multiple_title')
+            : t('misc.qj_success_single_title');
+
     const getDepartmentName = (specialty: string | null | undefined): string => {
       const normalized = (specialty || '').toLowerCase();
       if (normalized === 'cardio' || normalized === 'cardiology') return t('misc.qj_dept_cardiology');
@@ -807,25 +874,29 @@ const QueueJoin = () => {
     return (
       <main className="min-h-screen flex items-center justify-center p-4 qj-page-base" aria-labelledby="queue-join-success-title">
         <div className="max-w-md w-full text-center qj-glass-card" role="status" aria-live="polite">
-          <CheckCircle style={{
-            width: '64px',
-            height: '64px',
-            color: 'var(--mac-success)',
-            margin: '0 auto 20px'
-          }} aria-hidden="true" />
+          {successCount > 0 ? (
+            <CheckCircle style={{
+              width: '64px',
+              height: '64px',
+              color: 'var(--mac-success)',
+              margin: '0 auto 20px'
+            }} aria-hidden="true" />
+          ) : (
+            <AlertCircle className="qj-failed-icon" aria-hidden="true" />
+          )}
           <h2 id="queue-join-success-title" className="qj-title-success">
-            {isMultiple ? t('misc.qj_success_multiple_title') : t('misc.qj_success_single_title')}
+            {successTitle}
           </h2>
 
-          {isMultiple ? (
+          {successCount > 0 && isMultiple ? (
             // Множественная регистрация
             <>
               <div className="qj-success-box">
                 <p className="qj-success-entries-title">
-                  {t('misc.qj_success_registered_in', { count: result?.entries?.length ?? 0 })}
+                  {t('misc.qj_success_registered_in', { count: successCount })}
                 </p>
                 <div className="qj-success-entries-list">
-                  {(result?.entries ?? []).map((entry, idx) => (
+                  {successEntries.map((entry, idx) => (
                     <div
                       key={idx}
                       style={{
@@ -857,26 +928,13 @@ const QueueJoin = () => {
                   ))}
                 </div>
               </div>
-
-              <div style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-tertiary)',
-                marginBottom: 'var(--mac-spacing-6)',
-                lineHeight: '1.5'
-              }}>
-                <p>{t('misc.qj_be_ready')}</p>
-                <p>{t('misc.qj_we_will_notify')}</p>
-                <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
-                  {t('misc.qj_view_entries_tabs')}
-                </p>
-              </div>
             </>
           ) : (
             // Одиночная регистрация
             <>
               <div className="qj-success-box-lg">
                 <div className="qj-success-number">
-                  №{String(result?.queue_number ?? '')}
+                  №{String(singleEntryNumber ?? '')}
                 </div>
                 <p className="qj-success-label">{t('misc.qj_your_number')}</p>
               </div>
@@ -931,20 +989,41 @@ const QueueJoin = () => {
                   </div>
                 )}
               </div>
-
-              <div style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-tertiary)',
-                marginBottom: 'var(--mac-spacing-6)',
-                lineHeight: '1.5'
-              }}>
-                <p>{t('misc.qj_be_ready')}</p>
-                <p>{t('misc.qj_we_will_notify')}</p>
-                <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
-                  {t('misc.qj_view_entry_tab', { name: departmentName })}
-                </p>
-              </div>
             </>
+          )}
+
+          {successCount > 0 && (
+            <div className="qj-success-footer">
+              <p>{t('misc.qj_be_ready')}</p>
+              <p>{t('misc.qj_we_will_notify')}</p>
+              <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
+                {isMultiple ? t('misc.qj_view_entries_tabs') : t('misc.qj_view_entry_tab', { name: departmentName })}
+              </p>
+            </div>
+          )}
+
+          {failedEntries.length > 0 && (
+            // RQ-10 (S-08): неудачные направления — отдельно, с причиной;
+            // частичный результат не выглядит полным успехом.
+            <div className="qj-failed-box">
+              <p className="qj-failed-title">
+                {t('misc.qj_partial_failed_title')}
+              </p>
+              <ul className="qj-failed-list">
+                {failedEntries.map((failedEntry, idx) => (
+                  <li key={idx} className="qj-failed-item">
+                    <div className="qj-failed-direction">
+                      {failedDirectionLabel(failedEntry.specialist_id)}
+                    </div>
+                    {failedEntry.error ? (
+                      <div className="qj-failed-reason">
+                        {String(failedEntry.error)}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <button
@@ -1494,6 +1573,19 @@ const QueueJoin = () => {
                     <AlertCircle className="h-5 w-5 mr-2" style={{ color: 'var(--mac-error)' }} />
                     <span style={{ color: 'var(--mac-error)', fontSize: 'var(--mac-font-size-base)' }}>{error}</span>
                   </div>
+                  {submitResultUnknown && (
+                    // RQ-10 (S-08): ответ потерян — честный статус повтора.
+                    <p className="qj-error-hint">
+                      {t('misc.qj_result_unknown_hint')}
+                    </p>
+                  )}
+                  {showSessionConsumedAdvisory && (
+                    // RQ-10 (S-08): повтор отклонен после потери ответа —
+                    // запись могла быть создана первой попыткой.
+                    <p className="qj-error-advisory">
+                      {t('misc.qj_session_consumed_advisory')}
+                    </p>
+                  )}
                 </div>
               )}
 

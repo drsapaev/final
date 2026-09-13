@@ -103,6 +103,12 @@ def get_registrar_services(
                 "is_consultation": getattr(
                     service, 'is_consultation', False
                 ),  # Добавляем поле is_consultation
+                # RQ-05 (F-04): каталог регистратуры обязан передавать
+                # requires_doctor, чтобы выбор врача был обязательным ровно
+                # там, где его требует сервер (S-03).
+                "requires_doctor": bool(
+                    getattr(service, 'requires_doctor', False)
+                ),
                 "group": None,  # Добавим группу для frontend
             }
 

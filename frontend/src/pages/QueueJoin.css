@@ -673,3 +673,71 @@
   clip: rect(0, 0, 0, 0);
   border: 0;
 }
+
+/* ─── RQ-10 (S-08): partial QR join result — failed directions + honest hints ─── */
+.qj-failed-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--mac-error, red);
+  margin: 0 auto 20px;
+}
+
+.qj-success-footer {
+  font-size: var(--mac-font-size-sm, 13px);
+  color: var(--mac-text-tertiary, gray);
+  margin-bottom: var(--mac-spacing-6, 24px);
+  line-height: 1.5;
+}
+
+.qj-failed-box {
+  width: 100%;
+  margin-top: var(--mac-spacing-3, 12px);
+  margin-bottom: var(--mac-spacing-6, 24px);
+  padding: var(--mac-spacing-4, 16px);
+  background: color-mix(in srgb, var(--mac-warning, orange), transparent 92%);
+  border: 1px solid color-mix(in srgb, var(--mac-warning, orange), transparent 60%);
+  border-radius: var(--mac-radius-lg, 12px);
+  text-align: left;
+}
+
+.qj-failed-title {
+  font-size: var(--mac-font-size-sm, 13px);
+  font-weight: var(--mac-font-weight-semibold, 600);
+  color: var(--mac-text-primary, black);
+  margin-bottom: var(--mac-spacing-2, 8px);
+}
+
+.qj-failed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2, 8px);
+}
+
+.qj-failed-item {
+  background: color-mix(in srgb, var(--mac-warning, orange), transparent 84%);
+  border-radius: var(--mac-radius-md, 10px);
+  padding: var(--mac-spacing-2, 8px) var(--mac-spacing-3, 12px);
+}
+
+.qj-failed-direction {
+  font-size: var(--mac-font-size-sm, 13px);
+  font-weight: var(--mac-font-weight-semibold, 600);
+  color: var(--mac-text-primary, black);
+}
+
+.qj-failed-reason {
+  font-size: var(--mac-font-size-xs, 11px);
+  color: var(--mac-text-secondary, darkgray);
+  margin-top: var(--mac-spacing-1, 4px);
+}
+
+.qj-error-hint,
+.qj-error-advisory {
+  color: var(--mac-text-secondary, darkgray);
+  font-size: var(--mac-font-size-sm, 13px);
+  margin-top: var(--mac-spacing-2, 8px);
+  text-align: left;
+}
