@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
+from urllib.parse import quote
 from uuid import uuid4
 
 import pytest
@@ -9,7 +10,7 @@ from app.core.security import get_password_hash
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
 from app.models.emr import EMR
-from app.models.lab import LabOrder, LabResult
+from app.models.lab import LabOrder, LabReportInstance, LabResult
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
@@ -1122,3 +1123,87 @@ def test_create_lab_order_endpoint_resolves_published_version(
     assert body["patient_id"] == test_patient.id
     assert body["template_name"]
     assert body["status"]
+
+
+@pytest.mark.integration
+def test_bulk_values_optimistic_locking_bumps_token_and_rejects_stale(
+    client,
+    auth_headers,
+    db_session,
+    test_patient,
+    test_visit,
+):
+    """PR3: каждое успешное bulk-сохранение должно продвигать version token
+    (updated_at), иначе два лаборанта с одним устаревшим токеном молча
+    перезаписывают друг друга после первого сохранения. Stale token обязан
+    получать 409 и не перезаписывать изменения другого пользователя.
+    """
+    instance = _create_lab_report_instance(
+        client,
+        auth_headers=auth_headers,
+        patient_id=test_patient.id,
+        visit_id=test_visit.id,
+    )
+    token_before = instance["updated_at"]
+    assert token_before
+
+    def _frontend_iso(token: str) -> str:
+        # Фронтенд отправляет toISOString() — всегда с offset. SQLite-харнес
+        # сериализует токены без offset; с offset-less токеном guard в
+        # _assert_not_concurrently_modified получает aware-vs-naive вычитание
+        # и graceful-degradation пропускает проверку блокировки.
+        return datetime.fromisoformat(token).replace(tzinfo=UTC).isoformat()
+
+    def _bulk_save(expected_token: str, value: str):
+        return client.post(
+            f"/api/v1/lab/report-instances/{instance['id']}/bulk-values"
+            f"?expected_updated_at={quote(_frontend_iso(expected_token), safe='')}",
+            headers=auth_headers,
+            json=[{"field_key": "wbc", "value_text": value}],
+        )
+
+    # In-sync сохранение №1 (DRAFT -> IN_PROGRESS)
+    first = _bulk_save(token_before, "5.2")
+    assert first.status_code == 200, first.text
+    token_first = first.json()["instance"]["updated_at"]
+    assert token_first != token_before, (
+        "успешное bulk-сохранение должно продвигать version token"
+    )
+
+    # In-sync сохранение №2: статус уже IN_PROGRESS, колонки instance не
+    # меняются — token всё равно обязан продвинуться (дефект PR3 на base).
+    second = _bulk_save(token_first, "5.4")
+    assert second.status_code == 200, second.text
+    token_second = second.json()["instance"]["updated_at"]
+    assert token_second != token_first, (
+        "повторное bulk-сохранение обязано продвинуть version token, "
+        "иначе optimistic locking не защищает второй и последующие saves"
+    )
+
+    # Stale token: симулируем, что другой лаборант сохранил блок 10 минут
+    # назад; вызывающий с token_second обязан получить 409.
+    row = (
+        db_session.query(LabReportInstance)
+        .filter(LabReportInstance.id == instance["id"])
+        .first()
+    )
+    row.updated_at = datetime.now(UTC) - timedelta(minutes=10)
+    db_session.commit()
+
+    stale = _bulk_save(token_second, "9.9")
+    assert stale.status_code == 409, stale.text
+
+    fresh = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}",
+        headers=auth_headers,
+    )
+    assert fresh.status_code == 200, fresh.text
+    wbc_field = next(
+        field
+        for section in fresh.json()["sections"]
+        for field in section["fields"]
+        if field["field_key"] == "wbc"
+    )
+    assert wbc_field["value_text"] == "5.4", (
+        "stale save не должен перезаписывать значения актуальной версии"
+    )

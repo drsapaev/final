@@ -202,6 +202,12 @@ class InstancesMixin(LabReportingServiceMixinBase):
 
         if instance.status == "DRAFT" and updated_values:
             instance.status = "IN_PROGRESS"
+        # PR3: каждое успешное bulk-сохранение обязано продвигать version
+        # token (updated_at). На IN_PROGRESS статус больше не меняется и
+        # колонки instance не затрагиваются — без явного продвижения
+        # SQLAlchemy не отправит UPDATE для instance, и два лаборанта с
+        # одним устаревшим токеном могут молча перезаписать друг друга.
+        instance.updated_at = datetime.now(UTC)
         self.repository.commit()
         return self.get_instance(instance.id), updated_values
 

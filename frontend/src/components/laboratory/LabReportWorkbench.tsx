@@ -170,7 +170,11 @@ export default function LabReportWorkbench({
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         if (!saving && handleSaveDraftRef.current) {
-          handleSaveDraftRef.current();
+          // PR3: attemptSaveDraft бросает исключение при неудаче — показываем
+          // ошибку через общий обработчик (включая конфликтный 409-toast).
+          void Promise.resolve(handleSaveDraftRef.current()).catch((saveError: unknown) => {
+            notifySaveError(saveError);
+          });
         }
       }
     };
@@ -270,7 +274,7 @@ export default function LabReportWorkbench({
     // WF-06 fix: передаём updated_at для optimistic locking.
     // Если backend обнаружит, что бланк был изменён другим пользователем
     // после этого timestamp — вернёт 409, persistDraft выбросит exception.
-    const expectedUpdatedAt = activeInstance.updated_at
+    let expectedUpdatedAt = activeInstance.updated_at
       ? new Date(activeInstance.updated_at as string).toISOString()
       : null;
 
@@ -296,6 +300,13 @@ export default function LabReportWorkbench({
       latestInstance = await labReportingApi.updateInstance(activeInstance.id as string | number, {
         signer_snapshot: signerSnapshot
       }, expectedUpdatedAt) as Record<string, unknown>;
+      // PR3: signer-запрос продвинул updated_at — последующий bulk-запрос
+      // обязан использовать token из ответа первого запроса, иначе получит
+      // 409 от собственного сохранения.
+      const signerUpdatedAt = latestInstance?.updated_at as string | undefined;
+      if (signerUpdatedAt) {
+        expectedUpdatedAt = new Date(signerUpdatedAt).toISOString();
+      }
     }
     if (payload.length > 0) {
       const response = (await labReportingApi.bulkSaveValues(activeInstance.id as string | number, payload, expectedUpdatedAt)) as Record<string, unknown>;
@@ -305,10 +316,12 @@ export default function LabReportWorkbench({
     return latestInstance;
   }
 
-  async function handleSaveDraft() {
+  // PR3: ядро сохранения — бросает исключение при неудаче, чтобы autosave
+  // (и любой другой вызывающий) мог достоверно отличить успех от провала
+  // и не выставлял lastAutoSave после неуспешного запроса.
+  async function attemptSaveDraft() {
     if (!activeInstance) {
-      notify?.('error', t('errors.open_or_create_first'));
-      return;
+      throw new Error(t('errors.open_or_create_first'));
     }
     // WF-07 fix: запоминаем статус до save, чтобы обнаружить auto-transition.
     const previousStatus = activeInstance.status;
@@ -322,25 +335,60 @@ export default function LabReportWorkbench({
         values: { ...draftValues },
         signer: { ...signerSnapshot },
       };
+      // PR3: isDirty-мемо кэшируется по draftValues — сброс baseline в ref
+      // сам по себе не перерисует бейдж «несохранённые изменения» и
+      // индикатор «✓ сохранено». Форсируем перерасчёт новой ссылкой.
+      setDraftValues((prev) => ({ ...prev }));
       const newStatus = latest?.status || previousStatus;
       if (previousStatus === 'DRAFT' && newStatus === 'IN_PROGRESS') {
         notify?.('info', t('success.draft_saved_in_progress'));
       } else {
         notify?.('success', t('success.draft_saved'));
       }
-    } catch (error) {
-      notify?.('error', (error instanceof Error ? error.message : String(error)));
     } finally {
       setSaving(false);
       setBusyAction('');
+    }
+  }
+
+  // PR3: при 409 optimistic locking показываем локализованное действие
+  // «Обновить актуальную версию». Введённый draft НЕ перезаписываем
+  // автоматически — актуальная версия открывается только явным кликом.
+  function notifySaveError(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('другим пользователем') && activeInstance) {
+      labToast.interactiveError(
+        'Бланк изменён другим пользователем. Нажмите здесь, чтобы обновить актуальную версию; ваш черновик не перезаписан.',
+        {
+          autoClose: 10000,
+          onClick: () => {
+            void (async () => {
+              const fresh = await labReportingApi.getInstance(activeInstance.id as string | number);
+              onInstanceChange?.(fresh as Record<string, unknown>);
+            })();
+          },
+        }
+      );
+      return;
+    }
+    notify?.('error', message);
+  }
+
+  async function handleSaveDraft() {
+    try {
+      await attemptSaveDraft();
+    } catch (error) {
+      notifySaveError(error);
     }
   }
   // WF-22 fix: обновляем ref для keyboard shortcut.
   // L-L-4 fix: присваивание перенесено в useEffect (было при каждом render,
   // что может вызывать stale-closure проблемы в race conditions).
   // Намеренно без deps array — обновляем ref на каждом render (дешёвая операция).
+  // PR3: ref указывает на attemptSaveDraft (бросает исключение), чтобы
+  // autosave достоверно различал успех и провал.
   useEffect(() => {
-    handleSaveDraftRef.current = handleSaveDraft;
+    handleSaveDraftRef.current = attemptSaveDraft;
   });
 
   // WF-round5: handleMarkReady убран — Mark Ready был функционально пустой
@@ -372,7 +420,9 @@ export default function LabReportWorkbench({
       await onQueueChanged?.();
       notify?.('success', t('success.finalized'));
     } catch (error) {
-      notify?.('error', (error instanceof Error ? error.message : String(error)));
+      // PR3: конфликт 409 при финализации показывает действие
+      // «Обновить актуальную версию» вместо сырой ошибки.
+      notifySaveError(error);
     } finally {
       setSaving(false);
       setBusyAction('');
@@ -403,7 +453,9 @@ export default function LabReportWorkbench({
       await onRefreshRecentReports?.();
       notify?.('success', t('success.revised'));
     } catch (error) {
-      notify?.('error', (error instanceof Error ? error.message : String(error)));
+      // PR3: конфликт 409 при revise показывает действие
+      // «Обновить актуальную версию» вместо сырой ошибки.
+      notifySaveError(error);
     } finally {
       setSaving(false);
       setBusyAction('');

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { describe, expect, it } from 'vitest';
+import { renderHook } from '@testing-library/react';
 
 import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
@@ -12,6 +13,8 @@ const source = fs.readFileSync(
   path.join(ROOT, 'components/laboratory/hooks/useLabReportState.ts'),
   'utf8'
 );
+
+import { useLabReportState } from '../useLabReportState';
 
 describe('useLabReportState hook (STRAT#1)', () => {
   it('exports useLabReportState function', () => {
@@ -94,5 +97,57 @@ describe('useLabReportState hook (STRAT#1)', () => {
 
   it('has STRAT#1 marker in JSDoc', () => {
     expect(source).toContain('STRAT#1');
+  });
+});
+
+describe('useLabReportState draft hydration (PR3)', () => {
+  const reopenedDraftInstance = {
+    id: 77,
+    status: 'DRAFT',
+    template_id: 3,
+    updated_at: '2026-09-13T08:00:00.000000+00:00',
+    signer_snapshot: {},
+    available_actions: ['edit', 'save_draft', 'finalize'],
+    sections: [
+      {
+        key: 'cbc',
+        title: 'CBC',
+        fields: [
+          {
+            field_key: 'wbc',
+            label: 'Лейкоциты',
+            value_type: 'text',
+            value_text: '5.2',
+            comment: 'утренний забор',
+          },
+          {
+            field_key: 'hgb',
+            label: 'Гемоглобин',
+            value_type: 'numeric',
+            value_text: '140',
+            comment: null,
+          },
+        ],
+      },
+    ],
+  };
+
+  it('hydrates field_key__comment keys from materialized field comments', () => {
+    const { result } = renderHook(() =>
+      useLabReportState({ activeInstance: reopenedDraftInstance })
+    );
+
+    expect(result.current.draftValues['wbc__comment']).toBe('утренний забор');
+    // Поле без комментария гидратируется пустой строкой, чтобы повторное
+    // сохранение отправляло прежнее состояние, а не null по умолчанию.
+    expect(result.current.draftValues['hgb__comment']).toBe('');
+  });
+
+  it('keeps the reopened draft clean (not dirty) right after hydration', () => {
+    const { result } = renderHook(() =>
+      useLabReportState({ activeInstance: reopenedDraftInstance })
+    );
+
+    expect(result.current.isDirty).toBe(false);
   });
 });
