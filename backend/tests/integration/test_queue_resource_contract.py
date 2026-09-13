@@ -217,7 +217,12 @@ def test_partial_unique_allows_inactive_and_null_resource_duplicates(
     # indexes — the 0053 users.email precedent): the doctor axis keeps
     # its per-doctor rows untouched by the resource index
     doctor_queue_a = DailyQueue(day=_DAY, specialist_id=doctor.id, queue_tag="lab")
-    doctor_queue_b = DailyQueue(day=_DAY, specialist_id=doctor.id, queue_tag="lab")
+    # RQ-14.a.1: two ACTIVE duplicates on the doctor axis are now
+    # rejected (that fork was the RQ-14.a defect); an inactive history
+    # row stays legal.
+    doctor_queue_b = DailyQueue(
+        day=_DAY, specialist_id=doctor.id, queue_tag="lab", active=False
+    )
     db_session.add(doctor_queue_a)
     db_session.add(doctor_queue_b)
     db_session.commit()
@@ -773,7 +778,8 @@ def test_alembic_chain_single_head_0063() -> None:
     assert graph["0064_push_devices_registry"] == ("0063_queue_resource_contract",)
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    assert heads == ["0064_push_devices_registry"]
+    # RQ-14.a.1: the chain head moved to 0065.
+    assert heads == ["0065_queue_numbering_unique"]
 
 
 # ===================== D. parity + ADR =====================

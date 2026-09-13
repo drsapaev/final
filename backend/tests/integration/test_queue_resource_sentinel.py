@@ -587,7 +587,8 @@ def test_alembic_chain_single_head_0062() -> None:
     assert len("0061_telegram_config_singleton") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0064_push_devices_registry"]
+    # RQ-14.a.1: the chain head moved to 0065.
+    assert heads == ["0065_queue_numbering_unique"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============
