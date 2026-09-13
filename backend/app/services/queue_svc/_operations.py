@@ -1293,6 +1293,30 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             if not daily_queue:
                 raise QueueNotFoundError("Очередь ещё не активна")
 
+            # RQ-09.c: the token names a Doctor.id — mirror the Path A/B
+            # owner-eligibility predicate, but ONLY when the resolved
+            # surface is doctor-owned. A resource-owned registry surface
+            # (QD-2C) is joined as the RESOURCE: its legacy synthetic
+            # token owner ('Lab'/'Nurse') deliberately fails the
+            # doctor-role check, so gating there would break resource
+            # joins.
+            if daily_queue.queue_resource_id is None:
+                token_doctor = (
+                    db.query(Doctor)
+                    .join(User, Doctor.user_id == User.id)
+                    .filter(
+                        Doctor.active.is_(True),
+                        Doctor.id == token_obj.specialist_id,
+                        User.is_active.is_(True),
+                        func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
+                    )
+                    .first()
+                )
+                if not token_doctor or is_doctor_profile_incomplete(
+                    token_doctor.specialty
+                ):
+                    raise QueueValidationError("Специалист недоступен для записи")
+
         # Валидации пациента
         is_valid, validation_message = self.validate_queue_entry_data(
             patient_name, phone, telegram_id
