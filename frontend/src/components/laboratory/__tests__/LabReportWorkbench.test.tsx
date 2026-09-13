@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbenchRaw from '../LabReportWorkbench';
 import { labReportingApi } from '@/api/labReporting';
@@ -403,6 +403,12 @@ describe('LabReportWorkbench', () => {
 });
 
 describe('LabReportWorkbench draft save integrity (PR3)', () => {
+  // custom/no-fake-timers-without-cleanup: fake timers из autosave-теста
+  // обязаны возвращаться к real timers в hook, а не только в finally.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   // vi.mock подменяет методы на vi.fn(), но статический тип остаётся от
   // реального labReportingApi — приводим к vi.fn для setup и инспекции.
   const mockedApi = labReportingApi as unknown as {
