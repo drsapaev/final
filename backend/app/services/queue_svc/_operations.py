@@ -1233,19 +1233,27 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                             cabinet = doctor.cabinet
             else:
                 # Legacy: specialist_id_override is Doctor.id
+                # RQ-09.a: mirror the Path A eligible-doctors predicate —
+                # the appointment_eligibility contract ("the QR/online
+                # queue join excludes ghosts") requires the owner to
+                # exist, be active and carry a doctor-family role; the
+                # Doctor-row-only check let owner-ghosts join when their
+                # id was submitted directly.
                 doctor = (
                     db.query(Doctor)
+                    .join(User, Doctor.user_id == User.id)
                     .filter(
                         Doctor.active.is_(True),
-                        or_(
-                            Doctor.id == specialist_id_override,
-                        ),
+                        Doctor.id == specialist_id_override,
+                        User.is_active.is_(True),
+                        func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
                     )
                     .first()
                 )
                 if not doctor or is_doctor_profile_incomplete(doctor.specialty):
                     # Incomplete ("general" sentinel) profiles are not
-                    # bookable via QR/online paths (Codex P1-D).
+                    # bookable via QR/online paths (Codex P1-D); a missing
+                    # or ineligible owner row resolves to the same refusal.
                     raise QueueValidationError("Специалист недоступен для записи")
 
                 qr_profile = self._get_qr_visible_profile_for_doctor(db, doctor)
