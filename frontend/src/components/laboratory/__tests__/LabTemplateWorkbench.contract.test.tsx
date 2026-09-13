@@ -160,3 +160,152 @@ describe('LabTemplateWorkbench template version command contract', () => {
     expect(source).not.toContain("'Копия шаблона создана.'");
   });
 });
+
+// ─── PR4: behavioral tests — валидация текущего draft до любых запросов ───
+import '@testing-library/jest-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach as rtlBeforeEach } from 'vitest';
+import LabTemplateWorkbenchRaw from '../LabTemplateWorkbench';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+
+vi.mock('../../../api/labReporting', () => ({
+  labReportingApi: {
+    listCatalogUnits: vi.fn(),
+    listCatalogAnalytes: vi.fn(),
+    listCatalogReferenceRanges: vi.fn(),
+    createTemplate: vi.fn(),
+    createTemplateVersion: vi.fn(),
+    updateTemplateVersion: vi.fn(),
+    publishTemplateVersion: vi.fn(),
+    archiveTemplateVersion: vi.fn(),
+    cloneTemplate: vi.fn(),
+  },
+}));
+
+import { labReportingApi } from '@/api/labReporting';
+
+const mockedApi = labReportingApi as unknown as Record<string, ReturnType<typeof vi.fn>>;
+
+const ruleTemplateFixture = {
+  id: 5,
+  code: 'rule_demo',
+  name: 'Rule Demo',
+  family: 'chemistry',
+  description: '',
+  is_active: true,
+  published_version_id: 51,
+  draft_version_id: null,
+  latest_version_id: 51,
+  versions: [
+    {
+      id: 51,
+      template_id: 5,
+      version_no: 1,
+      status: 'PUBLISHED',
+      available_actions: ['create_draft'],
+      layout_preset: 'lab_table_classic_v1',
+      page_settings: {},
+      branding_overrides: {},
+      signer_defaults: {},
+      footer_notes: '',
+      sections: [
+        {
+          key: 's1',
+          title: 'Раздел 1',
+          sort_order: 10,
+          section_style: {},
+          fields: [
+            {
+              field_key: 'hgb',
+              label: 'Гемоглобин',
+              value_type: 'numeric',
+              unit: 'г/л',
+              reference_mode: 'static_text',
+              reference_text: '110-160',
+              required: false,
+              sort_order: 10,
+              reference_rule: {
+                cases: [
+                  { when: { source: 'patient.sex', op: 'eq', value: 'M' }, text: '1-10', low: 1, high: 10 },
+                ],
+                default: { text: '1-10', low: 1, high: 10 },
+              },
+              visibility_rule: null,
+              highlight_rule: null,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+function renderRuleTemplateWorkbench() {
+  return render(
+    <ThemeProvider>
+      <LabTemplateWorkbenchRaw
+        templates={[ruleTemplateFixture]}
+        selectedTemplate={ruleTemplateFixture}
+        onSelectTemplate={vi.fn()}
+        onTemplatesChanged={vi.fn(async () => {})}
+        notify={vi.fn()}
+      />
+    </ThemeProvider>
+  );
+}
+
+function expandFirstFieldEditor() {
+  fireEvent.click(screen.getByRole('button', { name: /Поле: Гемоглобин/ }));
+}
+
+describe('LabTemplateWorkbench draft rule validation (PR4)', () => {
+  rtlBeforeEach(() => {
+    vi.clearAllMocks();
+    mockedApi.listCatalogUnits.mockResolvedValue([]);
+    mockedApi.listCatalogAnalytes.mockResolvedValue([]);
+    mockedApi.listCatalogReferenceRanges.mockResolvedValue([]);
+    mockedApi.createTemplateVersion.mockResolvedValue({ id: 52 });
+    mockedApi.updateTemplateVersion.mockResolvedValue({ id: 52 });
+    mockedApi.publishTemplateVersion.mockResolvedValue({ id: 52 });
+  });
+
+  it('blocks publish when the edited rule becomes low >= high (validates draft text, not stale object)', async () => {
+    renderRuleTemplateWorkbench();
+    expandFirstFieldEditor();
+
+    // Пользователь меняет нижнюю границу кейса с 1 на 10 (1..10 -> 10..1).
+    fireEvent.change(screen.getByLabelText('Нижняя граница нормы'), {
+      target: { value: '10' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Опубликовать' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(mockedApi.createTemplateVersion).not.toHaveBeenCalled();
+    expect(mockedApi.updateTemplateVersion).not.toHaveBeenCalled();
+    expect(mockedApi.publishTemplateVersion).not.toHaveBeenCalled();
+  });
+
+  it('reports invalid rule JSON inline before any request and keeps the typed text', async () => {
+    renderRuleTemplateWorkbench();
+    expandFirstFieldEditor();
+
+    // Developer path: raw JSON textarea внутри structured editor.
+    fireEvent.click(screen.getByText('Raw JSON (для продвинутых)'));
+    fireEvent.change(screen.getByLabelText('JSON правил нормы'), {
+      target: { value: '{invalid' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('alert').textContent).toContain('Гемоглобин');
+    expect(mockedApi.createTemplateVersion).not.toHaveBeenCalled();
+    expect(mockedApi.updateTemplateVersion).not.toHaveBeenCalled();
+    // Введённый текст не потерян.
+    expect((screen.getByLabelText('JSON правил нормы') as HTMLTextAreaElement).value).toBe('{invalid');
+  });
+});

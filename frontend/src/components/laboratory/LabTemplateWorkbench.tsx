@@ -14,6 +14,7 @@ import {
   hydrateVersion,
   buildVersionPayload,
   hasTemplateVersionAction,
+  parseJsonInput,
 } from './templateEditor/utils';
 import {
   EDITOR_TABS,
@@ -184,13 +185,17 @@ export default function LabTemplateWorkbench({
   }
 
   // PR-57: validate reference ranges (low < high) before save/publish
+  // PR4: читаем ТЕКУЩИЙ draft из reference_rule_text (structured editor
+  // пишет именно туда), а не устаревший field.reference_rule с бэкенда —
+  // иначе правка 1..10 -> 10..1 невидима для валидатора.
   function validateReferenceRanges() {
     if (!draftVersion?.sections) return [] as string[];
     const errors: string[] = [];
     draftVersion.sections.forEach((section: Record<string, unknown>, sIdx: number) => {
       ((section.fields as Record<string, unknown>[]) || []).forEach((field: Record<string, unknown>) => {
-        const rule = field.reference_rule as Record<string, unknown> | null;
-        if (!rule) return;
+        const parsed = parseJsonInput(field.reference_rule_text as string | null | undefined);
+        if (!parsed || parsed === Symbol.for('invalid-json') || typeof parsed !== 'object') return;
+        const rule = parsed as Record<string, unknown>;
         const def = rule.default as Record<string, unknown> | undefined;
         if (def && def.low != null && def.high != null && def.low !== '' && def.high !== '') {
           if (parseFloat(String(def.low)) >= parseFloat(String(def.high))) {
@@ -202,6 +207,31 @@ export default function LabTemplateWorkbench({
             if (parseFloat(String(c.low)) >= parseFloat(String(c.high))) {
               errors.push(t('misc.ltw_sektsiya_section_title_sidx__2', { sIdx: (section.title as string) || sIdx + 1, field_key: (field.label as string) || (field.field_key as string), cIdx: cIdx + 1, low: c.low, high: c.high }));
             }
+          }
+        });
+      });
+    });
+    return errors;
+  }
+
+  // PR4: JSON-валидация правил текущего draft ДО любых запросов —
+  // buildVersionPayload бросает позже, когда ensureDraftVersion уже успел
+  // создать draft-версию запросом.
+  function validateRuleJsonErrors() {
+    if (!draftVersion?.sections) return [] as string[];
+    const errors: string[] = [];
+    const invalidMarker = Symbol.for('invalid-json');
+    const ruleKeys: Array<[string, string]> = [
+      ['reference_rule_text', 'правил нормы'],
+      ['visibility_rule_text', 'правил видимости'],
+      ['highlight_rule_text', 'правил подсветки'],
+    ];
+    draftVersion.sections.forEach((section: Record<string, unknown>, sIdx: number) => {
+      ((section.fields as Record<string, unknown>[]) || []).forEach((field: Record<string, unknown>) => {
+        const fieldTitle = (field.label as string) || (field.field_key as string) || `#${sIdx + 1}`;
+        ruleKeys.forEach(([key, ruleTitle]) => {
+          if (parseJsonInput(field[key] as string | null | undefined) === invalidMarker) {
+            errors.push(`${fieldTitle}: JSON ${ruleTitle} заполнен некорректно`);
           }
         });
       });
@@ -233,9 +263,10 @@ export default function LabTemplateWorkbench({
       return;
     }
     const rangeErrors = validateReferenceRanges();
+    const jsonErrors = validateRuleJsonErrors();
     const keyErrors = validateFieldKeyUniqueness();
-    if (rangeErrors.length > 0 || keyErrors.length > 0) {
-      const allErrors = [...rangeErrors, ...keyErrors];
+    if (rangeErrors.length > 0 || jsonErrors.length > 0 || keyErrors.length > 0) {
+      const allErrors = [...rangeErrors, ...jsonErrors, ...keyErrors];
       notify?.('error', `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
       return;
     }
@@ -259,9 +290,10 @@ export default function LabTemplateWorkbench({
       return;
     }
     const rangeErrors = validateReferenceRanges();
+    const jsonErrors = validateRuleJsonErrors();
     const keyErrors = validateFieldKeyUniqueness();
-    if (rangeErrors.length > 0 || keyErrors.length > 0) {
-      const allErrors = [...rangeErrors, ...keyErrors];
+    if (rangeErrors.length > 0 || jsonErrors.length > 0 || keyErrors.length > 0) {
+      const allErrors = [...rangeErrors, ...jsonErrors, ...keyErrors];
       notify?.('error', `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
       return;
     }
@@ -493,6 +525,14 @@ export default function LabTemplateWorkbench({
   // DesignTab / SignersTab / PreviewTab. Это убирает ~700 строк из этого файла
   // и позволяет независимо тестировать каждый tab.
 
+  // PR4: единый список ошибок валидации текущего draft для inline-блока;
+  // хендлеры Save/Publish используют те же проверки перед любым запросом.
+  const draftValidationErrors = [
+    ...validateReferenceRanges(),
+    ...validateRuleJsonErrors(),
+    ...validateFieldKeyUniqueness(),
+  ];
+
   return (
     <div className="ltw-root">
       <Card variant="filled" padding="none">
@@ -619,6 +659,16 @@ export default function LabTemplateWorkbench({
             <Alert severity="info">{t('misc.ltw_vyberite_shablon_sleva_chtob')}</Alert>
           ) : (
             <div className="ltw-grid-16">
+              {/* PR4: inline-ошибки валидации текущего draft — видны до
+                  нажатия Save/Publish, без ожидания toast-уведомления. */}
+              {draftValidationErrors.length > 0 && (
+                <Alert severity="error" role="alert">
+                  {draftValidationErrors.slice(0, 5).map((errorText: string) => (
+                    <div key={errorText}>{errorText}</div>
+                  ))}
+                  {draftValidationErrors.length > 5 && <div>… +{draftValidationErrors.length - 5}</div>}
+                </Alert>
+              )}
               <div className="ltw-badges-row">
                 <Badge variant="info">{String(selectedTemplate.code ?? "")}</Badge>
                 <Badge variant="primary">{String(selectedTemplate.family ?? "")}</Badge>

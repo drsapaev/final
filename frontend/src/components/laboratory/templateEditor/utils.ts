@@ -1,4 +1,3 @@
-import { safeJsonParse } from '../../../utils/safeJsonParse';
 /**
  * L-H-6 fix: shared helpers для templateEditor.
  * Раньше жили в LabTemplateWorkbench.jsx как module-level functions.
@@ -80,8 +79,12 @@ export function parseJsonInput(value: string | null | undefined) {
   if (!value?.trim()) {
     return null;
   }
+  // PR4: safeJsonParse возвращает fallback вместо throw, из-за чего маркер
+  // invalid-json был недостижим и некорректный JSON молча сохранялся как
+  // null. Здесь throw обязателен: вызывающий код различает
+  // пусто (null) / распарсено (value) / некорректно (invalid-json).
   try {
-    return safeJsonParse(value);
+    return JSON.parse(value);
   } catch {
     return Symbol.for('invalid-json');
   }
