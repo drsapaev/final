@@ -27,12 +27,17 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import uuid
 from datetime import date, datetime
 from pathlib import Path
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
+from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.crud.queue_owner_policy import (
     QueueOwnerConfigurationError,
@@ -123,16 +128,12 @@ def _load_migration_0064():
     return module
 
 
-def _scratch():
+def _cutover_metadata() -> sa.MetaData:
     """Minimal tables for the cutover: services + queue_profiles joined
     against users/doctors/queue_resources/daily_queues/queue_entries
     (the 0063 scratch pattern; the tool's surface definition joins the
-    same tables)."""
-    engine = sa.create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=sa.pool.StaticPool,
-    )
+    same tables). Shared by the sqlite scratch harness and the
+    PostgreSQL two-connection race fixture."""
     metadata = sa.MetaData()
     sa.Table(
         "users",
@@ -197,7 +198,22 @@ def _scratch():
         sa.Column("number", sa.Integer, nullable=False),
         sa.Column("status", sa.String(20), nullable=False, default="waiting"),
     )
-    metadata.create_all(engine)
+    return metadata
+
+
+def _create_cutover_tables(engine) -> None:
+    """Create the minimal cutover tables on ANY engine (sqlite scratch or
+    the isolated PostgreSQL schema of the race fixture)."""
+    _cutover_metadata().create_all(engine)
+
+
+def _scratch():
+    engine = sa.create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=sa.pool.StaticPool,
+    )
+    _create_cutover_tables(engine)
     return engine.connect()
 
 
@@ -205,9 +221,9 @@ def _seed_user(conn, username: str, *, role: str = "Resource") -> int:
     conn.execute(
         sa.text(
             "INSERT INTO users (username, role, is_active, hashed_password)"
-            " VALUES (:u, :r, 1, :p)"
+            " VALUES (:u, :r, :a, :p)"
         ),
-        {"u": username, "r": role, "p": _DISABLED_HASH},
+        {"u": username, "r": role, "a": True, "p": _DISABLED_HASH},
     )
     (user_id,) = conn.execute(
         sa.text("SELECT id FROM users WHERE username = :u"), {"u": username}
@@ -220,7 +236,7 @@ def _seed_doctor(conn, user_id: int | None, *, specialty: str, active: bool = Tr
         sa.text(
             "INSERT INTO doctors (user_id, specialty, active)" " VALUES (:u, :s, :a)"
         ),
-        {"u": user_id, "s": specialty, "a": 1 if active else 0},
+        {"u": user_id, "s": specialty, "a": bool(active)},
     )
     (doctor_id,) = conn.execute(
         sa.text("SELECT id FROM doctors ORDER BY id DESC LIMIT 1")
@@ -245,16 +261,17 @@ def _seed_synthetic_world(conn) -> None:
     conn.execute(
         sa.text(
             "INSERT INTO doctors (id, user_id, specialty, active)"
-            " VALUES (10, :u, 'cardio', 1)"
+            " VALUES (10, :u, 'cardio', :a)"
         ),
-        {"u": cardio_user},
+        {"u": cardio_user, "a": True},
     )
     # the ACTIVE lab registry row (the 0059 seed shape)
     conn.execute(
         sa.text(
             "INSERT INTO queue_resources (code, queue_tag, display_name, active)"
-            " VALUES ('lab', 'lab', 'Лаборатория', 1)"
-        )
+            " VALUES ('lab', 'lab', 'Лаборатория', :a)"
+        ),
+        {"a": True},
     )
 
 
@@ -266,21 +283,24 @@ def _seed_decided_services(conn) -> None:
             sa.text(
                 "INSERT INTO services (code, name, queue_tag,"
                 " department_key, doctor_id, requires_doctor, active)"
-                " VALUES (:c, :n, 'general', NULL, NULL, 0, 1)"
+                " VALUES (:c, :n, 'general', NULL, NULL, :rd, :a)"
             ),
-            {"c": code, "n": f"Лаб-услуга {code}"},
+            {"c": code, "n": f"Лаб-услуга {code}", "rd": False, "a": True},
         )
     for code in _ASSIGN_CODES:
         conn.execute(
             sa.text(
                 "INSERT INTO services (code, name, queue_tag,"
                 " department_key, doctor_id, requires_doctor, active)"
-                " VALUES (:c, :n, 'cardio', 'cardiology', NULL, 1, 1)"
+                " VALUES (:c, :n, 'cardio', 'cardiology', NULL, :rd, :a)"
             ),
-            {"c": code, "n": f"Кардио-услуга {code}"},
+            {"c": code, "n": f"Кардио-услуга {code}", "rd": True, "a": True},
         )
     conn.execute(
-        sa.text("INSERT INTO queue_profiles (key, is_active) VALUES ('general', 1)")
+        sa.text(
+            "INSERT INTO queue_profiles (key, is_active) VALUES ('general', :a)"
+        ),
+        {"a": True},
     )
 
 
@@ -731,6 +751,304 @@ def test_migration_source_never_deletes_or_inserts() -> None:
     assert "DELETE" not in source
     assert "INSERT" not in source
     assert "UPDATE services" in source
+
+
+# ===================== the preflight→write race (3995689409, P1) =====================
+
+
+def test_upgrade_aborts_when_operator_edits_row_between_preflight_and_write() -> None:
+    """The race the review exposed: an operator edit lands AFTER the
+    pre-state check read the row (deploy reality — alembic runs while
+    uvicorn still serves catalog writes). The guarded UPDATE (identity
+    id+code AND the expected source tag) matches zero rows and the map
+    aborts; the operator's edit is NOT overwritten and the caller's
+    rollback discards every write the migration made before the abort.
+
+    Sqlite single-connection simulation: the edit joins the migration's
+    transaction, so the pre-rollback assertions prove the not-overwritten
+    half and the post-rollback assertions prove the atomic half; the
+    committed-separate-transaction proof runs on PostgreSQL below."""
+    conn = _scratch()
+    _seed_synthetic_world(conn)
+    _seed_decided_services(conn)
+    conn.commit()
+
+    module = _load_migration_0064()
+    original_assert = module._assert_registry_target
+
+    def operator_edit_between_preflight_and_write(migration_conn, to_tag):
+        migration_conn.execute(
+            sa.text("UPDATE services SET queue_tag = 'ecg' WHERE code = 'LAB_CA'")
+        )
+        return original_assert(migration_conn, to_tag)
+
+    module._assert_registry_target = operator_edit_between_preflight_and_write
+
+    trans = conn.begin()
+    with pytest.raises(RuntimeError, match="concurrently modified"):
+        module.upgrade_with_conn(conn)
+
+    # NOT overwritten: the guarded predicate refused the foreign source
+    # state; rows the migration already wrote before the abort are still
+    # in THIS transaction (to be discarded by the caller's rollback).
+    assert _service_state(conn, "LAB_CA").queue_tag == "ecg"
+    assert _service_state(conn, "L03").queue_tag == "lab"
+    trans.rollback()
+
+    # Atomic: the caller's rollback discards EVERY migration write — no
+    # partial application of the map.
+    for code in _RETAG_CODES:
+        assert _service_state(conn, code).queue_tag == "general", code
+    for code in _ASSIGN_CODES:
+        assert _service_state(conn, code).doctor_id is None
+
+
+def test_upgrade_treats_a_concurrent_same_target_edit_as_a_proven_no_op(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """rowcount=0 alone justifies NOTHING (the 3995689409 ruling): when
+    the operator concurrently moved the row to the exact post-state, the
+    guard re-reads and PROVES the no-op before continuing; the migration
+    completes and the remaining map applies."""
+    conn = _scratch()
+    _seed_synthetic_world(conn)
+    _seed_decided_services(conn)
+    conn.commit()
+
+    module = _load_migration_0064()
+    original_assert = module._assert_registry_target
+
+    def operator_applies_the_same_target(migration_conn, to_tag):
+        migration_conn.execute(
+            sa.text("UPDATE services SET queue_tag = 'lab' WHERE code = 'LAB_CA'")
+        )
+        return original_assert(migration_conn, to_tag)
+
+    module._assert_registry_target = operator_applies_the_same_target
+
+    module.upgrade_with_conn(conn)  # must NOT raise
+    conn.commit()
+
+    assert "proven idempotent no-op" in capsys.readouterr().out
+    for code in _RETAG_CODES:
+        assert _service_state(conn, code).queue_tag == "lab", code
+    for code in _ASSIGN_CODES:
+        assert _service_state(conn, code).doctor_id == _TARGET_DOCTOR_ID
+
+
+def test_assign_doctor_guard_matches_the_null_source_state_and_refuses_foreign_edits() -> None:
+    """NULL comparison semantics (the 3995689409 ruling): ``doctor_id =
+    :expected`` never matches NULL, so the guarded assign UPDATE carries
+    an explicit IS NULL arm. K01 sits on the NULL pre-state — a clean
+    apply must match it; a concurrent foreign doctor (99) must make the
+    guard abort without writing the target over it."""
+    conn = _scratch()
+    _seed_synthetic_world(conn)
+    _seed_decided_services(conn)
+    conn.commit()
+
+    module = _load_migration_0064()
+    original_assert = module._assert_target_doctor
+
+    def operator_sets_a_foreign_doctor(migration_conn, doctor_id):
+        migration_conn.execute(
+            sa.text("UPDATE services SET doctor_id = 99 WHERE code = 'K01'")
+        )
+        return original_assert(migration_conn, doctor_id)
+
+    module._assert_target_doctor = operator_sets_a_foreign_doctor
+
+    trans = conn.begin()
+    with pytest.raises(RuntimeError, match="concurrently modified"):
+        module.upgrade_with_conn(conn)
+
+    # the operator's foreign doctor survived the refused write; the 33
+    # retags the migration had already written sit in the transaction
+    assert _service_state(conn, "K01").doctor_id == 99
+    assert _service_state(conn, "L03").queue_tag == "lab"
+    trans.rollback()
+
+    # and the caller's rollback discards them all
+    assert _service_state(conn, "K01").doctor_id is None
+    for code in _RETAG_CODES:
+        assert _service_state(conn, code).queue_tag == "general", code
+
+
+@pytest.fixture
+def cutover_pg_engine():
+    """An isolated PostgreSQL schema with the minimal cutover tables —
+    the two-connection race proof (3995689409): one connection runs the
+    migration, a SECOND connection plays the operator, and the final
+    state is verified from a fresh third read."""
+    database_url = os.environ.get("DATABASE_URL", "sqlite:///:memory:")
+    url = make_url(database_url)
+    if url.get_backend_name() != "postgresql":
+        pytest.skip("guarded-write race proof requires PostgreSQL")
+    if os.environ.get("CI", "").lower() != "true" and not (
+        url.database or ""
+    ).startswith("clinic_test"):
+        pytest.skip("use CI or an explicitly disposable clinic_test database")
+
+    schema = "test_cutover_race_" + uuid.uuid4().hex
+    admin_engine = create_engine(url, pool_pre_ping=True)
+    with admin_engine.begin() as connection:
+        connection.execute(CreateSchema(schema))
+
+    engine = create_engine(
+        url,
+        pool_pre_ping=True,
+        connect_args={
+            "options": (
+                f"-csearch_path={schema} "
+                "-cstatement_timeout=10000 -clock_timeout=8000"
+            )
+        },
+    )
+    try:
+        _create_cutover_tables(engine)
+        yield engine
+    finally:
+        engine.dispose()
+        with admin_engine.begin() as connection:
+            connection.execute(DropSchema(schema, cascade=True))
+        admin_engine.dispose()
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_pg_two_connections_operator_edit_is_never_overwritten_and_migration_rolls_back_whole_map(
+    cutover_pg_engine,
+) -> None:
+    """The MANDATORY PostgreSQL proof (thread 3995689409): the operator
+    CHANGES the row between the migration's preflight and its write
+    attempt, in a SEPARATE COMMITTED transaction. His edit must survive;
+    the migration's own changes must roll back ENTIRELY — verified in the
+    DATABASE by a fresh third read, not by HTTP codes or return values."""
+    with cutover_pg_engine.connect() as setup_conn:
+        _seed_synthetic_world(setup_conn)
+        _seed_decided_services(setup_conn)
+        setup_conn.commit()
+
+    module = _load_migration_0064()
+    original_assert = module._assert_registry_target
+
+    def operator_edits_between_preflight_and_write(migration_conn, to_tag):
+        # connection B: the operator's own COMMITTED transaction, landing
+        # exactly between the pre-state check and the guarded write
+        with cutover_pg_engine.connect() as operator_conn:
+            with operator_conn.begin():
+                operator_conn.execute(
+                    sa.text(
+                        "UPDATE services SET queue_tag = 'ecg'"
+                        " WHERE code = 'LAB_CA'"
+                    )
+                )
+        return original_assert(migration_conn, to_tag)
+
+    module._assert_registry_target = operator_edits_between_preflight_and_write
+
+    with cutover_pg_engine.connect() as migration_conn:
+        migration_trans = migration_conn.begin()
+        with pytest.raises(RuntimeError, match="concurrently modified"):
+            module.upgrade_with_conn(migration_conn)
+        migration_trans.rollback()
+
+    # fresh third read: the operator's edit is the ONLY surviving change
+    with cutover_pg_engine.connect() as verify_conn:
+        assert _service_state(verify_conn, "LAB_CA").queue_tag == "ecg"
+        for code in _RETAG_CODES:
+            if code != "LAB_CA":
+                assert _service_state(verify_conn, code).queue_tag == "general", code
+        for code in _ASSIGN_CODES:
+            assert _service_state(verify_conn, code).doctor_id is None
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_pg_two_connections_concurrent_same_target_is_a_proven_no_op(
+    cutover_pg_engine,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """PostgreSQL counterpart: the operator concurrently applies the
+    SAME decision (moves LAB_CA onto the 'lab' target) in his own
+    committed transaction. The guarded UPDATE matches zero rows, the
+    guard re-reads and PROVES the exact post-state, and the migration
+    completes the rest of the map."""
+    with cutover_pg_engine.connect() as setup_conn:
+        _seed_synthetic_world(setup_conn)
+        _seed_decided_services(setup_conn)
+        setup_conn.commit()
+
+    module = _load_migration_0064()
+    original_assert = module._assert_registry_target
+
+    def operator_applies_the_same_target(migration_conn, to_tag):
+        with cutover_pg_engine.connect() as operator_conn:
+            with operator_conn.begin():
+                operator_conn.execute(
+                    sa.text(
+                        "UPDATE services SET queue_tag = 'lab'"
+                        " WHERE code = 'LAB_CA'"
+                    )
+                )
+        return original_assert(migration_conn, to_tag)
+
+    module._assert_registry_target = operator_applies_the_same_target
+
+    with cutover_pg_engine.connect() as migration_conn:
+        migration_trans = migration_conn.begin()
+        module.upgrade_with_conn(migration_conn)  # must NOT raise
+        migration_trans.commit()
+
+    assert "proven idempotent no-op" in capsys.readouterr().out
+    with cutover_pg_engine.connect() as verify_conn:
+        for code in _RETAG_CODES:
+            assert _service_state(verify_conn, code).queue_tag == "lab", code
+        for code in _ASSIGN_CODES:
+            assert _service_state(verify_conn, code).doctor_id == _TARGET_DOCTOR_ID
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_pg_two_connections_assign_guard_null_semantics_foreign_doctor(
+    cutover_pg_engine,
+) -> None:
+    """PostgreSQL counterpart for the assign half: K01 sits on the NULL
+    pre-state (the ``= :expected`` arm alone would never match it); the
+    operator sets a foreign doctor (99) between preflight and write in
+    his own committed transaction — the guard refuses, the operator's
+    row survives and the whole map (retags included) rolls back."""
+    with cutover_pg_engine.connect() as setup_conn:
+        _seed_synthetic_world(setup_conn)
+        _seed_decided_services(setup_conn)
+        setup_conn.commit()
+
+    module = _load_migration_0064()
+    original_assert = module._assert_target_doctor
+
+    def operator_sets_a_foreign_doctor(migration_conn, doctor_id):
+        with cutover_pg_engine.connect() as operator_conn:
+            with operator_conn.begin():
+                operator_conn.execute(
+                    sa.text(
+                        "UPDATE services SET doctor_id = 99 WHERE code = 'K01'"
+                    )
+                )
+        return original_assert(migration_conn, doctor_id)
+
+    module._assert_target_doctor = operator_sets_a_foreign_doctor
+
+    with cutover_pg_engine.connect() as migration_conn:
+        migration_trans = migration_conn.begin()
+        with pytest.raises(RuntimeError, match="concurrently modified"):
+            module.upgrade_with_conn(migration_conn)
+        migration_trans.rollback()
+
+    with cutover_pg_engine.connect() as verify_conn:
+        assert _service_state(verify_conn, "K01").doctor_id == 99
+        for code in _RETAG_CODES:
+            assert _service_state(verify_conn, code).queue_tag == "general", code
+        assert _service_state(verify_conn, "K11").doctor_id is None
 
 
 def test_embedded_decisions_match_the_operator_map_evidence() -> None:

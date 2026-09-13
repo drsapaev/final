@@ -49,10 +49,18 @@ transaction; PG DDL/DML is transactional):
      silently. CI runs ``alembic upgrade head`` on an EMPTY database —
      no surfaces, no decisions to apply, a clean pass.
 
-2. Decision application — exact-row (``UPDATE ... WHERE id = :id``),
-   deterministic (code order), postcondition re-verified after every
-   write, per-row inventory printed BEFORE the mutation (the migration
-   log is the audit trail; a pre-E backup is the restore path):
+2. Decision application — exact-row AND expected-state-guarded
+   (``UPDATE ... WHERE id = :id AND code = :code AND <expected source
+   state>``, exactly one affected row verified — thread 3995689409,
+   P1: alembic runs while uvicorn is still serving in the deploy script,
+   so an operator catalog edit can land between the pre-state check and
+   the write; the guarded predicate makes the UPDATE match zero rows
+   instead of overwriting the newer edit, and a rowcount != 1 is either
+   PROVEN to be the exact post-state — an idempotent no-op — or aborts
+   the whole map with no rows changed), deterministic (code order),
+   postcondition re-verified after every write, per-row inventory
+   printed BEFORE the mutation (the migration log is the audit trail; a
+   pre-E backup is the restore path):
 
    - ``retag_resource`` (33 lab services L03-L35 / LAB_*): the service
      ``queue_tag`` moves from ``general`` to ``lab`` — validated
@@ -193,8 +201,26 @@ _DISABLE_DECISIONS: tuple[str, ...] = ()
 _PROFILE_DECISIONS: dict[str, str] = {"general": "keep_profile"}
 
 # ============================================================================
-# SQL — inventory, validation, application. Every mutation targets an
-# exact row id and is re-verified after the write (the 0063 pattern).
+# SQL — inventory, validation, application. Every mutation is guarded by
+# exact identity (id + code) AND the expected source state, verifies
+# exactly one affected row, and is re-verified after the write (the 0063
+# pattern). The guarded predicates close the preflight→write race the
+# review exposed (thread 3995689409, P1): the deploy reality is that
+# scripts/deploy_restart.ps1 runs alembic at lines 170–180 while uvicorn
+# is only stopped at lines 191–204, so catalog writes CAN interleave —
+# an ID-only UPDATE would overwrite a newer operator edit that landed
+# after ``_assert_decision_pre_states`` read the row. With the expected
+# source state in the WHERE clause the concurrent edit makes the UPDATE
+# match zero rows instead, and a rowcount != 1 is never accepted blindly:
+# the row is re-read and the no-op is PROVEN (the exact post-state) or
+# the whole map aborts with no rows changed.
+# NULL comparison semantics (thread 3995689409): ``col = :param`` never
+# matches NULL on either engine, and a bare ``:param IS NULL`` arm is
+# untypable for the PostgreSQL server-side parameter binding. Every
+# nullable expected column therefore carries a PRECOMPUTED NULL flag
+# (1/0) plus the exact comparison arm — the flag is Python-side truth,
+# the SQL stays engine-portable (see ``_is_null_flag`` below).
+
 # ============================================================================
 
 _SELECT_ACTIVE_GENERAL_QUEUES = sa.text("""
@@ -276,15 +302,37 @@ _SELECT_SERVICE_BY_ID = sa.text("""
     """)
 
 _UPDATE_SERVICE_QUEUE_TAG = sa.text("""
-    UPDATE services SET queue_tag = :to_tag WHERE id = :id
+    UPDATE services
+    SET queue_tag = :to_tag
+    WHERE id = :id
+      AND code = :code
+      AND ((:expected_queue_tag_is_null = 1 AND queue_tag IS NULL)
+           OR (:expected_queue_tag_is_null = 0
+               AND queue_tag IS NOT NULL
+               AND queue_tag = :expected_queue_tag))
     """)
 
 _UPDATE_SERVICE_DOCTOR = sa.text("""
-    UPDATE services SET doctor_id = :doctor_id WHERE id = :id
+    UPDATE services
+    SET doctor_id = :doctor_id
+    WHERE id = :id
+      AND code = :code
+      AND ((:expected_doctor_id_is_null = 1 AND doctor_id IS NULL)
+           OR (:expected_doctor_id_is_null = 0
+               AND doctor_id IS NOT NULL
+               AND doctor_id = :expected_doctor_id))
+      AND ((:expected_queue_tag_is_null = 1 AND queue_tag IS NULL)
+           OR (:expected_queue_tag_is_null = 0
+               AND queue_tag IS NOT NULL
+               AND queue_tag = :expected_queue_tag))
     """)
 
 _UPDATE_SERVICE_ACTIVE = sa.text("""
-    UPDATE services SET active = :active WHERE id = :id
+    UPDATE services
+    SET active = :active
+    WHERE id = :id
+      AND code = :code
+      AND active = :expected_active
     """)
 
 _SELECT_ACTIVE_REGISTRY_ROW = sa.text("""
@@ -311,12 +359,22 @@ _SELECT_PROFILE_BY_KEY = sa.text("""
     """)
 
 _UPDATE_PROFILE_ACTIVE = sa.text("""
-    UPDATE queue_profiles SET is_active = :active WHERE id = :id
+    UPDATE queue_profiles
+    SET is_active = :active
+    WHERE id = :id
+      AND key = :key
+      AND is_active = :expected_active
     """)
 
 
 def _abort(message: str) -> None:
     raise RuntimeError(f"{_MIGRATION_NAME} abort: {message}")
+
+
+def _is_null_flag(value) -> int:
+    """Python-side NULL truth for the guarded expected-state predicates —
+    the portable engine-agnostic form of ``:param IS NULL``."""
+    return 1 if value is None else 0
 
 
 def _assert_no_active_general_queues(conn) -> None:
@@ -546,6 +604,71 @@ def _assert_decision_pre_states(conn, surfaces: dict) -> None:
                 )
 
 
+def _guarded_service_update(
+    conn,
+    *,
+    statement,
+    params,
+    service_id: int,
+    service_code: str,
+    decision: str,
+    expected_description: str,
+    post_state_check,
+    post_state_description: str,
+) -> bool:
+    """Run ONE catalog mutation guarded by identity + expected source
+    state and verify exactly one affected row (thread 3995689409, P1).
+
+    Returns True when the row changed. A rowcount of anything else is
+    NEVER accepted blindly — the row is re-read and the outcome proven:
+
+    - the exact post-state of THIS decision → a concurrent operator (or
+      an earlier pass) already applied it — an idempotent no-op, printed
+      as such (returns False, nothing written for the row);
+    - anything else — a vanished row, a changed identity (id+code) or a
+      foreign source state — is a NEWER operator edit that must not be
+      overwritten: the whole map aborts with no rows changed (the raise
+      propagates; alembic rolls the single transaction back — there are
+      no partial commits anywhere in this revision).
+    """
+    result = conn.execute(statement, params)
+    if result.rowcount == 1:
+        return True
+    after = conn.execute(_SELECT_SERVICE_BY_ID, {"id": service_id}).fetchone()
+    if after is None:
+        _abort(
+            f"{decision} target service id={service_id} "
+            f"code={service_code!r} vanished between the pre-state check "
+            "and the guarded write — the identity (id+code) matched no "
+            "row; re-run the inventory (never widen the predicate); "
+            "aborting with no rows changed"
+        )
+    if after.code != service_code:
+        _abort(
+            f"{decision} target service id={service_id} changed identity "
+            f"between the pre-state check and the guarded write (code "
+            f"stored={after.code!r}, expected {service_code!r}); aborting "
+            "with no rows changed"
+        )
+    if post_state_check(after):
+        print(
+            f"{_MIGRATION_NAME}: {decision} service id={service_id} "
+            f"code={service_code!r} concurrently arrived at the exact "
+            f"post-state ({post_state_description}) — proven idempotent "
+            "no-op, nothing written for it"
+        )
+        return False
+    _abort(
+        f"{decision} target service id={service_id} code={service_code!r} "
+        "was concurrently modified between the pre-state check and the "
+        f"guarded write (live queue_tag={after.queue_tag!r}, "
+        f"doctor_id={after.doctor_id!r}, active={bool(after.active)}; the "
+        f"embedded map expected {expected_description}) — a newer operator "
+        "edit is never overwritten by the cutover; re-run the inventory "
+        "and update the decision tables; aborting with no rows changed"
+    )
+
+
 def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
     """Apply the embedded operator map, exact-row, deterministic.
 
@@ -553,7 +676,16 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
     coverage, pre-state and target validations (registry resource,
     real doctor) ALL run BEFORE the first mutation — a stale map or
     an invalid target aborts with the catalog untouched, not
-    half-converted."""
+    half-converted.
+
+    Write phase (thread 3995689409, P1): every UPDATE carries the exact
+    identity (id + code) AND the expected source state read by the
+    inventory, and must affect exactly one row. A concurrent catalog
+    edit that lands between the pre-state check and the write makes the
+    guarded UPDATE match zero rows; the mismatch is then PROVEN to be
+    either the exact post-state (an idempotent no-op) or it aborts the
+    whole map — a newer operator edit is never overwritten, and the
+    map is never partially applied."""
     counts = {"retag_resource": 0, "assign_doctor": 0, "disable_service": 0}
 
     _assert_decision_pre_states(conn, surfaces)
@@ -581,9 +713,28 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
             f"(doctor_id={row.doctor_id}, requires_doctor="
             f"{row.requires_doctor})"
         )
-        conn.execute(_UPDATE_SERVICE_QUEUE_TAG, {"id": row.id, "to_tag": to_tag})
-        counts["retag_resource"] += 1
-        _verify_service_state(conn, service_id=row.id, queue_tag=to_tag)
+        applied = _guarded_service_update(
+            conn,
+            statement=_UPDATE_SERVICE_QUEUE_TAG,
+            params={
+                "id": row.id,
+                "code": row.code,
+                "to_tag": to_tag,
+                "expected_queue_tag": row.queue_tag,
+                "expected_queue_tag_is_null": _is_null_flag(row.queue_tag),
+            },
+            service_id=row.id,
+            service_code=row.code,
+            decision="retag_resource",
+            expected_description=f"queue_tag={row.queue_tag!r}",
+            post_state_check=(
+                lambda after, _to_tag=to_tag: after.queue_tag == _to_tag
+            ),
+            post_state_description=f"queue_tag={to_tag!r}",
+        )
+        if applied:
+            counts["retag_resource"] += 1
+            _verify_service_state(conn, service_id=row.id, queue_tag=to_tag)
 
     for code, target_doctor_id, _original, _snapshot_tag in _ASSIGN_DOCTOR_DECISIONS:
         row = surfaces.get(code)
@@ -601,12 +752,38 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
             f"code={code!r} doctor_id {row.doctor_id} -> "
             f"{target_doctor_id} (tag={row.queue_tag!r})"
         )
-        conn.execute(
-            _UPDATE_SERVICE_DOCTOR,
-            {"id": row.id, "doctor_id": target_doctor_id},
+        applied = _guarded_service_update(
+            conn,
+            statement=_UPDATE_SERVICE_DOCTOR,
+            params={
+                "id": row.id,
+                "code": row.code,
+                "doctor_id": target_doctor_id,
+                "expected_doctor_id": row.doctor_id,
+                "expected_doctor_id_is_null": _is_null_flag(row.doctor_id),
+                "expected_queue_tag": row.queue_tag,
+                "expected_queue_tag_is_null": _is_null_flag(row.queue_tag),
+            },
+            service_id=row.id,
+            service_code=row.code,
+            decision="assign_doctor",
+            expected_description=(
+                f"doctor_id={row.doctor_id!r} on queue_tag={row.queue_tag!r}"
+            ),
+            post_state_check=(
+                lambda after, _doctor=target_doctor_id, _tag=row.queue_tag: (
+                    after.doctor_id == _doctor and after.queue_tag == _tag
+                )
+            ),
+            post_state_description=(
+                f"doctor_id={target_doctor_id} on queue_tag={row.queue_tag!r}"
+            ),
         )
-        counts["assign_doctor"] += 1
-        _verify_service_state(conn, service_id=row.id, doctor_id=target_doctor_id)
+        if applied:
+            counts["assign_doctor"] += 1
+            _verify_service_state(
+                conn, service_id=row.id, doctor_id=target_doctor_id
+            )
 
     for code in _DISABLE_DECISIONS:
         row = surfaces.get(code)
@@ -616,15 +793,32 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
             f"{_MIGRATION_NAME}: disable_service service id={row.id} "
             f"code={code!r} (tag={row.queue_tag!r})"
         )
-        conn.execute(_UPDATE_SERVICE_ACTIVE, {"id": row.id, "active": False})
-        counts["disable_service"] += 1
-        _verify_service_state(conn, service_id=row.id, active=False)
+        applied = _guarded_service_update(
+            conn,
+            statement=_UPDATE_SERVICE_ACTIVE,
+            params={
+                "id": row.id,
+                "code": row.code,
+                "active": False,
+                "expected_active": True,
+            },
+            service_id=row.id,
+            service_code=row.code,
+            decision="disable_service",
+            expected_description="active=True",
+            post_state_check=lambda after: not bool(after.active),
+            post_state_description="active=False",
+        )
+        if applied:
+            counts["disable_service"] += 1
+            _verify_service_state(conn, service_id=row.id, active=False)
 
     return counts
 
 
 def _apply_profile_decisions(conn) -> int:
-    """keep_profile writes nothing; retire_profile deactivates."""
+    """keep_profile writes nothing; retire_profile deactivates (guarded
+    by key identity + expected is_active, the same 3995689409 contract)."""
     retired = 0
     for profile_key, decision in _PROFILE_DECISIONS.items():
         if decision != "retire_profile":
@@ -640,7 +834,36 @@ def _apply_profile_decisions(conn) -> int:
             f"{_MIGRATION_NAME}: retire_profile profile id={row.id} "
             f"key={profile_key!r} is_active={bool(row.is_active)} -> false"
         )
-        conn.execute(_UPDATE_PROFILE_ACTIVE, {"id": row.id, "active": False})
+        result = conn.execute(
+            _UPDATE_PROFILE_ACTIVE,
+            {
+                "id": row.id,
+                "key": profile_key,
+                "active": False,
+                "expected_active": True,
+            },
+        )
+        if result.rowcount == 1:
+            retired += 1
+        else:
+            after = conn.execute(
+                _SELECT_PROFILE_BY_KEY, {"key": profile_key}
+            ).fetchone()
+            if after is not None and not bool(after.is_active):
+                print(
+                    f"{_MIGRATION_NAME}: retire_profile profile "
+                    f"id={row.id} key={profile_key!r} concurrently "
+                    "arrived at is_active=false — proven idempotent no-op"
+                )
+                continue
+            _abort(
+                f"retire_profile target profile id={row.id} "
+                f"key={profile_key!r} was concurrently modified between "
+                "the read and the guarded write (is_active="
+                f"{bool(after.is_active) if after is not None else 'row vanished'}"
+                ") — a newer operator edit is never overwritten; aborting "
+                "with no rows changed"
+            )
         after = conn.execute(_SELECT_PROFILE_BY_KEY, {"key": profile_key}).fetchone()
         if after is None or bool(after.is_active):
             _abort(
@@ -648,7 +871,6 @@ def _apply_profile_decisions(conn) -> int:
                 "still active after retire_profile; aborting with no "
                 "rows changed"
             )
-        retired += 1
     return retired
 
 
