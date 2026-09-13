@@ -189,6 +189,11 @@ export function useLabReportState({
     activeInstance.sections.forEach((section) => {
       section.fields.forEach((field) => {
         values[field.field_key] = extractFieldValue(field);
+        // PR3: гидратируем per-field комментарий из материализованного поля
+        // (ReportEditor редактирует `field_key__comment`), иначе повторное
+        // сохранение отправит comment: null и затрёт существующий комментарий.
+        const fieldComment = (field as { comment?: unknown }).comment;
+        values[`${field.field_key}__comment`] = fieldComment ?? '';
       });
     });
     setDraftValues(values);

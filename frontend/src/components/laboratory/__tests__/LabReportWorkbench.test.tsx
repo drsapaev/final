@@ -3,7 +3,7 @@ import '@testing-library/jest-dom';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbenchRaw from '../LabReportWorkbench';
@@ -399,5 +399,183 @@ describe('LabReportWorkbench', () => {
     expect(source).not.toContain("'Отправляю лабораторный отчёт на печать...'");
     expect(source).not.toContain("'Не удалось сформировать PDF. Проверьте соединение и попробуйте снова.'");
     expect(source).not.toContain("'PDF сформирован некорректно. Обратитесь к администратору.'");
+  });
+});
+
+describe('LabReportWorkbench draft save integrity (PR3)', () => {
+  // vi.mock подменяет методы на vi.fn(), но статический тип остаётся от
+  // реального labReportingApi — приводим к vi.fn для setup и инспекции.
+  const mockedApi = labReportingApi as unknown as {
+    updateInstance: ReturnType<typeof vi.fn>;
+    bulkSaveValues: ReturnType<typeof vi.fn>;
+  };
+
+  const reopenedDraftInstance = {
+    id: 77,
+    status: 'DRAFT',
+    template_id: 3,
+    patient_id: 444,
+    updated_at: '2026-09-13T08:00:00.000000+00:00',
+    signer_snapshot: {},
+    available_actions: ['edit', 'save_draft', 'finalize'],
+    critical_findings: [],
+    sections: [
+      {
+        key: 'cbc',
+        title: 'CBC',
+        fields: [
+          {
+            field_key: 'wbc',
+            label: 'Лейкоциты',
+            value_type: 'text',
+            value_text: '5.2',
+            comment: 'утренний забор',
+          },
+          {
+            field_key: 'hgb',
+            label: 'Гемоглобин',
+            value_type: 'numeric',
+            value_text: '140',
+            comment: null,
+          },
+        ],
+      },
+    ],
+  };
+
+  function renderWithActiveInstance(props: Record<string, unknown> = {}) {
+    return render(
+      <ThemeProvider>
+        <LabReportWorkbench
+          selectedAppointment={null}
+          templates={[]}
+          templateResolution={null}
+          templateResolutionLoading={false}
+          reportHistory={[]}
+          recentReports={[]}
+          activeInstance={reopenedDraftInstance}
+          onInstanceChange={vi.fn()}
+          onOpenInstance={vi.fn()}
+          onRefreshHistory={vi.fn()}
+          onRefreshRecentReports={vi.fn()}
+          onQueueChanged={vi.fn()}
+          notify={vi.fn()}
+          {...props}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  it('sends the hydrated per-field comment when saving a reopened draft', async () => {
+    mockedApi.bulkSaveValues.mockResolvedValue({
+      instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:05.000000+00:00' },
+    });
+
+    renderWithActiveInstance();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalled());
+    // Дочищаем всю цепочку сохранения, чтобы её «хвост» не выполнялся
+    // посреди следующего теста (моки общие на файл).
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) {
+        await Promise.resolve();
+      }
+    });
+
+    const payload = mockedApi.bulkSaveValues.mock.calls[0][1] as Array<
+      Record<string, unknown>
+    >;
+    const wbcItem = payload.find((item) => item.field_key === 'wbc');
+    expect(wbcItem?.comment).toBe('утренний забор');
+  });
+
+  it('uses the version token from the signer response for the subsequent values save', async () => {
+    const signerResponseUpdated = '2026-09-13T08:00:05.500000+00:00';
+    mockedApi.updateInstance.mockResolvedValue({
+      ...reopenedDraftInstance,
+      updated_at: signerResponseUpdated,
+      signer_snapshot: { lab_technician_name: 'Иванов И.И.' },
+    });
+    mockedApi.bulkSaveValues.mockResolvedValue({
+      instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:06.000000+00:00' },
+    });
+
+    renderWithActiveInstance();
+    fireEvent.click(screen.getByText('Подписи'));
+    fireEvent.change(screen.getByLabelText('ФИО лаборанта'), {
+      target: { value: 'Иванов И.И.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalled());
+
+    // Последовательное сохранение signer -> values: bulk обязан использовать
+    // updated_at из ответа первого запроса, иначе получит 409 от себя самого.
+    // Ассертим последний вызов: тестовые моки общие на файл, и «хвосты»
+    // цепочек предыдущих тестов могут добавлять более ранние вызовы.
+    const bulkCalls = mockedApi.bulkSaveValues.mock.calls;
+    const ownBulkCall = bulkCalls[bulkCalls.length - 1];
+    expect(mockedApi.updateInstance).toHaveBeenCalledWith(
+      77,
+      { signer_snapshot: expect.objectContaining({ lab_technician_name: 'Иванов И.И.' }) },
+      new Date('2026-09-13T08:00:00.000000+00:00').toISOString()
+    );
+    expect(ownBulkCall[2]).toBe(new Date(signerResponseUpdated).toISOString());
+  });
+
+  it('does not surface an autosave confirmation for a failed autosave', async () => {
+    vi.useFakeTimers();
+    try {
+      // Все autosave-попытки в этом тесте неудачны: base после неудачи всё
+      // равно ставит lastAutoSave, исправленный код — нет.
+      mockedApi.bulkSaveValues.mockRejectedValue(
+        new Error('Бланк был изменён другим пользователем')
+      );
+
+      const utils = renderWithActiveInstance();
+      fireEvent.change(screen.getByLabelText('Результат: Лейкоциты'), {
+        target: { value: '6.5' },
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30000);
+      });
+      expect(mockedApi.bulkSaveValues.mock.calls.length).toBeGreaterThanOrEqual(1);
+      // Dirty/retry состояние сохранено: введённое значение не откатилось.
+      expect(screen.getByLabelText('Результат: Лейкоциты')).toHaveValue('6.5');
+
+      // Смена активного бланка сбрасывает dirty, но lastAutoSave от
+      // НЕУДАЧНОГО autosave не должен «переживать» смену бланка — иначе UI
+      // показывает «✓ сохранено» для отчёта, который ни разу не сохранялся.
+      const nextInstance = { ...reopenedDraftInstance, id: 78 };
+      utils.rerender(
+        <ThemeProvider>
+          <LabReportWorkbench
+            selectedAppointment={null}
+            templates={[]}
+            templateResolution={null}
+            templateResolutionLoading={false}
+            reportHistory={[]}
+            recentReports={[]}
+            activeInstance={nextInstance}
+            onInstanceChange={vi.fn()}
+            onOpenInstance={vi.fn()}
+            onRefreshHistory={vi.fn()}
+            onRefreshRecentReports={vi.fn()}
+            onQueueChanged={vi.fn()}
+            notify={vi.fn()}
+          />
+        </ThemeProvider>
+      );
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(screen.queryByText((content) => content.includes('✓ сохранено'))).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      vi.clearAllMocks();
+    }
   });
 });
