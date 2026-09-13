@@ -16,11 +16,16 @@ from app.services.telegram_staff_action_adapter_service import (
 )
 
 
-def _linked_queue_entry(db_session, *, visit_id: int, test_doctor, test_patient):
+def _linked_queue_entry(
+    db_session, *, visit_id: int, test_doctor, test_patient, tag="cardiology_common"
+):
+    # RQ-14.a.1: each helper call creates its own (day, doctor, tag) row —
+    # callers that need a second entry pass a distinct tag (two ACTIVE
+    # rows on one key are now rejected by the doctor-axis unique).
     queue = DailyQueue(
         day=date.today(),
         specialist_id=test_doctor.id,
-        queue_tag="cardiology_common",
+        queue_tag=tag,
         active=True,
     )
     db_session.add(queue)
@@ -53,6 +58,7 @@ def _other_patient_queue_entry(db_session, *, visit_id: int, test_doctor):
         visit_id=visit_id,
         test_doctor=test_doctor,
         test_patient=other_patient,
+        tag="cardiology_common_other",
     )
 
 
