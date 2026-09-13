@@ -4,6 +4,8 @@ Split from queue_service.py.
 """
 from __future__ import annotations
 
+from sqlalchemy import select, text  # RQ-14.a: row-lock + advisory lock
+
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import expand_queue_tags
 from app.crud import queue_resource_routing
@@ -569,6 +571,23 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         # ✅ ИСПРАВЛЕНО: Используем doctor.id для specialist_id (ForeignKey на doctors.id)
         actual_specialist_id = doctor.id
 
+        # RQ-14.a: serialize first arrivals for the same (day, specialist).
+        # The select-then-INSERT below had no serialization and no UNIQUE
+        # on (day, specialist_id, queue_tag) for doctor-owned rows (the
+        # 0063 partial unique covers only the resource axis), so two
+        # concurrent get_or_create calls forked TWO rows for one key
+        # (E-033 pin). Transaction-scoped advisory lock — the loser blocks
+        # here until the winner commits, then re-reads and reuses the
+        # committed row (same pattern as the RQ-25.a.1 patient-identity
+        # fix). The resource branch above is already serialized by
+        # lock_registry_tag_creation. PostgreSQL-only: the SQLite
+        # conftest tests skip this branch harmlessly.
+        if db.get_bind().dialect.name == "postgresql":
+            db.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
+                {"lock_key": f"daily_queue:{day}:{actual_specialist_id}"},
+            )
+
         # PR-26: ARCHITECTURE FIX — queue is owned by DOCTOR, not by queue_tag.
         #
         # Previous code searched by (day, queue_tag) IGNORING specialist_id,
@@ -701,6 +720,22 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             daily_queue = db.query(DailyQueue).filter(DailyQueue.id == queue_id).with_for_update().first()
             if not daily_queue:
                 raise QueueNotFoundError(f"DailyQueue {queue_id} not found")
+        else:
+            # RQ-14.a: an already-loaded daily_queue used to skip the row
+            # lock entirely — every live writer (QR join, desk wizard,
+            # crud, batch, visit confirmation) passes one, so two
+            # concurrent writers read the same MAX(number) and committed
+            # the SAME number (E-033 pin). Take the same FOR UPDATE row
+            # lock the queue_id branch takes: all writers of one queue
+            # serialize from the max-read until the caller's commit, so
+            # the next writer re-reads a fresh snapshot (READ COMMITTED)
+            # after the previous number landed. Per-queue scope only —
+            # numbers may still repeat ACROSS queues.
+            db.execute(
+                select(DailyQueue.id)
+                .where(DailyQueue.id == daily_queue.id)
+                .with_for_update()
+            )
 
         # start_number не является полем DailyQueue, используется только для вычисления номера записи
         # Не нужно устанавливать его в daily_queue

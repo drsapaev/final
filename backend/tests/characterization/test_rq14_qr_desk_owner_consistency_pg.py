@@ -495,24 +495,29 @@ def test_desk_then_qr_aligned_tags_share_queue_row(pg_engine, pg_session):
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_concurrent_desk_and_qr_numbering_can_duplicate_within_one_queue(
+def test_concurrent_desk_and_qr_numbering_stay_unique_within_one_queue(
     pg_engine, pg_session
 ):
-    """Pins RQ-14.a (numbering race): same queue row, two writers, one number.
+    """RQ-14.a FIXED (was the E-033 duplicate pin, flipped on the fix):
+    same queue row, two concurrent writers — DISTINCT numbers.
 
-    Deterministic interleaving: both writers compute the next number via
-    ``calculate_next_number`` (plain SELECT MAX — no row lock on the
-    already-loaded queue, no unique constraint on (queue_id, number));
-    a barrier AFTER the read releases both inserts simultaneously.
-    """
+    The E-033 pin proved the numbering race: both writers computed the
+    next number via an unlocked ``SELECT MAX`` on an already-loaded
+    queue (no row lock, no (queue_id, number) unique) and committed the
+    SAME number behind a barrier. RQ-14.a serializes every writer of a
+    queue on the queue row (FOR UPDATE in ``get_next_queue_number`` for
+    the already-loaded branch), so the second writer reads a fresh
+    snapshot after the first one's number landed. Per-queue uniqueness
+    is asserted here; numbers repeating ACROSS queues is a different
+    (preserved) contract."""
     _patch_online_window()
     world = _seed_join_world(pg_session, suffix="race", service_tag="cardiology_race")
 
     from app.models.online_queue import DailyQueue
-    from app.services.queue_service import QueueBusinessService
 
     # Pre-create the shared queue row so both writers RESOLVE it instead of
-    # racing in get_or_create (that separate race is out of this slice's scope).
+    # racing in get_or_create (that separate race is covered by the RQ-14.a
+    # integration suite).
     Session = sessionmaker(bind=pg_engine, future=True)
     seed_session = Session()
     queue_row = DailyQueue(
@@ -526,15 +531,6 @@ def test_concurrent_desk_and_qr_numbering_can_duplicate_within_one_queue(
     queue_id = queue_row.id
     seed_session.close()
 
-    orig_calc = QueueBusinessService.calculate_next_number.__func__
-    barrier = threading.Barrier(2, timeout=20)
-
-    def _raced_calc(cls, db, daily_queue):
-        number = orig_calc(cls, db, daily_queue)
-        barrier.wait()
-        return number
-
-    QueueBusinessService.calculate_next_number = classmethod(_raced_calc)
     results: dict[str, dict] = {}
 
     def desk_worker():
@@ -549,17 +545,14 @@ def test_concurrent_desk_and_qr_numbering_can_duplicate_within_one_queue(
             "+998901000002",
         )
 
-    try:
-        threads = [
-            threading.Thread(target=desk_worker),
-            threading.Thread(target=qr_worker),
-        ]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join(timeout=60)
-    finally:
-        QueueBusinessService.calculate_next_number = classmethod(orig_calc)
+    threads = [
+        threading.Thread(target=desk_worker),
+        threading.Thread(target=qr_worker),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=60)
 
     assert "desk" in results and "qr" in results
     assert results["desk"]["error"] is None, results["desk"]
@@ -568,9 +561,9 @@ def test_concurrent_desk_and_qr_numbering_can_duplicate_within_one_queue(
     entries = _entries(pg_engine, queue_id)
     assert len(entries) == 2, f"both writers must land on the shared row: {entries}"
     numbers = sorted(e["number"] for e in entries)
-    # THE GAP: two concurrent writers committed the SAME number in ONE queue.
-    assert len(set(numbers)) == 1, (
-        f"expected duplicate number (current behavior, RQ-14.a), got {numbers}"
+    # THE CONTRACT (RQ-14.a): per-queue numbers must not duplicate.
+    assert len(set(numbers)) == 2, (
+        f"per-queue uniqueness violated: {numbers}"
     )
 
 
