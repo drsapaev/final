@@ -270,6 +270,107 @@ class TestLabReportingService:
             f"Backfill должен создать 2 LabResult, got {after}"
         )
 
+    def test_revise_and_additional_blank_refresh_legacy_projection(
+        self, db_session, test_patient, test_visit
+    ):
+        """PR2: legacy lab_results должна отражать последнюю финализированную
+        версию каждого показателя и не блокироваться наличием любых строк
+        того же order_id.
+
+        Сценарий плана PR2:
+          - финализировать бланк A (hgb, wbc);
+          - revise → изменить один показатель → финализировать: legacy
+            consumer видит новое значение;
+          - дополнительный бланк B (ige_total, другой test_code) того же
+            visit (тот же order): показатели A сохраняются, показатель B
+            появляется.
+        """
+        test_patient.sex = "M"
+        test_patient.birth_date = date(1990, 1, 1)
+        db_session.commit()
+
+        service = LabReportingService(db_session)
+        templates = service.list_templates()
+        cbc_template = next(t for t in templates if t.code == "cbc_oak")
+
+        instance_a = service.create_instance(
+            {
+                "patient_id": test_patient.id,
+                "visit_id": test_visit.id,
+                "template_id": cbc_template.id,
+            }
+        )
+        service.bulk_upsert_values(
+            instance_a.id,
+            [
+                {"field_key": "hgb", "value_text": "100"},
+                {"field_key": "wbc", "value_text": "5.2"},
+            ],
+        )
+        # Чистим возможные legacy строки, как в соседних тестах проекции
+        db_session.execute(
+            delete(LabResult).where(LabResult.order_id == instance_a.order_id)
+        )
+        db_session.commit()
+
+        finalized_a = service.finalize(instance_a.id)
+        assert finalized_a.status == "FINALIZED"
+
+        def _legacy_rows() -> dict:
+            return {
+                row.test_code: row
+                for row in db_session.query(LabResult)
+                .filter(LabResult.order_id == instance_a.order_id)
+                .all()
+            }
+
+        assert _legacy_rows()["hgb"].value == "100"
+        assert _legacy_rows()["wbc"].value == "5.2"
+
+        # Revise → изменить один синтетический показатель → финализировать
+        revision = service.revise(finalized_a.id)
+        service.bulk_upsert_values(
+            revision.id,
+            [{"field_key": "hgb", "value_text": "140"}],
+        )
+        service.finalize(revision.id)
+
+        rows = _legacy_rows()
+        assert rows["hgb"].value == "140", (
+            "legacy projection must show the revised value after re-finalize"
+        )
+        assert rows["wbc"].value == "5.2", (
+            "unrelated indicator of the same order must be preserved"
+        )
+
+        # Дополнительный бланк B (другой шаблон/test_code) того же visit:
+        # _resolve_or_create_order переиспользует order визита
+        ige_template = next(t for t in templates if t.code == "ige_total")
+        instance_b = service.create_instance(
+            {
+                "patient_id": test_patient.id,
+                "visit_id": test_visit.id,
+                "template_id": ige_template.id,
+            }
+        )
+        assert instance_b.order_id == instance_a.order_id, (
+            "additional blank for the same visit must reuse the same order"
+        )
+        service.bulk_upsert_values(
+            instance_b.id,
+            [{"field_key": "total_ige", "value_text": "150"}],
+        )
+        service.finalize(instance_b.id)
+
+        rows = _legacy_rows()
+        assert rows["hgb"].value == "140", (
+            "blank B finalize must not drop blank A indicators"
+        )
+        assert rows["wbc"].value == "5.2"
+        assert rows["total_ige"].value == "150", (
+            "additional blank must reach the legacy projection"
+        )
+
     def test_create_instance_prefills_signer_snapshot_from_actor_name(
         self, db_session, test_patient
     ):
