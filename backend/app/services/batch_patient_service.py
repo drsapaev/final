@@ -20,7 +20,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.crud.queue_owner_policy import (
-    is_internal_resource_doctor,
+    eligible_real_doctor,
     owner_configuration_error,
 )
 from app.crud.queue_resource_routing import resolve_tag_resource
@@ -654,6 +654,24 @@ class BatchPatientService:
 
         explicit_specialist_id = action.doctor_id or getattr(service, "doctor_id", None)
         if explicit_specialist_id:
+            # QD-2E (PR review thread 3995711803, P2): явный источник
+            # назначения (action.doctor_id / service.doctor_id) проходит
+            # тот же ОБЩИЙ контракт пригодности ДО создания очереди —
+            # непригодный явный врач (неактивный Doctor, отсутствующий/
+            # неактивный User, внутренний Resource) не строит
+            # doctor-owned очередь, которой некому управлять; отказ
+            # происходит до любых записей (без сирот queue-entry/визита).
+            if not eligible_real_doctor(self.db, int(explicit_specialist_id)):
+                raise owner_configuration_error(
+                    queue_tag=queue_tag,
+                    detail=(
+                        f"explicit doctor id={int(explicit_specialist_id)} is "
+                        "not an eligible real owner (inactive doctor, "
+                        "missing/inactive user link or an internal resource "
+                        "account) — the batch create-action fails closed "
+                        "before any queue row is written"
+                    ),
+                )
             return queue_service.get_or_create_daily_queue(
                 self.db,
                 day=target_date,
@@ -729,7 +747,25 @@ class BatchPatientService:
             if doctor_id is not None
         ]
         if len(service_doctor_ids) == 1:
-            return int(service_doctor_ids[0])
+            # QD-2E (PR review thread 3995711803, P2): единый врач услуг
+            # обязан быть пригодным реальным владельцем — ОБЩИЙ контракт
+            # eligible_real_doctor (активный Doctor + связанный активный
+            # User + не внутренний Resource), как во всех прочих путях
+            # owner-resolution. Стухшая привязка услуги к врачу не строит
+            # тихую очередь, которой никто не может управлять (D-08).
+            candidate_id = int(service_doctor_ids[0])
+            if not eligible_real_doctor(self.db, candidate_id):
+                raise owner_configuration_error(
+                    queue_tag=queue_tag,
+                    detail=(
+                        f"the tag's single service doctor id={candidate_id} "
+                        "is not an eligible real owner (inactive doctor, "
+                        "missing/inactive user link or an internal "
+                        "resource account) — a stale catalog assignment "
+                        "fails closed"
+                    ),
+                )
+            return candidate_id
         if len(service_doctor_ids) > 1:
             raise ValueError(
                 "Неоднозначный владелец очереди по услугам "
@@ -749,12 +785,16 @@ class BatchPatientService:
         matching_doctors = [
             doctor
             for doctor in self.db.query(Doctor).filter(Doctor.active == True).all()
-            # QD-2E (RQ-15.b): внутренние ресурсные аккаунты (роль
-            # Resource — 0056/0057: lab/ecg/general_resource) никогда
-            # не владельцы очередей: синтетик недостижим и через
-            # specialty-матчинг (D-08 — ни одного маршрута на
-            # синтетиков, каким бы путём он ни шёл).
-            if not is_internal_resource_doctor(doctor)
+            # QD-2E (PR review thread 3995711803, P2): specialty-fallback
+            # применяет ПОЛНЫЙ общий контракт пригодности, а не его часть:
+            # раньше is_internal_resource_doctor отсеивал только
+            # внутренние аккаунты и возвращал False при отсутствии User —
+            # активный Doctor с неактивным/отсутствующим User молча
+            # становился владельцем очереди, которой некому управлять.
+            # eligible_real_doctor — тот же shared-предикат, что и во всех
+            # новых owner-resolution путях (D-08: синтетики недостижимы
+            # и через specialty-матчинг, каким бы путём он ни шёл).
+            if eligible_real_doctor(self.db, doctor.id)
             and (
                 (doctor.specialty or "").strip().lower() in specialty_candidates
                 or normalize_specialty((doctor.specialty or "").strip()) in specialty_candidates
