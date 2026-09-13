@@ -41333,6 +41333,289 @@
         ]
       }
     },
+    "/api/v1/push/devices/register": {
+      "post": {
+        "tags": [
+          "push-devices"
+        ],
+        "summary": "Register Push Device",
+        "description": "Register (or idempotently refresh) a push device credential.",
+        "operationId": "register_push_device_api_v1_push_devices_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushDeviceRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Пер-юзер квота живых push-устройств исчерпана",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceErrorDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибки валидации запроса (обёртка error/message/detail)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Превышен лимит частоты регистраций",
+            "headers": {
+              "Retry-After": {
+                "description": "Секунды до повторной попытки",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceRateLimitDetail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/push/devices/refresh": {
+      "post": {
+        "tags": [
+          "push-devices"
+        ],
+        "summary": "Refresh Push Device",
+        "description": "Heartbeat from an already-registered device (bumps last_seen_at).",
+        "operationId": "refresh_push_device_api_v1_push_devices_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushDeviceRefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceRefreshResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Устройство не найдено или credential инвалидирован",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceErrorDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибки валидации запроса (обёртка error/message/detail)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/push/devices/unregister": {
+      "post": {
+        "tags": [
+          "push-devices"
+        ],
+        "summary": "Unregister Push Device",
+        "description": "Retire the matching device(s) of the current user (single logout).",
+        "operationId": "unregister_push_device_api_v1_push_devices_unregister_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PushDeviceUnregisterByToken"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PushDeviceUnregisterByDeviceId"
+                  }
+                ],
+                "title": "Payload",
+                "description": "token или device_id — хотя бы одно; оба → пересечение"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceUnregisterResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибки валидации запроса (обёртка error/message/detail)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/push/devices": {
+      "get": {
+        "tags": [
+          "push-devices"
+        ],
+        "summary": "List Push Devices",
+        "description": "List the current user's registered push devices (no credentials).",
+        "operationId": "list_push_devices_api_v1_push_devices_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/push/devices/{device_row_id}/toggle": {
+      "post": {
+        "tags": [
+          "push-devices"
+        ],
+        "summary": "Toggle Push Device",
+        "description": "Toggle the device-level switch; other devices stay untouched.",
+        "operationId": "toggle_push_device_api_v1_push_devices__device_row_id__toggle_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_row_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Row Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushDeviceToggleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Устройство не найдено (или принадлежит другому пользователю)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceErrorDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибки валидации запроса (обёртка error/message/detail)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/phone-verification/send-code": {
       "post": {
         "tags": [
@@ -93968,6 +94251,354 @@
         ],
         "title": "ProvidersResponse",
         "description": "Список доступных провайдеров"
+      },
+      "PushDeviceErrorDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PushDeviceErrorDetail",
+        "description": "Body of HTTPException errors on this surface: ``{\"detail\": ...}``."
+      },
+      "PushDeviceListResponse": {
+        "properties": {
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/PushDeviceOut"
+            },
+            "type": "array",
+            "title": "Devices"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "devices",
+          "total_count"
+        ],
+        "title": "PushDeviceListResponse"
+      },
+      "PushDeviceOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "fcm",
+              "webpush"
+            ],
+            "title": "Provider"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "web"
+            ],
+            "title": "Platform"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "token_fingerprint": {
+            "type": "string",
+            "title": "Token Fingerprint"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "invalidated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidated At"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "platform",
+          "device_id",
+          "enabled",
+          "token_fingerprint",
+          "last_seen_at",
+          "invalidated_at",
+          "created_at"
+        ],
+        "title": "PushDeviceOut"
+      },
+      "PushDeviceRateLimitDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "retry_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PushDeviceRateLimitDetail",
+        "description": "Body of the 429 rate-limit response on this surface."
+      },
+      "PushDeviceRefreshRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 65536,
+            "minLength": 1,
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "PushDeviceRefreshRequest"
+      },
+      "PushDeviceRefreshResponse": {
+        "properties": {
+          "refreshed": {
+            "type": "boolean",
+            "title": "Refreshed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refreshed"
+        ],
+        "title": "PushDeviceRefreshResponse"
+      },
+      "PushDeviceRegisterRequest": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "fcm",
+              "webpush"
+            ],
+            "title": "Provider"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "android",
+              "web"
+            ],
+            "title": "Platform"
+          },
+          "token": {
+            "type": "string",
+            "maxLength": 65536,
+            "minLength": 1,
+            "title": "Token"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          },
+          "previous_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 65536,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "platform",
+          "token"
+        ],
+        "title": "PushDeviceRegisterRequest"
+      },
+      "PushDeviceToggleRequest": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "PushDeviceToggleRequest"
+      },
+      "PushDeviceUnregisterByDeviceId": {
+        "properties": {
+          "token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 65536,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "device_id": {
+            "type": "string",
+            "maxLength": 128,
+            "title": "Device Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id"
+        ],
+        "title": "PushDeviceUnregisterByDeviceId",
+        "description": "Logout variant 2: identify the device by its install identifier."
+      },
+      "PushDeviceUnregisterByToken": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 65536,
+            "minLength": 1,
+            "title": "Token"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "PushDeviceUnregisterByToken",
+        "description": "Logout variant 1: identify the device by its credential."
+      },
+      "PushDeviceUnregisterResponse": {
+        "properties": {
+          "disabled": {
+            "type": "integer",
+            "title": "Disabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "disabled"
+        ],
+        "title": "PushDeviceUnregisterResponse"
+      },
+      "PushDeviceValidationError": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "detail": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error",
+          "message",
+          "detail"
+        ],
+        "title": "PushDeviceValidationError",
+        "description": "Wrapped validation-error body produced by the global handler."
       },
       "QRTokenGenerateRequest": {
         "properties": {

@@ -194,6 +194,10 @@ RATE_LIMITS = {
     "file_upload": _env_rate_limit("file_upload", "20/minute"),
     "export": _env_rate_limit("export", "5/minute"),
     "migration": _env_rate_limit("migration", "1/minute"),
+    # PR-6 round 6 (codex P1): push credential registration writes a
+    # 64 KiB TOAST value per request — cap the write churn (WAL/TOAST,
+    # dead tuples) that even a retention-pruned registry incurs.
+    "push_register": _env_rate_limit("push_register", "10/minute"),
     "default": _env_rate_limit("default", "60/minute"),
 }
 

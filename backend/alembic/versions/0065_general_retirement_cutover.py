@@ -106,9 +106,12 @@ against a scratch SQLite connection without an alembic context (the
 contract already carries the schema; RQ-15.c/d add the archival and
 deletion revisions later).
 
-Revision-id note: ``0064_general_retirement_cutover`` is 31 chars —
+Revision-id note: ``0065_general_retirement_cutover`` is 31 chars —
 the alembic_version.version_num VARCHAR(32) limit (the 0059 CI
-lesson).
+lesson). Originally authored as ``0064_general_retirement_cutover``;
+renumbered to 0065 when main merged ``0064_push_devices_registry``
+(PR-6) — the two migrations claimed the same revision slot from the
+same parent, and the chain must stay single-headed.
 """
 
 from __future__ import annotations
@@ -117,13 +120,14 @@ import sqlalchemy as sa
 
 from alembic import op
 
-# Revision identifiers — chained after 0063_queue_resource_contract.
-revision = "0064_general_retirement_cutover"
-down_revision = "0063_queue_resource_contract"
+# Revision identifiers — chained after 0064_push_devices_registry
+# (renumbered from 0063/0064 after the PR-6 registry landed on main).
+revision = "0065_general_retirement_cutover"
+down_revision = "0064_push_devices_registry"
 branch_labels = None
 depends_on = None
 
-_MIGRATION_NAME = "0064_general_retirement_cutover"
+_MIGRATION_NAME = "0065_general_retirement_cutover"
 
 # The 0055 synthetic routing vocabulary (the exact identities the
 # RQ-15.d deletion will target; here they only define the fallback

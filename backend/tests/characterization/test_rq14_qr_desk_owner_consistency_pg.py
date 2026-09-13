@@ -495,31 +495,30 @@ def test_desk_then_qr_aligned_tags_share_queue_row(pg_engine, pg_session):
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_concurrent_desk_and_qr_numbering_is_serialized_by_the_claim_coordinator(
+def test_concurrent_desk_and_qr_numbering_stay_unique_within_one_queue(
     pg_engine, pg_session
 ):
-    """QD-2E reconciliation of the RQ-14.a numbering-race characterization.
+    """RQ-14.a FIXED (was the E-033 duplicate pin, flipped on the fix):
+    same queue row, two concurrent writers — DISTINCT numbers.
 
-    The original pin (main #3243) aligned two writers with a barrier
-    AFTER ``calculate_next_number`` and proved both committed the SAME
-    number (the numbering gap). On this branch that gap is CLOSED
-    architecturally: the tag-wide claim coordinator serializes every
-    claim-taking writer on (day, tag) with a transaction-scoped advisory
-    lock, so the second writer only computes its number after the first
-    commits — distinct numbers, no duplicate. The barrier-based race is
-    also a self-deadlock now (a writer waiting inside the barrier holds
-    the (day, tag) advisory lock while the other blocks on it), so the
-    concurrent pin runs without a barrier and asserts the serialized
-    outcome: both writers land on the shared queue row with DIFFERENT
-    numbers.
-    """
+    The E-033 pin proved the numbering race: both writers computed the
+    next number via an unlocked ``SELECT MAX`` on an already-loaded
+    queue (no row lock, no (queue_id, number) unique) and committed the
+    SAME number behind a barrier. RQ-14.a serializes every writer of a
+    queue on the queue row (FOR UPDATE in ``get_next_queue_number`` for
+    the already-loaded branch), so the second writer reads a fresh
+    snapshot after the first one's number landed. Per-queue uniqueness
+    is asserted here; numbers repeating ACROSS queues is a different
+    (preserved) contract."""
+
     _patch_online_window()
     world = _seed_join_world(pg_session, suffix="race", service_tag="cardiology_race")
 
     from app.models.online_queue import DailyQueue
 
     # Pre-create the shared queue row so both writers RESOLVE it instead of
-    # racing in get_or_create (that separate race is out of this slice's scope).
+    # racing in get_or_create (that separate race is covered by the RQ-14.a
+    # integration suite).
     Session = sessionmaker(bind=pg_engine, future=True)
     seed_session = Session()
     queue_row = DailyQueue(
@@ -563,11 +562,9 @@ def test_concurrent_desk_and_qr_numbering_is_serialized_by_the_claim_coordinator
     entries = _entries(pg_engine, queue_id)
     assert len(entries) == 2, f"both writers must land on the shared row: {entries}"
     numbers = sorted(e["number"] for e in entries)
-    # SERIALIZED: the claim coordinator orders the two writers on (day,
-    # tag); the second number is computed after the first commit — the
-    # RQ-14.a duplicate-number gap is closed on this branch.
-    assert numbers == [1, 2], (
-        f"expected the serialized distinct numbers 1 and 2, got {numbers}"
+    # THE CONTRACT (RQ-14.a): per-queue numbers must not duplicate.
+    assert len(set(numbers)) == 2, (
+        f"per-queue uniqueness violated: {numbers}"
     )
 
 
