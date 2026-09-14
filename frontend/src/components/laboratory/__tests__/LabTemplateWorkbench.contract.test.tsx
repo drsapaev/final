@@ -345,3 +345,60 @@ describe('LabTemplateWorkbench create template flow (PR5)', () => {
     expect(onSelectTemplate.mock.calls[0][0]).toMatchObject({ id: 9, code: 'new_rule_t' });
   });
 });
+
+describe('LabTemplateWorkbench guard save freshness (PR5 review fix)', () => {
+  it('registered save uses the current render state after the template loads later', async () => {
+    const registerDirtySource = vi.fn(
+      (_source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => {}
+    );
+    const onTemplatesChanged = vi.fn(async (_preferredTemplateId?: string | number | null) => {});
+    mockedApi.createTemplateVersion.mockResolvedValue({ id: 52 });
+    mockedApi.updateTemplateVersion.mockResolvedValue({ id: 52 });
+
+    const workbench = (template: Record<string, unknown> | null) => (
+      <ThemeProvider>
+        <LabTemplateWorkbenchRaw
+          templates={template ? [template] : []}
+          selectedTemplate={template}
+          onSelectTemplate={vi.fn()}
+          onTemplatesChanged={onTemplatesChanged}
+          registerDirtySource={registerDirtySource}
+          notify={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    // Реальный LabPanel монтирует workbench до загрузки шаблона.
+    const { rerender } = render(workbench(null));
+    rerender(workbench(ruleTemplateFixture));
+
+    // Ждём hydrate активной версии, раскрываем поле и делаем draft dirty.
+    await screen.findByRole('button', { name: /Поле: Гемоглобин/ });
+    fireEvent.click(screen.getByRole('button', { name: /Поле: Гемоглобин/ }));
+    fireEvent.change(screen.getByLabelText('Нижняя граница нормы'), {
+      target: { value: '2' },
+    });
+
+    // Guard вызывает зарегистрированный источник: save обязан видеть
+    // АКТУАЛЬНЫЙ рендер, а не selectedTemplate=null первого рендера.
+    const source = registerDirtySource.mock.calls[0][0] as {
+      id: string;
+      isDirty: () => boolean;
+      save: () => Promise<void>;
+    };
+    expect(source.id).toBe('template');
+    expect(source.isDirty()).toBe(true);
+    await source.save();
+
+    // Актуальный version id (51 -> новый draft 52) и актуальные изменения.
+    expect(mockedApi.createTemplateVersion).toHaveBeenCalledWith(5, 51);
+    expect(mockedApi.updateTemplateVersion).toHaveBeenCalled();
+    const [, payload] = mockedApi.updateTemplateVersion.mock.calls[0] as [unknown, { sections: Array<{ fields: Array<Record<string, unknown>> }> }];
+    const rule = payload.sections[0].fields[0].reference_rule as {
+      cases: Array<{ low: number }>;
+    };
+    expect(rule.cases[0].low).toBe(2);
+    // Сохранение прошло успешно — переход может продолжиться.
+    expect(onTemplatesChanged).toHaveBeenCalled();
+  });
+});

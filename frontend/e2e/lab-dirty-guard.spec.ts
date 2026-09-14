@@ -81,9 +81,16 @@ const INSTANCE_A = {
   })),
 };
 
+const INSTANCE_B = {
+  ...INSTANCE_A,
+  id: 89,
+  patient_id: 102,
+  patient_snapshot: { patient_id: 102, full_name: 'Пациент Два' },
+};
+
 const QUEUE_ENTRIES = [
   { id: 1, appointment_id: 'a-1', patient_id: 101, patient_fio: 'Пациент Один', patient_phone: '', status: 'waiting', report_instance_id: 88, services: [], service_codes: [], service_details: [] },
-  { id: 2, appointment_id: 'a-2', patient_id: 102, patient_fio: 'Пациент Два', patient_phone: '', status: 'waiting', services: [], service_codes: [], service_details: [] },
+  { id: 2, appointment_id: 'a-2', patient_id: 102, patient_fio: 'Пациент Два', patient_phone: '', status: 'waiting', report_instance_id: 89, services: [], service_codes: [], service_details: [] },
 ];
 
 async function installSession(page: Page) {
@@ -134,6 +141,7 @@ async function installApiMocks(page: Page) {
   });
   await page.route('**/api/v1/lab/report-instances?**', (route) => json(route, []));
   await page.route('**/api/v1/lab/report-instances/88', (route) => json(route, INSTANCE_A));
+  await page.route('**/api/v1/lab/report-instances/89', (route) => json(route, INSTANCE_B));
   await page.route('**/api/v1/lab/catalog/**', (route) => json(route, []));
   await page.route('**/api/v1/lab/recent-reports**', (route) => json(route, []));
 }
@@ -190,10 +198,17 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
 
     await page.getByRole('tab').first().click();
     await page.getByRole('button', { name: /Пациент Два/ }).first().dispatchEvent('click');
-    await page.getByRole('dialog').getByRole('button', { name: 'Выйти без сохранения' }).click();
+    // Вложенного guard быть не должно: РОВНО один диалог на переход.
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    expect(await dialog.count()).toBe(1);
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
 
-    // Переход выполнен: выбранным стал пациент Два (очередь подсвечивает его).
+    // Согласованный контекст: пациент Два И его отчёт #89 (не отчёт A).
     await expect(page.getByText('Пациент Два').first()).toBeVisible();
+    await expect(page.getByText('Отчёт #89').first()).toBeVisible();
+    // Диалог закрыт, повторного подтверждения нет.
+    await expect(dialog).toHaveCount(0);
   });
 
   test('create template -> returned template is selected in the editor', async ({ page }) => {

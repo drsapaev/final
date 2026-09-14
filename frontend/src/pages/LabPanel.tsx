@@ -443,34 +443,42 @@ export default function LabPanel() {
     }
   }, [mergeResolvedVisitIntoState, notify]);
 
+  // PR5-review: «сырое» открытие отчёта без guard — вызывается ВНУТРИ уже
+  // подтверждённого перехода (смена пациента), чтобы не запускать вложенный
+  // guard и не оставлять частично изменённый контекст при отмене.
+  const applyInstanceTransition = useCallback(async (instanceId: string | number) => {
+    try {
+      const instance = (await labReportingApi.getInstance(instanceId)) as { patient_snapshot?: { patient_id?: string | number; [k: string]: unknown }; [k: string]: unknown };
+      setActiveInstance(instance);
+      if (instance.patient_snapshot?.patient_id) {
+        // L-M-2 fix: дедупликация loadReportHistory.
+        // Сначала помечаем patient_id в loadedHistoryForPatientRef — это
+        // предотвращает повторный вызов из useEffect [selectedAppointment]
+        // ниже, который сработает когда setSelectedAppointment обновит состояние.
+        loadedHistoryForPatientRef.current = instance.patient_snapshot.patient_id;
+        await loadReportHistory(instance.patient_snapshot.patient_id);
+      }
+      switchTab('reports');
+    } catch (error) {
+      logger.error('[LabPanel] loadInstance failed', error);
+      notify(
+        'error',
+        getErrorMessage(error, t('misc.lp_ne_udalos_otkryt_laboratorny'))
+      );
+    }
+  }, [loadReportHistory, notify, switchTab]);
+
   const loadInstance = useCallback(async (instanceId: string | number) => {
     if (!instanceId) {
       return;
     }
-    // PR5: открытие другого отчёта — переход через dirty-guard (включая
-    // восстановление ?instance=N из URL при повторных входах).
-    guardTransition(async () => {
-      try {
-        const instance = (await labReportingApi.getInstance(instanceId)) as { patient_snapshot?: { patient_id?: string | number; [k: string]: unknown }; [k: string]: unknown };
-        setActiveInstance(instance);
-        if (instance.patient_snapshot?.patient_id) {
-          // L-M-2 fix: дедупликация loadReportHistory.
-          // Сначала помечаем patient_id в loadedHistoryForPatientRef — это
-          // предотвращает повторный вызов из useEffect [selectedAppointment]
-          // ниже, который сработает когда setSelectedAppointment обновит состояние.
-          loadedHistoryForPatientRef.current = instance.patient_snapshot.patient_id;
-          await loadReportHistory(instance.patient_snapshot.patient_id);
-        }
-        switchTab('reports');
-      } catch (error) {
-        logger.error('[LabPanel] loadInstance failed', error);
-        notify(
-          'error',
-          getErrorMessage(error, t('misc.lp_ne_udalos_otkryt_laboratorny'))
-        );
-      }
+    // PR5: публичный переход через dirty-guard (недавние отчёты,
+    // восстановление ?instance=N из URL). Внутри подтверждённого перехода
+    // используется applyInstanceTransition — подтверждение один раз.
+    guardTransition(() => {
+      void applyInstanceTransition(instanceId);
     });
-  }, [guardTransition, loadReportHistory, notify, switchTab]);
+  }, [guardTransition, applyInstanceTransition]);
 
   // WF-15 fix: URL sync для patient/instance — shareable + back-button friendly.
   // При смене selectedAppointment или activeInstance обновляем URL params.
@@ -493,16 +501,30 @@ export default function LabPanel() {
     }
   }, [selectedAppointment, activeInstance, location.search, navigate]);
 
+  // PR5-review: актуальный id активного отчёта для URL-restore effect —
+  // эффект зависит от searchParams, но не от activeInstance (stale closure).
+  const activeInstanceIdRef = useRef<string | number | null>(null);
+  useEffect(() => {
+    activeInstanceIdRef.current = (activeInstance?.id as string | number | null) ?? null;
+  });
+
   useEffect(() => {
     loadLabAppointments();
     loadTemplates();
     loadRecentReports();
     // WF-15 fix: восстановление контекста из URL при загрузке.
     // Если URL содержит ?instance=N — открываем этот отчёт.
+    // PR5-review: скип, если этот отчёт уже активен — иначе URL-sync
+    // (промежуточный instance старого отчёта) перезапускал guarded
+    // loadInstance внутри уже подтверждённого перехода и оставлял
+    // второй, вечный guard-диалог.
     const instanceParam = searchParams.get('instance');
     if (instanceParam) {
       const instanceId = parseInt(instanceParam, 10);
-      if (!Number.isNaN(instanceId)) {
+      if (
+        !Number.isNaN(instanceId)
+        && String(activeInstanceIdRef.current) !== String(instanceId)
+      ) {
         loadInstance(instanceId);
       }
     }
@@ -702,7 +724,7 @@ export default function LabPanel() {
               // создания.
               const instanceId = appointment.report_instance_id as string | number | undefined;
               if (instanceId) {
-                loadInstance(instanceId);
+                void applyInstanceTransition(instanceId);
               } else {
                 setActiveInstance(null);
               }

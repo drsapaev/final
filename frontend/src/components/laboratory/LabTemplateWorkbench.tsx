@@ -269,7 +269,9 @@ export default function LabTemplateWorkbench({
   // чтобы dirty-guard не продолжал переход после неуспешного сохранения.
   async function attemptSaveTemplate() {
     if (!selectedTemplate) {
-      throw new Error(t('errors.select_template_first'));
+      const message = t('errors.select_template_first');
+      notify?.('error', message);
+      throw new Error(message);
     }
     const rangeErrors = validateReferenceRanges();
     const jsonErrors = validateRuleJsonErrors();
@@ -295,8 +297,9 @@ export default function LabTemplateWorkbench({
   async function handleSaveTemplate() {
     try {
       await attemptSaveTemplate();
-    } catch (error) {
-      notify?.('error', getErrorMessage(error));
+    } catch {
+      // attemptSaveTemplate обязан сам показать ошибку пользователю
+      // (включая ранний выход при отсутствии выбранного шаблона).
     }
   }
 
@@ -552,12 +555,20 @@ export default function LabTemplateWorkbench({
     isTemplateDirtyRef.current = templateDirty;
   });
   const registerDirtySourceRef = useRef(registerDirtySource);
+  // PR5-review: attemptSaveTemplate захватывает state конкретного рендера —
+  // регистрация монтируется один раз, но вызывает АКТУАЛЬНУЮ функцию через
+  // обновляемый ref (паттерн handleSaveDraftRef в LabReportWorkbench),
+  // иначе после загрузки шаблона save продолжает видеть первый рендер.
+  const attemptSaveTemplateRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    attemptSaveTemplateRef.current = attemptSaveTemplate;
+  });
   useEffect(() => {
     if (!registerDirtySourceRef.current) return;
     return registerDirtySourceRef.current({
       id: 'template',
       isDirty: () => isTemplateDirtyRef.current,
-      save: () => attemptSaveTemplate(),
+      save: () => attemptSaveTemplateRef.current(),
     });
   }, []);
 
