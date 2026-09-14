@@ -31,6 +31,7 @@ import os
 import sys
 import uuid
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -58,7 +59,7 @@ from app.models.online_queue import (  # noqa: E402
 from app.models.patient import Patient  # noqa: E402
 from app.models.service import Service  # noqa: E402
 from app.models.user import User  # noqa: E402
-from app.models.visit import Visit  # noqa: E402
+from app.models.visit import Visit, VisitService  # noqa: E402
 from app.services.batch_patient_service import (  # noqa: E402
     BatchPatientService,
     EntryAction,
@@ -66,6 +67,12 @@ from app.services.batch_patient_service import (  # noqa: E402
 from app.services.morning_assignment import (  # noqa: E402
     MorningAssignmentClaimError,
     MorningAssignmentService,
+)
+from app.services.registrar_wizard_queue_assignment_service import (  # noqa: E402
+    RegistrarWizardQueueAssignmentService,
+)
+from app.services.visit_lifecycle_service import (  # noqa: E402
+    VisitLifecycleService,
 )
 
 # ─── Harness ───────────────────────────────────────────────────────────
@@ -345,6 +352,206 @@ def test_morning_compatible_claim_returns_the_previous_result_idempotently(
         # naive — compare the wall-clock value, not the tzinfo wrapper)
         assert entry.queue_time.replace(tzinfo=None) == original_queue_time.replace(
             tzinfo=None
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.queue
+def test_morning_anonymous_phone_bridge_claim_is_bound_and_start_visit_resolves_it(
+    session_factory, clean_db
+):
+    """QD-2E review P1 (anonymous-claim binding) — the mandatory FULL
+    registration regression, not a dict-level status="existing" check.
+
+    A legacy online ticket with NULL patient/visit links (matching the
+    patient's typed name and shared phone) exists for the tag/day. The
+    registrar wizard registers the real patient P and visit V. The SAME
+    number must be reused — and the reused claim must now be BOUND:
+    entry.patient_id == P.id and entry.visit_id == V.id, so the
+    entry-based start-visit resolves exactly V and never creates a second
+    visit or a second ticket."""
+    unique = uuid.uuid4().hex[:8]
+    tag = f"cardio_{unique}"
+    with session_factory() as session:
+        doctor = _make_doctor(session, f"desk_{unique}")
+        patient = _make_patient(session, unique, 7)
+        visit = _make_visit(session, patient, doctor_id=doctor.id)
+        service = Service(
+            code=f"SRV-{unique}",
+            name="SYNTHETIC binding consult",
+            price=100000.00,
+            duration_minutes=30,
+            active=True,
+            requires_doctor=True,
+            queue_tag=tag,
+            is_consultation=True,
+            allow_doctor_price_override=False,
+        )
+        session.add(service)
+        session.flush()
+        session.add(
+            VisitService(
+                visit_id=visit.id,
+                service_id=service.id,
+                code=service.code,
+                name=service.name,
+                qty=1,
+                price=Decimal("100000.00"),
+                currency="UZS",
+            )
+        )
+        owners_queue = _make_queue(session, tag=tag, specialist_id=doctor.id)
+        # the LEGACY anonymous ticket: no patient link, no visit link, but
+        # the typed name and the shared phone of THIS patient (the exact
+        # row the coordinator's phone/name bridge resolves)
+        entry = OnlineQueueEntry(
+            queue_id=owners_queue.id,
+            number=5,
+            patient_id=None,
+            patient_name=patient.short_name(),
+            phone=patient.phone,
+            source="online",
+            status="waiting",
+            queue_time=datetime.now(UTC),
+        )
+        session.add(entry)
+        session.commit()
+        original_queue_time = entry.queue_time
+
+        # the real registrar wizard seam — the /registrar/cart assignment pass
+        queue_numbers = RegistrarWizardQueueAssignmentService(
+            session
+        ).assign_same_day_queue_numbers(
+            [visit],
+            target_day=visit.visit_date,
+            source="desk",
+            current_user=None,
+        )
+        session.commit()
+
+        # the SAME number is returned for THIS visit
+        assert queue_numbers == {
+            visit.id: [
+                {
+                    "queue_tag": tag,
+                    "queue_id": owners_queue.id,
+                    "number": 5,
+                    "status": "existing",
+                }
+            ]
+        }
+        # the claim is no longer anonymous — the patient and visit links exist
+        assert entry.patient_id == patient.id
+        assert entry.visit_id == visit.id
+        # no second ticket for the queue, no second visit for the patient/day
+        assert (
+            session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == owners_queue.id)
+            .count()
+            == 1
+        )
+        assert (
+            session.query(Visit)
+            .filter(
+                Visit.patient_id == patient.id,
+                Visit.visit_date == visit.visit_date,
+            )
+            .count()
+            == 1
+        )
+        # the original ticket data is preserved (number/queue_time untouched)
+        assert entry.number == 5
+        assert entry.queue_time.replace(tzinfo=None) == original_queue_time.replace(
+            tzinfo=None
+        )
+        # the wizard activated the registration's visit
+        session.refresh(visit)
+        assert visit.status == "open"
+
+        # the entry-based start-visit now resolves exactly V — the consumer
+        # path that used to fall through to NULL patient/visit links
+        started = VisitLifecycleService(session).start_visit(
+            visit_id=entry.visit_id, current_user=None, commit=True
+        )
+        assert started.id == visit.id
+        assert started.status == "in_progress"
+
+
+@pytest.mark.unit
+@pytest.mark.queue
+def test_morning_claim_bound_to_another_visit_is_never_rebound(
+    session_factory, clean_db
+):
+    """QD-2E review P1 (incompatible binding): the patient's active claim
+    is already bound to ANOTHER visit — the reuse is a hard conflict
+    (MorningAssignmentClaimError), the existing binding survives, and no
+    second ticket is issued."""
+    unique = uuid.uuid4().hex[:8]
+    tag = f"cardio_{unique}"
+    with session_factory() as session:
+        doctor = _make_doctor(session, f"conf_{unique}")
+        patient = _make_patient(session, unique, 8)
+        visit = _make_visit(session, patient, doctor_id=doctor.id)
+        earlier_visit = _make_visit(session, patient, doctor_id=doctor.id)
+        owners_queue = _make_queue(session, tag=tag, specialist_id=doctor.id)
+        service = Service(
+            code=f"SRV-{unique}",
+            name="SYNTHETIC conflict consult",
+            price=100000.00,
+            duration_minutes=30,
+            active=True,
+            requires_doctor=True,
+            queue_tag=tag,
+            is_consultation=True,
+            allow_doctor_price_override=False,
+        )
+        session.add(service)
+        session.flush()
+        session.add(
+            VisitService(
+                visit_id=visit.id,
+                service_id=service.id,
+                code=service.code,
+                name=service.name,
+                qty=1,
+                price=Decimal("100000.00"),
+                currency="UZS",
+            )
+        )
+        entry = OnlineQueueEntry(
+            queue_id=owners_queue.id,
+            number=3,
+            patient_id=patient.id,
+            patient_name=patient.short_name(),
+            phone=patient.phone,
+            source="online",
+            status="waiting",
+            visit_id=earlier_visit.id,
+            queue_time=datetime.now(UTC),
+        )
+        session.add(entry)
+        session.commit()
+
+        with pytest.raises(MorningAssignmentClaimError, match="another visit"):
+            RegistrarWizardQueueAssignmentService(
+                session
+            ).assign_same_day_queue_numbers(
+                [visit],
+                target_day=visit.visit_date,
+                source="desk",
+                current_user=None,
+            )
+
+        # the existing binding survives untouched; the conflicting
+        # registration did not steal the ticket
+        session.rollback()
+        session.refresh(entry)
+        assert entry.visit_id == earlier_visit.id
+        assert (
+            session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.queue_id == owners_queue.id)
+            .count()
+            == 1
         )
 
 

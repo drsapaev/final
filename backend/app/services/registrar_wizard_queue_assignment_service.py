@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.crud.queue_resource_routing import lock_queue_tag_claim_scope
+from app.models.service import Service
 from app.models.visit import Visit
 from app.services.morning_assignment import (
     MorningAssignmentCreateBranchHandoff,
@@ -89,6 +90,13 @@ class RegistrarWizardQueueAssignmentService:
         # подтверждение) не могут держать пересекающиеся scope-ы во взаимно
         # обратном порядке (deadlock) и не видят полуматериализованную
         # корзину.
+        # QD-2E review P1: сами ключи БерЁТ prelock_cart_tag_claim_scopes
+        # из эндпоинта корзины — ДО первого create_visit (см. docstring
+        # этого хелпера: FK KEY SHARE визита на враче обязан браться ПОД
+        # уже взятым scope-ом). Этот проход остаётся поясом надёжности:
+        # идемпотентное пере-взятие тех же ключей + закрытие расхождения,
+        # если каталог услуг сменил тег между pre-lock и материализацией
+        # визитов.
         self._lock_cart_tag_claim_scopes(
             assignment_service, visits, target_day
         )
@@ -153,6 +161,66 @@ class RegistrarWizardQueueAssignmentService:
                 continue
 
         return queue_numbers
+
+    @staticmethod
+    def prelock_cart_tag_claim_scopes(
+        db: Session,
+        cart_visits: Sequence[Any],
+        *,
+        target_day: date,
+    ) -> None:
+        """Take the claim lock for every (day, tag) scope of the cart BEFORE
+        the cart writes its first row.
+
+        QD-2E review P1 (cart/GQL lock-order inversion): the visit INSERT
+        fires the ``visits.doctor_id`` FK check, which holds a FOR KEY SHARE
+        row lock on the doctor until the cart's single commit. Taking the
+        tag/day advisory locks only later — inside
+        ``assign_same_day_queue_numbers`` — inverted the global lock order
+        against GraphQL ``joinQueue`` (tag/day advisory lock first, then
+        ``Doctor ... FOR UPDATE``): the cart held the doctor's KEY SHARE and
+        waited for the advisory lock, joinQueue held the advisory lock and
+        waited for the doctor row — a deadlock PostgreSQL must break by
+        aborting one of the two business operations.
+
+        Pre-acquiring the full scope set from the REQUEST payload (the same
+        service rows the assignment pass later re-derives from the created
+        VisitService rows) restores the order: the cart waits for a claim
+        scope BEFORE it holds any doctor row lock, so it can never queue
+        behind an advisory-lock holder that is itself waiting on the cart.
+        The locks are transaction-scoped and idempotent while held, so the
+        re-acquisition inside ``_lock_cart_tag_claim_scopes`` stays free.
+
+        The payload items are duck-typed (``.visit_date`` + ``.services``
+        with ``.service_id``) — the endpoint schemas are not imported here
+        to keep the api -> services direction of the context boundary. The
+        same-day mirror of ``_lock_cart_tag_claim_scopes`` is exact: the
+        cart always creates its visits ``confirmed``.
+        """
+        service_ids: set[int] = set()
+        for visit_request in cart_visits:
+            if visit_request.visit_date != target_day:
+                # Same-day confirmed visits only — the exact scope the
+                # assignment pass processes below mirrors this filter.
+                continue
+            for service_item in visit_request.services:
+                service_ids.add(int(service_item.service_id))
+        if not service_ids:
+            return
+        queue_tags = {
+            row[0]
+            for row in (
+                db.query(Service.queue_tag)
+                .filter(
+                    Service.id.in_(service_ids),
+                    Service.queue_tag.isnot(None),
+                )
+                .all()
+            )
+            if row[0]
+        }
+        for queue_tag in sorted(queue_tags):
+            lock_queue_tag_claim_scope(db, queue_tag, target_day)
 
     def _lock_cart_tag_claim_scopes(
         self,

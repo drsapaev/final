@@ -948,6 +948,39 @@ class MorningAssignmentService:
             )
 
         if existing_entry:
+            # QD-2E review P1 (anonymous-claim binding): a reused claim is
+            # only a completed assignment when it is LINKED to this
+            # registration's patient and visit. The coordinator's phone/name
+            # bridge resolves LEGACY rows with patient_id IS NULL (and the
+            # patient arm can return a visit-less row) — returning
+            # status="existing" for such a row left the ticket anonymous:
+            # the wizard activated the visit while the entry kept
+            # patient_id/visit_id NULL, and the entry-based start-visit
+            # could no longer resolve the visit (the registry gap the
+            # review traced through _queue_ops.start_queue_visit and the
+            # QR full-update lookup). Mirror the confirmation seam
+            # (_reuse_existing_active_entry): bind the missing links
+            # atomically in THIS transaction; an INCOMPATIBLE existing
+            # binding is a hard conflict and is never silently rebound.
+            # The number, queue_time and the rest of the original ticket
+            # stay untouched.
+            if existing_entry.patient_id not in (None, visit.patient_id):
+                # The coordinator already rejects cross-patient claims
+                # (patient arm is exact, the post-check folds the rest) —
+                # this guard is the belt-and-suspenders boundary contract.
+                raise MorningAssignmentClaimError(
+                    "Active queue claim is already bound to another "
+                    f"patient for queue_tag={queue_tag}"
+                )
+            if existing_entry.visit_id not in (None, visit.id):
+                raise MorningAssignmentClaimError(
+                    "Active queue claim is already bound to another "
+                    f"visit for queue_tag={queue_tag}"
+                )
+            if existing_entry.patient_id is None:
+                existing_entry.patient_id = visit.patient_id
+            if existing_entry.visit_id is None:
+                existing_entry.visit_id = visit.id
             logger.info(
                 "Active queue entry already exists for queue %s",
                 queue_tag,

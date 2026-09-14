@@ -84,6 +84,24 @@ def create_cart_appointments(
         created_visit_amounts: dict[int, Decimal] = {}
         total_invoice_amount = Decimal('0')
 
+        # QD-2E review P1 (cart/GQL lock ordering): every (day, tag) claim
+        # scope of the cart is taken BEFORE the first cart write. The
+        # visit INSERTs below fire the doctors FK check — a FOR KEY SHARE
+        # row lock on the doctor held until the single db.commit() below —
+        # so acquiring the tag/day advisory locks only inside queue
+        # assignment inverted the order against GraphQL joinQueue (tag
+        # lock first, then Doctor FOR UPDATE) and deadlocked PostgreSQL
+        # under concurrency. Pre-acquired scopes are re-entrant inside the
+        # assignment pass (idempotent transaction-scoped xact locks).
+        # ``today`` is computed once and reused for the assignment call so
+        # the pre-locked scope set cannot drift across a midnight rollover.
+        today = date.today()
+        RegistrarWizardQueueAssignmentService.prelock_cart_tag_claim_scopes(
+            db,
+            cart_data.visits,
+            target_day=today,
+        )
+
         # Создаём визиты
         from time import sleep
 
@@ -229,7 +247,9 @@ def create_cart_appointments(
 
         # Assign queue entries for confirmed same-day visits via extracted seam.
         queue_numbers = {}
-        today = date.today()
+        # ``today`` was computed BEFORE the pre-lock above — the same
+        # instance is reused so the assignment pass targets exactly the
+        # scopes that were pre-acquired.
 
         queue_numbers = RegistrarWizardQueueAssignmentService(db).assign_same_day_queue_numbers(
             created_visits,

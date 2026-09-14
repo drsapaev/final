@@ -1073,10 +1073,22 @@ class Mutation:
 
                 # Row-lock follows the common tag/day lock. It keeps doctor
                 # eligibility stable through the final queue-entry commit.
+                # QD-2E review P1 (cart/GQL lock-order inversion): the lock
+                # mode is FOR SHARE, not FOR UPDATE. Concurrent cart saves
+                # (/registrar/cart) insert visits whose doctors FK check
+                # holds FOR KEY SHARE on this exact row until the cart's
+                # single commit; FOR UPDATE conflicts with KEY SHARE, so a
+                # joinQueue holding the tag/day advisory lock could wait on
+                # the doctor row while the cart waited on the advisory lock —
+                # a deadlock PostgreSQL breaks by aborting one business
+                # operation. FOR SHARE still blocks every concurrent row
+                # UPDATE (an eligibility-changing UPDATE takes at least FOR
+                # NO KEY UPDATE), preserving the guard's purpose, while
+                # staying compatible with FK KEY SHARE holders.
                 doctor = (
                     db.query(Doctor)
                     .filter(Doctor.id == input.doctor_id)
-                    .with_for_update()
+                    .with_for_update(read=True)
                     .populate_existing()
                     .first()
                 )
