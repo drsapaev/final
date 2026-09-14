@@ -78,7 +78,7 @@ describe('UserManagement actions menu positioning', () => {
     const menu = await screen.findByRole('menu', {}, { timeout: 5000 });
     const style = menu.getAttribute('style') ?? '';
     const readVar = (name: string): string => {
-      const m = style.match(new RegExp(`${name}:\s*([^;]+)`));
+      const m = style.match(new RegExp(`${name}:([^;]+)`));
       return m ? m[1].trim() : '';
     };
     // The variables MUST be valid CSS lengths: a bare number is invalid for
