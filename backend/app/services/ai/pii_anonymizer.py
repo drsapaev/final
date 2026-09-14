@@ -194,13 +194,17 @@ class PIIAnonymizer(IAnonymizer):
         # `[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` (which overlapped `.` between the
         # character class and the literal).
         #
-        # CodeQL still flags this as polynomial-redos due to the outer `+`
-        # quantifier on the non-capturing group (structurally similar to
-        # `(\w+)+`). Empirical testing confirms LINEAR performance — see
-        # test_pii_regex_redos.py. Suppressing as false positive.
+        # Round 15 (owner codex review P1, PR #3215): the local part was
+        # still quadratic — `[class]+@` on a long @-free input restarts
+        # the unbounded class run at every position. This runs on
+        # user-controlled AI-gateway payloads (anonymize() before every
+        # provider call), so a ~192 KB message stalled the event loop for
+        # ~27 s. The negative lookbehind anchors each attempt to the start
+        # of a local-part run → O(n) total; matches are byte-identical
+        # (leftmost-first semantics already picked the run-start match).
         # codeql[py/polynomial-redos]
         text = re.sub(
-            r'[a-zA-Z0-9._%+-]+@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}',
+            r'(?<![a-zA-Z0-9._%+-])[a-zA-Z0-9._%+-]+@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}',
             '[EMAIL]',
             text
         )

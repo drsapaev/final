@@ -13,6 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 
+from app.core.pii_masker import SECRET_FIELD_PATTERNS, mask_pii
 from app.services.queue_service import (
     QueueConflictError,
     QueueError,
@@ -21,6 +22,60 @@ from app.services.queue_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Bound the echoed "input" value of validation errors: the raw input can
+# be arbitrarily large (e.g. a 64 KiB push credential) and used to be
+# echoed verbatim into logs AND the 422 response.
+_VALIDATION_INPUT_PREVIEW_LEN = 256
+
+
+def _sanitize_validation_errors(errors: list) -> list:
+    """Scrub rejected raw inputs out of RequestValidationError details.
+
+    Pydantic v2 embeds the offending value under the "input" key of each
+    error - a credential field (loc tail in SECRET_FIELD_PATTERNS) would
+    leak its plaintext into logs and the 422 response, which no masker
+    covers because the key is "input", not "token". Secret-tail inputs
+    are fully redacted; other oversized inputs are truncated to a bounded
+    preview; nested dict/list inputs go through mask_pii as usual.
+    """
+    sanitized: list = []
+    for err in errors:
+        if not isinstance(err, dict):
+            sanitized.append(err)
+            continue
+        item = dict(err)
+        loc = item.get("loc") or ()
+        loc_tail = str(loc[-1]).lower() if loc else ""
+        if "input" in item:
+            if loc_tail in SECRET_FIELD_PATTERNS:
+                item["input"] = "[REDACTED]"
+            else:
+                value = item["input"]
+                if isinstance(value, (bytes, bytearray)):
+                    # PR-6 round 10 (codex P1): non-JSON content types hand
+                    # Pydantic the raw body as BYTES - decode it and let it
+                    # flow through the same scrub-and-bound string path, so a
+                    # form-encoded credential cannot reach the 422 response or
+                    # the warning log.
+                    value = bytes(value).decode("utf-8", errors="replace")
+                if isinstance(value, str):
+                    # PR-6 round 9 (codex P2): scrub EVERY string input
+                    # before any length bound - a double-serialized body
+                    # arrives as a SHORT string whose embedded credential
+                    # would otherwise be echoed verbatim in the 422 (the
+                    # retained prefix of a long input could too).
+                    value = mask_pii(value)
+                    if len(value) > _VALIDATION_INPUT_PREVIEW_LEN:
+                        item["input"] = (
+                            value[:_VALIDATION_INPUT_PREVIEW_LEN] + "...[TRUNCATED]"
+                        )
+                    else:
+                        item["input"] = value
+                elif isinstance(value, (dict, list)):
+                    item["input"] = mask_pii(value)
+        sanitized.append(item)
+    return sanitized
 
 
 def _get_request_id(request: Request) -> str:
@@ -217,10 +272,15 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         """
         Обработка ошибок валидации Pydantic (автоматически вызывается FastAPI)
+
+        SECURITY (PR-6 round 2): exc.errors() embeds the rejected raw
+        value under "input" - a credential field would leak its plaintext
+        into logs and the 422 response. Sanitized before both uses.
         """
+        safe_errors = _sanitize_validation_errors(exc.errors())
         logger.warning(
             "RequestValidationError: %s (path: %s)",
-            str(exc.errors()),
+            str(safe_errors),
             request.url.path,
         )
         return JSONResponse(
@@ -232,7 +292,7 @@ def register_exception_handlers(app: FastAPI) -> None:
                 # (e.g. the ValueError raised by a custom validator) - passing
                 # it raw made JSONResponse itself raise, surfacing as a 500
                 # from the security-middleware catch-all instead of a 422.
-                "detail": jsonable_encoder(exc.errors()),
+                "detail": jsonable_encoder(safe_errors),
             },
         )
 

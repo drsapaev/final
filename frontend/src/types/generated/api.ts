@@ -14460,6 +14460,106 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/push/devices/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register Push Device
+         * @description Register (or idempotently refresh) a push device credential.
+         */
+        post: operations["register_push_device_api_v1_push_devices_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Push Device
+         * @description Heartbeat from an already-registered device (bumps last_seen_at).
+         */
+        post: operations["refresh_push_device_api_v1_push_devices_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices/unregister": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unregister Push Device
+         * @description Retire the matching device(s) of the current user (single logout).
+         */
+        post: operations["unregister_push_device_api_v1_push_devices_unregister_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Push Devices
+         * @description List the current user's registered push devices (no credentials).
+         */
+        get: operations["list_push_devices_api_v1_push_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices/{device_row_id}/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Toggle Push Device
+         * @description Toggle the device-level switch; other devices stay untouched.
+         */
+        post: operations["toggle_push_device_api_v1_push_devices__device_row_id__toggle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/phone-verification/send-code": {
         parameters: {
             query?: never;
@@ -32926,6 +33026,131 @@ export type components = {
         ProvidersResponse: {
             /** Providers */
             providers: components["schemas"]["ProviderInfo"][];
+        };
+        /**
+         * PushDeviceErrorDetail
+         * @description Body of HTTPException errors on this surface: ``{"detail": ...}``.
+         */
+        PushDeviceErrorDetail: {
+            /** Detail */
+            detail: string;
+        };
+        /** PushDeviceListResponse */
+        PushDeviceListResponse: {
+            /** Devices */
+            devices: components["schemas"]["PushDeviceOut"][];
+            /** Total Count */
+            total_count: number;
+        };
+        /** PushDeviceOut */
+        PushDeviceOut: {
+            /** Id */
+            id: number;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "fcm" | "webpush";
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "web";
+            /** Device Id */
+            device_id: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Token Fingerprint */
+            token_fingerprint: string;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Invalidated At */
+            invalidated_at: string | null;
+            /** Created At */
+            created_at: string | null;
+        };
+        /**
+         * PushDeviceRateLimitDetail
+         * @description Body of the 429 rate-limit response on this surface.
+         */
+        PushDeviceRateLimitDetail: {
+            /** Detail */
+            detail: string;
+            /** Retry After */
+            retry_after?: number | null;
+        };
+        /** PushDeviceRefreshRequest */
+        PushDeviceRefreshRequest: {
+            /** Token */
+            token: string;
+        };
+        /** PushDeviceRefreshResponse */
+        PushDeviceRefreshResponse: {
+            /** Refreshed */
+            refreshed: boolean;
+        };
+        /** PushDeviceRegisterRequest */
+        PushDeviceRegisterRequest: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "fcm" | "webpush";
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "web";
+            /** Token */
+            token: string;
+            /** Device Id */
+            device_id?: string | null;
+            /** Previous Token */
+            previous_token?: string | null;
+        };
+        /** PushDeviceToggleRequest */
+        PushDeviceToggleRequest: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /**
+         * PushDeviceUnregisterByDeviceId
+         * @description Logout variant 2: identify the device by its install identifier.
+         */
+        PushDeviceUnregisterByDeviceId: {
+            /** Token */
+            token?: string | null;
+            /** Device Id */
+            device_id: string;
+        };
+        /**
+         * PushDeviceUnregisterByToken
+         * @description Logout variant 1: identify the device by its credential.
+         */
+        PushDeviceUnregisterByToken: {
+            /** Token */
+            token: string;
+            /** Device Id */
+            device_id?: string | null;
+        };
+        /** PushDeviceUnregisterResponse */
+        PushDeviceUnregisterResponse: {
+            /** Disabled */
+            disabled: number;
+        };
+        /**
+         * PushDeviceValidationError
+         * @description Wrapped validation-error body produced by the global handler.
+         */
+        PushDeviceValidationError: {
+            /** Error */
+            error: string;
+            /** Message */
+            message: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            }[];
         };
         /**
          * QRTokenGenerateRequest
@@ -63688,6 +63913,198 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    register_push_device_api_v1_push_devices_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushDeviceRegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceOut"];
+                };
+            };
+            /** @description Пер-юзер квота живых push-устройств исчерпана */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceErrorDetail"];
+                };
+            };
+            /** @description Ошибки валидации запроса (обёртка error/message/detail) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceValidationError"];
+                };
+            };
+            /** @description Превышен лимит частоты регистраций */
+            429: {
+                headers: {
+                    /** @description Секунды до повторной попытки */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceRateLimitDetail"];
+                };
+            };
+        };
+    };
+    refresh_push_device_api_v1_push_devices_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushDeviceRefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceRefreshResponse"];
+                };
+            };
+            /** @description Устройство не найдено или credential инвалидирован */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceErrorDetail"];
+                };
+            };
+            /** @description Ошибки валидации запроса (обёртка error/message/detail) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceValidationError"];
+                };
+            };
+        };
+    };
+    unregister_push_device_api_v1_push_devices_unregister_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushDeviceUnregisterByToken"] | components["schemas"]["PushDeviceUnregisterByDeviceId"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceUnregisterResponse"];
+                };
+            };
+            /** @description Ошибки валидации запроса (обёртка error/message/detail) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceValidationError"];
+                };
+            };
+        };
+    };
+    list_push_devices_api_v1_push_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceListResponse"];
+                };
+            };
+        };
+    };
+    toggle_push_device_api_v1_push_devices__device_row_id__toggle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_row_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushDeviceToggleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceOut"];
+                };
+            };
+            /** @description Устройство не найдено (или принадлежит другому пользователю) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceErrorDetail"];
+                };
+            };
+            /** @description Ошибки валидации запроса (обёртка error/message/detail) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceValidationError"];
                 };
             };
         };

@@ -217,7 +217,12 @@ def test_partial_unique_allows_inactive_and_null_resource_duplicates(
     # indexes — the 0053 users.email precedent): the doctor axis keeps
     # its per-doctor rows untouched by the resource index
     doctor_queue_a = DailyQueue(day=_DAY, specialist_id=doctor.id, queue_tag="lab")
-    doctor_queue_b = DailyQueue(day=_DAY, specialist_id=doctor.id, queue_tag="lab")
+    # RQ-14.a.1: two ACTIVE duplicates on the doctor axis are now
+    # rejected (that fork was the RQ-14.a defect); an inactive history
+    # row stays legal.
+    doctor_queue_b = DailyQueue(
+        day=_DAY, specialist_id=doctor.id, queue_tag="lab", active=False
+    )
     db_session.add(doctor_queue_a)
     db_session.add(doctor_queue_b)
     db_session.commit()
@@ -750,8 +755,8 @@ def test_migration_data_statements_never_delete_or_invent() -> None:
 
 
 def test_alembic_chain_single_head_0063() -> None:
-    """The chain stays single-headed with 0063 as the head (the
-    sentinel-suite graph pattern)."""
+    """The chain stays single-headed (the sentinel-suite graph pattern).
+    The head moved to 0064 with the push device registry (PR-6)."""
     graph: dict[str, tuple[str, ...]] = {}
     for path in sorted((BACKEND_ROOT / "alembic" / "versions").glob("*.py")):
         source = path.read_text(encoding="utf-8")
@@ -767,9 +772,14 @@ def test_alembic_chain_single_head_0063() -> None:
         graph[revision_match.group(1)] = parents
 
     assert graph["0063_queue_resource_contract"] == ("0062_telegram_webhook_dedup",)
+    # PR-6: the chain head moved to 0064 (push_devices registry — the
+    # canonical multi-device store; write-maintained only, no push
+    # activation in this migration).
+    assert graph["0064_push_devices_registry"] == ("0063_queue_resource_contract",)
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    assert heads == ["0063_queue_resource_contract"]
+    # RQ-14.a.1: the chain head moved to 0065.
+    assert heads == ["0065_queue_numbering_unique"]
 
 
 # ===================== D. parity + ADR =====================
