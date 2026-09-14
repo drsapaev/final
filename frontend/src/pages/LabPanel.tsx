@@ -4,6 +4,7 @@ import { Alert, Badge, Button, Card, CardContent, CardHeader } from '../componen
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
 import LabReportWorkbench from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
+import { useDirtyTransitionGuard } from '../components/laboratory/hooks/useDirtyTransitionGuard';
 import { formatLabStatus } from '../components/laboratory/labUiLabels';
 import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -329,10 +330,14 @@ export default function LabPanel() {
   }, [loadingMore, hasMoreQueue, queueOffset, notify]);
 
   // H-2 fix: keyboard shortcuts for tab switching, refresh, clear selection.
+  // PR5: единый dirty-guard для переходов, уничтожающих введённый draft
+  // (смена пациента/отчёта/шаблона, Escape, восстановление из URL).
+  const { registerDirtySource, guardTransition, guardDialog } = useDirtyTransitionGuard();
+
   useLabHotkeys({
     switchTab,
     refreshData: loadLabAppointments,
-    clearSelection: () => setSelectedAppointment(null),
+    clearSelection: () => guardTransition(() => setSelectedAppointment(null)),
   });
 
   const loadTemplates = useCallback(async (preferredTemplateId: string | number | null = null) => {
@@ -438,10 +443,10 @@ export default function LabPanel() {
     }
   }, [mergeResolvedVisitIntoState, notify]);
 
-  const loadInstance = useCallback(async (instanceId: string | number) => {
-    if (!instanceId) {
-      return;
-    }
+  // PR5-review: «сырое» открытие отчёта без guard — вызывается ВНУТРИ уже
+  // подтверждённого перехода (смена пациента), чтобы не запускать вложенный
+  // guard и не оставлять частично изменённый контекст при отмене.
+  const applyInstanceTransition = useCallback(async (instanceId: string | number) => {
     try {
       const instance = (await labReportingApi.getInstance(instanceId)) as { patient_snapshot?: { patient_id?: string | number; [k: string]: unknown }; [k: string]: unknown };
       setActiveInstance(instance);
@@ -462,6 +467,18 @@ export default function LabPanel() {
       );
     }
   }, [loadReportHistory, notify, switchTab]);
+
+  const loadInstance = useCallback(async (instanceId: string | number) => {
+    if (!instanceId) {
+      return;
+    }
+    // PR5: публичный переход через dirty-guard (недавние отчёты,
+    // восстановление ?instance=N из URL). Внутри подтверждённого перехода
+    // используется applyInstanceTransition — подтверждение один раз.
+    guardTransition(() => {
+      void applyInstanceTransition(instanceId);
+    });
+  }, [guardTransition, applyInstanceTransition]);
 
   // WF-15 fix: URL sync для patient/instance — shareable + back-button friendly.
   // При смене selectedAppointment или activeInstance обновляем URL params.
@@ -484,16 +501,30 @@ export default function LabPanel() {
     }
   }, [selectedAppointment, activeInstance, location.search, navigate]);
 
+  // PR5-review: актуальный id активного отчёта для URL-restore effect —
+  // эффект зависит от searchParams, но не от activeInstance (stale closure).
+  const activeInstanceIdRef = useRef<string | number | null>(null);
+  useEffect(() => {
+    activeInstanceIdRef.current = (activeInstance?.id as string | number | null) ?? null;
+  });
+
   useEffect(() => {
     loadLabAppointments();
     loadTemplates();
     loadRecentReports();
     // WF-15 fix: восстановление контекста из URL при загрузке.
     // Если URL содержит ?instance=N — открываем этот отчёт.
+    // PR5-review: скип, если этот отчёт уже активен — иначе URL-sync
+    // (промежуточный instance старого отчёта) перезапускал guarded
+    // loadInstance внутри уже подтверждённого перехода и оставлял
+    // второй, вечный guard-диалог.
     const instanceParam = searchParams.get('instance');
     if (instanceParam) {
       const instanceId = parseInt(instanceParam, 10);
-      if (!Number.isNaN(instanceId)) {
+      if (
+        !Number.isNaN(instanceId)
+        && String(activeInstanceIdRef.current) !== String(instanceId)
+      ) {
         loadInstance(instanceId);
       }
     }
@@ -684,18 +715,21 @@ export default function LabPanel() {
           loadingMore={loadingMore}
           queueTotal={queueTotal}
           onOpenAppointment={(appointment) => {
-            setSelectedAppointment(appointment as Record<string, unknown>);
-            setTemplateResolution(null);
-            // WF-03 fix: если у пациента уже есть report_instance_id —
-            // сразу открываем существующий отчёт, а не сбрасываем в режим
-            // создания.
-            const instanceId = appointment.report_instance_id as string | number | undefined;
-            if (instanceId) {
-              loadInstance(instanceId);
-            } else {
-              setActiveInstance(null);
-            }
-            switchTab('reports');
+            // PR5: смена пациента — переход через dirty-guard.
+            guardTransition(() => {
+              setSelectedAppointment(appointment as Record<string, unknown>);
+              setTemplateResolution(null);
+              // WF-03 fix: если у пациента уже есть report_instance_id —
+              // сразу открываем существующий отчёт, а не сбрасываем в режим
+              // создания.
+              const instanceId = appointment.report_instance_id as string | number | undefined;
+              if (instanceId) {
+                void applyInstanceTransition(instanceId);
+              } else {
+                setActiveInstance(null);
+              }
+              switchTab('reports');
+            });
           }}
           selectedAppointment={selectedAppointment as Record<string, unknown> & { id?: string | number; patient_fio?: string; patient_phone?: string; patient_id?: string | number; visit_id?: string | number; appointment_time?: string; status?: string }}
           reportHistory={reportHistory as unknown as Array<Record<string, unknown> & { id: string | number; created_at: string; status: string; flagged_findings_count: number; critical_findings_count: number; max_flag_severity?: number }>}
@@ -712,15 +746,19 @@ export default function LabPanel() {
         <LabTemplateWorkbench
           templates={templates}
           selectedTemplate={selectedTemplate}
+          registerDirtySource={registerDirtySource}
           onSelectTemplate={async (template) => {
-            try {
-              const templateId = (template as { id?: string | number })?.id;
-              if (templateId == null) return;
-              const loaded = (await labReportingApi.getTemplate(templateId)) as Record<string, unknown>;
-              setSelectedTemplate(loaded);
-            } catch (error) {
-              notify('error', getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_shablon_p')));
-            }
+            // PR5: смена шаблона — переход через dirty-guard.
+            guardTransition(async () => {
+              try {
+                const templateId = (template as { id?: string | number })?.id;
+                if (templateId == null) return;
+                const loaded = (await labReportingApi.getTemplate(templateId)) as Record<string, unknown>;
+                setSelectedTemplate(loaded);
+              } catch (error) {
+                notify('error', getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_shablon_p')));
+              }
+            });
           }}
           onTemplatesChanged={async (preferredTemplateId = null) => {
             await loadTemplates(preferredTemplateId);
@@ -773,6 +811,7 @@ export default function LabPanel() {
           templateResolutionLoading={templateResolutionLoading}
           reportHistory={reportHistory as unknown as never[]}
           recentReports={recentReports as unknown as never[]}
+          registerDirtySource={registerDirtySource}
           activeInstance={activeInstance as unknown as null}
           onInstanceChange={setActiveInstance}
           onOpenInstance={loadInstance as unknown as (instance: Record<string, unknown>) => void}
@@ -783,7 +822,9 @@ export default function LabPanel() {
         />
       </section>
 
-              {/* H-1 fix: session timeout warning dialog */}
+              {/* PR5: единый dirty-guard диалог */}
+        {guardDialog}
+        {/* H-1 fix: session timeout warning dialog */}
         {sessionWarning && (
           <div
             role="alertdialog"

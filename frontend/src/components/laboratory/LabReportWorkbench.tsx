@@ -63,6 +63,7 @@ export default function LabReportWorkbench({
   onRefreshHistory,
   onRefreshRecentReports = undefined,
   onQueueChanged = undefined,
+  registerDirtySource = undefined,
   notify
 }: {
   selectedAppointment?: Record<string, unknown> | null;
@@ -78,6 +79,7 @@ export default function LabReportWorkbench({
   onRefreshRecentReports?: () => Promise<void>;
   onQueueChanged?: () => Promise<void>;
   notify?: (type: string, message: string) => void;
+  registerDirtySource?: (source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => void;
   [k: string]: unknown;
 }) {
   const { t: rawT } = useTranslation();
@@ -390,6 +392,22 @@ export default function LabReportWorkbench({
   useEffect(() => {
     handleSaveDraftRef.current = attemptSaveDraft;
   });
+
+  // PR5: регистрация dirty-состояния отчёта в панели — guard переходов
+  // решает (сохранить / выйти без сохранения / отмена) по этому источнику.
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => {
+    isDirtyRef.current = isDirty;
+  });
+  const registerDirtySourceRef = useRef(registerDirtySource);
+  useEffect(() => {
+    if (!registerDirtySourceRef.current) return;
+    return registerDirtySourceRef.current({
+      id: 'report',
+      isDirty: () => isDirtyRef.current,
+      save: () => Promise.resolve(handleSaveDraftRef.current?.()).then(() => undefined),
+    });
+  }, []);
 
   // WF-round5: handleMarkReady убран — Mark Ready был функционально пустой
   // операцией (backend разрешал одинаковые действия для DRAFT/IN_PROGRESS/READY).
