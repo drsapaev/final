@@ -121,6 +121,20 @@ def test_staff_cancel_visit_adapter_mutates_visit_and_queue_with_audit(
         visit_id=test_visit.id,
         test_doctor=test_doctor,
     )
+    # RQ-14.a.2: the same-queue negative — another patient's entry IN THE
+    # SAME DailyQueue row (the CI companion moved the second helper queue
+    # to its own tag, so the same-queue ownership check is pinned here
+    # explicitly instead of incidentally).
+    same_queue_other_patient = OnlineQueueEntry(
+        queue_id=entry.queue_id,
+        visit_id=test_visit.id,
+        number=8,
+        patient_name="Same Queue Other",
+        phone="+998900000128",
+        source="desk",
+        status="waiting",
+    )
+    db_session.add(same_queue_other_patient)
     db_session.flush()
 
     result = TelegramStaffActionAdapterService(db_session).staff_cancel_visit(
@@ -135,6 +149,7 @@ def test_staff_cancel_visit_adapter_mutates_visit_and_queue_with_audit(
     assert test_visit.status == "canceled"  # Issue #06: normalized from British to American
     assert entry.status == "cancelled"  # queue entry keeps British spelling
     assert wrong_owner_entry.status == "waiting"
+    assert same_queue_other_patient.status == "waiting"
     assert result["queue"]["queue_time_preserved"] is True
     assert _audit_actions(db_session) == [
         "staff_action_confirmed",
