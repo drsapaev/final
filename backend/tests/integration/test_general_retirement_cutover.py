@@ -4,7 +4,7 @@ Stage E of the QD-2 staged rollout (ADR-001 "Stage E ``general``
 decision", owner decision D-08, 2026-09-12). This suite pins BOTH
 halves of the cutover this PR lands:
 
-- the CATALOG half — migration ``0065_general_retirement_cutover``:
+- the CATALOG half — migration ``0066_general_retirement_cutover``:
   the operator map (``evidence/stage_e_operator_map_20260912.json``,
   36/57 decided) applied EXACTLY (33 lab retags + 2 cardio doctor
   assignments), inventory-before-mutation, the loud-abort categories
@@ -54,7 +54,7 @@ from app.models.visit import Visit, VisitService
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_ROOT = REPO_ROOT / "backend"
 MIGRATION_0064 = (
-    BACKEND_ROOT / "alembic" / "versions" / "0065_general_retirement_cutover.py"
+    BACKEND_ROOT / "alembic" / "versions" / "0066_general_retirement_cutover.py"
 )
 OPERATOR_MAP = REPO_ROOT / "evidence" / "stage_e_operator_map_20260912.json"
 
@@ -120,7 +120,7 @@ _TARGET_DOCTOR_ID = 10  # the production single real cardiologist
 
 def _load_migration_0064():
     spec = importlib.util.spec_from_file_location(
-        "migration_0065_general_retirement_cutover", MIGRATION_0064
+        "migration_0066_general_retirement_cutover", MIGRATION_0064
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

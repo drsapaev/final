@@ -217,7 +217,12 @@ def test_partial_unique_allows_inactive_and_null_resource_duplicates(
     # indexes — the 0053 users.email precedent): the doctor axis keeps
     # its per-doctor rows untouched by the resource index
     doctor_queue_a = DailyQueue(day=_DAY, specialist_id=doctor.id, queue_tag="lab")
-    doctor_queue_b = DailyQueue(day=_DAY, specialist_id=doctor.id, queue_tag="lab")
+    # RQ-14.a.1: two ACTIVE duplicates on the doctor axis are now
+    # rejected (that fork was the RQ-14.a defect); an inactive history
+    # row stays legal.
+    doctor_queue_b = DailyQueue(
+        day=_DAY, specialist_id=doctor.id, queue_tag="lab", active=False
+    )
     db_session.add(doctor_queue_a)
     db_session.add(doctor_queue_b)
     db_session.commit()
@@ -771,15 +776,20 @@ def test_alembic_chain_single_head_0063() -> None:
     # canonical multi-device store; write-maintained only, no push
     # activation in this migration).
     assert graph["0064_push_devices_registry"] == ("0063_queue_resource_contract",)
-    # QD-2E (RQ-15.b): the cutover was renumbered 0064 -> 0065 after PR-6
-    # claimed the 0064 slot — the chain stays single-headed.
-    assert graph["0065_general_retirement_cutover"] == (
-        "0064_push_devices_registry",
+    # RQ-14.a.1 (main #3252): DB-level UNIQUE for queue numbering and
+    # the doctor axis claimed the 0065 slot from 0064.
+    assert graph["0065_queue_numbering_unique"] == ("0064_push_devices_registry",)
+    # QD-2E (RQ-15.b): the cutover was renumbered 0065 -> 0066 after
+    # main's RQ-14.a.1 claimed the 0065 slot from the same parent — the
+    # chain stays single-headed.
+    assert graph["0066_general_retirement_cutover"] == (
+        "0065_queue_numbering_unique",
     )
-    assert len("0065_general_retirement_cutover") <= 32
+    assert len("0066_general_retirement_cutover") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    assert heads == ["0065_general_retirement_cutover"]
+    # single head: the QD-2E cutover chained after main's numbering UNIQUE
+    assert heads == ["0066_general_retirement_cutover"]
 
 
 # ===================== D. parity + ADR =====================

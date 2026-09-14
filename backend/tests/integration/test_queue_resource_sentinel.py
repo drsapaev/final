@@ -578,23 +578,29 @@ def test_alembic_chain_single_head_0062() -> None:
     # canonical multi-device store; write-maintained only, no push
     # activation in this migration).
     assert graph["0064_push_devices_registry"] == ("0063_queue_resource_contract",)
-    # QD-2E (RQ-15.b): the cutover was renumbered 0064 -> 0065 after
-    # PR-6 claimed the 0064 slot from the same parent — the chain stays
-    # single-headed (data-only; the id fits the VARCHAR(32) stamp).
-    assert graph["0065_general_retirement_cutover"] == (
-        "0064_push_devices_registry",
+    # RQ-14.a.1 (main #3252): DB-level UNIQUE for queue numbering and
+    # the doctor axis claimed the 0065 slot from 0064.
+    assert graph["0065_queue_numbering_unique"] == ("0064_push_devices_registry",)
+    # QD-2E (RQ-15.b): the cutover was renumbered 0065 -> 0066 after
+    # main's RQ-14.a.1 claimed the 0065 slot from the same parent — the
+    # chain stays single-headed (data-only; the id fits the VARCHAR(32)
+    # stamp).
+    assert graph["0066_general_retirement_cutover"] == (
+        "0065_queue_numbering_unique",
     )
     # alembic_version.version_num is VARCHAR(32): both ends of the new
     # link must fit (CI on 40cec49 exploded on real PostgreSQL with a
     # 38-char id — scratch-SQLite ignores VARCHAR widths).
     assert len("0064_push_devices_registry") <= 32
-    assert len("0065_general_retirement_cutover") <= 32
+    assert len("0065_queue_numbering_unique") <= 32
+    assert len("0066_general_retirement_cutover") <= 32
     assert len("0063_queue_resource_contract") <= 32
     assert len("0062_telegram_webhook_dedup") <= 32
     assert len("0061_telegram_config_singleton") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    assert heads == ["0065_general_retirement_cutover"]
+    # single head: the QD-2E cutover chained after main's numbering UNIQUE
+    assert heads == ["0066_general_retirement_cutover"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============
