@@ -147,7 +147,9 @@ def _assert_pg_head(engine) -> None:
     assert engine.dialect.name == "postgresql"
     with engine.connect() as conn:
         version = conn.execute(text("select version_num from alembic_version")).scalar()
-    assert version == "0065_queue_numbering_unique", version
+    # QD-2E chain reconciliation: the PR chains 0066_general_retirement_cutover
+    # (data-only) after 0065 — the populated head assert advances with it.
+    assert version == "0066_general_retirement_cutover", version
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:
@@ -172,7 +174,8 @@ def _both_unique_objects(engine) -> dict[str, bool]:
 
 @pytest.fixture(scope="module")
 def pg_engine():
-    """A run-unique scratch database upgraded to head (0065)."""
+    """A run-unique scratch database upgraded to head (0066 — the QD-2E
+    cutover is data-only and a clean no-op on the empty scratch)."""
     admin_url, _host = _verified_admin_url()
     db_name, sa_url = _scratch_pair(admin_url, "main")
     _create_scratch(admin_url, db_name)
