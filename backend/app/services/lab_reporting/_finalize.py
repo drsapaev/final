@@ -128,13 +128,19 @@ class FinalizeMixin(LabReportingServiceMixinBase):
         finalize(), используя order_id как связь (instance.order_id →
         lab_results.order_id).
 
-        Upsert по (order_id, test_code): показатель, уже спроецированный
-        из этого заказа, обновляется значением последней финализированной
-        версии, остальные показатели заказа сохраняются. Повторный sync
-        не создаёт дубликатов; revise() (тот же order_id) обновляет
-        значения в legacy, а дополнительный бланк того же визита
-        (переиспользует order через _resolve_or_create_order) добавляет
-        свои показатели, не трогая чужие.
+        C-track guard (решение владельца, см.
+        .ai-factory/plans/lab-results-lineage-decision.md): upsert по
+        (order_id, test_code) перезаписывал результат ДРУГОГО
+        самостоятельного исследования при совпадении field_key
+        (например glucose в biochem_panel — кровь и urinalysis_oam — моча).
+        Без lineage-полей принадлежность существующей строки цепочке этого
+        бланка недоказуема, поэтому при наличии любых строк заказа
+        проекция пропускается: существующие результаты никогда не
+        перезаписываются. Неполнота legacy (значения ревизий и
+        дополнительных бланков не попадают в legacy до трека A+) — явное
+        временное ограничение, а не восстановление полноты. A+ добавит
+        source_root_instance_id / source_instance_id и upsert по
+        (source_root_instance_id, test_code).
 
         Маппинг полей:
           field_def.label              → test_name
@@ -153,19 +159,27 @@ class FinalizeMixin(LabReportingServiceMixinBase):
             )
             return
 
-        # Upsert-проекция по (order_id, test_code). Ранний return при наличии
-        # любых строк этого order недопустим: revise() сохраняет order_id,
-        # а дополнительный бланк визита переиспользует тот же order — в обоих
-        # случаях legacy lab_results должен актуализироваться.
-        existing_by_code = {
-            result.test_code: result
-            for result in self.db.query(LabResult)
+        # C-track guard: наличие любых строк этого order означает, что их
+        # происхождение недоказуемо на текущей схеме (нет lineage-полей).
+        # Перезапись запрещена решением владельца; создание строк разрешено
+        # только для заказа без единой проекции (первичный бланк/backfill).
+        existing_count = (
+            self.db.query(LabResult.id)
             .filter(LabResult.order_id == instance.order_id)
-            .all()
-        }
+            .count()
+        )
+        if existing_count:
+            logger.warning(
+                "[LAB] _sync_legacy_lab_results: order %s already has %d "
+                "LabResult rows; skipping projection without proven lineage "
+                "(C-track guard, A+ pending) for instance %s",
+                instance.order_id,
+                existing_count,
+                instance.id,
+            )
+            return
 
         created_count = 0
-        updated_count = 0
         for value in instance.values:
             field_def = field_map.get(value.field_key)
             if not field_def:
@@ -197,35 +211,24 @@ class FinalizeMixin(LabReportingServiceMixinBase):
             # (high, low, abnormal, critical, warning). None/empty → False.
             abnormal = bool(value.resolved_flag)
 
-            projected = {
-                "test_name": field_def.label or value.field_key,
-                "value": result_value[:128] if result_value else None,
-                "unit": (field_def.unit or "")[:32] or None,
-                "ref_range": (value.resolved_reference_text or "")[:64] or None,
-                "abnormal": abnormal,
-            }
-
-            lab_result = existing_by_code.get(value.field_key)
-            if lab_result is not None:
-                for attr, projected_value in projected.items():
-                    setattr(lab_result, attr, projected_value)
-                updated_count += 1
-            else:
-                self.db.add(
-                    LabResult(
-                        order_id=instance.order_id,
-                        test_code=value.field_key,
-                        notes=None,
-                        **projected,
-                    )
+            self.db.add(
+                LabResult(
+                    order_id=instance.order_id,
+                    test_code=value.field_key,
+                    test_name=field_def.label or value.field_key,
+                    value=result_value[:128] if result_value else None,
+                    unit=(field_def.unit or "")[:32] or None,
+                    ref_range=(value.resolved_reference_text or "")[:64] or None,
+                    abnormal=abnormal,
+                    notes=None,
                 )
-                created_count += 1
+            )
+            created_count += 1
 
         logger.info(
-            "[LAB] _sync_legacy_lab_results: created %d, updated %d LabResult "
-            "projections for instance %s (order %s)",
+            "[LAB] _sync_legacy_lab_results: created %d LabResult projections "
+            "for instance %s (order %s)",
             created_count,
-            updated_count,
             instance.id,
             instance.order_id,
         )
