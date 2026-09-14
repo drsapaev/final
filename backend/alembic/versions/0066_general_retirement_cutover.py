@@ -39,17 +39,23 @@ transaction; PG DDL/DML is transactional):
      ``queue_resources`` row, or ``department_key = 'general'``, or its
      ``doctor_id`` is a synthetic Doctor — the exact
      ``inventory_general_retirement.py`` surface definition) whose
-     code carries no decision in the embedded tables. The 2026-09-12
-     production state (21 null decisions: procedures x16, stomatology
-     x2, dermatology, ultrason, neurology) makes the migration ABORT
-     loudly on production until the map is completed — this is
-     deliberate: the runtime half of the cutover (fail-closed owner
-     resolution, the same PR) turns those surfaces into explicit
-     configuration errors, so the catalog half must not strand them
-     silently. CI runs ``alembic upgrade head`` on an EMPTY database —
-     no surfaces, no decisions to apply, a clean pass.
+     IDENTITY carries no decision in the embedded tables: every
+     decision binds the exact (snapshot id, code) object it was
+     approved for (thread 3995689408), so a different live row
+     re-using a mapped code is UNDECIDED for the map's purposes — the
+     decision approved for id=21/code='L03' never covers a replacement
+     id=999. The 2026-09-12 production state (21 null decisions:
+     procedures x16, stomatology x2, dermatology, ultrason,
+     neurology) makes the migration ABORT loudly on production until
+     the map is completed — this is deliberate: the runtime half of
+     the cutover (fail-closed owner resolution, the same PR) turns
+     those surfaces into explicit configuration errors, so the catalog
+     half must not strand them silently. CI runs ``alembic upgrade
+     head`` on an EMPTY database — no surfaces, no decisions to apply,
+     a clean pass.
 
-2. Decision application — exact-row AND expected-state-guarded
+2. Decision application — SNAPSHOT-IDENTITY-BOUND (thread
+   3995689408, P1) AND exact-row expected-state-guarded
    (``UPDATE ... WHERE id = :id AND code = :code AND <expected source
    state>``, exactly one affected row verified — thread 3995689409,
    P1: alembic runs while uvicorn is still serving in the deploy script,
@@ -60,7 +66,21 @@ transaction; PG DDL/DML is transactional):
    the whole map with no rows changed), deterministic (code order),
    postcondition re-verified after every write, per-row inventory
    printed BEFORE the mutation (the migration log is the audit trail; a
-   pre-E backup is the restore path):
+   pre-E backup is the restore path).
+
+   Identity resolution (3995689408): the write target is resolved by
+   the snapshot (id, code) pair from the approved map, NEVER by
+   re-looking the code up among the live rows at application time.
+   The concrete scenario closed: the map approves a decision for
+   id=21/code='L03'; the original object is later deleted or
+   disabled; a NEW row id=999/code='L03' appears — the migration must
+   NOT apply the old decision to id=999. Resolution outcomes: the
+   snapshot row live and code-matched → the write target; its code
+   changed → identity drift, abort; the snapshot row gone/disabled
+   with a live code carrier → abort (the decision was never approved
+   for the carrier); gone/disabled with NO carrier → inert, printed,
+   nothing written. The same identity rule runs in the D-08 coverage
+   gate above and in the by-code pre-state validation.
 
    - ``retag_resource`` (33 lab services L03-L35 / LAB_*): the service
      ``queue_tag`` moves from ``general`` to ``lab`` — validated
@@ -84,6 +104,16 @@ transaction; PG DDL/DML is transactional):
    targets the already-mutated state and the coverage re-check passes
    — retagged services left the fallback surface, assigned services
    carry an explicit doctor, disabled services are inactive).
+
+Boundary (documented per the fix directive): the snapshot ids are
+PRODUCTION identities from the 2026-09-12 map; this map is NOT a
+universal id map for every installation. A database whose active
+rows carry the mapped codes under different ids does not match the
+approved map — the D-08 coverage gate aborts for those identities and
+the operator must re-run the inventory and carry the decisions for
+HIS database's identities (the runbook cycle). The CI empty database
+remains a clean no-op pass (no surfaces, no code carriers, every
+decision inert).
 
 Downgrade is CONSERVATIVE, VALIDATE-ONLY (Codex round-1 P1; the 0059
 round-2 ruling and the 0063 downgrade philosophy): it writes NOTHING.
@@ -148,59 +178,90 @@ _SYNTHETIC_OWNER_USERNAMES = frozenset(
 # decisions are appended to these tables, the D-08 runbook cycle).
 # Parity with the evidence file is pinned by test (the map file and
 # these tables cannot drift).
+#
+# IDENTITY (thread 3995689408, P1): every decision row carries the
+# SNAPSHOT SERVICE ID from the approved map alongside the code. The
+# approved decision binds (id, code) — an exact object — and is
+# NEVER re-pointed at whatever row happens to carry the code at
+# application time. The concrete loss this closes: the map approved
+# a decision for id=21/code='L03'; the operator later deletes or
+# disables id=21 and a NEW row id=999/code='L03' appears — a
+# code-only lookup would apply the old decision to the new object it
+# was never approved for. The resolution and coverage logic below
+# therefore key decisions by (snapshot_id, code):
+#
+# - an ACTIVE general-fallback surface is covered ONLY by the
+#   decision carrying ITS OWN (id, code) — a different live object
+#   with a mapped code is UNDECIDED for the map's purposes and
+#   aborts the cutover;
+# - the application target is resolved by snapshot id first (the
+#   row must still carry the mapped code): a vanished/disabled
+#   approved object with a live code carrier aborts, a vanished or
+#   disabled object with no carrier is inert, and a row whose id
+#   matched but whose code changed is identity drift and aborts.
+#
+# BOUNDARY (documented per the fix directive): the snapshot ids are
+# PRODUCTION identities. This map is NOT a universal id map for
+# every installation — another database whose active rows carry the
+# mapped codes under different ids does not match the approved map
+# and must re-run the inventory and carry its own decision tables
+# (the D-08 runbook cycle). The CI empty database stays a clean
+# no-op pass: no surfaces, no carriers, every decision inert.
 # ============================================================================
 
-# (service_code, from_tag, to_tag) — 33 lab services.
-_RETAG_DECISIONS: tuple[tuple[str, str, str], ...] = (
-    ("L03", "general", "lab"),
-    ("L14", "general", "lab"),
-    ("L15", "general", "lab"),
-    ("L16", "general", "lab"),
-    ("L17", "general", "lab"),
-    ("L18", "general", "lab"),
-    ("L19", "general", "lab"),
-    ("L20", "general", "lab"),
-    ("L21", "general", "lab"),
-    ("L22", "general", "lab"),
-    ("L23", "general", "lab"),
-    ("L24", "general", "lab"),
-    ("L25", "general", "lab"),
-    ("L26", "general", "lab"),
-    ("L27", "general", "lab"),
-    ("L28", "general", "lab"),
-    ("L29", "general", "lab"),
-    ("L30", "general", "lab"),
-    ("L31", "general", "lab"),
-    ("L32", "general", "lab"),
-    ("L33", "general", "lab"),
-    ("L34", "general", "lab"),
-    ("L35", "general", "lab"),
-    ("LAB_ALT", "general", "lab"),
-    ("LAB_AST", "general", "lab"),
-    ("LAB_BILE_URINE", "general", "lab"),
-    ("LAB_CA", "general", "lab"),
-    ("LAB_CRP", "general", "lab"),
-    ("LAB_FUNGI", "general", "lab"),
-    ("LAB_HBA1C", "general", "lab"),
-    ("LAB_IGE", "general", "lab"),
-    ("LAB_MALAS", "general", "lab"),
-    ("LAB_RF", "general", "lab"),
+# (snapshot_id, service_code, from_tag, to_tag) — 33 lab services;
+# the ids are the 2026-09-12 production snapshot identities.
+_RETAG_DECISIONS: tuple[tuple[int, str, str, str], ...] = (
+    (21, "L03", "general", "lab"),
+    (11, "L14", "general", "lab"),
+    (27, "L15", "general", "lab"),
+    (22, "L16", "general", "lab"),
+    (24, "L17", "general", "lab"),
+    (23, "L18", "general", "lab"),
+    (20, "L19", "general", "lab"),
+    (28, "L20", "general", "lab"),
+    (29, "L21", "general", "lab"),
+    (52, "L22", "general", "lab"),
+    (63, "L23", "general", "lab"),
+    (53, "L24", "general", "lab"),
+    (12, "L25", "general", "lab"),
+    (72, "L26", "general", "lab"),
+    (30, "L27", "general", "lab"),
+    (32, "L28", "general", "lab"),
+    (73, "L29", "general", "lab"),
+    (44, "L30", "general", "lab"),
+    (74, "L31", "general", "lab"),
+    (62, "L32", "general", "lab"),
+    (61, "L33", "general", "lab"),
+    (60, "L34", "general", "lab"),
+    (33, "L35", "general", "lab"),
+    (25, "LAB_ALT", "general", "lab"),
+    (26, "LAB_AST", "general", "lab"),
+    (36, "LAB_BILE_URINE", "general", "lab"),
+    (31, "LAB_CA", "general", "lab"),
+    (51, "LAB_CRP", "general", "lab"),
+    (70, "LAB_FUNGI", "general", "lab"),
+    (34, "LAB_HBA1C", "general", "lab"),
+    (75, "LAB_IGE", "general", "lab"),
+    (71, "LAB_MALAS", "general", "lab"),
+    (50, "LAB_RF", "general", "lab"),
 )
 
-# (service_code, target_doctor_id, original_doctor_id, snapshot_tag) —
-# the single real cardiologist (production id 10; validated against
-# the LIVE database below — never re-pointed by the migration). The
-# snapshot tag is part of the stale-map contract: an active mapped
-# service sitting on ANY other tag is drift, not an inert decision
-# (Codex round-3 P1).
-_ASSIGN_DOCTOR_DECISIONS: tuple[tuple[str, int, int | None, str], ...] = (
-    ("K01", 10, None, "cardio"),
-    ("K11", 10, None, "cardio"),
+# (snapshot_id, service_code, target_doctor_id, original_doctor_id,
+# snapshot_tag) — the single real cardiologist (production id 10;
+# validated against the LIVE database below — never re-pointed by
+# the migration). The snapshot tag is part of the stale-map contract:
+# an active mapped service sitting on ANY other tag is drift, not an
+# inert decision (Codex round-3 P1). The snapshot ids (K01=2, K11=127)
+# are the 2026-09-12 production identities (thread 3995689408).
+_ASSIGN_DOCTOR_DECISIONS: tuple[tuple[int, str, int, int | None, str], ...] = (
+    (2, "K01", 10, None, "cardio"),
+    (127, "K11", 10, None, "cardio"),
 )
 
-# (service_code,) — none in the 2026-09-12 map; supported for the
-# remaining 21 operator decisions.
-_DISABLE_DECISIONS: tuple[str, ...] = ()
+# (snapshot_id, service_code) — none in the 2026-09-12 map; supported
+# for the remaining 21 operator decisions (same identity contract).
+_DISABLE_DECISIONS: tuple[tuple[int, str], ...] = ()
 
 # {profile_key: decision} — "keep_profile" writes nothing;
 # "retire_profile" deactivates the profile (not used by the current
@@ -303,7 +364,8 @@ _SELECT_SERVICE_BY_CODE_ANY = sa.text("""
     """)
 
 _SELECT_SERVICE_BY_ID = sa.text("""
-    SELECT id, code, queue_tag, department_key, doctor_id, active
+    SELECT id, code, queue_tag, department_key, doctor_id,
+           requires_doctor, active
     FROM services
     WHERE id = :id
     """)
@@ -415,18 +477,33 @@ def _assert_no_active_general_queues(conn) -> None:
 
 def _inventory_and_assert_coverage(conn) -> dict:
     """Print the full surface inventory, then enforce the D-08 gate:
-    every ACTIVE general-fallback service must carry a decision."""
+    every ACTIVE general-fallback service must carry a decision —
+    carrying ITS OWN identity (thread 3995689408): a decision approved
+    for (id=21, code='L03') does not cover a different live object
+    (id=999) that merely re-uses the code."""
     rows = conn.execute(
         _SELECT_SURFACES,
         {"synthetic_usernames": sorted(_SYNTHETIC_OWNER_USERNAMES)},
     ).fetchall()
 
-    decided_codes: set[str] = set()
-    for code, _from_tag, _to_tag in _RETAG_DECISIONS:
-        decided_codes.add(code)
-    for code, _target, _original, _snapshot_tag in _ASSIGN_DOCTOR_DECISIONS:
-        decided_codes.add(code)
-    decided_codes.update(_DISABLE_DECISIONS)
+    # (snapshot_id, code) -> decision kind — the approved identity keys
+    decided_identities: dict[tuple[int, str], str] = {}
+    for snapshot_id, code, _from_tag, _to_tag in _RETAG_DECISIONS:
+        decided_identities[(snapshot_id, code)] = "retag_resource"
+    for (
+        snapshot_id,
+        code,
+        _target,
+        _original,
+        _snapshot_tag,
+    ) in _ASSIGN_DOCTOR_DECISIONS:
+        decided_identities[(snapshot_id, code)] = "assign_doctor"
+    for snapshot_id, code in _DISABLE_DECISIONS:
+        decided_identities[(snapshot_id, code)] = "disable_service"
+    decided_codes = {code for _snapshot_id, code in decided_identities}
+    decided_ids_by_code: dict[str, list[int]] = {}
+    for snapshot_id, code in decided_identities:
+        decided_ids_by_code.setdefault(code, []).append(snapshot_id)
 
     surfaces: dict = {}
     undecided: list[str] = []
@@ -448,13 +525,28 @@ def _inventory_and_assert_coverage(conn) -> dict:
                 "re-run the inventory; aborting with no rows changed"
             )
         surfaces[row.code] = row
-        if row.code not in decided_codes:
+        if (row.id, row.code) in decided_identities:
+            continue
+        if row.code in decided_codes:
+            # a different live object under a mapped code — the
+            # decision was approved for the snapshot identity, never
+            # for this row (thread 3995689408: id=21 deleted, id=999
+            # re-using the code must NOT inherit the decision)
+            decided_for = ", ".join(
+                str(i) for i in sorted(decided_ids_by_code[row.code])
+            )
+            undecided.append(
+                f"code={row.code!r} (id={row.id}): the map decides "
+                f"id(s) {decided_for} for that code — a DIFFERENT "
+                "object carries it now"
+            )
+        else:
             undecided.append(f"code={row.code!r} (id={row.id}, tag={row.queue_tag!r})")
 
     if undecided:
         _abort(
             f"{len(undecided)} ACTIVE general-fallback service(s) with "
-            "NO operator decision: "
+            "NO operator decision for their identity: "
             + "; ".join(undecided)
             + " — D-08 forbids inference; complete the operator map "
             "(evidence/stage_e_operator_map), append the decisions to "
@@ -465,13 +557,6 @@ def _inventory_and_assert_coverage(conn) -> dict:
             "changed"
         )
 
-    inert = sorted(decided_codes - set(surfaces))
-    for code in inert:
-        print(
-            f"{_MIGRATION_NAME}: decision for {code!r} is inert on this "
-            "database (no ACTIVE general-fallback service with that "
-            "code) — no rows changed for it"
-        )
     return surfaces
 
 
@@ -568,9 +653,19 @@ def _assert_decision_pre_states(conn, surfaces: dict) -> None:
     _SELECT_SURFACES (the tag resolves), and treating it as inert
     would let the cutover mutate the other mapped rows despite the
     stale map."""
-    for code, from_tag, to_tag in _RETAG_DECISIONS:
+    for snapshot_id, code, from_tag, to_tag in _RETAG_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
         for row in rows:
+            if row.id != snapshot_id:
+                _abort(
+                    f"stale operator map for {code!r}: the live service "
+                    f"(id={row.id}) carries the code but the embedded "
+                    f"map decides id={snapshot_id} for it (thread "
+                    "3995689408) — a different object must not inherit "
+                    "the approved decision; re-run the inventory and "
+                    "update the decision tables; aborting with no rows "
+                    "changed"
+                )
             if row.queue_tag not in (from_tag, to_tag):
                 _abort(
                     f"stale operator map for {code!r}: the live service "
@@ -583,6 +678,7 @@ def _assert_decision_pre_states(conn, surfaces: dict) -> None:
                 )
 
     for (
+        snapshot_id,
         code,
         target_doctor_id,
         original_doctor_id,
@@ -590,6 +686,16 @@ def _assert_decision_pre_states(conn, surfaces: dict) -> None:
     ) in _ASSIGN_DOCTOR_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
         for row in rows:
+            if row.id != snapshot_id:
+                _abort(
+                    f"stale operator map for {code!r}: the live service "
+                    f"(id={row.id}) carries the code but the embedded "
+                    f"map decides id={snapshot_id} for it (thread "
+                    "3995689408) — a different object must not inherit "
+                    "the approved decision; re-run the inventory and "
+                    "update the decision tables; aborting with no rows "
+                    "changed"
+                )
             if row.queue_tag != snapshot_tag:
                 _abort(
                     f"stale operator map for {code!r}: the live service "
@@ -609,6 +715,88 @@ def _assert_decision_pre_states(conn, surfaces: dict) -> None:
                     "by the cutover; re-run the inventory and update the "
                     "decision tables; aborting with no rows changed"
                 )
+
+
+def _resolve_decision_target(
+    conn,
+    *,
+    snapshot_id: int,
+    code: str,
+    decision: str,
+):
+    """Resolve ONE decision's application target by the approved
+    identity (thread 3995689408, P1): the snapshot (id, code) pair
+    from the map — never "whatever row currently carries the code".
+
+    Returns the LIVE identity row (the write target), or None when
+    the decision is inert. Resolution outcomes:
+
+    - the snapshot row exists, still carries the mapped code and is
+      ACTIVE -> the write target (the guarded UPDATE and the
+      pre-state checks below take it from here);
+    - the snapshot row exists but its CODE changed -> identity
+      drift: abort (the catalog row id=21 is no longer the object the
+      operator approved);
+    - the snapshot row is gone or disabled while a DIFFERENT active
+      row carries the code -> abort: the decision was approved for
+      another object and is never re-pointed at the carrier;
+    - the snapshot row is gone or disabled and NO active row carries
+      the code -> inert (the operator resolved the object out of the
+      catalog himself); nothing is written and the cutover proceeds.
+    """
+    identity = conn.execute(_SELECT_SERVICE_BY_ID, {"id": snapshot_id}).fetchone()
+    carriers = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
+    carrier_ids = [row.id for row in carriers]
+
+    if identity is None:
+        if carrier_ids:
+            _abort(
+                f"stale operator map for {code!r}: the approved service "
+                f"id={snapshot_id} no longer exists but {len(carriers)} "
+                f"ACTIVE row(s) carry the code (ids "
+                f"{', '.join(str(i) for i in carrier_ids)}) — the "
+                f"decision was never approved for them ({decision} is "
+                "bound to the snapshot identity); re-run the inventory "
+                "and update the decision tables; aborting with no rows "
+                "changed"
+            )
+        print(
+            f"{_MIGRATION_NAME}: {decision} decision for id={snapshot_id} "
+            f"code={code!r} is inert — the snapshot object is gone and "
+            "no ACTIVE service carries the code; no rows changed for it"
+        )
+        return None
+
+    if identity.code != code:
+        _abort(
+            f"stale operator map for {code!r}: service id={snapshot_id} "
+            f"now carries code={identity.code!r} — the approved decision "
+            f"binds id={snapshot_id} to {code!r}; the catalog identity "
+            "drifted after the map was approved; re-run the inventory "
+            "and update the decision tables; aborting with no rows "
+            "changed"
+        )
+
+    if not identity.active:
+        if carrier_ids:
+            _abort(
+                f"stale operator map for {code!r}: the approved service "
+                f"id={snapshot_id} is disabled while {len(carriers)} "
+                f"ACTIVE row(s) carry the code (ids "
+                f"{', '.join(str(i) for i in carrier_ids)}) — the "
+                f"{decision} decision does not cover them; re-run the "
+                "inventory and update the decision tables; aborting "
+                "with no rows changed"
+            )
+        print(
+            f"{_MIGRATION_NAME}: {decision} decision for id={snapshot_id} "
+            f"code={code!r} is inert — the approved object is disabled "
+            "(the operator's own resolution) and no ACTIVE service "
+            "carries the code; no rows changed for it"
+        )
+        return None
+
+    return identity
 
 
 def _guarded_service_update(
@@ -680,31 +868,72 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
     """Apply the embedded operator map, exact-row, deterministic.
 
     Pre-flight ordering (the 0063 no-rows-changed contract): the
-    coverage, pre-state and target validations (registry resource,
-    real doctor) ALL run BEFORE the first mutation — a stale map or
-    an invalid target aborts with the catalog untouched, not
-    half-converted.
+    coverage, identity resolution, pre-state and target validations
+    (registry resource, real doctor) ALL run BEFORE the first mutation
+    — a stale map or an invalid target aborts with the catalog
+    untouched, not half-converted.
+
+    Identity (thread 3995689408, P1): each decision resolves its write
+    target by the SNAPSHOT (id, code) pair from the approved map —
+    ``_resolve_decision_target`` never falls back to a code-only
+    lookup, so a replacement row re-using a mapped code can never
+    inherit the old decision. The ``surfaces`` inventory stays the D-08
+    coverage gate (and prints it), but is no longer the write-target
+    resolver.
 
     Write phase (thread 3995689409, P1): every UPDATE carries the exact
     identity (id + code) AND the expected source state read by the
-    inventory, and must affect exactly one row. A concurrent catalog
-    edit that lands between the pre-state check and the write makes the
-    guarded UPDATE match zero rows; the mismatch is then PROVEN to be
-    either the exact post-state (an idempotent no-op) or it aborts the
-    whole map — a newer operator edit is never overwritten, and the
-    map is never partially applied."""
+    identity resolution, and must affect exactly one row. A concurrent
+    catalog edit that lands between the pre-state check and the write
+    makes the guarded UPDATE match zero rows; the mismatch is then
+    PROVEN to be either the exact post-state (an idempotent no-op) or
+    it aborts the whole map — a newer operator edit is never
+    overwritten, and the map is never partially applied."""
     counts = {"retag_resource": 0, "assign_doctor": 0, "disable_service": 0}
 
+    # Phase order (the race contract, thread 3995689409): the identity
+    # rows are read FIRST — the expected source state for the guarded
+    # writes is the state at THIS earliest read, so any catalog edit
+    # landing between here and a write makes the guarded predicate
+    # match zero rows and abort (or proves the idempotent no-op). A
+    # later re-read would silently absorb the concurrent edit into
+    # the expected state and clobber it.
+    targets: dict[str, object] = {}
+    for snapshot_id, code, _from_tag, _to_tag in _RETAG_DECISIONS:
+        targets[code] = _resolve_decision_target(
+            conn, snapshot_id=snapshot_id, code=code, decision="retag_resource"
+        )
+    for (
+        snapshot_id,
+        code,
+        _target,
+        _original,
+        _snapshot_tag,
+    ) in _ASSIGN_DOCTOR_DECISIONS:
+        targets[code] = _resolve_decision_target(
+            conn, snapshot_id=snapshot_id, code=code, decision="assign_doctor"
+        )
+    for snapshot_id, code in _DISABLE_DECISIONS:
+        targets[code] = _resolve_decision_target(
+            conn, snapshot_id=snapshot_id, code=code, decision="disable_service"
+        )
+
     _assert_decision_pre_states(conn, surfaces)
-    for code, _from_tag, to_tag in _RETAG_DECISIONS:
-        if surfaces.get(code) is not None:
+    for _snapshot_id, code, _from_tag, to_tag in _RETAG_DECISIONS:
+        if targets[code] is not None:
             _assert_registry_target(conn, to_tag)
-    for code, target_doctor_id, _original, _snapshot_tag in _ASSIGN_DOCTOR_DECISIONS:
-        if surfaces.get(code) is not None:
+    for (
+        _snapshot_id,
+        code,
+        target_doctor_id,
+        _original,
+        _snapshot_tag,
+    ) in _ASSIGN_DOCTOR_DECISIONS:
+        if targets[code] is not None:
             _assert_target_doctor(conn, target_doctor_id)
 
-    for code, _from_tag, to_tag in _RETAG_DECISIONS:
-        row = surfaces.get(code)
+    for _snapshot_id, code, _from_tag, to_tag in _RETAG_DECISIONS:
+        row = targets[code]
         if row is None:
             continue
         if row.queue_tag == to_tag:
@@ -743,8 +972,14 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
             counts["retag_resource"] += 1
             _verify_service_state(conn, service_id=row.id, queue_tag=to_tag)
 
-    for code, target_doctor_id, _original, _snapshot_tag in _ASSIGN_DOCTOR_DECISIONS:
-        row = surfaces.get(code)
+    for (
+        _snapshot_id,
+        code,
+        target_doctor_id,
+        _original,
+        _snapshot_tag,
+    ) in _ASSIGN_DOCTOR_DECISIONS:
+        row = targets[code]
         if row is None:
             continue
         if row.doctor_id == target_doctor_id:
@@ -792,8 +1027,8 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
                 conn, service_id=row.id, doctor_id=target_doctor_id
             )
 
-    for code in _DISABLE_DECISIONS:
-        row = surfaces.get(code)
+    for _snapshot_id, code in _DISABLE_DECISIONS:
+        row = targets[code]
         if row is None:
             continue
         print(
@@ -825,7 +1060,19 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
 
 def _apply_profile_decisions(conn) -> int:
     """keep_profile writes nothing; retire_profile deactivates (guarded
-    by key identity + expected is_active, the same 3995689409 contract)."""
+    by key identity + expected is_active, the same 3995689409 contract).
+
+    Same-error-class audit (thread 3995689408, "check every decision
+    table of this migration"): profile decisions are keyed by the
+    NATURAL key ``queue_profiles.key`` (a stable business identity,
+    not a surrogate row id), and the only current decision
+    (``general`` -> keep_profile) writes NOTHING — so no
+    re-created-profile exposure exists in the current map. A future
+    ``retire_profile`` row inherits the guarded-write contract above:
+    key identity + expected is_active in the UPDATE predicate, exactly
+    one affected row, idempotent no-op proven on rowcount != 1 — a
+    re-created profile is only ever deactivated when the operator's map
+    still names its key, and the validate-only downgrade reports it."""
     retired = 0
     for profile_key, decision in _PROFILE_DECISIONS.items():
         if decision != "retire_profile":
@@ -923,18 +1170,20 @@ def downgrade_with_conn(conn) -> None:
         "(the 0059/0063 conservative ruling — the upgrade log inventory "
         "and a pre-E backup are the restore paths)"
     )
-    for code, from_tag, to_tag in _RETAG_DECISIONS:
+    for snapshot_id, code, from_tag, to_tag in _RETAG_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE_ANY, {"code": code}).fetchall()
         for row in rows:
             if row.queue_tag == to_tag:
                 print(
                     f"{_MIGRATION_NAME} downgrade: service id={row.id} "
-                    f"code={code!r} sits on the retagged state "
-                    f"{to_tag!r} — the pre-E value was {from_tag!r} "
+                    f"code={code!r} (snapshot id={snapshot_id}) sits on "
+                    f"the retagged state {to_tag!r} — the pre-E value "
+                    f"was {from_tag!r} "
                     "(see the upgrade log inventory; restore manually or "
                     "from the pre-E backup if required)"
                 )
     for (
+        snapshot_id,
         code,
         target_doctor_id,
         original_doctor_id,
@@ -945,19 +1194,21 @@ def downgrade_with_conn(conn) -> None:
             if row.doctor_id == target_doctor_id:
                 print(
                     f"{_MIGRATION_NAME} downgrade: service id={row.id} "
-                    f"code={code!r} sits on the assigned doctor "
-                    f"{target_doctor_id} — the pre-E value was "
+                    f"code={code!r} (snapshot id={snapshot_id}) sits on "
+                    f"the assigned doctor {target_doctor_id} — the pre-E "
+                    f"value was "
                     f"{original_doctor_id!r} (see the upgrade log "
                     "inventory; restore manually or from the pre-E "
                     "backup if required)"
                 )
-    for code in _DISABLE_DECISIONS:
+    for snapshot_id, code in _DISABLE_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE_ANY, {"code": code}).fetchall()
         for row in rows:
             if not bool(row.active):
                 print(
                     f"{_MIGRATION_NAME} downgrade: service id={row.id} "
-                    f"code={code!r} is disabled by the cutover decision "
+                    f"code={code!r} (snapshot id={snapshot_id}) is "
+                    "disabled by the cutover decision "
                     "— re-activate manually if the rollback requires it"
                 )
 

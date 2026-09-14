@@ -114,6 +114,46 @@ _RETAG_CODES = (
 _ASSIGN_CODES = ("K01", "K11")
 _TARGET_DOCTOR_ID = 10  # the production single real cardiologist
 
+# The 2026-09-12 production snapshot identities (thread 3995689408):
+# every decision binds the exact (id, code) object it was approved
+# for — the seeded catalog must mirror them (like doctor id 10).
+_RETAG_SNAPSHOT_IDS = {
+    "L03": 21,
+    "L14": 11,
+    "L15": 27,
+    "L16": 22,
+    "L17": 24,
+    "L18": 23,
+    "L19": 20,
+    "L20": 28,
+    "L21": 29,
+    "L22": 52,
+    "L23": 63,
+    "L24": 53,
+    "L25": 12,
+    "L26": 72,
+    "L27": 30,
+    "L28": 32,
+    "L29": 73,
+    "L30": 44,
+    "L31": 74,
+    "L32": 62,
+    "L33": 61,
+    "L34": 60,
+    "L35": 33,
+    "LAB_ALT": 25,
+    "LAB_AST": 26,
+    "LAB_BILE_URINE": 36,
+    "LAB_CA": 31,
+    "LAB_CRP": 51,
+    "LAB_FUNGI": 70,
+    "LAB_HBA1C": 34,
+    "LAB_IGE": 75,
+    "LAB_MALAS": 71,
+    "LAB_RF": 50,
+}
+_ASSIGN_SNAPSHOT_IDS = {"K01": 2, "K11": 127}
+
 
 # ===================== helpers =====================
 
@@ -276,25 +316,40 @@ def _seed_synthetic_world(conn) -> None:
 
 
 def _seed_decided_services(conn) -> None:
-    """The 36-decided production snapshot: 33 lab services tagged
-    'general' (requires_doctor=false) + K01/K11 cardio consults."""
+    """The 36-decided production snapshot WITH the snapshot identities
+    (thread 3995689408): 33 lab services tagged 'general'
+    (requires_doctor=false) + K01/K11 cardio consults, every row at
+    its 2026-09-12 production id — the map's decisions bind (id, code),
+    so the seeded catalog must mirror them exactly like doctor id 10."""
     for code in _RETAG_CODES:
         conn.execute(
             sa.text(
-                "INSERT INTO services (code, name, queue_tag,"
+                "INSERT INTO services (id, code, name, queue_tag,"
                 " department_key, doctor_id, requires_doctor, active)"
-                " VALUES (:c, :n, 'general', NULL, NULL, :rd, :a)"
+                " VALUES (:id, :c, :n, 'general', NULL, NULL, :rd, :a)"
             ),
-            {"c": code, "n": f"Лаб-услуга {code}", "rd": False, "a": True},
+            {
+                "id": _RETAG_SNAPSHOT_IDS[code],
+                "c": code,
+                "n": f"Лаб-услуга {code}",
+                "rd": False,
+                "a": True,
+            },
         )
     for code in _ASSIGN_CODES:
         conn.execute(
             sa.text(
-                "INSERT INTO services (code, name, queue_tag,"
+                "INSERT INTO services (id, code, name, queue_tag,"
                 " department_key, doctor_id, requires_doctor, active)"
-                " VALUES (:c, :n, 'cardio', 'cardiology', NULL, :rd, :a)"
+                " VALUES (:id, :c, :n, 'cardio', 'cardiology', NULL, :rd, :a)"
             ),
-            {"c": code, "n": f"Кардио-услуга {code}", "rd": True, "a": True},
+            {
+                "id": _ASSIGN_SNAPSHOT_IDS[code],
+                "c": code,
+                "n": f"Кардио-услуга {code}",
+                "rd": True,
+                "a": True,
+            },
         )
     conn.execute(
         sa.text(
@@ -701,6 +756,263 @@ def test_inert_decision_proceeds_with_a_log() -> None:
     assert doctor_id == _TARGET_DOCTOR_ID
 
 
+# ========== the snapshot-identity contract (thread 3995689408, P1) ==========
+
+from contextlib import contextmanager
+
+
+@contextmanager
+def _scratch_engine_disposed():
+    """A scratch connection whose engine is disposed DETERMINISTICALLY at
+    test end (test hygiene, the QD-2C round-5 ruling): a leaked engine
+    perturbs the process heap long after the test, and the lab seed
+    cache (app/services/lab_reporting/_base.py) keys its per-bind state
+    by ``id(bind)`` — CPython address reuse then flips a later lab test
+    into skipping its seeding. Disposing here keeps this suite's
+    footprint bounded and deterministic."""
+    conn = _scratch()
+    try:
+        yield conn
+    finally:
+        conn.engine.dispose()
+
+
+def test_identity_snapshot_object_deleted_and_code_reused_aborts() -> None:
+    """The exact finding scenario: the map approved a decision for
+    id=21/code='L03'; the original object was deleted; a NEW row
+    id=999/code='L03' sits on the fallback surface. The migration must
+    NOT apply the old decision to id=999 — the coverage gate aborts
+    with the different-object message and NOTHING is written."""
+    with _scratch_engine_disposed() as conn:
+        _seed_synthetic_world(conn)
+        _seed_decided_services(conn)
+        conn.execute(sa.text("DELETE FROM services WHERE id = 21"))
+        conn.execute(
+            sa.text(
+                "INSERT INTO services (id, code, name, queue_tag,"
+                " department_key, doctor_id, requires_doctor, active)"
+                " VALUES (999, 'L03', 'Новый анализ', 'general', NULL, NULL, 0, 1)"
+            )
+        )
+
+        _assert_abort(conn, "the map decides id\\(s\\) 21 for that code")
+
+        # no rows changed: the replacement keeps the operator's 'general'
+        # and the rest of the map was never touched
+        tag, _, _ = _service_state(conn, "L03")
+        assert tag == "general"
+        tag, _, _ = _service_state(conn, "L14")
+        assert tag == "general"
+        _, doctor_id, _ = _service_state(conn, "K01")
+        assert doctor_id is None
+
+
+def test_identity_approved_object_disabled_with_active_replacement_aborts() -> None:
+    """Variant of the finding: the approved object id=21 was DISABLED
+    (not deleted) while a different active row re-uses the code on the
+    fallback surface — the decision does not cover the replacement and
+    the map aborts with no rows changed."""
+    with _scratch_engine_disposed() as conn:
+        _seed_synthetic_world(conn)
+        _seed_decided_services(conn)
+        conn.execute(sa.text("UPDATE services SET active = 0 WHERE id = 21"))
+        conn.execute(
+            sa.text(
+                "INSERT INTO services (id, code, name, queue_tag,"
+                " department_key, doctor_id, requires_doctor, active)"
+                " VALUES (999, 'L03', 'Новый анализ', 'general', NULL, NULL, 0, 1)"
+            )
+        )
+
+        _assert_abort(conn, "the map decides id\\(s\\) 21 for that code")
+        tag, _, _ = _service_state(conn, "L03")
+        assert tag == "general"
+        tag, _, _ = _service_state(conn, "L14")
+        assert tag == "general"
+
+
+def test_identity_deleted_object_with_off_surface_carrier_aborts() -> None:
+    """The coverage gate only sees fallback-surface rows; a carrier
+    hidden behind an ACTIVE resource tag would slip past it. The
+    application-phase identity resolution must still refuse: the
+    approved id=21 is gone while a live id=999 carries the code."""
+    with _scratch_engine_disposed() as conn:
+        _seed_synthetic_world(conn)
+        _seed_decided_services(conn)
+        # an ACTIVE ecg registry row (the 0059 seed shape)
+        conn.execute(
+            sa.text(
+                "INSERT INTO queue_resources (code, queue_tag, display_name, active)"
+                " VALUES ('ecg', 'ecg', 'ЭКГ', 1)"
+            )
+        )
+        conn.execute(sa.text("DELETE FROM services WHERE id = 21"))
+        # the replacement sits on the RESOLVED 'ecg' tag: invisible to the
+        # coverage inventory, visible to the identity resolution
+        conn.execute(
+            sa.text(
+                "INSERT INTO services (id, code, name, queue_tag,"
+                " department_key, doctor_id, requires_doctor, active)"
+                " VALUES (999, 'L03', 'Новый анализ', 'ecg', NULL, NULL, 0, 1)"
+            )
+        )
+
+        _assert_abort(conn, "id=21 no longer exists but 1 ACTIVE row")
+        tag, _, _ = _service_state(conn, "L03")
+        assert tag == "ecg"  # the replacement is never retagged by the old decision
+        tag, _, _ = _service_state(conn, "L14")
+        assert tag == "general"
+def test_identity_disabled_object_with_off_surface_carrier_aborts() -> None:
+    """Same as above with the disabled variant: the approved object is
+    inactive, a different live row carries the code behind a resolved
+    tag — abort, never re-point the decision."""
+    with _scratch_engine_disposed() as conn:
+        _seed_synthetic_world(conn)
+        _seed_decided_services(conn)
+        conn.execute(
+            sa.text(
+                "INSERT INTO queue_resources (code, queue_tag, display_name, active)"
+                " VALUES ('ecg', 'ecg', 'ЭКГ', 1)"
+            )
+        )
+        conn.execute(sa.text("UPDATE services SET active = 0 WHERE id = 21"))
+        conn.execute(
+            sa.text(
+                "INSERT INTO services (id, code, name, queue_tag,"
+                " department_key, doctor_id, requires_doctor, active)"
+                " VALUES (999, 'L03', 'Новый анализ', 'ecg', NULL, NULL, 0, 1)"
+            )
+        )
+
+        _assert_abort(conn, "id=21 is disabled while 1 ACTIVE row")
+        # the replacement (id=999) keeps the operator's 'ecg' — never retagged
+        (replacement_tag,) = conn.execute(
+            sa.text("SELECT queue_tag FROM services WHERE id = 999")
+        ).fetchone()
+        assert replacement_tag == "ecg"
+        # the disabled approved object is never re-activated or re-tagged
+        approved_tag, approved_active = conn.execute(
+            sa.text("SELECT queue_tag, active FROM services WHERE id = 21")
+        ).fetchone()
+        assert (approved_tag, bool(approved_active)) == ("general", False)
+def test_identity_row_id_reused_for_a_different_code_aborts() -> None:
+    """ID matched but the code/expected state changed: the snapshot row
+    id=21 now carries a different code — the catalog identity drifted
+    after the map was approved and the migration must abort instead of
+    silently skipping (a silent skip would let the rest of the map
+    apply onto a database that no longer matches the approval)."""
+    with _scratch_engine_disposed() as conn:
+        _seed_synthetic_world(conn)
+        _seed_decided_services(conn)
+        # id=21 re-keyed off the fallback surface entirely (tag NULL,
+        # no department, no doctor — invisible to the coverage inventory)
+        conn.execute(
+            sa.text("UPDATE services SET code = 'L99', queue_tag = NULL WHERE id = 21")
+        )
+
+        _assert_abort(conn, "service id=21 now carries code='L99'")
+        # no rows changed anywhere in the map
+        tag, _, _ = _service_state(conn, "L14")
+        assert tag == "general"
+        _, doctor_id, _ = _service_state(conn, "K01")
+        assert doctor_id is None
+def test_identity_object_already_in_proven_final_state_is_a_noop() -> None:
+    """The original object exists with its snapshot identity and ALREADY
+    sits on the decision's final state (a hand-applied decision or an
+    earlier pass) — the migration proves the no-op and completes the
+    REST of the map."""
+    with _scratch_engine_disposed() as conn:
+        _seed_synthetic_world(conn)
+        _seed_decided_services(conn)
+        # the operator hand-applied the L03 decision before running the
+        # cutover (the 0063 no-op precedent)
+        conn.execute(sa.text("UPDATE services SET queue_tag = 'lab' WHERE id = 21"))
+
+        module = _load_migration_0064()
+        module.upgrade_with_conn(conn)  # must not raise
+
+        tag, _, _ = _service_state(conn, "L03")
+        assert tag == "lab"
+        # the rest of the map still applied
+        for code in ("L14", "L15", "LAB_RF"):
+            tag, _, _ = _service_state(conn, code)
+            assert tag == "lab", code
+        _, doctor_id, _ = _service_state(conn, "K01")
+        assert doctor_id == _TARGET_DOCTOR_ID
+def test_identity_one_conflict_rolls_back_the_whole_map() -> None:
+    """One conflicting decision in the map (a stale row the operator
+    moved to a third tag) aborts the cutover with NO other decision
+    applied — the map is atomic, never partially applied."""
+    with _scratch_engine_disposed() as conn:
+        _seed_synthetic_world(conn)
+        _seed_decided_services(conn)
+        # the operator moved L20 (id=28) to 'procedures' after the snapshot
+        conn.execute(
+            sa.text("UPDATE services SET queue_tag = 'procedures' WHERE id = 28")
+        )
+
+        _assert_abort(conn, "stale operator map for 'L20'")
+
+        # EVERY decided service is untouched — no partial application;
+        # L20 itself keeps the operator's newer 'procedures' decision
+        for code in _RETAG_CODES:
+            tag, _, _ = _service_state(conn, code)
+            assert tag == ("procedures" if code == "L20" else "general"), code
+        for code in _ASSIGN_CODES:
+            _, doctor_id, _ = _service_state(conn, code)
+            assert doctor_id is None, code
+def test_identity_disabled_object_without_replacement_is_inert() -> None:
+    """The operator resolved an approved object himself by disabling it
+    (no replacement row re-uses the code): the decision is inert with an
+    explicit identity-aware log line, and the rest of the map applies."""
+    with _scratch_engine_disposed() as conn:
+        _seed_synthetic_world(conn)
+        _seed_decided_services(conn)
+        conn.execute(sa.text("UPDATE services SET active = 0 WHERE id = 127"))  # K11
+
+        module = _load_migration_0064()
+        module.upgrade_with_conn(conn)  # must not raise
+
+        _, doctor_id, active = _service_state(conn, "K11")
+        assert (doctor_id, bool(active)) == (None, False)  # never re-activated
+        _, doctor_id, _ = _service_state(conn, "K01")
+        assert doctor_id == _TARGET_DOCTOR_ID  # the rest of the map applied
+def test_identity_other_database_shape_aborts_with_the_boundary_message() -> None:
+    """The documented boundary: the map's snapshot ids are PRODUCTION
+    identities — another installation whose rows carry the same codes
+    under different ids does not match the approved map and needs its
+    own decisions (the D-08 runbook cycle), NOT a silent re-target."""
+    with _scratch_engine_disposed() as conn:
+        _seed_synthetic_world(conn)
+        # same codes, DIFFERENT ids (a non-production database shape)
+        next_id = 500
+        for code in _RETAG_CODES:
+            conn.execute(
+                sa.text(
+                    "INSERT INTO services (id, code, name, queue_tag,"
+                    " department_key, doctor_id, requires_doctor, active)"
+                    " VALUES (:id, :c, :n, 'general', NULL, NULL, 0, 1)"
+                ),
+                {"id": next_id, "c": code, "n": f"Лаб-услуга {code}"},
+            )
+            next_id += 1
+        for code in _ASSIGN_CODES:
+            conn.execute(
+                sa.text(
+                    "INSERT INTO services (id, code, name, queue_tag,"
+                    " department_key, doctor_id, requires_doctor, active)"
+                    " VALUES (:id, :c, :n, 'cardio', 'cardiology', NULL, 1, 1)"
+                ),
+                {"id": next_id, "c": code, "n": f"Кардио-услуга {code}"},
+            )
+            next_id += 1
+        conn.execute(
+            sa.text("INSERT INTO queue_profiles (key, is_active) VALUES ('general', 1)")
+        )
+
+        _assert_abort(conn, "a DIFFERENT object carries it now")
+        tag, _, _ = _service_state(conn, "L03")
+        assert tag == "general"
 def test_downgrade_is_validate_only_and_writes_nothing() -> None:
     """Codex round-1 P1 (the 0059 round-2 / 0063 ruling): the data
     downgrade cannot prove WHICH rows the upgrade changed — a mapped
@@ -1053,18 +1365,34 @@ def test_pg_two_connections_assign_guard_null_semantics_foreign_doctor(
 
 def test_embedded_decisions_match_the_operator_map_evidence() -> None:
     """Parity pin: the embedded tables ARE the completed-map snapshot
-    (evidence/stage_e_operator_map_20260912.json) — they cannot drift."""
+    (evidence/stage_e_operator_map_20260912.json) — they cannot drift,
+    INCLUDING the snapshot service ids (thread 3995689408: the identity
+    is part of the approved decision, not a code-only key)."""
     payload = json.loads(OPERATOR_MAP.read_text(encoding="utf-8"))
     items = payload["items"]
     map_retags = {
-        item["code"]: (item["queue_tag"], item["target_queue_tag"])
+        item["code"]: (
+            item["id"],
+            item["queue_tag"],
+            item["target_queue_tag"],
+        )
         for item in items
         if item["surface"] == "service" and item["decision"] == "retag_resource"
     }
     map_assigns = {
-        item["code"]: (item["target_doctor_id"], item["doctor_id"], item["queue_tag"])
+        item["code"]: (
+            item["id"],
+            item["target_doctor_id"],
+            item["doctor_id"],
+            item["queue_tag"],
+        )
         for item in items
         if item["surface"] == "service" and item["decision"] == "assign_doctor"
+    }
+    map_disables = {
+        item["code"]: item["id"]
+        for item in items
+        if item["surface"] == "service" and item["decision"] == "disable_service"
     }
     map_profiles = {
         item["key"]: item["decision"]
@@ -1074,18 +1402,41 @@ def test_embedded_decisions_match_the_operator_map_evidence() -> None:
 
     module = _load_migration_0064()
     assert {
-        code: (from_tag, to_tag) for code, from_tag, to_tag in module._RETAG_DECISIONS
+        code: (snapshot_id, from_tag, to_tag)
+        for snapshot_id, code, from_tag, to_tag in module._RETAG_DECISIONS
     } == map_retags
     assert {
-        code: (target, original, snapshot_tag)
-        for code, target, original, snapshot_tag in module._ASSIGN_DOCTOR_DECISIONS
+        code: (snapshot_id, target, original, snapshot_tag)
+        for (
+            snapshot_id,
+            code,
+            target,
+            original,
+            snapshot_tag,
+        ) in module._ASSIGN_DOCTOR_DECISIONS
     } == map_assigns
     assert module._DISABLE_DECISIONS == ()
+    assert map_disables == {}
     assert module._PROFILE_DECISIONS == map_profiles
     # the snapshot really is the 36-decided production state
     assert len(map_retags) == 33
     assert len(map_assigns) == 2
     assert sum(1 for item in items if item["decision"] is None) == 21
+    # the seed mirrors the same identities (the scratch fixtures and
+    # the embedded map cannot drift either)
+    assert _RETAG_SNAPSHOT_IDS == {
+        code: snapshot_id for snapshot_id, code, _f, _t in module._RETAG_DECISIONS
+    }
+    assert _ASSIGN_SNAPSHOT_IDS == {
+        code: snapshot_id
+        for (
+            snapshot_id,
+            code,
+            _target,
+            _original,
+            _snapshot_tag,
+        ) in module._ASSIGN_DOCTOR_DECISIONS
+    }
 
 
 # ===================== B. runtime fail-closed (db_session) =====================
