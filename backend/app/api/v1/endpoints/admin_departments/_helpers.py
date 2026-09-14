@@ -8,7 +8,7 @@ from decimal import Decimal  # noqa: F401
 from typing import Any  # noqa: F401
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
-from pydantic import BaseModel, ConfigDict, Field  # noqa: F401
+from pydantic import BaseModel, ConfigDict, Field, field_validator  # noqa: F401
 from sqlalchemy import and_, func, or_  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
@@ -97,7 +97,7 @@ class DepartmentResponse(BaseModel):
     key: str
     name_ru: str
     name_uz: str | None
-    icon: str
+    icon: str = ""
     color: str | None
     gradient: str | None
     display_order: int
@@ -106,6 +106,14 @@ class DepartmentResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    # QD-0 provisioning (0055) inserts departments with icon=NULL; the
+    # column is nullable by design, but the required str field failed
+    # the WHOLE GET /admin/departments list with a 400. Coerce the
+    # cosmetic NULL to the empty string.
+    @field_validator("icon", mode="before")
+    @classmethod
+    def _icon_none_to_empty(cls, value: object) -> object:
+        return "" if value is None else value
 
 class DepartmentResponseWithSettings(DepartmentResponse):
     """Схема ответа отделения с настройками"""
