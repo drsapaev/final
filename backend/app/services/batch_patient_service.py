@@ -23,7 +23,10 @@ from app.crud.queue_owner_policy import (
     eligible_real_doctor,
     owner_configuration_error,
 )
-from app.crud.queue_resource_routing import resolve_tag_resource
+from app.crud.queue_resource_routing import (
+    resolve_tag_resource,
+    tag_routes_to_resource,
+)
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
@@ -652,6 +655,27 @@ class BatchPatientService:
     ) -> DailyQueue:
         queue_service = get_queue_service()
 
+        # Review round 4 (P2): the RESOURCE path is decided FIRST. The
+        # canonical get_or_create_daily_queue ignores specialist_id
+        # entirely when the tag routes on the resource axis (an existing
+        # resource-owned (day, tag) surface, or an ACTIVE registry row) —
+        # so a stale service.doctor_id (a deactivated/synthetic doctor
+        # left on a lab service) or an unnecessary action.doctor_id must
+        # NOT fail the operation on a doctor that never owns the queue.
+        # The doctor eligibility contract below applies only when the
+        # resulting queue is actually DOCTOR-owned.
+        routes_to_resource = queue_tag and (
+            tag_routes_to_resource(self.db, queue_tag, target_date) is not None
+            or resolve_tag_resource(self.db, queue_tag) is not None
+        )
+        if routes_to_resource:
+            return queue_service.get_or_create_daily_queue(
+                self.db,
+                day=target_date,
+                specialist_id=None,
+                queue_tag=queue_tag,
+            )
+
         explicit_specialist_id = action.doctor_id or getattr(service, "doctor_id", None)
         if explicit_specialist_id:
             # QD-2E (PR review thread 3995711803, P2): явный источник
@@ -667,9 +691,10 @@ class BatchPatientService:
                     detail=(
                         f"explicit doctor id={int(explicit_specialist_id)} is "
                         "not an eligible real owner (inactive doctor, "
-                        "missing/inactive user link or an internal resource "
-                        "account) — the batch create-action fails closed "
-                        "before any queue row is written"
+                        "missing/inactive user link, an internal resource "
+                        "account or an incomplete profile) — the batch "
+                        "create-action fails closed before any queue row "
+                        "is written"
                     ),
                 )
             return queue_service.get_or_create_daily_queue(

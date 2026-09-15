@@ -167,6 +167,7 @@ from alembic import op
 # QD-2E review P1 (e0248660a): the mapped assign targets are validated
 # against the canonical doctor-family vocabulary (see _assert_target_doctor).
 from app.core.roles import is_doctor_role_spelling
+from app.core.specialties import INCOMPLETE_DOCTOR_SPECIALTY
 
 # Revision identifiers — chained after 0065_queue_numbering_unique
 # (renumbered from 0064/0065 after the PR-6 registry and main's
@@ -289,11 +290,6 @@ _ASSIGN_DOCTOR_DECISIONS: tuple[
     (126, "O20", 18, None, 30, "neurology", True),
     (90, "S10", 16, None, 27, "stomatology", None),
 )
-
-# The approved doctor-to-owner linkage for the refinement decisions
-# (doctor_id -> user_id): part of the owner-approved identity, validated
-# by _assert_target_doctor at application time.
-_REFINEMENT_DOCTOR_USER_LINKAGE = {17: 29, 18: 30, 16: 27}
 
 # The approved doctor-to-owner linkage for the refinement decisions
 # (doctor_id -> user_id): part of the owner-approved identity, validated
@@ -530,6 +526,19 @@ _SELECT_REGISTRY_BY_TAG_ANY = sa.text("""
     ORDER BY id
     """)
 
+# Review round 4 (P1): the seed-tag coverage gate must see the services
+# ON the tag regardless of whether the tag already resolves to an ACTIVE
+# queue_resources row — _SELECT_SURFACES deliberately EXCLUDES resolved
+# tags, so this dedicated inventory is the only D-08 view that stays
+# closed once the resource exists.
+_SELECT_SEED_TAG_SERVICES = sa.text("""
+    SELECT id, code, name, queue_tag, department_key, doctor_id,
+           requires_doctor
+    FROM services
+    WHERE active = true AND queue_tag = :queue_tag
+    ORDER BY id
+    """)
+
 _INSERT_REGISTRY_RESOURCE = sa.text("""
     INSERT INTO queue_resources
         (code, queue_tag, display_name, active,
@@ -739,12 +748,26 @@ def _assert_target_doctor(
             "never assigns services to a non-doctor owner; re-run the "
             "inventory; aborting with no rows changed"
         )
-    if not row.specialty:
+    # Review round 4 (P2): the SAME completed-profile contract the
+    # canonical booking eligibility (ensure_doctor_eligible_for_appointment
+    # -> is_doctor_profile_incomplete) enforces — the 'general'
+    # onboarding sentinel and a blank/whitespace specialty are INCOMPLETE
+    # profiles: such a doctor is not selectable for ordinary booking, so
+    # the cutover must not permanently assign services to it either.
+    # The check mirrors the SSOT constant from app.core.specialties
+    # (import-light — shared by CRUD, services and migrations alike).
+    specialty_cleaned = (row.specialty or "").strip()
+    if (
+        not specialty_cleaned
+        or specialty_cleaned == INCOMPLETE_DOCTOR_SPECIALTY
+    ):
         _abort(
-            f"assign_doctor target doctor id={doctor_id} has no "
-            "specialty — the canonical eligibility contract requires a "
-            "completed profile (the runtime would reject this doctor at "
-            "booking time); aborting with no rows changed"
+            f"assign_doctor target doctor id={doctor_id} has an "
+            f"incomplete profile (specialty={row.specialty!r}) — the "
+            "canonical eligibility contract treats the 'general' "
+            "onboarding sentinel and a blank specialty as incomplete "
+            "(the runtime would reject this doctor at booking time); "
+            "aborting with no rows changed"
         )
     if expected_user_id is not None and row.user_id != expected_user_id:
         _abort(
@@ -792,6 +815,80 @@ def _verify_service_state(
             f"postcondition failed for service id={service_id}: "
             f"active stored={bool(row.active)!r} expected={active!r}; "
             "aborting with no rows changed"
+        )
+
+
+def _assert_registry_seed_tag_coverage(conn) -> None:
+    """Review round 4 (P1): the D-08 coverage gate for the seed tag
+    ITSELF, independent of whether the resource already exists.
+
+    ``_SELECT_SURFACES`` EXCLUDES services whose tag resolves to an
+    ACTIVE ``queue_resources`` row — once ``QueueResource('procedures')``
+    exists (seeded by an earlier pass, pre-created by an operator, or
+    left by a manual repair), every ACTIVE service on the tag becomes
+    INVISIBLE to the general coverage inventory. Without this dedicated
+    check the resource would effectively extend the 16 approved
+    ``(id, code)`` decisions to the WHOLE tag: a 17th, never-approved
+    procedure would silently ride the resource axis with no operator
+    decision and no abort (the review's P1 — the D-08 "only explicitly
+    approved services move" contract broken by resource creation).
+
+    Every ACTIVE service on the seed tag must therefore carry its OWN
+    decided identity — an (id, code) pair ANY decision table of the
+    operator map names (a mapped service that drifted onto the seed tag
+    is NOT silently approved: the pre-state validation diagnoses it as a
+    stale map and aborts). Anything genuinely undecided aborts BEFORE
+    the resource is created or mutated: the runbook is a new operator
+    decision, never a silent tag-wide approval."""
+    approved: set[tuple[int, str]] = set()
+    for snapshot_id, code, _from_tag, _to_tag in _RETAG_DECISIONS:
+        approved.add((snapshot_id, code))
+    for (
+        snapshot_id,
+        code,
+        _target_doctor_id,
+        _original_doctor_id,
+        _expected_user_id,
+        _snapshot_tag,
+        _set_requires_doctor,
+    ) in _ASSIGN_DOCTOR_DECISIONS:
+        approved.add((snapshot_id, code))
+    for snapshot_id, code, _snapshot_tag in _CLEAR_DOCTOR_REQUIREMENT_DECISIONS:
+        approved.add((snapshot_id, code))
+    for snapshot_id, code in _DISABLE_DECISIONS:
+        approved.add((snapshot_id, code))
+
+    rows = conn.execute(
+        _SELECT_SEED_TAG_SERVICES, {"queue_tag": _REGISTRY_SEED_TAG}
+    ).fetchall()
+    undecided: list[str] = []
+    for row in rows:
+        print(
+            f"{_MIGRATION_NAME}: registry seed tag service "
+            f"id={row.id} code={row.code!r} tag={row.queue_tag!r} "
+            f"dept={row.department_key!r} doctor_id={row.doctor_id} "
+            f"requires_doctor={row.requires_doctor} "
+            f"approved={(row.id, row.code) in approved}"
+        )
+        if (row.id, row.code) in approved:
+            continue
+        undecided.append(
+            f"code={row.code!r} (id={row.id}, tag={row.queue_tag!r})"
+        )
+
+    if undecided:
+        _abort(
+            f"{len(undecided)} ACTIVE service(s) on the registry seed "
+            f"tag {_REGISTRY_SEED_TAG!r} with NO operator decision for "
+            "their identity: "
+            + "; ".join(undecided)
+            + " — creating/keeping the QueueResource would route them "
+            "onto the resource axis WITHOUT an approved decision: D-08 "
+            "forbids tag-wide inference (only the explicit (id, code) "
+            "pairs of the operator map are covered); complete the "
+            "operator map (evidence/stage_e_operator_map), append the "
+            "decisions to this revision's tables and re-run the "
+            "inventory; aborting with no rows changed"
         )
 
 
@@ -1383,7 +1480,15 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
                 "with doctor_id=NULL"
             ),
             post_state_check=(
-                lambda after: (
+                # Review round 4 (P2): the loop variable must be CAPTURED
+                # by the callback — the bare ``_expected_tag`` name was
+                # never defined, so the idempotent-race path (a concurrent
+                # transaction already arrived at the exact approved
+                # post-state) raised NameError instead of proving the
+                # no-op and crashed the upgrade (the e0248660a "bind the
+                # race-callback expected tag" fix only bound the GQL
+                # resolver argument — this migration callback was missed).
+                lambda after, _expected_tag=snapshot_tag: (
                     not bool(after.requires_doctor)
                     and after.doctor_id is None
                     and after.queue_tag == _expected_tag
@@ -1502,13 +1607,25 @@ def _apply_profile_decisions(conn) -> int:
 def upgrade_with_conn(conn) -> dict[str, int]:
     """The testable cutover entry (the 0063 module-level pattern)."""
     _assert_no_active_general_queues(conn)
-    # D-08 refinement (2026-09-15): the procedures resource must exist
-    # BEFORE the coverage inventory — with the ACTIVE 'procedures' row
-    # the 16 procedure services leave the general-fallback surface
-    # (registry-resolved), and the refinement flips them onto the
-    # resource axis by identity in the same transaction.
-    _ensure_procedures_registry_resource(conn)
+    # Review round 4 (P1): the D-08 coverage inventory runs BEFORE the
+    # procedures registry resource is seeded. _SELECT_SURFACES EXCLUDES
+    # services whose tag resolves to an ACTIVE queue_resources row, so
+    # seeding the resource FIRST would hide EVERY active service on the
+    # 'procedures' tag from the coverage gate — an unapproved 17th
+    # procedure (added to the catalog after the map was approved) would
+    # silently ride the resource axis with no operator decision and no
+    # abort. With the inventory first, the sixteen approved procedures
+    # appear as general-fallback surfaces (all decided identities — no
+    # abort), and the dedicated seed-tag check below keeps the same gate
+    # closed even when the resource ALREADY exists (pre-created by an
+    # operator or left by a manual repair).
     surfaces = _inventory_and_assert_coverage(conn)
+    _assert_registry_seed_tag_coverage(conn)
+    # D-08 refinement (owner, 2026-09-15): the 16 procedure services
+    # route through the ACTIVE QueueResource('procedures'). Idempotent,
+    # guarded seed (absent -> INSERT with the 0059 defaults; ACTIVE
+    # same-code -> no-op; anything else -> operator decision).
+    _ensure_procedures_registry_resource(conn)
     counts = _apply_service_decisions(conn, surfaces)
     counts["retire_profile"] = _apply_profile_decisions(conn)
     print(

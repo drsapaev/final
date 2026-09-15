@@ -1403,6 +1403,75 @@ def test_pg_two_connections_assign_guard_null_semantics_foreign_doctor(
         assert _service_state(verify_conn, "K11").doctor_id is None
 
 
+@pytest.mark.integration
+@pytest.mark.migration
+def test_pg_two_connections_concurrent_clear_post_state_is_a_proven_no_op(
+    cutover_pg_engine,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Review round 4 (P2) — the MANDATORY two-transaction PostgreSQL
+    proof for the clear_requires_doctor race: the operator concurrently
+    applies the SAME approved decision (P08: requires_doctor False,
+    doctor_id NULL, tag 'procedures') in his own COMMITTED transaction,
+    exactly between the migration's pre-state read and its guarded
+    UPDATE. The guarded UPDATE matches zero rows; the guard must re-read
+    and PROVE the exact post-state (the unfixed callback raised
+    NameError on the undefined ``_expected_tag`` and crashed the
+    upgrade); the rest of the map applies and commits."""
+    with cutover_pg_engine.connect() as setup_conn:
+        _seed_refinement_world(setup_conn)
+        setup_conn.commit()
+
+    module = _load_migration_0064()
+    original_assert = module._assert_target_doctor
+
+    def operator_applies_the_same_clear(migration_conn, doctor_id, _user=None):
+        # connection B: the operator's own COMMITTED transaction, landing
+        # exactly between the pre-state read and the guarded write
+        with cutover_pg_engine.connect() as operator_conn:
+            with operator_conn.begin():
+                operator_conn.execute(
+                    sa.text(
+                        "UPDATE services SET requires_doctor = false"
+                        " WHERE code = 'P08'"
+                    )
+                )
+        return original_assert(migration_conn, doctor_id, _user)
+
+    module._assert_target_doctor = operator_applies_the_same_clear
+
+    with cutover_pg_engine.connect() as migration_conn:
+        migration_trans = migration_conn.begin()
+        module.upgrade_with_conn(migration_conn)  # must NOT raise
+        migration_trans.commit()
+
+    assert "proven idempotent no-op" in capsys.readouterr().out
+    with cutover_pg_engine.connect() as verify_conn:
+        row = verify_conn.execute(
+            sa.text(
+                "SELECT requires_doctor, doctor_id, queue_tag FROM services"
+                " WHERE code = 'P08'"
+            )
+        ).fetchone()
+        assert (bool(row.requires_doctor), row.doctor_id, row.queue_tag) == (
+            False,
+            None,
+            "procedures",
+        ), row
+        # the whole map applied on the committed post-state
+        cleared = verify_conn.execute(
+            sa.text(
+                "SELECT COUNT(*) FROM services WHERE queue_tag = 'procedures'"
+                " AND active = true AND requires_doctor IS FALSE"
+            )
+        ).scalar()
+        assert cleared == 16
+        for code in _RETAG_CODES:
+            assert _service_state(verify_conn, code).queue_tag == "lab", code
+        for code in _ASSIGN_CODES:
+            assert _service_state(verify_conn, code).doctor_id == _TARGET_DOCTOR_ID
+
+
 def test_embedded_decisions_match_the_operator_map_evidence() -> None:
     """Parity pin: the embedded tables ARE the completed-map snapshot
     (evidence/stage_e_operator_map_20260912.json) — they cannot drift,
@@ -1526,6 +1595,60 @@ def test_eligible_real_doctor_rejects_demoted_owner(db_session: Session) -> None
     assert eligible_real_doctor(db_session, doctor.id) is False
 
 
+@pytest.mark.parametrize("specialty", ["general", "", "   "])
+def test_eligible_real_doctor_rejects_incomplete_profile_specialties(
+    db_session: Session, specialty: str
+) -> None:
+    """Review round 4 (P2): the completed-profile contract — the SAME one
+    the canonical booking eligibility enforces
+    (ensure_doctor_eligible_for_appointment -> is_doctor_profile_incomplete).
+    The 'general' onboarding sentinel and a blank/whitespace specialty are
+    incomplete profiles: such a doctor is rejected at ordinary booking
+    time, so the queue-owner surfaces must not accept it as an owner
+    either (the registration paths must agree on who is a valid owner)."""
+    from app.crud.queue_owner_policy import eligible_real_doctor
+
+    owner = User(
+        username="incomplete_profile_owner",
+        hashed_password="synthetic-test-only",
+        role="Doctor",
+        is_active=True,
+    )
+    db_session.add(owner)
+    db_session.commit()
+    db_session.refresh(owner)
+    doctor = Doctor(user_id=owner.id, specialty=specialty, active=True)
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+
+    assert eligible_real_doctor(db_session, doctor.id) is False
+
+
+def test_eligible_real_doctor_accepts_a_completed_profile(
+    db_session: Session,
+) -> None:
+    """Positive control: a real canonical specialty passes the shared
+    contract — the new gate must not over-block valid owners."""
+    from app.crud.queue_owner_policy import eligible_real_doctor
+
+    owner = User(
+        username="completed_profile_owner",
+        hashed_password="synthetic-test-only",
+        role="Doctor",
+        is_active=True,
+    )
+    db_session.add(owner)
+    db_session.commit()
+    db_session.refresh(owner)
+    doctor = Doctor(user_id=owner.id, specialty="cardiology", active=True)
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+
+    assert eligible_real_doctor(db_session, doctor.id) is True
+
+
 def test_refinement_abort_when_target_user_demoted() -> None:
     """Review P1 (0066): a mapped target whose owner was DEMOTED to a
     non-doctor role must abort the cutover — the canonical appointment/QR
@@ -1535,6 +1658,27 @@ def test_refinement_abort_when_target_user_demoted() -> None:
     conn.execute(sa.text("UPDATE users SET role = 'Registrar' WHERE id = 29"))
 
     _assert_abort(conn, "is not a doctor-family role")
+
+
+@pytest.mark.parametrize("specialty", ["general", "", "   "])
+def test_refinement_abort_when_target_doctor_profile_incomplete(
+    specialty: str,
+) -> None:
+    """Review round 4 (P2): a mapped target doctor whose profile is
+    INCOMPLETE (the 'general' onboarding sentinel, a blank or a
+    whitespace-only specialty) must abort the cutover — the canonical
+    booking eligibility rejects such a doctor at booking time, so the
+    migration must not permanently assign services to it either. The
+    previous ``if not row.specialty`` check let 'general' and whitespace
+    through (only NULL/empty-string aborted)."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(
+        sa.text("UPDATE doctors SET specialty = :s WHERE id = 17"),
+        {"s": specialty},
+    )
+
+    _assert_abort(conn, "incomplete profile")
 
 
 def test_setup_conflicts_on_inactive_matching_doctor() -> None:
@@ -1599,6 +1743,165 @@ def test_setup_conflicts_on_inactive_matching_doctor() -> None:
 
     with _pytest.raises(RuntimeError, match="INACTIVE"):
         run_setup_in_connection(conn)  # type: ignore[arg-type]
+
+
+def test_setup_dry_run_is_plan_only_and_never_touches_sequences(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Review round 4 (P2): --dry-run is PLAN + conflict verification —
+    ``setval()`` is NOT transactional in PostgreSQL (a rollback never
+    restores the sequence), and the auto-id INSERTs (medical_specialties
+    / queue_resources) consume a non-rollbackable ``nextval()``. The
+    plan run must therefore execute NEITHER; the explicit-id INSERTs
+    (users / doctors / services) touch no sequence and still run inside
+    the rolled-back transaction (they keep validating constraints).
+    Audited at the statement level against a recording fake connection."""
+    from app.scripts.qd2e_setup import run_setup_in_connection as _run
+
+    statements: list[str] = []
+    inserted_user_ids: set[int] = set()
+
+    class _FakeResult:
+        def __init__(self, row):
+            self._row = row
+
+        def fetchone(self):
+            return self._row
+
+    class _FakeConn:
+        """The empty-database world: every probe misses, the explicit-id
+        INSERTs execute (recorded), the plan must never reach setval or
+        the auto-id INSERTs."""
+
+        def execute(self, statement, params=None):
+            text = str(statement)
+            statements.append(text)
+            if "INSERT INTO users" in text:
+                inserted_user_ids.add(int(params["i"]))
+                return _FakeResult(None)
+            if "INSERT INTO doctors" in text or "INSERT INTO services" in text:
+                return _FakeResult(None)
+            if "SELECT id, username FROM users WHERE id" in text:
+                return _FakeResult(None)
+            if "SELECT id FROM users WHERE id" in text:
+                # the owner-user probe for a doctor: the user was just
+                # inserted earlier in this same (rolled-back) run
+                if params["i"] in inserted_user_ids:
+                    return _FakeResult((params["i"],))
+                return _FakeResult(None)
+            if "FROM doctors WHERE id" in text:
+                return _FakeResult(None)
+            if "FROM medical_specialties WHERE code" in text:
+                return _FakeResult(None)
+            if "FROM queue_resources WHERE queue_tag" in text:
+                return _FakeResult(None)
+            if "FROM services WHERE code" in text or "FROM services WHERE id" in text:
+                return _FakeResult(None)
+            raise AssertionError(f"unexpected statement: {text[:80]}")
+
+    conn = _FakeConn()
+    counts = _run(conn, plan_only=True)  # type: ignore[arg-type]
+
+    # the plan journals what apply WOULD create
+    out = capsys.readouterr().out
+    assert "would-create: medical_specialty" in out
+    assert "would-create: queue_resource" in out
+    assert "would-create: user id=" in out
+    assert "would-create: doctor id=" in out
+    assert "would-create: service id=" in out
+    assert "sequence-plan" in out
+    assert counts["specialties"] == 5
+    assert counts["registry"] == 2
+
+    # the non-transactional statements were NEVER executed
+    for text in statements:
+        assert "setval" not in text, text
+        assert "pg_get_serial_sequence" not in text, text
+        assert "INSERT INTO medical_specialties" not in text, text
+        assert "INSERT INTO queue_resources" not in text, text
+    # the explicit-id writes DID run (plan keeps validating constraints
+    # inside the transaction the caller rolls back)
+    assert any("INSERT INTO users" in text for text in statements)
+    assert any("INSERT INTO doctors" in text for text in statements)
+    assert any("INSERT INTO services" in text for text in statements)
+
+
+def test_setup_sequence_sync_never_decreases_an_ahead_serial() -> None:
+    """Review round 4 (P2), apply mode: the sequence synchronization must
+    NEVER decrease a serial that is already AHEAD of MAX(id) — a decrease
+    would make later ordinary inserts collide with previously handed-out
+    ids. Serial next=1001, MAX(id)=75 -> no setval at all."""
+    from types import SimpleNamespace as _Row
+
+    from app.scripts import qd2e_setup
+
+    statements: list[dict] = []
+
+    class _FakeResult:
+        def __init__(self, row):
+            self._row = row
+
+        def fetchone(self):
+            return self._row
+
+        def scalar(self):
+            return self._row
+
+    class _FakeConn:
+        def execute(self, statement, params=None):
+            text = str(statement)
+            if "pg_get_serial_sequence" in text:
+                return _FakeResult("public.users_id_seq")
+            if "last_value, is_called" in text:
+                return _FakeResult(_Row(last_value=1000, is_called=True))  # next=1001
+            if "COALESCE(MAX(id)" in text:
+                return _FakeResult(75)
+            if "setval" in text:
+                statements.append({"text": text, "params": params})
+                return _FakeResult(75)
+            raise AssertionError(f"unexpected statement: {text[:80]}")
+
+    qd2e_setup._synchronize_table_sequence(_FakeConn(), "users")
+    assert statements == []  # the ahead serial is left untouched
+
+
+def test_setup_sequence_sync_advances_a_behind_serial_to_max_id() -> None:
+    """Review round 4 (P2), apply mode: a serial BEHIND MAX(id) (the
+    forced-id snapshot inserts passed it) is advanced exactly to MAX(id)
+    — the next ordinary insert gets MAX+1 and cannot collide."""
+    from types import SimpleNamespace as _Row
+
+    from app.scripts import qd2e_setup
+
+    setval_calls: list[dict] = []
+
+    class _FakeResult:
+        def __init__(self, row):
+            self._row = row
+
+        def fetchone(self):
+            return self._row
+
+        def scalar(self):
+            return self._row
+
+    class _FakeConn:
+        def execute(self, statement, params=None):
+            text = str(statement)
+            if "pg_get_serial_sequence" in text:
+                return _FakeResult("public.users_id_seq")
+            if "last_value, is_called" in text:
+                return _FakeResult(_Row(last_value=5, is_called=False))  # next=5
+            if "COALESCE(MAX(id)" in text:
+                return _FakeResult(75)
+            if "setval" in text:
+                setval_calls.append({"text": text, "params": params})
+                return _FakeResult(75)
+            raise AssertionError(f"unexpected statement: {text[:80]}")
+
+    qd2e_setup._synchronize_table_sequence(_FakeConn(), "users")
+    assert len(setval_calls) == 1
+    assert setval_calls[0]["params"] == {"s": "public.users_id_seq", "v": 75}
 
 
 # ===================== B. runtime fail-closed (db_session) =====================
@@ -2766,6 +3069,162 @@ def test_refinement_abort_when_neurology_doctor_inactive() -> None:
     _assert_abort(conn, "is inactive")
 
 
+def test_refinement_aborts_on_unapproved_seventeenth_procedure() -> None:
+    """Review round 4 (P1): an ACTIVE service on the 'procedures' tag that
+    is NOT one of the 16 approved identities must abort the cutover
+    BEFORE the registry resource is created. Before the fix the resource
+    was seeded FIRST — _SELECT_SURFACES then excluded every
+    procedures-tag service from the coverage inventory, and the
+    unapproved service silently rode the resource axis (the D-08 "only
+    explicitly approved services move" contract broken by the resource
+    effectively approving the WHOLE tag)."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(
+        sa.text(
+            "INSERT INTO services (id, code, name, queue_tag,"
+            " department_key, doctor_id, requires_doctor, active)"
+            " VALUES (999, 'P_NEW', 'service P_NEW', 'procedures', NULL,"
+            " NULL, true, true)"
+        )
+    )
+    # COMMIT the catalog drift (a real operator's new service is
+    # committed long before the migration runs — it must survive the
+    # migration's own rollback to prove what was NOT changed)
+    conn.commit()
+
+    _assert_abort(conn, "NO operator decision")
+    # close the aborted migration transaction; the seeded world persists
+    conn.rollback()
+
+    # full rollback: the resource was never created, the 17th service and
+    # the 16 approved procedures keep their pre-states
+    assert conn.execute(
+        sa.text("SELECT COUNT(*) FROM queue_resources WHERE queue_tag = 'procedures'")
+    ).scalar() == 0
+    row = conn.execute(
+        sa.text(
+            "SELECT requires_doctor, doctor_id, queue_tag, active"
+            " FROM services WHERE code = 'P_NEW'"
+        )
+    ).fetchone()
+    assert (
+        bool(row.requires_doctor),
+        row.doctor_id,
+        row.queue_tag,
+        bool(row.active),
+    ) == (True, None, "procedures", True)
+    still_required = conn.execute(
+        sa.text(
+            "SELECT COUNT(*) FROM services WHERE queue_tag = 'procedures'"
+            " AND requires_doctor IS TRUE AND active = true"
+            " AND code IN :codes"
+        ).bindparams(sa.bindparam("codes", expanding=True)),
+        {"codes": list(_CLEAR_CODES)},
+    ).scalar()
+    assert still_required == 16
+
+
+def test_refinement_aborts_on_unapproved_procedure_when_resource_preexists() -> None:
+    """Review round 4 (P1, the resource-independent half): even when an
+    ACTIVE QueueResource('procedures') already exists (an operator
+    pre-created it — the general coverage inventory then sees NO
+    procedures-tag service at all), the dedicated seed-tag gate still
+    requires an approved identity for every ACTIVE service on the tag:
+    keeping the resource must not route an unapproved service onto the
+    resource axis."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(
+        sa.text(
+            "INSERT INTO queue_resources (code, queue_tag, display_name,"
+            " active, start_number_online, max_online_per_day)"
+            " VALUES ('procedures', 'procedures', 'Процедуры', 1, 1, 15)"
+        )
+    )
+    conn.execute(
+        sa.text(
+            "INSERT INTO services (id, code, name, queue_tag,"
+            " department_key, doctor_id, requires_doctor, active)"
+            " VALUES (999, 'P_NEW', 'service P_NEW', 'procedures', NULL,"
+            " NULL, true, true)"
+        )
+    )
+    # COMMIT both (the operator's pre-created resource and the catalog
+    # drift are committed facts the migration must refuse to build on)
+    conn.commit()
+
+    # the general inventory cannot see P_NEW (the tag resolves through the
+    # pre-existing resource) — the DEDICATED seed-tag gate must abort
+    _assert_abort(conn, "on the registry seed tag")
+    # close the aborted migration transaction; the seeded world persists
+    conn.rollback()
+
+    row = conn.execute(
+        sa.text(
+            "SELECT requires_doctor, doctor_id, queue_tag, active"
+            " FROM services WHERE code = 'P_NEW'"
+        )
+    ).fetchone()
+    assert (
+        bool(row.requires_doctor),
+        row.doctor_id,
+        row.queue_tag,
+        bool(row.active),
+    ) == (True, None, "procedures", True)
+
+
+def test_refinement_concurrent_exact_post_state_on_clear_block_is_a_proven_noop(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Review round 4 (P2): a concurrent transaction that arrives at the
+    EXACT approved post-state of a clear_requires_doctor row
+    (requires_doctor=False, doctor_id=NULL, tag 'procedures') between the
+    pre-state read and the guarded UPDATE is a proven idempotent no-op —
+    the migration continues and applies the rest of the map. Before the
+    fix the post_state_check callback referenced an UNDEFINED
+    ``_expected_tag`` name: the very race the guard was written to
+    accept crashed the upgrade with a NameError instead."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.commit()
+
+    module = _load_migration_0064()
+    original_assert = module._assert_target_doctor
+
+    def operator_applies_the_same_clear(migration_conn, doctor_id, _user=None):
+        migration_conn.execute(
+            sa.text(
+                "UPDATE services SET requires_doctor = false WHERE code = 'P08'"
+            )
+        )
+        return original_assert(migration_conn, doctor_id, _user)
+
+    module._assert_target_doctor = operator_applies_the_same_clear
+
+    module.upgrade_with_conn(conn)  # must NOT raise (NameError before the fix)
+    conn.commit()
+
+    assert "proven idempotent no-op" in capsys.readouterr().out
+    # the whole map still applied; every procedure sits at its post-state
+    rows = conn.execute(
+        sa.text(
+            "SELECT code, requires_doctor, doctor_id, queue_tag FROM services"
+            " WHERE queue_tag = 'procedures' AND active = true"
+        )
+    ).fetchall()
+    assert len(rows) == 16
+    for row in rows:
+        assert (bool(row.requires_doctor), row.doctor_id) == (False, None), row
+    # the registry resource was seeded (the map applied)
+    assert conn.execute(
+        sa.text(
+            "SELECT COUNT(*) FROM queue_resources WHERE queue_tag = 'procedures'"
+            " AND active = true"
+        )
+    ).scalar() == 1
+
+
 def test_refinement_registry_seed_never_overwrites_operator_settings() -> None:
     conn = _scratch()
     _seed_refinement_world(conn)
@@ -2964,3 +3423,227 @@ def test_pg_populated_refinement_map_reapplication_is_idempotent(
     assert counts["clear_requires_doctor"] == 0
     assert counts["disable_service"] == 0
     assert counts["retire_profile"] == 0
+
+
+# ===================== review round 4 — qd2e_setup sequence safety (PG) ======
+
+
+def _qd2e_setup_metadata() -> sa.MetaData:
+    """The minimal tables the qd2e_setup script touches — WITH serial ids
+    (autoincrement) so the sequence behavior is the real PostgreSQL one."""
+    metadata = sa.MetaData()
+    sa.Table(
+        "alembic_version",
+        metadata,
+        sa.Column("version_num", sa.String(32), primary_key=True),
+    )
+    sa.Table(
+        "users",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("username", sa.String(50), nullable=False),
+        sa.Column("hashed_password", sa.String(255), nullable=False),
+        sa.Column("role", sa.String(20), nullable=False),
+        sa.Column("is_active", sa.Boolean, nullable=False),
+        sa.Column("is_superuser", sa.Boolean, nullable=False),
+        sa.Column("must_change_password", sa.Boolean, nullable=False),
+        sa.Column("push_notifications_enabled", sa.Boolean, nullable=False),
+    )
+    sa.Table(
+        "doctors",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("user_id", sa.Integer, nullable=True),
+        sa.Column("specialty", sa.String(100), nullable=False),
+        sa.Column("start_number_online", sa.Integer, nullable=True),
+        sa.Column("max_online_per_day", sa.Integer, nullable=True),
+        sa.Column("active", sa.Boolean, nullable=False),
+    )
+    sa.Table(
+        "medical_specialties",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("code", sa.String(50), nullable=False),
+        sa.Column("title_ru", sa.String(200), nullable=False),
+        sa.Column("sort_order", sa.Integer, nullable=True),
+        sa.Column("active", sa.Boolean, nullable=False),
+    )
+    sa.Table(
+        "queue_resources",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("code", sa.String(50), nullable=False),
+        sa.Column("queue_tag", sa.String(32), nullable=False),
+        sa.Column("display_name", sa.String(200), nullable=False),
+        sa.Column("active", sa.Boolean, nullable=False),
+        sa.Column("start_number_online", sa.Integer, nullable=True),
+        sa.Column("max_online_per_day", sa.Integer, nullable=True),
+    )
+    sa.Table(
+        "services",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("code", sa.String(32), nullable=False),
+        sa.Column("name", sa.String(256), nullable=False),
+        sa.Column("queue_tag", sa.String(32), nullable=True),
+        sa.Column("department_key", sa.String(50), nullable=True),
+        sa.Column("doctor_id", sa.Integer, nullable=True),
+        sa.Column("requires_doctor", sa.Boolean, nullable=False),
+        sa.Column("active", sa.Boolean, nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("is_consultation", sa.Boolean, nullable=True),
+        sa.Column("allow_doctor_price_override", sa.Boolean, nullable=True),
+    )
+    return metadata
+
+
+@pytest.fixture
+def qd2e_setup_pg_engine():
+    """An isolated PostgreSQL schema with the qd2e_setup tables (serial
+    ids) + the 0065 alembic_version row the script's schema gate reads."""
+    database_url = os.environ.get("DATABASE_URL", "sqlite:///:memory:")
+    url = make_url(database_url)
+    if url.get_backend_name() != "postgresql":
+        pytest.skip("qd2e_setup sequence proof requires PostgreSQL")
+    if os.environ.get("CI", "").lower() != "true" and not (
+        url.database or ""
+    ).startswith("clinic_test"):
+        pytest.skip("use CI or an explicitly disposable clinic_test database")
+
+    schema = "test_qd2e_setup_" + uuid.uuid4().hex
+    admin_engine = create_engine(url, pool_pre_ping=True)
+    with admin_engine.begin() as connection:
+        connection.execute(CreateSchema(schema))
+
+    engine = create_engine(
+        url,
+        pool_pre_ping=True,
+        connect_args={
+            "options": (
+                f"-csearch_path={schema} "
+                "-cstatement_timeout=10000 -clock_timeout=8000"
+            )
+        },
+    )
+    try:
+        _qd2e_setup_metadata().create_all(engine)
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text(
+                    "INSERT INTO alembic_version (version_num)"
+                    " VALUES ('0065_queue_numbering_unique')"
+                )
+            )
+        dsn = url.render_as_string(hide_password=False)
+        separator = "&" if "?" in dsn else "?"
+        dsn_with_schema = f"{dsn}{separator}options=-csearch_path%3D{schema}"
+        yield {"engine": engine, "dsn": dsn_with_schema}
+    finally:
+        engine.dispose()
+        with admin_engine.begin() as connection:
+            connection.execute(DropSchema(schema, cascade=True))
+        admin_engine.dispose()
+
+
+def _sequence_state(conn, table: str):
+    return conn.execute(
+        sa.text(f"SELECT last_value, is_called FROM {table}_id_seq")
+    ).fetchone()
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_pg_qd2e_setup_dry_run_leaves_sequences_untouched_and_apply_syncs(
+    qd2e_setup_pg_engine,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Review round 4 (P2) — the REAL PostgreSQL proof for the setup
+    script's sequence semantics:
+
+    - --dry-run on an EMPTY database leaves EVERY sequence byte-identical
+      (the unfixed script ran setval(users/doctors/services -> MAX=1)
+      despite the later rollback, and the auto-id inserts consumed
+      nextval() — none of which PostgreSQL ever undoes);
+    - apply provisions the snapshot world and advances the three
+      forced-id serials exactly to MAX(id);
+    - a SECOND apply on the populated world never DECREASES a serial
+      that an operator pushed ahead (5000 stays 5000), and a dry-run on
+      the populated world leaves it untouched too."""
+    from app.scripts import qd2e_setup
+
+    engine = qd2e_setup_pg_engine["engine"]
+    dsn = qd2e_setup_pg_engine["dsn"]
+
+    with engine.connect() as conn:
+        baseline = {
+            table: _sequence_state(conn, table)
+            for table in (
+                "users",
+                "doctors",
+                "services",
+                "medical_specialties",
+                "queue_resources",
+            )
+        }
+
+    # ---- dry-run on the empty world: plan only, sequences untouched ----
+    assert qd2e_setup.main(["--database-url", dsn, "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "would-create: medical_specialty" in out
+    assert "would-create: queue_resource" in out
+    assert "sequence-plan" in out
+
+    with engine.connect() as conn:
+        for table, state in baseline.items():
+            assert _sequence_state(conn, table) == state, table
+        for table in (
+            "users",
+            "doctors",
+            "services",
+            "medical_specialties",
+            "queue_resources",
+        ):
+            assert conn.execute(
+                sa.text(f"SELECT COUNT(*) FROM {table}")
+            ).scalar() == 0, table
+
+    # ---- apply: the snapshot world + the serials advance to MAX(id) ----
+    assert qd2e_setup.main(["--database-url", dsn]) == 0
+    with engine.connect() as conn:
+        assert conn.execute(sa.text("SELECT COUNT(*) FROM users")).scalar() == 6
+        assert conn.execute(sa.text("SELECT COUNT(*) FROM doctors")).scalar() == 5
+        assert (
+            conn.execute(sa.text("SELECT COUNT(*) FROM medical_specialties")).scalar()
+            == 5
+        )
+        assert (
+            conn.execute(sa.text("SELECT COUNT(*) FROM queue_resources")).scalar() == 2
+        )
+        assert conn.execute(sa.text("SELECT COUNT(*) FROM services")).scalar() == 56
+        for table, expected_max in (
+            ("users", 30),
+            ("doctors", 18),
+            ("services", 127),
+        ):
+            state = _sequence_state(conn, table)
+            assert (int(state.last_value), bool(state.is_called)) == (
+                expected_max,
+                True,
+            ), table
+
+    # ---- an operator pushes the users serial far ahead (5000) ----
+    with engine.begin() as conn:
+        conn.execute(sa.text("SELECT setval('users_id_seq', 5000, true)"))
+
+    # a second apply is an idempotent no-op that must NOT pull the serial
+    # back down to MAX(id)=30 (the never-decrease contract)
+    assert qd2e_setup.main(["--database-url", dsn]) == 0
+    with engine.connect() as conn:
+        state = _sequence_state(conn, "users")
+        assert (int(state.last_value), bool(state.is_called)) == (5000, True)
+
+    # and a dry-run on the populated world leaves it untouched as well
+    assert qd2e_setup.main(["--database-url", dsn, "--dry-run"]) == 0
+    with engine.connect() as conn:
+        state = _sequence_state(conn, "users")
+        assert (int(state.last_value), bool(state.is_called)) == (5000, True)

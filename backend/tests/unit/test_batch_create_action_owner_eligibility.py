@@ -21,7 +21,7 @@ from datetime import date
 import pytest
 
 from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.service import Service
 from app.models.user import User
 from app.services.batch_patient_service import BatchPatientService, EntryAction
@@ -295,3 +295,116 @@ def test_positive_control_valid_doctor_via_specialty_is_still_selected(
     assert queue is not None
     assert queue.specialist_id == doctor.id
     assert queue.queue_tag == _TAG
+
+
+# ===================== review round 4 — resource axis first (P2) =============
+
+_RESOURCE_TAG = "elig-lab"
+
+
+def _make_registry_resource(db_session) -> QueueResource:
+    resource = QueueResource(
+        code=_RESOURCE_TAG,
+        queue_tag=_RESOURCE_TAG,
+        display_name="ELIG Lab",
+        active=True,
+        start_number_online=1,
+        max_online_per_day=15,
+    )
+    db_session.add(resource)
+    db_session.commit()
+    db_session.refresh(resource)
+    return resource
+
+
+def _make_resource_service(db_session, *, code: str, doctor_id: int | None) -> Service:
+    service = Service(
+        code=code,
+        service_code=code,
+        name=f"Lab {code}",
+        active=True,
+        queue_tag=_RESOURCE_TAG,
+        doctor_id=doctor_id,
+        requires_doctor=doctor_id is not None,
+    )
+    db_session.add(service)
+    db_session.commit()
+    db_session.refresh(service)
+    return service
+
+
+def _assert_created_on_resource_axis(
+    db_session, patient_id: int, result, resource: QueueResource
+) -> None:
+    """The entry was created on the RESOURCE axis: the queue is
+    resource-owned (specialist NULL, queue_resource_id set), never
+    doctor-owned by the stale/invalid doctor binding."""
+    assert result.status == "created", result.error
+    entry = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.id == result.id)
+        .first()
+    )
+    assert entry is not None
+    queue = db_session.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+    assert queue is not None
+    assert queue.queue_resource_id == resource.id
+    assert queue.specialist_id is None
+    assert queue.queue_tag == _RESOURCE_TAG
+
+
+@pytest.mark.unit
+@pytest.mark.queue
+def test_resource_tag_with_stale_service_doctor_creates_on_resource_axis(
+    db_session, eligible_patient
+):
+    """Review round 4 (P2): the resource path is decided BEFORE the doctor
+    guard. An ACTIVE QueueResource tag whose service still carries a
+    stale doctor binding (a deactivated owner) must create the entry on
+    the RESOURCE axis: the canonical get_or_create_daily_queue IGNORES
+    specialist_id for a registry tag, so an ineligible doctor that never
+    owns the resulting queue must not fail the whole operation. Before
+    the fix the early guard rejected the batch create as a configuration
+    error before the resource routing was ever consulted."""
+    stale_user = _make_user(
+        db_session, username="elig_stale_resource_doc", active=False
+    )
+    stale_doctor = _make_doctor(db_session, user_id=stale_user.id)
+    resource = _make_registry_resource(db_session)
+    service = _make_resource_service(
+        db_session, code="ELIG-RES-1", doctor_id=stale_doctor.id
+    )
+
+    result = BatchPatientService(db_session)._create_entry(
+        patient_id=eligible_patient.id,
+        target_date=date.today(),
+        action=_create_action(service),
+    )
+
+    _assert_created_on_resource_axis(
+        db_session, eligible_patient.id, result, resource
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.queue
+def test_resource_tag_with_explicit_action_doctor_creates_on_resource_axis(
+    db_session, eligible_patient
+):
+    """Review round 4 (P2), the action-side variant: an unnecessary
+    action.doctor_id pointing at an ineligible doctor must not fail a
+    resource-tagged create either — the resource is the real owner."""
+    stale_user = _make_user(db_session, username="elig_stale_action_doc", active=False)
+    stale_doctor = _make_doctor(db_session, user_id=stale_user.id)
+    resource = _make_registry_resource(db_session)
+    service = _make_resource_service(db_session, code="ELIG-RES-2", doctor_id=None)
+
+    result = BatchPatientService(db_session)._create_entry(
+        patient_id=eligible_patient.id,
+        target_date=date.today(),
+        action=_create_action(service, doctor_id=stale_doctor.id),
+    )
+
+    _assert_created_on_resource_axis(
+        db_session, eligible_patient.id, result, resource
+    )

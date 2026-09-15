@@ -133,31 +133,44 @@ def is_internal_resource_doctor(doctor) -> bool:
 
 def eligible_real_doctor(db: Session, doctor_id: int) -> bool:
     """An explicit SERVICE doctor is an eligible queue owner only when
-    the Doctor row exists, is active, is user-linked, the linked User
-    is active and the account is not an internal 'Resource' sentinel
-    (Codex round-1 P2 — a stale catalog assignment must fail closed,
-    not silently build a queue on an ineligible owner)."""
+    the Doctor row exists, is active, has a COMPLETED profile, is
+    user-linked, the linked User is active and the account is not an
+    internal 'Resource' sentinel (Codex round-1 P2 — a stale catalog
+    assignment must fail closed, not silently build a queue on an
+    ineligible owner).
+
+    Review round 4 (P2): the completed-profile contract — the SAME one
+    the canonical booking eligibility
+    (``ensure_doctor_eligible_for_appointment`` ->
+    ``is_doctor_profile_incomplete``) enforces. The 'general' onboarding
+    sentinel and a blank/whitespace specialty are incomplete profiles:
+    such a doctor is rejected at ordinary booking time, so the
+    queue-owner surfaces must not accept it as an owner either (the
+    registration paths must agree on who is a valid owner)."""
     from app.core.roles import (
         is_doctor_role_spelling,
         is_internal_only_role_spelling,
     )
+    from app.services.user_mgmt._base import is_doctor_profile_incomplete
 
     row = (
-        db.query(Doctor.active, User.is_active, User.role)
+        db.query(Doctor.active, Doctor.specialty, User.is_active, User.role)
         .outerjoin(User, User.id == Doctor.user_id)
         .filter(Doctor.id == doctor_id)
         .first()
     )
     if row is None or not row[0]:
         return False
-    if row[1] is None or not row[1]:
+    if is_doctor_profile_incomplete(row[1]):
         return False
-    if row[2] is not None and is_internal_only_role_spelling(row[2]):
+    if row[2] is None or not row[2]:
+        return False
+    if row[3] is not None and is_internal_only_role_spelling(row[3]):
         return False
     # QD-2E review P1 (e0248660a): an active Doctor row whose owner was
     # DEMOTED to Admin/Registrar/Cashier must not own queues either —
     # mirror the canonical is_doctor_role_spelling predicate enforced by
     # ensure_doctor_eligible_for_appointment.
-    if row[2] is not None and not is_doctor_role_spelling(row[2]):
+    if row[3] is not None and not is_doctor_role_spelling(row[3]):
         return False
     return True

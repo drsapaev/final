@@ -15,6 +15,18 @@ Usage:
   python -m app.scripts.qd2e_setup --database-url postgresql+psycopg://... \
       [--dry-run]
 
+``--dry-run`` is PLAN + conflict verification only: every identity
+check runs, the row writes are rolled back, and — review round 4 (P2)
+— the sequences are LEFT UNTOUCHED. PostgreSQL ``setval()``/``nextval()``
+are NOT transactional (the rollback never undoes them), so a plan run
+must not execute ``setval()`` at all and must not run the auto-id
+INSERTs (medical_specialties / queue_resources) that consume
+``nextval()``; the explicit-id INSERTs (users / doctors / services)
+touch no sequence and still execute inside the rolled-back transaction
+(they keep validating the constraints). The apply-mode sequence sync
+never DECREASES a sequence: it only advances it up to MAX(id) when the
+snapshot ids have passed the serial's next value.
+
 Exit codes: 0 = applied/no-op, 1 = conflict (rolled back, nothing
 changed), 2 = usage/schema error.
 """
@@ -112,9 +124,18 @@ def _journal(action: str, detail: str) -> None:
     print(f"{_MIGRATION_NAME}: {action}: {detail}", flush=True)
 
 
-def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
+def run_setup_in_connection(
+    conn: sa.Connection, *, plan_only: bool = False
+) -> dict[str, int]:
     """Provision everything inside the CALLER's transaction. Raises
-    RuntimeError on any identity conflict (the caller rolls back)."""
+    RuntimeError on any identity conflict (the caller rolls back).
+
+    ``plan_only=True`` (the ``--dry-run`` mode) keeps every check and
+    journal entry but performs ONLY the writes that PostgreSQL can
+    fully undo: the auto-id INSERTs (medical_specialties /
+    queue_resources — they consume a non-rollbackable ``nextval()``)
+    and the sequence synchronization (``setval()`` is never undone by
+    a rollback) are planned, not executed (review round 4, P2)."""
     counts: dict[str, int] = {
         "specialties": 0,
         "users": 0,
@@ -122,6 +143,7 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
         "registry": 0,
         "services": 0,
     }
+    _create_action = "would-create" if plan_only else "create"
 
     # ---------- specialties (natural key: code) ----------
     for code, title_ru, sort_order in _SPECIALTIES:
@@ -130,15 +152,22 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
             {"c": code},
         ).fetchone()
         if row is None:
-            _journal("create", f"medical_specialty {code!r}")
-            counts["specialties"] += 1
-            conn.execute(
-                sa.text(
-                    "INSERT INTO medical_specialties (code, title_ru,"
-                    " sort_order, active) VALUES (:c, :t, :s, true)"
-                ),
-                {"c": code, "t": title_ru, "s": sort_order},
+            _journal(
+                _create_action,
+                f"medical_specialty {code!r}",
             )
+            counts["specialties"] += 1
+            if not plan_only:
+                # auto-id INSERT -> consumes nextval(), which PostgreSQL
+                # NEVER rolls back: a plan run must stay read-only for the
+                # sequence (review round 4, P2)
+                conn.execute(
+                    sa.text(
+                        "INSERT INTO medical_specialties (code, title_ru,"
+                        " sort_order, active) VALUES (:c, :t, :s, true)"
+                    ),
+                    {"c": code, "t": title_ru, "s": sort_order},
+                )
         else:
             _journal("no-op", f"medical_specialty {code!r} exists")
 
@@ -149,8 +178,13 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
             {"i": user_id},
         ).fetchone()
         if row is None:
-            _journal("create", f"user id={user_id} {username!r} ({role})")
+            _journal(
+                _create_action,
+                f"user id={user_id} {username!r} ({role})",
+            )
             counts["users"] += 1
+            # explicit snapshot id -> no sequence consumption: the plan
+            # run still executes it inside the rolled-back transaction
             conn.execute(
                 sa.text(
                     "INSERT INTO users (id, username, hashed_password, role,"
@@ -197,7 +231,7 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
                     "— the user is missing; fix the environment"
                 )
             _journal(
-                "create",
+                _create_action,
                 f"doctor id={doctor_id} user={user_id} specialty={specialty!r}",
             )
             counts["doctors"] += 1
@@ -226,16 +260,20 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
             {"t": tag},
         ).fetchone()
         if row is None:
-            _journal("create", f"queue_resource {code!r} ({tag!r})")
+            _journal(_create_action, f"queue_resource {code!r} ({tag!r})")
             counts["registry"] += 1
-            conn.execute(
-                sa.text(
-                    "INSERT INTO queue_resources (code, queue_tag,"
-                    " display_name, active, start_number_online,"
-                    " max_online_per_day) VALUES (:c, :t, :d, true, 1, 15)"
-                ),
-                {"c": code, "t": tag, "d": display},
-            )
+            if not plan_only:
+                # auto-id INSERT -> consumes nextval(), which PostgreSQL
+                # NEVER rolls back: a plan run must stay read-only for the
+                # sequence (review round 4, P2)
+                conn.execute(
+                    sa.text(
+                        "INSERT INTO queue_resources (code, queue_tag,"
+                        " display_name, active, start_number_online,"
+                        " max_online_per_day) VALUES (:c, :t, :d, true, 1, 15)"
+                    ),
+                    {"c": code, "t": tag, "d": display},
+                )
         else:
             _journal("no-op", f"queue_resource {tag!r} exists")
 
@@ -260,11 +298,13 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
         ).fetchone()
         if row is None:
             _journal(
-                "create",
+                _create_action,
                 f"service id={sid} {code!r} tag={tag!r} "
                 f"requires_doctor={requires}",
             )
             counts["services"] += 1
+            # explicit snapshot id -> no sequence consumption: the plan
+            # run still executes it inside the rolled-back transaction
             conn.execute(
                 sa.text(
                     "INSERT INTO services (id, code, name, queue_tag,"
@@ -296,17 +336,69 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
     # ---------- synchronize the id sequences (review P1: forced ids do
     # not advance the serials — the next ordinary insert would collide
     # with a snapshot id) ----------
-    for table in ("users", "doctors", "services"):
-        conn.execute(
-            sa.text(
-                "SELECT setval(pg_get_serial_sequence(:t, 'id'),"
-                " (SELECT COALESCE(MAX(id), 1) FROM " + table + "))"
-            ),
-            {"t": table},
+    # Review round 4 (P2): setval() is NOT transactional in PostgreSQL —
+    # a rollback never restores the previous sequence state, so the
+    # plan (--dry-run) mode must NOT touch the sequences at all. The
+    # apply-mode sync also never DECREASES a sequence: it advances the
+    # serial to MAX(id) only when the snapshot ids have passed the
+    # serial's next value (a rollback-decrease would make later inserts
+    # collide with previously handed-out ids).
+    if plan_only:
+        _journal(
+            "sequence-plan",
+            "users/doctors/services synchronization SKIPPED (setval is not"
+            " transactional — a dry run must leave the sequences intact)",
         )
-        _journal("sequence-sync", table)
+    else:
+        for table in ("users", "doctors", "services"):
+            _synchronize_table_sequence(conn, table)
 
     return counts
+
+
+def _quote_qualified_identifier(name: str) -> str:
+    """Quote a schema-qualified identifier returned by the catalog
+    (pg_get_serial_sequence) for safe inlining into a statement."""
+    parts = name.split(".")
+    return ".".join('"' + part.replace('"', '""') + '"' for part in parts)
+
+
+def _synchronize_table_sequence(conn: sa.Connection, table: str) -> None:
+    """Advance the table's id serial up to MAX(id) — never decrease it.
+
+    The forced-id INSERTs above leave the serial behind MAX(id); the
+    next ordinary insert would collide with a snapshot id. The sync
+    reads the sequence's true NEXT value (last_value + is_called) and
+    only calls setval when MAX(id) has passed it."""
+    seq_name = conn.execute(
+        sa.text("SELECT pg_get_serial_sequence(:t, 'id')"), {"t": table}
+    ).scalar()
+    if seq_name is None:
+        raise RuntimeError(
+            f"table {table!r} has no serial id column — cannot synchronize"
+            " the sequence"
+        )
+    state = conn.execute(
+        sa.text(
+            "SELECT last_value, is_called FROM "
+            + _quote_qualified_identifier(seq_name)
+        )
+    ).fetchone()
+    next_from_seq = int(state.last_value) + (1 if state.is_called else 0)
+    max_id = int(
+        conn.execute(
+            sa.text("SELECT COALESCE(MAX(id), 0) FROM " + table)
+        ).scalar()
+    )
+    if max_id >= next_from_seq:
+        conn.execute(
+            sa.text("SELECT setval(:s, :v)"), {"s": seq_name, "v": max_id}
+        )
+        _journal("sequence-sync", f"{table} -> {max_id}")
+    else:
+        _journal(
+            "sequence-ok", f"{table} (serial next={next_from_seq} > MAX={max_id})"
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -315,7 +407,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="apply inside a transaction and roll it back (verify only)",
+        help=(
+            "plan + conflict verification only: the row writes are rolled"
+            " back and the sequences are left untouched (setval/nextval"
+            " are not transactional in PostgreSQL)"
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -332,7 +428,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
         try:
-            counts = run_setup_in_connection(conn)
+            counts = run_setup_in_connection(conn, plan_only=args.dry_run)
         except RuntimeError as exc:
             conn.rollback()
             print(
@@ -343,7 +439,11 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         if args.dry_run:
             conn.rollback()
-            print(f"{_MIGRATION_NAME}: DRY-RUN — rolled back, no changes")
+            print(
+                f"{_MIGRATION_NAME}: DRY-RUN — rolled back, no changes; the "
+                "id sequences were left untouched (setval/nextval are not "
+                "transactional in PostgreSQL)"
+            )
         else:
             conn.commit()
         journal_tail = ", ".join(f"{k}={v}" for k, v in counts.items())
