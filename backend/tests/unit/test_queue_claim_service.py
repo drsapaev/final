@@ -22,12 +22,13 @@ def _add_entry(
     phone: str | None = None,
     telegram_id: int | None = None,
     status: str = "waiting",
+    patient_name: str = "SYNTHETIC-QUEUE-CLAIM",
 ) -> OnlineQueueEntry:
     entry = OnlineQueueEntry(
         queue_id=daily_queue.id,
         number=number,
         patient_id=patient_id,
-        patient_name="SYNTHETIC-QUEUE-CLAIM",
+        patient_name=patient_name,
         phone=phone,
         telegram_id=telegram_id,
         source="desk",

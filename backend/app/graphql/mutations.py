@@ -1047,6 +1047,11 @@ class Mutation:
                             queue_tag=input.queue_tag,
                             patient_id=input.patient_id,
                             phone=patient.phone,
+                            # QD-2E review P1 (055a7c7ec): without the name
+                            # a shared family phone would treat ANOTHER
+                            # family member's legacy NULL-patient ticket as
+                            # this patient's claim and block a valid join.
+                            patient_name=patient.short_name(),
                         )
                     except QueueClaimConflictError:
                         return QueueMutationResponse(
