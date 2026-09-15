@@ -68,20 +68,22 @@ _REGISTRY: tuple[tuple[str, str, str], ...] = (
     ("ecg", "ecg", "ЭКГ"),
 )
 
-# (snapshot_id, code, name, queue_tag, department_key, requires_doctor) —
-# the mapped services at their PRE-STATES. The decision columns (the
-# doctor assignments, the requires_doctor flips, the lab retags) are NOT
-# touched here: migration 0066 applies them from the embedded map.
-_SERVICES: tuple[tuple[int, str, str, str, str | None, bool], ...] = (
-    (3, "S01", "Консультация стоматолога", "stomatology", None, True),
-    (1, "D01", "Консультация дерматолога-косметолога", "dermatology", None, True),
-    (2, "K01", "Консультация кардиолога", "cardio", "cardiology", True),
-    (127, "K11", "ЭхоКГ", "cardio", "cardiology", True),
-    (90, "S10", "Рентгенография зуба", "stomatology", None, True),
-    (125, "O10", "УЗИ", "ultrason", None, False),
-    (126, "O20", "Невропатолог", "neurology", None, False),
+# (snapshot_id, code, name, queue_tag, department_key, requires_doctor,
+#  is_consultation) — the mapped services at their PRE-STATES with the
+# PRODUCTION is_consultation values (read-only production census
+# 2026-09-15; never derived from requires_doctor). The decision columns
+# (the doctor assignments, the requires_doctor flips, the lab retags) are
+# NOT touched here: migration 0066 applies them from the embedded map.
+_SERVICES: tuple[tuple[int, str, str, str, str | None, bool, bool], ...] = (
+    (3, "S01", "Консультация стоматолога", "stomatology", None, True, True),
+    (1, "D01", "Консультация дерматолога-косметолога", "dermatology", None, True, True),
+    (2, "K01", "Консультация кардиолога", "cardio", "cardiology", True, True),
+    (127, "K11", "ЭхоКГ", "cardio", "cardiology", True, False),
+    (90, "S10", "Рентгенография зуба", "stomatology", None, True, False),
+    (125, "O10", "УЗИ", "ultrason", None, False, False),
+    (126, "O20", "Невропатолог", "neurology", None, False, True),
     *[
-        (sid, code, f"Лаб-услуга {code}", "general", None, False)
+        (sid, code, f"Лаб-услуга {code}", "general", None, False, False)
         for sid, code in (
             (21, "L03"), (11, "L14"), (27, "L15"), (22, "L16"), (24, "L17"),
             (23, "L18"), (20, "L19"), (28, "L20"), (29, "L21"), (52, "L22"),
@@ -94,7 +96,7 @@ _SERVICES: tuple[tuple[int, str, str, str, str | None, bool], ...] = (
         )
     ],
     *[
-        (sid, code, f"Процедура {code}", "procedures", None, True)
+        (sid, code, f"Процедура {code}", "procedures", None, True, False)
         for sid, code in (
             (100, "P08"), (101, "P03"), (102, "P09"), (103, "P07"),
             (104, "P10"), (110, "C07"), (111, "C08"), (112, "C03"),
@@ -224,8 +226,22 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
         else:
             _journal("no-op", f"queue_resource {tag!r} exists")
 
-    # ---------- services (snapshot id identity, PRE-STATES only) ----------
-    for sid, code, name, tag, dept, requires in _SERVICES:
+    # ---------- services (snapshot id + code identity, PRE-STATES only) --
+    for sid, code, name, tag, dept, requires, is_consultation in _SERVICES:
+        # code-ownership check (review P1, 2026-09-15): a populated test
+        # database may carry a mapped code under a DIFFERENT id — inserting
+        # a second logical service would pollute the environment and make
+        # migration 0066 abort on the undecided original; report the
+        # conflict instead.
+        carrier = conn.execute(
+            sa.text("SELECT id FROM services WHERE code = :c"), {"c": code}
+        ).fetchone()
+        if carrier is not None and carrier.id != sid:
+            raise RuntimeError(
+                f"service code={code!r} is owned by id={carrier.id}, the "
+                f"map decides id={sid} — resolve the identity conflict "
+                "manually"
+            )
         row = conn.execute(
             sa.text("SELECT id, code FROM services WHERE id = :i"), {"i": sid}
         ).fetchone()
@@ -252,7 +268,7 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
                     "t": tag,
                     "d": dept,
                     "r": requires,
-                    "ic": requires,
+                    "ic": is_consultation,
                     "ao": False,
                 },
             )
@@ -263,6 +279,19 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
             )
         else:
             _journal("no-op", f"service id={sid} {code!r} exists")
+
+    # ---------- synchronize the id sequences (review P1: forced ids do
+    # not advance the serials — the next ordinary insert would collide
+    # with a snapshot id) ----------
+    for table in ("users", "doctors", "services"):
+        conn.execute(
+            sa.text(
+                "SELECT setval(pg_get_serial_sequence(:t, 'id'),"
+                " (SELECT COALESCE(MAX(id), 1) FROM " + table + "))"
+            ),
+            {"t": table},
+        )
+        _journal("sequence-sync", table)
 
     return counts
 
