@@ -1378,7 +1378,7 @@ def test_pg_two_connections_assign_guard_null_semantics_foreign_doctor(
     module = _load_migration_0064()
     original_assert = module._assert_target_doctor
 
-    def operator_sets_a_foreign_doctor(migration_conn, doctor_id):
+    def operator_sets_a_foreign_doctor(migration_conn, doctor_id, _user=None):
         with cutover_pg_engine.connect() as operator_conn:
             with operator_conn.begin():
                 operator_conn.execute(
