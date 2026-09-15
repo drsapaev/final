@@ -57,6 +57,9 @@ MIGRATION_0064 = (
     BACKEND_ROOT / "alembic" / "versions" / "0066_general_retirement_cutover.py"
 )
 OPERATOR_MAP = REPO_ROOT / "evidence" / "stage_e_operator_map_20260912.json"
+REFINEMENT_MAP = (
+    REPO_ROOT / "evidence" / "stage_e_operator_map_refinement_20260915.json"
+)
 
 WIZARD_HELPERS = (
     BACKEND_ROOT
@@ -152,7 +155,30 @@ _RETAG_SNAPSHOT_IDS = {
     "LAB_MALAS": 71,
     "LAB_RF": 50,
 }
-_ASSIGN_SNAPSHOT_IDS = {"K01": 2, "K11": 127}
+_ASSIGN_SNAPSHOT_IDS = {
+    "K01": 2,
+    "K11": 127,
+    # the 2026-09-15 refinement assignments (part of the embedded map)
+    "O10": 125,
+    "O20": 126,
+    "S10": 90,
+}
+
+# The 2026-09-15 D-08 refinement identities (owner decisions: O10 -> UZD
+# doctor 17, O20 -> Невролог doctor 18, S10 -> Stomatolog doctor 16; the
+# 16 procedure services move onto the QueueResource('procedures') axis).
+_REFINEMENT_ASSIGN_SNAPSHOT_IDS = {"O10": 125, "O20": 126, "S10": 90}
+_REFINEMENT_DOCTORS = {17: 29, 18: 30, 16: 27}  # doctor_id -> user_id
+_CLEAR_CODES = (
+    "P08", "P03", "P09", "P07", "P10",
+    "C07", "C08", "C03", "C06", "C09",
+    "C12", "C11", "C10", "D06", "D05", "D07",
+)
+_CLEAR_SNAPSHOT_IDS = {
+    "P08": 100, "P03": 101, "P09": 102, "P07": 103, "P10": 104,
+    "C07": 110, "C08": 111, "C03": 112, "C06": 113, "C09": 114,
+    "C12": 115, "C11": 116, "C10": 117, "D06": 120, "D05": 121, "D07": 122,
+}
 
 
 # ===================== helpers =====================
@@ -200,6 +226,12 @@ def _cutover_metadata() -> sa.MetaData:
         sa.Column("queue_tag", sa.String(32), nullable=False),
         sa.Column("display_name", sa.String(200), nullable=False),
         sa.Column("active", sa.Boolean, nullable=False, default=True),
+        # 0058 EXPAND columns (the D-08 refinement seed inserts them);
+        # nullable here — the minimal scratch table only needs the columns
+        # to EXIST, and the legacy lab-registry helper inserts without them
+        sa.Column("start_number_online", sa.Integer, nullable=True),
+        sa.Column("max_online_per_day", sa.Integer, nullable=True),
+        sa.Column("default_cabinet", sa.String(20), nullable=True),
     )
     sa.Table(
         "services",
@@ -479,17 +511,20 @@ def test_upgrade_applies_the_operator_map_exactly() -> None:
 
 
 def test_upgrade_aborts_on_undecided_surface() -> None:
-    """The 2026-09-12 production state: 21 null decisions make the
-    migration REFUSE to run — the D-08 gate (no silent stranding)."""
+    """The D-08 gate (no silent stranding): after the 2026-09-15
+    refinement 19 of the 21 nulls are decided (and the procedures tag
+    is registry-resolved by the seeded QueueResource) — the migration
+    still REFUSES to run while S01/D01 remain undecided."""
     conn = _scratch()
     _seed_synthetic_world(conn)
     _seed_decided_services(conn)
-    # an ACTIVE undecided surface (procedures — one of the 21 nulls)
+    # an ACTIVE undecided surface — S01 is one of the two remaining nulls
     conn.execute(
         sa.text(
             "INSERT INTO services (code, name, queue_tag, department_key,"
             " doctor_id, requires_doctor, active)"
-            " VALUES ('P03', 'УФО терапия', 'procedures', NULL, NULL, 1, 1)"
+            " VALUES ('S01', 'Консультация стоматолога', 'stomatology',"
+            " NULL, NULL, 1, 1)"
         )
     )
 
@@ -1057,11 +1092,16 @@ def test_downgrade_never_clobbers_a_pre_existing_post_state() -> None:
 
 def test_migration_source_never_deletes_or_inserts() -> None:
     """Source pin (the 0059/0063 NOTE convention): the cutover carries
-    no DELETE and no INSERT — the only data writes are the guarded
-    service/profile UPDATEs."""
+    no DELETE and no INSERT against the CLINIC data tables — the only
+    data writes are the guarded service/profile UPDATEs plus the SINGLE
+    documented registry seed (QueueResource('procedures'), the D-08
+    2026-09-15 refinement)."""
     source = MIGRATION_0064.read_text(encoding="utf-8")
     assert "DELETE" not in source
-    assert "INSERT" not in source
+    assert "INSERT INTO services" not in source
+    assert "INSERT INTO daily_queues" not in source
+    assert "INSERT INTO queue_entries" not in source
+    assert "INSERT INTO queue_resources" in source
     assert "UPDATE services" in source
 
 
@@ -1162,7 +1202,7 @@ def test_assign_doctor_guard_matches_the_null_source_state_and_refuses_foreign_e
     module = _load_migration_0064()
     original_assert = module._assert_target_doctor
 
-    def operator_sets_a_foreign_doctor(migration_conn, doctor_id):
+    def operator_sets_a_foreign_doctor(migration_conn, doctor_id, _user=None):
         migration_conn.execute(
             sa.text("UPDATE services SET doctor_id = 99 WHERE code = 'K01'")
         )
@@ -1405,16 +1445,35 @@ def test_embedded_decisions_match_the_operator_map_evidence() -> None:
         code: (snapshot_id, from_tag, to_tag)
         for snapshot_id, code, from_tag, to_tag in module._RETAG_DECISIONS
     } == map_retags
-    assert {
-        code: (snapshot_id, target, original, snapshot_tag)
+    # the 2026-09-12 evidence file decides exactly K01/K11 on the doctor
+    # axis; the O10/O20/S10 assignments come from the 2026-09-15
+    # REFINEMENT file (pinned by its own test below) and must NOT appear
+    # in this original-map comparison.
+    embedded_assigns = {
+        code: (snapshot_id, target, original, snapshot_tag, expected_user, set_requires)
         for (
             snapshot_id,
             code,
             target,
             original,
+            expected_user,
             snapshot_tag,
+            set_requires,
         ) in module._ASSIGN_DOCTOR_DECISIONS
+    }
+    # the original 2026-09-12 map decides exactly K01/K11 (no requires_doctor
+    # flip, no user-linkage pin there) — the refinement entries are pinned by
+    # their own test
+    assert {
+        code: (entry[0], entry[1], entry[2], entry[3])
+        for code, entry in embedded_assigns.items()
+        if code in map_assigns
     } == map_assigns
+    assert all(
+        entry[4] is None and entry[5] is None
+        for code, entry in embedded_assigns.items()
+        if code in map_assigns
+    )
     assert module._DISABLE_DECISIONS == ()
     assert map_disables == {}
     assert module._PROFILE_DECISIONS == map_profiles
@@ -1434,7 +1493,9 @@ def test_embedded_decisions_match_the_operator_map_evidence() -> None:
             code,
             _target,
             _original,
+            _expected_user,
             _snapshot_tag,
+            _set_requires,
         ) in module._ASSIGN_DOCTOR_DECISIONS
     }
 
@@ -2342,3 +2403,315 @@ def test_no_new_general_routes_in_morning_precreate(
         assert queue.queue_tag != "general"
     tags = {queue.queue_tag for queue in queues}
     assert tags == {"lab", "cardio"}
+
+
+# ===================== D-08 refinement (2026-09-15) =====================
+
+
+def test_refinement_matches_the_refinement_evidence_file() -> None:
+    """Parity pin for the dated refinement: the O10/O20/S10 assignments
+    (with the requires_doctor flip) and the 16 clear_requires_doctor
+    decisions are EXACTLY the owner-approved refinement file."""
+    payload = json.loads(REFINEMENT_MAP.read_text(encoding="utf-8"))
+    items = payload["items"]
+    module = _load_migration_0064()
+
+    refinement_assigns = {
+        item["code"]: (
+            item["id"],
+            item["target_doctor_id"],
+            item["set_requires_doctor"],
+        )
+        for item in items
+        if item["decision"] == "assign_doctor"
+    }
+    refinement_clears = {
+        item["code"]: (item["id"], item["queue_tag"])
+        for item in items
+        if item["decision"] == "clear_requires_doctor"
+    }
+    assert payload["registry_seed"]["code"] == "procedures"
+    assert payload["registry_seed"]["active"] is True
+
+    embedded_assigns = {
+        code: (snapshot_id, target, set_requires)
+        for (
+            snapshot_id,
+            code,
+            target,
+            _original,
+            expected_user,
+            _snapshot_tag,
+            set_requires,
+        ) in module._ASSIGN_DOCTOR_DECISIONS
+        if code in refinement_assigns
+    }
+    assert embedded_assigns == refinement_assigns
+    embedded_clears = {
+        code: (snapshot_id, snapshot_tag)
+        for snapshot_id, code, snapshot_tag in (
+            module._CLEAR_DOCTOR_REQUIREMENT_DECISIONS
+        )
+    }
+    assert embedded_clears == refinement_clears
+    # the doctor-to-owner linkage is part of the approved refinement
+    assert module._REFINEMENT_DOCTOR_USER_LINKAGE == {17: 29, 18: 30, 16: 27}
+
+
+def _seed_refinement_world(conn) -> None:
+    """The decided world + the 2026-09-15 refinement objects: the
+    O10/O20/S10 services (snapshot ids 125/126/90), the 16 procedure
+    services, and the three refinement doctors FORCED to the production
+    ids 17/18/16 with the owner-approved user linkage 29/30/27."""
+    _seed_synthetic_world(conn)
+    _seed_decided_services(conn)
+
+    # users with the production ids (the migration pins doctor -> user)
+    for user_id, username in ((29, "UZD"), (30, "Невролог"), (27, "Stomatolog")):
+        conn.execute(
+            sa.text(
+                "INSERT INTO users (id, username, role, is_active,"
+                " hashed_password) VALUES (:i, :u, 'doctor', 1, :p)"
+            ),
+            {"i": user_id, "u": username, "p": _DISABLED_HASH},
+        )
+    for doctor_id, user_id, specialty in (
+        (17, 29, "ultrason"),
+        (18, 30, "neurology"),
+        (16, 27, "dentistry"),
+    ):
+        conn.execute(
+            sa.text(
+                "INSERT INTO doctors (id, user_id, specialty, active)"
+                " VALUES (:i, :u, :s, 1)"
+            ),
+            {"i": doctor_id, "u": user_id, "s": specialty},
+        )
+
+    refinement_tags = {"O10": "ultrason", "O20": "neurology", "S10": "stomatology"}
+    for code, snapshot_id in _REFINEMENT_ASSIGN_SNAPSHOT_IDS.items():
+        requires = 0 if code in ("O10", "O20") else 1
+        conn.execute(
+            sa.text(
+                "INSERT INTO services (id, code, name, queue_tag,"
+                " department_key, doctor_id, requires_doctor, active)"
+                " VALUES (:i, :c, :n, :t, NULL, NULL, :r, 1)"
+            ),
+            {
+                "i": snapshot_id,
+                "c": code,
+                "n": f"service {code}",
+                "t": refinement_tags[code],
+                "r": requires,
+            },
+        )
+    for code in _CLEAR_CODES:
+        conn.execute(
+            sa.text(
+                "INSERT INTO services (id, code, name, queue_tag,"
+                " department_key, doctor_id, requires_doctor, active)"
+                " VALUES (:i, :c, :n, 'procedures', NULL, NULL, 1, 1)"
+            ),
+            {"i": _CLEAR_SNAPSHOT_IDS[code], "c": code, "n": f"service {code}"},
+        )
+    # commit: the abort tests roll the connection back and must still see
+    # the seeded world (only the migration's own writes are discarded)
+    conn.commit()
+
+
+def test_upgrade_applies_the_refined_decisions() -> None:
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(
+        sa.text(
+            "INSERT INTO daily_queues (day, specialist_id, queue_resource_id,"
+            " queue_tag, active) VALUES ('2026-09-12', NULL, 1, 'lab', 1)"
+        )
+    )
+    conn.execute(
+        sa.text(
+            "INSERT INTO queue_entries (queue_id, number, status)"
+            " VALUES (1, 7, 'waiting')"
+        )
+    )
+    entries_before = conn.execute(
+        sa.text("SELECT id, queue_id, number, status FROM queue_entries")
+    ).fetchall()
+
+    module = _load_migration_0064()
+    module.upgrade_with_conn(conn)
+
+    # O10/O20/S10: the doctor axis, requires_doctor True
+    for code, doctor_id in (("O10", 17), ("O20", 18), ("S10", 16)):
+        row = conn.execute(
+            sa.text(
+                "SELECT doctor_id, requires_doctor, queue_tag FROM services"
+                " WHERE code = :c"
+            ),
+            {"c": code},
+        ).fetchone()
+        assert (row.doctor_id, bool(row.requires_doctor)) == (doctor_id, True), code
+        assert row.queue_tag == {"O10": "ultrason", "O20": "neurology", "S10": "stomatology"}[code], code
+    # the 16 procedures: the resource axis
+    for code in _CLEAR_CODES:
+        row = conn.execute(
+            sa.text(
+                "SELECT requires_doctor, doctor_id, queue_tag FROM services"
+                " WHERE code = :c"
+            ),
+            {"c": code},
+        ).fetchone()
+        assert (bool(row.requires_doctor), row.doctor_id) == (False, None), code
+        assert row.queue_tag == "procedures", code
+    # the registry seed
+    reg = conn.execute(
+        sa.text(
+            "SELECT code, queue_tag, active FROM queue_resources"
+            " WHERE queue_tag = 'procedures'"
+        )
+    ).fetchall()
+    assert reg == [("procedures", "procedures", 1)]
+    # the existing history is untouched
+    entries_after = conn.execute(
+        sa.text("SELECT id, queue_id, number, status FROM queue_entries")
+    ).fetchall()
+    assert entries_after == entries_before
+
+
+def test_refinement_is_idempotent_second_pass() -> None:
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    module = _load_migration_0064()
+    module.upgrade_with_conn(conn)
+    # the clean second pass applies nothing and does not abort
+    module.upgrade_with_conn(conn)
+    for code, doctor_id in (("O10", 17), ("O20", 18), ("S10", 16)):
+        row = conn.execute(
+            sa.text("SELECT doctor_id, requires_doctor FROM services WHERE code = :c"),
+            {"c": code},
+        ).fetchone()
+        assert (row.doctor_id, bool(row.requires_doctor)) == (doctor_id, True), code
+
+
+def test_refinement_abort_on_o10_replacement_row() -> None:
+    """The approved O10 decision binds (id=125, code='O10'); a different
+    live row re-using the code must not inherit it (thread 3995689408)."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(sa.text("UPDATE services SET id = 999 WHERE code = 'O10'"))
+
+    # the D-08 coverage gate runs before identity resolution and reports
+    # the replacement row as UNDECIDED for the map's purposes
+    _assert_abort(conn, "a DIFFERENT object carries it now")
+
+
+def test_refinement_abort_leaves_no_partial_map() -> None:
+    """One invalid target aborts the WHOLE map — the single transaction
+    leaves every other decided service untouched."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    # the neurology target doctor 18 is never seeded -> abort
+    conn.execute(sa.text("DELETE FROM doctors WHERE id = 18"))
+
+    _assert_abort(conn, "does not exist")
+    # mirror the production alembic behaviour: the failed migration is
+    # rolled back as a whole
+    conn.rollback()
+
+    for code, doctor_id, requires in (
+        ("O10", None, False),
+        ("S10", None, True),
+    ):
+        row = conn.execute(
+            sa.text("SELECT doctor_id, requires_doctor FROM services WHERE code = :c"),
+            {"c": code},
+        ).fetchone()
+        assert (
+            row.doctor_id,
+            bool(row.requires_doctor),
+        ) == (doctor_id, requires), code
+    for code in _CLEAR_CODES:
+        row = conn.execute(
+            sa.text("SELECT requires_doctor FROM services WHERE code = :c"),
+            {"c": code},
+        ).fetchone()
+        assert bool(row.requires_doctor) is True, code
+    assert (
+        conn.execute(
+            sa.text(
+                "SELECT COUNT(*) FROM queue_resources WHERE queue_tag = 'procedures'"
+            )
+        ).scalar()
+        == 0
+    )
+
+
+def test_refinement_abort_when_o10_doctor_linked_to_wrong_user() -> None:
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    # link doctor 17 to a DIFFERENT EXISTING account (user 30) so the
+    # foreign-owner check fires (a nonexistent user would trip the
+    # inactive-owner branch first)
+    conn.execute(sa.text("UPDATE doctors SET user_id = 30 WHERE id = 17"))
+
+    _assert_abort(conn, "linked to user id=30")
+
+
+def test_refinement_abort_when_neurology_doctor_inactive() -> None:
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(sa.text("UPDATE doctors SET active = 0 WHERE id = 18"))
+
+    _assert_abort(conn, "is inactive")
+
+
+def test_refinement_registry_seed_never_overwrites_operator_settings() -> None:
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    # an operator-configured procedures resource (different numbering)
+    conn.execute(
+        sa.text(
+            "INSERT INTO queue_resources (code, queue_tag, display_name,"
+            " active, start_number_online, max_online_per_day)"
+            " VALUES ('proc_cab', 'procedures', 'Процедурный кабинет', 1, 30, 40)"
+        )
+    )
+
+    _assert_abort(conn, "exists as code='proc_cab'")
+
+    row = conn.execute(
+        sa.text(
+            "SELECT start_number_online, max_online_per_day FROM"
+            " queue_resources WHERE queue_tag = 'procedures'"
+        )
+    ).fetchone()
+    assert tuple(row) == (30, 40)  # the operator settings survive
+
+
+def test_refinement_history_and_entries_are_never_rewritten() -> None:
+    """The cutover writes ONLY services + the seeded registry row — the
+    visit/queue/entry history is byte-identical before and after."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(
+        sa.text(
+            "INSERT INTO daily_queues (day, specialist_id, queue_resource_id,"
+            " queue_tag, active) VALUES ('2026-09-12', NULL, 1, 'lab', 1)"
+        )
+    )
+    conn.execute(
+        sa.text(
+            "INSERT INTO queue_entries (queue_id, number, status)"
+            " VALUES (1, 3, 'called')"
+        )
+    )
+    queues_before = conn.execute(sa.text("SELECT * FROM daily_queues")).fetchall()
+    entries_before = conn.execute(sa.text("SELECT * FROM queue_entries")).fetchall()
+
+    module = _load_migration_0064()
+    module.upgrade_with_conn(conn)
+
+    assert (
+        conn.execute(sa.text("SELECT * FROM daily_queues")).fetchall() == queues_before
+    )
+    assert conn.execute(sa.text("SELECT * FROM queue_entries")).fetchall() == entries_before

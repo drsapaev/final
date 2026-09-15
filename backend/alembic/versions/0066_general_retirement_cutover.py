@@ -14,6 +14,18 @@ operator map, nothing more:
 - source of truth: ``evidence/stage_e_operator_map_20260912.json``
   (the completed-map snapshot of the 2026-09-12 production inventory,
   PR #3209; 36 of 57 items decided, 21 remain ``null``);
+- DATED REFINEMENT (owner decisions, 2026-09-15, recorded in
+  ``evidence/stage_e_operator_map_refinement_20260915.json``): 19 of the
+  21 null surfaces are now decided — O10 -> Doctor 17 (UZD, requires_doctor
+  True), O20 -> Doctor 18 (Невролог, requires_doctor True), S10 ->
+  Doctor 16 (Stomatolog), and the 16 procedure services move onto the
+  resource axis (requires_doctor False, doctor_id NULL, tag 'procedures',
+  routed via the QueueResource('procedures') seeded by this revision with
+  the 0059 defaults — operator-editable; no operator-approved values yet).
+  The original 2026-09-12 snapshot file is kept verbatim; REMAINING
+  UNDECIDED: S01 (Консультация стоматолога) and D01 (Консультация
+  дерматолога-косметолога) — the migration still aborts on production
+  until the owner approves those two;
 - D-08: no inference from service names or codes. The map is the only
   source of retag/assign/disable decisions; this migration implements
   it verbatim and refuses to proceed while any ACTIVE general-fallback
@@ -254,14 +266,74 @@ _RETAG_DECISIONS: tuple[tuple[int, str, str, str], ...] = (
 # an active mapped service sitting on ANY other tag is drift, not an
 # inert decision (Codex round-3 P1). The snapshot ids (K01=2, K11=127)
 # are the 2026-09-12 production identities (thread 3995689408).
-_ASSIGN_DOCTOR_DECISIONS: tuple[tuple[int, str, int, int | None, str], ...] = (
-    (2, "K01", 10, None, "cardio"),
-    (127, "K11", 10, None, "cardio"),
+_ASSIGN_DOCTOR_DECISIONS: tuple[
+    tuple[int, str, int, int | None, int | None, str, bool | None], ...
+] = (
+    # (snapshot_id, code, target_doctor_id, original_doctor_id,
+    #  expected_user_id | None, snapshot_tag, set_requires_doctor | None).
+    # original_doctor_id: the 12.09 snapshot pre-state (None for all the
+    # current entries) — the guarded UPDATE and the downgrade report it.
+    # expected_user_id: the D-08 refinement (2026-09-15) pins the
+    # doctor-to-owner linkage (abort on a foreign owner). set_requires_doctor
+    # is the same refinement: an assigned EXPLICIT doctor makes the service
+    # doctor-required — O10/O20 flip False -> True with the confirmed source
+    # state guarded in the UPDATE; None leaves the flag untouched (K01/K11
+    # were already True; S10 stays True as decided).
+    (2, "K01", 10, None, None, "cardio", None),
+    (127, "K11", 10, None, None, "cardio", None),
+    (125, "O10", 17, None, 29, "ultrason", True),
+    (126, "O20", 18, None, 30, "neurology", True),
+    (90, "S10", 16, None, 27, "stomatology", None),
 )
+
+# The approved doctor-to-owner linkage for the refinement decisions
+# (doctor_id -> user_id): part of the owner-approved identity, validated
+# by _assert_target_doctor at application time.
+_REFINEMENT_DOCTOR_USER_LINKAGE = {17: 29, 18: 30, 16: 27}
+
+# The approved doctor-to-owner linkage for the refinement decisions
+# (doctor_id -> user_id): part of the owner-approved identity, validated
+# by _assert_target_doctor at application time.
+_REFINEMENT_DOCTOR_USER_LINKAGE = {17: 29, 18: 30, 16: 27}
 
 # (snapshot_id, service_code) — none in the 2026-09-12 map; supported
 # for the remaining 21 operator decisions (same identity contract).
 _DISABLE_DECISIONS: tuple[tuple[int, str], ...] = ()
+
+# D-08 refinement (owner, 2026-09-15): the 16 procedure services are
+# performed by non-doctor staff of the procedures cabinet — the resource
+# axis, NOT a doctor. Target state: requires_doctor False (flipped from
+# the confirmed True), doctor_id stays NULL, queue_tag stays 'procedures';
+# routing goes through the ACTIVE QueueResource('procedures') seeded by
+# this revision (see _REGISTRY_SEED_TAG). The snapshot ids are the
+# 2026-09-12 production identities; any row differing from the listed
+# group/tag is shown as a discrepancy and STOPS the refinement (never a
+# silent extension).
+_CLEAR_DOCTOR_REQUIREMENT_DECISIONS: tuple[tuple[int, str, str], ...] = (
+    (100, "P08", "procedures"),
+    (101, "P03", "procedures"),
+    (102, "P09", "procedures"),
+    (103, "P07", "procedures"),
+    (104, "P10", "procedures"),
+    (110, "C07", "procedures"),
+    (111, "C08", "procedures"),
+    (112, "C03", "procedures"),
+    (113, "C06", "procedures"),
+    (114, "C09", "procedures"),
+    (115, "C12", "procedures"),
+    (116, "C11", "procedures"),
+    (117, "C10", "procedures"),
+    (120, "D06", "procedures"),
+    (121, "D05", "procedures"),
+    (122, "D07", "procedures"),
+)
+
+# The procedures resource the D-08 refinement routes the 16 services onto.
+# SEED DEFAULTS (start_number_online=1, max_online_per_day=15) mirror the
+# 0059 lab/ecg precedent — the operator has NOT approved specific cabinet /
+# limit / numbering values yet; that gap is flagged here explicitly and
+# remains an operator decision (the row is editable without a migration).
+_REGISTRY_SEED_TAG = "procedures"
 
 # {profile_key: decision} — "keep_profile" writes nothing;
 # "retire_profile" deactivates the profile (not used by the current
@@ -383,7 +455,10 @@ _UPDATE_SERVICE_QUEUE_TAG = sa.text("""
 
 _UPDATE_SERVICE_DOCTOR = sa.text("""
     UPDATE services
-    SET doctor_id = :doctor_id
+    SET doctor_id = :doctor_id,
+        requires_doctor = (CASE WHEN :set_requires_doctor = 1
+                                THEN true
+                                ELSE requires_doctor END)
     WHERE id = :id
       AND code = :code
       AND ((:expected_doctor_id_is_null = 1 AND doctor_id IS NULL)
@@ -394,6 +469,22 @@ _UPDATE_SERVICE_DOCTOR = sa.text("""
            OR (:expected_queue_tag_is_null = 0
                AND queue_tag IS NOT NULL
                AND queue_tag = :expected_queue_tag))
+      AND ((:requires_doctor_decision = 0)
+           OR (:expected_requires_doctor_is_null = 1
+               AND requires_doctor IS NULL)
+           OR (:expected_requires_doctor_is_null = 0
+               AND requires_doctor IS NOT NULL
+               AND requires_doctor = :expected_requires_doctor))
+    """)
+
+_UPDATE_SERVICE_REQUIRES_DOCTOR = sa.text("""
+    UPDATE services
+    SET requires_doctor = false
+    WHERE id = :id
+      AND code = :code
+      AND requires_doctor = true
+      AND doctor_id IS NULL
+      AND queue_tag = :expected_queue_tag
     """)
 
 _UPDATE_SERVICE_ACTIVE = sa.text("""
@@ -414,6 +505,7 @@ _SELECT_TARGET_DOCTOR = sa.text("""
     SELECT
         d.id,
         d.active,
+        d.specialty,
         d.user_id,
         u.username,
         u.role,
@@ -421,6 +513,21 @@ _SELECT_TARGET_DOCTOR = sa.text("""
     FROM doctors d
     LEFT JOIN users u ON u.id = d.user_id
     WHERE d.id = :doctor_id
+    """)
+
+_SELECT_REGISTRY_BY_TAG_ANY = sa.text("""
+    SELECT id, code, queue_tag, active FROM queue_resources
+    WHERE queue_tag = :queue_tag
+    ORDER BY id
+    """)
+
+_INSERT_REGISTRY_RESOURCE = sa.text("""
+    INSERT INTO queue_resources
+        (code, queue_tag, display_name, active,
+         start_number_online, max_online_per_day, default_cabinet)
+    VALUES
+        (:code, :queue_tag, :display_name, true,
+         :start_number_online, :max_online_per_day, NULL)
     """)
 
 _SELECT_PROFILE_BY_KEY = sa.text("""
@@ -493,13 +600,17 @@ def _inventory_and_assert_coverage(conn) -> dict:
     for (
         snapshot_id,
         code,
-        _target,
-        _original,
+        _target_doctor_id,
+        _original_doctor_id,
+        _expected_user_id,
         _snapshot_tag,
+        _set_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         decided_identities[(snapshot_id, code)] = "assign_doctor"
     for snapshot_id, code in _DISABLE_DECISIONS:
         decided_identities[(snapshot_id, code)] = "disable_service"
+    for snapshot_id, code, _snapshot_tag in _CLEAR_DOCTOR_REQUIREMENT_DECISIONS:
+        decided_identities[(snapshot_id, code)] = "clear_requires_doctor"
     decided_codes = {code for _snapshot_id, code in decided_identities}
     decided_ids_by_code: dict[str, list[int]] = {}
     for snapshot_id, code in decided_identities:
@@ -573,9 +684,13 @@ def _assert_registry_target(conn, to_tag: str) -> None:
         )
 
 
-def _assert_target_doctor(conn, doctor_id: int) -> None:
-    """The assign target must be a real, active, user-linked Doctor —
-    never a 0055 synthetic (D-08: the map names a REAL doctor)."""
+def _assert_target_doctor(
+    conn, doctor_id: int, expected_user_id: int | None = None
+) -> None:
+    """The assign target must be a real, active, user-linked Doctor with a
+    completed profile (the canonical eligibility contract) — never a 0055
+    synthetic (D-08: the map names a REAL doctor). ``expected_user_id``
+    pins the doctor-to-owner linkage when the refinement carries it."""
     row = conn.execute(_SELECT_TARGET_DOCTOR, {"doctor_id": doctor_id}).fetchone()
     if row is None:
         _abort(
@@ -605,6 +720,21 @@ def _assert_target_doctor(conn, doctor_id: int) -> None:
             "synthetic/internal resource identity — D-08: the operator "
             "map names a REAL doctor; aborting with no rows changed"
         )
+    if not row.specialty:
+        _abort(
+            f"assign_doctor target doctor id={doctor_id} has no "
+            "specialty — the canonical eligibility contract requires a "
+            "completed profile (the runtime would reject this doctor at "
+            "booking time); aborting with no rows changed"
+        )
+    if expected_user_id is not None and row.user_id != expected_user_id:
+        _abort(
+            f"assign_doctor target doctor id={doctor_id} is linked to "
+            f"user id={row.user_id}, but the refinement approves the "
+            f"doctor of user id={expected_user_id} — the (doctor, owner) "
+            "identity is part of the approved decision; aborting with "
+            "no rows changed"
+        )
 
 
 def _verify_service_state(
@@ -613,6 +743,7 @@ def _verify_service_state(
     service_id: int,
     queue_tag: str | None = ...,
     doctor_id: int | None = ...,
+    requires_doctor: bool | None = ...,
     active: bool | None = None,
 ) -> None:
     """Postcondition re-verification after every mutation (0063)."""
@@ -631,12 +762,82 @@ def _verify_service_state(
             f"doctor_id stored={row.doctor_id!r} expected={doctor_id!r}; "
             "aborting with no rows changed"
         )
+    if requires_doctor is not ... and bool(row.requires_doctor) is not requires_doctor:
+        _abort(
+            f"postcondition failed for service id={service_id}: "
+            f"requires_doctor stored={bool(row.requires_doctor)!r} "
+            f"expected={requires_doctor!r}; aborting with no rows changed"
+        )
     if active is not None and bool(row.active) is not active:
         _abort(
             f"postcondition failed for service id={service_id}: "
             f"active stored={bool(row.active)!r} expected={active!r}; "
             "aborting with no rows changed"
         )
+
+
+def _ensure_procedures_registry_resource(conn) -> None:
+    """D-08 refinement (owner, 2026-09-15): the 16 procedure services
+    route through the ACTIVE QueueResource('procedures'). Idempotent,
+    guarded seed:
+
+    - absent -> INSERT with the 0059 seed defaults (start_number_online=1,
+      max_online_per_day=15). The operator has NOT approved specific
+      cabinet/limit/numbering values for this resource yet — the defaults
+      are the 0059 precedent and stay operator-editable without a
+      migration (flagged in the migration log);
+    - an ACTIVE row with the same (code, queue_tag) -> proven no-op;
+    - an INACTIVE row, or a row with a foreign code on the tag -> abort
+      (operator decision, never silently re-activated or re-pointed)."""
+    rows = conn.execute(
+        _SELECT_REGISTRY_BY_TAG_ANY, {"queue_tag": _REGISTRY_SEED_TAG}
+    ).fetchall()
+    if len(rows) == 1:
+        row = rows[0]
+        if bool(row.active) and row.code == _REGISTRY_SEED_TAG:
+            print(
+                f"{_MIGRATION_NAME}: registry resource {_REGISTRY_SEED_TAG!r} "
+                f"(code={row.code!r}, id={row.id}) already ACTIVE — seed no-op"
+            )
+            return
+        _abort(
+            f"registry seed target {_REGISTRY_SEED_TAG!r} exists as "
+            f"code={row.code!r} active={bool(row.active)} (id={row.id}) — "
+            "a disabled or foreign-coded resource is an operator decision "
+            "(re-activate/repair it, then re-run); aborting with no rows "
+            "changed"
+        )
+    if len(rows) > 1:
+        _abort(
+            f"registry seed target {_REGISTRY_SEED_TAG!r} is ambiguous: "
+            f"{len(rows)} rows carry the tag — repair the registry, then "
+            "re-run; aborting with no rows changed"
+        )
+    conn.execute(
+        _INSERT_REGISTRY_RESOURCE,
+        {
+            "code": _REGISTRY_SEED_TAG,
+            "queue_tag": _REGISTRY_SEED_TAG,
+            "display_name": "Процедуры",
+            "start_number_online": 1,
+            "max_online_per_day": 15,
+        },
+    )
+    check = conn.execute(
+        _SELECT_ACTIVE_REGISTRY_ROW, {"queue_tag": _REGISTRY_SEED_TAG}
+    ).fetchall()
+    if len(check) != 1:
+        _abort(
+            "registry seed postcondition failed: the procedures resource "
+            "is not resolvable as exactly one ACTIVE row; aborting with "
+            "no rows changed"
+        )
+    print(
+        f"{_MIGRATION_NAME}: registry seed created QueueResource("
+        f"code='procedures', queue_tag='procedures', active=true, "
+        "start_number_online=1, max_online_per_day=15) — SEED DEFAULTS, "
+        "operator-editable (no operator-approved values yet)"
+    )
 
 
 def _assert_decision_pre_states(conn, surfaces: dict) -> None:
@@ -682,7 +883,9 @@ def _assert_decision_pre_states(conn, surfaces: dict) -> None:
         code,
         target_doctor_id,
         original_doctor_id,
+        _expected_user_id,
         snapshot_tag,
+        _set_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
         for row in rows:
@@ -714,6 +917,54 @@ def _assert_decision_pre_states(conn, surfaces: dict) -> None:
                     "newer operator assignment must not be overwritten "
                     "by the cutover; re-run the inventory and update the "
                     "decision tables; aborting with no rows changed"
+                )
+
+    for snapshot_id, code, snapshot_tag in _CLEAR_DOCTOR_REQUIREMENT_DECISIONS:
+        rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
+        for row in rows:
+            if row.id != snapshot_id:
+                _abort(
+                    f"stale operator map for {code!r}: the live service "
+                    f"(id={row.id}) carries the code but the embedded "
+                    f"refinement decides id={snapshot_id} for it (thread "
+                    "3995689408) — a different object must not inherit "
+                    "the approved decision; re-run the inventory and "
+                    "update the decision tables; aborting with no rows "
+                    "changed"
+                )
+            if row.queue_tag != snapshot_tag:
+                _abort(
+                    f"refinement discrepancy for {code!r}: the live "
+                    f"service (id={row.id}) carries queue_tag="
+                    f"{row.queue_tag!r} but the refinement decided it on "
+                    f"{snapshot_tag!r} — the row differs from the listed "
+                    "group; show the discrepancy to the operator instead "
+                    "of extending the decision silently; aborting with "
+                    "no rows changed"
+                )
+
+    for snapshot_id, code, snapshot_tag in _CLEAR_DOCTOR_REQUIREMENT_DECISIONS:
+        rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
+        for row in rows:
+            if row.id != snapshot_id:
+                _abort(
+                    f"stale operator map for {code!r}: the live service "
+                    f"(id={row.id}) carries the code but the embedded "
+                    f"refinement decides id={snapshot_id} for it (thread "
+                    "3995689408) — a different object must not inherit "
+                    "the approved decision; re-run the inventory and "
+                    "update the decision tables; aborting with no rows "
+                    "changed"
+                )
+            if row.queue_tag != snapshot_tag:
+                _abort(
+                    f"refinement discrepancy for {code!r}: the live "
+                    f"service (id={row.id}) carries queue_tag="
+                    f"{row.queue_tag!r} but the refinement decided it on "
+                    f"{snapshot_tag!r} — the row differs from the listed "
+                    "group; show the discrepancy to the operator instead "
+                    "of extending the decision silently; aborting with "
+                    "no rows changed"
                 )
 
 
@@ -889,7 +1140,12 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
     PROVEN to be either the exact post-state (an idempotent no-op) or
     it aborts the whole map — a newer operator edit is never
     overwritten, and the map is never partially applied."""
-    counts = {"retag_resource": 0, "assign_doctor": 0, "disable_service": 0}
+    counts = {
+        "retag_resource": 0,
+        "assign_doctor": 0,
+        "clear_requires_doctor": 0,
+        "disable_service": 0,
+    }
 
     # Phase order (the race contract, thread 3995689409): the identity
     # rows are read FIRST — the expected source state for the guarded
@@ -906,9 +1162,11 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
     for (
         snapshot_id,
         code,
-        _target,
-        _original,
+        _target_doctor_id,
+        _original_doctor_id,
+        _expected_user_id,
         _snapshot_tag,
+        _set_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         targets[code] = _resolve_decision_target(
             conn, snapshot_id=snapshot_id, code=code, decision="assign_doctor"
@@ -916,6 +1174,13 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
     for snapshot_id, code in _DISABLE_DECISIONS:
         targets[code] = _resolve_decision_target(
             conn, snapshot_id=snapshot_id, code=code, decision="disable_service"
+        )
+    for snapshot_id, code, _snapshot_tag in _CLEAR_DOCTOR_REQUIREMENT_DECISIONS:
+        targets[code] = _resolve_decision_target(
+            conn,
+            snapshot_id=snapshot_id,
+            code=code,
+            decision="clear_requires_doctor",
         )
 
     _assert_decision_pre_states(conn, surfaces)
@@ -926,11 +1191,13 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
         _snapshot_id,
         code,
         target_doctor_id,
-        _original,
+        _original_doctor_id,
+        expected_user_id,
         _snapshot_tag,
+        _set_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         if targets[code] is not None:
-            _assert_target_doctor(conn, target_doctor_id)
+            _assert_target_doctor(conn, target_doctor_id, expected_user_id)
 
     for _snapshot_id, code, _from_tag, to_tag in _RETAG_DECISIONS:
         row = targets[code]
@@ -976,13 +1243,19 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
         _snapshot_id,
         code,
         target_doctor_id,
-        _original,
+        _original_doctor_id,
+        _expected_user_id,
         _snapshot_tag,
+        set_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         row = targets[code]
         if row is None:
             continue
-        if row.doctor_id == target_doctor_id:
+        fully_applied = row.doctor_id == target_doctor_id and (
+            set_requires_doctor is None
+            or bool(row.requires_doctor) == set_requires_doctor
+        )
+        if fully_applied:
             # idempotent second pass — the decision is already applied
             print(
                 f"{_MIGRATION_NAME}: assign_doctor service id={row.id} "
@@ -992,7 +1265,8 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
         print(
             f"{_MIGRATION_NAME}: assign_doctor service id={row.id} "
             f"code={code!r} doctor_id {row.doctor_id} -> "
-            f"{target_doctor_id} (tag={row.queue_tag!r})"
+            f"{target_doctor_id} (tag={row.queue_tag!r}, "
+            f"set_requires_doctor={set_requires_doctor})"
         )
         applied = _guarded_service_update(
             conn,
@@ -1005,27 +1279,102 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
                 "expected_doctor_id_is_null": _is_null_flag(row.doctor_id),
                 "expected_queue_tag": row.queue_tag,
                 "expected_queue_tag_is_null": _is_null_flag(row.queue_tag),
+                "set_requires_doctor": 0 if set_requires_doctor is None else 1,
+                "requires_doctor_decision": 0 if set_requires_doctor is None else 1,
+                "expected_requires_doctor": (
+                    0 if set_requires_doctor is not None else None
+                ),
+                "expected_requires_doctor_is_null": _is_null_flag(
+                    0 if set_requires_doctor is not None else None
+                ),
             },
             service_id=row.id,
             service_code=row.code,
             decision="assign_doctor",
             expected_description=(
                 f"doctor_id={row.doctor_id!r} on queue_tag={row.queue_tag!r}"
+                + (
+                    f", requires_doctor={bool(row.requires_doctor)}"
+                    if set_requires_doctor is not None
+                    else ""
+                )
             ),
             post_state_check=(
-                lambda after, _doctor=target_doctor_id, _tag=row.queue_tag: (
-                    after.doctor_id == _doctor and after.queue_tag == _tag
+                lambda after, _doctor=target_doctor_id, _tag=row.queue_tag, _req=set_requires_doctor: (
+                    after.doctor_id == _doctor
+                    and after.queue_tag == _tag
+                    and (_req is None or bool(after.requires_doctor) == _req)
                 )
             ),
             post_state_description=(
                 f"doctor_id={target_doctor_id} on queue_tag={row.queue_tag!r}"
+                + (f", requires_doctor={set_requires_doctor}" if set_requires_doctor is not None else "")
             ),
         )
         if applied:
             counts["assign_doctor"] += 1
             _verify_service_state(
-                conn, service_id=row.id, doctor_id=target_doctor_id
+                conn,
+                service_id=row.id,
+                doctor_id=target_doctor_id,
+                requires_doctor=set_requires_doctor if set_requires_doctor is not None else ...,
             )
+
+    for _snapshot_id, code, snapshot_tag in _CLEAR_DOCTOR_REQUIREMENT_DECISIONS:
+        row = targets[code]
+        if row is None:
+            continue
+        if row.doctor_id is not None:
+            _abort(
+                f"clear_requires_doctor target service id={row.id} "
+                f"code={code!r} carries doctor_id={row.doctor_id} — the "
+                "refinement approves doctor_id=NULL (the procedures "
+                "cabinet staff execute these); a Doctor-linked row is a "
+                "discrepancy for the operator, never auto-cleared; "
+                "aborting with no rows changed"
+            )
+        if row.requires_doctor is None or not bool(row.requires_doctor):
+            print(
+                f"{_MIGRATION_NAME}: clear_requires_doctor service "
+                f"id={row.id} code={code!r} already requires_doctor=false "
+                "— no-op"
+            )
+            continue
+        print(
+            f"{_MIGRATION_NAME}: clear_requires_doctor service id={row.id} "
+            f"code={code!r} requires_doctor true -> false "
+            f"(tag={row.queue_tag!r}, doctor_id stays NULL)"
+        )
+        applied = _guarded_service_update(
+            conn,
+            statement=_UPDATE_SERVICE_REQUIRES_DOCTOR,
+            params={
+                "id": row.id,
+                "code": row.code,
+                "expected_queue_tag": row.queue_tag,
+            },
+            service_id=row.id,
+            service_code=row.code,
+            decision="clear_requires_doctor",
+            expected_description=(
+                f"requires_doctor=True on queue_tag={row.queue_tag!r} "
+                "with doctor_id=NULL"
+            ),
+            post_state_check=(
+                lambda after: (
+                    not bool(after.requires_doctor)
+                    and after.doctor_id is None
+                    and after.queue_tag == _expected_tag
+                )
+            ),
+            post_state_description=(
+                "requires_doctor=False, doctor_id=NULL, "
+                f"queue_tag={snapshot_tag!r}"
+            ),
+        )
+        if applied:
+            counts["clear_requires_doctor"] += 1
+            _verify_service_state(conn, service_id=row.id, requires_doctor=False)
 
     for _snapshot_id, code in _DISABLE_DECISIONS:
         row = targets[code]
@@ -1131,6 +1480,12 @@ def _apply_profile_decisions(conn) -> int:
 def upgrade_with_conn(conn) -> dict[str, int]:
     """The testable cutover entry (the 0063 module-level pattern)."""
     _assert_no_active_general_queues(conn)
+    # D-08 refinement (2026-09-15): the procedures resource must exist
+    # BEFORE the coverage inventory — with the ACTIVE 'procedures' row
+    # the 16 procedure services leave the general-fallback surface
+    # (registry-resolved), and the refinement flips them onto the
+    # resource axis by identity in the same transaction.
+    _ensure_procedures_registry_resource(conn)
     surfaces = _inventory_and_assert_coverage(conn)
     counts = _apply_service_decisions(conn, surfaces)
     counts["retire_profile"] = _apply_profile_decisions(conn)
@@ -1187,7 +1542,9 @@ def downgrade_with_conn(conn) -> None:
         code,
         target_doctor_id,
         original_doctor_id,
+        _expected_user_id,
         _snapshot_tag,
+        _set_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE_ANY, {"code": code}).fetchall()
         for row in rows:
