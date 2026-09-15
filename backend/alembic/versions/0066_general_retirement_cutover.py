@@ -22,10 +22,19 @@ operator map, nothing more:
   resource axis (requires_doctor False, doctor_id NULL, tag 'procedures',
   routed via the QueueResource('procedures') seeded by this revision with
   the 0059 defaults — operator-editable; no operator-approved values yet).
-  The original 2026-09-12 snapshot file is kept verbatim; REMAINING
-  UNDECIDED: S01 (Консультация стоматолога) and D01 (Консультация
-  дерматолога-косметолога) — the migration still aborts on production
-  until the owner approves those two;
+  The original 2026-09-12 snapshot file is kept verbatim;
+- DATED FINAL CONFIRMATION (owner decision, 2026-09-16, recorded in
+  ``evidence/stage_e_operator_map_refinement_20260916.json``): the last
+  two null surfaces are decided — S01 (Консультация стоматолога) ->
+  Doctor 16 (user-linked Stomatolog, User 27, requires_doctor stays True)
+  and D01 (Консультация дерматолога-косметолога) -> Doctor 15
+  (user-linked Dermatolog, User 26, requires_doctor stays True), both on
+  the DOCTOR axis. The effective operator map is now COMPLETE: 21/21 null
+  decisions decided, effective undecided = 0. The confirmation binds the
+  exact snapshot identities (S01 id=3, D01 id=1) and the exact
+  (doctor, user) linkage — a mismatched object or pre-state never
+  auto-substitutes. The 2026-09-15 refinement file is kept verbatim;
+  procedures stay on the resource axis (never assigned to a doctor);
 - D-08: no inference from service names or codes. The map is the only
   source of retag/assign/disable decisions; this migration implements
   it verbatim and refuses to proceed while any ACTIVE general-fallback
@@ -56,12 +65,15 @@ transaction; PG DDL/DML is transactional):
      approved for (thread 3995689408), so a different live row
      re-using a mapped code is UNDECIDED for the map's purposes — the
      decision approved for id=21/code='L03' never covers a replacement
-     id=999. The 2026-09-12 production state (21 null decisions:
-     procedures x16, stomatology x2, dermatology, ultrason,
-     neurology) makes the migration ABORT loudly on production until
-     the map is completed — this is deliberate: the runtime half of
+     id=999. The 2026-09-12 production state had 21 null decisions
+     (procedures x16, stomatology x2, dermatology, ultrason,
+     neurology) — all 21 are now decided by the two dated owner
+     refinements (2026-09-15 + 2026-09-16), so the map applies on the
+     snapshot-shaped production catalog. The abort remains the safety
+     net for any NEW undecided surface that appears between the map
+     and the deploy: the runtime half of
      the cutover (fail-closed owner resolution, the same PR) turns
-     those surfaces into explicit configuration errors, so the catalog
+     undecided surfaces into explicit configuration errors, so the catalog
      half must not strand them silently. CI runs ``alembic upgrade
      head`` on an EMPTY database — no surfaces, no decisions to apply,
      a clean pass.
@@ -100,14 +112,16 @@ transaction; PG DDL/DML is transactional):
      (abort if the resource was deactivated; the operator re-runs the
      inventory);
    - ``assign_doctor`` (K01 consultation + K11 EchoCG → the single
-     real cardiologist): the service ``doctor_id`` is set — validated
+     real cardiologist; the 2026-09-15 refinement O10/O20/S10; the
+     2026-09-16 final confirmation S01/D01): the service ``doctor_id``
+     is set — validated
      against the LIVE database (the doctor exists, is active, is
      user-linked and is NOT a 0055 synthetic; abort otherwise). The
      embedded target is the production doctor id from the operator
      map — a different database identity means the map is stale and
      the inventory must be re-run, never re-pointed by the migration;
-   - ``disable_service`` (none in the current map; supported for the
-     remaining 21 decisions): the service is deactivated;
+   - ``disable_service`` (none in the current map; supported for
+     future operator decisions): the service is deactivated;
    - ``keep_profile`` (the ``general`` queue profile): no write — the
      profile stays as the operator decided (``retire_profile`` would
      deactivate it; supported, not used by the current map).
@@ -190,11 +204,14 @@ _SYNTHETIC_OWNER_USERNAMES = frozenset(
 # ============================================================================
 # The operator map, embedded verbatim from the completed-map snapshot
 # evidence/stage_e_operator_map_20260912.json (2026-09-12 production
-# inventory, PR #3209; 36/57 decided — 21 null decisions BLOCK this
-# migration on production until the operator completes them and the
-# decisions are appended to these tables, the D-08 runbook cycle).
-# Parity with the evidence file is pinned by test (the map file and
-# these tables cannot drift).
+# inventory, PR #3209; 36/57 decided at snapshot time — 21 null
+# decisions) COMPLETED by the two dated owner refinements:
+# 2026-09-15 (19 of 21; evidence/stage_e_operator_map_refinement_
+# 20260915.json) and 2026-09-16 (the final 2 — S01/D01; evidence/
+# stage_e_operator_map_refinement_20260916.json). The effective map is
+# complete (21/21 nulls decided); the D-08 abort remains for genuinely
+# NEW undecided surfaces. Parity with BOTH refinement files is pinned
+# by test (the map files and these tables cannot drift).
 #
 # IDENTITY (thread 3995689408, P1): every decision row carries the
 # SNAPSHOT SERVICE ID from the approved map alongside the code. The
@@ -283,21 +300,30 @@ _ASSIGN_DOCTOR_DECISIONS: tuple[
     # is the same refinement: an assigned EXPLICIT doctor makes the service
     # doctor-required — O10/O20 flip False -> True with the confirmed source
     # state guarded in the UPDATE; None leaves the flag untouched (K01/K11
-    # were already True; S10 stays True as decided).
+    # were already True; S10/S01/D01 stay True as decided).
     (2, "K01", 10, None, None, "cardio", None),
     (127, "K11", 10, None, None, "cardio", None),
     (125, "O10", 17, None, 29, "ultrason", True),
     (126, "O20", 18, None, 30, "neurology", True),
     (90, "S10", 16, None, 27, "stomatology", None),
+    # the DATED FINAL CONFIRMATION (owner, 2026-09-16): the last two
+    # null decisions — the doctor axis, requires_doctor already True
+    # (left untouched), snapshot tags are the approved pre-states. The
+    # (doctor, user) linkage is part of the approved identity (16->27,
+    # 15->26) and is validated by _assert_target_doctor at application
+    # time (a foreign or demoted owner aborts, never auto-substituted).
+    (3, "S01", 16, None, 27, "stomatology", None),
+    (1, "D01", 15, None, 26, "dermatology", None),
 )
 
 # The approved doctor-to-owner linkage for the refinement decisions
 # (doctor_id -> user_id): part of the owner-approved identity, validated
-# by _assert_target_doctor at application time.
-_REFINEMENT_DOCTOR_USER_LINKAGE = {17: 29, 18: 30, 16: 27}
+# by _assert_target_doctor at application time. 17/18/16 come from the
+# 2026-09-15 refinement; 15 is the 2026-09-16 final confirmation (D01).
+_REFINEMENT_DOCTOR_USER_LINKAGE = {17: 29, 18: 30, 16: 27, 15: 26}
 
-# (snapshot_id, service_code) — none in the 2026-09-12 map; supported
-# for the remaining 21 operator decisions (same identity contract).
+# (snapshot_id, service_code) — none in the completed map; supported
+# for future operator decisions (same identity contract).
 _DISABLE_DECISIONS: tuple[tuple[int, str], ...] = ()
 
 # D-08 refinement (owner, 2026-09-15): the 16 procedure services are

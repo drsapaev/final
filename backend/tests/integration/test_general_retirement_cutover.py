@@ -60,6 +60,9 @@ OPERATOR_MAP = REPO_ROOT / "evidence" / "stage_e_operator_map_20260912.json"
 REFINEMENT_MAP = (
     REPO_ROOT / "evidence" / "stage_e_operator_map_refinement_20260915.json"
 )
+FINAL_CONFIRMATION_MAP = (
+    REPO_ROOT / "evidence" / "stage_e_operator_map_refinement_20260916.json"
+)
 
 WIZARD_HELPERS = (
     BACKEND_ROOT
@@ -162,6 +165,9 @@ _ASSIGN_SNAPSHOT_IDS = {
     "O10": 125,
     "O20": 126,
     "S10": 90,
+    # the 2026-09-16 final confirmation assignments (S01/D01)
+    "S01": 3,
+    "D01": 1,
 }
 
 # The 2026-09-15 D-08 refinement identities (owner decisions: O10 -> UZD
@@ -169,6 +175,11 @@ _ASSIGN_SNAPSHOT_IDS = {
 # 16 procedure services move onto the QueueResource('procedures') axis).
 _REFINEMENT_ASSIGN_SNAPSHOT_IDS = {"O10": 125, "O20": 126, "S10": 90}
 _REFINEMENT_DOCTORS = {17: 29, 18: 30, 16: 27}  # doctor_id -> user_id
+# The 2026-09-16 DATED FINAL CONFIRMATION (owner): the last two null
+# decisions — S01 -> Stomatolog doctor 16 (User 27), D01 -> Dermatolog
+# doctor 15 (User 26); the doctor axis, requires_doctor stays True.
+_FINAL_CONFIRMATION_ASSIGN_SNAPSHOT_IDS = {"S01": 3, "D01": 1}
+_FINAL_CONFIRMATION_DOCTORS = {16: 27, 15: 26}  # doctor_id -> user_id
 _CLEAR_CODES = (
     "P08", "P03", "P09", "P07", "P10",
     "C07", "C08", "C03", "C06", "C09",
@@ -512,18 +523,23 @@ def test_upgrade_applies_the_operator_map_exactly() -> None:
 
 def test_upgrade_aborts_on_undecided_surface() -> None:
     """The D-08 gate (no silent stranding): after the 2026-09-15
-    refinement 19 of the 21 nulls are decided (and the procedures tag
-    is registry-resolved by the seeded QueueResource) — the migration
-    still REFUSES to run while S01/D01 remain undecided."""
+    refinement (19 nulls) AND the 2026-09-16 final confirmation (the
+    last two — S01/D01) the effective operator map is COMPLETE
+    (effective undecided = 0) — but the gate itself stays: an ACTIVE
+    general-fallback surface that appeared OUTSIDE the approved map
+    (a genuinely new service, never auto-included) still REFUSES to
+    run. S01 itself is now a DECIDED identity (pinned by the final
+    confirmation tests below), so the representative is an unmapped
+    code."""
     conn = _scratch()
     _seed_synthetic_world(conn)
     _seed_decided_services(conn)
-    # an ACTIVE undecided surface — S01 is one of the two remaining nulls
+    # an ACTIVE undecided surface — a NEW service outside the map
     conn.execute(
         sa.text(
             "INSERT INTO services (code, name, queue_tag, department_key,"
             " doctor_id, requires_doctor, active)"
-            " VALUES ('S01', 'Консультация стоматолога', 'stomatology',"
+            " VALUES ('X01', 'Новая услуга вне карты', 'general',"
             " NULL, NULL, 1, 1)"
         )
     )
@@ -2858,20 +2874,132 @@ def test_refinement_matches_the_refinement_evidence_file() -> None:
         )
     }
     assert embedded_clears == refinement_clears
-    # the doctor-to-owner linkage is part of the approved refinement
-    assert module._REFINEMENT_DOCTOR_USER_LINKAGE == {17: 29, 18: 30, 16: 27}
+    # the doctor-to-owner linkage approved by the 2026-09-15 refinement
+    # is part of the embedded linkage (doctor 15 arrives only with the
+    # 2026-09-16 final confirmation, pinned by its own test below)
+    assert all(
+        module._REFINEMENT_DOCTOR_USER_LINKAGE.get(doctor_id) == user_id
+        for doctor_id, user_id in ((17, 29), (18, 30), (16, 27))
+    )
+
+
+def test_final_confirmation_matches_the_20260916_evidence_file() -> None:
+    """Parity pin for the DATED FINAL CONFIRMATION (owner, 2026-09-16):
+    the last two null decisions — S01 -> Stomatolog Doctor 16 (User 27),
+    D01 -> Dermatolog Doctor 15 (User 26) — are EXACTLY the approved
+    file, including the snapshot identities, the snapshot tags, the
+    (doctor, user) linkage and the untouched requires_doctor=True. The
+    effective operator map is COMPLETE: every null of the original
+    snapshot is decided (effective undecided = 0)."""
+    payload = json.loads(FINAL_CONFIRMATION_MAP.read_text(encoding="utf-8"))
+    assert payload["refines"] == (
+        "evidence/stage_e_operator_map_refinement_20260915.json"
+    )
+    assert payload["refined_date"] == "2026-09-16"
+    items = payload["items"]
+    module = _load_migration_0064()
+
+    final_assigns = {
+        item["code"]: (
+            item["id"],
+            item["target_doctor_id"],
+            item["expected_user_id"],
+            item["queue_tag"],
+            item["set_requires_doctor"],
+        )
+        for item in items
+        if item["decision"] == "assign_doctor"
+    }
+    assert final_assigns == {
+        "S01": (3, 16, 27, "stomatology", None),
+        "D01": (1, 15, 26, "dermatology", None),
+    }
+
+    embedded = {
+        code: (snapshot_id, target, expected_user, snapshot_tag, set_requires)
+        for (
+            snapshot_id,
+            code,
+            target,
+            _original,
+            expected_user,
+            snapshot_tag,
+            set_requires,
+        ) in module._ASSIGN_DOCTOR_DECISIONS
+        if code in final_assigns
+    }
+    assert embedded == final_assigns
+    # the full approved doctor-to-owner linkage (both dated refinements)
+    assert module._REFINEMENT_DOCTOR_USER_LINKAGE == {
+        17: 29,
+        18: 30,
+        16: 27,
+        15: 26,
+    }
+
+    # the effective map is COMPLETE: every null item of the original
+    # snapshot is decided by the two dated refinements, and the
+    # embedded tables carry a decision for every one of them
+    snapshot = json.loads(OPERATOR_MAP.read_text(encoding="utf-8"))
+    nulls = {
+        item["code"]
+        for item in snapshot["items"]
+        if item["surface"] == "service" and item["decision"] is None
+    }
+    assert nulls == {
+        "S01",
+        "D01",
+        "S10",
+        "O10",
+        "O20",
+        *(_CLEAR_CODES),
+    }
+    decided_by_refinements = {item["code"] for item in json.loads(
+        REFINEMENT_MAP.read_text(encoding="utf-8"
+    ))["items"]}
+    decided_by_confirmation = {item["code"] for item in items}
+    assert nulls == decided_by_refinements | decided_by_confirmation
+    embedded_identities = (
+        {code for (_sid, code, _from, _to) in module._RETAG_DECISIONS}
+        | {code for (_sid, code, *_rest) in module._ASSIGN_DOCTOR_DECISIONS}
+        | {code for (_sid, code, _tag) in module._CLEAR_DOCTOR_REQUIREMENT_DECISIONS}
+        | {code for (_sid, code) in module._DISABLE_DECISIONS}
+    )
+    assert embedded_identities == {
+        item["code"]
+        for item in snapshot["items"]
+        if item["surface"] == "service" and item["decision"] is not None
+    } | nulls
+    # effective undecided = 0 for the agreed set: every service item of
+    # the snapshot carries a decision in the embedded tables
+    assert (
+        len(embedded_identities)
+        == sum(
+            1
+            for item in snapshot["items"]
+            if item["surface"] == "service"
+        )
+        == 56
+    )
 
 
 def _seed_refinement_world(conn) -> None:
-    """The decided world + the 2026-09-15 refinement objects: the
-    O10/O20/S10 services (snapshot ids 125/126/90), the 16 procedure
-    services, and the three refinement doctors FORCED to the production
-    ids 17/18/16 with the owner-approved user linkage 29/30/27."""
+    """The decided world + the 2026-09-15 refinement objects + the
+    2026-09-16 final confirmation objects: the O10/O20/S10 services
+    (snapshot ids 125/126/90), the S01/D01 services (snapshot ids 3/1),
+    the 16 procedure services, and the refinement doctors FORCED to the
+    production ids 17/18/16/15 with the owner-approved user linkage
+    29/30/27/26."""
     _seed_synthetic_world(conn)
     _seed_decided_services(conn)
 
     # users with the production ids (the migration pins doctor -> user)
-    for user_id, username in ((29, "UZD"), (30, "Невролог"), (27, "Stomatolog")):
+    for user_id, username in (
+        (29, "UZD"),
+        (30, "Невролог"),
+        (27, "Stomatolog"),
+        (26, "Dermatolog"),
+    ):
         conn.execute(
             sa.text(
                 "INSERT INTO users (id, username, role, is_active,"
@@ -2883,6 +3011,7 @@ def _seed_refinement_world(conn) -> None:
         (17, 29, "ultrason"),
         (18, 30, "neurology"),
         (16, 27, "dentistry"),
+        (15, 26, "dermatology"),
     ):
         conn.execute(
             sa.text(
@@ -2892,8 +3021,18 @@ def _seed_refinement_world(conn) -> None:
             {"i": doctor_id, "u": user_id, "s": specialty},
         )
 
-    refinement_tags = {"O10": "ultrason", "O20": "neurology", "S10": "stomatology"}
-    for code, snapshot_id in _REFINEMENT_ASSIGN_SNAPSHOT_IDS.items():
+    refinement_tags = {
+        "O10": "ultrason",
+        "O20": "neurology",
+        "S10": "stomatology",
+        # the 2026-09-16 final confirmation pre-state tags
+        "S01": "stomatology",
+        "D01": "dermatology",
+    }
+    for code, snapshot_id in {
+        **_REFINEMENT_ASSIGN_SNAPSHOT_IDS,
+        **_FINAL_CONFIRMATION_ASSIGN_SNAPSHOT_IDS,
+    }.items():
         requires = False if code in ("O10", "O20") else True
         conn.execute(
             sa.text(
@@ -2945,8 +3084,15 @@ def test_upgrade_applies_the_refined_decisions() -> None:
     module = _load_migration_0064()
     module.upgrade_with_conn(conn)
 
-    # O10/O20/S10: the doctor axis, requires_doctor True
-    for code, doctor_id in (("O10", 17), ("O20", 18), ("S10", 16)):
+    # O10/O20/S10 + the 2026-09-16 final confirmation S01/D01:
+    # the doctor axis, requires_doctor True
+    for code, doctor_id in (
+        ("O10", 17),
+        ("O20", 18),
+        ("S10", 16),
+        ("S01", 16),
+        ("D01", 15),
+    ):
         row = conn.execute(
             sa.text(
                 "SELECT doctor_id, requires_doctor, queue_tag FROM services"
@@ -2955,7 +3101,16 @@ def test_upgrade_applies_the_refined_decisions() -> None:
             {"c": code},
         ).fetchone()
         assert (row.doctor_id, bool(row.requires_doctor)) == (doctor_id, True), code
-        assert row.queue_tag == {"O10": "ultrason", "O20": "neurology", "S10": "stomatology"}[code], code
+        assert (
+            row.queue_tag
+            == {
+                "O10": "ultrason",
+                "O20": "neurology",
+                "S10": "stomatology",
+                "S01": "stomatology",
+                "D01": "dermatology",
+            }[code]
+        ), code
     # the 16 procedures: the resource axis
     for code in _CLEAR_CODES:
         row = conn.execute(
@@ -2989,7 +3144,13 @@ def test_refinement_is_idempotent_second_pass() -> None:
     module.upgrade_with_conn(conn)
     # the clean second pass applies nothing and does not abort
     module.upgrade_with_conn(conn)
-    for code, doctor_id in (("O10", 17), ("O20", 18), ("S10", 16)):
+    for code, doctor_id in (
+        ("O10", 17),
+        ("O20", 18),
+        ("S10", 16),
+        ("S01", 16),
+        ("D01", 15),
+    ):
         row = conn.execute(
             sa.text("SELECT doctor_id, requires_doctor FROM services WHERE code = :c"),
             {"c": code},
@@ -3025,6 +3186,8 @@ def test_refinement_abort_leaves_no_partial_map() -> None:
     for code, doctor_id, requires in (
         ("O10", None, False),
         ("S10", None, True),
+        ("S01", None, True),
+        ("D01", None, True),
     ):
         row = conn.execute(
             sa.text("SELECT doctor_id, requires_doctor FROM services WHERE code = :c"),
@@ -3067,6 +3230,131 @@ def test_refinement_abort_when_neurology_doctor_inactive() -> None:
     conn.execute(sa.text("UPDATE doctors SET active = 0 WHERE id = 18"))
 
     _assert_abort(conn, "is inactive")
+
+
+# ===================== D-08 final confirmation (2026-09-16) ==================
+
+
+def test_final_confirmation_applies_s01_d01_doctor_axis() -> None:
+    """Positive pins for the two confirmed assignments (owner,
+    2026-09-16): S01 (snapshot id=3, tag 'stomatology') -> Doctor 16
+    (User 27 Stomatolog) and D01 (snapshot id=1, tag 'dermatology') ->
+    Doctor 15 (User 26 Dermatolog) — the DOCTOR axis: doctor_id set,
+    requires_doctor stays True, the snapshot tags are preserved (the
+    doctor-owned service keeps its routing vocabulary), and the whole
+    map (retags + the other refinements + the procedures resource)
+    applies in the same single transaction."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    module = _load_migration_0064()
+
+    counts = module.upgrade_with_conn(conn)
+
+    assert counts["assign_doctor"] == 7  # K01, K11 + O10, O20, S10 + S01, D01
+    for code, doctor_id, tag in (
+        ("S01", 16, "stomatology"),
+        ("D01", 15, "dermatology"),
+    ):
+        row = conn.execute(
+            sa.text(
+                "SELECT doctor_id, requires_doctor, queue_tag FROM services"
+                " WHERE id = :i AND code = :c"
+            ),
+            {"i": {"S01": 3, "D01": 1}[code], "c": code},
+        ).fetchone()
+        assert (row.doctor_id, bool(row.requires_doctor), row.queue_tag) == (
+            doctor_id,
+            True,
+            tag,
+        ), code
+
+
+def test_final_confirmation_abort_when_dermatolog_linked_to_wrong_user() -> None:
+    """Negative pin (wrong target identity): the confirmed D01 decision
+    binds (Doctor 15, User 26 Dermatolog); linking doctor 15 to a
+    different existing account (User 27) aborts the cutover — the
+    (doctor, owner) pair is part of the approved identity and is never
+    auto-substituted."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    # link doctor 15 to the Stomatolog's account — a real, active,
+    # doctor-family account, but NOT the approved owner
+    conn.execute(sa.text("UPDATE doctors SET user_id = 27 WHERE id = 15"))
+
+    _assert_abort(conn, "linked to user id=27")
+
+
+def test_final_confirmation_abort_when_stomatolog_doctor_inactive() -> None:
+    """Negative pin (wrong target profile): deactivating the confirmed
+    S01 target (Doctor 16) aborts the cutover — an inactive doctor is
+    not a valid permanent service owner."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(sa.text("UPDATE doctors SET active = 0 WHERE id = 16"))
+
+    _assert_abort(conn, "is inactive")
+
+
+def test_final_confirmation_abort_when_dermatolog_profile_incomplete() -> None:
+    """Negative pin (wrong target profile): the confirmed D01 target
+    (Doctor 15) carrying the 'general' onboarding sentinel specialty —
+    an INCOMPLETE profile the canonical booking eligibility rejects —
+    aborts the cutover instead of permanently assigning D01 to it."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(sa.text("UPDATE doctors SET specialty = 'general' WHERE id = 15"))
+
+    _assert_abort(conn, "incomplete profile")
+
+
+def test_final_confirmation_abort_on_s01_replacement_row() -> None:
+    """Negative pin (object substitution): the confirmed S01 decision
+    binds (id=3, code='S01'); a DIFFERENT live row re-using the code
+    must not inherit it (thread 3995689408 identity contract on the
+    final confirmation too)."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(sa.text("UPDATE services SET id = 999 WHERE code = 'S01'"))
+
+    # the D-08 coverage gate reports the replacement row as UNDECIDED
+    # for the map's purposes (the decision approves id=3, not id=999)
+    _assert_abort(conn, "a DIFFERENT object carries it now")
+
+
+def test_final_confirmation_abort_on_d01_moved_off_snapshot_tag() -> None:
+    """Negative pin (pre-state drift): D01 hand-moved off its snapshot
+    tag 'dermatology' before the cutover is a stale map — the newer
+    operator change is never overwritten by the confirmed decision."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(
+        sa.text("UPDATE services SET queue_tag = 'procedures' WHERE code = 'D01'")
+    )
+
+    _assert_abort(conn, "stale operator map for 'D01'")
+
+
+def test_final_confirmation_is_idempotent_second_pass() -> None:
+    """The final-confirmed map re-application is a proven no-op: the
+    second pass applies nothing, does not abort, and S01/D01 keep the
+    confirmed doctor contract."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    module = _load_migration_0064()
+    module.upgrade_with_conn(conn)
+
+    counts = module.upgrade_with_conn(conn)
+
+    assert counts["retag_resource"] == 0
+    assert counts["assign_doctor"] == 0
+    assert counts["clear_requires_doctor"] == 0
+    assert counts["disable_service"] == 0
+    for code, doctor_id in (("S01", 16), ("D01", 15)):
+        row = conn.execute(
+            sa.text("SELECT doctor_id, requires_doctor FROM services WHERE code = :c"),
+            {"c": code},
+        ).fetchone()
+        assert (row.doctor_id, bool(row.requires_doctor)) == (doctor_id, True), code
 
 
 def test_refinement_aborts_on_unapproved_seventeenth_procedure() -> None:
@@ -3291,18 +3579,14 @@ def test_refinement_history_and_entries_are_never_rewritten() -> None:
 def test_pg_populated_refinement_transition(cutover_pg_engine) -> None:
     conn = cutover_pg_engine.connect()
     # the seed commits internally (its per-group commits must survive the
-    # migration's rollback-on-failure); TEST-WORLD ONLY: the S01/D01
-    # registry rows resolve the still-undecided surfaces so the D-08
-    # coverage gate passes — NOT an approval of production assignments
-    # for S01/D01 (those remain pending owner decisions).
+    # migration's rollback-on-failure). 2026-09-16: S01/D01 carry their
+    # OWNER-CONFIRMED assign_doctor decisions (evidence/
+    # stage_e_operator_map_refinement_20260916.json) — the world mirrors
+    # production: NO stomatology/dermatology QueueResource rows exist,
+    # the two surfaces are covered by the decisions, and the cutover
+    # assigns the doctors (the earlier TEST registry workaround is
+    # retired with the undecided state it papered over).
     _seed_refinement_world(conn)
-    conn.execute(
-        sa.text(
-            "INSERT INTO queue_resources (code, queue_tag, display_name, active)"
-            " VALUES ('stomatology', 'stomatology', 'TEST stomatology', true),"
-            " ('dermatology', 'dermatology', 'TEST dermatology', true)"
-        )
-    )
     conn.commit()
     # a live resource-owned queue + an entry: the cutover must not touch
     # the history
@@ -3366,6 +3650,61 @@ def test_pg_populated_refinement_transition(cutover_pg_engine) -> None:
             True,
             "stomatology",
         ), s10
+        # the 2026-09-16 final confirmation on REAL PostgreSQL: S01/D01
+        # are assigned to their confirmed doctors, doctor axis, tags kept
+        s01 = fresh.execute(
+            sa.text(
+                "SELECT doctor_id, requires_doctor, queue_tag FROM services"
+                " WHERE id = 3 AND code = 'S01'"
+            )
+        ).fetchone()
+        d01 = fresh.execute(
+            sa.text(
+                "SELECT doctor_id, requires_doctor, queue_tag FROM services"
+                " WHERE id = 1 AND code = 'D01'"
+            )
+        ).fetchone()
+        assert (s01.doctor_id, bool(s01.requires_doctor), s01.queue_tag) == (
+            16,
+            True,
+            "stomatology",
+        ), s01
+        assert (d01.doctor_id, bool(d01.requires_doctor), d01.queue_tag) == (
+            15,
+            True,
+            "dermatology",
+        ), d01
+        # a REAL PostgreSQL boolean predicate on the assigned columns
+        assert (
+            fresh.execute(
+                sa.text(
+                    "SELECT COUNT(*) FROM services WHERE code='S01'"
+                    " AND requires_doctor IS TRUE AND doctor_id = 16"
+                )
+            ).scalar()
+            == 1
+        )
+        assert (
+            fresh.execute(
+                sa.text(
+                    "SELECT COUNT(*) FROM services WHERE code='D01'"
+                    " AND requires_doctor IS TRUE AND doctor_id = 15"
+                )
+            ).scalar()
+            == 1
+        )
+        # no test-world stomatology/dermatology resources were created —
+        # the confirmed decisions route through the DOCTOR axis, and
+        # production carries no such registry rows
+        assert (
+            fresh.execute(
+                sa.text(
+                    "SELECT COUNT(*) FROM queue_resources"
+                    " WHERE queue_tag IN ('stomatology', 'dermatology')"
+                )
+            ).scalar()
+            == 0
+        )
         # the 16 procedures: the resource axis
         procs = fresh.execute(
             sa.text(
@@ -3396,16 +3735,12 @@ def test_pg_populated_refinement_map_reapplication_is_idempotent(
 ) -> None:
     """Alembic does not re-run applied revisions — the MAP re-application
     is proven by calling the revision logic a second time on the
-    committed post-state: a clean no-op, no abort, no changes."""
+    committed post-state: a clean no-op, no abort, no changes (including
+    the 2026-09-16 confirmed S01/D01 assignments)."""
     conn = cutover_pg_engine.connect()
+    # the world mirrors production: NO test-world stomatology/dermatology
+    # registry rows (S01/D01 are decided identities, not resolved tags)
     _seed_refinement_world(conn)
-    conn.execute(
-        sa.text(
-            "INSERT INTO queue_resources (code, queue_tag, display_name, active)"
-            " VALUES ('stomatology', 'stomatology', 'TEST stomatology', true),"
-            " ('dermatology', 'dermatology', 'TEST dermatology', true)"
-        )
-    )
     conn.commit()
 
     module = _load_migration_0064()
