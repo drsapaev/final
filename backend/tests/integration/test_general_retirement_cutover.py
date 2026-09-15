@@ -1500,6 +1500,107 @@ def test_embedded_decisions_match_the_operator_map_evidence() -> None:
     }
 
 
+# ===================== review round 2 (codex on 055a7c7ec) =====================
+
+
+def test_eligible_real_doctor_rejects_demoted_owner(db_session: Session) -> None:
+    """Review P1 (e0248660a): an ACTIVE Doctor row whose owner was demoted
+    to a non-doctor role (Admin/Registrar/Cashier) is NOT an eligible
+    queue owner — mirror the canonical is_doctor_role_spelling predicate."""
+    from app.crud.queue_owner_policy import eligible_real_doctor
+
+    demoted = User(
+        username="synthetic_demoted_owner",
+        hashed_password="synthetic-test-only",
+        role="Registrar",
+        is_active=True,
+    )
+    db_session.add(demoted)
+    db_session.commit()
+    db_session.refresh(demoted)
+    doctor = Doctor(user_id=demoted.id, specialty="cardiology", active=True)
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+
+    assert eligible_real_doctor(db_session, doctor.id) is False
+
+
+def test_refinement_abort_when_target_user_demoted() -> None:
+    """Review P1 (0066): a mapped target whose owner was DEMOTED to a
+    non-doctor role must abort the cutover — the canonical appointment/QR
+    eligibility would reject that owner at booking time."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(sa.text("UPDATE users SET role = 'Registrar' WHERE id = 29"))
+
+    _assert_abort(conn, "is not a doctor-family role")
+
+
+def test_setup_conflicts_on_inactive_matching_doctor() -> None:
+    """Review P2 (qd2e_setup findings): an INACTIVE doctor matching the
+    snapshot identity makes the setup report a conflict — the cutover
+    would abort in its target-doctor validation otherwise. Verified
+    against a fake connection mirroring the inactive row."""
+    from types import SimpleNamespace as _Row
+
+    import pytest as _pytest
+
+    from app.scripts.qd2e_setup import run_setup_in_connection
+
+    class _FakeResult:
+        def __init__(self, row):
+            self._row = row
+
+        def fetchone(self):
+            return self._row
+
+    class _FakeConn:
+        """Answers the setup's probes: specialties absent, the users
+        22/26/27/28/29/30 present as expected, doctor 10 INACTIVE."""
+
+        def execute(self, statement, params=None):
+            text = str(statement)
+            if "FROM alembic_version" in text:
+                return _FakeResult(("0065_queue_numbering_unique",))
+            if "FROM medical_specialties WHERE code" in text:
+                return _FakeResult(None)
+            if "INSERT INTO medical_specialties" in text:
+                return _FakeResult(None)
+            if "INSERT INTO users" in text:
+                return _FakeResult(None)
+            if "INSERT INTO doctors" in text:
+                return _FakeResult(None)
+            if "INSERT INTO queue_resources" in text:
+                return _FakeResult(None)
+            if "INSERT INTO services" in text:
+                return _FakeResult(None)
+            if "setval" in text or "SELECT COALESCE" in text:
+                return _FakeResult(None)
+            if "FROM users WHERE id" in text:
+                if params["i"] == 22:
+                    return _FakeResult(_Row(id=22, username="Cardio"))
+                return _FakeResult(None)
+            if "FROM doctors WHERE id" in text:
+                # doctor 10 exists but INACTIVE (the conflict under test)
+                if params["i"] == 10:
+                    return _FakeResult(
+                        _Row(id=10, user_id=22, specialty="cardiology", active=False)
+                    )
+                return _FakeResult(None)
+            if "FROM queue_resources WHERE queue_tag" in text:
+                return _FakeResult(None)
+            raise AssertionError(f"unexpected statement: {text[:80]}")
+
+        def execute_insert(self, *args, **kwargs):
+            raise AssertionError("no writes expected before the conflict")
+
+    conn = _FakeConn()
+
+    with _pytest.raises(RuntimeError, match="INACTIVE"):
+        run_setup_in_connection(conn)  # type: ignore[arg-type]
+
+
 # ===================== B. runtime fail-closed (db_session) =====================
 
 

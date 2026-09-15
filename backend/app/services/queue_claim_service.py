@@ -119,12 +119,18 @@ def lock_and_resolve_active_tag_claim(
         # no patient link (name-narrowed when the caller supplies the typed
         # name) — a typed row of ANOTHER patient sharing the family phone
         # is that patient's claim, never this one's.
+        # QD-2E review P1 (e0248660a): a BLANK stored name with the same
+        # phone is still a phone-only legacy claim — treating it as
+        # "no claim" would allow a SECOND ticket for the same tag/day.
+        # The name narrows only when a stored name actually exists.
+        stored_name_blank = not (entry.patient_name or "").strip()
         matches_phone = (
             normalized_phone is not None
             and entry.patient_id is None
             and _normalize_phone(entry.phone) == normalized_phone
             and (
                 patient_name is None
+                or stored_name_blank
                 or _entry_name_matches(entry.patient_name, patient_name)
             )
         )

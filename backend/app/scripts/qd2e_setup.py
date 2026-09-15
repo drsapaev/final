@@ -54,12 +54,12 @@ _DOCTORS: tuple[tuple[int, int, str], ...] = (
 
 # (code, title_ru) — the specialty catalog entries the refinement doctors
 # carry (ultrason/neurology were added by the operator on 2026-09-14).
-_SPECIALTIES: tuple[tuple[str, str], ...] = (
-    ("cardiology", "Кардиология"),
-    ("dermatology", "Дерматология"),
-    ("dentistry", "Стоматология"),
-    ("ultrason", "УЗИ"),
-    ("neurology", "Неврология"),
+_SPECIALTIES: tuple[tuple[str, str, int], ...] = (
+    ("cardiology", "Кардиология", 10),
+    ("dermatology", "Дерматология", 20),
+    ("dentistry", "Стоматология", 30),
+    ("ultrason", "УЗИ", 40),
+    ("neurology", "Неврология", 50),
 )
 
 # (code, queue_tag, display_name) — the 0059-shape ACTIVE registry rows.
@@ -124,7 +124,7 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
     }
 
     # ---------- specialties (natural key: code) ----------
-    for code, title_ru in _SPECIALTIES:
+    for code, title_ru, sort_order in _SPECIALTIES:
         row = conn.execute(
             sa.text("SELECT id FROM medical_specialties WHERE code = :c"),
             {"c": code},
@@ -134,10 +134,10 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
             counts["specialties"] += 1
             conn.execute(
                 sa.text(
-                    "INSERT INTO medical_specialties (code, title_ru, active)"
-                    " VALUES (:c, :t, true)"
+                    "INSERT INTO medical_specialties (code, title_ru,"
+                    " sort_order, active) VALUES (:c, :t, :s, true)"
                 ),
-                {"c": code, "t": title_ru},
+                {"c": code, "t": title_ru, "s": sort_order},
             )
         else:
             _journal("no-op", f"medical_specialty {code!r} exists")
@@ -154,8 +154,9 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
             conn.execute(
                 sa.text(
                     "INSERT INTO users (id, username, hashed_password, role,"
-                    " is_active, is_superuser, must_change_password)"
-                    " VALUES (:i, :u, :p, :r, true, false, false)"
+                    " is_active, is_superuser, must_change_password,"
+                    " push_notifications_enabled)"
+                    " VALUES (:i, :u, :p, :r, true, false, false, false)"
                 ),
                 {"i": user_id, "u": username, "p": _DISABLED_HASH, "r": role},
             )
@@ -171,9 +172,21 @@ def run_setup_in_connection(conn: sa.Connection) -> dict[str, int]:
     # ---------- doctors (snapshot id identity, user linkage pinned) ----------
     for doctor_id, user_id, specialty in _DOCTORS:
         row = conn.execute(
-            sa.text("SELECT id, user_id, specialty FROM doctors WHERE id = :i"),
+            sa.text(
+                "SELECT id, user_id, specialty, active FROM doctors"
+                " WHERE id = :i"
+            ),
             {"i": doctor_id},
         ).fetchone()
+        if row is not None and not row.active:
+            # review P2 (e0248660a): an INACTIVE matching doctor would pass
+            # the setup and make migration 0066 abort in its target-doctor
+            # validation — report the conflict now, not after the fact
+            raise RuntimeError(
+                f"doctor id={doctor_id} exists but is INACTIVE — activate "
+                "it (operator decision) or remove the row; the setup must "
+                "leave a runnable environment"
+            )
         if row is None:
             owner = conn.execute(
                 sa.text("SELECT id FROM users WHERE id = :i"), {"i": user_id}

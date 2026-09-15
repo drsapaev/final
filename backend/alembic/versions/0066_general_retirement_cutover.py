@@ -164,6 +164,10 @@ import sqlalchemy as sa
 
 from alembic import op
 
+# QD-2E review P1 (e0248660a): the mapped assign targets are validated
+# against the canonical doctor-family vocabulary (see _assert_target_doctor).
+from app.core.roles import is_doctor_role_spelling
+
 # Revision identifiers — chained after 0065_queue_numbering_unique
 # (renumbered from 0064/0065 after the PR-6 registry and main's
 # RQ-14.a.1 numbering UNIQUE landed on main).
@@ -724,6 +728,16 @@ def _assert_target_doctor(
             f"(username={row.username!r}, role={row.role!r}) is a "
             "synthetic/internal resource identity — D-08: the operator "
             "map names a REAL doctor; aborting with no rows changed"
+        )
+    # QD-2E review P1 (e0248660a): a mapped target whose owner was DEMOTED
+    # to a non-doctor role must not receive permanent service assignments —
+    # the canonical appointment/QR eligibility would reject that owner.
+    if not is_doctor_role_spelling(row.role):
+        _abort(
+            f"assign_doctor target doctor id={doctor_id} owner role "
+            f"{row.role!r} is not a doctor-family role — the cutover "
+            "never assigns services to a non-doctor owner; re-run the "
+            "inventory; aborting with no rows changed"
         )
     if not row.specialty:
         _abort(

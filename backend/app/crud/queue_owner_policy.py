@@ -137,7 +137,10 @@ def eligible_real_doctor(db: Session, doctor_id: int) -> bool:
     is active and the account is not an internal 'Resource' sentinel
     (Codex round-1 P2 — a stale catalog assignment must fail closed,
     not silently build a queue on an ineligible owner)."""
-    from app.core.roles import is_internal_only_role_spelling
+    from app.core.roles import (
+        is_doctor_role_spelling,
+        is_internal_only_role_spelling,
+    )
 
     row = (
         db.query(Doctor.active, User.is_active, User.role)
@@ -150,5 +153,11 @@ def eligible_real_doctor(db: Session, doctor_id: int) -> bool:
     if row[1] is None or not row[1]:
         return False
     if row[2] is not None and is_internal_only_role_spelling(row[2]):
+        return False
+    # QD-2E review P1 (e0248660a): an active Doctor row whose owner was
+    # DEMOTED to Admin/Registrar/Cashier must not own queues either —
+    # mirror the canonical is_doctor_role_spelling predicate enforced by
+    # ensure_doctor_eligible_for_appointment.
+    if row[2] is not None and not is_doctor_role_spelling(row[2]):
         return False
     return True
