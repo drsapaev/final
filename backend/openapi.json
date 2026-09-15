@@ -15294,6 +15294,56 @@
         }
       }
     },
+    "/api/v1/queues/profiles/{profile_key}/impact-preview": {
+      "get": {
+        "tags": [
+          "registrar"
+        ],
+        "summary": "Get Queue Profile Impact Preview",
+        "description": "RQ-12.b (D-02): server-side impact preview of what a lifecycle\naction on this profile would touch.\n\nRead-only: this endpoint never mutates anything and its report is\ninformational only — the delete endpoint re-verifies the same links\nat execution time, so a stale preview cannot authorize destruction\n(ACCEPTANCE S-10: \"повторить со stale preview\").",
+        "operationId": "get_queue_profile_impact_preview_api_v1_queues_profiles__profile_key__impact_preview_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Queue Profile Impact Preview Api V1 Queues Profiles  Profile Key  Impact Preview Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queues/profiles/{profile_key}": {
       "put": {
         "tags": [

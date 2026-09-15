@@ -5284,6 +5284,32 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queues/profiles/{profile_key}/impact-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Queue Profile Impact Preview
+         * @description RQ-12.b (D-02): server-side impact preview of what a lifecycle
+         *     action on this profile would touch.
+         *
+         *     Read-only: this endpoint never mutates anything and its report is
+         *     informational only — the delete endpoint re-verifies the same links
+         *     at execution time, so a stale preview cannot authorize destruction
+         *     (ACCEPTANCE S-10: "повторить со stale preview").
+         */
+        get: operations["get_queue_profile_impact_preview_api_v1_queues_profiles__profile_key__impact_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queues/profiles/{profile_key}": {
         parameters: {
             query?: never;
@@ -48131,6 +48157,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    get_queue_profile_impact_preview_api_v1_queues_profiles__profile_key__impact_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
