@@ -210,7 +210,7 @@ const AIChatWidget = ({
             {error &&
       <div className="chat-widget-error">
                     <span>⚠️ {error}</span>
-                    <button onClick={clearError}>✕</button>
+                    <button onClick={clearError} aria-label={t('close')}>✕</button>
                 </div>
       }
 
