@@ -182,7 +182,7 @@ export function CompletenessChecker({
                     {/* Header */}
                     <div className="completeness-checker__header">
                         <span>🧠 Проверка полноты ЭМК</span>
-                        <button onClick={() => setIsOpen(false)}>×</button>
+                        <button onClick={() => setIsOpen(false)} aria-label={t('close')}>×</button>
                     </div>
 
                     {/* Content */}
