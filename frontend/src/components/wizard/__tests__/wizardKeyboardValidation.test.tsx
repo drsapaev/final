@@ -160,3 +160,28 @@ describe('Fix E: keyboard & validation contract', () => {
     );
   });
 });
+
+describe('Codex R16 PR 3096: future-date birth date error is translated per locale', () => {
+  const localePath = (name: string) =>
+    path.resolve(__dirname, `../../../i18n/locales/${name}.ts`);
+  const extractFutureMessage = (source: string) =>
+    source.match(/aw_birth_date_future: '([^']+)'/)?.[1] ?? null;
+
+  it('defines aw_birth_date_future independently for en, kk and uz-Cyrl (no Russian reuse)', () => {
+    // R16 P2: ключ добавлялся в ru.ts и КОПИРОВАЛСЯ дословно в en.ts,
+    // kk.ts и uz-Cyrl.ts — валидационное сообщение неожиданно переключалось
+    // на русский у регистратора с другим языком интерфейса. Каждая локаль
+    // — независимый ресурс и несёт собственный перевод.
+    const ruMsg = extractFutureMessage(fs.readFileSync(localePath('ru'), 'utf8'));
+    expect(ruMsg).toBeTruthy();
+    const messages: Array<[string, string]> = [];
+    for (const name of ['en', 'kk', 'uz-Cyrl'] as const) {
+      const msg = extractFutureMessage(fs.readFileSync(localePath(name), 'utf8'));
+      expect(msg, `${name}.ts must define aw_birth_date_future`).toBeTruthy();
+      expect(msg, `${name}.ts must not reuse the Russian string`).not.toEqual(ruMsg);
+      if (msg) messages.push([name, msg]);
+    }
+    // три независимых ресурса — три различных строки
+    expect(new Set(messages.map(([, m]) => m)).size).toBe(3);
+  });
+});
