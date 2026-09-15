@@ -118,11 +118,35 @@ class TestE2EVisitFlow:
         assert scheduled_visit.patient_id == test_patient.id
         assert scheduled_visit.doctor_id == test_doctor.id
 
-    def test_complete_visit_flow_today(self, client, db_session, auth_headers, test_patient, test_service):
+    def test_complete_visit_flow_today(
+        self, client, db_session, cardio_auth_headers, test_doctor, test_patient, test_service
+    ):
         """
         Полный E2E тест: врач назначил визит на сегодня → пациент подтвердил → номер выдан
+
+        QD-2E surface-reuse ruling: the scheduling user must be a real
+        doctor — the former auth_headers (an admin with no Doctor record)
+        produced an unowned visit (visit.doctor_id pointed at the admin's
+        user id) whose queue number used to be BORROWED from the
+        pre-created queue (the forbidden inference); it now fails closed
+        with the D-08 error, so the realistic doctor-scheduled flow is
+        pinned instead.
         """
         # ШАГ 1: Врач назначает визит на сегодня
+        # (контекст пациент↔врач — pre-existing visit, как в соседнем
+        # schedule-next тесте: врач расписывает СВОЕГО пациента)
+        prior_visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=_clinic_today(db_session) - timedelta(days=1),
+            visit_time="09:00",
+            status="completed",
+            discount_mode="none",
+            source="desk",
+        )
+        db_session.add(prior_visit)
+        db_session.commit()
+
         schedule_response = client.post(
             "/api/v1/doctor/visits/schedule-next",
             json={
@@ -134,7 +158,7 @@ class TestE2EVisitFlow:
                 "all_free": False,
                 "confirmation_channel": "telegram"
             },
-            headers=auth_headers
+            headers=cardio_auth_headers
         )
 
         assert schedule_response.status_code == 200
@@ -283,9 +307,15 @@ class TestE2EVisitFlow:
 
         assert queue_entry is None
 
-    def test_morning_assignment_flow(self, client, db_session, auth_headers, test_patient, admin_user):
+    def test_morning_assignment_flow(
+        self, client, db_session, auth_headers, test_doctor, test_patient, admin_user
+    ):
         """
         E2E тест утреннего присвоения номеров: визит подтвержден вчера → утром номер выдан
+
+        QD-2E surface-reuse ruling: the visit carries a REAL doctor
+        (test_doctor) — the former admin-as-doctor world produced an
+        unowned visit whose number was borrowed from a hand-made queue.
         """
         # Создаем уникальную услугу для этого теста
         from app.models.service import Service
@@ -302,7 +332,7 @@ class TestE2EVisitFlow:
         # ШАГ 1: Создаем подтвержденный визит на сегодня (имитируем что подтвердили вчера)
         visit = Visit(
             patient_id=test_patient.id,
-            doctor_id=admin_user.id,  # Используем админа как врача
+            doctor_id=test_doctor.id,
             visit_date=_clinic_today(db_session),
             visit_time="09:00",
             status="confirmed",
@@ -370,16 +400,22 @@ class TestE2EVisitFlow:
         db_session.refresh(visit)
         assert visit.status == "open"
 
-    def test_registrar_confirmation_flow(self, client, db_session, auth_headers, test_patient, admin_user):
+    def test_registrar_confirmation_flow(
+        self, client, db_session, auth_headers, test_doctor, test_patient, admin_user
+    ):
         """
         E2E тест подтверждения регистратором: визит создан → регистратор подтвердил → номер выдан
+
+        QD-2E surface-reuse ruling: the visit carries a REAL doctor
+        (test_doctor) — the former admin-as-doctor world produced an
+        unowned visit whose number was borrowed from a hand-made queue.
         """
         # ШАГ 1: Создаем визит ожидающий подтверждения
         # (дата клиники, не host-UTC: активация confirmed → open
         # сравнивает visit_date с днём клиники — SSOT)
         visit = Visit(
             patient_id=test_patient.id,
-            doctor_id=admin_user.id,
+            doctor_id=test_doctor.id,
             visit_date=_clinic_today(db_session),
             visit_time="11:00",
             status="pending_confirmation",
@@ -479,20 +515,26 @@ class TestE2EVisitFlow:
         visit_id = schedule_data["visit_id"]
         confirmation_token = schedule_data["confirmation"]["token"]
 
-        # ШАГ 3: Создаем очереди для разных услуг
-        ecg_queue = DailyQueue(
-            day=_clinic_today(db_session),
-            specialist_id=2,  # Ресурсный врач для ЭКГ
+        # ШАГ 3: Создаем ресурсы реестра для тегов ЭКГ/лаборатории —
+        # production-форма QD-2C (сиды 0059): теги реестра маршрутизируются
+        # на ресурсную ось, НЕ через несуществующих «ресурсных врачей»
+        # (QD-2E surface-reuse ruling: врач записи никогда не выводится
+        # из существования чужой очереди)
+        from app.models.online_queue import QueueResource
+
+        ecg_resource = QueueResource(
+            code="ecg",
             queue_tag="ecg",
-            active=True
+            display_name="ЭКГ",
+            active=True,
         )
-        lab_queue = DailyQueue(
-            day=_clinic_today(db_session),
-            specialist_id=3,  # Ресурсный врач для лаборатории
+        lab_resource = QueueResource(
+            code="lab",
             queue_tag="lab",
-            active=True
+            display_name="Лаборатория",
+            active=True,
         )
-        db_session.add_all([ecg_queue, lab_queue])
+        db_session.add_all([ecg_resource, lab_resource])
         db_session.commit()
 
         # ШАГ 4: Пациент подтверждает визит
