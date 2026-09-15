@@ -2471,7 +2471,7 @@ def _seed_refinement_world(conn) -> None:
         conn.execute(
             sa.text(
                 "INSERT INTO users (id, username, role, is_active,"
-                " hashed_password) VALUES (:i, :u, 'doctor', 1, :p)"
+                " hashed_password) VALUES (:i, :u, 'doctor', true, :p)"
             ),
             {"i": user_id, "u": username, "p": _DISABLED_HASH},
         )
@@ -2483,19 +2483,19 @@ def _seed_refinement_world(conn) -> None:
         conn.execute(
             sa.text(
                 "INSERT INTO doctors (id, user_id, specialty, active)"
-                " VALUES (:i, :u, :s, 1)"
+                " VALUES (:i, :u, :s, true)"
             ),
             {"i": doctor_id, "u": user_id, "s": specialty},
         )
 
     refinement_tags = {"O10": "ultrason", "O20": "neurology", "S10": "stomatology"}
     for code, snapshot_id in _REFINEMENT_ASSIGN_SNAPSHOT_IDS.items():
-        requires = 0 if code in ("O10", "O20") else 1
+        requires = False if code in ("O10", "O20") else True
         conn.execute(
             sa.text(
                 "INSERT INTO services (id, code, name, queue_tag,"
                 " department_key, doctor_id, requires_doctor, active)"
-                " VALUES (:i, :c, :n, :t, NULL, NULL, :r, 1)"
+                " VALUES (:i, :c, :n, :t, NULL, NULL, :r, true)"
             ),
             {
                 "i": snapshot_id,
@@ -2510,7 +2510,7 @@ def _seed_refinement_world(conn) -> None:
             sa.text(
                 "INSERT INTO services (id, code, name, queue_tag,"
                 " department_key, doctor_id, requires_doctor, active)"
-                " VALUES (:i, :c, :n, 'procedures', NULL, NULL, 1, 1)"
+                " VALUES (:i, :c, :n, 'procedures', NULL, NULL, true, true)"
             ),
             {"i": _CLEAR_SNAPSHOT_IDS[code], "c": code, "n": f"service {code}"},
         )
@@ -2525,7 +2525,7 @@ def test_upgrade_applies_the_refined_decisions() -> None:
     conn.execute(
         sa.text(
             "INSERT INTO daily_queues (day, specialist_id, queue_resource_id,"
-            " queue_tag, active) VALUES ('2026-09-12', NULL, 1, 'lab', 1)"
+            " queue_tag, active) VALUES ('2026-09-12', NULL, 1, 'lab', true)"
         )
     )
     conn.execute(
@@ -2696,7 +2696,7 @@ def test_refinement_history_and_entries_are_never_rewritten() -> None:
     conn.execute(
         sa.text(
             "INSERT INTO daily_queues (day, specialist_id, queue_resource_id,"
-            " queue_tag, active) VALUES ('2026-09-12', NULL, 1, 'lab', 1)"
+            " queue_tag, active) VALUES ('2026-09-12', NULL, 1, 'lab', true)"
         )
     )
     conn.execute(
@@ -2715,3 +2715,151 @@ def test_refinement_history_and_entries_are_never_rewritten() -> None:
         conn.execute(sa.text("SELECT * FROM daily_queues")).fetchall() == queues_before
     )
     assert conn.execute(sa.text("SELECT * FROM queue_entries")).fetchall() == entries_before
+
+
+# ===================== the populated-PostgreSQL transition =====================
+# (owner mandate, 2026-09-15): the refinement's guarded UPDATE compares the
+# BOOLEAN column requires_doctor against a bound parameter. SQLite stores
+# booleans as integers and cannot expose the int/boolean typing difference;
+# real PostgreSQL (the production migration stack) CAN — this test runs the
+# cutover data logic on REAL PostgreSQL/psycopg against a COMMITTED
+# 0065-state world and proves the rows are ACTUALLY updated.
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_pg_populated_refinement_transition(cutover_pg_engine) -> None:
+    conn = cutover_pg_engine.connect()
+    # the seed commits internally (its per-group commits must survive the
+    # migration's rollback-on-failure); TEST-WORLD ONLY: the S01/D01
+    # registry rows resolve the still-undecided surfaces so the D-08
+    # coverage gate passes — NOT an approval of production assignments
+    # for S01/D01 (those remain pending owner decisions).
+    _seed_refinement_world(conn)
+    conn.execute(
+        sa.text(
+            "INSERT INTO queue_resources (code, queue_tag, display_name, active)"
+            " VALUES ('stomatology', 'stomatology', 'TEST stomatology', true),"
+            " ('dermatology', 'dermatology', 'TEST dermatology', true)"
+        )
+    )
+    conn.commit()
+    # a live resource-owned queue + an entry: the cutover must not touch
+    # the history
+    conn.execute(
+        sa.text(
+            "INSERT INTO daily_queues (day, specialist_id, queue_resource_id,"
+            " queue_tag, active) VALUES ('2026-09-12', NULL, 1, 'lab', true)"
+        )
+    )
+    conn.execute(
+        sa.text(
+            "INSERT INTO queue_entries (queue_id, number, status)"
+            " VALUES (1, 7, 'waiting')"
+        )
+    )
+    conn.commit()
+
+    module = _load_migration_0064()
+    try:
+        module.upgrade_with_conn(conn)
+    except Exception:
+        # never leave the migration transaction open — the fixture teardown
+        # would block on the held locks
+        conn.rollback()
+        raise
+    conn.commit()
+
+    # the verified post-state, read from a FRESH connection after commit
+    fresh = cutover_pg_engine.connect()
+    try:
+        o10 = fresh.execute(
+            sa.text(
+                "SELECT doctor_id, requires_doctor FROM services"
+                " WHERE id = 125 AND code = 'O10'"
+            )
+        ).fetchone()
+        o20 = fresh.execute(
+            sa.text(
+                "SELECT doctor_id, requires_doctor FROM services"
+                " WHERE id = 126 AND code = 'O20'"
+            )
+        ).fetchone()
+        assert (o10.doctor_id, bool(o10.requires_doctor)) == (17, True), o10
+        assert (o20.doctor_id, bool(o20.requires_doctor)) == (18, True), o20
+        # a REAL PostgreSQL boolean predicate on the flipped column
+        assert fresh.execute(
+            sa.text("SELECT COUNT(*) FROM services WHERE code='O10' AND requires_doctor IS TRUE")
+        ).scalar() == 1
+        assert fresh.execute(
+            sa.text("SELECT COUNT(*) FROM services WHERE code='O20' AND requires_doctor IS TRUE")
+        ).scalar() == 1
+        # S10 keeps the approved doctor contract
+        s10 = fresh.execute(
+            sa.text(
+                "SELECT doctor_id, requires_doctor, queue_tag FROM services"
+                " WHERE id = 90 AND code = 'S10'"
+            )
+        ).fetchone()
+        assert (s10.doctor_id, bool(s10.requires_doctor), s10.queue_tag) == (
+            16,
+            True,
+            "stomatology",
+        ), s10
+        # the 16 procedures: the resource axis
+        procs = fresh.execute(
+            sa.text(
+                "SELECT code, requires_doctor, doctor_id, queue_tag FROM services"
+                " WHERE queue_tag = 'procedures' AND active = true ORDER BY code"
+            )
+        ).fetchall()
+        assert len(procs) == 16
+        for row in procs:
+            assert (bool(row.requires_doctor), row.doctor_id) == (False, None), row
+        # the seeded registry row
+        assert fresh.execute(
+            sa.text(
+                "SELECT COUNT(*) FROM queue_resources"
+                " WHERE queue_tag = 'procedures' AND active = true"
+            )
+        ).scalar() == 1
+        # the history untouched
+        assert fresh.execute(
+            sa.text("SELECT number, status FROM queue_entries WHERE queue_id = 1")
+        ).fetchall() == [(7, "waiting")]
+    finally:
+        fresh.close()
+
+
+def test_pg_populated_refinement_map_reapplication_is_idempotent(
+    cutover_pg_engine,
+) -> None:
+    """Alembic does not re-run applied revisions — the MAP re-application
+    is proven by calling the revision logic a second time on the
+    committed post-state: a clean no-op, no abort, no changes."""
+    conn = cutover_pg_engine.connect()
+    _seed_refinement_world(conn)
+    conn.execute(
+        sa.text(
+            "INSERT INTO queue_resources (code, queue_tag, display_name, active)"
+            " VALUES ('stomatology', 'stomatology', 'TEST stomatology', true),"
+            " ('dermatology', 'dermatology', 'TEST dermatology', true)"
+        )
+    )
+    conn.commit()
+
+    module = _load_migration_0064()
+    module.upgrade_with_conn(conn)
+    conn.commit()
+    # the SECOND application of the map (not an alembic re-run)
+    try:
+        counts = module.upgrade_with_conn(conn)
+    except Exception:
+        conn.rollback()
+        raise
+    conn.commit()
+    assert counts["retag_resource"] == 0
+    assert counts["assign_doctor"] == 0
+    assert counts["clear_requires_doctor"] == 0
+    assert counts["disable_service"] == 0
+    assert counts["retire_profile"] == 0

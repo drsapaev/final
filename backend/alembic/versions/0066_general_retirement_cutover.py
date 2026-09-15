@@ -475,7 +475,12 @@ _UPDATE_SERVICE_DOCTOR = sa.text("""
            OR (:expected_requires_doctor_is_null = 0
                AND requires_doctor IS NOT NULL
                AND requires_doctor = :expected_requires_doctor))
-    """)
+    """).bindparams(
+        # review P1 (055a7c7ec): PostgreSQL binds a Python int as smallint
+        # and `boolean = smallint` does not exist — type the boolean-column
+        # bind explicitly instead of relying on the Python value
+        sa.bindparam("expected_requires_doctor", type_=sa.Boolean())
+    )
 
 _UPDATE_SERVICE_REQUIRES_DOCTOR = sa.text("""
     UPDATE services
@@ -1281,8 +1286,11 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
                 "expected_queue_tag_is_null": _is_null_flag(row.queue_tag),
                 "set_requires_doctor": 0 if set_requires_doctor is None else 1,
                 "requires_doctor_decision": 0 if set_requires_doctor is None else 1,
+                # a REAL Python bool: PG binds int 0 as smallint and the
+                # boolean comparison fails with `boolean = smallint` (the
+                # review P1 on 055a7c7ec, reproduced on PostgreSQL 17)
                 "expected_requires_doctor": (
-                    0 if set_requires_doctor is not None else None
+                    False if set_requires_doctor is not None else None
                 ),
                 "expected_requires_doctor_is_null": _is_null_flag(
                     0 if set_requires_doctor is not None else None
