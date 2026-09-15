@@ -214,3 +214,48 @@ describe('Fix C (Codex R11 PR 3092): uncertain-outcome 409 recovery path', () =>
     expect(catchBlock).toContain('cartIdempotencyPayloadRef.current = null;');
   });
 });
+
+describe('Fix C (Codex R16 PR 3095): stale-quote 409 rotates the idempotency binding', () => {
+  const readWizardSource = () => fs.readFileSync(
+    path.resolve(__dirname, '../AppointmentWizardV2.tsx'),
+    'utf8'
+  );
+
+  it('rotates key + payload refs when refreshing a non-idempotency 409 quote', () => {
+    // R16 P2: stale-price 409 — pre-commit validation failure. Refreshed
+    // quote carries a NEW quote_token → next submission serializes a
+    // different payload → the key bound to the OLD payload would be blocked
+    // locally by cartIdempotencyGuard before any request: the registrar
+    // could never confirm the new amount without reloading the wizard.
+    const source = readWizardSource();
+    const start = source.indexOf('} catch (cartError: unknown) {');
+    const end = source.indexOf('if (isPermissionError) {', start);
+    const catchBlock = source.slice(start, end);
+    // цитата-409 различает idempotency-409 (code idempotency_*) от
+    // pre-commit валидационных 409 (stale quote, нет цены)
+    expect(catchBlock).toContain("cartErr.status === 409 && !backendCode?.startsWith('idempotency')");
+    // ротация происходит ВНУТРИ той же ветки, что и инвалидация квоты
+    const quoteBranch = catchBlock.slice(
+      catchBlock.indexOf("cartErr.status === 409 && !backendCode?.startsWith('idempotency')")
+    );
+    const branchBody = quoteBranch.slice(0, quoteBranch.indexOf('}'));
+    expect(branchBody).toContain('setQuoteRefreshNonce((n) => n + 1);');
+    expect(branchBody).toContain('cartIdempotencyKeyRef.current = null;');
+    expect(branchBody).toContain('cartIdempotencyPayloadRef.current = null;');
+    // обоснование решения задокументировано у ветки
+    expect(catchBlock).toContain('Codex R16 PR 3095');
+  });
+
+  it('keeps uncertain-outcome handling BEFORE the quote-refresh branch (binding preserved for idempotency 409s)', () => {
+    // uncertain-outcome 409 должен выходить раньше ротации: его привязка
+    // управляется reconcile-диалогом (R11), in-flight — удерживает ключ.
+    const source = readWizardSource();
+    const start = source.indexOf('} catch (cartError: unknown) {');
+    const end = source.indexOf('if (isPermissionError) {', start);
+    const catchBlock = source.slice(start, end);
+    const uncertainIdx = catchBlock.indexOf("backendCode === 'idempotency_uncertain_outcome'");
+    const refreshIdx = catchBlock.indexOf("!backendCode?.startsWith('idempotency')");
+    expect(uncertainIdx).toBeGreaterThanOrEqual(0);
+    expect(refreshIdx).toBeGreaterThan(uncertainIdx);
+  });
+});

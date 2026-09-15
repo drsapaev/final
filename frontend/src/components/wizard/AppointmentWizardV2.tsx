@@ -2782,10 +2782,23 @@ const AppointmentWizardV2 = ({
         // immediately request the current itemized pricing, so pressing
         // Complete reconfirms the NEW amount instead of resubmitting the
         // stale one indefinitely.
-        if (cartErr.status === 409) {
+        // Codex R16 PR 3095 (P2): stale-price 409 — pre-commit validation
+        // failure, so rotate BOTH idempotency refs together with the quote
+        // refresh. The refreshed quote has a NEW quote_token: the next
+        // submission serializes a different payload, and the key still bound
+        // to the old payload would be blocked locally by cartIdempotencyGuard
+        // before any request reaches the backend — the registrar could never
+        // confirm the new amount. Idempotency 409s (uncertain-outcome /
+        // in-flight / payload-mismatch) carry an `idempotency_*` code and
+        // must NOT release the binding: the uncertain case already returned
+        // above; in-flight keeps the binding so the retry replays the
+        // committed outcome with the SAME key.
+        if (cartErr.status === 409 && !backendCode?.startsWith('idempotency')) {
           setCartQuote(null);
           setCartQuoteStatus('idle');
           setQuoteRefreshNonce((n) => n + 1);
+          cartIdempotencyKeyRef.current = null;
+          cartIdempotencyPayloadRef.current = null;
         }
 
         if (isPermissionError) {
