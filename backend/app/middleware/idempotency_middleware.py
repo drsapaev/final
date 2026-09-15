@@ -1089,6 +1089,26 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     media_type="application/json",
                 )
 
+        # Codex R16 #3092 (P1): lease renewal starts IMMEDIATELY after the
+        # claim is acquired — not just before call_next. The pre-execution
+        # phase below (DB authorization, intent checks, distributed SET) can
+        # legally outlive the 90 s lease (connection-pool wait, Redis
+        # latency, storage stall); a lapse in that window let another worker
+        # acquire the key and execute the same cart while THIS worker
+        # proceeded on stale pre-execution checks. The loop's renewals carry
+        # the OWNER TOKEN (Codex R3), so once ownership is lost they are
+        # harmless no-ops against the foreign claim.
+        lease_task: asyncio.Task | None = None
+
+        def _cancel_lease() -> None:
+            if lease_task is not None:
+                lease_task.cancel()
+
+        if claim is not None and claim_acquired and claim_token is not None:
+            lease_task = asyncio.create_task(
+                _renew_lease_loop(claim, user_id, idempotency_key, claim_token)
+            )
+
         # Codex R6 #3092 (P1): establish the authorized role BEFORE execution —
         # the single DB authorization query of the execute path. Post-commit
         # the outcome is then retained UNCONDITIONALLY: the previous post-
@@ -1113,6 +1133,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
             if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                 claim.release(user_id, idempotency_key, claim_token)
+            _cancel_lease()
             return _principal_refusal_response()
 
         # Codex R9 #3092 (P1): reconcile-before-execute. The endpoint commits
@@ -1136,7 +1157,72 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
             if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                 claim.release(user_id, idempotency_key, claim_token)
+            _cancel_lease()
             return self._uncertain_outcome_response()
+        # Codex R16 #3092 (P1): атомарная перепроверка владения ПЕРЕД
+        # исполнением — CAS-продление lease тем же токеном. False означает,
+        # что lease истёк (pre-execution фаза пережила его, несмотря на
+        # eager-цикл, либо Redis мигнул) и ключ мог быть перезахвачен другим
+        # воркером: исполнение здесь продублировало бы корзину. Сначала
+        # перепроверяем сохранённый исход (второй владелец мог уже
+        # закоммитить и записать его), иначе отказываем 409 in-flight —
+        # повтор с тем же ключом разрешается штатным replay-путём.
+        # Проверка выполняется ДО mark_execution_intent: если владение
+        # потеряно, маркер «дошли до исполнения» не остаётся висеть без
+        # исхода и не заставляет клиента применять reconcile-сценарий для
+        # никогда не исполнявшегося запроса.
+        if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
+            if not claim.renew(user_id, idempotency_key, claim_token):
+                _cancel_lease()
+                if claim.try_available():
+                    replayed, stored_hash, stored_role = claim.load_response(user_id, idempotency_key)
+                    if replayed is not None:
+                        if stored_hash and stored_hash != incoming_hash:
+                            return self._payload_mismatch_response()
+                        # Привязка роли — тот же контракт R4/R6, что и на
+                        # обычных replay-путях; авторизация исполнителя уже
+                        # вычислена выше. Отказ политики (permitted False /
+                        # смена роли) здесь НЕ уходит в call_next — исполнение
+                        # без владения ключом запрещено: 409, и повтор с тем
+                        # же ключом разрешит роль штатным replay-путём.
+                        permitted = self._role_permitted_for_replay(request, stored_role, exec_role, _exec_superuser)
+                        if permitted is True or (
+                            permitted is None and (stored_role is None or exec_role == stored_role)
+                        ):
+                            logger.info(
+                                "Idempotency replay after lease lapse (outcome stored by the new owner): user=%s key=%s path=%s",
+                                user_id, idempotency_key, request.url.path,
+                            )
+                            return replayed
+                    logger.warning(
+                        "Idempotency lease lapsed before execution (ownership lost): user=%s key=%s path=%s",
+                        user_id, idempotency_key, request.url.path,
+                    )
+                    return Response(
+                        status_code=409,
+                        headers={"Retry-After": "1", "Cache-Control": "no-store"},
+                        content=(
+                            '{"code": "idempotency_in_flight", "detail": "Request with this Idempotency-Key is '
+                            'still being processed. Retry with the same key."}'
+                        ),
+                        media_type="application/json",
+                    )
+                if claim.required:
+                    # Redis умер между захватом и перепроверкой — fail-closed
+                    # для required-координации (контракт R7/R15).
+                    return Response(
+                        status_code=503,
+                        headers={"Retry-After": "2", "Cache-Control": "no-store"},
+                        content=(
+                            '{"code": "idempotency_unavailable", "detail": "Идемпотентность '
+                            'временно недоступна: распределённая координация не отвечает. '
+                            'Повторите запрос с тем же Idempotency-Key."}'
+                        ),
+                        media_type="application/json",
+                    )
+                # Implicit ARQ-fallback без Redis: in-memory degrade —
+                # исполняем, как и прежде по контракту деградации.
+
         if claim is not None and claim.try_available():
             # Codex R15 #3092 (P1): для required-координации маркер обязан быть
             # ПОДТВЕРЖДЁННО распределённым непосредственно перед call_next.
@@ -1154,6 +1240,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 )
                 if claim_acquired and claim_token is not None:
                     claim.release(user_id, idempotency_key, claim_token)
+                _cancel_lease()
                 return Response(
                     status_code=503,
                     headers={"Retry-After": "2", "Cache-Control": "no-store"},
@@ -1175,6 +1262,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             )
             if claim_acquired and claim_token is not None:
                 claim.release(user_id, idempotency_key, claim_token)
+            _cancel_lease()
             return Response(
                 status_code=503,
                 headers={"Retry-After": "2", "Cache-Control": "no-store"},
@@ -1188,18 +1276,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         else:
             _mark_local_execution_intent(user_id, idempotency_key)
 
-        # Execute handler with a lease-renewal loop (Codex R2 #3092 P2):
-        # while this worker is still executing, the in-flight claim is
-        # periodically extended so a slow-but-alive request never lapses;
-        # if the worker dies, the loop dies with it and the short lease
-        # expires on its own (no 24h 409 lockout). Codex R3 #3092 (P1):
-        # renewals and release carry the OWNER TOKEN, so a stale worker can
-        # neither extend nor delete a claim that now belongs to another.
-        lease_task: asyncio.Task | None = None
-        if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
-            lease_task = asyncio.create_task(
-                _renew_lease_loop(claim, user_id, idempotency_key, claim_token)
-            )
+        # Execute handler under the lease-renewal loop (Codex R2 #3092 P2).
+        # Codex R16 #3092 (P1): the loop is started EAGERLY right after
+        # acquisition and ownership is re-verified atomically above — by
+        # this point the lease is freshly extended and owned by THIS worker.
+        # If the worker dies, the loop dies with it and the short lease
+        # expires on its own (no 24h 409 lockout).
         try:
             response = await call_next(request)
         except Exception:
