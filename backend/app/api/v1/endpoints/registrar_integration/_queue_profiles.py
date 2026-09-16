@@ -70,7 +70,7 @@ def get_queue_profiles(
         profiles = query.order_by(QueueProfile.display_order).all()
 
         # Если таблица не существует или пуста - возвращаем fallback
-        if not profiles:
+        if not profiles and db.query(QueueProfile.id).first() is None:
             logger.warning("Queue profiles table is empty, returning hardcoded fallback")
             return {
                 "success": True,
@@ -171,7 +171,7 @@ def get_queue_profiles_public(
             .all()
         )
 
-        if not profiles:
+        if not profiles and db.query(QueueProfile.id).first() is None:
             # Fallback: возвращаем все из INITIAL_QUEUE_PROFILES (кроме general и ecg)
             logger.warning("Queue profiles table is empty for QR page, returning fallback")
             return {
@@ -257,7 +257,12 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
     from app.models.online_queue import DailyQueue, OnlineQueueEntry
     from app.models.service import Service
 
-    tags = [t for t in (profile.queue_tags or []) if t]
+    # QR entry points route on the profile key even when an explicit tag
+    # list omits it. Count that real usage without rewriting the operator's
+    # configured tags or merging queues (reviews #3269 and #3274).
+    tags = list(dict.fromkeys(
+        t for t in [*(profile.queue_tags or []), profile.key] if t
+    ))
     services = 0
     daily_queues = 0
     entries_waiting = 0
