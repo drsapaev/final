@@ -286,6 +286,24 @@ pytest_add_cli_args_test_selection = [
     # test_queue_resource_contract audits repo artifacts (docs/adr/ADR-001,
     # alembic versions) — zero mutation value under the sandbox.
     "--deselect", "tests/integration/test_queue_resource_contract.py",
+    # test_general_retirement_cutover.py (#3250) — six pure repo-artifact
+    # readers: evidence/stage_e_operator_map*.json at REPO_ROOT, the
+    # migration-0066 source, and registrar_wizard/_helpers.py +
+    # batch_patient_service.py sources at BACKEND_ROOT. Static
+    # file-vs-embedded comparisons with zero mutation value; under the
+    # sandbox REPO_ROOT resolves to backend/ and BACKEND_ROOT to
+    # backend/backend/, neither of which carries these artifacts
+    # (nightly run 70, 2026-09-16: baseline 1 failed / 2183 passed, -x
+    # stopped at the first reader — FileNotFoundError evidence JSON).
+    # The DB-driven cutover tests stay in the run: green up to the
+    # reader failure in run 70 and green in the normal backend-tests
+    # job on #3250/#3277.
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_migration_source_never_deletes_or_inserts",
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_embedded_decisions_match_the_operator_map_evidence",
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_batch_resolver_source_has_no_synthetic_mapping",
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_wizard_helpers_general_default_is_gone",
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_refinement_matches_the_refinement_evidence_file",
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_final_confirmation_matches_the_20260916_evidence_file",
     # tests/unit/test_idempotency_distributed_claim.py — whole-file deselect:
     # the fixture patches MODULE GLOBALS of app.middleware.idempotency_middleware,
     # which is structurally incompatible with the mutmut sandbox (module-identity
