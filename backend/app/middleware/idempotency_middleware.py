@@ -109,6 +109,21 @@ _INTENT_RELEASE_LUA = (
 )
 
 
+# Review #3283: checking the lease and recording intent must be ONE
+# Redis operation. A paused worker must not overwrite another attempt's
+# unknown outcome and subsequently delete it as its own failed write.
+_INTENT_MARK_LUA = (
+    "if redis.call('get', KEYS[1]) ~= ARGV[1] then return -1 end "
+    "local existing = redis.call('get', KEYS[2]); "
+    "if existing and existing ~= ARGV[1] then return -2 end "
+    "redis.call('set', KEYS[2], ARGV[1], 'EX', ARGV[2]); return 1"
+)
+
+
+class _IntentClaimLost(RuntimeError):
+    """Redis positively refused a stale owner or a foreign intent."""
+
+
 def redact_redis_url(url: str) -> str:
     """Strip URI userinfo credentials from a Redis URL before logging.
 
@@ -725,32 +740,45 @@ class DistributedIdempotencyClaim:
         return f"idem:{user_id}:{key}:intent"
 
     def mark_execution_intent(self, user_id: int | str, key: str, owner_token: str | None = None) -> bool:
-        """Durable marker: 'this key reached execution'.
+        """Confirm an intent without overwriting another attempt's outcome.
 
-        Codex R15 #3092 (P1): returns True iff the DISTRIBUTED marker write
-        was CONFIRMED. Callers with required coordination must treat False
-        as refusal (503) — a silently-missing marker let a lost-response
-        retry re-execute the write after the lease expired. The local mirror
-        is always written as a belt-and-suspenders fallback for THIS worker.
+        Owner-bound calls atomically check the current lease AND the existing
+        marker. A positive ownership refusal raises _IntentClaimLost, even
+        for optional Redis: this is not a transport outage eligible for the
+        local fallback. Transport errors retain the existing bool contract.
 
-        Махмудбек R18 #3277 (P2): the marker VALUE carries the attempt's
-        owner token (fallback "1" keeps token-less callers working), so a
-        refused attempt can purge its OWN marker with a compare-and-delete
-        (clear_execution_intent_if_owner). Existence checks stay
-        value-agnostic (EXISTS).
+        Token-less legacy callers may only INSERT an absent marker. The
+        dispatch path supplies its acquired token whenever it owns a claim.
         """
         confirmed = False
         if self._ensure_available() and self._client is not None:
-            confirmed = bool(
-                self._run(
-                    self._client.set,
+            if owner_token:
+                result = self._run(
+                    self._client.eval,
+                    _INTENT_MARK_LUA,
+                    2,
+                    self._claim_key(user_id, key),
                     self._intent_key(user_id, key),
-                    owner_token or "1",
-                    ex=self._ttl,
+                    owner_token,
+                    str(self._ttl),
                 )
-            )
-        # Mirror locally too: Redis degradation after marking must not turn a
-        # later retry into a blind re-execution on THIS worker.
+                if result in (-1, -2):
+                    # No marker was written. In particular, do not create or
+                    # later clear a local mirror for somebody else's intent.
+                    raise _IntentClaimLost("Idempotency intent ownership lost")
+                confirmed = result == 1
+            else:
+                confirmed = bool(
+                    self._run(
+                        self._client.set,
+                        self._intent_key(user_id, key),
+                        "1",
+                        nx=True,
+                        ex=self._ttl,
+                    )
+                )
+        # Preserve the local safety mirror on transport failures. A refused
+        # required attempt clears only its own marker before returning 503.
         _mark_local_execution_intent(user_id, key)
         return confirmed
 
@@ -1395,11 +1423,25 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # только локально, второй воркер его не видит, и потерянный ответ
                 # после истечения lease приводил к повторному исполнению записи
                 # (дубликаты визитов/счетов/очереди).
-                intent_confirmed = claim.mark_execution_intent(
-                    user_id,
-                    idempotency_key,
-                    owner_token=claim_token if (claim_acquired and claim_token is not None) else None,
-                )
+                try:
+                    intent_confirmed = claim.mark_execution_intent(
+                        user_id,
+                        idempotency_key,
+                        owner_token=claim_token if (claim_acquired and claim_token is not None) else None,
+                    )
+                except _IntentClaimLost:
+                    # Keep the same key: another attempt may still be running
+                    # or may already have committed. Never run this handler or
+                    # invoke failed-write intent cleanup after an owner refusal.
+                    return Response(
+                        status_code=409,
+                        headers={"Retry-After": "1", "Cache-Control": "no-store"},
+                        content=(
+                            '{"code": "idempotency_in_flight", "detail": '
+                            '"Request ownership changed. Retry with the same key."}'
+                        ),
+                        media_type="application/json",
+                    )
                 if claim.required and not intent_confirmed:
                     logger.warning(
                         "Idempotency execution intent NOT confirmed in distributed store: "
