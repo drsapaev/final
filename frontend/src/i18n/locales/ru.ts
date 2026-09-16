@@ -10272,6 +10272,18 @@ const ru = {
     rp_worklist_root: 'Регистратура',
     rp_worklist_title: 'Рабочий список: {label}',
     rp_worklist_filter: 'Фильтр: {label}',
+    rp_counter_records_one: 'запись',
+    rp_counter_records_few: 'записи',
+    rp_counter_records_many: 'записей',
+    rp_counter_records_other: 'записи',
+    rp_counter_patients_one: 'пациент',
+    rp_counter_patients_few: 'пациента',
+    rp_counter_patients_many: 'пациентов',
+    rp_counter_patients_other: 'пациента',
+    // RQ-21.b (D-07): подписанные счётчики worklist — единица согласуется
+    // со скоупом на narrowed-форме («показано 3 из 50 записей»).
+    rp_counter_shown_of: 'показано {shown} из {scope} {unit}',
+    rp_counter_loaded: 'загружено:',
     rp_aria_new_appointment: 'Создать новую запись из рабочего списка регистратора',
     rp_empty_queue_title: 'Очередь пуста',
     rp_empty_queue_dept: 'Сегодня нет записей в отделении {dept}',
