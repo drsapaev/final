@@ -28,6 +28,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import threading
 import uuid
 from datetime import date, datetime
 from pathlib import Path
@@ -1488,6 +1489,137 @@ def test_pg_two_connections_concurrent_clear_post_state_is_a_proven_no_op(
             assert _service_state(verify_conn, code).doctor_id == _TARGET_DOCTOR_ID
 
 
+@pytest.mark.integration
+@pytest.mark.migration
+def test_pg_two_connections_owner_linkage_change_waits_for_the_migration(
+    cutover_pg_engine,
+) -> None:
+    """QD-2E review P1 (c48081f03): the approved (doctor, owner) linkage
+    check must be ATOMIC with the service assignment. The preflight
+    validated Doctor 15 -> User 26, but nothing HELD those rows — and
+    deploy_restart.ps1 runs ``alembic upgrade head`` BEFORE the old
+    uvicorn is stopped, so catalog writes CAN interleave: another
+    committed transaction re-linking Doctor 15 -> User 999 between the
+    check and the ``UPDATE services`` left the migration assigning D01
+    to a profile that no longer carried the approved owner AT
+    ASSIGNMENT TIME (verified by the review: approved_user_id=26,
+    actual_user_id_at_assignment=999, affected_rows=1, postconditions
+    green).
+
+    Fix contract (the reviewer's requirement): the target Doctor AND
+    User rows are locked FOR UPDATE — in a deterministic ascending
+    order — BEFORE the validation and held until the migration
+    transaction commits. The concurrent re-link then either WAITS for
+    the migration to finish (or fails its lock timeout), but never
+    interleaves. Proven with a NOWAIT probe from the operator's own
+    connection: on the fixed tree the probe reports the row lock, the
+    re-link commits only AFTER the migration, and the linkage read at
+    the assignment moment is still the approved one."""
+    with cutover_pg_engine.connect() as setup_conn:
+        _seed_refinement_world(setup_conn)
+        setup_conn.commit()
+
+    module = _load_migration_0064()
+    original_guarded_update = module._guarded_service_update
+
+    probe_resolved = threading.Event()
+    operator_committed = threading.Event()
+    outcome: dict[str, str] = {}
+    operator_error: list[BaseException] = []
+
+    def operator_relinks_the_doctor() -> None:
+        """Connection B: the operator's own transaction, fired exactly
+        between the preflight linkage check and the D01 guarded write."""
+        try:
+            with cutover_pg_engine.connect() as operator_conn:
+                try:
+                    with operator_conn.begin():
+                        operator_conn.execute(
+                            sa.text(
+                                "SELECT id FROM doctors WHERE id = 15"
+                                " FOR UPDATE NOWAIT"
+                            )
+                        )
+                    outcome["probe"] = "unlocked"
+                except sa.exc.OperationalError:
+                    # 55P03 lock_not_available: the migration already
+                    # holds the doctor row — the stabilized window
+                    outcome["probe"] = "locked"
+                probe_resolved.set()
+                # the re-link itself: on the fixed tree this blocks on the
+                # migration's row lock until the migration commits
+                with operator_conn.begin():
+                    operator_conn.execute(
+                        sa.text(
+                            "UPDATE doctors SET user_id = 999 WHERE id = 15"
+                        )
+                    )
+                operator_committed.set()
+        except BaseException as exc:  # noqa: BLE001
+            operator_error.append(exc)
+            probe_resolved.set()
+            operator_committed.set()
+
+    def guarded_update_with_relink_race(migration_conn, **kwargs):
+        if (
+            kwargs.get("decision") == "assign_doctor"
+            and kwargs.get("service_code") == "D01"
+        ):
+            operator = threading.Thread(
+                target=operator_relinks_the_doctor, daemon=True
+            )
+            operator.start()
+            assert probe_resolved.wait(
+                timeout=10.0
+            ), "the operator probe never resolved"
+            if outcome["probe"] == "unlocked":
+                # UNFIXED tree: no row lock held the re-link — wait for the
+                # commit to land so the re-read below deterministically
+                # observes the interleaved change (and the assertion FAILS)
+                assert operator_committed.wait(
+                    timeout=1.0
+                ), "the unlocked re-link never landed"
+            # THE contract: at the assignment moment the approved linkage
+            # still holds — read inside the migration's own transaction
+            live_user_id = migration_conn.execute(
+                sa.text("SELECT user_id FROM doctors WHERE id = 15")
+            ).scalar()
+            assert live_user_id == 26, (
+                "D01 was assigned while Doctor 15 already carried a "
+                "foreign owner — the preflight (doctor, owner) linkage "
+                "check was not atomic with the assignment"
+            )
+        return original_guarded_update(migration_conn, **kwargs)
+
+    module._guarded_service_update = guarded_update_with_relink_race
+
+    with cutover_pg_engine.connect() as migration_conn:
+        migration_trans = migration_conn.begin()
+        module.upgrade_with_conn(migration_conn)  # must NOT raise
+        migration_trans.commit()
+
+    # the re-link unblocked only at the migration commit
+    assert operator_committed.wait(timeout=10.0)
+    assert not operator_error
+    assert outcome["probe"] == "locked", (
+        "the migration did not hold the target doctor row between the "
+        "preflight check and the write"
+    )
+
+    with cutover_pg_engine.connect() as verify_conn:
+        row = verify_conn.execute(
+            sa.text("SELECT doctor_id FROM services WHERE code = 'D01'")
+        ).fetchone()
+        assert row.doctor_id == 15
+        linkage = verify_conn.execute(
+            sa.text("SELECT user_id FROM doctors WHERE id = 15")
+        ).scalar()
+        # the operator's re-link landed strictly AFTER the migration: the
+        # assignment was made against the approved linkage, the newer
+        # edit survived and is a post-migration operator decision
+        assert linkage == 999
+
+
 def test_embedded_decisions_match_the_operator_map_evidence() -> None:
     """Parity pin: the embedded tables ARE the completed-map snapshot
     (evidence/stage_e_operator_map_20260912.json) — they cannot drift,
@@ -1796,6 +1928,11 @@ def test_setup_dry_run_is_plan_only_and_never_touches_sequences(
         def fetchone(self):
             return self._row
 
+        def fetchall(self):
+            # the registry probe reads ALL rows of the tag (the
+            # c48081f03 review P2 fix); the empty-database world has none
+            return []
+
     class _FakeConn:
         """The empty-database world: every probe misses, the explicit-id
         INSERTs execute (recorded), the plan must never reach setval or
@@ -1992,6 +2129,170 @@ def test_setup_no_conflict_when_only_the_snapshot_row_exists() -> None:
             sa.text("SELECT COUNT(*) FROM services")
         ).scalar()
         assert total == len(qd2e_setup._SERVICES)
+    finally:
+        conn.close()
+        engine.dispose()
+
+
+def test_setup_conflicts_on_inactive_required_registry_resource() -> None:
+    """QD-2E review P2 (c48081f03): the test database already carries
+    QueueResource('lab', active=false). The old probe checked EXISTENCE
+    only (``SELECT id FROM queue_resources WHERE queue_tag = :t``),
+    treated any found row as the ready resource and reported a no-op —
+    the setup "succeeded" while the very next step (migration 0066
+    requires EXACTLY ONE ACTIVE registry row per mapped tag) would
+    abort: a false green test environment. The setup must terminate
+    with the conflict and roll the whole group back; re-activation is
+    an operator decision the setup never makes silently (the
+    deactivation may itself be intentional)."""
+    from app.scripts.qd2e_setup import run_setup_in_connection
+
+    conn, engine = _qd2e_setup_sqlite_conn()
+    try:
+        conn.execute(
+            sa.text(
+                "INSERT INTO queue_resources (code, queue_tag, display_name,"
+                " active, start_number_online, max_online_per_day)"
+                " VALUES ('lab', 'lab', 'Лаборатория', false, 1, 15)"
+            )
+        )
+        conn.commit()
+
+        with pytest.raises(RuntimeError, match="INACTIVE"):
+            run_setup_in_connection(conn)  # type: ignore[arg-type]
+        conn.rollback()
+
+        # nothing partial survived the rolled-back group; the row keeps
+        # its operator-set inactive state
+        counts = conn.execute(
+            sa.text(
+                "SELECT (SELECT COUNT(*) FROM medical_specialties),"
+                " (SELECT COUNT(*) FROM users),"
+                " (SELECT COUNT(*) FROM doctors),"
+                " (SELECT COUNT(*) FROM queue_resources),"
+                " (SELECT COUNT(*) FROM services)"
+            )
+        ).fetchone()
+        assert tuple(counts) == (0, 0, 0, 1, 0)
+        state = conn.execute(
+            sa.text(
+                "SELECT code, active FROM queue_resources"
+                " WHERE queue_tag = 'lab'"
+            )
+        ).fetchone()
+        assert (state.code, bool(state.active)) == ("lab", False)
+    finally:
+        conn.close()
+        engine.dispose()
+
+
+def test_setup_conflicts_on_ambiguous_registry_tag_rows() -> None:
+    """The same defect family as the services code-owner probe
+    (2c5ea05ce): queue_resources.queue_tag carries NO unique constraint
+    in the deployed 0058 DDL (the model's unique=True is not the
+    installed contract), so two rows can share the tag. The old
+    fetchone() probe saw whichever row the engine returned first — the
+    second holder stayed invisible and the setup reported a clean
+    no-op while migration 0066's exactly-one-ACTIVE-row gate (or its
+    ambiguous-tag abort) would reject the environment."""
+    from app.scripts.qd2e_setup import run_setup_in_connection
+
+    conn, engine = _qd2e_setup_sqlite_conn()
+    try:
+        conn.execute(
+            sa.text(
+                "INSERT INTO queue_resources (code, queue_tag, display_name,"
+                " active, start_number_online, max_online_per_day)"
+                " VALUES ('lab', 'lab', 'Лаборатория', true, 1, 15)"
+            )
+        )
+        conn.execute(
+            sa.text(
+                "INSERT INTO queue_resources (code, queue_tag, display_name,"
+                " active, start_number_online, max_online_per_day)"
+                " VALUES ('lab_cab', 'lab', 'Лаборатория 2', true, 1, 15)"
+            )
+        )
+        conn.commit()
+
+        with pytest.raises(RuntimeError, match="2 rows carry the tag"):
+            run_setup_in_connection(conn)  # type: ignore[arg-type]
+        conn.rollback()
+
+        counts = conn.execute(
+            sa.text(
+                "SELECT (SELECT COUNT(*) FROM medical_specialties),"
+                " (SELECT COUNT(*) FROM users),"
+                " (SELECT COUNT(*) FROM doctors),"
+                " (SELECT COUNT(*) FROM queue_resources),"
+                " (SELECT COUNT(*) FROM services)"
+            )
+        ).fetchone()
+        assert tuple(counts) == (0, 0, 0, 2, 0)
+    finally:
+        conn.close()
+        engine.dispose()
+
+
+def test_setup_registry_is_a_proven_noop_on_existing_active_rows() -> None:
+    """Control arm (no false positives): both required registry rows
+    already exist ACTIVE with the map codes — a proven no-op, no
+    duplicate registry writes planned or executed, no conflict. Runs
+    in plan mode with the full service catalog pre-seeded (the pattern
+    of test_setup_no_conflict_when_only_the_snapshot_row_exists: the
+    service INSERTs use the PG ``now()`` and must never execute on
+    SQLite)."""
+    from app.scripts import qd2e_setup
+    from app.scripts.qd2e_setup import run_setup_in_connection as _run
+
+    conn, engine = _qd2e_setup_sqlite_conn()
+    try:
+        for code, tag, display in qd2e_setup._REGISTRY:
+            conn.execute(
+                sa.text(
+                    "INSERT INTO queue_resources (code, queue_tag,"
+                    " display_name, active, start_number_online,"
+                    " max_online_per_day)"
+                    " VALUES (:c, :t, :d, true, 1, 15)"
+                ),
+                {"c": code, "t": tag, "d": display},
+            )
+        for (
+            sid,
+            code,
+            name,
+            tag,
+            dept,
+            _requires,
+            _is_consultation,
+        ) in qd2e_setup._SERVICES:
+            conn.execute(
+                sa.text(
+                    "INSERT INTO services (id, code, name, queue_tag,"
+                    " department_key, doctor_id, requires_doctor, active)"
+                    " VALUES (:i, :c, :n, :t, :d, NULL, :r, 1)"
+                ),
+                {
+                    "i": sid,
+                    "c": code,
+                    "n": name,
+                    "t": tag,
+                    "d": dept,
+                    "r": bool(_requires),
+                },
+            )
+        conn.commit()
+
+        counts = _run(conn, plan_only=True)  # type: ignore[arg-type]
+        conn.rollback()
+
+        assert counts["registry"] == 0
+        assert (
+            conn.execute(
+                sa.text("SELECT COUNT(*) FROM queue_resources")
+            ).scalar()
+            == 2
+        )
     finally:
         conn.close()
         engine.dispose()
@@ -3761,6 +4062,174 @@ def test_refinement_aborts_on_unapproved_procedure_when_resource_preexists() -> 
         row.queue_tag,
         bool(row.active),
     ) == (True, None, "procedures", True)
+
+
+def test_upgrade_aborts_on_doctor_owned_seed_tag_queue() -> None:
+    """QD-2E review P1 (c48081f03): an ACTIVE ``procedures`` queue owned
+    by a REAL doctor (with a waiting patient) survives the old blocking
+    check — it only covered ``queue_tag='general'`` and synthetic
+    owners. The migration then seeded QueueResource('procedures') on
+    top of the doctor's surface, while ``tag_routes_to_resource`` /
+    ``get_or_create_daily_queue`` keep returning the EXISTING queue of
+    the tag regardless of its owner: the catalog declared procedures
+    resource-routed, but new arrivals kept landing in the DOCTOR's
+    queue — contradicting the approved decision (procedures run on the
+    resource axis, never assigned to the dermatologist).
+
+    The cutover must refuse with no rows changed: the runbook is an
+    explicit operator resolution (transfer the queue onto the resource
+    axis or close it), never an automatic rebind of an occupied queue."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    # the review's queue id 80: ACTIVE, owned by the REAL dermatologist
+    # (doctor 15), not on the resource axis, with a waiting patient
+    conn.execute(
+        sa.text(
+            "INSERT INTO daily_queues (id, day, specialist_id,"
+            " queue_resource_id, queue_tag, active)"
+            " VALUES (80, '2026-09-16', 15, NULL, 'procedures', true)"
+        )
+    )
+    conn.execute(
+        sa.text(
+            "INSERT INTO queue_entries (queue_id, number, status)"
+            " VALUES (80, 7, 'waiting')"
+        )
+    )
+    conn.commit()
+
+    _assert_abort(conn, "doctor-owned seed-tag queue")
+    conn.rollback()
+
+    # no rows changed: the resource was NOT activated over the doctor's
+    # queue, the queue and its waiting patient are intact, and the map
+    # was not applied
+    assert (
+        conn.execute(
+            sa.text(
+                "SELECT COUNT(*) FROM queue_resources WHERE queue_tag = 'procedures'"
+            )
+        ).scalar()
+        == 0
+    )
+    queue = conn.execute(
+        sa.text(
+            "SELECT specialist_id, queue_resource_id, active"
+            " FROM daily_queues WHERE id = 80"
+        )
+    ).fetchone()
+    assert (queue.specialist_id, queue.queue_resource_id, bool(queue.active)) == (
+        15,
+        None,
+        True,
+    )
+    assert (
+        conn.execute(
+            sa.text("SELECT COUNT(*) FROM queue_entries WHERE queue_id = 80")
+        ).scalar()
+        == 1
+    )
+    tag, doctor_id, _ = _service_state(conn, "D01")
+    assert (tag, doctor_id) == ("dermatology", None)
+    tag, _, _ = _service_state(conn, "L03")
+    assert tag == "general"
+
+
+def test_upgrade_aborts_on_foreign_resource_bound_seed_tag_queue() -> None:
+    """The same conflict family, foreign-binding arm: an active
+    procedures-tag queue whose ``queue_resource_id`` points at ANOTHER
+    registry row (the lab resource) is not the tag's resource surface
+    either — after the seed, ``tag_routes_to_resource`` returns it (a
+    queue_resource_id row IS the surface) while its caps/numbering
+    follow the LAB row. Also an explicit operator resolution, never a
+    silent rebind."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    # the lab registry row exists (the 0059 seed shape, id from the
+    # seeded synthetic world); bind the procedures-tag queue to it
+    (lab_resource_id,) = conn.execute(
+        sa.text("SELECT id FROM queue_resources WHERE queue_tag = 'lab'")
+    ).fetchone()
+    conn.execute(
+        sa.text(
+            "INSERT INTO daily_queues (day, specialist_id, queue_resource_id,"
+            " queue_tag, active) VALUES ('2026-09-16', NULL, :r, 'procedures', true)"
+        ),
+        {"r": lab_resource_id},
+    )
+    conn.commit()
+
+    _assert_abort(conn, "doctor-owned seed-tag queue")
+    conn.rollback()
+
+    assert (
+        conn.execute(
+            sa.text(
+                "SELECT COUNT(*) FROM queue_resources WHERE queue_tag = 'procedures'"
+            )
+        ).scalar()
+        == 0
+    )
+    tag, _, _ = _service_state(conn, "L03")
+    assert tag == "general"
+
+
+def test_upgrade_proceeds_when_seed_tag_queue_is_already_resource_owned() -> None:
+    """Control arm: the operator pre-created QueueResource('procedures')
+    (active, same code — a proven seed no-op) and the day's procedures
+    queue is ALREADY on the resource axis (queue_resource_id set,
+    specialist NULL, including the 0059 dual-ownership bridge shape).
+    That is the desired post-state — the queue-conflict gate must NOT
+    fire and the map applies."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(
+        sa.text(
+            "INSERT INTO queue_resources (code, queue_tag, display_name,"
+            " active, start_number_online, max_online_per_day)"
+            " VALUES ('procedures', 'procedures', 'Процедуры', 1, 1, 15)"
+        )
+    )
+    (resource_id,) = conn.execute(
+        sa.text("SELECT id FROM queue_resources WHERE queue_tag = 'procedures'")
+    ).fetchone()
+    # a resource-owned queue (specialist NULL) for one day AND a bridged
+    # one (dual ownership, the 0059 backfill shape) for another day
+    conn.execute(
+        sa.text(
+            "INSERT INTO daily_queues (day, specialist_id, queue_resource_id,"
+            " queue_tag, active) VALUES ('2026-09-16', NULL, :r, 'procedures', true)"
+        ),
+        {"r": resource_id},
+    )
+    conn.execute(
+        sa.text(
+            "INSERT INTO daily_queues (day, specialist_id, queue_resource_id,"
+            " queue_tag, active) VALUES ('2026-09-17', 15, :r, 'procedures', true)"
+        ),
+        {"r": resource_id},
+    )
+    conn.commit()
+
+    module = _load_migration_0064()
+    module.upgrade_with_conn(conn)  # must NOT raise
+    conn.commit()
+
+    # the map applied and the resource-axis queues are untouched
+    row = conn.execute(
+        sa.text("SELECT doctor_id FROM services WHERE code = 'D01'")
+    ).fetchone()
+    assert row.doctor_id == 15
+    owners = conn.execute(
+        sa.text(
+            "SELECT day, specialist_id, queue_resource_id FROM daily_queues"
+            " WHERE queue_tag = 'procedures' ORDER BY day"
+        )
+    ).fetchall()
+    assert [(o.day, o.specialist_id, o.queue_resource_id) for o in owners] == [
+        ("2026-09-16", None, resource_id),
+        ("2026-09-17", 15, resource_id),
+    ]
 
 
 def test_refinement_concurrent_exact_post_state_on_clear_block_is_a_proven_noop(

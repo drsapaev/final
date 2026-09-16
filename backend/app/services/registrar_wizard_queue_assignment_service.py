@@ -430,6 +430,19 @@ class RegistrarWizardQueueAssignmentService:
           записи): номер, queue_time и остальные поля талона корзина
           никогда не трогала, они не восстанавливаются — они не менялись.
 
+        QD-2E review P2 (c48081f03): восстановление применяется по ID из
+        ``reused_entry_bindings`` — НЕ по результату запроса по visit_id.
+        Штатная SessionLocal работает с ``autoflush=False``: привязка
+        переиспользованного талона может остаться ТОЛЬКО в памяти
+        (ошибка следующего направления случилась до первого явного
+        flush), и запрос очистки по visit_id вернёт ПУСТО — но внешний
+        commit() обязанателен flush, и неприменённый журнал оставил бы
+        привязку в БД (визит confirmed + талон, связанный с ним, при
+        assignments=[]; повторная регистрация упирается в guard «талон
+        уже связан с другим визитом»). Запрос по визиту остаётся
+        источником CREATED-записей; доступ к журналу восстановления —
+        только по ID из снапшота.
+
         Механизм по-прежнему без rollback и без savepoint: rollback стёр
         бы flush-нутые строки атомарной корзины (Codex R1 #3092), savepoint
         несовместим с savepoint-изоляцией db_session-фикстуры (P2-1b).
@@ -440,29 +453,75 @@ class RegistrarWizardQueueAssignmentService:
         bindings: Mapping[int, MorningAssignmentReusedEntryBinding] = (
             reused_entry_bindings or {}
         )
+        # Codex R3 #3092 (P1): capture the PK while the instance is alive.
+        visit_id = visit.id
+
+        # CREATED-entry candidates: rows the DB already associates with
+        # the visit. autoflush is OFF, so this query runs WITHOUT
+        # flushing pending state — deliberate: the compensation must not
+        # persist an in-memory binding just because it queried for it.
         entries = self.db.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.visit_id == visit.id
+            OnlineQueueEntry.visit_id == visit_id
         ).all()
+        entries_by_id: dict[int, OnlineQueueEntry] = {
+            entry.id: entry for entry in entries
+        }
+
         restored_count = 0
+        # RESTORE first — by ledger ID, independent of the query outcome
+        # (the c48081f03 review P2): db.get() is an identity-map hit for
+        # the unflushed binding (the reuse branch loaded the row in THIS
+        # session), a real SELECT only happens when the row is absent.
+        for entry_id, binding in bindings.items():
+            entry = entries_by_id.pop(entry_id, None)
+            if entry is None:
+                entry = self.db.get(OnlineQueueEntry, entry_id)
+            if entry is None:
+                # The talon vanished mid-transaction (deleted by another
+                # path): there is no row left to restore — report loudly,
+                # the binding cannot survive a deleted row either.
+                logger.error(
+                    "REGISTRATION: переиспользованный талон id=%d (визит %d) "
+                    "исчез до применения компенсации — восстановление "
+                    "невозможно",
+                    entry_id,
+                    visit_id,
+                )
+                continue
+            # Снапшот снят ДО привязки и не зависит от ORM history (flush
+            # между привязкой и сбоем её очищает).
+            entry.patient_id = binding.previous_patient_id
+            entry.visit_id = binding.previous_visit_id
+            restored_count += 1
+
+        # DELETE the created entries the DB already knows about.
         deleted_count = 0
-        for entry in entries:
-            binding = bindings.get(entry.id)
-            if binding is not None:
-                # Восстановление прежних связей переиспользованного
-                # талона. Снапшот снят ДО привязки и не зависит от ORM
-                # history (flush между привязкой и сбоем её очищает).
-                entry.patient_id = binding.previous_patient_id
-                entry.visit_id = binding.previous_visit_id
-                restored_count += 1
-            else:
-                self.db.delete(entry)
+        for entry in entries_by_id.values():
+            self.db.delete(entry)
+            deleted_count += 1
+
+        # Belt-and-suspenders (the created-entry twin of the same gap):
+        # an entry the basket CREATED but never flushed (the allocator
+        # staged the object and failed before its INSERT) is PENDING in
+        # the session — invisible to the visit_id query, and the outer
+        # commit() would INSERT it. A pending object was never written,
+        # so the compensation is an EXPUNGE (dropping the future INSERT),
+        # not a DELETE statement.
+        for obj in list(self.db.new):
+            if (
+                isinstance(obj, OnlineQueueEntry)
+                and obj.visit_id == visit_id
+                and obj.id not in bindings
+            ):
+                self.db.expunge(obj)
                 deleted_count += 1
-        if entries:
+
+        if entries or restored_count or deleted_count:
             self.db.flush()
             logger.info(
                 "REGISTRATION: компенсирующая зачистка очереди визита %d — "
                 "удалено записей: %d, восстановлено переиспользованных: %d",
-                visit.id,
+                visit_id,
                 deleted_count,
                 restored_count,
             )

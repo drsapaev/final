@@ -255,11 +255,34 @@ def run_setup_in_connection(
 
     # ---------- registry rows (natural key: queue_tag) ----------
     for code, tag, display in _REGISTRY:
-        row = conn.execute(
-            sa.text("SELECT id FROM queue_resources WHERE queue_tag = :t"),
+        # QD-2E review P2 (c48081f03): the probe used to check EXISTENCE
+        # only (``SELECT id ... fetchone()``). Two failure shapes:
+        # - an INACTIVE row passed as a ready resource and the setup
+        #   reported a no-op — while migration 0066 (the next step of the
+        #   runbook) requires EXACTLY ONE ACTIVE registry row per mapped
+        #   tag and aborts: a false-green test environment;
+        # - queue_resources.queue_tag carries NO unique constraint in the
+        #   deployed 0058 DDL, so two rows can share the tag — a
+        #   fetchone() saw whichever row the engine returned first (the
+        #   same defect family as the services code-owner probe).
+        # The probe now reads EVERY row of the tag and requires exactly
+        # one ACTIVE carrier; anything else is an explicit conflict the
+        # operator resolves (re-activating a disabled resource is an
+        # operator decision — the deactivation may be intentional).
+        rows = conn.execute(
+            sa.text(
+                "SELECT id, code, active FROM queue_resources WHERE queue_tag = :t"
+            ),
             {"t": tag},
-        ).fetchone()
-        if row is None:
+        ).fetchall()
+        if len(rows) > 1:
+            raise RuntimeError(
+                f"queue_resources tag {tag!r} is ambiguous: {len(rows)} rows"
+                " carry the tag (ids "
+                + ", ".join(str(row.id) for row in rows)
+                + ") — repair the registry, then re-run the setup"
+            )
+        if not rows:
             _journal(_create_action, f"queue_resource {code!r} ({tag!r})")
             counts["registry"] += 1
             if not plan_only:
@@ -274,6 +297,21 @@ def run_setup_in_connection(
                     ),
                     {"c": code, "t": tag, "d": display},
                 )
+        elif not bool(rows[0].active):
+            raise RuntimeError(
+                f"queue_resources tag {tag!r} (id={rows[0].id},"
+                f" code={rows[0].code!r}) exists but is INACTIVE — the"
+                " migration the setup prepares for requires exactly one"
+                " ACTIVE registry row per mapped tag; re-activating it is"
+                " an operator decision (the deactivation may itself be"
+                " intentional), the setup never makes it silently"
+            )
+        elif rows[0].code != code:
+            raise RuntimeError(
+                f"queue_resources tag {tag!r} exists with code"
+                f" {rows[0].code!r} (id={rows[0].id}), the map expects"
+                f" {code!r} — resolve the identity conflict manually"
+            )
         else:
             _journal("no-op", f"queue_resource {tag!r} exists")
 

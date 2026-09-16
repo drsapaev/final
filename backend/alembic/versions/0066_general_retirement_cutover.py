@@ -578,6 +578,72 @@ _SELECT_REGISTRY_BY_TAG_ANY = sa.text("""
     ORDER BY id
     """)
 
+# c48081f03 review P1 (doctor-owned seed-tag queue): every ACTIVE queue
+# on the seed tag that is NOT bound to a registry row carrying the SAME
+# tag will capture the tag's routing AFTER the resource is activated —
+# tag_routes_to_resource/get_or_create_daily_queue return the EXISTING
+# (day, tag) queue regardless of its owner, so new patients would keep
+# landing in the doctor's queue while the catalog declares the tag
+# resource-routed. Such queues (queue_resource_id NULL — the doctor's
+# own — or pointing at a FOREIGN registry row) are an operator
+# resolution, never a silent rebind.
+_SELECT_UNRESOLVED_SEED_TAG_QUEUES = sa.text("""
+    SELECT
+        q.id AS queue_id,
+        q.day,
+        q.specialist_id,
+        q.queue_resource_id,
+        u.username AS owner_username,
+        (SELECT COUNT(*) FROM queue_entries e WHERE e.queue_id = q.id)
+            AS entry_count,
+        (SELECT COUNT(*) FROM queue_entries e
+            WHERE e.queue_id = q.id
+              AND e.status IN ('waiting', 'called', 'in_service',
+                               'diagnostics')
+        ) AS live_entry_count
+    FROM daily_queues q
+    LEFT JOIN doctors d ON d.id = q.specialist_id
+    LEFT JOIN users u ON u.id = d.user_id
+    WHERE q.active = true
+      AND q.queue_tag = :queue_tag
+      AND (
+            q.queue_resource_id IS NULL
+         OR NOT EXISTS (
+                SELECT 1 FROM queue_resources r
+                WHERE r.id = q.queue_resource_id
+                  AND r.queue_tag = :queue_tag
+            )
+      )
+    ORDER BY q.day, q.id
+    """)
+
+# c48081f03 review P1 (linkage atomicity): row-lock stabilization of
+# the VERIFIED target identities. deploy_restart.ps1 runs
+# ``alembic upgrade head`` BEFORE the old uvicorn stops, so concurrent
+# catalog writes CAN interleave with the migration: a plain SELECT
+# validates the Doctor→User linkage and releases nothing — another
+# committed transaction can re-link the doctor between the check and
+# the ``UPDATE services``. These locks are taken BEFORE the target
+# validation and held until the migration transaction commits, in a
+# DETERMINISTIC order (doctors ascending, then users ascending, then
+# registry rows ascending; catalog rows last — the guarded UPDATE
+# order). PostgreSQL only: SQLite (the test scratch) has no FOR UPDATE
+# and keeps sequential test semantics.
+_SELECT_LOCK_DOCTOR_ROWS = sa.text("""
+    SELECT id, user_id FROM doctors WHERE id IN :doctor_ids ORDER BY id
+    FOR UPDATE
+    """).bindparams(sa.bindparam("doctor_ids", expanding=True))
+
+_SELECT_LOCK_USER_ROWS = sa.text("""
+    SELECT id FROM users WHERE id IN :user_ids ORDER BY id
+    FOR UPDATE
+    """).bindparams(sa.bindparam("user_ids", expanding=True))
+
+_SELECT_LOCK_REGISTRY_ROWS = sa.text("""
+    SELECT id FROM queue_resources WHERE queue_tag IN :queue_tags
+    ORDER BY id FOR UPDATE
+    """).bindparams(sa.bindparam("queue_tags", expanding=True))
+
 # Review round 4 (P1): the seed-tag coverage gate must see the services
 # ON the tag regardless of whether the tag already resolves to an ACTIVE
 # queue_resources row — _SELECT_SURFACES deliberately EXCLUDES resolved
@@ -944,6 +1010,118 @@ def _assert_registry_seed_tag_coverage(conn) -> None:
             "decisions to this revision's tables and re-run the "
             "inventory; aborting with no rows changed"
         )
+
+
+def _assert_no_unresolved_seed_tag_queues(conn) -> None:
+    """c48081f03 review P1: the seed-tag ROUTING-CONFLICT gate.
+
+    The old blocking check (``_assert_no_active_general_queues``) only
+    stopped ``general``-tag queues and synthetic owners — an ACTIVE
+    ``procedures`` queue owned by a REAL doctor passed it, and the
+    migration then seeded QueueResource('procedures') on top of the
+    doctor's surface. But ``tag_routes_to_resource`` (QD-2C) returns
+    the EXISTING active (day, tag) queue whatever its owner, and
+    ``get_or_create_daily_queue`` returns it without ever moving it
+    onto the resource axis: the catalog would declare procedures
+    resource-routed while new arrivals keep landing in the doctor's
+    queue — contradicting the approved D-08 decision (procedures run
+    on the resource axis and are never assigned to the doctor).
+
+    Every ACTIVE queue on the seed tag that is NOT already bound to a
+    registry row carrying the SAME tag (a resource-owned row, or the
+    0059 dual-ownership bridge) therefore blocks the cutover BEFORE
+    the resource is activated. The runbook is an explicit operator
+    resolution — transfer the queue onto the resource axis under a
+    separate approved decision, or close it; an occupied queue is
+    never automatically re-bound (the waiting patients are live)."""
+    rows = conn.execute(
+        _SELECT_UNRESOLVED_SEED_TAG_QUEUES, {"queue_tag": _REGISTRY_SEED_TAG}
+    ).fetchall()
+    if not rows:
+        return
+    inventory = "; ".join(
+        f"queue id={row.queue_id} day={row.day} "
+        f"owner={row.owner_username or f'doctor:{row.specialist_id}'} "
+        f"specialist_id={row.specialist_id} "
+        f"queue_resource_id={row.queue_resource_id} "
+        f"entries={row.entry_count}/live={row.live_entry_count}"
+        for row in rows
+    )
+    _abort(
+        f"{len(rows)} ACTIVE doctor-owned seed-tag queue(s) on "
+        f"{_REGISTRY_SEED_TAG!r} — activating the "
+        f"QueueResource({_REGISTRY_SEED_TAG!r}) would leave the tag's "
+        "existing surface capturing new arrivals (the runtime returns "
+        "the existing (day, tag) queue regardless of its owner, so new "
+        "patients would keep landing on the DOCTOR's queue while the "
+        "catalog declares the tag resource-routed); resolve the queues "
+        "first (transfer them onto the resource axis under a separate "
+        "approved operator decision, or close them — never an automatic "
+        "rebind of an occupied queue); inventory: "
+        + inventory
+        + "; aborting with no rows changed"
+    )
+
+
+def _lock_rows_for_update(conn, statement, params) -> None:
+    """Dialect-gated FOR UPDATE stabilization (the c48081f03 review
+    P1): PostgreSQL takes the row locks; SQLite (the test scratch
+    engine) has no FOR UPDATE syntax and keeps sequential test
+    semantics — the single-connection proofs stay valid there."""
+    if conn.dialect.name != "postgresql":
+        return
+    conn.execute(statement, params)
+
+
+def _stabilize_assign_target_rows(
+    conn, doctor_ids: list[int], expected_user_ids: set[int]
+) -> None:
+    """c48081f03 review P1: lock the assign-target Doctor rows and their
+    linked User rows BEFORE ``_assert_target_doctor`` validates them,
+    and hold the locks until the migration transaction commits.
+
+    Without the locks the validation was a plain SELECT: between the
+    check (Doctor 15 -> User 26 approved) and the ``UPDATE services``
+    another committed transaction could re-link the doctor (User 999)
+    — the service then received a profile that no longer carried the
+    approved owner AT ASSIGNMENT TIME, with affected_rows=1 and every
+    service postcondition green (the guarded UPDATE only protects the
+    SERVICE row, never the linkage). The deploy window is real:
+    deploy_restart.ps1 runs alembic BEFORE the old uvicorn is stopped.
+
+    Lock order (deterministic, must stay consistent if extended):
+    doctors ascending id, then the linked + expected users ascending
+    id. A concurrent linkage edit now either WAITS for the migration
+    to commit or fails its lock timeout — it can never interleave; a
+    rare lock-order inversion with a concurrent app transaction is
+    resolved by PostgreSQL aborting one side, which surfaces as a
+    failed migration (never as a silently wrong assignment)."""
+    if not doctor_ids:
+        return
+    if conn.dialect.name != "postgresql":
+        return
+    locked = conn.execute(
+        _SELECT_LOCK_DOCTOR_ROWS, {"doctor_ids": doctor_ids}
+    ).fetchall()
+    live_user_ids = {row.user_id for row in locked if row.user_id is not None}
+    user_ids = sorted(live_user_ids | set(expected_user_ids))
+    if user_ids:
+        conn.execute(_SELECT_LOCK_USER_ROWS, {"user_ids": user_ids})
+
+
+def _stabilize_registry_target_rows(conn, queue_tags: list[str]) -> None:
+    """c48081f03 review P1 (the analogous principle for the verified
+    target RESOURCES): lock the queue_resources rows of every live
+    retag target tag before ``_assert_registry_target`` proves the
+    exactly-one-ACTIVE-row contract, and hold them until the commit —
+    a concurrent deactivation/re-activation of the row can no longer
+    land between the validation and the retag writes. Rows are locked
+    in ascending id order across the (sorted) target tags."""
+    if not queue_tags:
+        return
+    _lock_rows_for_update(
+        conn, _SELECT_LOCK_REGISTRY_ROWS, {"queue_tags": queue_tags}
+    )
 
 
 def _ensure_procedures_registry_resource(conn) -> None:
@@ -1387,6 +1565,56 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
         )
 
     _assert_decision_pre_states(conn, surfaces)
+
+    # c48081f03 review P1: STABILIZE the verified target identities
+    # BEFORE the validations below — the row locks are held until the
+    # migration transaction commits (see _stabilize_assign_target_rows
+    # / _stabilize_registry_target_rows for the window being closed:
+    # deploy_restart.ps1 runs alembic while the old uvicorn still
+    # serves catalog writes, and a plain SELECT proof of the
+    # Doctor->User linkage never held the rows it verified).
+    assign_target_doctor_ids = sorted(
+        {
+            target_doctor_id
+            for (
+                _snapshot_id,
+                _code,
+                target_doctor_id,
+                _original_doctor_id,
+                _expected_user_id,
+                _snapshot_tag,
+                _set_requires_doctor,
+                _expected_requires_doctor,
+            ) in _ASSIGN_DOCTOR_DECISIONS
+            if targets[_code] is not None
+        }
+    )
+    assign_expected_user_ids = {
+        expected_user_id
+        for (
+            _snapshot_id,
+            _code,
+            _target_doctor_id,
+            _original_doctor_id,
+            expected_user_id,
+            _snapshot_tag,
+            _set_requires_doctor,
+            _expected_requires_doctor,
+        ) in _ASSIGN_DOCTOR_DECISIONS
+        if targets[_code] is not None and expected_user_id is not None
+    }
+    _stabilize_assign_target_rows(
+        conn, assign_target_doctor_ids, assign_expected_user_ids
+    )
+    retag_target_tags = sorted(
+        {
+            to_tag
+            for _snapshot_id, code, _from_tag, to_tag in _RETAG_DECISIONS
+            if targets[code] is not None
+        }
+    )
+    _stabilize_registry_target_rows(conn, retag_target_tags)
+
     for _snapshot_id, code, _from_tag, to_tag in _RETAG_DECISIONS:
         if targets[code] is not None:
             _assert_registry_target(conn, to_tag)
@@ -1748,6 +1976,13 @@ def upgrade_with_conn(conn) -> dict[str, int]:
     # operator or left by a manual repair).
     surfaces = _inventory_and_assert_coverage(conn)
     _assert_registry_seed_tag_coverage(conn)
+    # c48081f03 review P1: the seed-tag routing-conflict gate — BEFORE the
+    # resource is activated. An ACTIVE doctor-owned (or foreign-bound)
+    # queue on the tag would keep capturing new arrivals after the
+    # activation (tag-first routing returns the existing queue whatever
+    # its owner), so the cutover refuses instead of silently layering
+    # resource routing over the doctor's surface.
+    _assert_no_unresolved_seed_tag_queues(conn)
     # D-08 refinement (owner, 2026-09-15): the 16 procedure services
     # route through the ACTIVE QueueResource('procedures'). Idempotent,
     # guarded seed (absent -> INSERT with the 0059 defaults; ACTIVE

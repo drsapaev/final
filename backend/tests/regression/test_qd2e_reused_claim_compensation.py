@@ -233,7 +233,9 @@ def _create_cart_visit(session, world: dict) -> Visit:
     return visit
 
 
-def _make_failing_basket(session, world: dict, *, fail_tag: str):
+def _make_failing_basket(
+    session, world: dict, *, fail_tag: str
+):
     """The basket with the review's injected failure: processing of the
     SECOND direction performs a flush (persisting the first direction's
     binding of the pre-existing ticket) and then raises a non-SQL error
@@ -257,6 +259,37 @@ def _make_failing_basket(session, world: dict, *, fail_tag: str):
             # FIRST (reuse) direction before the failure strikes
             session.flush()
             raise RuntimeError(f"INJECTED non-SQL failure for {fail_tag}")
+        return original_materialize(prepared_assignment)
+
+    service._materialize_prepared_assignment = patched_materialize
+    return service
+
+
+def _make_failing_basket_before_flush(session, world: dict, *, fail_tag: str):
+    """The c48081f03 review P2 arm: the SECOND direction fails BEFORE any
+    flush follows the first direction's binding. The штатная SessionLocal
+    runs ``autoflush=False`` (app/db/session.py), so the reused ticket's
+    new ``visit_id`` is still IN MEMORY ONLY — the DB row keeps its
+    committed NULL, and a cleanup query BY visit_id cannot find the
+    entry no matter how it is filtered."""
+    from app.services.morning_assignment import MorningAssignmentService
+
+    real_morning_service = MorningAssignmentService(session)
+    service = RegistrarWizardQueueAssignmentService(
+        session,
+        assignment_service_factory=lambda db: real_morning_service,
+    )
+    original_materialize = service._materialize_prepared_assignment
+
+    def patched_materialize(prepared_assignment):
+        if (
+            prepared_assignment is not None
+            and prepared_assignment.create_handoff is not None
+            and fail_tag in prepared_assignment.create_handoff.queue_tag
+        ):
+            # deliberately NO flush: the binding stays in the session's
+            # dirty set, never persisted before the failure
+            raise RuntimeError(f"INJECTED pre-flush failure for {fail_tag}")
         return original_materialize(prepared_assignment)
 
     service._materialize_prepared_assignment = patched_materialize
@@ -387,6 +420,136 @@ class TestQD2EReusedClaimCompensation:
             == 0
         )
         # and no orphaned entry for the patient on the failed day at all
+        assert (
+            proof.query(OnlineQueueEntry)
+            .join(DailyQueue, DailyQueue.id == OnlineQueueEntry.queue_id)
+            .filter(
+                OnlineQueueEntry.patient_id == world["patient_id"],
+                DailyQueue.day == _DAY,
+            )
+            .count()
+            == 0
+        )
+        proof.close()
+
+    def test_committed_ticket_survives_pre_flush_failure_of_next_direction(
+        self, session_factory, clean_db
+    ):
+        """REGRESSION (the c48081f03 review P2, the before-flush arm): the
+        first direction reuses the committed ticket №7 and binds it IN
+        MEMORY (autoflush=False); the second direction fails BEFORE any
+        flush. The old cleanup queried BY visit_id — the DB still holds
+        visit_id NULL for the old ticket, the query returned NOTHING and
+        the ledger restore was never applied; the outer commit() then
+        PERSISTED the binding (the review measured visit_id=501 after
+        commit, cleanup found 0 rows). The basket returned assignments=[]
+        while the visit kept the ticket — and the NEXT registration of
+        the patient would hit the "already bound to another visit"
+        guard.
+
+        The restore must key off the LEDGER (by entry id), not off the
+        visit_id query result."""
+        setup = session_factory()
+        world = _prepare_world(setup)
+        entry_id, number = _create_committed_ticket(setup, world, number=7)
+        setup.close()
+
+        # the cart transaction
+        cart = session_factory()
+        visit = _create_cart_visit(cart, world)
+        visit_id = visit.id
+        basket = _make_failing_basket_before_flush(
+            cart, world, fail_tag=world["tag_b"]
+        )
+
+        queue_numbers = basket.assign_same_day_queue_numbers(
+            [visit], target_day=_DAY, source="desk"
+        )
+        # the cart endpoint commits the transaction regardless
+        cart.commit()
+
+        assert queue_numbers == {}
+        cart.close()
+
+        proof = session_factory()
+        row = proof.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.id == entry_id
+        ).one()
+        assert row.id == entry_id
+        assert row.number == number
+        assert row.queue_time == _PRESERVED_QUEUE_TIME
+        assert row.status == "waiting"
+        assert row.source == "online"
+        # the RESTORED pre-binding links — the in-memory binding must NOT
+        # survive the outer commit (the review's failing arm kept 501)
+        assert row.patient_id == world["patient_id"]
+        assert row.visit_id is None
+        committed_visit = proof.query(Visit).filter(Visit.id == visit_id).one()
+        assert committed_visit.status == "confirmed"
+        # not a single basket-created queue entry survived
+        assert (
+            proof.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.visit_id == visit_id)
+            .count()
+            == 0
+        )
+        proof.close()
+
+    def test_pending_created_entry_is_expunged_on_pre_flush_failure(
+        self, session_factory, clean_db
+    ):
+        """The created-entry twin of the before-flush arm: an entry the
+        basket CREATED but never flushed (the allocator staged the object
+        and failed before its flush) is PENDING in the session — the
+        visit_id query cannot see it either, and an unexpunged pending
+        object would be INSERTed by the outer commit. The compensating
+        cleanup must delete it from the session (no INSERT must ever
+        reach the DB)."""
+        setup = session_factory()
+        world = _prepare_world(setup)
+        setup.close()  # no committed ticket
+
+        cart = session_factory()
+        visit = _create_cart_visit(cart, world)
+        visit_id = visit.id
+
+        staged_entries: list[OnlineQueueEntry] = []
+
+        def staging_allocator(handoff):
+            """A broken allocator: stages the entry WITHOUT flushing and
+            raises — the failure point sits between the object
+            construction and its INSERT (the kwargs are the exact
+            prepare_wizard_queue_assignment handoff shape)."""
+            entry = OnlineQueueEntry(
+                queue_id=handoff.daily_queue.id,
+                patient_id=handoff.create_entry_kwargs.get("patient_id"),
+                patient_name=handoff.create_entry_kwargs.get("patient_name"),
+                number=1,
+                status="waiting",
+                source="desk",
+                visit_id=visit_id,
+            )
+            cart.add(entry)
+            staged_entries.append(entry)
+            raise RuntimeError("INJECTED allocator failure before flush")
+
+        basket = RegistrarWizardQueueAssignmentService(
+            cart, create_entry_allocator=staging_allocator
+        )
+
+        queue_numbers = basket.assign_same_day_queue_numbers(
+            [visit], target_day=_DAY, source="desk"
+        )
+        assert queue_numbers == {}
+        cart.commit()
+
+        proof = session_factory()
+        assert (
+            proof.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.visit_id == visit_id)
+            .count()
+            == 0
+        )
         assert (
             proof.query(OnlineQueueEntry)
             .join(DailyQueue, DailyQueue.id == OnlineQueueEntry.queue_id)
