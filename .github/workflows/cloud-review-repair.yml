@@ -5,7 +5,7 @@ on:
     branches: [cloud/review-repair-20260916]
     paths:
       - .github/workflows/cloud-review-repair.yml
-      - scripts/cloud_review_repair/**
+      - scripts/cloud_review_repair/config.json
 
 permissions:
   contents: read
@@ -15,10 +15,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  repair-intent:
+  configuration:
     if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/cloud/review-repair-20260916'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    outputs:
+      enabled: ${{ steps.config.outputs.enabled }}
+      kind: ${{ steps.config.outputs.kind }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - id: config
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+          path = Path('scripts/cloud_review_repair/config.json')
+          cfg = json.loads(path.read_text()) if path.exists() else {'enabled': False}
+          kind = cfg.get('kind', 'backend')
+          assert kind in {'backend', 'frontend', 'powershell'}
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              print('enabled=' + str(bool(cfg.get('enabled'))).lower(), file=f)
+              print('kind=' + kind, file=f)
+
+  repair:
+    needs: configuration
+    if: needs.configuration.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
     permissions:
       contents: write
     services:
@@ -42,13 +66,14 @@ jobs:
       DATABASE_URL: postgresql+psycopg://clinic:review_ci_only@127.0.0.1:5432/clinicdb
       ARQ_REDIS_URL: redis://127.0.0.1:6379/0
       TEST_IDEMPOTENCY_REDIS_URL: redis://127.0.0.1:6379/15
+      RQ09B_PG_ADMIN_URL: postgresql://clinic:review_ci_only@127.0.0.1:5432/postgres
+      TEST_REVIEW_PG_ADMIN_URL: postgresql://clinic:review_ci_only@127.0.0.1:5432/postgres
       ENV: dev
       TESTING: '1'
       CORS_DISABLE: '1'
       WS_DEV_ALLOW: '1'
       SENTRY_DSN: ''
       PYTHONUTF8: '1'
-      TARGET_BRANCH: fix/review-r19-intent-ownership
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -59,110 +84,36 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - name: Prepare fresh isolated product tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/evidence"
-          git fetch --depth=1 origin main
-          git worktree add --detach "$RUNNER_TEMP/product" FETCH_HEAD
-          cd "$RUNNER_TEMP/product"
-          git rev-parse HEAD | tee "$RUNNER_TEMP/evidence/base-sha.txt"
-          test -z "$(git status --porcelain)"
-          python - <<'PY'
-          import os
-          from pathlib import Path
-          src = Path(os.environ['GITHUB_WORKSPACE']) / 'scripts/cloud_review_repair/01-intent.patch'
-          patch = src.read_text().replace('\n diff --git ', '\ndiff --git ')
-          (Path(os.environ['RUNNER_TEMP']) / 'repair.patch').write_text(patch)
-          PY
-          git apply --check "$RUNNER_TEMP/repair.patch"
-      - name: Install backend test dependencies
+        run: python scripts/cloud_review_repair/runner.py prepare
+      - name: Install backend and regression-test dependencies
         working-directory: ${{ runner.temp }}/product/backend
         run: |
           python -m pip install -r requirements.txt
           python -m pip install pytest pytest-cov pytest-asyncio pytest-deadfixtures httpx ruff
-      - name: Verify execution boundaries with repository gate
-        shell: pwsh
-        working-directory: ${{ runner.temp }}/product
-        run: |
-          ./ai/langgraph/scripts/run_agent_gate.ps1 'Fix review 5701514498: backend/app/middleware/idempotency_middleware.py and backend/tests/unit/test_idempotency_distributed_claim.py only; atomic owner-checked intent, preserve RBAC and optional Redis degradation.' --known-root-cause backend/app/middleware/idempotency_middleware.py | Tee-Object -FilePath "$env:RUNNER_TEMP/evidence/gate.txt"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Apply tests first and demonstrate five behavioral failures
-        shell: bash
-        working-directory: ${{ runner.temp }}/product
-        run: |
-          set -euo pipefail
-          git apply --include='backend/tests/*' "$RUNNER_TEMP/repair.patch"
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('backend/tests/unit/test_idempotency_distributed_claim.py')
-          s = p.read_text()
-          old = '    def _harness_resolve(request, user_id, username, _ids={}):'
-          assert s.count(old) == 1
-          s = s.replace(old, '    subject_ids: dict[str, int] = {}\n\n    def _harness_resolve(request, user_id, username):')
-          old = '        return _ids.setdefault(username, 9000 + len(_ids) + 1)'
-          assert s.count(old) == 1
-          s = s.replace(old, '        return subject_ids.setdefault(username, 9000 + len(subject_ids) + 1)')
-          p.write_text(s)
-          PY
-          cd backend
-          alembic upgrade head > "$RUNNER_TEMP/evidence/migration.log" 2>&1
-          set +e
-          python -m pytest tests/unit/test_idempotency_distributed_claim.py -k 'r19 and not lost_reply' -o addopts='' --junitxml="$RUNNER_TEMP/evidence/red.xml" > "$RUNNER_TEMP/evidence/red.log" 2>&1
-          result=$?
-          set -e
-          cat "$RUNNER_TEMP/evidence/red.log"
-          test "$result" -eq 1
-          python - <<'PY'
-          import os
-          import xml.etree.ElementTree as ET
-          from pathlib import Path
-          tree = ET.parse(Path(os.environ['RUNNER_TEMP']) / 'evidence/red.xml')
-          cases = tree.findall('.//testcase')
-          assert len(cases) == 5, len(cases)
-          assert all(c.find('failure') is not None for c in cases)
-          assert not tree.findall('.//error')
-          assert not tree.findall('.//skipped')
-          print('RED confirmed: five assertion failures on the unmodified runtime')
-          PY
-      - name: Apply runtime fix and verify full affected suites
-        shell: bash
-        working-directory: ${{ runner.temp }}/product
-        run: |
-          set -euo pipefail
-          git apply --include='backend/app/*' "$RUNNER_TEMP/repair.patch"
-          cd backend
-          python -m pytest tests/unit/test_idempotency_distributed_claim.py tests/test_registrar_cart_atomicity.py -o addopts='' --junitxml="$RUNNER_TEMP/evidence/green.xml" 2>&1 | tee "$RUNNER_TEMP/evidence/green.log"
-          python -m ruff check app/middleware/idempotency_middleware.py tests/unit/test_idempotency_distributed_claim.py 2>&1 | tee "$RUNNER_TEMP/evidence/ruff.log"
-          cd ..
-          git diff --check
-          git diff --stat | tee "$RUNNER_TEMP/evidence/diffstat.txt"
-          git diff > "$RUNNER_TEMP/evidence/product.patch"
-          python - <<'PY'
-          import subprocess
-          paths = set(subprocess.check_output(['git','diff','--name-only'], text=True).splitlines())
-          assert paths == {'backend/app/middleware/idempotency_middleware.py', 'backend/tests/unit/test_idempotency_distributed_claim.py'}, paths
-          PY
+      - uses: actions/setup-node@v6
+        if: needs.configuration.outputs.kind == 'frontend'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        if: needs.configuration.outputs.kind == 'frontend'
+        working-directory: ${{ runner.temp }}/product/frontend
+        run: npm ci
+      - name: Install isolated browser
+        if: needs.configuration.outputs.kind == 'frontend'
+        working-directory: ${{ runner.temp }}/product/frontend
+        run: npx playwright install --with-deps chromium
+      - name: Fail-first repair, regression tests and exact scope proof
+        run: python scripts/cloud_review_repair/runner.py validate
       - name: Publish verified feature branch (never main)
-        shell: bash
-        working-directory: ${{ runner.temp }}/product
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          test "$TARGET_BRANCH" = 'fix/review-r19-intent-ownership'
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git switch -c "$TARGET_BRANCH"
-          git add backend/app/middleware/idempotency_middleware.py backend/tests/unit/test_idempotency_distributed_claim.py
-          git commit -m 'fix(idempotency): atomically bind execution intent to the current claim'
-          gh auth setup-git
-          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
-          git rev-parse HEAD | tee "$RUNNER_TEMP/evidence/commit-sha.txt"
+        run: python scripts/cloud_review_repair/runner.py publish
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: intent-repair-evidence
+          name: repair-evidence
           path: ${{ runner.temp }}/evidence/
           retention-days: 7
           if-no-files-found: error
