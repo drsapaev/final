@@ -281,3 +281,90 @@ describe('RQ-21.a — worklist "no matches" vs empty queue (S-18)', () => {
     expect(screen.queryByText(/rp_worklist_no_matches/)).toBeNull();
   });
 });
+
+// RQ-21.b (D-07 APPROVED): the worklist counters are SIGNED. Both counter
+// surfaces (the header meta line and the loading/status badge) render the
+// SAME composed descriptor from the SSOT module — unit word included,
+// narrowed scopes shown as «показано N из M», loaded pages never presented
+// as totals. Before the slice both surfaces printed
+// `${length} tabs_appointments` («3 Все записи») — a broken label that also
+// called aggregated PATIENTS «записи» on the all-departments view.
+describe('RQ-21.b — signed worklist counters', () => {
+  const tStub = (key: string) => key;
+
+  it('degraded fallback (no counter prop): specific tab rows render with the records unit key', () => {
+    render(
+      <WorklistView
+        {...baseProps}
+        activeTab="cardiology"
+        filteredAppointments={[{ id: '1' }, { id: '2' }, { id: '3' }] as Record<string, unknown>[]}
+        tI18n={tStub}
+      />,
+    );
+
+    // Both counter surfaces share the same descriptor → same signed string.
+    expect(screen.getAllByText(/3 registrarPanel\.rp_counter_records/).length).toBe(2);
+  });
+
+  it('degraded fallback: all-departments rows render with the PATIENTS unit key (units never mixed)', () => {
+    render(
+      <WorklistView
+        {...baseProps}
+        activeTab={null}
+        filteredAppointments={[{ id: '1' }, { id: '2' }] as Record<string, unknown>[]}
+        tI18n={tStub}
+      />,
+    );
+
+    expect(screen.getAllByText(/2 registrarPanel\.rp_counter_patients/).length).toBe(2);
+    expect(screen.queryByText(/tabs_appointments/)).toBeNull();
+  });
+
+  it('panel-provided narrowed descriptor renders the honest «показано N из M» composition', () => {
+    render(
+      <WorklistView
+        {...baseProps}
+        activeTab="cardiology"
+        filteredAppointments={[{ id: '1' }] as Record<string, unknown>[]}
+        counter={{
+          unit: 'records', count: 1, scopeCount: 3, narrowed: true, loadedPage: false,
+        }}
+        tI18n={tStub}
+      />,
+    );
+
+    // tStub drops options, so the composition is key-level: both surfaces
+    // render the shown_of head (the unit word rides inside its options).
+    expect(screen.getAllByText(/rp_counter_shown_of/).length).toBe(2);
+  });
+
+  it('loaded page (hasMore) renders the loaded-prefix key — a page is never the total', () => {
+    render(
+      <WorklistView
+        {...baseProps}
+        activeTab="cardiology"
+        filteredAppointments={[{ id: '1' }] as Record<string, unknown>[]}
+        paginationInfo={{ total: 99, hasMore: true, loadingMore: false }}
+        tI18n={tStub}
+      />,
+    );
+
+    expect(screen.getAllByText(/rp_counter_loaded/).length).toBe(2);
+  });
+
+  it('loading badge keeps the loading label; the header meta keeps its (pre-slice) counter line', () => {
+    render(
+      <WorklistView
+        {...baseProps}
+        activeTab="cardiology"
+        appointmentsLoading
+        tI18n={tStub}
+      />,
+    );
+
+    expect(screen.getByText(/registrarPanel\.loading/)).toBeInTheDocument();
+    // Preserved pre-slice behavior: the header meta line still carries the
+    // signed counter (now unit-correct) while the badge shows loading.
+    expect(screen.getAllByText(/rp_counter_records/).length).toBe(1);
+  });
+});

@@ -16,6 +16,8 @@ import type { Appointment } from '../../../types/domain/clinic';
 import {
   computeDepartmentStats,
   computeRegistrarWorklistRows,
+  describeRegistrarWorklistCounter,
+  formatRegistrarWorklistCounter,
   resolveRegistrarWorklistEmptyScopeKind,
   type QueueProfileItem,
 } from '../registrarWorklistRows';
@@ -348,5 +350,176 @@ describe('resolveRegistrarWorklistEmptyScopeKind (RQ-21.a)', () => {
       queueProfiles: profiles,
     });
     expect(kind).toBe('filtered-empty');
+  });
+});
+
+// RQ-21.b (D-07 APPROVED): the worklist counters are SIGNED — they name
+// their unit ('records' on a specific tab, 'patients' on the aggregated
+// all-departments view — the two row kinds must never share one label),
+// carry the honest scope (the loaded day+tab scope BEFORE status/search
+// narrowing), and never present a narrowed count as the whole scope
+// ("показано N из M") nor a loaded page as the total (loadedPage mirrors
+// paginationInfo.hasMore — the registrar/queues/today contract returns the
+// full day today, so the flag is structural honesty for future paging).
+describe('describeRegistrarWorklistCounter (RQ-21.b, D-07)', () => {
+  const profiles: QueueProfileItem[] = [{ key: 'cardio', queue_tags: ['cardiology', 'cardio-kb'] }];
+
+  it('specific tab: unit=records; scopeCount counts tag-matched entries BEFORE status/search narrowing', () => {
+    const appointments = asAppointments([
+      appt({ id: '1', queue_tag: 'cardiology', queue_time: '2026-08-29T08:00:00+05:00', patient_fio: 'Иванов Иван' }),
+      appt({ id: '2', queue_tag: 'cardio-kb', queue_time: '2026-08-29T08:30:00+05:00', patient_fio: 'Бета' }),
+      appt({ id: '3', queue_tag: 'lab', queue_time: '2026-08-29T07:00:00+05:00', patient_fio: 'Гамма' }),
+    ]);
+    const rows = computeRegistrarWorklistRows({
+      appointments, activeTab: 'cardio', statusFilter: null, searchQuery: 'иван',
+      queueProfiles: profiles, services: {}, fallbackPatientLabel: FALLBACK,
+    });
+    const d = describeRegistrarWorklistCounter({
+      appointments, activeTab: 'cardio', queueProfiles: profiles, rows, hasMore: false,
+    });
+    expect(d.unit).toBe('records');
+    expect(d.scopeCount).toBe(2); // both cardio entries are in the tab scope
+    expect(d.count).toBe(rows.length); // one source: the list under the counter
+    expect(d.narrowed).toBe(true); // search narrowed 2 → 1
+  });
+
+  it('all-departments view: unit=patients; scopeCount is the AGGREGATED patient count, not the record count', () => {
+    // S-18: one patient with several services/doctors is ONE patient row on
+    // the all-departments view — the counter must not call those «записи».
+    const appointments = asAppointments([
+      appt({ id: '1', queue_tag: 'cardiology', queue_time: '2026-08-29T08:00:00+05:00', patient_fio: 'Иванов Иван', patient_id: 100 }),
+      appt({ id: '2', queue_tag: 'lab', queue_time: '2026-08-29T08:30:00+05:00', patient_fio: 'Иванов Иван', patient_id: 100 }),
+      appt({ id: '3', queue_tag: 'lab', queue_time: '2026-08-29T09:00:00+05:00', patient_fio: 'Петров Пётр', patient_id: 200 }),
+    ]);
+    const rows = computeRegistrarWorklistRows({
+      appointments, activeTab: null, statusFilter: null, searchQuery: '',
+      queueProfiles: profiles, services: {}, fallbackPatientLabel: FALLBACK,
+    });
+    const d = describeRegistrarWorklistCounter({
+      appointments, activeTab: null, queueProfiles: profiles, rows, hasMore: false,
+    });
+    expect(d.unit).toBe('patients');
+    expect(d.scopeCount).toBe(2); // two patients from three records
+    expect(d.count).toBe(rows.length);
+    expect(d.narrowed).toBe(false);
+  });
+
+  it('no narrowing → narrowed=false even with a full scope; empty scope stays honest (0 of 0 is not narrowed)', () => {
+    const appointments = asAppointments([
+      appt({ id: '1', queue_tag: 'cardiology', queue_time: '2026-08-29T08:00:00+05:00' }),
+    ]);
+    const rows = computeRegistrarWorklistRows({
+      appointments, activeTab: 'cardio', statusFilter: null, searchQuery: '',
+      queueProfiles: profiles, services: {}, fallbackPatientLabel: FALLBACK,
+    });
+    const d = describeRegistrarWorklistCounter({
+      appointments, activeTab: 'cardio', queueProfiles: profiles, rows, hasMore: false,
+    });
+    expect(d.narrowed).toBe(false);
+    expect(d.count).toBe(d.scopeCount);
+
+    const empty = describeRegistrarWorklistCounter({
+      appointments: asAppointments([]), activeTab: 'cardio', queueProfiles: profiles,
+      rows: [], hasMore: false,
+    });
+    expect(empty.narrowed).toBe(false);
+    expect(empty.scopeCount).toBe(0);
+    expect(empty.count).toBe(0);
+  });
+
+  it('status filter narrows before aggregation on all-departments; narrowed reflects rows vs aggregated scope', () => {
+    const appointments = asAppointments([
+      appt({ id: '1', queue_tag: 'lab', queue_time: '2026-08-29T08:00:00+05:00', patient_fio: 'Иванов Иван', status: 'waiting' }),
+      appt({ id: '2', queue_tag: 'lab', queue_time: '2026-08-29T08:30:00+05:00', patient_fio: 'Петров Пётр', status: 'done' }),
+    ]);
+    const rows = computeRegistrarWorklistRows({
+      appointments, activeTab: null, statusFilter: 'done', searchQuery: '',
+      queueProfiles: profiles, services: {}, fallbackPatientLabel: FALLBACK,
+    });
+    const d = describeRegistrarWorklistCounter({
+      appointments, activeTab: null, queueProfiles: profiles, rows, hasMore: false,
+    });
+    expect(d.scopeCount).toBe(2); // scope ignores the status filter
+    expect(d.count).toBe(1);
+    expect(d.narrowed).toBe(true);
+  });
+
+  it('loadedPage mirrors hasMore (D-07: loaded rows must never be presented as the total)', () => {
+    const appointments = asAppointments([
+      appt({ id: '1', queue_tag: 'cardiology', queue_time: '2026-08-29T08:00:00+05:00' }),
+    ]);
+    const rows = computeRegistrarWorklistRows({
+      appointments, activeTab: 'cardio', statusFilter: null, searchQuery: '',
+      queueProfiles: profiles, services: {}, fallbackPatientLabel: FALLBACK,
+    });
+    expect(describeRegistrarWorklistCounter({
+      appointments, activeTab: 'cardio', queueProfiles: profiles, rows, hasMore: true,
+    }).loadedPage).toBe(true);
+    expect(describeRegistrarWorklistCounter({
+      appointments, activeTab: 'cardio', queueProfiles: profiles, rows, hasMore: false,
+    }).loadedPage).toBe(false);
+  });
+});
+
+describe('formatRegistrarWorklistCounter (RQ-21.b, D-07)', () => {
+  // Deterministic ru resolver mirroring the CLDR categories i18next resolves
+  // (Intl.PluralRules('ru'): one/few/many) over the REAL keys the formatter
+  // asks for — pins the composed grammar, not i18next itself.
+  const RU_UNITS: Record<string, [string, string, string]> = {
+    'registrarPanel.rp_counter_records': ['запись', 'записи', 'записей'],
+    'registrarPanel.rp_counter_patients': ['пациент', 'пациента', 'пациентов'],
+  };
+  const ruT = (key: string, options?: Record<string, unknown>): string => {
+    const unit = RU_UNITS[key];
+    if (unit && options && typeof options.count === 'number') {
+      const n = options.count;
+      if (n % 10 === 1 && n % 100 !== 11) return unit[0];
+      if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return unit[1];
+      return unit[2];
+    }
+    if (key === 'registrarPanel.rp_counter_shown_of') {
+      return `показано ${options?.shown} из ${options?.scope} ${options?.unit}`;
+    }
+    if (key === 'registrarPanel.rp_counter_loaded') return 'загружено:';
+    return key;
+  };
+
+  it('plain form: count + unit word in the correct ru plural form (1 запись / 3 записи / 5 записей / 0 записей)', () => {
+    const mk = (count: number) => ({
+      unit: 'records' as const, count, scopeCount: count, narrowed: false, loadedPage: false,
+    });
+    expect(formatRegistrarWorklistCounter(ruT, mk(1))).toBe('1 запись');
+    expect(formatRegistrarWorklistCounter(ruT, mk(3))).toBe('3 записи');
+    expect(formatRegistrarWorklistCounter(ruT, mk(5))).toBe('5 записей');
+    expect(formatRegistrarWorklistCounter(ruT, mk(0))).toBe('0 записей');
+  });
+
+  it('patients unit: 2 пациента / 5 пациентов — units never mixed across surfaces', () => {
+    const mk = (count: number) => ({
+      unit: 'patients' as const, count, scopeCount: count, narrowed: false, loadedPage: false,
+    });
+    expect(formatRegistrarWorklistCounter(ruT, mk(2))).toBe('2 пациента');
+    expect(formatRegistrarWorklistCounter(ruT, mk(5))).toBe('5 пациентов');
+  });
+
+  it('narrowed form: «показано N из M» with the unit word agreeing with the SCOPE number', () => {
+    expect(formatRegistrarWorklistCounter(ruT, {
+      unit: 'records', count: 1, scopeCount: 3, narrowed: true, loadedPage: false,
+    })).toBe('показано 1 из 3 записи');
+    expect(formatRegistrarWorklistCounter(ruT, {
+      unit: 'records', count: 1, scopeCount: 5, narrowed: true, loadedPage: false,
+    })).toBe('показано 1 из 5 записей');
+    expect(formatRegistrarWorklistCounter(ruT, {
+      unit: 'patients', count: 0, scopeCount: 2, narrowed: true, loadedPage: false,
+    })).toBe('показано 0 из 2 пациента');
+  });
+
+  it('loaded page: honest «загружено:» prefix instead of presenting a page as the total', () => {
+    expect(formatRegistrarWorklistCounter(ruT, {
+      unit: 'records', count: 50, scopeCount: 50, narrowed: false, loadedPage: true,
+    })).toBe('загружено: 50 записей');
+    expect(formatRegistrarWorklistCounter(ruT, {
+      unit: 'records', count: 3, scopeCount: 9, narrowed: true, loadedPage: true,
+    })).toBe('загружено: показано 3 из 9 записей');
   });
 });

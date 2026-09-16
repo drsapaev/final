@@ -19,6 +19,12 @@ import type { WorklistPaginationInfo } from '../useRegistrarWorklistData';
 // RQ-21.a: scope fact ('queue-empty' vs 'filtered-empty') resolved by the
 // presentation-only SSOT module; the view only picks the empty state.
 import type { RegistrarWorklistEmptyScopeKind } from '../registrarWorklistRows';
+// RQ-21.b (D-07): signed counters — one descriptor from the panel (same data
+// as the list) rendered through one formatter on BOTH counter surfaces.
+import {
+  formatRegistrarWorklistCounter,
+  type RegistrarWorklistCounterDescriptor,
+} from '../registrarWorklistRows';
 // RQ-19: the tabpanel labelledby must reference the REAL id of the tab
 // button selected in navigation/Tabs — both sides share tabButtonIdFor.
 import { tabButtonIdFor } from '../../../components/navigation/Tabs';
@@ -63,6 +69,12 @@ interface WorklistViewProps {
    *  renders the "no matches" state instead of the misleading empty-queue
    *  state. Default 'queue-empty' keeps the genuine QW-04 state. */
   emptyScopeKind?: RegistrarWorklistEmptyScopeKind;
+  /** RQ-21.b (D-07): signed-counter descriptor computed by the panel from
+   *  the same data as the list (unit records vs patients, honest scope,
+   *  narrowed «N из M», loadedPage≠total). Optional for compat: without it
+   *  the view degrades to a rows-count descriptor with the unit still
+   *  derived from the active view kind (never the old unsigned label). */
+  counter?: RegistrarWorklistCounterDescriptor;
   tI18n: (key: string, options?: Record<string, unknown>) => string;
 }
 
@@ -90,8 +102,22 @@ const WorklistView = ({
   onRetry,
   // RQ-21.a: default keeps the pre-slice behavior (genuine empty-queue state).
   emptyScopeKind = 'queue-empty',
+  counter,
   tI18n,
-}: WorklistViewProps) => (
+}: WorklistViewProps) => {
+  // RQ-21.b degraded fallback (out-of-panel consumers / tests): without the
+  // panel descriptor the unit STILL follows the row kind (patients on the
+  // aggregated all-departments view, records on a specific tab) and the
+  // pagination flag stays honest — only the scope denominator is unknown,
+  // so no «N из M» claim is made (narrowed=false, scope=count).
+  const effectiveCounter: RegistrarWorklistCounterDescriptor = counter ?? {
+    unit: activeTab ? 'records' : 'patients',
+    count: filteredAppointments.length,
+    scopeCount: filteredAppointments.length,
+    narrowed: false,
+    loadedPage: paginationInfo.hasMore,
+  };
+  return (
   <div
     id="main-content"
     role="tabpanel"
@@ -122,7 +148,7 @@ const WorklistView = ({
             // PR-13: use formatRegistrarDate to avoid browser-local timezone issues
             // historyDate is YYYY-MM-DD (Tashkent), parse as Tashkent midnight
             formatRegistrarDate(`${historyDate}T00:00:00+05:00`, language?.startsWith('ru') ? 'ru-RU' : 'uz-UZ') :
-            tI18n('registrarPanel.today')} · {filteredAppointments.length} {tI18n('registrarPanel.tabs_appointments')}
+            tI18n('registrarPanel.today')} · {formatRegistrarWorklistCounter(tI18n, effectiveCounter)}
           </p>
         </div>
 
@@ -148,7 +174,7 @@ const WorklistView = ({
             </Badge>
           }
           <Badge variant={appointmentsLoading ? 'info' : 'secondary'}>
-            {appointmentsLoading ? tI18n('registrarPanel.loading') : `${filteredAppointments.length} ${tI18n('registrarPanel.tabs_appointments')}`}
+            {appointmentsLoading ? tI18n('registrarPanel.loading') : formatRegistrarWorklistCounter(tI18n, effectiveCounter)}
           </Badge>
           <Button
           variant="primary"
@@ -298,6 +324,7 @@ const WorklistView = ({
       {/* Старая таблица и прежняя конфигурация удалены - используется EnhancedAppointmentsTable */}
     </div>
   </div>
-);
+  );
+};
 
 export default WorklistView;

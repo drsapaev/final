@@ -1532,3 +1532,125 @@ def test_replay_rechecks_resource_authorization_for_same_role(monkeypatch):
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
         idem_module._resolve_principal_id_sync = saved_resolve
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Codex R16 #3092 (P1): eager lease renewal + atomic ownership re-verify
+# before execution. The claim used to be renewed only just before call_next,
+# so the PRE-EXECUTION phase (DB authorization, intent checks, distributed
+# SET) could legally outlive the 90 s lease (connection-pool wait, Redis
+# latency). A lapse in that window let another worker acquire the key and
+# execute the same cart while this worker proceeded on stale checks.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_lease_renewal_starts_during_preexecution_phase(two_workers, monkeypatch):
+    """Eager renewal: the loop must renew WHILE the pre-execution phase
+    (DB authorization) is still running, not only around call_next.
+
+    lease_seconds=1 → loop interval = max(1.0, 0.5) = 1.0 s. The stubbed
+    authorization sleeps 1.5 s, so with the eager start the first renewal
+    lands at ~1.0 s (BEFORE auth_end ≈ 1.5 s). With the old placement the
+    renewal task was created only after authorization — its first renewal
+    could never precede auth_end."""
+    import asyncio
+    import time
+
+    from starlette.responses import Response as _UnusedResponse  # noqa: F401
+
+    client1, _client2, counters, fake = two_workers
+    claim = idem_module._distributed_claim
+    claim._lease_seconds = 1
+
+    events: list[tuple[str, float]] = []
+    t0 = time.monotonic()
+    orig_eval = FakeRedis.eval
+
+    def rec_eval(self, script, numkeys, key, *args):
+        if "expire" in script:
+            events.append(("renew", time.monotonic() - t0))
+        return orig_eval(self, script, numkeys, key, *args)
+
+    monkeypatch.setattr(FakeRedis, "eval", rec_eval)
+
+    orig_auth = IdempotencyMiddleware._principal_authorized
+
+    async def slow_auth(self, request, payload, **kw):
+        events.append(("auth_start", time.monotonic() - t0))
+        try:
+            await asyncio.sleep(1.5)
+            return await orig_auth(self, request, payload, **kw)
+        finally:
+            events.append(("auth_end", time.monotonic() - t0))
+
+    monkeypatch.setattr(IdempotencyMiddleware, "_principal_authorized", slow_auth)
+
+    r = client1.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": "r16-eager"})
+    assert r.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    auth_end = max(t for name, t in events if name == "auth_end")
+    renews = [t for name, t in events if name == "renew"]
+    assert renews, "the renewal loop must run at least once"
+    assert any(t < auth_end for t in renews), (
+        "lease renewal must start during the pre-execution phase (eager after "
+        f"acquisition), not only around call_next: renews={renews}, auth_end={auth_end:.2f}"
+    )
+
+
+def test_ownership_lost_before_execution_refuses_409_not_duplicate(two_workers, monkeypatch):
+    """Lease lapsed during pre-execution and ANOTHER worker re-acquired the
+    key → this worker must NOT execute: CAS re-verify fails → 409 in-flight,
+    handler untouched. The old code executed anyway (duplicate cart)."""
+    client1, _client2, counters, fake = two_workers
+    claim = idem_module._distributed_claim
+    key = "r16-stolen"
+
+    orig_intent = claim.execution_intent_exists
+
+    def steal(user_id, k):
+        # Second worker won the expired claim: the stored token is no longer
+        # ours — the CAS renew below must detect the loss.
+        fake.store[nkey("1", key, "claim")] = "foreign-token"
+        return orig_intent(user_id, k)
+
+    monkeypatch.setattr(claim, "execution_intent_exists", steal)
+
+    r = client1.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": key})
+    assert r.status_code == 409, r.text
+    assert r.json()["code"] == "idempotency_in_flight"
+    assert counters["w1"]["calls"] == 0, "executing without ownership duplicates the write"
+
+
+def test_ownership_lost_replays_outcome_stored_by_new_owner(two_workers, monkeypatch):
+    """Lease lapsed, the new owner already executed and STORED the outcome →
+    this worker must replay the stored response instead of executing again."""
+    import json as _json
+
+    from starlette.responses import Response as StarletteResponse
+
+    from app.middleware.idempotency_middleware import payload_hash
+
+    client1, _client2, counters, fake = two_workers
+    claim = idem_module._distributed_claim
+    key = "r16-replay-after-lapse"
+
+    orig_intent = claim.execution_intent_exists
+
+    def steal_and_store(user_id, k):
+        fake.store[nkey("1", key, "claim")] = "foreign-token"
+        claim.store_response(
+            user_id,
+            k,
+            StarletteResponse(content=_json.dumps({"done": True}), status_code=200, media_type="application/json"),
+            payload_hash=payload_hash(b""),
+            principal_role="Registrar",
+        )
+        return orig_intent(user_id, k)
+
+    monkeypatch.setattr(claim, "execution_intent_exists", steal_and_store)
+
+    r = client1.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": key})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"done": True}, "must replay the outcome stored by the new owner"
+    assert counters["w1"]["calls"] == 0, "the handler must not run a second time"
