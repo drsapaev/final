@@ -13,11 +13,12 @@
     {"cwd": "backend", "argv": ["python", "-m", "pytest", "tests/unit/test_idempotency_distributed_claim.py", "tests/test_registrar_cart_atomicity.py", "-o", "addopts="]}
   ],
   "red": {
-    "argv": ["python", "-m", "pytest", "-c", "/dev/null", "scripts/tests/test_deploy_migration_order.py", "--junitxml=$EVIDENCE/red.xml"],
+    "argv": ["python", "-m", "pytest", "-c", "/dev/null", "-p", "no:cacheprovider", "scripts/tests/test_deploy_migration_order.py", "--junitxml=$EVIDENCE/red.xml"],
     "failures": 4
   },
   "green": [
-    {"argv": ["python", "-m", "pytest", "-c", "/dev/null", "scripts/tests/test_deploy_migration_order.py", "--junitxml=$EVIDENCE/green.xml"]},
+    {"argv": ["python", "-c", "from pathlib import Path; p=Path('scripts/tests/test_deploy_migration_order.py'); s=p.read_text(); old='env=env, capture_output=True, text=True, timeout=30,'; assert s.count(old)==1; p.write_text(s.replace(old, old+' check=False,'))"]},
+    {"argv": ["python", "-m", "pytest", "-c", "/dev/null", "-p", "no:cacheprovider", "scripts/tests/test_deploy_migration_order.py", "--junitxml=$EVIDENCE/green.xml"]},
     {"argv": ["python", "-m", "ruff", "check", "--isolated", "scripts/tests/test_deploy_migration_order.py"]}
   ]
 }
