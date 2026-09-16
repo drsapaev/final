@@ -8853,6 +8853,32 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/queue/settings/effective": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Effective Queue Settings
+         * @description RQ-23.a (D-06 APPROVED, S-20): отчёт эффективных настроек очереди.
+         *
+         *     Read-only вычисление над существующими строками: каждый управляемый
+         *     параметр получает источник (клиника → отделение → владелец → снимок
+         *     дня), флаг «живое/не применяется» и время применения. Фронтенд
+         *     отображает результат и источник уровня (D-06); поведение очередей
+         *     отчёт не меняет.
+         */
+        get: operations["get_effective_queue_settings_api_v1_admin_queue_settings_effective_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/queue/test": {
         parameters: {
             query?: never;
@@ -54139,6 +54165,40 @@ export interface operations {
                 "application/json": components["schemas"]["QueueSettingsUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_effective_queue_settings_api_v1_admin_queue_settings_effective_get: {
+        parameters: {
+            query?: {
+                department_id?: number | null;
+                tag?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

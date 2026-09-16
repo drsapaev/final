@@ -25161,6 +25161,79 @@
         ]
       }
     },
+    "/api/v1/admin/queue/settings/effective": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Effective Queue Settings",
+        "description": "RQ-23.a (D-06 APPROVED, S-20): отчёт эффективных настроек очереди.\n\nRead-only вычисление над существующими строками: каждый управляемый\nпараметр получает источник (клиника → отделение → владелец → снимок\nдня), флаг «живое/не применяется» и время применения. Фронтенд\nотображает результат и источник уровня (D-06); поведение очередей\nотчёт не меняет.",
+        "operationId": "get_effective_queue_settings_api_v1_admin_queue_settings_effective_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "department_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Id"
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tag"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Effective Queue Settings Api V1 Admin Queue Settings Effective Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/queue/test": {
       "post": {
         "tags": [
