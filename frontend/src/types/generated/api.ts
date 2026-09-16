@@ -28749,6 +28749,11 @@ export type components = {
              * @description Список ID специалистов (для общего QR)
              */
             specialist_ids?: number[] | null;
+            /**
+             * Specialist Entity Types
+             * @description Типы сущностей specialist_ids, выровненные по индексам ('doctor' | 'profile'); тип выбора передаётся явно (D-01), тип сущности не определяется по совпадению числового ID
+             */
+            specialist_entity_types?: string[] | null;
         };
         /**
          * JoinSessionCompleteResponse
