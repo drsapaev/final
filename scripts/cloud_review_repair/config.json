@@ -1,24 +1,25 @@
 {
   "enabled": true,
-  "kind": "powershell",
-  "branch": "fix/review-migration-quiescence",
+  "kind": "backend",
+  "branch": "fix/review-profile-lifecycle",
   "source_ref": "main",
-  "task": "scripts/cloud_review_repair/tasks/deploy_order.py",
-  "root_cause": "scripts/deploy_restart.ps1",
-  "question": "Correct production restart ordering for queue cutover safety; modify scripts/deploy_restart.ps1 and scripts/tests/test_deploy_migration_order.py only. Stop managed runtime before migrations, preserve revision 0066, and test all host operations through mocks; no production execution.",
-  "allowed_paths": ["scripts/deploy_restart.ps1", "scripts/tests/test_deploy_migration_order.py"],
-  "commit_message": "fix(deploy): quiesce the managed runtime before database migrations",
+  "task": "scripts/cloud_review_repair/tasks/profile_lifecycle.py",
+  "root_cause": "backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py",
+  "question": "Fix production queue profile lifecycle findings 5701669474 and 5701675073: modify backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py and backend/tests/test_review_profile_lifecycle.py only. Distinguish archived profiles from missing configuration and count actual profile-key queue usage; preserve configured tags and patient history.",
+  "allowed_paths": ["backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py", "backend/tests/test_review_profile_lifecycle.py"],
+  "commit_message": "fix(queue): preserve intentional profile visibility and count key-routed usage",
   "post_merge_checks": [
-    {"cwd": "backend", "argv": ["python", "-m", "alembic", "upgrade", "head"]},
-    {"cwd": "backend", "argv": ["python", "-m", "pytest", "tests/unit/test_idempotency_distributed_claim.py", "tests/test_registrar_cart_atomicity.py", "-o", "addopts="]}
+    {"argv": ["python", "-m", "pytest", "-c", "/dev/null", "-p", "no:cacheprovider", "scripts/tests/test_deploy_migration_order.py"]}
   ],
   "red": {
-    "argv": ["python", "-m", "pytest", "-c", "/dev/null", "-p", "no:cacheprovider", "scripts/tests/test_deploy_migration_order.py", "--junitxml=$EVIDENCE/red.xml"],
-    "failures": 4
+    "cwd": "backend",
+    "argv": ["python", "-m", "pytest", "tests/test_review_profile_lifecycle.py", "-o", "addopts=", "--junitxml=$EVIDENCE/red.xml"],
+    "failures": 7
   },
   "green": [
-    {"argv": ["python", "-c", "from pathlib import Path; p=Path('scripts/tests/test_deploy_migration_order.py'); s=p.read_text(); old='env=env, capture_output=True, text=True, timeout=30,'; assert s.count(old)==1; p.write_text(s.replace(old, old+' check=False,'))"]},
-    {"argv": ["python", "-m", "pytest", "-c", "/dev/null", "-p", "no:cacheprovider", "scripts/tests/test_deploy_migration_order.py", "--junitxml=$EVIDENCE/green.xml"]},
-    {"argv": ["python", "-m", "ruff", "check", "--isolated", "scripts/tests/test_deploy_migration_order.py"]}
+    {"cwd": "backend", "argv": ["python", "-m", "ruff", "check", "--fix", "tests/test_review_profile_lifecycle.py"]},
+    {"cwd": "backend", "argv": ["python", "-m", "ruff", "format", "tests/test_review_profile_lifecycle.py"]},
+    {"cwd": "backend", "argv": ["python", "-m", "pytest", "tests/test_review_profile_lifecycle.py", "tests/unit/test_codex_lifecycle_regressions.py", "tests/integration/test_admin_departments_icon_null.py", "tests/integration/test_admin_departments_overview_route.py", "tests/unit/test_specialty_canonicalization.py", "-o", "addopts=", "--junitxml=$EVIDENCE/green.xml"]},
+    {"cwd": "backend", "argv": ["python", "-m", "ruff", "check", "app/api/v1/endpoints/registrar_integration/_queue_profiles.py", "tests/test_review_profile_lifecycle.py"]}
   ]
 }
