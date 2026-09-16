@@ -93,6 +93,18 @@ jobs:
         run: |
           set -euo pipefail
           git apply --include='backend/tests/*' "$RUNNER_TEMP/repair.patch"
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('backend/tests/unit/test_idempotency_distributed_claim.py')
+          s = p.read_text()
+          old = '    def _harness_resolve(request, user_id, username, _ids={}):'
+          assert s.count(old) == 1
+          s = s.replace(old, '    subject_ids: dict[str, int] = {}\n\n    def _harness_resolve(request, user_id, username):')
+          old = '        return _ids.setdefault(username, 9000 + len(_ids) + 1)'
+          assert s.count(old) == 1
+          s = s.replace(old, '        return subject_ids.setdefault(username, 9000 + len(subject_ids) + 1)')
+          p.write_text(s)
+          PY
           cd backend
           alembic upgrade head > "$RUNNER_TEMP/evidence/migration.log" 2>&1
           set +e
