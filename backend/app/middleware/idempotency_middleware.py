@@ -99,6 +99,14 @@ _LEASE_RELEASE_LUA = (
     "if redis.call('get', KEYS[1]) == ARGV[1] then "
     "return redis.call('del', KEYS[1]) else return 0 end"
 )
+# Махмудбек R18 #3277 (P2): compare-and-delete для intent-маркера. Значением
+# маркера является токен попытки-владельца (mark_execution_intent), поэтому
+# отказная попытка может убрать СОБСТВЕННЫЙ маркер и только его: маркер другой
+# попытки с неизвестным исходом (защита R9) не задевается.
+_INTENT_RELEASE_LUA = (
+    "if redis.call('get', KEYS[1]) == ARGV[1] then "
+    "return redis.call('del', KEYS[1]) else return 0 end"
+)
 
 
 def redact_redis_url(url: str) -> str:
@@ -716,7 +724,7 @@ class DistributedIdempotencyClaim:
     def _intent_key(user_id: int | str, key: str) -> str:
         return f"idem:{user_id}:{key}:intent"
 
-    def mark_execution_intent(self, user_id: int | str, key: str) -> bool:
+    def mark_execution_intent(self, user_id: int | str, key: str, owner_token: str | None = None) -> bool:
         """Durable marker: 'this key reached execution'.
 
         Codex R15 #3092 (P1): returns True iff the DISTRIBUTED marker write
@@ -724,6 +732,12 @@ class DistributedIdempotencyClaim:
         as refusal (503) — a silently-missing marker let a lost-response
         retry re-execute the write after the lease expired. The local mirror
         is always written as a belt-and-suspenders fallback for THIS worker.
+
+        Махмудбек R18 #3277 (P2): the marker VALUE carries the attempt's
+        owner token (fallback "1" keeps token-less callers working), so a
+        refused attempt can purge its OWN marker with a compare-and-delete
+        (clear_execution_intent_if_owner). Existence checks stay
+        value-agnostic (EXISTS).
         """
         confirmed = False
         if self._ensure_available() and self._client is not None:
@@ -731,7 +745,7 @@ class DistributedIdempotencyClaim:
                 self._run(
                     self._client.set,
                     self._intent_key(user_id, key),
-                    "1",
+                    owner_token or "1",
                     ex=self._ttl,
                 )
             )
@@ -747,6 +761,37 @@ class DistributedIdempotencyClaim:
         if self._ensure_available() and self._client is not None:
             self._run(self._client.delete, self._intent_key(user_id, key))
         _clear_local_execution_intent(user_id, key)
+
+    def clear_execution_intent_if_owner(self, user_id: int | str, key: str, owner_token: str) -> bool:
+        """Махмудбек R18 #3277 (P2): delete the intent marker ONLY if it was
+        written by the attempt owning ``owner_token`` (compare-and-delete).
+
+        A refused (503) attempt whose marker SET reported failure must be
+        able to purge a marker that may have LANDED despite the failure —
+        otherwise a false ``idempotency_uncertain_outcome`` blocks the retry
+        after Redis recovery for an operation that provably never executed.
+        The owner binding guarantees a marker from ANOTHER attempt (the R9
+        unknown-outcome protection) is never deleted. Best-effort by
+        contract: the direct client call (bypassing the ``_run`` cooldown)
+        gives the cleanup a chance right after the failed SET, while
+        ``_ensure_available`` is still in its reconnect cooldown. A cleanup
+        that loses the race against a late-landing SET degrades to the
+        conservative 409 reconcile — never to a duplicate execution.
+        """
+        if self._client is None or not owner_token:
+            return False
+        try:
+            return bool(
+                self._client.eval(
+                    _INTENT_RELEASE_LUA,
+                    1,
+                    self._intent_key(user_id, key),
+                    owner_token,
+                )
+            )
+        except Exception as exc:
+            logger.warning("Idempotency intent owner-cleanup failed: %s", exc)
+            return False
 
     def execution_intent_exists(self, user_id: int | str, key: str) -> bool:
         if self._ensure_available() and self._client is not None:
@@ -1089,6 +1134,72 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     media_type="application/json",
                 )
 
+            # Махмудбек R18 #3277 (P1): успешный захват claim НЕ гарантирует,
+            # что операция ещё не исполнена. Между нашим ПЕРВЫМ load_response()
+            # и этим acquire() другой воркер мог завершить тот же ключ:
+            # записать response, ОСВОБОДИТЬ claim и очистить intent — наш
+            # SET NX тогда успешно берёт ОСВОБОДИВШИЙСЯ ключ, intent-проверка
+            # ниже ничего не находит, CAS-продление подтверждает владение
+            # НОВЫМ claim — и хендлер исполняет запись ВТОРОЙ раз (дубликаты
+            # визитов/счетов/очереди). Ветка post-inflight выше перепроверяет
+            # исход только при ОТКАЗЕ acquire; ветка УСПЕХА обязана
+            # перепроверить тоже. Здесь не нужно ни падение Redis, ни истечение
+            # lease, ни отмена запроса — достаточно межпроцессного
+            # чередования между отдельными командами чтения и захвата.
+            # Сохранённый исход возвращается по тому же replay-контракту,
+            # что и все остальные replay-ветки: привязка payload, АКТУАЛЬНАЯ
+            # авторизация принципала с ресурсной проверкой активного профиля
+            # Doctor (R15/R17), политика роли эндпоинта (R6). Только что
+            # захваченный claim освобождается СВОИМ токеном
+            # (compare-and-delete): claim, перезахваченный другим воркером
+            # за время await, не задевается.
+            replayed, stored_hash, stored_role = claim.load_response(user_id, idempotency_key)
+            if replayed is not None:
+                if stored_hash and stored_hash != incoming_hash:
+                    claim.release(user_id, idempotency_key, claim_token)
+                    return self._payload_mismatch_response()
+                authorized, current_role, current_superuser = await self._principal_authorized(
+                    request, principal_payload, require_active_doctor_profile=True
+                )
+                if not authorized:
+                    logger.warning(
+                        "Idempotency post-acquire replay refused (principal not authorized): user=%s key=%s path=%s",
+                        user_id, idempotency_key, request.url.path,
+                    )
+                    # Codex R8 #3092 (P1): неисполняющий отказ, снапшот хранится.
+                    claim.release(user_id, idempotency_key, claim_token)
+                    return _principal_refusal_response()
+                permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
+                if permitted is True or (
+                    permitted is None and (stored_role is None or current_role == stored_role)
+                ):
+                    logger.info(
+                        "Idempotency distributed replay (post-acquire): user=%s key=%s path=%s",
+                        user_id, idempotency_key, request.url.path,
+                    )
+                    claim.release(user_id, idempotency_key, claim_token)
+                    return replayed
+                if permitted is False:
+                    # Политика эндпоинта отказывает текущей роли — require_roles
+                    # внутри call_next даст штатный 403 + аудит, снапшот
+                    # ХРАНИТСЯ (тот же контракт, что и в ветках выше).
+                    logger.warning(
+                        "Idempotency post-acquire replay refused (endpoint policy): user=%s key=%s path=%s (stored=%s current=%s)",
+                        user_id, idempotency_key, request.url.path, stored_role, current_role,
+                    )
+                    claim.release(user_id, idempotency_key, claim_token)
+                    return await call_next(request)
+                # permitted is None (политика неизвестна) И метка роли
+                # сменилась: консервативный R4 — эвикт устаревшей привязки и
+                # ИСПОЛНЕНИЕ под НАШИМ claim (владение уже захвачено), исход
+                # перезапишется с актуальной ролью — далее штатный путь.
+                logger.warning(
+                    "Idempotency post-acquire replay refused (role changed since execution, policy unknown): user=%s key=%s path=%s (%s -> %s) — re-executing",
+                    user_id, idempotency_key, request.url.path, stored_role, current_role,
+                )
+                claim.forget_response(user_id, idempotency_key)
+                _idempotency_cache.invalidate(user_id, idempotency_key)
+
         # Codex R16 #3092 (P1): lease renewal starts IMMEDIATELY after the
         # claim is acquired — not just before call_next. The pre-execution
         # phase below (DB authorization, intent checks, distributed SET) can
@@ -1284,7 +1395,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # только локально, второй воркер его не видит, и потерянный ответ
                 # после истечения lease приводил к повторному исполнению записи
                 # (дубликаты визитов/счетов/очереди).
-                intent_confirmed = claim.mark_execution_intent(user_id, idempotency_key)
+                intent_confirmed = claim.mark_execution_intent(
+                    user_id,
+                    idempotency_key,
+                    owner_token=claim_token if (claim_acquired and claim_token is not None) else None,
+                )
                 if claim.required and not intent_confirmed:
                     logger.warning(
                         "Idempotency execution intent NOT confirmed in distributed store: "
@@ -1293,6 +1408,30 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     )
                     if claim_acquired and claim_token is not None:
                         claim.release(user_id, idempotency_key, claim_token)
+                    # Махмудбек R18 #3277 (P2): intent НЕ подтверждён, хендлер
+                    # не запускался — попытка обязана убрать СОБСТВЕННЫЕ
+                    # маркеры. Безусловно записанный mark_execution_intent
+                    # локальный mirror переживал отказ: восстановление Redis
+                    # и истечение lease давали повтору ложный 409
+                    # idempotency_uncertain_outcome для операции, которая
+                    # заведомо НЕ дошла до исполнения — recovery-тупик,
+                    # требующий ручной сверки/смены ключа. Очистка
+                    # распределённого маркера привязана к токену попытки:
+                    # confirmed=False не отличает «не записан» от «записан,
+                    # но ответ потерян», поэтому ключ, дозаписавшийся despite
+                    # отказа, удаляется только если в нём токен ЭТОЙ попытки.
+                    # Чужой маркер (предыдущая попытка с неизвестным исходом)
+                    # не задевается — до его защиты попытка не доходит:
+                    # uncertain-проверка выше отсеивает. Остаточный риск —
+                    # маркер, дозаписавшийся ПОСЛЕ очистки: повтор получит
+                    # консервативный 409 reconcile, никогда не дубль.
+                    if claim_acquired and claim_token is not None:
+                        claim.clear_execution_intent_if_owner(user_id, idempotency_key, claim_token)
+                    # Локальный mirror можно снять безусловно: reaching mark
+                    # означает, что uncertain-проверка выше НЕ нашла ни
+                    # распределённого, ни локального маркера — значит
+                    # локальная запись создана именно ЭТОЙ попыткой.
+                    _clear_local_execution_intent(user_id, idempotency_key)
                     _cancel_lease()
                     return Response(
                         status_code=503,

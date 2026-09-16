@@ -1894,3 +1894,183 @@ def test_cancellation_during_preexecution_authorization_stops_lease_renewals(two
         assert counters["w1"]["calls"] == 0
 
     asyncio.run(scenario())
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Махмудбек R18 #3277: два остаточных дефекта middleware, существовавшие ДО
+# #3277 и сохранявшиеся в main. P1 — успешный захват claim после устаревшего
+# чтения допускал повторное исполнение; P2 — отказ записи intent оставлял
+# ложный локальный маркер и блокировал восстановительный повтор.
+
+
+def test_post_acquire_replay_when_response_lands_between_read_and_acquire(two_workers, monkeypatch):
+    """Махмудбек R18 #3277 (P1): воркер B завершает запрос строго между
+    первым load_response() воркера A и его успешным acquire() — A возвращает
+    сохранённый исход, суммарное число исполнений остаётся равным ОДНОМУ.
+
+    Прежний порядок перепроверял результат только при ОТКАЗЕ acquire
+    (ветка post-inflight); при УСПЕШНОМ захвате код шёл к исполнению, не
+    проверяя, что другой воркер уже сохранил ответ, освободил claim и
+    очистил intent: наш SET NX брал освобождённый ключ, intent-проверка
+    не находила ничего, CAS-продление подтверждало владение НОВЫМ claim —
+    и хендлер исполнял запись второй раз (дубликаты визитов/счетов)."""
+    client1, client2, counters, fake_redis = two_workers
+    claim = idem_module._distributed_claim
+    ns = idem_module.IdempotencyMiddleware._namespace(1)
+    key = "r18-postacquire-replay"
+
+    # Хук на уровне Redis (техника _plant_lapse): ПЕРВОЕ чтение воркера A
+    # возвращает None (B ещё не завершился), и в этот момент B завершается —
+    # сохраняет исход и освобождает claim.
+    original_load = claim.load_response
+    seen = {"first": True}
+
+    def _load_with_b_finishing(*args, **kwargs):
+        result = original_load(*args, **kwargs)
+        if seen["first"]:
+            seen["first"] = False
+            from fastapi import Response as FastAPIResponse
+
+            claim.store_response(
+                ns,
+                key,
+                FastAPIResponse(content=b'{"ok": true, "calls": 1}', status_code=200),
+                payload_hash=idem_module.payload_hash(b""),
+                principal_role="Registrar",
+            )
+        return result
+
+    monkeypatch.setattr(claim, "load_response", _load_with_b_finishing)
+
+    second = client2.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": key})
+    assert second.status_code == 200, second.text
+    assert second.json() == {"ok": True, "calls": 1}, (
+        "the outcome stored by the finished first attempt must be replayed"
+    )
+    assert counters["w2"]["calls"] == 0, (
+        "a SUCCESSFUL acquire must re-check the stored outcome: the operation "
+        "already completed, re-executing it duplicates visits/invoices/queue"
+    )
+    # Claim, захваченный для этой попытки, освобождён своим токеном —
+    # повтор с тем же ключом не должен ждать истечения lease.
+    assert nkey("1", key, "claim") not in fake_redis.store
+
+
+def test_post_acquire_payload_mismatch_returns_409_not_second_execution(two_workers, monkeypatch):
+    """Махмудбек R18 #3277 (P1, вариант с другим payload): в том же окне
+    между чтением и захватом чужой исход сохранён под ДРУГИМ payload —
+    повтор обязан получить 409 idempotency_payload_mismatch, а не второе
+    исполнение с чужим (или своим повторным) ответом."""
+    client1, client2, counters, fake_redis = two_workers
+    claim = idem_module._distributed_claim
+    ns = idem_module.IdempotencyMiddleware._namespace(1)
+    key = "r18-postacquire-mismatch"
+
+    original_load = claim.load_response
+    seen = {"first": True}
+
+    def _load_with_foreign_payload(*args, **kwargs):
+        result = original_load(*args, **kwargs)
+        if seen["first"]:
+            seen["first"] = False
+            from fastapi import Response as FastAPIResponse
+
+            claim.store_response(
+                ns,
+                key,
+                FastAPIResponse(content=b'{"ok": true, "other": "payload"}', status_code=200),
+                payload_hash="0" * 64,  # не совпадает с payload_hash(b"")
+                principal_role="Registrar",
+            )
+        return result
+
+    monkeypatch.setattr(claim, "load_response", _load_with_foreign_payload)
+
+    second = client2.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": key})
+    assert second.status_code == 409, second.text
+    assert second.json()["code"] == "idempotency_payload_mismatch"
+    assert counters["w2"]["calls"] == 0, (
+        "changed data under a reused key must be neither executed nor replayed"
+    )
+    assert nkey("1", key, "claim") not in fake_redis.store
+
+
+def test_failed_intent_write_recovery_does_not_block_same_key_retry(monkeypatch):
+    """Махмудбек R18 #3277 (P2): неуспешная запись intent (503, хендлер не
+    запускался) не должна оставлять ложный «неизвестный исход». Локальный
+    mirror, безусловно записанный mark_execution_intent, переживал отказ:
+    после восстановления Redis и истечения lease повтор с тем же ключом
+    получал 409 idempotency_uncertain_outcome для операции, которая
+    заведомо НЕ дошла до исполнения — recovery-тупик. Теперь попытка
+    убирает собственные маркеры (распределённый — по токену владельца),
+    и повтор исполняется ровно один раз."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
+    idem_module._local_execution_intents.clear()
+
+    class _IntentSetFailsUntilRecovery(FakeRedis):
+        """Ломается ТОЛЬКО запись intent-маркера (claim-SET проходит) —
+        до флага восстановления, моделирующего возврат Redis."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.fail_intent_sets = True
+
+        def set(self, key, value, nx=False, xx=False, ex=None):
+            if self.fail_intent_sets and key.endswith(":intent") and not nx:
+                raise ConnectionError("simulated intent SET failure")
+            return super().set(key, value, nx=nx, xx=xx, ex=ex)
+
+    fake = _IntentSetFailsUntilRecovery()
+    saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    claim = object.__new__(DistributedIdempotencyClaim)
+    claim._ttl = 24 * 60 * 60
+    claim._prefix = "idem"
+    claim._lease_seconds = 90
+    claim._required = True
+    claim._client = fake
+    claim._available = True
+    claim._failed_at = 0.0
+    idem_module._distributed_claim = claim
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9012
+    )
+    try:
+        counter = {"calls": 0}
+        client = TestClient(_make_app(counter), raise_server_exceptions=False)
+        h1 = auth_headers("1")
+        key = "r18-intent-recovery"
+
+        # Попытка 1: SET intent падает → 503, хендлер не запускается,
+        # распределённого маркера нет (запись не дошла).
+        r1 = client.post("/echo", headers={**h1, "Idempotency-Key": key})
+        assert r1.status_code == 503, r1.text
+        assert r1.json()["code"] == "idempotency_unavailable"
+        assert counter["calls"] == 0
+        assert nkey("1", key, "intent") not in fake.store, (
+            "the failed SET must not leave a distributed intent marker"
+        )
+        assert nkey("1", key, "claim") not in fake.store, (
+            "the refused attempt must release its claim"
+        )
+
+        # Инфраструктура восстановилась (Redis вернулся, lease истёк):
+        # повтор с тем же ключом обязан исполниться один раз, а не
+        # получить ложный uncertain-outcome от собственного локального
+        # mirror отклонённой попытки.
+        fake.fail_intent_sets = False
+        r2 = client.post("/echo", headers={**h1, "Idempotency-Key": key})
+        assert r2.status_code == 200, (
+            f"recovery retry must execute once, not receive a false 409 "
+            f"idempotency_uncertain_outcome: {r2.status_code} {r2.text}"
+        )
+        assert counter["calls"] == 1
+        # Известный исход: intent больше не нужен.
+        assert nkey("1", key, "intent") not in fake.store
+    finally:
+        idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
+        idem_module._local_execution_intents.clear()
