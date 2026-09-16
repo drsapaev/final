@@ -1210,3 +1210,102 @@ def test_bulk_deactivation_follows_hide_contract(
         assert all(
             not p.is_active for p in linked
         ), f"bulk deactivation must hide {dept_key}"
+
+
+# ---------------------------------------------------------------------------
+# RQ-13 UI-slice (S-11 browser, D-06): bulk-delete guard parity. The single
+# DELETE endpoint blocks departments whose linked profiles still own
+# queues/entries (RQ-13.a), but the PR-18 bulk-delete loop hard-deleted via
+# raw db.delete() with NO guard and NO 1:1 profile cleanup — a user-reachable
+# S-11 violation surfaced by DepartmentManagement.tsx ("ожидающий пациент не
+# исчезает"). Contract: same significant-link bar as the single endpoint,
+# live recompute, all-or-nothing (no partial bulk delete), and cascade
+# parity (1:1 profile + settings cleaned exactly like the single path).
+# ---------------------------------------------------------------------------
+
+
+def test_department_bulk_delete_blocked_when_queue_history_exists(
+    pg_client, pg_session, pg_admin_user
+):
+    """Bulk delete with one blocked department must fail CLOSED with 409
+    and leave EVERY department (including the clean ones) untouched."""
+    headers = _dep_headers(pg_admin_user)
+    blocked = _create_department(pg_client, headers, "bulkA")
+    clean = _create_department(pg_client, headers, "bulkB")
+    seeded = _seed_waiting_entry_for_department(pg_session, blocked["key"], "bulkA")
+
+    resp = pg_client.request(
+        "DELETE",
+        "/api/v1/admin/departments/bulk-delete",
+        headers=headers,
+        json={"ids": [blocked["id"], clean["id"]]},
+    )
+    assert resp.status_code == 409, resp.text
+    detail = resp.json().get("detail") or {}
+    assert detail.get("error") == "department_has_queue_history", detail
+    assert detail.get("waiting_patients", 0) >= 1
+    blocked_rows = detail.get("blocked") or []
+    assert any(
+        row.get("department_id") == blocked["id"] for row in blocked_rows
+    ), f"blocked report must name the offending department: {detail}"
+    assert any(
+        p.get("entries_waiting", 0) >= 1
+        for row in blocked_rows
+        for p in (row.get("profiles") or [])
+    ), "impact must report waiting entries per profile"
+
+    from app.models.department import Department
+    from app.models.queue_profile import QueueProfile
+
+    pg_session.expire_all()
+    for dept in (blocked, clean):
+        assert (
+            pg_session.query(Department).filter(Department.id == dept["id"]).first()
+            is not None
+        ), "bulk delete is all-or-nothing: no partial deletion"
+    assert (
+        pg_session.query(QueueProfile)
+        .filter(QueueProfile.key == blocked["key"])
+        .first()
+        is not None
+    ), "linked 1:1 profile must survive the blocked bulk delete"
+
+    from app.models.online_queue import OnlineQueueEntry
+
+    entry = (
+        pg_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.id == seeded["entry_id"])
+        .first()
+    )
+    assert entry is not None and entry.status == "waiting"
+
+
+def test_department_bulk_delete_without_queue_history_cascades(
+    pg_client, pg_session, pg_admin_user
+):
+    """Clean departments delete in bulk with the SAME cascade as the
+    single endpoint: the 1:1 profile is removed, not orphaned."""
+    headers = _dep_headers(pg_admin_user)
+    d1 = _create_department(pg_client, headers, "bulkC")
+    d2 = _create_department(pg_client, headers, "bulkD")
+
+    from app.models.queue_profile import QueueProfile
+
+    resp = pg_client.request(
+        "DELETE",
+        "/api/v1/admin/departments/bulk-delete",
+        headers=headers,
+        json={"ids": [d1["id"], d2["id"]]},
+    )
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert payload.get("deleted") == 2, payload
+
+    pg_session.expire_all()
+    for dept in (d1, d2):
+        assert (
+            pg_session.query(QueueProfile)
+            .filter(QueueProfile.key == dept["key"])
+            .first()
+            is None
+        ), f"1:1 profile for {dept['key']} must be cascade-deleted, not orphaned"
