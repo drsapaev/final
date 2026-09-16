@@ -422,6 +422,99 @@ def _department_resource_tags(db: Session, department: Department) -> set[str]:
     return tags
 
 
+# ============================================================
+# RQ-13.a — department ↔ profile lifecycle coherence (D-06)
+# ============================================================
+
+
+def _department_linked_profiles(
+    db: Session, department: Department
+) -> list[QueueProfile]:
+    """RQ-13.a: every QueueProfile whose lifecycle the department gates.
+
+    Two linkage conventions exist side by side (trace dossier, plan RQ-13):
+    - the 1:1 profile auto-created by department integration
+      (``QueueProfile.key == department.key`` — created by
+      ``_ensure_department_integrations`` and hard-deleted together with
+      the department today);
+    - any profile bound by tag-family mapping
+      (``QueueProfile.department_key == department.key`` — seed 0055).
+    """
+    return (
+        db.query(QueueProfile)
+        .filter(
+            or_(
+                QueueProfile.department_key == department.key,
+                QueueProfile.key == department.key,
+            )
+        )
+        .all()
+    )
+
+
+def _sync_department_active_to_profiles(
+    db: Session, department: Department, *, active: bool
+) -> dict[str, int]:
+    """D-06 (APPROVED 2026-09-15): deactivating a department BLOCKS new
+    records at the tab/QR layer without touching queues, entries or any
+    service/payment path; activating it again must be predictable.
+
+    Contract:
+    - deactivation hides EVERY linked profile (``is_active=False``) —
+      the registrar tabs endpoint and the public QR page both filter on
+      ``QueueProfile.is_active``, so new records cannot be created for
+      this direction through either surface;
+    - reactivation restores ONLY the department-owned 1:1 profile
+      (``key == department.key``). Profiles that were archived
+      independently through the profile endpoint (RQ-12.b D-02 flow)
+      are never resurrected by a department toggle — the archive
+      decision stays in force (predictable un-archive).
+
+    Queues/entries are intentionally untouched: waiting patients remain
+    serviceable by staff (S-11) and today's queue is never recreated.
+    """
+    hidden = restored = 0
+    for profile in _department_linked_profiles(db, department):
+        if not active:
+            if profile.is_active:
+                profile.is_active = False
+                hidden += 1
+        elif (
+            not profile.is_active
+            and profile.key == department.key
+        ):
+            profile.is_active = True
+            restored += 1
+    return {"profiles_hidden": hidden, "profiles_restored": restored}
+
+
+def _sync_department_rename_to_own_profile(
+    db: Session, department: Department, old_name_ru: str | None
+) -> int:
+    """F-12 (plan RQ-13): a department rename must not leave diverging
+    titles on the department-owned profile — the profile was created
+    mirroring the department name, so it follows the rename.
+
+    Only the 1:1 profile (``key == department.key``) is retitled;
+    manually linked profiles keep their own titles (they may carry
+    titles unrelated to the department name). ``display_order``,
+    ``icon`` and ``color`` are deliberately NOT synced — independent
+    axes since creation, coherent with F-19/RQ-23 effective-settings
+    trace.
+    """
+    if (old_name_ru or None) == (department.name_ru or None):
+        return 0
+    profile = (
+        db.query(QueueProfile).filter(QueueProfile.key == department.key).first()
+    )
+    if profile is None:
+        return 0
+    new_title = department.name_ru or profile.key
+    profile.title = new_title
+    profile.title_ru = new_title
+    return 1
+
+
 def _collect_department_overview(db: Session) -> dict[str, Any]:
     """Формирует реальные показатели по отделениям."""
     # Codex round-28 P2: день обзора — clinic_today SSOT (таймзона настроек
