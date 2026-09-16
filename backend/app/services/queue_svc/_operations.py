@@ -1353,7 +1353,17 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 if not qr_profile:
                     raise QueueValidationError("Специалист недоступен для QR-записи")
 
-                queue_tag = doctor.specialty
+                # RQ-14.b (D-01 APPROVED 2026-09-15): the canonical queue tag
+                # of the doctor's QR direction is the QR-visible profile's
+                # registry key — the SAME source the profile-pick branch uses
+                # (queue_tag = profile_key). The raw ``doctor.specialty`` was
+                # a per-surface fallback that forked the (day, doctor)
+                # identity whenever the stored specialty spelling drifted
+                # from the profile key (E-033 pin; the dental family is the
+                # documented live case). Desk keeps its approved source
+                # (service.queue_tag); nothing is merged or renumbered —
+                # rows with genuinely different tags stay separate.
+                queue_tag = qr_profile.key
                 defaults = {
                     "start_number": doctor.start_number_online,
                     "max_online_entries": doctor.max_online_per_day,
