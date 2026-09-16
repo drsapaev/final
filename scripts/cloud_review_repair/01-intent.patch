@@ -1,0 +1,274 @@
+diff --git a/backend/app/middleware/idempotency_middleware.py b/backend/app/middleware/idempotency_middleware.py
+index fb0ec37..99424b4 100755
+--- a/backend/app/middleware/idempotency_middleware.py
++++ b/backend/app/middleware/idempotency_middleware.py
+@@ -109,6 +109,21 @@ _INTENT_RELEASE_LUA = (
+ )
+ 
+ 
++# Review #3283: checking the lease and recording intent must be ONE
++# Redis operation. A paused worker must not overwrite another attempt's
++# unknown outcome and subsequently delete it as its own failed write.
++_INTENT_MARK_LUA = (
++    "if redis.call('get', KEYS[1]) ~= ARGV[1] then return -1 end "
++    "local existing = redis.call('get', KEYS[2]); "
++    "if existing and existing ~= ARGV[1] then return -2 end "
++    "redis.call('set', KEYS[2], ARGV[1], 'EX', ARGV[2]); return 1"
++)
++
++
++class _IntentClaimLost(RuntimeError):
++    """Redis positively refused a stale owner or a foreign intent."""
++
++
+ def redact_redis_url(url: str) -> str:
+     """Strip URI userinfo credentials from a Redis URL before logging.
+ 
+@@ -725,32 +740,45 @@ class DistributedIdempotencyClaim:
+         return f"idem:{user_id}:{key}:intent"
+ 
+     def mark_execution_intent(self, user_id: int | str, key: str, owner_token: str | None = None) -> bool:
+-        """Durable marker: 'this key reached execution'.
+-
+-        Codex R15 #3092 (P1): returns True iff the DISTRIBUTED marker write
+-        was CONFIRMED. Callers with required coordination must treat False
+-        as refusal (503) — a silently-missing marker let a lost-response
+-        retry re-execute the write after the lease expired. The local mirror
+-        is always written as a belt-and-suspenders fallback for THIS worker.
+-
+-        Махмудбек R18 #3277 (P2): the marker VALUE carries the attempt's
+-        owner token (fallback "1" keeps token-less callers working), so a
+-        refused attempt can purge its OWN marker with a compare-and-delete
+-        (clear_execution_intent_if_owner). Existence checks stay
+-        value-agnostic (EXISTS).
++        """Confirm an intent without overwriting another attempt's outcome.
++
++        Owner-bound calls atomically check the current lease AND the existing
++        marker. A positive ownership refusal raises _IntentClaimLost, even
++        for optional Redis: this is not a transport outage eligible for the
++        local fallback. Transport errors retain the existing bool contract.
++
++        Token-less legacy callers may only INSERT an absent marker. The
++        dispatch path supplies its acquired token whenever it owns a claim.
+         """
+         confirmed = False
+         if self._ensure_available() and self._client is not None:
+-            confirmed = bool(
+-                self._run(
+-                    self._client.set,
++            if owner_token:
++                result = self._run(
++                    self._client.eval,
++                    _INTENT_MARK_LUA,
++                    2,
++                    self._claim_key(user_id, key),
+                     self._intent_key(user_id, key),
+-                    owner_token or "1",
+-                    ex=self._ttl,
++                    owner_token,
++                    str(self._ttl),
+                 )
+-            )
+-        # Mirror locally too: Redis degradation after marking must not turn a
+-        # later retry into a blind re-execution on THIS worker.
++                if result in (-1, -2):
++                    # No marker was written. In particular, do not create or
++                    # later clear a local mirror for somebody else's intent.
++                    raise _IntentClaimLost("Idempotency intent ownership lost")
++                confirmed = result == 1
++            else:
++                confirmed = bool(
++                    self._run(
++                        self._client.set,
++                        self._intent_key(user_id, key),
++                        "1",
++                        nx=True,
++                        ex=self._ttl,
++                    )
++                )
++        # Preserve the local safety mirror on transport failures. A refused
++        # required attempt clears only its own marker before returning 503.
+         _mark_local_execution_intent(user_id, key)
+         return confirmed
+ 
+@@ -1395,11 +1423,25 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
+                 # только локально, второй воркер его не видит, и потерянный ответ
+                 # после истечения lease приводил к повторному исполнению записи
+                 # (дубликаты визитов/счетов/очереди).
+-                intent_confirmed = claim.mark_execution_intent(
+-                    user_id,
+-                    idempotency_key,
+-                    owner_token=claim_token if (claim_acquired and claim_token is not None) else None,
+-                )
++                try:
++                    intent_confirmed = claim.mark_execution_intent(
++                        user_id,
++                        idempotency_key,
++                        owner_token=claim_token if (claim_acquired and claim_token is not None) else None,
++                    )
++                except _IntentClaimLost:
++                    # Keep the same key: another attempt may still be running
++                    # or may already have committed. Never run this handler or
++                    # invoke failed-write intent cleanup after an owner refusal.
++                    return Response(
++                        status_code=409,
++                        headers={"Retry-After": "1", "Cache-Control": "no-store"},
++                        content=(
++                            '{"code": "idempotency_in_flight", "detail": '
++                            '"Request ownership changed. Retry with the same key."}'
++                        ),
++                        media_type="application/json",
++                    )
+                 if claim.required and not intent_confirmed:
+                     logger.warning(
+                         "Idempotency execution intent NOT confirmed in distributed store: "
+ diff --git a/backend/tests/unit/test_idempotency_distributed_claim.py b/backend/tests/unit/test_idempotency_distributed_claim.py
+index 7314e2b..5852a1a 100644
+--- a/backend/tests/unit/test_idempotency_distributed_claim.py
++++ b/backend/tests/unit/test_idempotency_distributed_claim.py
+@@ -108,6 +108,17 @@ class FakeRedis:
+         if self.fail_next_ops > 0:
+             self.fail_next_ops -= 1
+             raise ConnectionError("simulated transient redis failure")
++        if numkeys == 2:
++            intent_key, token, ttl = args
++            if self.store.get(key) != token:
++                return -1
++            existing = self.store.get(intent_key)
++            if existing is not None and existing != token:
++                return -2
++            # Preserve the existing transport-failure injection seam. The
++            # real Lua operation is separately exercised against Redis below.
++            self.set(intent_key, token, ex=int(ttl))
++            return 1
+         if "del" in script:
+             if self.store.get(key) == args[0]:
+                 self.store.pop(key)
+@@ -2074,3 +2085,127 @@ def test_failed_intent_write_recovery_does_not_block_same_key_retry(monkeypatch)
+         idem_module._check_principal_authorized_sync = saved_auth
+         idem_module._resolve_principal_id_sync = saved_resolve
+         idem_module._local_execution_intents.clear()
++
++
++# R19 / review #3283 (5701514498): the final lease check and the intent
++# write cannot be separate operations. These assertions fail on the old SET.
++@pytest.mark.parametrize("required", [False, True])
++def test_r19_stale_intent_writer_never_executes(two_workers, monkeypatch, required):
++    client, retry_client, counters, fake = two_workers
++    claim = idem_module._distributed_claim
++    claim._required = required
++    key = "r19-stale-" + uuid.uuid4().hex
++    original = claim.mark_execution_intent
++
++    def paused_writer(user_id, k, owner_token=None):
++        # A resumes after B acquired the expired lease and left an unknown
++        # outcome. This boundary is AFTER dispatch's previous renew check.
++        fake.store[nkey("1", key, "claim")] = "attempt-B"
++        fake.store[nkey("1", key, "intent")] = "attempt-B"
++        return original(user_id, k, owner_token=owner_token)
++
++    monkeypatch.setattr(claim, "mark_execution_intent", paused_writer)
++    headers = {**auth_headers("1"), "Idempotency-Key": key}
++    response = client.post("/echo", headers=headers)
++    assert response.status_code == 409, response.text
++    assert counters["w1"]["calls"] == 0
++    assert fake.store[nkey("1", key, "intent")] == "attempt-B"
++    assert fake.store[nkey("1", key, "claim")] == "attempt-B"
++
++    # B's lease ends without a saved response. C must reconcile, never
++    # execute over B's unknown commit; restore the real marking method.
++    monkeypatch.setattr(claim, "mark_execution_intent", original)
++    fake.delete(nkey("1", key, "claim"))
++    retry = retry_client.post("/echo", headers=headers)
++    assert retry.status_code == 409, retry.text
++    assert retry.json()["code"] == "idempotency_uncertain_outcome"
++    assert counters["w2"]["calls"] == 0
++
++
++@pytest.fixture
++def r19_real_claim():
++    """Dedicated test-only Redis, unique namespace; never FLUSHDB."""
++    import os
++    from urllib.parse import urlsplit
++
++    import redis
++
++    url = os.getenv("TEST_IDEMPOTENCY_REDIS_URL")
++    if not url:
++        pytest.skip("TEST_IDEMPOTENCY_REDIS_URL not configured")
++    assert urlsplit(url).hostname in {"localhost", "127.0.0.1", "::1"}
++    client = redis.Redis.from_url(url, decode_responses=True)
++    client.ping()  # An explicitly configured but unavailable service FAILS.
++    claim = _make_claim(client)
++    namespace = "review-r19-" + uuid.uuid4().hex
++    key = "synthetic-operation"
++    yield claim, client, namespace, key
++    client.delete(
++        claim._claim_key(namespace, key),
++        claim._intent_key(namespace, key),
++        claim._resp_key(namespace, key),
++    )
++    idem_module._clear_local_execution_intent(namespace, key)
++    client.close()
++
++
++def _r19_try_mark(claim, namespace, key, token):
++    try:
++        return claim.mark_execution_intent(namespace, key, owner_token=token)
++    except RuntimeError:
++        return False
++
++
++@pytest.mark.redis
++def test_r19_real_redis_stale_owner_preserves_unknown_outcome(r19_real_claim):
++    claim, client, ns, key = r19_real_claim
++    token_a = claim.acquire(ns, key)
++    assert token_a
++    assert claim.renew(ns, key, token_a)
++    # Simulate expiration after that successful CAS, without a 90s sleep.
++    client.pexpire(claim._claim_key(ns, key), 0)
++    token_b = claim.acquire(ns, key)
++    assert token_b and token_b != token_a
++    assert claim.mark_execution_intent(ns, key, owner_token=token_b)
++
++    assert _r19_try_mark(claim, ns, key, token_a) is False
++    assert client.get(claim._intent_key(ns, key)) == token_b
++    assert claim.clear_execution_intent_if_owner(ns, key, token_a) is False
++    assert client.get(claim._intent_key(ns, key)) == token_b
++
++
++@pytest.mark.redis
++def test_r19_real_redis_current_claim_cannot_replace_foreign_intent(r19_real_claim):
++    claim, client, ns, key = r19_real_claim
++    token = claim.acquire(ns, key)
++    client.set(claim._intent_key(ns, key), "previous-unknown-attempt", ex=60)
++    assert _r19_try_mark(claim, ns, key, token) is False
++    assert client.get(claim._intent_key(ns, key)) == "previous-unknown-attempt"
++
++
++@pytest.mark.redis
++def test_r19_real_redis_tokenless_call_does_not_overwrite(r19_real_claim):
++    claim, client, ns, key = r19_real_claim
++    client.set(claim._intent_key(ns, key), "previous-unknown-attempt", ex=60)
++    assert claim.mark_execution_intent(ns, key) is False
++    assert client.get(claim._intent_key(ns, key)) == "previous-unknown-attempt"
++
++
++@pytest.mark.redis
++def test_r19_real_redis_lost_reply_cleans_only_own_landed_intent(r19_real_claim, monkeypatch):
++    claim, client, ns, key = r19_real_claim
++    token = claim.acquire(ns, key)
++    original_eval = client.eval
++
++    def landed_then_timeout(script, *args):
++        result = original_eval(script, *args)
++        if args[0] == 2:
++            assert result == 1
++            raise ConnectionError("synthetic lost intent reply")
++        return result
++
++    monkeypatch.setattr(client, "eval", landed_then_timeout)
++    assert claim.mark_execution_intent(ns, key, owner_token=token) is False
++    assert client.get(claim._intent_key(ns, key)) == token
++    assert claim.clear_execution_intent_if_owner(ns, key, token) is True
++    assert client.get(claim._intent_key(ns, key)) is None
