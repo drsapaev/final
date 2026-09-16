@@ -1,5 +1,5 @@
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { api } from '../../api/client';
@@ -24,6 +24,7 @@ import {
   Activity,
   Package,
   Zap,
+  Layers,
   ToggleLeft,
   ToggleRight } from
 'lucide-react';
@@ -34,6 +35,20 @@ import {
   Select,
 } from '../ui/macos';
 import type { SelectChangeEvent } from '../ui/macos/Select';
+import {
+  parseEffectiveQueueSettingsReport,
+  buildEffectiveReportUrl,
+  SOURCE_LEVEL_KEYS,
+  APPLIED_WHEN_KEYS,
+} from '../../utils/queueSettingsEffective';
+import type {
+  EffectiveQueueSettingsReport,
+  EffectiveField,
+  DepartmentQueueSettingsStatus,
+  OwnerOverride,
+  ResourceRow,
+  ActiveDayRow,
+} from '../../utils/queueSettingsEffective';
 
 type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
@@ -135,6 +150,37 @@ const getNumberSetting = (
 
 const normalizeText = (value: unknown): string => String(value ?? '').trim().toLowerCase();
 
+// RQ-23.ui (S-20): display names for report fields; unknown fields fall
+// back to the raw backend name (honest fallback, never invented labels).
+const EFFECTIVE_FIELD_NAME_KEYS: Record<string, string> = {
+  timezone: 'admin2.qs_eff_field_timezone',
+  queue_start_hour: 'admin2.qs_eff_field_queue_start_hour',
+  auto_close_time: 'admin2.qs_eff_field_auto_close_time',
+  start_numbers: 'admin2.qs_eff_field_start_numbers',
+  max_per_day: 'admin2.qs_eff_field_max_per_day',
+};
+
+const DEPARTMENT_FIELD_NAME_KEYS: Record<string, string> = {
+  enabled: 'admin2.qs_eff_dept_field_enabled',
+  queue_type: 'admin2.qs_eff_dept_field_queue_type',
+  queue_prefix: 'admin2.qs_eff_dept_field_queue_prefix',
+  max_daily_queue: 'admin2.qs_eff_dept_field_max_daily_queue',
+  max_concurrent_queue: 'admin2.qs_eff_dept_field_max_concurrent_queue',
+  avg_wait_time: 'admin2.qs_eff_dept_field_avg_wait_time',
+  show_on_display: 'admin2.qs_eff_dept_field_show_on_display',
+  auto_close_time: 'admin2.qs_eff_dept_field_auto_close_time',
+};
+
+const formatReportValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (!entries.length) return '—';
+    return entries.map(([key, entryValue]) => `${key}: ${String(entryValue)}`).join(', ');
+  }
+  return String(value);
+};
+
 const getDoctorDisplayName = (doctor: DoctorRecord | null | undefined, t: TranslationFn): string => (
   doctor?.user?.full_name || doctor?.user?.username || t('admin2.qs_doctor_fallback', { id: doctor?.id ?? '—' })
 );
@@ -203,6 +249,14 @@ const QueueSettings = () => {
   const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
   const [testResult, setTestResult] = useState<TestResult | null>(null);
 
+  // RQ-23.ui (S-20): effective settings report — read-only SSOT view over
+  // GET /admin/queue/settings/effective (backend RQ-23.a, PR 3289, E-050).
+  const [departmentsList, setDepartmentsList] = useState<{ id: number; key: string; name_ru: string | null }[]>([]);
+  const [reportScope, setReportScope] = useState<{ departmentId: number | null; tag: string | null }>({ departmentId: null, tag: null });
+  const [effectiveReport, setEffectiveReport] = useState<EffectiveQueueSettingsReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(true);
+  const [reportError, setReportError] = useState(false);
+
   // ⭐ SSOT: Загружаем специальности из QueueProfiles API
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
   const [doctors, setDoctors] = useState<DoctorRecord[]>([]);
@@ -239,10 +293,48 @@ const QueueSettings = () => {
     }
   }, []);
 
+  const loadDepartments = useCallback(async () => {
+    try {
+      const response = await api.get('/admin/departments');
+      const raw = Array.isArray(response.data)
+        ? response.data
+        : ((response.data?.departments ?? []) as Array<Record<string, unknown>>);
+      setDepartmentsList(
+        raw
+          .map((dept) => ({ id: Number(dept?.id), key: String(dept?.key ?? ''), name_ru: typeof dept?.name_ru === 'string' ? dept.name_ru : null }))
+          .filter((dept) => Number.isFinite(dept.id) && dept.id > 0),
+      );
+    } catch (error) {
+      logger.error('Ошибка загрузки отделений для отчёта:', error);
+      setDepartmentsList([]);
+    }
+  }, []);
+
+  const loadEffectiveReport = useCallback(async (scope: { departmentId: number | null; tag: string | null }) => {
+    try {
+      setReportLoading(true);
+      setReportError(false);
+      const response = await api.get(buildEffectiveReportUrl(scope));
+      setEffectiveReport(parseEffectiveQueueSettingsReport(response.data));
+    } catch (error) {
+      logger.error('Ошибка загрузки отчёта эффективных настроек:', error);
+      setEffectiveReport(null);
+      setReportError(true);
+    } finally {
+      setReportLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadProfiles();
     loadSettings();
-  }, [loadProfiles]);
+    loadDepartments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadProfiles, loadDepartments]);
+
+  useEffect(() => {
+    loadEffectiveReport(reportScope);
+  }, [reportScope, loadEffectiveReport]);
 
   const loadSettings = async () => {
     try {
@@ -263,6 +355,23 @@ const QueueSettings = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Unique queue tags across loaded profiles — tag scope for the report.
+  const tagOptions = useMemo(() => {
+    const tags = new Set<string>();
+    for (const specialty of specialties) {
+      for (const tag of specialty.tags) {
+        if (tag) tags.add(tag);
+      }
+    }
+    return Array.from(tags).sort();
+  }, [specialties]);
+
+  const getDoctorNameForReport = (doctorId: number): string => {
+    const doctor = doctors.find((candidate) => Number(candidate?.id) === Number(doctorId)) ?? null;
+    if (doctor) return getDoctorDisplayName(doctor, t);
+    return t('admin2.qs_doctor_fallback', { id: doctorId });
   };
 
   const handleSettingChange = (path: string, value: unknown) => {
@@ -657,6 +766,190 @@ const QueueSettings = () => {
             </Card>
           )}
         </div>
+
+        {/* Эффективные настройки: источник и время применения (RQ-23.ui, S-20, D-06) — read-only */}
+        <Card className="p-6 mb-6">
+          <section role="region" aria-label={t('admin2.qs_eff_title')}>
+            <div className="admin-header-flex-between-pb-24-border-bottom">
+              <div>
+                <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
+                  <Layers className="admin-icon-20-blue" />
+                  {t('admin2.qs_eff_title')}
+                </h3>
+                <p className="admin-p-sm-secondary-m0">
+                  {t('admin2.qs_eff_subtitle')}
+                </p>
+              </div>
+              <div className="admin-flex-gap-12">
+                <div className="w-56">
+                  <Select
+                    label={t('admin2.qs_eff_area_department')}
+                    value={reportScope.departmentId ?? 'all'}
+                    onChange={(event: SelectChangeEvent) => setReportScope((prev) => ({ ...prev, departmentId: event.target.value === 'all' ? null : Number(event.target.value) }))}
+                    options={[
+                      { value: 'all', label: t('admin2.qs_eff_area_all_departments') },
+                      ...departmentsList.map((dept) => ({ value: dept.id, label: dept.name_ru || dept.key })),
+                    ]}
+                    className="w-full"></Select>
+                </div>
+                <div className="w-48">
+                  <Select
+                    label={t('admin2.qs_eff_area_tag')}
+                    value={reportScope.tag ?? 'all'}
+                    onChange={(event: SelectChangeEvent) => setReportScope((prev) => ({ ...prev, tag: event.target.value === 'all' ? null : String(event.target.value) }))}
+                    options={[
+                      { value: 'all', label: t('admin2.qs_eff_area_all_tags') },
+                      ...tagOptions.map((tag) => ({ value: tag, label: tag })),
+                    ]}
+                    className="w-full"></Select>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => loadEffectiveReport(reportScope)}
+                  disabled={reportLoading}
+                  className="admin-action-btn">
+                  <RefreshCw className={reportLoading ? 'admin-icon-16-spin' : 'w-4 h-4'} />
+                  {t('admin2.qs_eff_refresh')}
+                </Button>
+              </div>
+            </div>
+
+            {reportError &&
+            <div className="admin-p-sm-secondary-m0 pt-3 text-[var(--mac-error)]">
+                {t('admin2.qs_eff_error')}
+              </div>
+            }
+
+            {!reportError && effectiveReport &&
+            <div className="flex flex-col gap-4 pt-4">
+                {/* Клиника-уровень: каждое поле — источник, живость, время применения */}
+                {effectiveReport.fields.map((fieldRow: EffectiveField) => {
+                  const nameKey = EFFECTIVE_FIELD_NAME_KEYS[fieldRow.field];
+                  return (
+                    <div key={fieldRow.field} data-field-row className="admin-section-divider-pt-16-border-top">
+                      <div className="admin-flex-between-sm">
+                        <div>
+                          <div className="admin-text-sm-med-primary">{nameKey ? t(nameKey) : fieldRow.field}</div>
+                          <div className="admin-text-xs-secondary">{formatReportValue(fieldRow.value)}</div>
+                          {fieldRow.snapshot_field &&
+                          <div className="admin-text-xs-secondary">→ {fieldRow.snapshot_field}</div>
+                          }
+                          {fieldRow.note &&
+                          <div className="admin-text-xs-secondary">{fieldRow.note}</div>
+                          }
+                        </div>
+                        <div className="admin-flex-center-12">
+                          <span className="admin-range-badge">{SOURCE_LEVEL_KEYS[fieldRow.level] ? t(SOURCE_LEVEL_KEYS[fieldRow.level]) : fieldRow.level}</span>
+                          <span className="admin-range-badge">{fieldRow.live ? t('admin2.qs_eff_live') : t('admin2.qs_eff_not_live')}</span>
+                          {fieldRow.applied_when.map((code) => (
+                            <span key={code} className="admin-range-badge">{APPLIED_WHEN_KEYS[code] ? t(APPLIED_WHEN_KEYS[code]) : code}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Отделение-уровень: display-only блок + владельцы (когда выбрано) */}
+                {effectiveReport.department &&
+                <div className="admin-section-divider-pt-16-border-top">
+                    <h4 className="admin-text-sm-med-primary">
+                      {t('admin2.qs_eff_department_dead_title')} — {effectiveReport.department.name_ru || effectiveReport.department.key}
+                    </h4>
+                    <div className="flex flex-col gap-2">
+                      {Object.entries(effectiveReport.department.queue_settings).map(([fieldName, status]: [string, DepartmentQueueSettingsStatus]) => {
+                        const deptNameKey = DEPARTMENT_FIELD_NAME_KEYS[fieldName];
+                        return (
+                          <div key={fieldName} data-dept-field-row className="admin-flex-between-sm">
+                            <div>
+                              <div className="admin-text-xs-secondary">{deptNameKey ? t(deptNameKey) : fieldName}</div>
+                              <div className="admin-text-xs-secondary">{formatReportValue(status.value)}</div>
+                              {status.note &&
+                              <div className="admin-text-xs-secondary">{status.note}</div>
+                              }
+                            </div>
+                            <div className="admin-flex-center-12">
+                              <span className="admin-range-badge">{status.live ? t('admin2.qs_eff_live') : t('admin2.qs_eff_not_live')}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <h4 className="admin-text-sm-med-primary">
+                      {t('admin2.qs_eff_owner_overrides_title')}
+                    </h4>
+                    <div className="flex flex-col gap-2">
+                      {effectiveReport.department.owner_overrides.map((override: OwnerOverride) => (
+                        <div key={override.doctor_id} data-owner-row className="admin-flex-between-sm">
+                          <div className="admin-text-xs-secondary">{getDoctorNameForReport(override.doctor_id)}</div>
+                          <div className="admin-flex-center-12">
+                            <span className="admin-range-badge">{t('admin2.qs_eff_owner_effective')}: {override.effective_start_number}</span>
+                            <span className="admin-range-badge">{SOURCE_LEVEL_KEYS[override.source] ? t(SOURCE_LEVEL_KEYS[override.source]) : override.source}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                }
+
+                {/* Ресурсная ось (QD-2C): значение реестра безусловно */}
+                {effectiveReport.resources.length > 0 &&
+                <div className="admin-section-divider-pt-16-border-top">
+                    <h4 className="admin-text-sm-med-primary">{t('admin2.qs_eff_resources_title')}</h4>
+                    <div className="flex flex-col gap-2">
+                      {effectiveReport.resources.map((resource: ResourceRow) => (
+                        <div key={resource.queue_resource_id} data-resource-row className="admin-flex-between-sm">
+                          <div className="admin-text-xs-secondary">{resource.display_name || resource.code}</div>
+                          <div className="admin-flex-center-12">
+                            <span className="admin-range-badge">{t('admin2.qs_eff_owner_effective')}: {resource.effective_start_number}</span>
+                            <span className="admin-range-badge">{SOURCE_LEVEL_KEYS[resource.source] ? t(SOURCE_LEVEL_KEYS[resource.source]) : resource.source}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                }
+
+                {/* Активный день: замороженный снимок (D-06) — read-only */}
+                <div className="admin-section-divider-pt-16-border-top">
+                  <h4 className="admin-text-sm-med-primary">
+                    {t('admin2.qs_eff_active_day_title')}
+                    {effectiveReport.clinic_today ? ` (${effectiveReport.clinic_today})` : ''}
+                  </h4>
+                  {effectiveReport.active_day.length === 0 ?
+                  <p className="admin-text-xs-secondary admin-m-0">{t('admin2.qs_eff_active_day_empty')}</p> :
+
+                  <div className="flex flex-col gap-2">
+                      {effectiveReport.active_day.map((dayRow: ActiveDayRow) => (
+                        <div key={dayRow.daily_queue_id} data-day-row className="admin-flex-between-sm">
+                          <div>
+                            <div className="admin-text-xs-secondary">{dayRow.queue_tag ?? '—'}</div>
+                            <div className="admin-flex-center-12">
+                              <span className="admin-text-xs-secondary">{t('admin2.qs_eff_day_start_number')}: </span>
+                              <strong>{dayRow.start_number}</strong>
+                              <span className="admin-text-xs-secondary">{t('admin2.qs_eff_day_window')}: </span>
+                              <strong>{dayRow.online_start_time ?? '—'} – {dayRow.online_end_time ?? '—'}</strong>
+                              <span className="admin-text-xs-secondary">{t('admin2.qs_eff_day_max_entries')}: </span>
+                              <strong>{dayRow.max_online_entries}</strong>
+                            </div>
+                            {dayRow.note &&
+                            <div className="admin-text-xs-secondary">{dayRow.note}</div>
+                            }
+                          </div>
+                          <span className="admin-range-badge">{t('admin2.qs_eff_frozen_badge')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            {!reportError && reportLoading && !effectiveReport &&
+            <p className="admin-text-xs-secondary admin-m-0">{t('admin2.qs_eff_loading')}</p>
+            }
+          </section>
+        </Card>
 
         {/* Информационная панель */}
         <Card className="admin-card-info-p-24">
