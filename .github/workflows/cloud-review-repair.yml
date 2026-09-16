@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
       - name: Package tracked review sources (no runtime data or credentials)
@@ -29,16 +29,14 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/review-sources"
           git rev-parse HEAD > "$RUNNER_TEMP/review-sources/HEAD.txt"
-          git archive --format=tar.gz HEAD \
-            AGENTS.md docs/devbrain docs/runbooks .agents/skills \
-            ai/langgraph backend/app backend/tests backend/alembic \
-            backend/pyproject.toml backend/uv.lock backend/requirements.txt \
-            backend/alembic.ini frontend/src frontend/package.json \
-            frontend/package-lock.json frontend/vite.config.ts \
-            frontend/vitest.config.ts frontend/tsconfig.json \
-            .github/workflows scripts/check_pr_review_template.py \
-            > "$RUNNER_TEMP/review-sources/review-sources.tar.gz"
-      - uses: actions/upload-artifact@v4
+          paths=()
+          for p in AGENTS.md docs/devbrain docs/runbooks .agents/skills ai/langgraph backend/app backend/tests backend/alembic backend/pyproject.toml uv.lock pyproject.toml backend/requirements.txt backend/requirements-dev.txt backend/alembic.ini backend/pytest.ini frontend/src frontend/e2e frontend/package.json frontend/package-lock.json frontend/vite.config.ts frontend/vite.config.js frontend/vitest.config.ts frontend/vitest.config.js frontend/tsconfig.json frontend/tsconfig.app.json frontend/playwright.config.ts .github/workflows scripts; do
+            if git cat-file -e "HEAD:$p" 2>/dev/null; then
+              paths+=("$p")
+            fi
+          done
+          git archive --format=tar.gz HEAD "${paths[@]}" > "$RUNNER_TEMP/review-sources/review-sources.tar.gz"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: review-sources
           path: ${{ runner.temp }}/review-sources/
