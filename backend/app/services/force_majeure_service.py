@@ -19,7 +19,6 @@ from sqlalchemy.orm import Session
 from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import (
     resolve_registry_tag_queue_for_specialist,
-    resource_start_number,
 )
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
@@ -35,6 +34,7 @@ from app.models.refund_deposit import (
 from app.models.visit import Visit
 from app.repositories.queue_api_repository import QueueApiRepository
 from app.services.fcm_service import get_fcm_service
+from app.services.queue_service import queue_service
 
 logger = logging.getLogger(__name__)
 
@@ -154,15 +154,21 @@ class ForceMajeureService:
         failed = []
         notification_targets = []
 
-        # Получаем следующий номер в очереди на завтра
-        next_number = self._get_next_queue_number(tomorrow_queue.id)
-        # QD-2C (Codex round-9 P2): нумерация ресурсной поверхности
-        # стартует с QueueResource.start_number_online — иначе
-        # перенесённые пациенты получают номера вне канонической
-        # последовательности (пустая очередь -> 1, а не старт реестра)
-        resource_floor = resource_start_number(self.db, tomorrow_queue)
-        if resource_floor is not None and next_number < resource_floor:
-            next_number = resource_floor
+        # R19 P2 (E-039 snapshot integration, #3279): единый SSOT-счётчик
+        # живых писателей (QR join, ресепшн, batch, visit confirmation):
+        # снимок дня (DailyQueue.start_number, 0067) СТАРШЕ живого
+        # реестра; FOR UPDATE-блокировка сериализует с параллельной
+        # регистрацией (RQ-14.a). Прежний локальный MAX+1 игнорировал
+        # снимок (врачебная очередь: первый перенесённый — №1 при
+        # старте дня 41), а отдельный resource_floor читал ЖИВОЕ
+        # QueueResource.start_number_online ПОВЕРХ снимка (изменение
+        # настройки 41 -> 501 уводило перенесённых из заморожённой
+        # последовательности, которую обычная регистрация соблюдает).
+        next_number = queue_service.get_next_queue_number(
+            self.db,
+            daily_queue=tomorrow_queue,
+            queue_tag=tomorrow_queue.queue_tag,
+        )
 
         for entry in entries:
             try:
@@ -413,15 +419,6 @@ class ForceMajeureService:
             self.db.flush()
 
         return queue
-
-    def _get_next_queue_number(self, queue_id: int) -> int:
-        """Получить следующий номер в очереди с учётом приоритета"""
-        max_number = self.db.query(OnlineQueueEntry.number).filter(
-            OnlineQueueEntry.queue_id == queue_id,
-            OnlineQueueEntry.status != "cancelled"
-        ).order_by(OnlineQueueEntry.number.desc()).first()
-
-        return (max_number[0] + 1) if max_number else 1
 
     def _get_payment_for_entry(self, entry: OnlineQueueEntry) -> Payment | None:
         """Получить платёж для записи"""
