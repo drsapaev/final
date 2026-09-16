@@ -4181,6 +4181,7 @@ def test_clinic_wide_profile_join_routes_registry_tag(db_session: Session) -> No
             patient_name="Пациент Профиля",
             phone="+998901234599",
             specialist_id_override=profile.id,
+            specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
             source="online",
         )
         queue = result["daily_queue"]
@@ -4265,6 +4266,7 @@ def test_clinic_wide_profile_join_prefers_deactivated_resource_surface(
             patient_name="Пациент ЭКГ",
             phone="+998901234598",
             specialist_id_override=profile.id,
+            specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
             source="online",
         )
         # the existing surface is reused — no fork, no «Нет активных врачей»
@@ -4335,6 +4337,7 @@ def test_clinic_wide_profile_join_doctor_path_without_registry(
             patient_name="Пациент Врача",
             phone="+998901234597",
             specialist_id_override=profile.id,
+            specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
             source="online",
         )
         queue = result["daily_queue"]

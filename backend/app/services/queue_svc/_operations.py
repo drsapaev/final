@@ -1068,6 +1068,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         phone: str | None = None,
         telegram_id: int | None = None,
         specialist_id_override: int | None = None,
+        specialist_type: str | None = None,
         patient_id: int | None = None,
         source: str = "online",
     ) -> dict[str, Any]:
@@ -1092,26 +1093,35 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             if specialist_id_override is None:
                 raise QueueValidationError("Выберите специалиста для записи")
 
-            # ⭐ SSOT FIX: specialist_id_override может быть:
-            # 1. QueueProfile.id (когда пользователь выбирает профиль на QR странице)
-            # 2. Doctor.id (legacy)
-            # Сначала проверяем, не является ли это QueueProfile.id
-            from app.models.queue_profile import QueueProfile
+            # RQ-09.b (D-01 APPROVED 2026-09-15): Doctor.id,
+            # QueueResource.id и QueueProfile.id — разные пространства; тип
+            # выбора передаётся ЯВНО и никогда не выводится из совпадения
+            # числового ID. Удалённый probe ``QueueProfile.id ==
+            # specialist_id_override`` молча переадресовывал выбранного
+            # пациентом врача на профильный маршрут (least-loaded /
+            # ресурс-поверхность), когда малый QueueProfile.id совпадал с
+            # переданным Doctor.id. Нетипизированный payload означает
+            # выбор ВРАЧА: публичная подборка (selectable_specialists)
+            # испускает только Doctor.id; профильный выбор остаётся
+            # доступным только при явно переданном типе "profile".
+            if specialist_type is not None:
+                specialist_type = str(specialist_type).strip().lower()
+            if specialist_type == "profile":
+                from app.models.queue_profile import QueueProfile
 
-            queue_profile_by_id = db.query(QueueProfile).filter(
-                QueueProfile.id == specialist_id_override,
-            ).first()
-            if queue_profile_by_id and not self._is_qr_visible_profile(
-                queue_profile_by_id
-            ):
-                raise QueueValidationError("Специалист недоступен для QR-записи")
-
-            queue_profile = (
-                queue_profile_by_id
-                if queue_profile_by_id
-                and self._is_qr_visible_profile(queue_profile_by_id)
-                else None
-            )
+                queue_profile = (
+                    db.query(QueueProfile)
+                    .filter(QueueProfile.id == specialist_id_override)
+                    .first()
+                )
+                if queue_profile is None or not self._is_qr_visible_profile(
+                    queue_profile
+                ):
+                    raise QueueValidationError("Специалист недоступен для QR-записи")
+            elif specialist_type in (None, "doctor"):
+                queue_profile = None
+            else:
+                raise QueueValidationError("Недопустимый тип специалиста")
 
             if queue_profile:
                 # ⭐ Это QueueProfile.id - ищем врача по specialty, соответствующему профилю

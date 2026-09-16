@@ -218,6 +218,14 @@ class JoinSessionCompleteRequest(BaseModel):
     specialist_ids: list[int] | None = Field(
         None, description="Список ID специалистов (для общего QR)"
     )
+    specialist_entity_types: list[str] | None = Field(
+        None,
+        description=(
+            "Типы сущностей specialist_ids, выровненные по индексам "
+            "('doctor' | 'profile'); тип выбора передаётся явно (D-01), "
+            "тип сущности не определяется по совпадению числового ID"
+        ),
+    )
 
 
 class JoinSessionCompleteMultipleResponse(BaseModel):

@@ -185,6 +185,9 @@ def test_clinic_wide_qr_exposes_backend_selectable_specialists(
     assert info_payload["selectable_specialists"] == [
         {
             "id": test_doctor.id,
+            # RQ-09.b (D-01): the selection carries the entity type
+            # EXPLICITLY (echoed back as specialist_entity_types).
+            "entity_type": "doctor",
             "specialty": "cardiology",
             "specialty_display": "Cardiology",
             "icon": "❤️",

@@ -91,6 +91,7 @@ def complete_join_session(
                 patient_name=request.patient_name,
                 phone=request.phone,
                 telegram_id=request.telegram_id,
+                specialist_entity_types=request.specialist_entity_types,
             )
             logger.info(
                 "[complete_join_session] Результат множественного присоединения: %s",
