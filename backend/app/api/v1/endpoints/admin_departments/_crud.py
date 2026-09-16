@@ -6,7 +6,10 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.endpoints.admin_departments._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.admin_departments._helpers import (
+    _department_linked_profiles,
     _ensure_department_integrations,
+    _sync_department_active_to_profiles,
+    _sync_department_rename_to_own_profile,
     router,
 )  # noqa: F401
 from app.api.v1.endpoints.admin_doctors import _reject_sentinel_linked_doctor  # QD-1.1
@@ -270,6 +273,8 @@ def bulk_activate_departments(
 
     updated = 0
     not_found = 0
+    profiles_hidden_total = 0
+    profiles_restored_total = 0
 
     for dept_id in ids:
         department = db.query(Department).filter(Department.id == dept_id).first()
@@ -277,6 +282,11 @@ def bulk_activate_departments(
             not_found += 1
             continue
         department.active = bool(active)
+        # RQ-13.a (D-06): bulk activation follows the SAME lifecycle
+        # contract as the single-department toggle.
+        sync = _sync_department_active_to_profiles(db, department, active=active)
+        profiles_hidden_total += sync["profiles_hidden"]
+        profiles_restored_total += sync["profiles_restored"]
         updated += 1
 
     db.commit()
@@ -286,6 +296,8 @@ def bulk_activate_departments(
         "success": True,
         "updated": updated,
         "not_found": not_found,
+        "profiles_hidden": profiles_hidden_total,
+        "profiles_restored": profiles_restored_total,
         "message": f"{action.capitalize()} {updated} отделений",
     }
 
@@ -313,10 +325,24 @@ def update_department(
             detail=f"Department with id {department_id} not found",
         )
 
+    # RQ-13.a (F-12/D-06): capture the pre-update state so the profile
+    # sync can detect what actually changed.
+    old_name_ru = department.name_ru
+    old_active = department.active
+
     # Обновляем только переданные поля
     update_data = department_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(department, field, value)
+
+    # RQ-13.a: propagate the changed lifecycle axes to the linked
+    # QueueProfiles (titles on rename, visibility on active flip).
+    renamed = _sync_department_rename_to_own_profile(db, department, old_name_ru)
+    active_sync = (
+        _sync_department_active_to_profiles(db, department, active=department.active)
+        if "active" in update_data and update_data["active"] != old_active
+        else {"profiles_hidden": 0, "profiles_restored": 0}
+    )
 
     db.commit()
     db.refresh(department)
@@ -324,6 +350,10 @@ def update_department(
     return {
         "success": True,
         "data": DepartmentResponse.from_orm(department).dict(),
+        "profile_sync": {
+            "titles_synced": renamed,
+            **active_sync,
+        },
         "message": "Department updated successfully",
     }
 
@@ -382,9 +412,47 @@ def delete_department(
             detail=f"Department with id {department_id} not found",
         )
 
-    # PR-22: cascade cleanup
+    # RQ-13.a: cascade cleanup
     cleaned = {"services": 0, "department_services": 0, "queue_settings": 0,
                "registration_settings": 0, "queue_profile": False}
+
+    # RQ-13.a (D-06/S-11/D-02): a department whose linked profiles still
+    # own queue history (any day) or waiting patients cannot be hard-
+    # deleted — the profile deletion below would remove the tab surfaces
+    # those patients are reachable through. Same significant-link bar as
+    # the profile hard-delete guard (RQ-12.b), computed live from the
+    # same SSOT at execution time (stale-data protection by construction).
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        _profile_link_counts,
+    )
+    linked_profiles = _department_linked_profiles(db, department)
+    blocked_links: list[dict] = []
+    for profile in linked_profiles:
+        counts = _profile_link_counts(db, profile)
+        if counts["entries_total"] > 0:
+            blocked_links.append(
+                {
+                    "profile_key": profile.key,
+                    "daily_queues": counts["daily_queues"],
+                    "entries_waiting": counts["entries_waiting"],
+                    "entries_total": counts["entries_total"],
+                }
+            )
+    if blocked_links:
+        total_waiting = sum(b["entries_waiting"] for b in blocked_links)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "department_has_queue_history",
+                "message": (
+                    "Нельзя удалить отделение: связанные вкладки очередей "
+                    "все ещё содержат записи/ожидающих пациентов. "
+                    "Деактивируйте отделение вместо удаления."
+                ),
+                "waiting_patients": total_waiting,
+                "profiles": blocked_links,
+            },
+        )
 
     # Clear department_key from services
     from app.models.service import Service
@@ -461,6 +529,12 @@ def toggle_department(
 
     # Переключаем active
     department.active = not department.active
+    # RQ-13.a (D-06): the toggle is a lifecycle transition — propagate
+    # visibility to the linked QueueProfiles (hide all linked on
+    # deactivation, restore the department-owned profile on activation).
+    profile_sync = _sync_department_active_to_profiles(
+        db, department, active=department.active
+    )
     db.commit()
     db.refresh(department)
 
@@ -469,6 +543,7 @@ def toggle_department(
     return {
         "success": True,
         "data": DepartmentResponse.from_orm(department).dict(),
+        "profile_sync": profile_sync,
         "message": f"Department '{department.name_ru}' {status_text}",
     }
 
