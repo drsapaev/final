@@ -588,19 +588,25 @@ def test_alembic_chain_single_head_0062() -> None:
     assert graph["0066_general_retirement_cutover"] == (
         "0065_queue_numbering_unique",
     )
+    # RQ-13.b (D-06, E-039): the day's applied start-number snapshot
+    # chains after the QD-2E cutover (additive column + owner backfill).
+    assert graph["0067_daily_queue_start_number"] == (
+        "0066_general_retirement_cutover",
+    )
     # alembic_version.version_num is VARCHAR(32): both ends of the new
     # link must fit (CI on 40cec49 exploded on real PostgreSQL with a
     # 38-char id — scratch-SQLite ignores VARCHAR widths).
     assert len("0064_push_devices_registry") <= 32
     assert len("0065_queue_numbering_unique") <= 32
     assert len("0066_general_retirement_cutover") <= 32
+    assert len("0067_daily_queue_start_number") <= 32
     assert len("0063_queue_resource_contract") <= 32
     assert len("0062_telegram_webhook_dedup") <= 32
     assert len("0061_telegram_config_singleton") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    # single head: the QD-2E cutover chained after main's numbering UNIQUE
-    assert heads == ["0066_general_retirement_cutover"]
+    # single head: RQ-13.b chains after the QD-2E cutover
+    assert heads == ["0067_daily_queue_start_number"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

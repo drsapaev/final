@@ -11,6 +11,7 @@ from sqlalchemy import select, text  # RQ-14.a: row-lock + advisory lock
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import expand_queue_tags
 from app.crud import queue_resource_routing
+from app.crud.queue_resource_routing import effective_day_start_number
 from app.models.online_queue import QueueResource
 from app.services.queue_claim_service import (
     QueueClaimConflictError,
@@ -352,6 +353,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             .scalar()
         ) or 0
 
+        # RQ-13.b (D-06, E-039): колонка существует с 0067 — снапшот дня
+        # (заморожен при создании) теперь реально читается; живые рериды
+        # ниже — defense для строк без снапшота (легаси/восстановление).
         start_number = getattr(daily_queue, "start_number", None)
         if not start_number and daily_queue.queue_resource_id:
             resource = db.get(QueueResource, daily_queue.queue_resource_id)
@@ -511,6 +515,12 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                             "max_online_entries"
                         ]
                     ),
+                    # RQ-13.b (D-06, E-039): снимок применённого стартового
+                    # номера реестра — дальнейшие изменения живой строки
+                    # реестра не сдвигают базовую линию действующего дня.
+                    start_number=effective_day_start_number(
+                        db, resource=resource, queue_tag=queue_tag
+                    ),
                     # Codex round-7 P1: кабинет ОБЩЕЙ очереди тега — из
                     # реестра (default_cabinet; сиды 0059 держат NULL —
                     # канонического источника нет), НЕ из кабинета
@@ -624,6 +634,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             online_start_time=f"{int(queue_start_hour):02d}:00",
             online_end_time=f"{int(queue_end_hour):02d}:00",
             max_online_entries=defaults.get("max_online_entries"),
+            # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
+            # дня (владелец → клиника) — живые настройки не сдвигают день.
+            start_number=effective_day_start_number(
+                db, doctor=doctor, queue_tag=queue_tag
+            ),
             cabinet_number=defaults.get("cabinet_number"),
             cabinet_floor=defaults.get("cabinet_floor"),
             cabinet_building=defaults.get("cabinet_building"),
@@ -689,15 +704,18 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
         fallback_start = default_start
         if fallback_start is None:
-            # QD-2C: ресурсная очередь стартует с нумерации реестра
-            # (QueueResource.start_number_online — сиды 0059 перенесли
-            # LIVE-значения синтетика, до QD-2E значения совпадают)
-            if daily_queue is not None and daily_queue.queue_resource_id:
+            # RQ-13.b: снимок дня (0067) СТАРШЕ живого реестра — при
+            # наличии снапшота живое значение реестра игнорируется
+            # (D-06: «новые настройки не меняют ... текущего дня»).
+            if daily_queue is not None and getattr(daily_queue, "start_number", None):
+                fallback_start = int(daily_queue.start_number)
+            elif daily_queue is not None and daily_queue.queue_resource_id:
+                # QD-2C: ресурсная очередь стартует с нумерации реестра
+                # (QueueResource.start_number_online — сиды 0059 перенесли
+                # LIVE-значения синтетика, до QD-2E значения совпадают)
                 resource = db.get(QueueResource, daily_queue.queue_resource_id)
                 if resource is not None and resource.start_number_online:
                     fallback_start = int(resource.start_number_online)
-            elif daily_queue and getattr(daily_queue, "start_number", None):
-                fallback_start = daily_queue.start_number
         if fallback_start is None:
             tag_key = queue_tag or "default"
             fallback_start = start_numbers.get(
@@ -733,9 +751,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 .where(DailyQueue.id == daily_queue.id)
                 .with_for_update()
             )
-
-        # start_number не является полем DailyQueue, используется только для вычисления номера записи
-        # Не нужно устанавливать его в daily_queue
 
         return self.calculate_next_number(db, daily_queue)
 

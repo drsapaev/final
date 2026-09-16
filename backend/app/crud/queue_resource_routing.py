@@ -202,6 +202,53 @@ def resource_start_number(db: Session, daily_queue: DailyQueue) -> int | None:
     return int(resource.start_number_online)
 
 
+def effective_day_start_number(
+    db: Session,
+    *,
+    resource: QueueResource | None = None,
+    doctor=None,
+    queue_tag: str | None = None,
+) -> int:
+    """RQ-13.b / D-06 SSOT: effective start number to freeze into a NEW day.
+
+    D-06 chain «клиника → отделение → владелец» (department level —
+    RQ-23): the owner value applies when explicitly configured (>1 —
+    the column default reads as "unconfigured"), otherwise the clinic
+    level: ``settings.start_numbers[tag]`` →
+    ``SPECIALTY_START_NUMBERS[tag]`` → 1. Resource axis (QD-2C): the
+    registry value is the SSOT, unconditionally.
+
+    The result is frozen into ``DailyQueue.start_number`` at day
+    creation (Alembic 0067) and does NOT follow live settings: «Новые
+    настройки не меняют выданные номера и историю текущего дня» (E-039).
+
+    CRUD layer home (next to ``resource_start_number``): repositories of
+    ANY context (emr/queue) may import crud directly; the services impl
+    modules are queue-context-gated (architecture gate).
+    """
+    if resource is not None:
+        return int(resource.start_number_online or 1)
+    if doctor is not None:
+        owner_start = int(doctor.start_number_online or 0)
+        if owner_start > 1:
+            return owner_start
+    from app.crud.clinic import get_queue_settings
+    from app.services.queue_svc._base import QueueBusinessServiceMixinBase
+
+    settings = get_queue_settings(db) or {}
+    start_numbers = settings.get("start_numbers", {}) or {}
+    tag_key = queue_tag or "default"
+    raw = start_numbers.get(tag_key)
+    if raw is None:
+        raw = QueueBusinessServiceMixinBase.SPECIALTY_START_NUMBERS.get(tag_key)
+    if raw is None:
+        raw = QueueBusinessServiceMixinBase.SPECIALTY_START_NUMBERS.get("default", 1)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return QueueBusinessServiceMixinBase.SPECIALTY_START_NUMBERS.get("default", 1)
+
+
 def resolve_registry_tag_queue_for_specialist(
     db: Session, day: date, specialist_id: int | None, queue_tag: str | None
 ) -> DailyQueue | None:

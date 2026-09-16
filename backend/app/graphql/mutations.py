@@ -35,6 +35,11 @@ from app.crud.appointment import (
 )
 from app.crud.clinic import get_queue_settings
 from app.crud.patient import soft_delete_patient
+from app.crud.queue_resource_routing import (
+    effective_day_start_number,
+    resource_start_number,
+    tag_routes_to_resource,
+)
 
 # Backward-compatible monkeypatch seam for the registry deactivation regression.
 from app.crud.queue_resource_routing import (
@@ -42,10 +47,6 @@ from app.crud.queue_resource_routing import (
 )
 from app.crud.queue_resource_routing import (
     resolve_tag_resource_locked as _resolve_tag_resource_locked,
-)
-from app.crud.queue_resource_routing import (
-    resource_start_number,
-    tag_routes_to_resource,
 )
 from app.crud.visit import create_visit
 from app.schemas.patient import PatientCreate, PatientUpdate
@@ -1263,6 +1264,13 @@ class Mutation:
                         cabinet_number=doctor.cabinet,
                         active=True,
                         max_online_entries=doctor.max_online_per_day,
+                        # RQ-13.b (D-06, E-039): снимок эффективного
+                        # стартового номера нового дня (владелец →
+                        # клиника-уровень); тег отсутствует → клиника
+                        # «default».
+                        start_number=effective_day_start_number(
+                            db, doctor=doctor, queue_tag=None
+                        ),
                     )
                     db.add(daily_queue)
                     db.flush()
@@ -1405,14 +1413,16 @@ class Mutation:
                 # GQL-AUDIT-28 P0-3: race на выдаче номера — берём MAX(number)
                 # внутри транзакции; у DailyQueue нет счётчика current_number.
                 # Codex P1 (round-13): пустая очередь врача со сконфигурированным
-                # start_number_online != 1 выдавала всегда билет #1. Как в
-                # каноническом calculate_next_number (queue_svc/_operations.py):
-                # max(max_number + 1, start_number), старт — настройка врача.
-                # QD-2C (Codex round-1 P2): очередь тега реестра (ресурсная
-                # или мост) стартует со значения реестра — как REST/svc пути
-                # (calculate_next_number), иначе GQL и REST расходились бы в
-                # последовательностях при отличии от настроки врача.
-                start_floor = resource_start_number(db, daily_queue)
+                # start_number_online != 1 выдавала всегда билет #1 — пол врача
+                # стал значением владельца.
+                # RQ-13.b (D-06, E-039): ПЕРВИЧНЫЙ пол — снимок дня
+                # (DailyQueue.start_number, 0067 — заморожен при создании);
+                # живые рериды реестра/врача — defense для строк без
+                # снапшота. Смена doctor.start_number_online в середине дня
+                # больше не сдвигает базовую линию действующего дня.
+                start_floor = getattr(daily_queue, "start_number", None)
+                if not start_floor:
+                    start_floor = resource_start_number(db, daily_queue)
                 if start_floor is None:
                     start_floor = doctor.start_number_online
                 next_number = max(

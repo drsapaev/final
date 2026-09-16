@@ -785,11 +785,17 @@ def test_alembic_chain_single_head_0063() -> None:
     assert graph["0066_general_retirement_cutover"] == (
         "0065_queue_numbering_unique",
     )
+    # RQ-13.b (D-06, E-039): the day's applied start-number snapshot
+    # chains after the QD-2E cutover (additive column + owner backfill).
+    assert graph["0067_daily_queue_start_number"] == (
+        "0066_general_retirement_cutover",
+    )
     assert len("0066_general_retirement_cutover") <= 32
+    assert len("0067_daily_queue_start_number") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    # single head: the QD-2E cutover chained after main's numbering UNIQUE
-    assert heads == ["0066_general_retirement_cutover"]
+    # single head: RQ-13.b chains after the QD-2E cutover
+    assert heads == ["0067_daily_queue_start_number"]
 
 
 # ===================== D. parity + ADR =====================

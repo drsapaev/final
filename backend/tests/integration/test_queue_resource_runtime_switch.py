@@ -3632,6 +3632,11 @@ def test_full_update_independent_entry_uses_resource_floor(
         queue_tag="lab",
         queue_resource_id=resource.id,
     )
+    # RQ-13.b (D-06): 0067 backfill parity — a day row that predates the
+    # snapshot carries its owner's registry floor; the independent-entry
+    # number must keep flooring at the registry value THROUGH the frozen
+    # snapshot (get_next_queue_number reads start_number first).
+    target_queue.start_number = 40
     assert target_queue.id != source_queue.id
 
     from datetime import datetime as _dt

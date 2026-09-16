@@ -46,6 +46,7 @@ import os
 import subprocess
 import sys
 import uuid
+from types import SimpleNamespace
 from datetime import UTC, date, datetime, time
 
 from pathlib import Path
@@ -147,9 +148,9 @@ def _assert_pg_head(engine) -> None:
     assert engine.dialect.name == "postgresql"
     with engine.connect() as conn:
         version = conn.execute(text("select version_num from alembic_version")).scalar()
-    # QD-2E chain reconciliation: the PR chains 0066_general_retirement_cutover
-    # (data-only) after 0065 — the populated head assert advances with it.
-    assert version == "0066_general_retirement_cutover", version
+    # QD-2E chain reconciliation + RQ-13.b: the populated head assert
+    # advances with the chain (0065 -> 0066 cutover -> 0067 snapshot).
+    assert version == "0067_daily_queue_start_number", version
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:
@@ -232,13 +233,25 @@ def _make_doctor(session, suffix: str):
 
 
 def _seed_queue(session, doctor_id: int, day: date, tag, active=True):
-    from app.models.online_queue import DailyQueue
-
-    q = DailyQueue(day=day, specialist_id=doctor_id, queue_tag=tag, active=active)
-    session.add(q)
+    """RQ-13.b: Core INSERT with the 0064-era column list so the
+    populated-upgrade proof can seed rows at the OLD schema revision
+    while later tests seed the same helper at head (start_number is
+    server-defaulted, never referenced)."""
+    # RAW SQL with the 0064-era column list: any SQLAlchemy insert
+    # (entity or Core) auto-includes python-defaulted columns such as the
+    # 0067 start_number, which does not exist on the pre-0067 schema this
+    # proof seeds at. A full ORM re-select would also reference the new
+    # column — callers only ever use .id, so return a lightweight stand-in.
+    row = session.execute(
+        text(
+            "INSERT INTO daily_queues (day, specialist_id, queue_tag, active, "
+            "online_start_time, online_end_time, max_online_entries) "
+            "VALUES (:d, :s, :t, :a, '07:00', '09:00', 15) RETURNING id"
+        ),
+        {"d": day, "s": doctor_id, "t": tag, "a": active},
+    ).one()
     session.commit()
-    session.refresh(q)
-    return q
+    return SimpleNamespace(id=row[0])
 
 
 def _seed_entry(session, queue_id: int, number: int, status="waiting", source="desk"):

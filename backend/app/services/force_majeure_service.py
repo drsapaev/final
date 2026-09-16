@@ -394,11 +394,20 @@ class ForceMajeureService:
             if doctor and doctor.specialty:
                 queue_tag = doctor.specialty.lower().replace(" ", "_")
 
+            # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
+            # нового (завтрашнего) дня — паритет с queue_svc-конструктором.
+            from app.crud.queue_resource_routing import (
+                effective_day_start_number,
+            )
+
             queue = DailyQueue(
                 day=target_date,
                 specialist_id=specialist_id,
                 queue_tag=queue_tag,
-                active=True
+                active=True,
+                start_number=effective_day_start_number(
+                    self.db, doctor=doctor, queue_tag=queue_tag
+                ),
             )
             self.db.add(queue)
             self.db.flush()
