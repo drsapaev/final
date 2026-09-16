@@ -20,7 +20,7 @@ import { useRegistrarWorklistData } from './registrar/useRegistrarWorklistData';
 import {
   computeDepartmentStats,
   computeRegistrarWorklistRows,
-  resolveRegistrarWorklistEmptyScopeKind,
+  resolveRegistrarWorklistPresentationFacts,
   type QueueProfileItem,
 } from './registrar/registrarWorklistRows';
 import { useRegistrarDialogs } from './registrar/useRegistrarDialogs';
@@ -434,7 +434,7 @@ const RegistrarPanel = () => {
             // RQ-20.b: явный сброс активного статус-фильтра (владелец URL — useRegistrarNavigation).
             onClearStatusFilter={clearStatusFilter}
             stale={worklistStale} onRetry={() => { void loadAppointments({ silent: false, source: 'worklist_retry' }); }}
-            emptyScopeKind={resolveRegistrarWorklistEmptyScopeKind({ appointments, activeTab, queueProfiles })}
+            {...resolveRegistrarWorklistPresentationFacts({ appointments, activeTab, queueProfiles, rows: filteredAppointments as Record<string, unknown>[], hasMore: paginationInfo.hasMore })}
             tI18n={tI18n}
           />
         }
