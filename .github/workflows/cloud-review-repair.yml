@@ -1,0 +1,46 @@
+name: Review repair sandbox
+
+on:
+  push:
+    branches: [cloud/review-repair-20260916]
+    paths:
+      - .github/workflows/cloud-review-repair.yml
+      - scripts/cloud_review_repair/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-review-repair-20260916
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: github.repository == 'drsapaev/final' && github.ref == 'refs/heads/cloud/review-repair-20260916'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Package tracked review sources (no runtime data or credentials)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/review-sources"
+          git rev-parse HEAD > "$RUNNER_TEMP/review-sources/HEAD.txt"
+          git archive --format=tar.gz HEAD \
+            AGENTS.md docs/devbrain docs/runbooks .agents/skills \
+            ai/langgraph backend/app backend/tests backend/alembic \
+            backend/pyproject.toml backend/uv.lock backend/requirements.txt \
+            backend/alembic.ini frontend/src frontend/package.json \
+            frontend/package-lock.json frontend/vite.config.ts \
+            frontend/vitest.config.ts frontend/tsconfig.json \
+            .github/workflows scripts/check_pr_review_template.py \
+            > "$RUNNER_TEMP/review-sources/review-sources.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: review-sources
+          path: ${{ runner.temp }}/review-sources/
+          retention-days: 1
+          if-no-files-found: error
