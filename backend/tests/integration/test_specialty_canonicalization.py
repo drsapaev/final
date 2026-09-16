@@ -200,6 +200,7 @@ def test_clinic_wide_join_finds_canonical_dentistry_doctor(
         patient_name="D-1 Patient",
         phone="+998900000111",
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     # The join resolved the profile to the canonical doctor instead of
     # raising "Нет активных врачей для профиля ...".

@@ -88,6 +88,8 @@ export interface QueueFilters {
 
 export interface QueueSpecialist {
   id: number | string;
+  /** RQ-09.b (D-01): explicit entity type — echoed back in specialist_entity_types */
+  entity_type?: 'doctor' | 'profile';
   doctor_name?: string;
   full_name?: string;
   name?: string;

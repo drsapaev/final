@@ -260,12 +260,39 @@ class SessionsMixin(QRQueueServiceMixinBase):
         patient_name: str,
         phone: str,
         telegram_id: int | None = None,
+        specialist_entity_types: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Завершает сессию присоединения для нескольких специалистов (общий QR).
+
+        RQ-09.b (D-01 APPROVED 2026-09-15): тип каждой сущности в
+        ``specialist_ids`` передаётся ЯВНО через ``specialist_entity_types``
+        (выровнен по индексам; значения 'doctor' | 'profile') и никогда не
+        выводится из совпадения числового ID.
         """
         if not specialist_ids:
             raise ValueError("Не выбраны специалисты для записи")
+
+        normalized_entity_types: list[str] | None = None
+        if specialist_entity_types is not None:
+            if len(specialist_entity_types) != len(specialist_ids):
+                raise ValueError(
+                    "specialist_entity_types должен соответствовать specialist_ids по длине"
+                )
+            allowed_types = {"doctor", "profile"}
+            normalized_entity_types = [
+                str(entity_type).strip().lower()
+                for entity_type in specialist_entity_types
+            ]
+            unknown = [
+                entity_type
+                for entity_type in normalized_entity_types
+                if entity_type not in allowed_types
+            ]
+            if unknown:
+                raise ValueError(
+                    f"Недопустимый тип специалиста: {', '.join(sorted(set(unknown)))}"
+                )
 
         # expires_at сохраняется в UTC (datetime.now(UTC)), поэтому сравниваем с UTC
         session = self._claim_pending_join_session(session_token)
@@ -295,7 +322,12 @@ class SessionsMixin(QRQueueServiceMixinBase):
         errors: list[dict[str, Any]] = []
         created_entries: list[OnlineQueueEntry] = []
 
-        for specialist_id in specialist_ids:
+        for index, specialist_id in enumerate(specialist_ids):
+            specialist_type = (
+                normalized_entity_types[index]
+                if normalized_entity_types is not None
+                else None
+            )
             try:
                 join_result = self.queue_domain_service.allocate_ticket(
                     allocation_mode="join_with_token",
@@ -305,6 +337,7 @@ class SessionsMixin(QRQueueServiceMixinBase):
                     telegram_id=telegram_id,
                     patient_id=patient_id,  # ⭐ Теперь ВСЕГДА заполнен
                     specialist_id_override=specialist_id,
+                    specialist_type=specialist_type,
                     source="online",
                 )
                 entry = join_result["entry"]

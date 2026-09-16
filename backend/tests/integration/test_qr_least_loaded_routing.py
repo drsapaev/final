@@ -241,6 +241,7 @@ def test_clinic_wide_join_routes_to_least_loaded(db_session, monkeypatch) -> Non
         patient_name="D-2 Patient",
         phone="+998900000222",
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     assert result["entry"] is not None
 
@@ -458,6 +459,7 @@ def test_clinic_wide_join_routes_around_limit_reached_doctor(
         patient_name="D-2 Bookable Patient",
         phone="+998900000333",
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     assert result["entry"] is not None
 
@@ -787,6 +789,7 @@ def test_clinic_wide_join_skips_owner_ineligible_ghosts(
         patient_name="D-2 Ghost Patient",
         phone="+998900000444",
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     assert result["entry"] is not None
     routed = (
@@ -896,6 +899,7 @@ def test_clinic_wide_join_retry_returns_original_entry(db_session, monkeypatch) 
         patient_name="D-2 Retry Patient",
         phone=phone,
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     assert first_result["entry"] is not None
     assert first_result["duplicate"] is False
@@ -908,6 +912,7 @@ def test_clinic_wide_join_retry_returns_original_entry(db_session, monkeypatch) 
         patient_name="D-2 Retry Patient",
         phone=phone,
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     assert retry_result["duplicate"] is True
     assert retry_result["entry"].id == first_result["entry"].id

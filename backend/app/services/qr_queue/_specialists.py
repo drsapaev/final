@@ -137,6 +137,11 @@ class SpecialistsMixin(QRQueueServiceMixinBase):
             selectable.append(
                 {
                     "id": doctor.id,
+                    # RQ-09.b (D-01): the selection carries the entity type
+                    # EXPLICITLY so the join never infers it from a numeric
+                    # id match (Doctor.id / QueueProfile.id are different
+                    # id spaces).
+                    "entity_type": "doctor",
                     "specialty": profile_key,
                     "specialty_display": (
                         profile.get("title_ru")

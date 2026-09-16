@@ -421,6 +421,15 @@ const QueueJoin = () => {
       // Если выбраны специалисты (общий QR), добавляем их в запрос
       if (selectedSpecialists && selectedSpecialists.length > 0) {
         requestBody.specialist_ids = selectedSpecialists;
+        // RQ-09.b (D-01): тип сущности передаётся явно — тип не выводится
+        // на сервере из совпадения числового ID (Doctor.id и QueueProfile.id
+        // — разные пространства идентификаторов).
+        const entityTypeById = new Map(
+          availableSpecialists.map((s) => [String(s.id), s.entity_type ?? 'doctor'])
+        );
+        requestBody.specialist_entity_types = selectedSpecialists.map(
+          (id) => entityTypeById.get(String(id)) ?? 'doctor'
+        );
       }
 
       const joinResult = await completeQueueJoinSession(requestBody);
