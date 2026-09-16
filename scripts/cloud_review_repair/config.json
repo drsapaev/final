@@ -19,7 +19,7 @@
   "green": [
     {"cwd": "backend", "argv": ["python", "-m", "ruff", "check", "--fix", "tests/test_review_profile_lifecycle.py"]},
     {"cwd": "backend", "argv": ["python", "-m", "ruff", "format", "tests/test_review_profile_lifecycle.py"]},
-    {"cwd": "backend", "argv": ["python", "-m", "pytest", "tests/test_review_profile_lifecycle.py", "tests/unit/test_codex_lifecycle_regressions.py", "tests/integration/test_admin_departments_icon_null.py", "tests/integration/test_admin_departments_overview_route.py", "tests/unit/test_specialty_canonicalization.py", "-o", "addopts=", "--junitxml=$EVIDENCE/green.xml"]},
+    {"cwd": "backend", "argv": ["python", "-m", "pytest", "tests/test_review_profile_lifecycle.py", "tests/integration/test_codex_lifecycle_regressions.py", "tests/integration/test_admin_departments_icon_null.py", "tests/integration/test_admin_departments_overview_route.py", "tests/integration/test_specialty_canonicalization.py", "-o", "addopts=", "--junitxml=$EVIDENCE/green.xml"]},
     {"cwd": "backend", "argv": ["python", "-m", "ruff", "check", "app/api/v1/endpoints/registrar_integration/_queue_profiles.py", "tests/test_review_profile_lifecycle.py"]}
   ]
 }
