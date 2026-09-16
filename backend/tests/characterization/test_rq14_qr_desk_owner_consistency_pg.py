@@ -510,6 +510,7 @@ def test_concurrent_desk_and_qr_numbering_stay_unique_within_one_queue(
     snapshot after the first one's number landed. Per-queue uniqueness
     is asserted here; numbers repeating ACROSS queues is a different
     (preserved) contract."""
+
     _patch_online_window()
     world = _seed_join_world(pg_session, suffix="race", service_tag="cardiology_race")
 

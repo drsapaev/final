@@ -776,10 +776,20 @@ def test_alembic_chain_single_head_0063() -> None:
     # canonical multi-device store; write-maintained only, no push
     # activation in this migration).
     assert graph["0064_push_devices_registry"] == ("0063_queue_resource_contract",)
+    # RQ-14.a.1 (main #3252): DB-level UNIQUE for queue numbering and
+    # the doctor axis claimed the 0065 slot from 0064.
+    assert graph["0065_queue_numbering_unique"] == ("0064_push_devices_registry",)
+    # QD-2E (RQ-15.b): the cutover was renumbered 0065 -> 0066 after
+    # main's RQ-14.a.1 claimed the 0065 slot from the same parent — the
+    # chain stays single-headed.
+    assert graph["0066_general_retirement_cutover"] == (
+        "0065_queue_numbering_unique",
+    )
+    assert len("0066_general_retirement_cutover") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    # RQ-14.a.1: the chain head moved to 0065.
-    assert heads == ["0065_queue_numbering_unique"]
+    # single head: the QD-2E cutover chained after main's numbering UNIQUE
+    assert heads == ["0066_general_retirement_cutover"]
 
 
 # ===================== D. parity + ADR =====================

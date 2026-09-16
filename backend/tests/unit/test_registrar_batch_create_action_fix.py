@@ -4,7 +4,7 @@ from datetime import date
 from types import SimpleNamespace
 
 from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.service import Service
 from app.models.user import User
 from app.services.batch_patient_service import BatchPatientService, EntryAction
@@ -108,11 +108,17 @@ def test_create_entry_routes_through_queue_domain_service_boundary(
     assert captured["daily_queue"].queue_tag == "cardiology"
 
 
-def test_create_entry_returns_safe_error_when_queue_resolution_is_ambiguous(
+def test_create_entry_with_multiple_tag_queues_resolves_the_owner_by_contract(
     db_session,
     test_patient,
     test_doctor,
 ):
+    """QD-2E surface-reuse ruling (PR review thread 3995689410): several
+    doctor queues sharing a queue_tag/day are NOT an error by themselves.
+    The former 'Неоднозначная очередь' guard counted queues and adopted
+    the single existing one — both halves are gone: the owner comes from
+    the resolver contracts (here the single eligible specialty match),
+    and the entry lands on exactly that owner's queue."""
     second_doctor = _create_second_doctor(db_session)
     service = _create_batch_service(
         db_session,
@@ -149,6 +155,13 @@ def test_create_entry_returns_safe_error_when_queue_resolution_is_ambiguous(
         ),
     )
 
-    assert result.status == "error"
-    assert result.id == 0
-    assert "Неоднозначная очередь" in (result.error or "")
+    assert result.status == "created"
+    entry = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.id == result.id)
+        .one()
+    )
+    queue = db_session.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).one()
+    # the single eligible specialty match owns the entry — the queue
+    # count never chose the owner and never raised
+    assert queue.specialist_id == second_doctor.id

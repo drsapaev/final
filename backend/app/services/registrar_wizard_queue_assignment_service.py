@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.crud.queue_owner_policy import QueueOwnerConfigurationError
+from app.crud.queue_resource_routing import lock_queue_tag_claim_scope
+from app.models.service import Service
 from app.models.visit import Visit
 from app.services.morning_assignment import (
     MorningAssignmentCreateBranchHandoff,
     MorningAssignmentPreparedQueueAssignment,
+    MorningAssignmentReusedEntryBinding,
     MorningAssignmentService,
 )
 from app.services.queue_domain_service import QueueDomainService
@@ -75,6 +79,29 @@ class RegistrarWizardQueueAssignmentService:
         queue_numbers: dict[int, list[dict[str, Any]]] = {}
         assignment_service = self._assignment_service_factory(self.db)
 
+        # QD-2E P1 (wizard/cart atomicity): корзина живёт в ОДНОЙ внешней
+        # транзакции с ОДНИМ commit-ом владельца вызова (атомарный
+        # /registrar/cart) — коммитить её по одному визиту нельзя. Поэтому
+        # ДО первого prepare_wizard_queue_assignment (т.е. до любого
+        # routing/owner lookup/write) собираем ВСЕ (day, queue_tag) ключи
+        # корзины, сортируем точные ключи и берём lock_queue_tag_claim_scope
+        # ровно один раз на ключ. Повторное взятие того же transaction-scoped
+        # lock внутри claim-координатора idempotent, зато две конкурирующие
+        # корзины (или корзина и любой single-tag writer — QR/GraphQL/
+        # подтверждение) не могут держать пересекающиеся scope-ы во взаимно
+        # обратном порядке (deadlock) и не видят полуматериализованную
+        # корзину.
+        # QD-2E review P1: сами ключи БерЁТ prelock_cart_tag_claim_scopes
+        # из эндпоинта корзины — ДО первого create_visit (см. docstring
+        # этого хелпера: FK KEY SHARE визита на враче обязан браться ПОД
+        # уже взятым scope-ом). Этот проход остаётся поясом надёжности:
+        # идемпотентное пере-взятие тех же ключей + закрытие расхождения,
+        # если каталог услуг сменил тег между pre-lock и материализацией
+        # визитов.
+        self._lock_cart_tag_claim_scopes(
+            assignment_service, visits, target_day
+        )
+
         for visit in visits:
             if visit.visit_date != target_day or visit.status != "confirmed":
                 continue
@@ -111,6 +138,19 @@ class RegistrarWizardQueueAssignmentService:
                         visit.id,
                         source,
                     )
+            except QueueOwnerConfigurationError:
+                # QD-2E (RQ-15.b): конфигурационная ошибка владельца —
+                # не per-visit transient-сбой. Тишина (continue) вернула
+                # бы баг-класс QD-0: корзина отвечает success, визит
+                # создан, номера очереди нет. Пробиваем наверх — cart-эндпоинт
+                # откатит транзакцию и вернёт оператору 4xx с причиной (D-08).
+                logger.error(
+                    "QD-2E fail-closed: queue owner configuration error "
+                    "for visit %d (source=%s) — re-raise (D-08)",
+                    visit.id,
+                    source,
+                )
+                raise
             except Exception as exc:
                 logger.warning(
                     "REGISTRATION: Queue assignment failed for visit %d (source=%s): %s",
@@ -122,6 +162,89 @@ class RegistrarWizardQueueAssignmentService:
                 continue
 
         return queue_numbers
+
+    @staticmethod
+    def prelock_cart_tag_claim_scopes(
+        db: Session,
+        cart_visits: Sequence[Any],
+        *,
+        target_day: date,
+    ) -> None:
+        """Take the claim lock for every (day, tag) scope of the cart BEFORE
+        the cart writes its first row.
+
+        QD-2E review P1 (cart/GQL lock-order inversion): the visit INSERT
+        fires the ``visits.doctor_id`` FK check, which holds a FOR KEY SHARE
+        row lock on the doctor until the cart's single commit. Taking the
+        tag/day advisory locks only later — inside
+        ``assign_same_day_queue_numbers`` — inverted the global lock order
+        against GraphQL ``joinQueue`` (tag/day advisory lock first, then
+        ``Doctor ... FOR UPDATE``): the cart held the doctor's KEY SHARE and
+        waited for the advisory lock, joinQueue held the advisory lock and
+        waited for the doctor row — a deadlock PostgreSQL must break by
+        aborting one of the two business operations.
+
+        Pre-acquiring the full scope set from the REQUEST payload (the same
+        service rows the assignment pass later re-derives from the created
+        VisitService rows) restores the order: the cart waits for a claim
+        scope BEFORE it holds any doctor row lock, so it can never queue
+        behind an advisory-lock holder that is itself waiting on the cart.
+        The locks are transaction-scoped and idempotent while held, so the
+        re-acquisition inside ``_lock_cart_tag_claim_scopes`` stays free.
+
+        The payload items are duck-typed (``.visit_date`` + ``.services``
+        with ``.service_id``) — the endpoint schemas are not imported here
+        to keep the api -> services direction of the context boundary. The
+        same-day mirror of ``_lock_cart_tag_claim_scopes`` is exact: the
+        cart always creates its visits ``confirmed``.
+        """
+        service_ids: set[int] = set()
+        for visit_request in cart_visits:
+            if visit_request.visit_date != target_day:
+                # Same-day confirmed visits only — the exact scope the
+                # assignment pass processes below mirrors this filter.
+                continue
+            for service_item in visit_request.services:
+                service_ids.add(int(service_item.service_id))
+        if not service_ids:
+            return
+        queue_tags = {
+            row[0]
+            for row in (
+                db.query(Service.queue_tag)
+                .filter(
+                    Service.id.in_(service_ids),
+                    Service.queue_tag.isnot(None),
+                )
+                .all()
+            )
+            if row[0]
+        }
+        for queue_tag in sorted(queue_tags):
+            lock_queue_tag_claim_scope(db, queue_tag, target_day)
+
+    def _lock_cart_tag_claim_scopes(
+        self,
+        assignment_service: MorningAssignmentService,
+        visits: Sequence[Visit],
+        target_day: date,
+    ) -> None:
+        """Take the claim lock for EVERY (day, tag) scope of the whole cart.
+
+        QD-2E P1: scope mirrors the per-visit eligibility below (same-day
+        confirmed visits). The exact ``(day, queue_tag)`` keys are sorted,
+        and each scope is taken exactly ONCE before any visit is prepared —
+        the deterministic order is what keeps overlapping carts/writers
+        deadlock-free (see lock_queue_tag_claim_scope).
+        """
+        cart_scope: set[tuple[date, str]] = set()
+        for visit in visits:
+            if visit.visit_date != target_day or visit.status != "confirmed":
+                continue
+            for queue_tag in assignment_service._get_visit_queue_tags(visit):
+                cart_scope.add((target_day, queue_tag))
+        for day, queue_tag in sorted(cart_scope):
+            lock_queue_tag_claim_scope(self.db, queue_tag, day)
 
     def _assign_same_day_queues_for_visit(
         self,
@@ -165,6 +288,13 @@ class RegistrarWizardQueueAssignmentService:
             return []
 
         queue_assignments: list[dict[str, Any]] = []
+        # QD-2E review P1 (2c5ea05ce, external report): provenance ledger
+        # of the PRE-EXISTING entries the reuse branch bound to THIS
+        # visit (entry_id -> pre-binding links). The compensating cleanup
+        # below DELETES only entries this basket created; the ledger rows
+        # are RESTORED to their pre-binding links instead — see
+        # _cleanup_visit_queue_entries.
+        reused_entry_bindings: dict[int, MorningAssignmentReusedEntryBinding] = {}
         # Codex R3 #3092 (P1): capture the PK while the instance is alive —
         # after a deep full rollback the ORM instance is expired, and every
         # attribute access below must not depend on a refresh that would
@@ -190,7 +320,11 @@ class RegistrarWizardQueueAssignmentService:
         # (её строки даже не перечитываются), контракт P2-1c «после сбоя в БД
         # не остаётся ни одной записи очереди визита» выполняется, частичное
         # присвоение по-прежнему невозможно (queue_assignments.clear() + break).
-        for queue_tag in unique_queue_tags:
+        # QD-2E P1: перебор только sorted-порядком — cart-scope-ы уже
+        # взяты _lock_cart_tag_claim_scopes в начале корзины; здесь порядок
+        # детерминирован для воспроизводимости материала корзины.
+        ordered_queue_tags = sorted(unique_queue_tags)
+        for queue_tag in ordered_queue_tags:
             try:
                 prepared_assignment = assignment_service.prepare_wizard_queue_assignment(
                     visit,
@@ -198,9 +332,31 @@ class RegistrarWizardQueueAssignmentService:
                     target_day,
                     source=source,
                 )
+                if (
+                    prepared_assignment is not None
+                    and prepared_assignment.reused_entry_binding is not None
+                ):
+                    binding = prepared_assignment.reused_entry_binding
+                    reused_entry_bindings[binding.entry_id] = binding
                 assignment = self._materialize_prepared_assignment(prepared_assignment)
                 if assignment:
                     queue_assignments.append(assignment)
+            except QueueOwnerConfigurationError:
+                # QD-2E (Codex round-1 P1): re-raise ДО generic-ветки —
+                # компенсирующая зачистка ниже вернула бы пустой список,
+                # верхний цикл продолжил бы другие визиты, и cart-эндпоинт
+                # закоммитил бы 200 с визитами без номеров (тихий QD-0).
+                # Конфиг-ошибка — не transient-сбой визита: пробиваем
+                # наверх до except QueueOwnerConfigurationError в
+                # assign_same_day_queue_numbers → 422 оператору (D-08).
+                logger.error(
+                    "QD-2E fail-closed: queue owner configuration error "
+                    "for visit %d queue_tag=%s (source=%s) — re-raise (D-08)",
+                    visit_id,
+                    queue_tag,
+                    source,
+                )
+                raise
             except Exception as exc:
                 logger.error(
                     "Ошибка присвоения очередей для визита %d: %s",
@@ -222,16 +378,23 @@ class RegistrarWizardQueueAssignmentService:
                 )
                 if not visit_still_in_tx:
                     raise
-                # Компенсирующая зачистка: DELETE записей очереди этого визита
-                # в той же транзакции (почему не rollback и не savepoint — см.
-                # комментарий выше). Ошибка зачистки НЕ глотается: она уйдёт в
-                # top-level assign_same_day_queue_numbers, визит не будет
+                # Компенсирующая зачистка С УЧЁТОМ ПРОИСХОЖДЕНИЯ записей
+                # (QD-2E review P1 на 2c5ea05ce): созданные этой корзиной
+                # записи удаляются (контракт P2-1c «после сбоя в БД не
+                # остаётся ни одной СОЗДАННОЙ записи очереди визита»), а
+                # переиспользованные закоммиченные талоны — ВОССТАНАВЛИВАЮТ
+                # прежние связи (patient_id/visit_id до привязки): их
+                # удаление стирало ранее сохранённый QR-талон, когда
+                # следующее направление корзины падало после flush.
+                # Ошибка зачистки НЕ глотается: она уйдёт в top-level
+                # assign_same_day_queue_numbers, визит не будет
                 # активирован, а endpoint атомарной корзины не закоммитит
                 # частичное состояние (P2-1c).
-                self._cleanup_visit_queue_entries(visit)
-                # P2-1c: CLEAR stale data — компенсированные записи больше не
-                # существуют в транзакции, поэтому словари в queue_assignments
-                # ссылались бы на несуществующие строки.
+                self._cleanup_visit_queue_entries(visit, reused_entry_bindings)
+                # P2-1c: CLEAR stale data — созданные записи удалены, а
+                # переиспользованные восстановлены в ДО-корзинное состояние
+                # (без связей с визитом), поэтому словари в queue_assignments
+                # больше не соответствуют строкам очереди этого визита.
                 queue_assignments.clear()
                 # P2-1c: обработка останавливается на этом визите — частичное
                 # присвоение не поддерживается.
@@ -239,28 +402,128 @@ class RegistrarWizardQueueAssignmentService:
 
         return queue_assignments
 
-    def _cleanup_visit_queue_entries(self, visit: Visit) -> None:
-        """Удалить записи очереди ЭТОГО визита в текущей транзакции.
+    def _cleanup_visit_queue_entries(
+        self,
+        visit: Visit,
+        reused_entry_bindings: (
+            Mapping[int, MorningAssignmentReusedEntryBinding] | None
+        ) = None,
+    ) -> None:
+        """Компенсирующая зачистка записей очереди ЭТОГО визита с учётом
+        их ПРОИСХОЖДЕНИЯ (QD-2E review P1 на 2c5ea05ce).
 
-        Компенсирующее действие вместо rollback/savepoint: rollback стёр бы
-        flush-нутые строки атомарной корзины (Codex R1 #3092), savepoint
-        несовместим с savepoint-изоляцией db_session-фикстуры в тестах
-        (P2-1b). DELETE по visit_id затрагивает только записи очереди
-        визита — корзина (визиты/invoice) не перечитывается и не меняется.
+        Раньше зачистка удаляла ВСЕ записи с visit_id == visit.id. После
+        того как prepare_wizard_queue_assignment начал привязывать
+        существующий (закоммиченный) QR-талон к создаваемому визиту, эта
+        семантика стирала ранее сохранённый талон: первое направление
+        корзины переиспользовало талон (visit_id <- visit.id), следующее
+        падало не-SQL ошибкой после flush — и компенсация удаляла талоны,
+        которые существовали ДО корзины. Это потеря данных, а не откат
+        собственных записей корзины.
+        Теперь запись различается по происхождению:
+
+        - создана этой корзиной (create-ветка) — DELETE, контракт P2-1c
+          («после сбоя в БД не остаётся ни одной созданной записи
+          очереди визита») сохранён;
+        - переиспользованный закоммиченный талон — RESTORE прежних
+          связей (patient_id/visit_id из снапшота привязки, снятого ДО
+          записи): номер, queue_time и остальные поля талона корзина
+          никогда не трогала, они не восстанавливаются — они не менялись.
+
+        QD-2E review P2 (c48081f03): восстановление применяется по ID из
+        ``reused_entry_bindings`` — НЕ по результату запроса по visit_id.
+        Штатная SessionLocal работает с ``autoflush=False``: привязка
+        переиспользованного талона может остаться ТОЛЬКО в памяти
+        (ошибка следующего направления случилась до первого явного
+        flush), и запрос очистки по visit_id вернёт ПУСТО — но внешний
+        commit() обязанателен flush, и неприменённый журнал оставил бы
+        привязку в БД (визит confirmed + талон, связанный с ним, при
+        assignments=[]; повторная регистрация упирается в guard «талон
+        уже связан с другим визитом»). Запрос по визиту остаётся
+        источником CREATED-записей; доступ к журналу восстановления —
+        только по ID из снапшота.
+
+        Механизм по-прежнему без rollback и без savepoint: rollback стёр
+        бы flush-нутые строки атомарной корзины (Codex R1 #3092), savepoint
+        несовместим с savepoint-изоляцией db_session-фикстуры (P2-1b).
+        Корзина (визиты/invoice) не перечитывается и не меняется.
         """
         from app.models.online_queue import OnlineQueueEntry
 
+        bindings: Mapping[int, MorningAssignmentReusedEntryBinding] = (
+            reused_entry_bindings or {}
+        )
+        # Codex R3 #3092 (P1): capture the PK while the instance is alive.
+        visit_id = visit.id
+
+        # CREATED-entry candidates: rows the DB already associates with
+        # the visit. autoflush is OFF, so this query runs WITHOUT
+        # flushing pending state — deliberate: the compensation must not
+        # persist an in-memory binding just because it queried for it.
         entries = self.db.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.visit_id == visit.id
+            OnlineQueueEntry.visit_id == visit_id
         ).all()
-        for entry in entries:
+        entries_by_id: dict[int, OnlineQueueEntry] = {
+            entry.id: entry for entry in entries
+        }
+
+        restored_count = 0
+        # RESTORE first — by ledger ID, independent of the query outcome
+        # (the c48081f03 review P2): db.get() is an identity-map hit for
+        # the unflushed binding (the reuse branch loaded the row in THIS
+        # session), a real SELECT only happens when the row is absent.
+        for entry_id, binding in bindings.items():
+            entry = entries_by_id.pop(entry_id, None)
+            if entry is None:
+                entry = self.db.get(OnlineQueueEntry, entry_id)
+            if entry is None:
+                # The talon vanished mid-transaction (deleted by another
+                # path): there is no row left to restore — report loudly,
+                # the binding cannot survive a deleted row either.
+                logger.error(
+                    "REGISTRATION: переиспользованный талон id=%d (визит %d) "
+                    "исчез до применения компенсации — восстановление "
+                    "невозможно",
+                    entry_id,
+                    visit_id,
+                )
+                continue
+            # Снапшот снят ДО привязки и не зависит от ORM history (flush
+            # между привязкой и сбоем её очищает).
+            entry.patient_id = binding.previous_patient_id
+            entry.visit_id = binding.previous_visit_id
+            restored_count += 1
+
+        # DELETE the created entries the DB already knows about.
+        deleted_count = 0
+        for entry in entries_by_id.values():
             self.db.delete(entry)
-        if entries:
+            deleted_count += 1
+
+        # Belt-and-suspenders (the created-entry twin of the same gap):
+        # an entry the basket CREATED but never flushed (the allocator
+        # staged the object and failed before its INSERT) is PENDING in
+        # the session — invisible to the visit_id query, and the outer
+        # commit() would INSERT it. A pending object was never written,
+        # so the compensation is an EXPUNGE (dropping the future INSERT),
+        # not a DELETE statement.
+        for obj in list(self.db.new):
+            if (
+                isinstance(obj, OnlineQueueEntry)
+                and obj.visit_id == visit_id
+                and obj.id not in bindings
+            ):
+                self.db.expunge(obj)
+                deleted_count += 1
+
+        if entries or restored_count or deleted_count:
             self.db.flush()
             logger.info(
-                "REGISTRATION: компенсирующая зачистка очереди визита %d — удалено записей: %d",
-                visit.id,
-                len(entries),
+                "REGISTRATION: компенсирующая зачистка очереди визита %d — "
+                "удалено записей: %d, восстановлено переиспользованных: %d",
+                visit_id,
+                deleted_count,
+                restored_count,
             )
 
     def _materialize_prepared_assignment(
