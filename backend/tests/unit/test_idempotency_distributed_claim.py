@@ -1654,3 +1654,243 @@ def test_ownership_lost_replays_outcome_stored_by_new_owner(two_workers, monkeyp
     assert r.status_code == 200, r.text
     assert r.json() == {"done": True}, "must replay the outcome stored by the new owner"
     assert counters["w1"]["calls"] == 0, "the handler must not run a second time"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Codex R17 #3267 (post-merge verification): two confirmed defects that persist
+# on main after the #3267 squash merge (8fa5af6f4).
+#
+# P1 — the lease-lapse replay branch (claim.renew() False → outcome stored by
+#      the new owner) bound the replay to exec_role/_exec_superuser from the
+#      PRE-EXECUTION authorization, which never passes
+#      require_active_doctor_profile=True. An active User with role Doctor but
+#      an INACTIVE Doctor profile kept the role label "Doctor", so the stored
+#      PHI-bearing body was returned while every endpoint that requires an
+#      active Doctor profile (e.g. legacy queue call-patient) would now 403
+#      the same principal on a fresh request.
+#
+# P2 — the eager lease task is created BEFORE the pre-execution authorization
+#      await, but the cleanup used to start only around call_next. A request
+#      cancelled while awaiting the authorization never reached the cleanup:
+#      the orphaned _renew_lease_loop task kept renewing the claim FOREVER
+#      (asyncio.CancelledError is a BaseException — except Exception cannot
+#      intercept it), so a same-key retry saw a busy claim with no executing
+#      request behind it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _plant_lapse(claim, fake, key: str, *, stored_body: dict, stored_role: str):
+    """Plant a lapse scenario: the claim token is no longer ours (another
+    worker re-acquired after the lease lapsed) and the new owner already
+    stored its outcome. Hooked into execution_intent_exists — the last sync
+    point before the CAS re-verify (same technique as the R16 tests)."""
+    import json as _json
+
+    from starlette.responses import Response as StarletteResponse
+
+    from app.middleware.idempotency_middleware import payload_hash
+
+    orig_intent = claim.execution_intent_exists
+
+    def steal_and_store(user_id, k):
+        fake.store[nkey("1", key, "claim")] = "foreign-token"
+        claim.store_response(
+            user_id,
+            k,
+            StarletteResponse(
+                content=_json.dumps(stored_body), status_code=200, media_type="application/json"
+            ),
+            payload_hash=payload_hash(b""),
+            principal_role=stored_role,
+        )
+        return orig_intent(user_id, k)
+
+    return steal_and_store
+
+
+def test_lease_lapse_replay_refused_for_inactive_doctor_profile(two_workers, monkeypatch):
+    """Codex R17 #3267 (P1): the lease-lapse replay must run the SAME fresh
+    replay authorization with require_active_doctor_profile=True. Active User
+    + role Doctor + INACTIVE Doctor profile → non-executing 403: no stored
+    body, handler never runs, snapshot kept for re-activation recovery."""
+    client1, _client2, counters, fake = two_workers
+    claim = idem_module._distributed_claim
+    key = "r17-lapse-inactive-doctor"
+
+    checks: list[bool] = []
+
+    def auth(request, user_id, username, jti, require_active_doctor_profile=False):
+        checks.append(bool(require_active_doctor_profile))
+        if require_active_doctor_profile:
+            # Doctor.user_id + Doctor.active mirror (queue.py:69-79):
+            # the profile is INACTIVE while the User account is active.
+            return (False, "Doctor", False)
+        return (True, "Doctor", False)
+
+    monkeypatch.setattr(idem_module, "_check_principal_authorized_sync", auth)
+    monkeypatch.setattr(
+        claim,
+        "execution_intent_exists",
+        _plant_lapse(
+            claim, fake, key,
+            stored_body={"patient_name": "PHI-не-для-выдачи"},
+            stored_role="Doctor",
+        ),
+    )
+
+    r = client1.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": key})
+
+    assert r.status_code == 403, f"stored body must not be returned to an inactive Doctor: {r.status_code} {r.text}"
+    assert r.json() == {"detail": "Пользователь деактивирован или сессия недействительна"}
+    assert "PHI" not in r.text, "the stored snapshot body must not leak"
+    assert counters["w1"]["calls"] == 0, "non-executing refusal: the handler must not run"
+    assert True in checks, "the replay authorization must run with require_active_doctor_profile=True"
+    # Snapshot KEPT (Codex R8 contract): re-activation restores the replay.
+    assert nkey("1", key, "resp") in fake.store
+
+
+def test_lease_lapse_replay_replays_for_active_doctor_profile(two_workers, monkeypatch):
+    """Positive control for the R17 P1 fix: the same lapse branch with an
+    ACTIVE Doctor profile still replays the stored outcome (the added
+    authorization must not break the legitimate path)."""
+    client1, _client2, counters, fake = two_workers
+    claim = idem_module._distributed_claim
+    key = "r17-lapse-active-doctor"
+
+    checks: list[bool] = []
+
+    def auth(request, user_id, username, jti, require_active_doctor_profile=False):
+        checks.append(bool(require_active_doctor_profile))
+        return (True, "Doctor", False)
+
+    monkeypatch.setattr(idem_module, "_check_principal_authorized_sync", auth)
+    monkeypatch.setattr(
+        claim,
+        "execution_intent_exists",
+        _plant_lapse(claim, fake, key, stored_body={"done": True}, stored_role="Doctor"),
+    )
+
+    r = client1.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": key})
+
+    assert r.status_code == 200, r.text
+    assert r.json() == {"done": True}
+    assert counters["w1"]["calls"] == 0
+    assert True in checks
+
+
+def test_cancellation_during_preexecution_authorization_stops_lease_renewals(two_workers, monkeypatch):
+    """Codex R17 #3267 (P2): cancelling the request while it awaits the
+    pre-execution authorization must stop the eager lease task. The old code
+    cancelled it only around call_next, so the orphaned loop renewed the
+    claim forever and the claim stayed busy long after the request died.
+
+    Methodology mirrors the independent verification: lease 2 s (real
+    asyncio.sleep — the loop interval is 1 s), one renewal observed BEFORE
+    the cancellation (eager start works), then the event loop runs LONGER
+    than the original TTL. Assert: no renewals after the cancellation, the
+    claim is released (nothing was executed), no task remains pending, the
+    handler never ran."""
+    import asyncio
+    import contextlib
+
+    from starlette.requests import Request as StarletteRequest
+    from starlette.responses import Response as StarletteResponse
+
+    _client1, _client2, counters, fake = two_workers
+    claim = idem_module._distributed_claim
+    claim._lease_seconds = 2
+    key = "r17-cancelled-auth"
+
+    renews = {"n": 0}
+    orig_eval = FakeRedis.eval
+
+    def rec_eval(self, script, numkeys, k, *args):
+        if "expire" in script and k == nkey("1", key, "claim"):
+            renews["n"] += 1
+        return orig_eval(self, script, numkeys, k, *args)
+
+    monkeypatch.setattr(FakeRedis, "eval", rec_eval)
+
+    entered = asyncio.Event()
+    orig_auth = IdempotencyMiddleware._principal_authorized
+
+    async def hanging_auth(self, request, payload, **kw):
+        entered.set()
+        await asyncio.sleep(3600)  # blocked pre-execution authorization
+        return await orig_auth(self, request, payload, **kw)  # pragma: no cover
+
+    monkeypatch.setattr(IdempotencyMiddleware, "_principal_authorized", hanging_auth)
+
+    app = _make_app({"calls": 0})
+    middleware = IdempotencyMiddleware(app)
+    claim_key = nkey("1", key, "claim")
+
+    async def scenario():
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": "/echo",
+            "raw_path": b"/echo",
+            "root_path": "",
+            "query_string": b"",
+            "headers": [
+                (b"host", b"test"),
+                (b"authorization", auth_headers("1")["Authorization"].encode()),
+                (b"idempotency-key", key.encode()),
+                (b"content-length", b"0"),
+            ],
+            "client": ("testclient", 50000),
+            "server": ("testserver", 80),
+            "app": app,
+        }
+
+        async def receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = StarletteRequest(scope, receive)
+
+        async def call_next(_req):
+            counters["w1"]["calls"] += 1  # pragma: no cover - must never run
+            return StarletteResponse(content=b"{}", status_code=200)  # pragma: no cover
+
+        dispatch_task = asyncio.create_task(middleware.dispatch(request, call_next))
+
+        # The request is now parked INSIDE the pre-execution authorization,
+        # i.e. the lease task already exists (created right before it).
+        await asyncio.wait_for(entered.wait(), timeout=5)
+
+        # Wait for the first eager renewal (interval = lease/2 = 1 s) so the
+        # test proves the loop WAS running before the cancellation.
+        for _ in range(60):
+            if renews["n"] >= 1:
+                break
+            await asyncio.sleep(0.05)
+        assert renews["n"] >= 1, "eager renewal must be active before the cancellation"
+
+        dispatch_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await dispatch_task
+
+        renews_at_cancel = renews["n"]
+
+        # Observe LONGER than the original 2 s lease: the orphaned loop used
+        # to renew here forever (control on the old code: +2 renewals, claim
+        # alive past its TTL).
+        await asyncio.sleep(2.6)
+
+        assert renews["n"] == renews_at_cancel, (
+            "lease task must stop renewing after the request is cancelled: "
+            f"{renews['n'] - renews_at_cancel} extra renewals observed"
+        )
+        assert claim_key not in fake.store, (
+            "claim must be released: nothing was executed (no intent marker, "
+            "handler never ran), so a same-key retry must acquire immediately"
+        )
+        pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()]
+        assert not pending, f"no task may outlive the cancelled request: {pending}"
+        assert counters["w1"]["calls"] == 0
+
+    asyncio.run(scenario())
