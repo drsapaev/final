@@ -554,10 +554,17 @@ def _upsert_daily_queue(db: Session, *, doctor: Any, queue_tag: str, cabinet: st
         .first()
     )
     if queue is None:
+        # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
+        # демо-дня — паритет с рантайм-сайтами создания.
+        from app.crud.queue_resource_routing import effective_day_start_number
+
         queue = DailyQueue(
             day=date.today(),
             specialist_id=doctor.id,
             queue_tag=queue_tag,
+            start_number=effective_day_start_number(
+                db, doctor=doctor, queue_tag=queue_tag
+            ),
         )
         db.add(queue)
     queue.active = True

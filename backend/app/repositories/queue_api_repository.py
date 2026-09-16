@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.crud import clinic as crud_clinic
 from app.crud.queue_resource_routing import (
+    effective_day_start_number,
     find_active_tag_queue,
     lock_registry_tag_creation,
     resolve_tag_resource,
@@ -43,7 +44,15 @@ class QueueApiRepository:
         )
 
     def create_daily_queue(self, *, day: date, specialist_id: int) -> DailyQueue:
-        daily_queue = DailyQueue(day=day, specialist_id=specialist_id, active=True)
+        doctor = self.db.get(Doctor, specialist_id)
+        daily_queue = DailyQueue(
+            day=day,
+            specialist_id=specialist_id,
+            active=True,
+            start_number=effective_day_start_number(
+                self.db, doctor=doctor, queue_tag=None
+            ),
+        )
         self.db.add(daily_queue)
         self.db.commit()
         self.db.refresh(daily_queue)
@@ -94,6 +103,11 @@ class QueueApiRepository:
             online_start_time=f"{int(settings.get('queue_start_hour', 7)):02d}:00",
             online_end_time=f"{int(settings.get('queue_end_hour', 9)):02d}:00",
             max_online_entries=resource.max_online_per_day,
+            # RQ-13.b (D-06, E-039): снимок применённого стартового номера
+            # реестра — паритет с queue_svc-конструктором.
+            start_number=effective_day_start_number(
+                self.db, resource=resource, queue_tag=queue_tag
+            ),
             # Codex round-8 P2: канонический кабинет реестра — паритет
             # с queue_svc-конструктором (round-7)
             cabinet_number=resource.default_cabinet,
