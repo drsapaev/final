@@ -279,15 +279,29 @@ def run_setup_in_connection(
 
     # ---------- services (snapshot id + code identity, PRE-STATES only) --
     for sid, code, name, tag, dept, requires, is_consultation in _SERVICES:
-        # code-ownership check (review P1, 2026-09-15): a populated test
-        # database may carry a mapped code under a DIFFERENT id — inserting
-        # a second logical service would pollute the environment and make
-        # migration 0066 abort on the undecided original; report the
-        # conflict instead.
+        # code-ownership check (review P1, 2026-09-15; review P2 on
+        # 2c5ea05ce): a populated test database may carry a mapped code
+        # under a DIFFERENT id — inserting a second logical service would
+        # pollute the environment and make migration 0066 abort on the
+        # undecided original; report the conflict instead.
+        # QD-2E review P2 (2c5ea05ce): the conflict probe asks for ANY
+        # FOREIGN owner of the code (id <> snapshot_id), not for the
+        # first row the engine happens to return. Service.code carries
+        # NO unique constraint (only Service.service_code does), so the
+        # correct snapshot row and a foreign carrier of the same code can
+        # coexist — a bare fetchone() then depends on the arbitrary row
+        # order (reproduced on SQLite: the snapshot row first → the
+        # conflict is missed → setup reports a clean no-op while the
+        # catalog holds a conflict that the 0066 by-code pre-state check
+        # would abort on). Any row the exclusion query returns is a
+        # conflict, regardless of order.
         carrier = conn.execute(
-            sa.text("SELECT id FROM services WHERE code = :c"), {"c": code}
+            sa.text(
+                "SELECT id FROM services WHERE code = :c AND id <> :sid"
+            ),
+            {"c": code, "sid": sid},
         ).fetchone()
-        if carrier is not None and carrier.id != sid:
+        if carrier is not None:
             raise RuntimeError(
                 f"service code={code!r} is owned by id={carrier.id}, the "
                 f"map decides id={sid} — resolve the identity conflict "

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date
 from typing import Any
 
@@ -14,6 +14,7 @@ from app.models.visit import Visit
 from app.services.morning_assignment import (
     MorningAssignmentCreateBranchHandoff,
     MorningAssignmentPreparedQueueAssignment,
+    MorningAssignmentReusedEntryBinding,
     MorningAssignmentService,
 )
 from app.services.queue_domain_service import QueueDomainService
@@ -287,6 +288,13 @@ class RegistrarWizardQueueAssignmentService:
             return []
 
         queue_assignments: list[dict[str, Any]] = []
+        # QD-2E review P1 (2c5ea05ce, external report): provenance ledger
+        # of the PRE-EXISTING entries the reuse branch bound to THIS
+        # visit (entry_id -> pre-binding links). The compensating cleanup
+        # below DELETES only entries this basket created; the ledger rows
+        # are RESTORED to their pre-binding links instead — see
+        # _cleanup_visit_queue_entries.
+        reused_entry_bindings: dict[int, MorningAssignmentReusedEntryBinding] = {}
         # Codex R3 #3092 (P1): capture the PK while the instance is alive —
         # after a deep full rollback the ORM instance is expired, and every
         # attribute access below must not depend on a refresh that would
@@ -324,6 +332,12 @@ class RegistrarWizardQueueAssignmentService:
                     target_day,
                     source=source,
                 )
+                if (
+                    prepared_assignment is not None
+                    and prepared_assignment.reused_entry_binding is not None
+                ):
+                    binding = prepared_assignment.reused_entry_binding
+                    reused_entry_bindings[binding.entry_id] = binding
                 assignment = self._materialize_prepared_assignment(prepared_assignment)
                 if assignment:
                     queue_assignments.append(assignment)
@@ -364,16 +378,23 @@ class RegistrarWizardQueueAssignmentService:
                 )
                 if not visit_still_in_tx:
                     raise
-                # Компенсирующая зачистка: DELETE записей очереди этого визита
-                # в той же транзакции (почему не rollback и не savepoint — см.
-                # комментарий выше). Ошибка зачистки НЕ глотается: она уйдёт в
-                # top-level assign_same_day_queue_numbers, визит не будет
+                # Компенсирующая зачистка С УЧЁТОМ ПРОИСХОЖДЕНИЯ записей
+                # (QD-2E review P1 на 2c5ea05ce): созданные этой корзиной
+                # записи удаляются (контракт P2-1c «после сбоя в БД не
+                # остаётся ни одной СОЗДАННОЙ записи очереди визита»), а
+                # переиспользованные закоммиченные талоны — ВОССТАНАВЛИВАЮТ
+                # прежние связи (patient_id/visit_id до привязки): их
+                # удаление стирало ранее сохранённый QR-талон, когда
+                # следующее направление корзины падало после flush.
+                # Ошибка зачистки НЕ глотается: она уйдёт в top-level
+                # assign_same_day_queue_numbers, визит не будет
                 # активирован, а endpoint атомарной корзины не закоммитит
                 # частичное состояние (P2-1c).
-                self._cleanup_visit_queue_entries(visit)
-                # P2-1c: CLEAR stale data — компенсированные записи больше не
-                # существуют в транзакции, поэтому словари в queue_assignments
-                # ссылались бы на несуществующие строки.
+                self._cleanup_visit_queue_entries(visit, reused_entry_bindings)
+                # P2-1c: CLEAR stale data — созданные записи удалены, а
+                # переиспользованные восстановлены в ДО-корзинное состояние
+                # (без связей с визитом), поэтому словари в queue_assignments
+                # больше не соответствуют строкам очереди этого визита.
                 queue_assignments.clear()
                 # P2-1c: обработка останавливается на этом визите — частичное
                 # присвоение не поддерживается.
@@ -381,28 +402,69 @@ class RegistrarWizardQueueAssignmentService:
 
         return queue_assignments
 
-    def _cleanup_visit_queue_entries(self, visit: Visit) -> None:
-        """Удалить записи очереди ЭТОГО визита в текущей транзакции.
+    def _cleanup_visit_queue_entries(
+        self,
+        visit: Visit,
+        reused_entry_bindings: (
+            Mapping[int, MorningAssignmentReusedEntryBinding] | None
+        ) = None,
+    ) -> None:
+        """Компенсирующая зачистка записей очереди ЭТОГО визита с учётом
+        их ПРОИСХОЖДЕНИЯ (QD-2E review P1 на 2c5ea05ce).
 
-        Компенсирующее действие вместо rollback/savepoint: rollback стёр бы
-        flush-нутые строки атомарной корзины (Codex R1 #3092), savepoint
-        несовместим с savepoint-изоляцией db_session-фикстуры в тестах
-        (P2-1b). DELETE по visit_id затрагивает только записи очереди
-        визита — корзина (визиты/invoice) не перечитывается и не меняется.
+        Раньше зачистка удаляла ВСЕ записи с visit_id == visit.id. После
+        того как prepare_wizard_queue_assignment начал привязывать
+        существующий (закоммиченный) QR-талон к создаваемому визиту, эта
+        семантика стирала ранее сохранённый талон: первое направление
+        корзины переиспользовало талон (visit_id <- visit.id), следующее
+        падало не-SQL ошибкой после flush — и компенсация удаляла талоны,
+        которые существовали ДО корзины. Это потеря данных, а не откат
+        собственных записей корзины.
+        Теперь запись различается по происхождению:
+
+        - создана этой корзиной (create-ветка) — DELETE, контракт P2-1c
+          («после сбоя в БД не остаётся ни одной созданной записи
+          очереди визита») сохранён;
+        - переиспользованный закоммиченный талон — RESTORE прежних
+          связей (patient_id/visit_id из снапшота привязки, снятого ДО
+          записи): номер, queue_time и остальные поля талона корзина
+          никогда не трогала, они не восстанавливаются — они не менялись.
+
+        Механизм по-прежнему без rollback и без savepoint: rollback стёр
+        бы flush-нутые строки атомарной корзины (Codex R1 #3092), savepoint
+        несовместим с savepoint-изоляцией db_session-фикстуры (P2-1b).
+        Корзина (визиты/invoice) не перечитывается и не меняется.
         """
         from app.models.online_queue import OnlineQueueEntry
 
+        bindings: Mapping[int, MorningAssignmentReusedEntryBinding] = (
+            reused_entry_bindings or {}
+        )
         entries = self.db.query(OnlineQueueEntry).filter(
             OnlineQueueEntry.visit_id == visit.id
         ).all()
+        restored_count = 0
+        deleted_count = 0
         for entry in entries:
-            self.db.delete(entry)
+            binding = bindings.get(entry.id)
+            if binding is not None:
+                # Восстановление прежних связей переиспользованного
+                # талона. Снапшот снят ДО привязки и не зависит от ORM
+                # history (flush между привязкой и сбоем её очищает).
+                entry.patient_id = binding.previous_patient_id
+                entry.visit_id = binding.previous_visit_id
+                restored_count += 1
+            else:
+                self.db.delete(entry)
+                deleted_count += 1
         if entries:
             self.db.flush()
             logger.info(
-                "REGISTRATION: компенсирующая зачистка очереди визита %d — удалено записей: %d",
+                "REGISTRATION: компенсирующая зачистка очереди визита %d — "
+                "удалено записей: %d, восстановлено переиспользованных: %d",
                 visit.id,
-                len(entries),
+                deleted_count,
+                restored_count,
             )
 
     def _materialize_prepared_assignment(

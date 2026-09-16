@@ -1535,7 +1535,15 @@ def test_embedded_decisions_match_the_operator_map_evidence() -> None:
     # REFINEMENT file (pinned by its own test below) and must NOT appear
     # in this original-map comparison.
     embedded_assigns = {
-        code: (snapshot_id, target, original, snapshot_tag, expected_user, set_requires)
+        code: (
+            snapshot_id,
+            target,
+            original,
+            snapshot_tag,
+            expected_user,
+            set_requires,
+            expected_requires,
+        )
         for (
             snapshot_id,
             code,
@@ -1544,10 +1552,13 @@ def test_embedded_decisions_match_the_operator_map_evidence() -> None:
             expected_user,
             snapshot_tag,
             set_requires,
+            expected_requires,
         ) in module._ASSIGN_DOCTOR_DECISIONS
     }
     # the original 2026-09-12 map decides exactly K01/K11 (no requires_doctor
-    # flip, no user-linkage pin there) — the refinement entries are pinned by
+    # flip, no user-linkage pin there — and no flag invariant: the K01/K11
+    # decisions never addressed requires_doctor, so BOTH the write arm and
+    # the expected arm stay None) — the refinement entries are pinned by
     # their own test
     assert {
         code: (entry[0], entry[1], entry[2], entry[3])
@@ -1555,7 +1566,7 @@ def test_embedded_decisions_match_the_operator_map_evidence() -> None:
         if code in map_assigns
     } == map_assigns
     assert all(
-        entry[4] is None and entry[5] is None
+        entry[4] is None and entry[5] is None and entry[6] is None
         for code, entry in embedded_assigns.items()
         if code in map_assigns
     )
@@ -1581,6 +1592,7 @@ def test_embedded_decisions_match_the_operator_map_evidence() -> None:
             _expected_user,
             _snapshot_tag,
             _set_requires,
+            _expected_requires,
         ) in module._ASSIGN_DOCTOR_DECISIONS
     }
 
@@ -1840,6 +1852,149 @@ def test_setup_dry_run_is_plan_only_and_never_touches_sequences(
     assert any("INSERT INTO users" in text for text in statements)
     assert any("INSERT INTO doctors" in text for text in statements)
     assert any("INSERT INTO services" in text for text in statements)
+
+
+def _qd2e_setup_sqlite_conn():
+    """A REAL SQLite connection over the qd2e_setup tables + the 0065
+    schema-version row — the review P2 reproduction ran the actual SQL
+    (row-order-dependent fetchone), so the regression proof must too."""
+    engine = sa.create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=sa.pool.StaticPool,
+    )
+    # an isolated schema name is impossible on sqlite; the static pool
+    # keeps the in-memory database private to THIS connection
+    _qd2e_setup_metadata().create_all(engine)
+    conn = engine.connect()
+    conn.execute(
+        sa.text(
+            "INSERT INTO alembic_version (version_num)"
+            " VALUES ('0065_queue_numbering_unique')"
+        )
+    )
+    conn.commit()
+    return conn, engine
+
+
+def test_setup_reports_conflict_when_a_second_code_owner_exists() -> None:
+    """QD-2E review P2 (2c5ea05ce): the correct snapshot row (id=3,
+    code='S01') AND a second active carrier of the same code (id=999)
+    coexist. Service.code has NO unique constraint (only
+    Service.service_code does), so this is a legal catalog state; the
+    old fetchone() probe saw whichever row the engine returned FIRST —
+    on SQLite the snapshot row wins, the conflict is missed and setup
+    reports a clean no-op while the catalog holds a conflict that the
+    0066 by-code pre-state check aborts on. The setup must terminate
+    with the conflict and roll the whole group back, regardless of row
+    order."""
+    from app.scripts.qd2e_setup import run_setup_in_connection
+
+    conn, engine = _qd2e_setup_sqlite_conn()
+    try:
+        # the CORRECT snapshot row for S01 (id=3) — inserted FIRST so the
+        # engine's natural row order returns it before the foreign row
+        # (the exact reproduction shape)
+        conn.execute(
+            sa.text(
+                "INSERT INTO services (id, code, name, queue_tag,"
+                " department_key, doctor_id, requires_doctor, active)"
+                " VALUES (3, 'S01', 'snapshot', 'stomatology',"
+                " NULL, NULL, 1, 1)"
+            )
+        )
+        # ... and the SECOND owner of the same code (the conflict)
+        conn.execute(
+            sa.text(
+                "INSERT INTO services (id, code, name, queue_tag,"
+                " department_key, doctor_id, requires_doctor, active)"
+                " VALUES (999, 'S01', 'foreign', 'stomatology',"
+                " NULL, NULL, 1, 1)"
+            )
+        )
+        conn.commit()
+
+        with pytest.raises(RuntimeError, match="owned by id=999"):
+            run_setup_in_connection(conn)  # type: ignore[arg-type]
+        # the caller (main()) rolls the whole group back
+        conn.rollback()
+
+        # nothing partial survived: the setup's own earlier writes
+        # (specialties/users/doctors/registry) were rolled back with the
+        # group, and the two pre-existing rows are untouched
+        counts = conn.execute(
+            sa.text(
+                "SELECT (SELECT COUNT(*) FROM medical_specialties),"
+                " (SELECT COUNT(*) FROM users),"
+                " (SELECT COUNT(*) FROM doctors),"
+                " (SELECT COUNT(*) FROM queue_resources),"
+                " (SELECT COUNT(*) FROM services)"
+            )
+        ).fetchone()
+        assert tuple(counts) == (0, 0, 0, 0, 2)
+        codes = conn.execute(
+            sa.text("SELECT id FROM services WHERE code = 'S01' ORDER BY id")
+        ).fetchall()
+        assert [row.id for row in codes] == [3, 999]
+    finally:
+        conn.close()
+        engine.dispose()
+
+
+def test_setup_no_conflict_when_only_the_snapshot_row_exists() -> None:
+    """Control arm (no false positives): with the snapshot rows seeded at
+    their exact map identities, EVERY service is a proven no-op — the
+    probe must never fire for the snapshot id itself (id <> snapshot_id
+    excludes it), so the whole plan pass completes with zero conflicts
+    and zero planned service writes. Runs on a REAL sqlite connection
+    over the setup's own table shapes; the full catalog is pre-seeded so
+    no service INSERT (whose created_at uses the PG ``now()``) ever
+    executes."""
+    from app.scripts import qd2e_setup
+    from app.scripts.qd2e_setup import run_setup_in_connection as _run
+
+    conn, engine = _qd2e_setup_sqlite_conn()
+    try:
+        for sid, code, name, tag, dept, _requires, _is_consultation in (
+            qd2e_setup._SERVICES
+        ):
+            conn.execute(
+                sa.text(
+                    "INSERT INTO services (id, code, name, queue_tag,"
+                    " department_key, doctor_id, requires_doctor, active)"
+                    " VALUES (:i, :c, :n, :t, :d, NULL, :r, 1)"
+                ),
+                {
+                    "i": sid,
+                    "c": code,
+                    "n": name,
+                    "t": tag,
+                    "d": dept,
+                    "r": bool(_requires),
+                },
+            )
+        conn.commit()
+
+        counts = _run(conn, plan_only=True)  # type: ignore[arg-type]
+        conn.rollback()  # the plan pass is rolled back by design
+
+        # every service identity matched its own snapshot row: no
+        # conflict raised, nothing planned for the services section
+        assert counts["services"] == 0
+        # the pre-existing catalog was never duplicated or mutated
+        owners = conn.execute(
+            sa.text(
+                "SELECT COUNT(*) FROM services WHERE code = 'S01'"
+            )
+        ).scalar()
+        assert owners == 1
+        total = conn.execute(
+            sa.text("SELECT COUNT(*) FROM services")
+        ).scalar()
+        assert total == len(qd2e_setup._SERVICES)
+    finally:
+        conn.close()
+        engine.dispose()
 
 
 def test_setup_sequence_sync_never_decreases_an_ahead_serial() -> None:
@@ -2863,10 +3018,29 @@ def test_refinement_matches_the_refinement_evidence_file() -> None:
             expected_user,
             _snapshot_tag,
             set_requires,
+            _expected_requires,
         ) in module._ASSIGN_DOCTOR_DECISIONS
         if code in refinement_assigns
     }
     assert embedded_assigns == refinement_assigns
+    # the O10/O20 flag WRITE carries its flip source state explicitly
+    # (the expected arm); S10 — like K01/K11 — never addressed the flag
+    # in its approved decision, so BOTH arms stay None for it
+    embedded_expected = {
+        code: expected_requires
+        for (
+            _snapshot_id,
+            code,
+            _target,
+            _original,
+            _expected_user,
+            _snapshot_tag,
+            _set_requires,
+            expected_requires,
+        ) in module._ASSIGN_DOCTOR_DECISIONS
+        if code in refinement_assigns
+    }
+    assert embedded_expected == {"O10": False, "O20": False, "S10": None}
     embedded_clears = {
         code: (snapshot_id, snapshot_tag)
         for snapshot_id, code, snapshot_tag in (
@@ -2925,10 +3099,33 @@ def test_final_confirmation_matches_the_20260916_evidence_file() -> None:
             expected_user,
             snapshot_tag,
             set_requires,
+            _expected_requires,
         ) in module._ASSIGN_DOCTOR_DECISIONS
         if code in final_assigns
     }
     assert embedded == final_assigns
+    # QD-2E review P2 (2c5ea05ce): the final confirmation ALSO pins the
+    # flag invariant — "requires_doctor=true" in the note and in every
+    # refined_by text, mirrored by the evidence items' recorded
+    # pre-state. Embedded as the expected arm: no write, but the
+    # pre-state check, the guarded UPDATE predicate and the post-check
+    # all REQUIRE True (a drifted False aborts, never auto-fixed).
+    assert all(item["requires_doctor"] is True for item in items)
+    embedded_expected = {
+        code: expected_requires
+        for (
+            _snapshot_id,
+            code,
+            _target,
+            _original,
+            _expected_user,
+            _snapshot_tag,
+            _set_requires,
+            expected_requires,
+        ) in module._ASSIGN_DOCTOR_DECISIONS
+        if code in final_assigns
+    }
+    assert embedded_expected == {"S01": True, "D01": True}
     # the full approved doctor-to-owner linkage (both dated refinements)
     assert module._REFINEMENT_DOCTOR_USER_LINKAGE == {
         17: 29,
@@ -3135,6 +3332,110 @@ def test_upgrade_applies_the_refined_decisions() -> None:
         sa.text("SELECT id, queue_id, number, status FROM queue_entries")
     ).fetchall()
     assert entries_after == entries_before
+
+
+def test_upgrade_aborts_when_final_confirmation_flag_drifted_to_false() -> None:
+    """QD-2E review P2 (2c5ea05ce): S01/D01 carry the correct snapshot
+    ids, tags and (absent) doctors, but requires_doctor=False — a drift
+    landed AFTER the 2026-09-16 approval that explicitly pins
+    requires_doctor=true. The migration must STOP with no rows changed:
+    the approved operator state is part of the decision, a mismatched
+    pre-state is never auto-accepted (and never auto-fixed — forcing
+    True would overwrite the newer operator edit instead of refusing)."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(
+        sa.text(
+            "UPDATE services SET requires_doctor = false"
+            " WHERE code IN ('S01', 'D01')"
+        )
+    )
+
+    _assert_abort(conn, "pins requires_doctor=True")
+
+    # no rows changed: the final-confirmation targets keep their
+    # (drifted) pre-states and NOTHING else in the map was applied
+    for code, tag in (("S01", "stomatology"), ("D01", "dermatology")):
+        row = conn.execute(
+            sa.text(
+                "SELECT doctor_id, requires_doctor, queue_tag FROM services"
+                " WHERE code = :c"
+            ),
+            {"c": code},
+        ).fetchone()
+        assert (row.doctor_id, bool(row.requires_doctor), row.queue_tag) == (
+            None,
+            False,
+            tag,
+        ), code
+    tag, doctor_id, _ = _service_state(conn, "K01")
+    assert (tag, doctor_id) == ("cardio", None)
+    tag, _, _ = _service_state(conn, "L03")
+    assert tag == "general"
+
+
+def test_upgrade_aborts_when_a_single_final_confirmation_flag_drifted() -> None:
+    """The review's exact scenario: ONLY D01 drifted (every other field
+    of every other decision matches the map) — one drifted flag still
+    stops the whole map: partial application on a broken invariant is
+    exactly what the no-rows-changed contract forbids."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    conn.execute(
+        sa.text("UPDATE services SET requires_doctor = false WHERE code = 'D01'")
+    )
+
+    _assert_abort(conn, "stale operator map for 'D01'")
+
+    row = conn.execute(
+        sa.text(
+            "SELECT doctor_id, requires_doctor FROM services WHERE code = 'D01'"
+        )
+    ).fetchone()
+    assert (row.doctor_id, bool(row.requires_doctor)) == (None, False)
+    tag, _, _ = _service_state(conn, "L03")
+    assert tag == "general"
+
+
+def test_upgrade_flag_drift_between_pre_state_and_write_aborts() -> None:
+    """The second layer (thread 3995689409 contract): the S01 flag drift
+    lands BETWEEN the pre-state check and the guarded write. The armed
+    requires_doctor predicate (the review P2 fix — the invariant arm of
+    the decision) makes the UPDATE match zero rows; the re-read proves
+    the row is NOT the exact post-state, and the map aborts instead of
+    writing doctor_id over the drifted flag."""
+    conn = _scratch()
+    _seed_refinement_world(conn)
+    module = _load_migration_0064()
+    original_pre_states = module._assert_decision_pre_states
+
+    def drift_after_pre_state_check(migration_conn, surfaces):
+        original_pre_states(migration_conn, surfaces)
+        migration_conn.execute(
+            sa.text("UPDATE services SET requires_doctor = false WHERE code = 'S01'")
+        )
+
+    module._assert_decision_pre_states = drift_after_pre_state_check
+
+    with pytest.raises(RuntimeError, match="concurrently modified") as excinfo:
+        module.upgrade_with_conn(conn)
+    assert "aborting with no rows changed" in str(excinfo.value)
+    conn.rollback()  # alembic rolls the single migration transaction back
+
+    # after the rollback the world is byte-identical to the seeded state
+    row = conn.execute(
+        sa.text(
+            "SELECT doctor_id, requires_doctor, queue_tag FROM services"
+            " WHERE code = 'S01'"
+        )
+    ).fetchone()
+    assert (row.doctor_id, bool(row.requires_doctor), row.queue_tag) == (
+        None,
+        True,
+        "stomatology",
+    )
+    tag, _, _ = _service_state(conn, "L03")
+    assert tag == "general"
 
 
 def test_refinement_is_idempotent_second_pass() -> None:

@@ -119,7 +119,16 @@ transaction; PG DDL/DML is transactional):
      user-linked and is NOT a 0055 synthetic; abort otherwise). The
      embedded target is the production doctor id from the operator
      map — a different database identity means the map is stale and
-     the inventory must be re-run, never re-pointed by the migration;
+     the inventory must be re-run, never re-pointed by the migration.
+     The ``requires_doctor`` flag is a SEPARATE two-part decision
+     (review P2 on 2c5ea05ce): the write arm (``set_requires_doctor``)
+     and the invariant arm (``expected_requires_doctor``) are pinned
+     independently — O10/O20 write True over the guarded False source
+     state; S01/D01 write NOTHING but REQUIRE the approved True
+     (pre-state check + guarded predicate + post-check; a drifted
+     False aborts and is never auto-fixed); K01/K11/S10 keep the
+     untouched-and-unchecked contract (their approved decisions never
+     addressed the flag);
    - ``disable_service`` (none in the current map; supported for
      future operator decisions): the service is deactivated;
    - ``keep_profile`` (the ``general`` queue profile): no write — the
@@ -289,31 +298,47 @@ _RETAG_DECISIONS: tuple[tuple[int, str, str, str], ...] = (
 # inert decision (Codex round-3 P1). The snapshot ids (K01=2, K11=127)
 # are the 2026-09-12 production identities (thread 3995689408).
 _ASSIGN_DOCTOR_DECISIONS: tuple[
-    tuple[int, str, int, int | None, int | None, str, bool | None], ...
+    tuple[int, str, int, int | None, int | None, str, bool | None, bool | None], ...
 ] = (
     # (snapshot_id, code, target_doctor_id, original_doctor_id,
-    #  expected_user_id | None, snapshot_tag, set_requires_doctor | None).
+    #  expected_user_id | None, snapshot_tag, set_requires_doctor | None,
+    #  expected_requires_doctor | None).
     # original_doctor_id: the 12.09 snapshot pre-state (None for all the
     # current entries) — the guarded UPDATE and the downgrade report it.
     # expected_user_id: the D-08 refinement (2026-09-15) pins the
-    # doctor-to-owner linkage (abort on a foreign owner). set_requires_doctor
-    # is the same refinement: an assigned EXPLICIT doctor makes the service
-    # doctor-required — O10/O20 flip False -> True with the confirmed source
-    # state guarded in the UPDATE; None leaves the flag untouched (K01/K11
-    # were already True; S10/S01/D01 stay True as decided).
-    (2, "K01", 10, None, None, "cardio", None),
-    (127, "K11", 10, None, None, "cardio", None),
-    (125, "O10", 17, None, 29, "ultrason", True),
-    (126, "O20", 18, None, 30, "neurology", True),
-    (90, "S10", 16, None, 27, "stomatology", None),
+    # doctor-to-owner linkage (abort on a foreign owner).
+    # set_requires_doctor (the WRITE): True writes requires_doctor=true
+    # — O10/O20 flip False -> True with the confirmed source state
+    # guarded in the UPDATE; None writes nothing.
+    # expected_requires_doctor (the INVARIANT, review P2 on 2c5ea05ce):
+    # the APPROVED pre-state of the flag, guarded BEFORE the write
+    # (_assert_decision_pre_states), inside the guarded UPDATE predicate
+    # and re-verified after it. "Not writing the field" and "not checking
+    # the field" are now SEPARATE decisions: S01/D01 (the 2026-09-16 final
+    # confirmation explicitly pins requires_doctor=true in the note and
+    # in every refined_by text) write NOTHING but REQUIRE True — a row
+    # drifted to False after the approval aborts the map instead of
+    # silently keeping a consultation declared doctor-less. O10/O20 carry
+    # the flip source state False explicitly. K01/K11/S10 keep the
+    # untouched-AND-unchecked contract: their approved decisions never
+    # addressed the flag (the 2026-09-12/15 texts), so guarding it would
+    # silently EXTEND those decisions — the exact thing this map forbids.
+    (2, "K01", 10, None, None, "cardio", None, None),
+    (127, "K11", 10, None, None, "cardio", None, None),
+    (125, "O10", 17, None, 29, "ultrason", True, False),
+    (126, "O20", 18, None, 30, "neurology", True, False),
+    (90, "S10", 16, None, 27, "stomatology", None, None),
     # the DATED FINAL CONFIRMATION (owner, 2026-09-16): the last two
-    # null decisions — the doctor axis, requires_doctor already True
-    # (left untouched), snapshot tags are the approved pre-states. The
-    # (doctor, user) linkage is part of the approved identity (16->27,
-    # 15->26) and is validated by _assert_target_doctor at application
-    # time (a foreign or demoted owner aborts, never auto-substituted).
-    (3, "S01", 16, None, 27, "stomatology", None),
-    (1, "D01", 15, None, 26, "dermatology", None),
+    # null decisions — the doctor axis, requires_doctor STAYS True as an
+    # explicitly pinned invariant (expected_requires_doctor=True: no
+    # write, but the pre-state, the guarded predicate and the post-check
+    # all require it — a drift to False aborts, it is never auto-fixed).
+    # Snapshot tags are the approved pre-states. The (doctor, user)
+    # linkage is part of the approved identity (16->27, 15->26) and is
+    # validated by _assert_target_doctor at application time (a foreign
+    # or demoted owner aborts, never auto-substituted).
+    (3, "S01", 16, None, 27, "stomatology", None, True),
+    (1, "D01", 15, None, 26, "dermatology", None, True),
 )
 
 # The approved doctor-to-owner linkage for the refinement decisions
@@ -447,7 +472,8 @@ _SELECT_SURFACES = sa.text("""
     """).bindparams(sa.bindparam("synthetic_usernames", expanding=True))
 
 _SELECT_SERVICE_BY_CODE = sa.text("""
-    SELECT id, code, queue_tag, department_key, doctor_id, active
+    SELECT id, code, queue_tag, department_key, doctor_id,
+           requires_doctor, active
     FROM services
     WHERE code = :code AND active = true
     ORDER BY id
@@ -649,6 +675,7 @@ def _inventory_and_assert_coverage(conn) -> dict:
         _expected_user_id,
         _snapshot_tag,
         _set_requires_doctor,
+        _expected_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         decided_identities[(snapshot_id, code)] = "assign_doctor"
     for snapshot_id, code in _DISABLE_DECISIONS:
@@ -877,6 +904,7 @@ def _assert_registry_seed_tag_coverage(conn) -> None:
         _expected_user_id,
         _snapshot_tag,
         _set_requires_doctor,
+        _expected_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         approved.add((snapshot_id, code))
     for snapshot_id, code, _snapshot_tag in _CLEAR_DOCTOR_REQUIREMENT_DECISIONS:
@@ -1027,7 +1055,8 @@ def _assert_decision_pre_states(conn, surfaces: dict) -> None:
         original_doctor_id,
         _expected_user_id,
         snapshot_tag,
-        _set_requires_doctor,
+        set_requires_doctor,
+        expected_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
         for row in rows:
@@ -1060,6 +1089,37 @@ def _assert_decision_pre_states(conn, surfaces: dict) -> None:
                     "by the cutover; re-run the inventory and update the "
                     "decision tables; aborting with no rows changed"
                 )
+            # QD-2E review P2 (2c5ea05ce): the approved flag invariant is
+            # validated BEFORE any mutation, under the same 0057 ruling as
+            # the fields above — the live value must sit on the embedded
+            # PRE-state or on the exact POST-state (the idempotent no-op);
+            # anything else is a newer operator edit that must abort the
+            # map instead of being silently accepted (S01/D01 drifted to
+            # requires_doctor=False after the 2026-09-16 confirmation is
+            # exactly this case). Decisions that never addressed the flag
+            # (both the write and the expected are None) stay unchecked.
+            if expected_requires_doctor is not None:
+                expected_post_flag = (
+                    set_requires_doctor
+                    if set_requires_doctor is not None
+                    else expected_requires_doctor
+                )
+                if bool(row.requires_doctor) not in (
+                    expected_requires_doctor,
+                    expected_post_flag,
+                ):
+                    _abort(
+                        f"stale operator map for {code!r}: the live service "
+                        f"(id={row.id}) carries requires_doctor="
+                        f"{row.requires_doctor!r} but the approved "
+                        f"decision pins requires_doctor="
+                        f"{expected_requires_doctor!r} (the 2026-09-16 "
+                        "final confirmation: the doctor axis keeps the "
+                        "consultation doctor-required) — a newer operator "
+                        "edit must not be overwritten by the cutover; "
+                        "re-run the inventory and update the decision "
+                        "tables; aborting with no rows changed"
+                    )
 
     for snapshot_id, code, snapshot_tag in _CLEAR_DOCTOR_REQUIREMENT_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE, {"code": code}).fetchall()
@@ -1309,6 +1369,7 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
         _expected_user_id,
         _snapshot_tag,
         _set_requires_doctor,
+        _expected_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         targets[code] = _resolve_decision_target(
             conn, snapshot_id=snapshot_id, code=code, decision="assign_doctor"
@@ -1337,6 +1398,7 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
         expected_user_id,
         _snapshot_tag,
         _set_requires_doctor,
+        _expected_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         if targets[code] is not None:
             _assert_target_doctor(conn, target_doctor_id, expected_user_id)
@@ -1389,13 +1451,37 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
         _expected_user_id,
         _snapshot_tag,
         set_requires_doctor,
+        expected_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         row = targets[code]
         if row is None:
             continue
+        # QD-2E review P2 (2c5ea05ce): the decision's POST-state flag.
+        # A write decision pins the written value; a no-write decision
+        # with an expected invariant pins the expected value; both None
+        # leaves the flag out of the applied-state contract entirely.
+        expected_post_requires_doctor = (
+            set_requires_doctor
+            if set_requires_doctor is not None
+            else expected_requires_doctor
+        )
+        # The PRE-state the guarded predicate expects. The decision table
+        # is the source of truth (O10/O20: the False flip source; S01/D01:
+        # the approved True invariant); the ``not set`` fallback keeps a
+        # write-only decision self-consistent (writing True guards on the
+        # current False — the pre-2c5ea05ce behaviour, now explicit).
+        expected_flag_value = (
+            expected_requires_doctor
+            if expected_requires_doctor is not None
+            else (
+                not set_requires_doctor
+                if set_requires_doctor is not None
+                else None
+            )
+        )
         fully_applied = row.doctor_id == target_doctor_id and (
-            set_requires_doctor is None
-            or bool(row.requires_doctor) == set_requires_doctor
+            expected_post_requires_doctor is None
+            or bool(row.requires_doctor) == expected_post_requires_doctor
         )
         if fully_applied:
             # idempotent second pass — the decision is already applied
@@ -1408,7 +1494,8 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
             f"{_MIGRATION_NAME}: assign_doctor service id={row.id} "
             f"code={code!r} doctor_id {row.doctor_id} -> "
             f"{target_doctor_id} (tag={row.queue_tag!r}, "
-            f"set_requires_doctor={set_requires_doctor})"
+            f"set_requires_doctor={set_requires_doctor}, "
+            f"expected_requires_doctor={expected_requires_doctor})"
         )
         applied = _guarded_service_update(
             conn,
@@ -1421,16 +1508,22 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
                 "expected_doctor_id_is_null": _is_null_flag(row.doctor_id),
                 "expected_queue_tag": row.queue_tag,
                 "expected_queue_tag_is_null": _is_null_flag(row.queue_tag),
-                "set_requires_doctor": 0 if set_requires_doctor is None else 1,
-                "requires_doctor_decision": 0 if set_requires_doctor is None else 1,
+                "set_requires_doctor": 1 if set_requires_doctor is True else 0,
+                # QD-2E review P2 (2c5ea05ce): "not writing the flag" and
+                # "not checking the flag" are SEPARATE arms now. The
+                # predicate arm is armed by EITHER a write decision or an
+                # expected invariant; an untouched-AND-unchecked decision
+                # keeps it disabled exactly as before.
+                "requires_doctor_decision": (
+                    1 if expected_flag_value is not None else 0
+                ),
                 # a REAL Python bool: PG binds int 0 as smallint and the
                 # boolean comparison fails with `boolean = smallint` (the
-                # review P1 on 055a7c7ec, reproduced on PostgreSQL 17)
-                "expected_requires_doctor": (
-                    False if set_requires_doctor is not None else None
-                ),
+                # review P1 on 055a7c7ec, reproduced on PostgreSQL 17).
+                # The expected pre-state comes from the decision table.
+                "expected_requires_doctor": expected_flag_value,
                 "expected_requires_doctor_is_null": _is_null_flag(
-                    0 if set_requires_doctor is not None else None
+                    expected_flag_value
                 ),
             },
             service_id=row.id,
@@ -1439,13 +1532,13 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
             expected_description=(
                 f"doctor_id={row.doctor_id!r} on queue_tag={row.queue_tag!r}"
                 + (
-                    f", requires_doctor={bool(row.requires_doctor)}"
-                    if set_requires_doctor is not None
+                    f", requires_doctor={expected_flag_value}"
+                    if expected_flag_value is not None
                     else ""
                 )
             ),
             post_state_check=(
-                lambda after, _doctor=target_doctor_id, _tag=row.queue_tag, _req=set_requires_doctor: (
+                lambda after, _doctor=target_doctor_id, _tag=row.queue_tag, _req=expected_post_requires_doctor: (
                     after.doctor_id == _doctor
                     and after.queue_tag == _tag
                     and (_req is None or bool(after.requires_doctor) == _req)
@@ -1453,7 +1546,11 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
             ),
             post_state_description=(
                 f"doctor_id={target_doctor_id} on queue_tag={row.queue_tag!r}"
-                + (f", requires_doctor={set_requires_doctor}" if set_requires_doctor is not None else "")
+                + (
+                    f", requires_doctor={expected_post_requires_doctor}"
+                    if expected_post_requires_doctor is not None
+                    else ""
+                )
             ),
         )
         if applied:
@@ -1462,7 +1559,11 @@ def _apply_service_decisions(conn, surfaces: dict) -> dict[str, int]:
                 conn,
                 service_id=row.id,
                 doctor_id=target_doctor_id,
-                requires_doctor=set_requires_doctor if set_requires_doctor is not None else ...,
+                requires_doctor=(
+                    expected_post_requires_doctor
+                    if expected_post_requires_doctor is not None
+                    else ...
+                ),
             )
 
     for _snapshot_id, code, snapshot_tag in _CLEAR_DOCTOR_REQUIREMENT_DECISIONS:
@@ -1710,6 +1811,7 @@ def downgrade_with_conn(conn) -> None:
         _expected_user_id,
         _snapshot_tag,
         _set_requires_doctor,
+        _expected_requires_doctor,
     ) in _ASSIGN_DOCTOR_DECISIONS:
         rows = conn.execute(_SELECT_SERVICE_BY_CODE_ANY, {"code": code}).fetchall()
         for row in rows:

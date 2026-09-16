@@ -61,9 +61,34 @@ class MorningAssignmentCreateBranchHandoff:
 
 
 @dataclass(frozen=True)
+class MorningAssignmentReusedEntryBinding:
+    """Pre-binding links of a committed ticket staged for reuse.
+
+    QD-2E review P1 (2c5ea05ce): binding a pre-existing QR ticket to the
+    visit being registered changes which rows a later compensation sees
+    as "this visit's entries". The snapshot lets the compensation tell a
+    basket-CREATED row (delete) from a basket-REUSED row (restore the
+    original links; the number/queue_time were never touched).
+
+    The values are captured BEFORE the writes and deliberately NOT from
+    ORM attribute history: the failure scenario crosses an intermediate
+    flush (get_or_create_daily_queue), and a flush clears the history.
+    """
+
+    entry_id: int
+    previous_patient_id: int | None
+    previous_visit_id: int | None
+
+
+@dataclass(frozen=True)
 class MorningAssignmentPreparedQueueAssignment:
     assignment: dict[str, Any] | None = None
     create_handoff: MorningAssignmentCreateBranchHandoff | None = None
+    # QD-2E review P1 (external report on 2c5ea05ce): provenance snapshot
+    # of the PRE-EXISTING entry the reuse branch bound to this visit.
+    # Consumed by the wizard's compensating cleanup — see
+    # RegistrarWizardQueueAssignmentService._cleanup_visit_queue_entries.
+    reused_entry_binding: MorningAssignmentReusedEntryBinding | None = None
 
 
 class MorningAssignmentService:
@@ -977,6 +1002,19 @@ class MorningAssignmentService:
                     "Active queue claim is already bound to another "
                     f"visit for queue_tag={queue_tag}"
                 )
+            # QD-2E review P1 (2c5ea05ce, external report): snapshot the
+            # pre-binding links BEFORE mutating the committed row. The
+            # wizard's compensating cleanup deletes only entries the
+            # basket CREATED; this snapshot is what lets it RESTORE this
+            # row's original patient_id/visit_id when a LATER direction
+            # of the same cart fails after a flush, instead of deleting a
+            # previously committed ticket (a data loss, not a rollback of
+            # the basket's own writes). Must precede the writes below.
+            reused_entry_binding = MorningAssignmentReusedEntryBinding(
+                entry_id=existing_entry.id,
+                previous_patient_id=existing_entry.patient_id,
+                previous_visit_id=existing_entry.visit_id,
+            )
             if existing_entry.patient_id is None:
                 existing_entry.patient_id = visit.patient_id
             if existing_entry.visit_id is None:
@@ -991,7 +1029,8 @@ class MorningAssignmentService:
                     "queue_id": daily_queue.id,
                     "number": existing_entry.number,
                     "status": "existing",
-                }
+                },
+                reused_entry_binding=reused_entry_binding,
             )
         # Получаем queue_time (бизнес-время регистрации)
         from zoneinfo import ZoneInfo
