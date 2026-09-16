@@ -349,6 +349,14 @@ class MigrationService:
                     # owner too — a resource-owned queue restored without
                     # it would come back with BOTH owners NULL.
                     "queue_resource_id": queue.queue_resource_id,
+                    # R19 P2 (RQ-13.b): the day's frozen snapshot is a
+                    # restorable property — the round-trip must put it
+                    # back, not let restore fall to the column default.
+                    "start_number": (
+                        int(queue.start_number)
+                        if queue.start_number is not None
+                        else 1
+                    ),
                     "queue_tag": queue.queue_tag,
                     "active": queue.active,
                     "opened_at": (
@@ -455,6 +463,15 @@ class MigrationService:
                     # QD-2A (Codex round-1 P1): restore the resource owner;
                     # .get() so pre-QD-2 backups (no key) stay restorable.
                     queue_resource_id=queue_data.get("queue_resource_id"),
+                    # R19 P2 (RQ-13.b): restore the recorded day snapshot
+                    # without recalculation; .get() so pre-snapshot
+                    # backups (no key) come back at the column default
+                    # (1) — the explicitly defined compatible behavior.
+                    start_number=(
+                        int(queue_data["start_number"])
+                        if queue_data.get("start_number") is not None
+                        else 1
+                    ),
                     queue_tag=queue_data["queue_tag"],
                     active=queue_data["active"],
                     opened_at=(

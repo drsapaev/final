@@ -7523,3 +7523,142 @@ def test_cabinet_specialist_filter_includes_resource_queues(
         day=None, specialist_id=lab_synthetic.id, cabinet_number=None
     )
     assert resource_queue.id in [item["id"] for item in payload_all]
+
+
+# ===================== XXI. R19 pins — force-majeure transfer
+#                        numbering follows the day snapshot =====================
+
+
+def test_force_majeure_transfer_numbers_from_day_snapshot_doctor_queue(
+    db_session: Session,
+) -> None:
+    """R19 P2 (snapshot integration, #3279): a force-majeure transfer
+    into a NEW doctor queue must number tickets from the queue's
+    frozen day snapshot (DailyQueue.start_number, RQ-13.b D-06), not
+    from its own private MAX+1 counter. #3279 added the snapshot to
+    the queue CREATION while the transfer kept its own counter — the
+    first transferred patient got №1 in a queue whose day starts at
+    41, and the next ordinary registration got №41."""
+    from app.services.force_majeure_service import ForceMajeureService
+
+    doctor_user = _make_user(db_session, username="fm_snap_dr1", role="doctor")
+    doctor = _make_doctor(
+        db_session, user_id=doctor_user.id, specialty="stom_r19a"
+    )
+    doctor.start_number_online = 41
+    db_session.commit()
+    db_session.refresh(doctor)
+
+    source_queue = _make_queue(
+        db_session,
+        day=_dt_now_tashkent_day(),
+        specialist_id=doctor.id,
+        queue_tag="stom_r19a",
+    )
+    entry = _make_waiting_entry(db_session, source_queue)
+
+    try:
+        result = ForceMajeureService(db_session).transfer_entries_to_tomorrow(
+            entries=[entry],
+            specialist_id=doctor.id,
+            reason="r19 pin",
+            performed_by_id=doctor_user.id,
+            send_notifications=False,
+        )
+        assert result["success"] is True, result
+
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        tomorrow = _dt_now_tashkent_day() + timedelta(days=1)
+        target_queue = (
+            db_session.query(DailyQueue)
+            .filter(DailyQueue.specialist_id == doctor.id, DailyQueue.day == tomorrow)
+            .one()
+        )
+        # the day was frozen at 41 by the creator — the transfer must
+        # read the SAME snapshot ordinary registration reads
+        assert target_queue.start_number == 41
+        assert moved.queue_id == target_queue.id
+        assert moved.number == 41, (
+            "transfer must number from the day snapshot (41), not from "
+            "the private MAX+1 counter (1) — E-039 violated"
+        )
+    finally:
+        _durable_cleanup(db_session, "fm_snap_dr1")
+
+
+def test_force_majeure_transfer_numbers_from_day_snapshot_resource_queue(
+    db_session: Session,
+) -> None:
+    """R19 P2 (live-setting drift, #3279): the transfer into an
+    EXISTING resource-owned queue must number from the day snapshot —
+    the old path floored at the LIVE
+    QueueResource.start_number_online, so an admin bump after the day
+    was frozen (41 -> 501) made transferred tickets jump outside the
+    frozen sequence while ordinary registration kept the snapshot."""
+    from app.services.force_majeure_service import ForceMajeureService
+
+    res_user = _make_user(db_session, username="fm_snap_res1", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=res_user.id, specialty="lab_r19b")
+    resource = _make_resource(
+        db_session, code="lab_r19b", queue_tag="lab_r19b", start_number_online=41
+    )
+
+    tomorrow = _dt_now_tashkent_day() + timedelta(days=1)
+    tomorrow_queue = _make_queue(
+        db_session,
+        day=tomorrow,
+        specialist_id=None,
+        queue_tag="lab_r19b",
+        queue_resource_id=resource.id,
+    )
+    # frozen at day creation (0067 shape)
+    tomorrow_queue.start_number = 41
+    db_session.commit()
+    db_session.refresh(tomorrow_queue)
+
+    # the admin bump AFTER the day was frozen
+    resource.start_number_online = 501
+    db_session.commit()
+
+    # control: ordinary registration keeps the SNAPSHOT
+    assert (
+        queue_service.get_next_queue_number(
+            db_session, daily_queue=tomorrow_queue, queue_tag="lab_r19b"
+        )
+        == 41
+    )
+
+    source_queue = _make_queue(
+        db_session,
+        day=_dt_now_tashkent_day(),
+        specialist_id=synthetic.id,
+        queue_tag="lab_r19b",
+    )
+    entry = _make_waiting_entry(db_session, source_queue)
+
+    try:
+        result = ForceMajeureService(db_session).transfer_entries_to_tomorrow(
+            entries=[entry],
+            specialist_id=synthetic.id,
+            reason="r19 pin",
+            performed_by_id=res_user.id,
+            send_notifications=False,
+        )
+        assert result["success"] is True, result
+
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        assert moved.queue_id == tomorrow_queue.id
+        assert moved.number == 41, (
+            "transfer must number from the day snapshot (41), not from "
+            "the LIVE registry value (501) — E-039 violated"
+        )
+    finally:
+        _durable_cleanup(db_session, "fm_snap_res1")
