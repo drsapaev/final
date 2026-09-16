@@ -108,6 +108,17 @@ class FakeRedis:
         if self.fail_next_ops > 0:
             self.fail_next_ops -= 1
             raise ConnectionError("simulated transient redis failure")
+        if numkeys == 2:
+            intent_key, token, ttl = args
+            if self.store.get(key) != token:
+                return -1
+            existing = self.store.get(intent_key)
+            if existing is not None and existing != token:
+                return -2
+            # Preserve the existing transport-failure injection seam. The
+            # real Lua operation is separately exercised against Redis below.
+            self.set(intent_key, token, ex=int(ttl))
+            return 1
         if "del" in script:
             if self.store.get(key) == args[0]:
                 self.store.pop(key)
@@ -221,12 +232,14 @@ def two_workers(fake_redis: FakeRedis):
     # Codex R11 #3092: the canonical resolution is stubbed — numeric subs are
     # user ids as-is; username subjects get a stable synthetic id (same
     # username -> same namespace within the harness run).
-    def _harness_resolve(request, user_id, username, _ids={}):
+    subject_ids: dict[str, int] = {}
+
+    def _harness_resolve(request, user_id, username):
         if user_id is not None:
             return user_id
         if not username:
             return None
-        return _ids.setdefault(username, 9000 + len(_ids) + 1)
+        return subject_ids.setdefault(username, 9000 + len(subject_ids) + 1)
     idem_module._resolve_principal_id_sync = _harness_resolve
 
     counters = {"w1": {"calls": 0, "inline": {"calls": 0, "allowed": True}}, "w2": {"calls": 0, "inline": {"calls": 0, "allowed": True}}}
@@ -2074,3 +2087,127 @@ def test_failed_intent_write_recovery_does_not_block_same_key_retry(monkeypatch)
         idem_module._check_principal_authorized_sync = saved_auth
         idem_module._resolve_principal_id_sync = saved_resolve
         idem_module._local_execution_intents.clear()
+
+
+# R19 / review #3283 (5701514498): the final lease check and the intent
+# write cannot be separate operations. These assertions fail on the old SET.
+@pytest.mark.parametrize("required", [False, True])
+def test_r19_stale_intent_writer_never_executes(two_workers, monkeypatch, required):
+    client, retry_client, counters, fake = two_workers
+    claim = idem_module._distributed_claim
+    claim._required = required
+    key = "r19-stale-" + uuid.uuid4().hex
+    original = claim.mark_execution_intent
+
+    def paused_writer(user_id, k, owner_token=None):
+        # A resumes after B acquired the expired lease and left an unknown
+        # outcome. This boundary is AFTER dispatch's previous renew check.
+        fake.store[nkey("1", key, "claim")] = "attempt-B"
+        fake.store[nkey("1", key, "intent")] = "attempt-B"
+        return original(user_id, k, owner_token=owner_token)
+
+    monkeypatch.setattr(claim, "mark_execution_intent", paused_writer)
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    response = client.post("/echo", headers=headers)
+    assert response.status_code == 409, response.text
+    assert counters["w1"]["calls"] == 0
+    assert fake.store[nkey("1", key, "intent")] == "attempt-B"
+    assert fake.store[nkey("1", key, "claim")] == "attempt-B"
+
+    # B's lease ends without a saved response. C must reconcile, never
+    # execute over B's unknown commit; restore the real marking method.
+    monkeypatch.setattr(claim, "mark_execution_intent", original)
+    fake.delete(nkey("1", key, "claim"))
+    retry = retry_client.post("/echo", headers=headers)
+    assert retry.status_code == 409, retry.text
+    assert retry.json()["code"] == "idempotency_uncertain_outcome"
+    assert counters["w2"]["calls"] == 0
+
+
+@pytest.fixture
+def r19_real_claim():
+    """Dedicated test-only Redis, unique namespace; never FLUSHDB."""
+    import os
+    from urllib.parse import urlsplit
+
+    import redis
+
+    url = os.getenv("TEST_IDEMPOTENCY_REDIS_URL")
+    if not url:
+        pytest.skip("TEST_IDEMPOTENCY_REDIS_URL not configured")
+    assert urlsplit(url).hostname in {"localhost", "127.0.0.1", "::1"}
+    client = redis.Redis.from_url(url, decode_responses=True)
+    client.ping()  # An explicitly configured but unavailable service FAILS.
+    claim = _make_claim(client)
+    namespace = "review-r19-" + uuid.uuid4().hex
+    key = "synthetic-operation"
+    yield claim, client, namespace, key
+    client.delete(
+        claim._claim_key(namespace, key),
+        claim._intent_key(namespace, key),
+        claim._resp_key(namespace, key),
+    )
+    idem_module._clear_local_execution_intent(namespace, key)
+    client.close()
+
+
+def _r19_try_mark(claim, namespace, key, token):
+    try:
+        return claim.mark_execution_intent(namespace, key, owner_token=token)
+    except RuntimeError:
+        return False
+
+
+@pytest.mark.redis
+def test_r19_real_redis_stale_owner_preserves_unknown_outcome(r19_real_claim):
+    claim, client, ns, key = r19_real_claim
+    token_a = claim.acquire(ns, key)
+    assert token_a
+    assert claim.renew(ns, key, token_a)
+    # Simulate expiration after that successful CAS, without a 90s sleep.
+    client.pexpire(claim._claim_key(ns, key), 0)
+    token_b = claim.acquire(ns, key)
+    assert token_b and token_b != token_a
+    assert claim.mark_execution_intent(ns, key, owner_token=token_b)
+
+    assert _r19_try_mark(claim, ns, key, token_a) is False
+    assert client.get(claim._intent_key(ns, key)) == token_b
+    assert claim.clear_execution_intent_if_owner(ns, key, token_a) is False
+    assert client.get(claim._intent_key(ns, key)) == token_b
+
+
+@pytest.mark.redis
+def test_r19_real_redis_current_claim_cannot_replace_foreign_intent(r19_real_claim):
+    claim, client, ns, key = r19_real_claim
+    token = claim.acquire(ns, key)
+    client.set(claim._intent_key(ns, key), "previous-unknown-attempt", ex=60)
+    assert _r19_try_mark(claim, ns, key, token) is False
+    assert client.get(claim._intent_key(ns, key)) == "previous-unknown-attempt"
+
+
+@pytest.mark.redis
+def test_r19_real_redis_tokenless_call_does_not_overwrite(r19_real_claim):
+    claim, client, ns, key = r19_real_claim
+    client.set(claim._intent_key(ns, key), "previous-unknown-attempt", ex=60)
+    assert claim.mark_execution_intent(ns, key) is False
+    assert client.get(claim._intent_key(ns, key)) == "previous-unknown-attempt"
+
+
+@pytest.mark.redis
+def test_r19_real_redis_lost_reply_cleans_only_own_landed_intent(r19_real_claim, monkeypatch):
+    claim, client, ns, key = r19_real_claim
+    token = claim.acquire(ns, key)
+    original_eval = client.eval
+
+    def landed_then_timeout(script, *args):
+        result = original_eval(script, *args)
+        if args[0] == 2:
+            assert result == 1
+            raise ConnectionError("synthetic lost intent reply")
+        return result
+
+    monkeypatch.setattr(client, "eval", landed_then_timeout)
+    assert claim.mark_execution_intent(ns, key, owner_token=token) is False
+    assert client.get(claim._intent_key(ns, key)) == token
+    assert claim.clear_execution_intent_if_owner(ns, key, token) is True
+    assert client.get(claim._intent_key(ns, key)) is None
