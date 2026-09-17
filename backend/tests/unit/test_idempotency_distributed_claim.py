@@ -2099,7 +2099,7 @@ def test_r19_stale_intent_writer_never_executes(two_workers, monkeypatch, requir
     key = "r19-stale-" + uuid.uuid4().hex
     original = claim.mark_execution_intent
 
-    def paused_writer(user_id, k, owner_token=None):
+    def paused_writer(user_id, k, owner_token=None, tokenless_marker=None):
         # A resumes after B acquired the expired lease and left an unknown
         # outcome. This boundary is AFTER dispatch's previous renew check.
         fake.store[nkey("1", key, "claim")] = "attempt-B"
@@ -2211,3 +2211,298 @@ def test_r19_real_redis_lost_reply_cleans_only_own_landed_intent(r19_real_claim,
     assert client.get(claim._intent_key(ns, key)) == token
     assert claim.clear_execution_intent_if_owner(ns, key, token) is True
     assert client.get(claim._intent_key(ns, key)) is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PR 3319 (owner P2, verified on main 1033c3c7b3): an OPTIONAL attempt that
+# degraded to the tokenless local path (Redis down at acquire) must never use
+# a tokenless marker as execution permission after Redis recovery, and its
+# known-outcome cleanup must never delete a foreign attempt's intent marker.
+# Window: Redis recovers BETWEEN the uncertain-outcome check (still down —
+# local branch) and the intent gate (recovered — distributed SET NX). On the
+# pre-fix code the degraded attempt then executed next to the foreign
+# attempt and its unconditional clear_execution_intent deleted the foreign
+# unknown-outcome protection (R9).
+
+
+class _RecoverableOutageRedis(FakeRedis):
+    """ping() raises while ``down`` — the outage window of the degrade."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.down = True
+
+    def ping(self) -> bool:
+        if self.down:
+            raise ConnectionError("simulated redis outage")
+        return True
+
+
+def _wire_outage_claim(fake: _RecoverableOutageRedis):
+    """Optional claim starting in the outage state (available=False)."""
+    claim = object.__new__(DistributedIdempotencyClaim)
+    claim._ttl = 24 * 60 * 60
+    claim._prefix = "idem"
+    claim._lease_seconds = 90
+    claim._required = False
+    claim._client = fake
+    claim._available = False
+    claim._failed_at = 0.0
+    return claim
+
+
+def test_recovered_tokenless_attempt_refuses_over_foreign_intent(monkeypatch):
+    """The owner's P2 interleaving: A degrades (no claim token), B marks its
+    intent, Redis recovers between A's uncertain check and A's intent gate.
+    A must be refused 409 WITHOUT running the handler, and B's intent marker
+    must survive (no cleanup over a foreign marker)."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
+    idem_module._local_execution_intents.clear()
+
+    fake = _RecoverableOutageRedis()
+    saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    idem_module._distributed_claim = _wire_outage_claim(fake)
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9012
+    )
+    try:
+        key = "pr3319-tokenless-over-foreign"
+        intent_key = nkey("1", key, "intent")
+
+        # Worker B already guards the key with its token-bound intent marker.
+        # Invisible to A while the outage lasts (every probe fails), so A
+        # degrades to the tokenless local path exactly as in the incident.
+        fake.store[intent_key] = "attempt-B"
+
+        counter = {"calls": 0}
+        client = TestClient(_make_app(counter), raise_server_exceptions=False)
+
+        # Recovery lands BETWEEN the uncertain-outcome check (still down —
+        # takes the LOCAL branch) and the intent gate: the very next probe
+        # of the degraded local uncertain check flips the outage off.
+        original_local_exists = idem_module._local_execution_intent_exists
+
+        def _recovering_local_exists(user_id, key_):
+            fake.down = False
+            return original_local_exists(user_id, key_)
+
+        monkeypatch.setattr(
+            idem_module, "_local_execution_intent_exists", _recovering_local_exists
+        )
+
+        response = client.post(
+            "/echo", headers={**auth_headers("1"), "Idempotency-Key": key}
+        )
+
+        assert response.status_code == 409, response.text
+        assert response.json()["code"] == "idempotency_in_flight"
+        assert counter["calls"] == 0, (
+            "a tokenless degraded attempt must never execute over a foreign intent"
+        )
+        assert fake.store.get(intent_key) == "attempt-B", (
+            "the foreign unknown-outcome marker must survive the refusal"
+        )
+    finally:
+        idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
+        idem_module._local_execution_intents.clear()
+        monkeypatch.undo()
+
+
+def test_recovered_tokenless_attempt_executes_once_without_foreign_intent(monkeypatch):
+    """Complementary path: same degrade+recovery, but NO foreign intent —
+    the tokenless SET NX wins, the handler runs exactly once, and the
+    anonymous marker is cleaned by the ownership-guarded known-outcome
+    cleanup (single execution preserved by the NX contract)."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
+    idem_module._local_execution_intents.clear()
+
+    fake = _RecoverableOutageRedis()
+    saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    idem_module._distributed_claim = _wire_outage_claim(fake)
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9012
+    )
+    try:
+        key = "pr3319-tokenless-clean-execution"
+        intent_key = nkey("1", key, "intent")
+
+        counter = {"calls": 0}
+        client = TestClient(_make_app(counter), raise_server_exceptions=False)
+
+        original_local_exists = idem_module._local_execution_intent_exists
+
+        def _recovering_local_exists(user_id, key_):
+            fake.down = False
+            return original_local_exists(user_id, key_)
+
+        monkeypatch.setattr(
+            idem_module, "_local_execution_intent_exists", _recovering_local_exists
+        )
+
+        response = client.post(
+            "/echo", headers={**auth_headers("1"), "Idempotency-Key": key}
+        )
+
+        assert response.status_code == 200, response.text
+        assert counter["calls"] == 1
+        # Known outcome: the attempt's OWN anonymous marker is gone.
+        assert intent_key not in fake.store, (
+            "the tokenless attempt must clean its own anonymous marker"
+        )
+    finally:
+        idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
+        idem_module._local_execution_intents.clear()
+        monkeypatch.undo()
+
+
+def test_known_outcome_cleanup_never_deletes_foreign_marker():
+    """clear_execution_intent_owned is value-bound: a tokenless cleanup
+    (anonymous "1") removes only an anonymous marker; an owning cleanup
+    removes only its own token-bound marker. Any foreign marker survives."""
+    fake = FakeRedis()
+    claim = _make_claim(fake)
+    claim._lease_seconds = 90
+
+    # Tokenless cleanup vs a foreign TOKEN-bound marker: survives.
+    fake.store[claim._intent_key("1", "k1")] = "attempt-B"
+    claim.clear_execution_intent_owned("1", "k1", None)
+    assert fake.store[claim._intent_key("1", "k1")] == "attempt-B"
+
+    # Tokenless cleanup vs its own anonymous marker: deleted.
+    fake.store[claim._intent_key("1", "k2")] = "1"
+    claim.clear_execution_intent_owned("1", "k2", None)
+    assert claim._intent_key("1", "k2") not in fake.store
+
+    # Owning cleanup vs an anonymous foreign marker: survives.
+    fake.store[claim._intent_key("1", "k3")] = "1"
+    claim.clear_execution_intent_owned("1", "k3", "attempt-T")
+    assert fake.store[claim._intent_key("1", "k3")] == "1"
+
+    # Owning cleanup vs its own token-bound marker: deleted.
+    fake.store[claim._intent_key("1", "k4")] = "attempt-T"
+    claim.clear_execution_intent_owned("1", "k4", "attempt-T")
+    assert claim._intent_key("1", "k4") not in fake.store
+
+    # codex PR 3319 P1: unique per-attempt tokenless markers. Attempt A's
+    # cleanup (marker m-A) must never delete attempt B's marker (m-B), and
+    # the historical shared "1" fallback must not match unique markers.
+    fake.store[claim._intent_key("1", "k5")] = "marker-B"
+    claim.clear_execution_intent_owned("1", "k5", "marker-A")
+    assert fake.store[claim._intent_key("1", "k5")] == "marker-B"
+    fake.store[claim._intent_key("1", "k6")] = "marker-A"
+    claim.clear_execution_intent_owned("1", "k6", "marker-A")
+    assert claim._intent_key("1", "k6") not in fake.store
+    fake.store[claim._intent_key("1", "k7")] = "marker-B"
+    claim.clear_execution_intent_owned("1", "k7", None)
+    assert fake.store[claim._intent_key("1", "k7")] == "marker-B"
+
+
+def test_tokenless_lost_set_response_cleans_own_marker(monkeypatch):
+    """codex PR 3319 P2: a tokenless SET whose RESPONSE is lost (Redis
+    applied the write, the attempt saw a transport error) previously left
+    the anonymous marker for a full TTL with no outcome — a recovery retry
+    received a false idempotency_uncertain_outcome for an operation that
+    never ran. The 409 branch now cleans THIS attempt's unique marker.
+
+    The reconnect cooldown is zeroed here ONLY so the recovery lands
+    within the request window (a real 5 s cooldown keeps the intent gate
+    closed for the whole request); the cooldown-bypass of the cleanup
+    itself is pinned separately by
+    test_owned_cleanup_bypasses_reconnect_cooldown."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
+    idem_module._local_execution_intents.clear()
+
+    class _LostSetResponseRedis(_RecoverableOutageRedis):
+        """The intent SET lands, then raises — the attempt sees failure."""
+
+        def set(self, key, value, nx=False, xx=False, ex=None):
+            result = super().set(key, value, nx=nx, xx=xx, ex=ex)
+            if nx and key.endswith(":intent"):
+                raise ConnectionError("simulated lost SET response")
+            return result
+
+    fake = _LostSetResponseRedis()
+    saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    idem_module._distributed_claim = _wire_outage_claim(fake)
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9012
+    )
+    try:
+        key = "pr3319-lost-set-response"
+        intent_key = nkey("1", key, "intent")
+
+        counter = {"calls": 0}
+        client = TestClient(_make_app(counter), raise_server_exceptions=False)
+
+        original_local_exists = idem_module._local_execution_intent_exists
+
+        def _recovering_local_exists(user_id, key_):
+            fake.down = False
+            return original_local_exists(user_id, key_)
+
+        monkeypatch.setattr(
+            idem_module, "_local_execution_intent_exists", _recovering_local_exists
+        )
+
+        response = client.post(
+            "/echo", headers={**auth_headers("1"), "Idempotency-Key": key}
+        )
+
+        assert response.status_code == 409, response.text
+        assert counter["calls"] == 0, "the handler must never run after a lost SET"
+        assert intent_key not in fake.store, (
+            "the landed own marker must be cleaned by the 409 branch so the "
+            "recovery retry does not face a false unknown-outcome"
+        )
+        assert nkey("1", key, "claim") not in fake.store
+    finally:
+        idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
+        idem_module._local_execution_intents.clear()
+        monkeypatch.undo()
+
+
+def test_owned_cleanup_bypasses_reconnect_cooldown():
+    """codex PR 3319 P2: right after a failed mark the claim is marked
+    unavailable for the whole reconnect cooldown; the owned cleanup must
+    still reach Redis through the direct client (best-effort, same as
+    clear_execution_intent_if_owner) instead of skipping on
+    _ensure_available."""
+    import time as _time
+
+    fake = FakeRedis()
+    claim = _make_claim(fake)
+    claim._lease_seconds = 90
+    marker = "marker-abc123"
+    fake.store[claim._intent_key("1", "k9")] = marker
+
+    # Simulate the post-failed-mark state: unavailable + fresh failure time
+    # (same time.time() scale as _ensure_available) under the PRODUCTION
+    # cooldown — _ensure_available would refuse until the cooldown elapses.
+    claim._available = False
+    claim._failed_at = _time.time()
+    assert claim.try_available() is False
+
+    claim.clear_execution_intent_owned("1", "k9", marker)
+    assert claim._intent_key("1", "k9") not in fake.store, (
+        "the owned cleanup must bypass the reconnect cooldown (direct client)"
+    )
+    # codex round 3: a successful direct eval proves Redis is reachable —
+    # the worker's coordination state must be restored, so the Retry-After
+    # retry re-enters the distributed protocol instead of degrading to the
+    # optional local path while another worker may acquire the unmarked key.
+    assert claim.try_available() is True
