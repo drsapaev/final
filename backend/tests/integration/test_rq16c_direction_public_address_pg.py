@@ -6,7 +6,10 @@ address of a direction is ``/q/<public_code>`` with an OPAQUE RANDOM
 server-generated code. This module pins the registry CONTRACT on a real
 PostgreSQL schema (E-055 §12 PG acceptance matrix):
 
-1. clean upgrade: one actual Alembic head (``0068_direction_public_address``)
+1. clean upgrade: one actual Alembic head — the chain head
+   (``0069_sentinel_pair_retirement``, chained above the
+   ``0068_direction_public_address`` registry revision by the RQ-15.d
+   repair, owner directive trace 1a0aef280204950d)
    and the registry table exists;
 2. an address row can be created for a QueueProfile; generated codes
    satisfy the approved shape (12 chars, canonical lowercase, approved
@@ -56,7 +59,10 @@ from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 SCRATCH_DB = "rq16c_check"
-EXPECTED_HEAD = "0068_direction_public_address"
+# The head pin advances with the chain (established pattern: #3306
+# advanced the 0067-era pins; the RQ-15.d repair chains 0069 above the
+# 0068 registry revision — owner directive trace 1a0aef280204950d).
+EXPECTED_HEAD = "0069_sentinel_pair_retirement"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -441,6 +447,24 @@ def test_downgrade_reupgrade_leaves_no_partial_registry(pg_env):
 
     r_down = _run_alembic(sa_url, "downgrade", "-1")
     assert r_down.returncode == 0, r_down.stderr[-1500:]
+    with psycopg.connect(psycopg_dsn) as conn:
+        version = conn.execute("select version_num from alembic_version").fetchone()[0]
+        # -1 from the 0069 chain head lands on the registry revision 0068:
+        # the retirement downgrade must leave NO partial registry rows.
+        assert version == "0068_direction_public_address"
+        present = conn.execute(
+            "select to_regclass('public.queue_direction_public_addresses')"
+        ).fetchone()[0]
+        assert present is not None, "0068 keeps the registry table"
+        leftover = conn.execute(
+            "select count(*) from queue_direction_public_addresses"
+        ).fetchone()[0]
+        assert leftover == 0, "0069 downgrade leaves no partial registry"
+
+    # one more step: 0068's own downgrade drops the registry table
+    # (the original pre-repair assertion, now one level below the head)
+    r_down2 = _run_alembic(sa_url, "downgrade", "-1")
+    assert r_down2.returncode == 0, r_down2.stderr[-1500:]
     with psycopg.connect(psycopg_dsn) as conn:
         version = conn.execute("select version_num from alembic_version").fetchone()[0]
         assert version == "0067_daily_queue_start_number"
