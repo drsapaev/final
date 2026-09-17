@@ -301,7 +301,7 @@ landing made explicit:
   alembic head and the deterministic conversion is a clean no-op on
   the second pass.
 
-### Stage E landing note (2026-09-17, RQ-15.d — migration 0068)
+### Stage E landing note (2026-09-17, RQ-15.d — migration 0069)
 
 Stage E retired the 0055 synthetic User+Doctor pairs
 (`ecg_resource` / `lab_resource` / `general_resource`) by the paired
@@ -376,7 +376,7 @@ writes a resource-owned row; stage D enforces the XOR at the DB level.
   log inventory is the audit trail).
 - Existing doctor-owned rows: byte-compatible, untouched at every stage.
 - Synthetic identities: removed only in stage E, after zero references
-  (`0068_sentinel_pair_retirement` — the paired deletion with the guard
+  (`0069_sentinel_pair_retirement` — the paired deletion with the guard
   taxonomy above; a pre-E backup is the restore path, the migration log
   inventory is the audit trail).
 

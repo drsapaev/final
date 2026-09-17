@@ -53,6 +53,10 @@ export interface CartService {
   service_code?: string;
   code?: string;
   is_consultation?: boolean;
+  // RQ-05.b: поля из DTO каталога (GET /registrar/services), по которым
+  // рисуется селектор врача: флаг обязательности и профиль отделения.
+  requires_doctor?: boolean;
+  department_key?: string;
   price?: number;
   duration?: number;
   [key: string]: unknown;

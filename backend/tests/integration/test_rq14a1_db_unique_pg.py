@@ -46,10 +46,9 @@ import os
 import subprocess
 import sys
 import uuid
-from types import SimpleNamespace
 from datetime import UTC, date, datetime, time
-
 from pathlib import Path
+from types import SimpleNamespace
 
 import psycopg
 import pytest
@@ -150,8 +149,9 @@ def _assert_pg_head(engine) -> None:
         version = conn.execute(text("select version_num from alembic_version")).scalar()
     # QD-2E chain reconciliation + RQ-13.b + RQ-15.d: the populated head
     # assert advances with the chain (0065 -> 0066 cutover -> 0067
-    # snapshot -> 0068 sentinel pair retirement).
-    assert version == "0068_sentinel_pair_retirement", version
+    # snapshot -> 0068 direction public-address registry, RQ-16.c /
+    # E-055 -> 0069 sentinel pair retirement).
+    assert version == "0069_sentinel_pair_retirement", version
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:

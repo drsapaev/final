@@ -1,0 +1,153 @@
+/**
+ * RQ-05.b — контракт DTO каталога регистратуры (GET /registrar/services).
+ *
+ * Цепочка «обязательный врач по DTO-флагу»:
+ *   backend _services_doctors.py отдаёт per-service requires_doctor
+ *   (F-04, RQ-05) → api/registrar.ts типизирует DTO
+ *   (RegistrarCatalogService) → AppointmentWizardV2.validateStep(2)
+ *   требует врача по флагу → CartStepV2 рисует селектор врача по флагу.
+ *
+ * Этот файл пинит ПЕРВЫЕ ДВА звена (источник флага + типизация) —
+ * статическими контрактами в духе csrfRecovery.test.ts (чтение
+ * исходников). Рантайм-поведение гейта — в
+ * components/wizard/__tests__/wizardRequiresDoctor.test.ts.
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { describe, expect, it } from 'vitest';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const backendSerializerPath = path.resolve(
+  __dirname,
+  '../../../../backend/app/api/v1/endpoints/registrar_integration/_services_doctors.py',
+);
+const registrarApiPath = path.resolve(__dirname, '../registrar.ts');
+
+// =====================================================================
+// 1. Backend: эмиссия флага per-service (F-04)
+// =====================================================================
+
+const readSerializer = () => fs.readFileSync(backendSerializerPath, 'utf8');
+const serializerServiceDataBlock = () =>
+  readSerializer().slice(
+    readSerializer().indexOf('service_data = {'),
+    readSerializer().indexOf('# [OK] НОВАЯ ЛОГИКА')
+  );
+
+describe('RQ-05.b: backend emits requires_doctor per registrar service (F-04)', () => {
+  it('service_data includes requires_doctor as bool(...)', () => {
+    const block = serializerServiceDataBlock();
+    expect(block).toContain('"requires_doctor": bool(');
+    expect(block).toContain("getattr(service, 'requires_doctor', False)");
+  });
+
+  it('keeps the RQ-05 (F-04) traceability marker', () => {
+    expect(readSerializer()).toContain('RQ-05 (F-04)');
+  });
+
+  it('emits the fields the frontend DTO type declares', () => {
+    const block = serializerServiceDataBlock();
+    for (const key of [
+      '"id":',
+      '"name":',
+      '"code":',
+      '"price":',
+      '"currency":',
+      '"duration_minutes":',
+      '"category_id":',
+      '"doctor_id":',
+      '"department_key":',
+      '"category_code":',
+      '"service_code":',
+      '"queue_tag":',
+      '"is_consultation":',
+      '"requires_doctor":',
+      '"group":',
+    ]) {
+      expect(block).toContain(key);
+    }
+  });
+});
+
+// =====================================================================
+// 2. Frontend: проводка типизированного каталога в мастер (codex P2, PR 3309)
+// =====================================================================
+
+const wizardPath = path.resolve(
+  __dirname,
+  '../../components/wizard/AppointmentWizardV2.tsx',
+);
+const wizardUtilsPath = path.resolve(
+  __dirname,
+  '../../components/wizard/wizardUtils.ts',
+);
+
+describe('RQ-05.b: wizard consumes the typed catalog (end-to-end linkage)', () => {
+  const readWizard = () => fs.readFileSync(wizardPath, 'utf8');
+  const loadServicesBlock = () => {
+    const source = readWizard();
+    return source.slice(
+      source.indexOf('const loadServices = useCallback(async () => {'),
+      source.indexOf('// ===================== РЕЗОЛВИНГ УСЛУГ (SSOT) =====================')
+    );
+  };
+
+  it('loads the catalog through the typed wrapper fetchRegistrarServices', () => {
+    expect(loadServicesBlock()).toContain('await fetchRegistrarServices()');
+  });
+
+  it('maps catalog groups through the typed SSOT adapter', () => {
+    expect(loadServicesBlock()).toContain('groupServices.map(wizardServiceFromCatalogEntry)');
+  });
+
+  it('transfers requires_doctor EXPLICITLY in the adapter (DTO rename breaks compile, not the gate)', () => {
+    expect(fs.readFileSync(wizardUtilsPath, 'utf8'))
+      .toContain('requires_doctor: Boolean(entry.requires_doctor)');
+  });
+
+  it('drops the untyped ServiceData[] cast in the catalog extraction', () => {
+    expect(loadServicesBlock()).not.toContain('as ServiceData[]');
+  });
+
+  it('normalizes nullable DTO strings for the wizard shape', () => {
+    const utils = fs.readFileSync(wizardUtilsPath, 'utf8');
+    expect(utils).toContain('service_code: entry.service_code ?? undefined');
+    expect(utils).toContain('department_key: entry.department_key ?? undefined');
+  });
+});
+
+// =====================================================================
+// 3. Frontend: типизация DTO по актуальному ответу бэкенда
+// =====================================================================
+
+describe('RQ-05.b: api/registrar.ts types the catalog DTO', () => {
+  const readApi = () => fs.readFileSync(registrarApiPath, 'utf8');
+
+  it('declares RegistrarCatalogService with required requires_doctor: boolean', () => {
+    const source = readApi();
+    const block = source.slice(
+      source.indexOf('export interface RegistrarCatalogService'),
+      source.indexOf('export interface RegistrarServicesResponse')
+    );
+    expect(block).toContain('requires_doctor: boolean;');
+    expect(block).toContain('is_consultation?: boolean;');
+    expect(block).toContain('department_key?: string | null;');
+  });
+
+  it('types services_by_group as Record<string, RegistrarCatalogService[]>', () => {
+    const source = readApi();
+    const block = source.slice(
+      source.indexOf('export interface RegistrarServicesResponse'),
+      source.indexOf('export async function fetchRegistrarServices')
+    );
+    expect(block).toContain('services_by_group?: Record<string, RegistrarCatalogService[]>');
+  });
+
+  it('documents requires_doctor as the mandatory-doctor flag (RQ-05 F-04 traceability)', () => {
+    const source = readApi();
+    expect(source).toContain('RQ-05');
+    expect(source).toContain('F-04');
+  });
+});

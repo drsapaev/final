@@ -1,6 +1,6 @@
 """RQ-15.d (ADR-001 stage E): the 0055 synthetic pair retirement pins.
 
-Migration ``0068_sentinel_pair_retirement`` completes the QD-2 staged
+Migration ``0069_sentinel_pair_retirement`` completes the QD-2 staged
 rollout (ADR-001 "Stage E"): the terminal state has doctorless queues
 owned by ``queue_resources`` rows — a reference registry with no User,
 no role, no login. The three synthetic User+Doctor pairs provisioned
@@ -71,8 +71,8 @@ from sqlalchemy.engine import make_url
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_ROOT = REPO_ROOT / "backend"
-MIGRATION_0068 = (
-    BACKEND_ROOT / "alembic" / "versions" / "0068_sentinel_pair_retirement.py"
+MIGRATION_0069 = (
+    BACKEND_ROOT / "alembic" / "versions" / "0069_sentinel_pair_retirement.py"
 )
 MIGRATION_0055 = (
     BACKEND_ROOT / "alembic" / "versions" / "0055_queue_resource_provisioning.py"
@@ -90,12 +90,12 @@ _DISABLED_HASH = "!disabled:queue-resource"
 def _module():
     """Lazily import the migration module (RED-first: every test fails
     individually while the module does not exist)."""
-    assert MIGRATION_0068.exists(), (
-        "0068_sentinel_pair_retirement.py is missing from the alembic "
+    assert MIGRATION_0069.exists(), (
+        "0069_sentinel_pair_retirement.py is missing from the alembic "
         "chain — the RQ-15.d retirement is not implemented"
     )
     spec = importlib.util.spec_from_file_location(
-        "migration_0068_sentinel_pair_retirement", MIGRATION_0068
+        "migration_0069_sentinel_pair_retirement", MIGRATION_0069
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -672,11 +672,11 @@ def test_pair_vocabulary_matches_the_0055_seed() -> None:
 
 @pytest.mark.integration
 @pytest.mark.migration
-def test_alembic_chain_single_head_0068() -> None:
+def test_alembic_chain_single_head_0069() -> None:
     """The chain stays single-headed with the retirement as the head
     (the sentinel-suite graph pattern)."""
     module = _module()
-    versions = MIGRATION_0068.parent
+    versions = MIGRATION_0069.parent
     graph: dict[str, tuple[str, ...]] = {}
     for path in sorted(versions.glob("*.py")):
         source = path.read_text(encoding="utf-8")
@@ -690,13 +690,13 @@ def test_alembic_chain_single_head_0068() -> None:
             else ()
         )
         graph[revision_match.group(1)] = parents
-    assert module.revision == "0068_sentinel_pair_retirement"
-    assert module.down_revision == "0067_daily_queue_start_number"
-    assert graph["0068_sentinel_pair_retirement"] == ("0067_daily_queue_start_number",)
+    assert module.revision == "0069_sentinel_pair_retirement"
+    assert module.down_revision == "0068_direction_public_address"
+    assert graph["0069_sentinel_pair_retirement"] == ("0068_direction_public_address",)
     assert len(module.revision) <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    assert heads == ["0068_sentinel_pair_retirement"]
+    assert heads == ["0069_sentinel_pair_retirement"]
 
 
 # ===================== C. PostgreSQL FK introspection =====================
@@ -894,7 +894,7 @@ def _candidate_admin_urls() -> list[str]:
 @pytest.mark.migration
 def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
     """``alembic upgrade head`` on a fresh scratch database: 0055
-    provisions the pairs somewhere mid-chain, 0068 retires them at the
+    provisions the pairs somewhere mid-chain, 0069 retires them at the
     head — the end state has zero synthetic usernames and zero doctors
     linked to them."""
     module = _module()

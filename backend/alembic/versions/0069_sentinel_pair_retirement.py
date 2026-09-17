@@ -111,14 +111,15 @@ import sqlalchemy as sa
 
 from alembic import op
 
-# Revision identifiers — chained after 007 (the day start-number
-# snapshot, RQ-13.b).
-revision = "0068_sentinel_pair_retirement"
-down_revision = "0067_daily_queue_start_number"
+# Revision identifiers — chained after 0068 (the direction public-address
+# registry, RQ-16.c), which follows 0067 (the day start-number snapshot,
+# RQ-13.b).
+revision = "0069_sentinel_pair_retirement"
+down_revision = "0068_direction_public_address"
 branch_labels = None
 depends_on = None
 
-_MIGRATION_NAME = "0068_sentinel_pair_retirement"
+_MIGRATION_NAME = "0069_sentinel_pair_retirement"
 
 # The exact 0055 identities (parity pinned by the test suite against
 # the 0055 source): username -> the specialty of its linked Doctor row.
