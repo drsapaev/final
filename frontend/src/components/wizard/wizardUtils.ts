@@ -868,6 +868,37 @@ const DEPARTMENT_CODE_MAPPING: Record<string, string> = {
   'O': 'procedures' // Прочие процедуры → вкладка procedures
 };
 
+// RQ-05.b: позиции корзины, у которых сервер требует врача (DTO-флаг
+// requires_doctor из GET /registrar/services, F-04), а врач не выбран.
+// Чистая функция: извлечена из AppointmentWizardV2.validateStep — гейт
+// шага 2 «выбор обязателен ровно там, где его требует сервер» (S-03).
+// Паритет с прежним инлайн-гейтом: услуга, отсутствующая в каталоге
+// (каталог ещё грузится / услуга удалена), фантомно шаг не блокирует.
+export interface MissingDoctorItemLike {
+  service_id?: string | number;
+  doctor_id?: string | number | null;
+  [key: string]: unknown;
+}
+
+export interface MissingDoctorServiceLike {
+  id?: string | number;
+  requires_doctor?: boolean;
+  [key: string]: unknown;
+}
+
+export const findMissingDoctorItems = (
+  items: MissingDoctorItemLike[],
+  services: MissingDoctorServiceLike[]
+): MissingDoctorItemLike[] => {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  if (!Array.isArray(services) || services.length === 0) return [];
+
+  return items.filter((item) => {
+    const service = services.find((s) => s.id === item.service_id);
+    return Boolean(service?.requires_doctor) && !item.doctor_id;
+  });
+};
+
 const DEPARTMENT_NORMALIZED_MAPPING: Record<string, string> = {
   'specialists': 'cardiology', // Консультации специалистов (только если не 'D' или 'S') -> cardiology
   'laboratory': 'lab', // ✅ Лаборатория -> lab (для соответствия вкладке)

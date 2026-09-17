@@ -240,6 +240,7 @@ import {
   serviceCodeToWizardCategory,
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
+  findMissingDoctorItems,
   categories
 } from './wizardUtils';
 
@@ -1594,11 +1595,12 @@ const AppointmentWizardV2 = ({
       if (wizardData.cart.items.length === 0) {
         newErrors.cart = t('misc.aw_cart_empty');
       }
-      // Проверяем, что для услуг, требующих врача, врач выбран
-      const missingDoctors = wizardData.cart.items.filter((item) => {
-        const service = servicesData.find((s) => s.id === (item as { service_id?: string | number }).service_id);
-        return service?.requires_doctor && !(item as { doctor_id?: string | number }).doctor_id;
-      });
+      // RQ-05.b: гейт «врач обязателен ровно там, где требует сервер» —
+      // SSOT-хелпер по DTO-флагу requires_doctor каталога (F-04).
+      const missingDoctors = findMissingDoctorItems(
+        wizardData.cart.items,
+        servicesData
+      );
       if (missingDoctors.length > 0) {
         newErrors.doctors = t('misc.aw_doctors_required');
       }
