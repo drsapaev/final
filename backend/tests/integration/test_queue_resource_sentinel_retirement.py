@@ -918,7 +918,14 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
         c.execute(f'CREATE DATABASE "{scratch_db}"')
 
     u = make_url(admin_url)
-    sa_url = str(u.set(drivername="postgresql+psycopg", database=scratch_db))
+    # render_as_string(hide_password=False): plain str(URL) masks the
+    # password as *** (SQLAlchemy 2.0) — the subprocess would then try
+    # to authenticate with the literal asterisks and fail. The local
+    # portable server (trust auth, no password) never surfaced this;
+    # the CI service (password auth) did.
+    sa_url = u.set(
+        drivername="postgresql+psycopg", database=scratch_db
+    ).render_as_string(hide_password=False)
     try:
         env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
         result = subprocess.run(
