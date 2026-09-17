@@ -919,14 +919,17 @@ const QueueSettings = () => {
                         );
                       })}
                     </div>
-                    {reportScope.tag === null &&
-                    <div className="admin-text-xs-secondary pt-2" data-testid="qs-eff-default-tag-note">
-                      {t('admin2.qs_eff_default_tag_note')}
-                    </div>
-                    }
+                    {/* PR 3318 codex P2: нота привязана к owner-разрешению — только
+                    effective_start_number владельцев резолвится через «default»;
+                    клиника-уровень в fields показывает полные словари по тегам */}
                     <h4 className="admin-text-sm-med-primary pt-2">
                       {t('admin2.qs_eff_owner_overrides_title')}
                     </h4>
+                    {reportScope.tag === null &&
+                    <div className="admin-text-xs-secondary pb-1" data-testid="qs-eff-default-tag-note">
+                      {t('admin2.qs_eff_default_tag_note')}
+                    </div>
+                    }
                     <div className="flex flex-col gap-2">
                       {effectiveReport.department.owner_overrides.map((override: OwnerOverride) => (
                         <div key={override.doctor_id} data-owner-row className="admin-flex-between-sm">

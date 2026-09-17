@@ -5450,7 +5450,7 @@ const ru = {
     qs_eff_owner_inactive: 'врач неактивен',
     qs_eff_owner_max_per_day: 'Лимит/день: {value}',
     qs_eff_day_inactive_badge: 'день деактивирован (историческая строка)',
-    qs_eff_default_tag_note: 'Тег не выбран: клинические значения показаны для ключа «default» — по тегам значения могут различаться.',
+    qs_eff_default_tag_note: 'Тег не выбран: эффективные стартовые номера клинического уровня у владельцев разрешаются ключом «default» — по тегам значения могут различаться.',
 
     // ─── PaymentProviderSettings (admin2.pps_*) ────────────────────────────
     pps_loading_message: 'Загрузка настроек...',

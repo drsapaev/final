@@ -5327,7 +5327,7 @@ const uzLatn = {
     qs_eff_owner_inactive: 'shifokor faol emas',
     qs_eff_owner_max_per_day: 'Kunlik limit: {value}',
     qs_eff_day_inactive_badge: "kun o'chirilgan (tarixiy qator)",
-    qs_eff_default_tag_note: "Teg tanlanmagan: klinik qiymatlar «default» kaliti bo'yicha ko'rsatilgan — teglar bo'yicha qiymatlar farq qilishi mumkin.",
+    qs_eff_default_tag_note: "Teg tanlanmagan: egalarning klinik darajadagi samarali boshlang'ich raqamlari «default» kaliti orqali aniqlanadi — teglar bo'yicha qiymatlar farq qilishi mumkin.",
 
     // ─── PaymentProviderSettings (admin2.pps_*) ────────────────────────────
     pps_loading_message: "Sozlamalar yuklanmoqda...",

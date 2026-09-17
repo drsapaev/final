@@ -5326,7 +5326,7 @@ const kk = {
     qs_eff_owner_inactive: 'дәрігер белсенді емес',
     qs_eff_owner_max_per_day: 'Күндік лимит: {value}',
     qs_eff_day_inactive_badge: 'күн өшірілген (тарихи жол)',
-    qs_eff_default_tag_note: 'Тег таңдалмаған: клиникалық мәндер «default» кілті бойынша көрсетілген — тегтер бойынша мәндер өзгеруі мүмкін.',
+    qs_eff_default_tag_note: 'Тег таңдалмаған: иелердің клиникалық деңгейдегі тиімді бастапқы нөмірлері «default» кілті арқылы шешіледі — тегтер бойынша мәндер өзгеруі мүмкін.',
 
     // ─── PaymentProviderSettings (admin2.pps_*) ────────────────────────────
     pps_loading_message: 'Загрузка настроек...',

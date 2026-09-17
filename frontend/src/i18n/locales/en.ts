@@ -5326,7 +5326,7 @@ const en = {
     qs_eff_owner_inactive: 'doctor inactive',
     qs_eff_owner_max_per_day: 'Daily cap: {value}',
     qs_eff_day_inactive_badge: 'day deactivated (historical row)',
-    qs_eff_default_tag_note: 'No tag selected: clinic-level values are shown for the «default» key — values may differ per tag.',
+    qs_eff_default_tag_note: "No tag selected: owners' clinic-level effective start numbers resolve through the «default» key — values may differ per tag.",
 
     // ─── PaymentProviderSettings (admin2.pps_*) ────────────────────────────
     pps_loading_message: 'Загрузка настроек...',
