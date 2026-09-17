@@ -14874,6 +14874,69 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/patient-access/request-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Patient Otp
+         * @description Отправить OTP для входа пациента. Ответ номер-нейтрален (anti-enum).
+         */
+        post: operations["request_patient_otp_api_v1_patient_access_request_otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/verify-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Patient Otp
+         * @description Проверить OTP -> одноразовый verification_grant (единый ответ при любой неудаче).
+         */
+        post: operations["verify_patient_otp_api_v1_patient_access_verify_otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Patient Login
+         * @description phone + verification_grant -> JWT канонического User(role=Patient).
+         *
+         *     Fail-closed: 0 или >1 активных verified Patient-пользователей на номер ->
+         *     единый generic 401 (endpoint не становится каталогом пациентов).
+         */
+        post: operations["patient_login_api_v1_patient_access_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/reorder/reorder": {
         parameters: {
             query?: never;
@@ -29948,24 +30011,6 @@ export type components = {
             query: string;
         };
         /**
-         * LoginRequest
-         * @description Схема для запроса входа
-         */
-        LoginRequest: {
-            /** Username */
-            username: string;
-            /** Password */
-            password: string;
-            /**
-             * Remember Me
-             * @description Запомнить пользователя
-             * @default false
-             */
-            remember_me: boolean;
-            /** Device Fingerprint */
-            device_fingerprint?: string | null;
-        };
-        /**
          * LoginResponse
          * @description Схема для ответа входа
          */
@@ -34452,6 +34497,13 @@ export type components = {
             /** Error */
             error?: string | null;
         };
+        /** RequestOtpRequest */
+        RequestOtpRequest: {
+            /** Phone */
+            phone: string;
+            /** Locale */
+            locale?: string | null;
+        };
         /**
          * RestoreRequest
          * @description Запрос восстановления из бэкапа
@@ -37824,6 +37876,13 @@ export type components = {
              */
             purpose: string;
         };
+        /** VerifyOtpRequest */
+        VerifyOtpRequest: {
+            /** Phone */
+            phone: string;
+            /** Code */
+            code: string;
+        };
         /** VisitCreate */
         VisitCreate: {
             /** Patient Id */
@@ -38723,6 +38782,13 @@ export type components = {
             /** New Password */
             new_password: string;
         };
+        /** LoginRequest */
+        app__api__v1__endpoints__patient_access__LoginRequest: {
+            /** Phone */
+            phone: string;
+            /** Verification Grant */
+            verification_grant: string;
+        };
         /**
          * TelemetryResponse
          * @description Ответ на telemetry
@@ -38934,6 +39000,24 @@ export type components = {
          * @enum {string}
          */
         app__models__dynamic_pricing__DiscountType: "percentage" | "fixed_amount" | "buy_x_get_y" | "tiered";
+        /**
+         * LoginRequest
+         * @description Схема для запроса входа
+         */
+        app__schemas__authentication__LoginRequest: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+            /**
+             * Remember Me
+             * @description Запомнить пользователя
+             * @default false
+             */
+            remember_me: boolean;
+            /** Device Fingerprint */
+            device_fingerprint?: string | null;
+        };
         /**
          * PasswordResetConfirmRequest
          * @description Схема для подтверждения сброса пароля
@@ -64727,6 +64811,111 @@ export interface operations {
             };
         };
     };
+    request_patient_otp_api_v1_patient_access_request_otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestOtpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_patient_otp_api_v1_patient_access_verify_otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyOtpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_login_api_v1_patient_access_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__v1__endpoints__patient_access__LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     reorder_queue_api_v1_queue_reorder_reorder_put: {
         parameters: {
             query?: never;
@@ -70632,7 +70821,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["LoginRequest"];
+                "application/json": components["schemas"]["app__schemas__authentication__LoginRequest"];
             };
         };
         responses: {
