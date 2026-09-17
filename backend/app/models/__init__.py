@@ -153,6 +153,9 @@ from .payment_webhook import PaymentProvider, PaymentTransaction, PaymentWebhook
 from .print_config import PrinterConfig, PrintJob, PrintTemplate
 from .push_device import PushDevice  # noqa: F401  # PR-6: registry re-export
 from .queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
+from .queue_direction_public_address import (  # noqa: F401  # RQ-16.c: public-address registry re-export
+    QueueDirectionPublicAddress,
+)
 from .refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
