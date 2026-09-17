@@ -388,9 +388,9 @@ def test_sqlite_scratch_skips_pair_row_locking_with_a_note(capsys) -> None:
         module.upgrade_with_conn(conn)
         conn.commit()
         out = capsys.readouterr().out
-        assert "pair-row locking skipped" in out, (
-            "the SQLite dialect gate must print its skip note"
-        )
+        assert (
+            "pair-row locking skipped" in out
+        ), "the SQLite dialect gate must print its skip note"
         assert "FOR UPDATE" not in out.replace(
             "pair-row locking skipped", ""
         ), "no locking SQL may run on the SQLite scratch dialect"

@@ -38,7 +38,26 @@ guards any FUTURE internal account the operator may provision.
 
 Upgrade contract (single transaction; PG DDL/DML is transactional):
 
-1. ALL-OR-NOTHING pair resolution, inventory-before-mutation:
+1. ALL-OR-NOTHING pair resolution, inventory-before-mutation, on rows
+   locked FOR UPDATE first (PostgreSQL; the P1-b hardening of the
+   owner closure plan, applied in the post-merge window BEFORE the
+   production application — after that the migration body is frozen):
+
+   - the three User rows and their linked Doctor rows are locked
+     ``FOR UPDATE`` (users first, then doctors, each ordered by id — a
+     deterministic acquisition order) BEFORE the resolution SELECT and
+     every guard runs: FOR UPDATE conflicts with every concurrent row
+     writer (a re-purpose of ``users.role``, an orphaning UPDATE of
+     ``doctors.user_id``) AND with the FOR KEY SHARE lock an
+     FK-referencing INSERT takes on the parent row, so from the first
+     lock to the commit the inventory, the guards, and the deletion
+     all see ONE stable world — the "verified 0055 shape" contract
+     holds at DELETE time, not just at CHECK time;
+   - the rowcount verification and the postcondition re-check stay in
+     place as the backstop (defense in depth), not the primary lock;
+   - non-PostgreSQL dialects (the SQLite scratch harness) skip the
+     locking with a printed note — single-connection harnesses cannot
+     race (the P1-2 dialect-gate precedent);
 
    - all three pairs present and shape-valid (linked doctor, the
      expected 0055 specialty, the post-0057 'Resource' role, not a
@@ -160,6 +179,26 @@ _SELECT_PAIRS = sa.text("""
     ORDER BY u.username
     """).bindparams(sa.bindparam("usernames", expanding=True))
 
+# The P1-b hardening: lock the pair rows BEFORE the resolution reads
+# them (PostgreSQL only — the dialect gate prints a note and skips on
+# the single-connection SQLite scratch harnesses). Users first, then
+# their linked doctors, each ordered by id — a deterministic
+# acquisition order; FOR UPDATE blocks every concurrent row writer
+# and every FK-referencing INSERT (FOR KEY SHARE) until this
+# transaction ends.
+_LOCK_PAIR_USERS = sa.text(
+    "SELECT id FROM users WHERE username IN :usernames ORDER BY id FOR UPDATE"
+).bindparams(sa.bindparam("usernames", expanding=True))
+
+_LOCK_PAIR_DOCTORS = sa.text("""
+    SELECT d.id
+    FROM doctors d
+    JOIN users u ON d.user_id = u.id
+    WHERE u.username IN :usernames
+    ORDER BY d.id
+    FOR UPDATE
+    """).bindparams(sa.bindparam("usernames", expanding=True))
+
 _SELECT_SERVICE_REFERENCES = sa.text("""
     SELECT sv.id, sv.code, sv.active, sv.queue_tag, sv.doctor_id
     FROM services sv
@@ -250,8 +289,36 @@ def _abort(message: str) -> None:
     raise RuntimeError(f"{_MIGRATION_NAME} abort: {message}")
 
 
+def _lock_pair_rows(conn) -> None:
+    """P1-b: serialize every concurrent writer away from the pairs
+    BEFORE the resolution reads them (PostgreSQL; the SQLite scratch
+    harnesses print a note and skip — single-connection harnesses
+    cannot race, the P1-2 dialect-gate precedent)."""
+    if conn.dialect.name != "postgresql":
+        print(
+            f"{_MIGRATION_NAME}: pair-row locking skipped on dialect "
+            f"{conn.dialect.name!r} (PostgreSQL-only surface; the "
+            "single-connection scratch harness cannot race — the "
+            "semantic shape guards still run)"
+        )
+        return
+    usernames = list(SYNTHETIC_PAIR_USERNAMES)
+    locked_users = conn.execute(_LOCK_PAIR_USERS, {"usernames": usernames}).fetchall()
+    locked_doctors = conn.execute(
+        _LOCK_PAIR_DOCTORS, {"usernames": usernames}
+    ).fetchall()
+    print(
+        f"{_MIGRATION_NAME}: locked {len(locked_users)} User row(s) and "
+        f"{len(locked_doctors)} Doctor row(s) FOR UPDATE — concurrent "
+        "pair-row writers and FK-referencing inserts block until this "
+        "transaction ends; the inventory, the guards, and the deletion "
+        "see one stable world"
+    )
+
+
 def _resolve_and_assert_pairs(conn) -> list:
     """Resolve the three pairs; enforce the all-or-nothing shape."""
+    _lock_pair_rows(conn)
     rows = conn.execute(
         _SELECT_PAIRS, {"usernames": list(SYNTHETIC_PAIR_USERNAMES)}
     ).fetchall()
