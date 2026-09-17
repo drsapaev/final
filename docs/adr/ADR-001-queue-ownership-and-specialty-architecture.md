@@ -361,6 +361,25 @@ explicit:
   place as the backstop (defense in depth). Applied in the only
   window where the merged 0069 body may change — BEFORE the
   production application (the operator stage).
+- **The locked SET, the provable terminal state, the exact-shape
+  downgrade (the E-061 review round).** Three hardenings close the
+  gaps a lock-on-rows cannot: (1) the lock selects return the locked
+  id sets and the resolution must prove EXACT set equality — a pair
+  that appeared AFTER the locks (a concurrent restore of a missing
+  half committing between the locks and the read) was never locked,
+  and the retirement aborts rather than delete an unlocked row;
+  (2) "all three usernames absent" is the already-retired verdict
+  only while NO Doctor row carries the bridge vocabulary without a
+  User link — the exact half a hand-deleted User leaves behind (the
+  `doctors.user_id` FK is ON DELETE SET NULL) — and the same proof
+  runs when the pairs are present, so the bridge vocabulary always
+  leaves WITH the pairs; (3) the downgrade verifies an existing
+  username field-by-field (hash, role, is_active, is_superuser,
+  must_change_password, exactly one linked Doctor, specialty,
+  active, caps 1/15) before treating it as the idempotent no-op,
+  and a final postcondition re-verifies all three pairs — a
+  username captured by a foreign row aborts instead of a silent
+  skip.
 
 The runtime half needed no code change: since the QD-2E cutover
 (0066, RQ-15.b) the owner resolution is fail-closed
