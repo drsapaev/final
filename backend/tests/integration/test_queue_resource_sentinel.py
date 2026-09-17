@@ -603,10 +603,16 @@ def test_alembic_chain_single_head_0062() -> None:
     assert len("0063_queue_resource_contract") <= 32
     assert len("0062_telegram_webhook_dedup") <= 32
     assert len("0061_telegram_config_singleton") <= 32
+    # RQ-16.c: the head moved to 0068 with the direction public-address
+    # registry (owner decision E-055, additive MODEL slice).
+    assert graph["0068_direction_public_address"] == (
+        "0067_daily_queue_start_number",
+    )
+    assert len("0068_direction_public_address") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    # single head: RQ-13.b chains after the QD-2E cutover
-    assert heads == ["0067_daily_queue_start_number"]
+    # single head: RQ-16.c chains after the 0067 start-number snapshot
+    assert heads == ["0068_direction_public_address"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

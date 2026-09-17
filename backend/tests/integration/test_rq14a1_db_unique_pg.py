@@ -149,8 +149,9 @@ def _assert_pg_head(engine) -> None:
     with engine.connect() as conn:
         version = conn.execute(text("select version_num from alembic_version")).scalar()
     # QD-2E chain reconciliation + RQ-13.b: the populated head assert
-    # advances with the chain (0065 -> 0066 cutover -> 0067 snapshot).
-    assert version == "0067_daily_queue_start_number", version
+    # advances with the chain (0065 -> 0066 cutover -> 0067 snapshot ->
+    # 0068 direction public-address registry, RQ-16.c / E-055).
+    assert version == "0068_direction_public_address", version
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:
