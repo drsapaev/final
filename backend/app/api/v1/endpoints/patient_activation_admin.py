@@ -79,5 +79,11 @@ async def issue_activation_token(
             f"(телефон {result['phone_masked']})"
         ),
     )
+    # Codex P1 (PR #3320 round 1): log_critical_change only db.add()s the
+    # audit row and this Redis-only issuance path performs no other DB
+    # write, while get_db() closes the session WITHOUT committing — the
+    # pending audit row was rolled back. Commit it explicitly: the audit
+    # trail must be durable (critical-table convention).
+    db.commit()
 
     return result

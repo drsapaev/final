@@ -37,8 +37,11 @@ from app.services.patient_activation_service import (
 )
 from app.services.patient_otp_service import get_patient_otp_service
 
-PHONE = "+998901112233"
-FAMILY_PHONE = "+998909998877"
+# SYNTHETIC constants only (AGENTS.md synthetic-data policy): obviously
+# fake sequential numbers, never a real-looking name+phone combination.
+PHONE = "+998900000001"
+FAMILY_PHONE = "+998900000002"
+CHANGED_PHONE = "+998900000009"
 
 pytestmark = pytest.mark.asyncio
 
@@ -64,7 +67,7 @@ def isolated_kv():
 
 
 def make_patient(
-    db_session, *, phone: str | None, first="Азиза", last="Каримова"
+    db_session, *, phone: str | None, first="SYNTHETIC-PRA2", last="Card"
 ) -> Patient:
     patient = Patient(
         first_name=first,
@@ -100,12 +103,17 @@ def issued_token(db_session, svc, patient) -> str:
 
 
 # ------------------------------------------------------------ masking
-def test_mask_phone_never_reveals_full_number():
+def test_mask_phone_canonical_last_three_digits_only():
+    """Codex P1 (PR #3320 round 1): the repo-canonical PII mask keeps only
+    the LAST THREE digits (+998901•••233, AGENTS.md / app/core/pii_masker).
+    The local 4-digit mask was a policy violation."""
     masked = mask_phone(PHONE)
-    assert masked.startswith("+99890") and masked.endswith("2233")
+    assert masked == "+998900•••001"
     assert PHONE not in masked
+    assert "0001" not in masked  # no fourth trailing digit
     assert mask_phone("") == "***"
-    assert mask_phone("123") == "***"
+    assert mask_phone("123") == "***"  # non-maskable input never leaks
+    assert mask_phone("+998") == "***"
 
 
 # ------------------------------------------------------------ issuance
@@ -208,7 +216,7 @@ async def test_request_otp_fails_when_card_phone_changed_after_issuance(
     patient = make_patient(db_session, phone=PHONE)
     token = issued_token(db_session, svc, patient)
 
-    patient.phone = "+998935554411"
+    patient.phone = CHANGED_PHONE
     db_session.commit()
 
     with pytest.raises(ActivationError) as err:
@@ -346,33 +354,217 @@ async def test_activation_otp_never_consumes_login_otp_state(
         otp.verify_login_otp(PHONE, activation_code)
 
 
-async def test_family_shared_phone_two_cards_activate_independently(
+def _bound_portal_user(db_session, phone: str, username: str) -> User:
+    """Conflict simulator: an active verified Patient-user ALREADY on phone."""
+    user = User(
+        username=username,
+        email=f"{username}@synthetic.local",
+        full_name="SYNTHETIC Bound User",
+        hashed_password=get_password_hash("Passw0rd!123"),
+        role="Patient",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.flush()
+    db_session.add(
+        UserProfile(
+            user_id=user.id,
+            full_name="SYNTHETIC Bound User",
+            phone=phone,
+            phone_verified=True,
+        )
+    )
+    db_session.commit()
+    return user
+
+
+async def _activated_card(db_session, svc, phone: str, *, label: str) -> Patient:
+    """Happy-path activation of one card; returns the linked patient."""
+    patient = make_patient(
+        db_session, phone=phone, first=f"SYNTHETIC-{label}", last="FamilyCard"
+    )
+    token = issued_token(db_session, svc, patient)
+    await svc.request_activation_otp(db_session, token)
+    code = _kv().last_sent_code[f"patact:{phone}"]
+    out = svc.activate(db_session, token, code)
+    db_session.refresh(patient)
+    assert patient.user_id == out["user"]["id"]
+    return patient
+
+
+async def test_family_shared_phone_only_first_activation_wins(
     db_session, svc, monkeypatch
 ):
-    """Family regression: two cards share one phone. Each token binds its
-    OWN Patient.id — activating the child's card must never touch the
-    mother's card, and the fail-closed login resolver still refuses."""
+    """Owner GO 2026-09-18, variant A (Codex P1 shared-phone lockout):
+    two cards share one family phone. The FIRST activation succeeds; the
+    second card can NEVER create a second portal identity on the same
+    phone — staff issuance is a controlled 409, and any pre-issued token
+    fails without consuming OTP or sending SMS — so the fail-closed login
+    resolver can never see two candidates (no permanent 401 lockout)."""
     monkeypatch.setattr(
         "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
     )
-    mother = make_patient(db_session, phone=FAMILY_PHONE, first="Мать", last="Юсупова")
+    from app.services import patient_activation_service as pas
+
+    mother = make_patient(
+        db_session, phone=FAMILY_PHONE, first="SYNTHETIC-Mother", last="FamilyCard"
+    )
     child = make_patient(
-        db_session, phone=FAMILY_PHONE, first="Ребёнок", last="Юсупова"
+        db_session, phone=FAMILY_PHONE, first="SYNTHETIC-Child", last="FamilyCard"
     )
 
+    mother_token = issued_token(db_session, svc, mother)  # pre-conflict issuance
     child_token = issued_token(db_session, svc, child)
+
     await svc.request_activation_otp(db_session, child_token)
     code = _kv().last_sent_code[f"patact:{FAMILY_PHONE}"]
-    out = svc.activate(db_session, child_token, code)
+    out = svc.activate(db_session, child_token, code)  # FIRST activation wins
 
     db_session.refresh(mother)
     db_session.refresh(child)
     assert child.user_id == out["user"]["id"]
     assert mother.user_id is None  # mother's card untouched
 
-    # login on the shared phone is STILL fail-closed (1 linked user only ->
-    # it actually resolves; the mother has no user, so exactly one candidate)
+    # second identity on the same phone is refused at every door
+    with pytest.raises(ActivationError) as err:
+        svc.issue_activation_token(db_session, mother.id)
+    assert err.value.status_code == 409
+    assert err.value.detail == pas.ERR_ISSUANCE_PHONE_BOUND
+
+    _kv().last_sent_code.clear()
+    with pytest.raises(ActivationError) as err:
+        await svc.request_activation_otp(db_session, mother_token)
+    assert err.value.status_code == 409
+    assert err.value.detail == pas.ERR_ACTIVATION_GENERIC  # neutral, no SMS
+
+    with pytest.raises(ActivationError) as err:
+        svc.activate(db_session, mother_token, "000000")
+    assert err.value.status_code == 409
+    assert err.value.detail == pas.ERR_PHONE_ALREADY_BOUND
+
+    # login on the shared phone resolves exactly the ONE portal user
     resolved = get_patient_otp_service().resolve_patient_user_by_phone(
         db_session, FAMILY_PHONE
     )
     assert resolved is not None and resolved.id == out["user"]["id"]
+
+
+async def test_issuance_blocked_when_phone_already_bound(db_session, svc, monkeypatch):
+    """GO point 1 (owner variant A): the staff early check fires BEFORE any
+    token exists, so the registrar learns about the conflict immediately."""
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    from app.services import patient_activation_service as pas
+
+    await _activated_card(db_session, svc, FAMILY_PHONE, label="Mother")
+    child = make_patient(
+        db_session, phone=FAMILY_PHONE, first="SYNTHETIC-Child", last="FamilyCard"
+    )
+
+    with pytest.raises(ActivationError) as err:
+        svc.issue_activation_token(db_session, child.id)
+    assert err.value.status_code == 409
+    assert err.value.detail == pas.ERR_ISSUANCE_PHONE_BOUND
+    db_session.refresh(child)
+    assert child.user_id is None
+
+
+async def test_activate_conflict_409_and_token_not_consumed(db_session, svc):
+    """GO point 4: authoritative conflict -> 409, NOTHING created, token NOT
+    consumed, card stays user_id=NULL (registrar keeps control)."""
+    from app.services import patient_activation_service as pas
+
+    child = make_patient(
+        db_session, phone=FAMILY_PHONE, first="SYNTHETIC-Child", last="FamilyCard"
+    )
+    child_token = issued_token(db_session, svc, child)
+    _bound_portal_user(db_session, FAMILY_PHONE, "synthetic_bound_user")
+
+    with pytest.raises(ActivationError) as err:
+        svc.activate(db_session, child_token, "000000")
+    assert err.value.status_code == 409
+    assert err.value.detail == pas.ERR_PHONE_ALREADY_BOUND
+    # token NOT consumed -> still resolvable (registrar can re-redeem later
+    # once the conflict is resolved, or reissue)
+    assert svc._lookup_entry(child_token) is not None
+    db_session.refresh(child)
+    assert child.user_id is None
+
+
+async def test_activate_rechecks_conflict_under_lock_before_otp(
+    db_session, svc, monkeypatch
+):
+    """GO points 3+5: the authoritative candidate re-read happens INSIDE the
+    phone-scope lock and BEFORE the single-use OTP consume — a race-window
+    conflict (created between precheck and lock) must not eat a valid OTP.
+    The counter mock models exactly that race: first read 0, second read 1."""
+    from app.services import patient_activation_service as pas
+
+    patient = make_patient(db_session, phone=PHONE)
+    token = issued_token(db_session, svc, patient)
+
+    calls = {"n": 0}
+
+    def _conflict_appears_after_precheck(db, phone):
+        calls["n"] += 1
+        return 1 if calls["n"] >= 2 else 0
+
+    monkeypatch.setattr(
+        pas, "_portal_user_count_for_phone", _conflict_appears_after_precheck
+    )
+
+    with pytest.raises(ActivationError) as err:
+        svc.activate(db_session, token, "000000")  # wrong code on purpose
+    assert err.value.status_code == 409
+    assert err.value.detail == pas.ERR_PHONE_ALREADY_BOUND
+    assert calls["n"] == 2  # precheck + authoritative re-read under the lock
+    # OTP NOT consumed, token entry still resolvable
+    assert svc._lookup_entry(token) is not None
+
+
+def test_lookup_is_idx_authoritative_reissue_race(db_session, svc):
+    """Codex P2 (reissue race): the revocation index is the source of truth —
+    a losing reissue token whose KV entry outlives its revocation must NOT
+    resolve, even though its own entry is still present."""
+    patient = make_patient(db_session, phone=PHONE)
+    old_token = issued_token(db_session, svc, patient)
+    backend = _kv()
+
+    # reissue race leftover: the index moved to a DIFFERENT hash while the
+    # losing token's own entry survived
+    backend.set(f"patact:idx:{patient.id}", "f" * 64, 3600)
+    assert svc._lookup_entry(old_token) is None
+
+    # a missing index revokes too (defensive: single source of truth)
+    second = issued_token(db_session, svc, patient)  # proper reissue
+    backend.delete(f"patact:idx:{patient.id}")
+    assert svc._lookup_entry(second) is None
+
+
+async def test_kv_outage_translated_to_activation_503(db_session, svc, monkeypatch):
+    """Codex P2 (Redis 500->503): a KV outage during ANY activation step
+    surfaces as the documented generic ActivationError(503), never an
+    unhandled PatientOtpError that would become a 500."""
+    from app.services.patient_otp_service import PatientOtpError
+
+    patient = make_patient(db_session, phone=PHONE)
+    token = issued_token(db_session, svc, patient)  # issued BEFORE the outage
+
+    def _boom():
+        raise PatientOtpError(503, "KV unavailable")
+
+    monkeypatch.setattr(get_patient_otp_service(), "get_backend", _boom)
+
+    with pytest.raises(ActivationError) as err:
+        svc.issue_activation_token(db_session, patient.id)
+    assert err.value.status_code == 503
+
+    with pytest.raises(ActivationError) as err:
+        await svc.request_activation_otp(db_session, token)
+    assert err.value.status_code == 503
+
+    with pytest.raises(ActivationError) as err:
+        svc.activate(db_session, token, "123456")
+    assert err.value.status_code == 503

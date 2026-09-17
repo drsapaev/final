@@ -9,8 +9,9 @@ real router/limiter/DB wiring:
 
 Acceptance exercised over HTTP: RBAC trio, token pinned to (Patient.id,
 card phone), client phone never accepted, atomic link, single-use token,
-family-shared-phone independence, generic anti-enum failures, critical
-audit on issuance, and the minted JWT being a CANONICAL session (works on
+family-shared-phone second-activation guard (owner GO 2026-09-18,
+variant A), generic anti-enum failures, critical audit on issuance, and
+the minted JWT being a CANONICAL session (works on
 the standard patient self-scope endpoint GET /patients/{id}).
 """
 
@@ -29,8 +30,9 @@ from tests.conftest import mint_access_token
 
 pytestmark = pytest.mark.asyncio
 
-PHONE = "+998901112233"
-FAMILY_PHONE = "+998909998877"
+# SYNTHETIC constants only (AGENTS.md synthetic-data policy).
+PHONE = "+998900000001"
+FAMILY_PHONE = "+998900000002"
 
 ISSUE_PATH = "/api/v1/patients/{pid}/activation-token"
 OTP_PATH = "/api/v1/patient-access/activate/request-otp"
@@ -56,7 +58,9 @@ def registrar_headers(registrar_user):
     return {"Authorization": f"Bearer {mint_access_token(registrar_user)}"}
 
 
-def make_patient(db_session, *, phone: str, first="Азиза", last="Каримова") -> Patient:
+def make_patient(
+    db_session, *, phone: str, first="SYNTHETIC-PRA2", last="Card"
+) -> Patient:
     patient = Patient(
         first_name=first,
         last_name=last,
@@ -83,7 +87,7 @@ async def test_full_activation_flow_over_http(
     issue_body = r_issue.json()
     token = issue_body["activation_token"]
     assert issue_body["expires_in_hours"] == 72
-    assert issue_body["phone_masked"].startswith("+99890***")
+    assert issue_body["phone_masked"] == "+998900•••001"  # canonical 3-digit mask
     assert PHONE not in issue_body["phone_masked"]
 
     # 2) activation OTP: NO client phone field exists; goes to the card phone
@@ -177,7 +181,7 @@ async def test_issue_rejects_already_linked_and_deleted(
     r = client.post(ISSUE_PATH.format(pid=patient.id), headers=registrar_headers)
     assert r.status_code == 409
 
-    deleted = make_patient(db_session, phone="+998907770011")
+    deleted = make_patient(db_session, phone="+998900000011")
     deleted.is_deleted = True
     db_session.commit()
     r2 = client.post(ISSUE_PATH.format(pid=deleted.id), headers=registrar_headers)
@@ -231,18 +235,27 @@ def _token_of(client, db_session, patient_id, registrar_headers):
     return r.json()["activation_token"]
 
 
-async def test_family_shared_phone_two_cards_http(
+async def test_family_shared_phone_second_activation_blocked_http(
     client, db_session, otp_kv, monkeypatch, registrar_headers
 ):
+    """Owner GO 2026-09-18, variant A: two cards share one family phone.
+    The FIRST activation wins; the second card is refused at every door
+    over real HTTP (staff issuance 409; pre-issued token: neutral no-SMS
+    request-otp 409 + confirm 409), so the fail-closed login resolver can
+    never see two candidates."""
     monkeypatch.setattr(
         "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
     )
-    mother = make_patient(db_session, phone=FAMILY_PHONE, first="Мать", last="Юсупова")
+    mother = make_patient(
+        db_session, phone=FAMILY_PHONE, first="SYNTHETIC-Mother", last="FamilyCard"
+    )
     child = make_patient(
-        db_session, phone=FAMILY_PHONE, first="Ребёнок", last="Юсупова"
+        db_session, phone=FAMILY_PHONE, first="SYNTHETIC-Child", last="FamilyCard"
     )
 
+    mother_token = _token_of(client, db_session, mother.id, registrar_headers)
     child_token = _token_of(client, db_session, child.id, registrar_headers)
+
     client.post(OTP_PATH, json={"activation_token": child_token})
     code = otp_kv.last_sent_code[f"patact:{FAMILY_PHONE}"]
     r_confirm = client.post(
@@ -252,7 +265,45 @@ async def test_family_shared_phone_two_cards_http(
     db_session.refresh(child)
     db_session.refresh(mother)
     assert child.user_id == r_confirm.json()["user"]["id"]
-    assert mother.user_id is None  # mother's card untouched
+    assert mother.user_id is None  # mother's card untouched by child activation
+
+    # staff issuance for the second card on the same phone -> controlled 409
+    r_issue = client.post(ISSUE_PATH.format(pid=mother.id), headers=registrar_headers)
+    assert r_issue.status_code == 409
+
+    # pre-issued mother token: public flow blocked, neutral + no SMS
+    otp_kv.last_sent_code.clear()
+    r_otp = client.post(OTP_PATH, json={"activation_token": mother_token})
+    assert r_otp.status_code == 409
+    assert f"patact:{FAMILY_PHONE}" not in otp_kv.last_sent_code
+
+    r_confirm2 = client.post(
+        CONFIRM_PATH, json={"activation_token": mother_token, "code": "000000"}
+    )
+    assert r_confirm2.status_code == 409
+    db_session.refresh(mother)
+    assert mother.user_id is None
+
+
+async def test_activation_kv_outage_returns_503_http(
+    client, db_session, otp_kv, monkeypatch, registrar_headers
+):
+    """Codex P2 (Redis 500->503): KV outage mid-activation surfaces as the
+    documented generic 503, never an unhandled 500."""
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    from app.services.patient_otp_service import PatientOtpError
+
+    patient = make_patient(db_session, phone=PHONE)
+    token = _token_of(client, db_session, patient.id, registrar_headers)
+
+    def _boom():
+        raise PatientOtpError(503, "KV unavailable")
+
+    monkeypatch.setattr(get_patient_otp_service(), "get_backend", _boom)
+    r = client.post(OTP_PATH, json={"activation_token": token})
+    assert r.status_code == 503
 
 
 async def test_activation_otp_endpoint_rate_limited_per_ip(

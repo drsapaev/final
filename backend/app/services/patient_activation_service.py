@@ -31,7 +31,9 @@ Flow (owner-approved):
 
 KV layout (Redis prod / in-memory TESTING, shared with patient_otp_service):
     patact:token:{sha256(token)}  -> JSON {patient_id, phone}   TTL 72h
-    patact:idx:{patient_id}       -> sha256(token) (revocation) TTL 72h
+    patact:idx:{patient_id}       -> sha256(token) (revocation
+                                     index — SOURCE OF TRUTH for
+                                     token lookups)             TTL 72h
 Activation OTP keys live in the isolated patact:* namespace of
 patient_otp_service (cooldown/cap/attempts never touch login OTP state).
 """
@@ -45,10 +47,11 @@ import secrets
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.pii_masker import mask_phone as _canonical_mask_phone
 from app.core.roles import Roles
 from app.core.security import get_password_hash
 from app.models.patient import Patient
@@ -81,6 +84,19 @@ ERR_PATIENT_ALREADY_LINKED = "Доступ для этого пациента у
 ERR_PATIENT_NO_PHONE = (
     "У пациента нет корректного номера телефона (+998XXXXXXXXX) для активации."
 )
+# Owner GO 2026-09-18 (variant A): a family phone may legally live on many
+# cards, but Phase 0 never creates a SECOND active verified Patient-user on
+# the same normalized phone (the login resolver is deliberately fail-closed
+# at >1 candidates). No UNIQUE on patients.phone / UserProfile.phone is
+# introduced — the restriction guards the portal identity only.
+ERR_ISSUANCE_PHONE_BOUND = (
+    "Портал-доступ с этим номером телефона уже активирован для другой карты. "
+    "Активация второго аккаунта на тот же номер недоступна."
+)
+ERR_PHONE_ALREADY_BOUND = (
+    "Этот номер телефона уже привязан к активному аккаунту портала. "
+    "Обратитесь в регистратуру."
+)
 
 
 @dataclass
@@ -90,14 +106,66 @@ class ActivationError(Exception):
 
 
 def mask_phone(phone: str) -> str:
-    """+998901112233 -> +99890***2233 (staff-facing; never full number)."""
-    if not phone or len(phone) < 10:
+    """Canonical repo-wide PII mask (AGENTS.md / app.core.pii_masker):
+    +998901112233 -> +998900•••001 — only the LAST THREE digits survive.
+
+    Codex P1 (PR #3320 round 1): the previous local 4-digit mask emitted
+    more of the number than the repository policy allows. Non-maskable
+    input degrades to full redaction instead of leaking."""
+    masked = _canonical_mask_phone(phone)
+    if not masked or masked == phone or "•" not in masked:
         return "***"
-    return f"{phone[:6]}***{phone[-4:]}"
+    return masked
 
 
 def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _phone_lock_key(normalized: str) -> int:
+    """Stable signed-int64 advisory-lock key for a phone scope
+    (domain-salted sha256 fingerprint — never the number itself)."""
+    digest = hashlib.sha256(b"patact:phone-lock:" + normalized.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big", signed=True)
+
+
+def _acquire_phone_scope_lock(db: Session, normalized: str) -> None:
+    """Serialize activations across DIFFERENT patient rows sharing a phone.
+
+    A single `Patient ... FOR UPDATE` locks ONE row — two family cards are
+    different rows and would not block each other (owner GO point 3). The
+    transaction-scoped PostgreSQL advisory lock keyed by the hashed phone
+    serializes the whole phone scope and is released automatically at
+    commit/rollback. Non-PG dialects (SQLite unit tests) skip the lock;
+    the pre/under-lock re-checks and the UNIQUE backstops still apply."""
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(:key)"),
+        {"key": _phone_lock_key(normalized)},
+    )
+
+
+def _portal_user_count_for_phone(db: Session, normalized: str) -> int:
+    """Mirror of the login-resolver candidate criteria
+    (patient_otp_service.resolve_patient_user_by_phone) as a COUNT.
+
+    The resolver itself is fail-closed and returns None for BOTH 0 and >1
+    candidates — ambiguous for a guard that must fire on >= 1. Counting the
+    SAME WHERE-clause answers exactly "would this activation create
+    candidate #2?"."""
+    stmt = (
+        select(func.count())
+        .select_from(User)
+        .join(UserProfile, UserProfile.user_id == User.id)
+        .where(
+            UserProfile.phone == normalized,
+            UserProfile.phone_verified.is_(True),
+            User.role == Roles.PATIENT,
+            User.is_active.is_(True),
+        )
+    )
+    return int(db.execute(stmt).scalar_one())
 
 
 class PatientActivationService:
@@ -120,7 +188,18 @@ class PatientActivationService:
         if not normalized:
             raise ActivationError(400, ERR_PATIENT_NO_PHONE)
 
-        backend = get_patient_otp_service().get_backend()
+        # Owner GO (variant A, point 1): early staff-side guard — the
+        # registrar learns about a family-phone conflict BEFORE any token
+        # exists (fail fast; no doomed SMS round-trip later).
+        if _portal_user_count_for_phone(db, normalized) > 0:
+            raise ActivationError(409, ERR_ISSUANCE_PHONE_BOUND)
+
+        try:
+            backend = get_patient_otp_service().get_backend()
+        except PatientOtpError as err:
+            # Codex P2: KV outage surfaces as the documented generic
+            # ActivationError, not an unhandled PatientOtpError/500.
+            raise ActivationError(err.status_code, err.detail) from err
         token = secrets.token_urlsafe(32)
         t_hash = _token_hash(token)
 
@@ -150,11 +229,12 @@ class PatientActivationService:
     def _lookup_entry(self, token: str) -> dict[str, Any] | None:
         if not token or not (16 <= len(token) <= 256):
             return None
-        raw = (
-            get_patient_otp_service()
-            .get_backend()
-            .get(f"{_TOKEN_NS}:{_token_hash(token)}")
-        )
+        t_hash = _token_hash(token)
+        try:
+            backend = get_patient_otp_service().get_backend()
+            raw = backend.get(f"{_TOKEN_NS}:{t_hash}")
+        except PatientOtpError as err:
+            raise ActivationError(err.status_code, err.detail) from err
         if not raw:
             return None
         try:
@@ -165,9 +245,18 @@ class PatientActivationService:
                 or "phone" not in entry
             ):
                 return None
-            return entry
         except Exception:  # noqa: BLE001 - corrupt entry -> invalid token
             return None
+        try:
+            idx = backend.get(f"{_PATIENT_IDX_NS}:{entry['patient_id']}")
+        except PatientOtpError as err:
+            raise ActivationError(err.status_code, err.detail) from err
+        # Codex P2 (reissue race): the revocation index is the source of
+        # truth. A losing concurrent reissue can leave its token entry
+        # behind; index mismatch/absence means REVOKED.
+        if idx != t_hash:
+            return None
+        return entry
 
     def _validate_patient_state(
         self, db: Session, entry: dict[str, Any]
@@ -195,6 +284,11 @@ class PatientActivationService:
             raise ActivationError(400, ERR_TOKEN_INVALID)
         if self._validate_patient_state(db, entry) is None:
             raise ActivationError(400, ERR_TOKEN_INVALID)
+        # Owner GO (variant A, point 2): never send an SMS for a doomed
+        # activation. Neutral generic response — reveals nothing about
+        # other accounts (anti-enum).
+        if _portal_user_count_for_phone(db, entry["phone"]) > 0:
+            raise ActivationError(409, ERR_ACTIVATION_GENERIC)
         try:
             await get_patient_otp_service().send_activation_otp(entry["phone"], locale)
         except PatientOtpError as err:
@@ -209,17 +303,37 @@ class PatientActivationService:
     def activate(self, db: Session, token: str, code: str) -> dict[str, Any]:
         """OTP + token -> canonical User(role=Patient) session.
 
-        Order: token lookup -> OTP verify (single-use) -> locked patient
-        revalidation -> staged User+UserProfile+link -> ONE commit ->
-        token consumed. Every failure is generic (anti-enum)."""
+        Order (owner GO 2026-09-18, variant A): token lookup -> phone-scope
+        precheck (no OTP burned on a doomed activation) -> transaction-
+        scoped advisory lock on the phone fingerprint -> authoritative
+        candidate RE-READ under the lock -> OTP verify (single-use) ->
+        locked patient revalidation -> staged User+UserProfile+link ->
+        ONE commit -> token consumed. Every failure is generic (anti-enum)."""
         entry = self._lookup_entry(token)
         if entry is None:
             raise ActivationError(400, ERR_TOKEN_INVALID)
 
+        # Owner GO (variant A, points 3-5): phone-scope serialization.
+        # Pre-transaction check first: a deterministically doomed activation
+        # must not consume a valid single-use OTP (owner point 5).
+        if _portal_user_count_for_phone(db, entry["phone"]) > 0:
+            raise ActivationError(409, ERR_PHONE_ALREADY_BOUND)
+
+        # A single `Patient ... FOR UPDATE` does NOT serialize two DIFFERENT
+        # family cards sharing one phone — the phone-scope advisory lock
+        # does. State under the lock is RE-READ, never trusted from the
+        # precheck (owner point 5).
+        _acquire_phone_scope_lock(db, entry["phone"])
+        if _portal_user_count_for_phone(db, entry["phone"]) > 0:
+            db.rollback()  # release the lock; OTP still intact
+            raise ActivationError(409, ERR_PHONE_ALREADY_BOUND)
+
         otp_service = get_patient_otp_service()
         try:
+            # Single-use OTP consumed ONLY after the authoritative check.
             otp_service.verify_activation_otp(entry["phone"], code)
         except PatientOtpError as err:
+            db.rollback()  # release the lock; nothing was written
             raise ActivationError(err.status_code, err.detail) from err
 
         # Lock the patient row: serializes concurrent activations of the
@@ -265,19 +379,24 @@ class PatientActivationService:
             db.commit()
         except IntegrityError as exc:
             db.rollback()
+            # CodeQL 1313 fix: constant message — no entry-derived values and
+            # no raw DB error text (constraint detail) in logs.
             logger.warning(
-                "activation commit conflict: patient_id=%s (%s)",
-                entry["patient_id"],
-                exc.orig,
+                "activation commit conflict (UNIQUE race backstop) -> generic 409"
             )
             raise ActivationError(409, ERR_ACTIVATION_GENERIC) from exc
         db.refresh(patient)
         db.refresh(user)
 
-        # Token is single-use: consumed ONLY after a successful commit.
-        backend = otp_service.get_backend()
-        backend.getdel(f"{_TOKEN_NS}:{_token_hash(token)}")
-        backend.delete(f"{_PATIENT_IDX_NS}:{entry['patient_id']}")
+        # Token is single-use: consumed ONLY after a successful commit. A KV
+        # outage here must NOT fail an already-committed activation — the
+        # linked card makes the token unusable anyway (state revalidation).
+        try:
+            backend = otp_service.get_backend()
+            backend.getdel(f"{_TOKEN_NS}:{_token_hash(token)}")
+            backend.delete(f"{_PATIENT_IDX_NS}:{entry['patient_id']}")
+        except PatientOtpError:
+            logger.warning("activation token cleanup skipped: KV unavailable")
 
         logger.info("patient activated: patient_id=%s user_id=%s", patient.id, user.id)
 
@@ -311,7 +430,8 @@ class PatientActivationService:
             ).scalar_one_or_none()
             if exists is None:
                 return candidate
-        logger.error("username generation exhausted for patient_id=%s", patient_id)
+        # CodeQL 1314 fix: no interpolated identifiers in the log.
+        logger.error("username generation exhausted after 5 attempts")
         raise ActivationError(503, ERR_ACTIVATION_GENERIC)
 
 
