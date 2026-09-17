@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.qr_queue import (
     _analytics,  # noqa: F401
+    _directions,  # noqa: F401
     _entries,  # noqa: F401
     _join,  # noqa: F401
     _online_entries,  # noqa: F401

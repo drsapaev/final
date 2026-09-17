@@ -2249,6 +2249,28 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/directions/{profile_key}/entry-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Поддерживаемые способы QR-входа направления (RQ-16.b)
+         * @description Read-only contract surface: explicitly enumerate the QR-entry
+         *     methods the server supports for the direction addressed by its
+         *     QR-visible profile key.
+         */
+        get: operations["get_direction_entry_methods_api_v1_queue_directions__profile_key__entry_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/admin/qr-tokens/generate": {
         parameters: {
             query?: never;
@@ -25772,6 +25794,47 @@ export type components = {
              */
             provider?: string | null;
         };
+        /**
+         * DirectionEntryMethod
+         * @description The contract methods space (DIRECTION_CONTRACT.md §6.2).
+         * @enum {string}
+         */
+        DirectionEntryMethod: "session_qr" | "permanent_address" | "view_only";
+        /**
+         * DirectionEntryMethodSupport
+         * @description One method with its honest support flag for this direction.
+         */
+        DirectionEntryMethodSupport: {
+            method: components["schemas"]["DirectionEntryMethod"];
+            /** Supported */
+            supported: boolean;
+        };
+        /**
+         * DirectionEntryMethodsResponse
+         * @description Explicit entry-methods enumeration for one QR-visible direction.
+         */
+        DirectionEntryMethodsResponse: {
+            /**
+             * Direction Key
+             * @description Canonical QR-visible profile key (normalized)
+             */
+            direction_key: string;
+            /**
+             * Profile Id
+             * @description QueueProfile.id — a separate id space (D-01)
+             */
+            profile_id: number;
+            /**
+             * Title
+             * @description Public display title (title_ru preferred)
+             */
+            title: string;
+            /**
+             * Entry Methods
+             * @description The WHOLE methods space, always fully present: every contract method carries an honest supported flag; clients must not infer methods absent from this enumeration
+             */
+            entry_methods: components["schemas"]["DirectionEntryMethodSupport"][];
+        };
         /** DiscountCalculationRequest */
         DiscountCalculationRequest: {
             /** Patient Id */
@@ -42942,6 +43005,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_direction_entry_methods_api_v1_queue_directions__profile_key__entry_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectionEntryMethodsResponse"];
                 };
             };
             /** @description Validation Error */

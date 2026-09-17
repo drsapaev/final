@@ -6113,6 +6113,49 @@
         }
       }
     },
+    "/api/v1/queue/directions/{profile_key}/entry-methods": {
+      "get": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Поддерживаемые способы QR-входа направления (RQ-16.b)",
+        "description": "Read-only contract surface: explicitly enumerate the QR-entry\nmethods the server supports for the direction addressed by its\nQR-visible profile key.",
+        "operationId": "get_direction_entry_methods_api_v1_queue_directions__profile_key__entry_methods_get",
+        "parameters": [
+          {
+            "name": "profile_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectionEntryMethodsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queue/admin/qr-tokens/generate": {
       "post": {
         "tags": [
@@ -75036,6 +75079,70 @@
         ],
         "title": "DifferentialDiagnosisRequest",
         "description": "Request body for POST /ai/differential-diagnosis."
+      },
+      "DirectionEntryMethod": {
+        "type": "string",
+        "enum": [
+          "session_qr",
+          "permanent_address",
+          "view_only"
+        ],
+        "title": "DirectionEntryMethod",
+        "description": "The contract methods space (DIRECTION_CONTRACT.md §6.2)."
+      },
+      "DirectionEntryMethodSupport": {
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/DirectionEntryMethod"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "supported"
+        ],
+        "title": "DirectionEntryMethodSupport",
+        "description": "One method with its honest support flag for this direction."
+      },
+      "DirectionEntryMethodsResponse": {
+        "properties": {
+          "direction_key": {
+            "type": "string",
+            "title": "Direction Key",
+            "description": "Canonical QR-visible profile key (normalized)"
+          },
+          "profile_id": {
+            "type": "integer",
+            "title": "Profile Id",
+            "description": "QueueProfile.id — a separate id space (D-01)"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Public display title (title_ru preferred)"
+          },
+          "entry_methods": {
+            "items": {
+              "$ref": "#/components/schemas/DirectionEntryMethodSupport"
+            },
+            "type": "array",
+            "title": "Entry Methods",
+            "description": "The WHOLE methods space, always fully present: every contract method carries an honest supported flag; clients must not infer methods absent from this enumeration"
+          }
+        },
+        "type": "object",
+        "required": [
+          "direction_key",
+          "profile_id",
+          "title",
+          "entry_methods"
+        ],
+        "title": "DirectionEntryMethodsResponse",
+        "description": "Explicit entry-methods enumeration for one QR-visible direction."
       },
       "DiscountCalculationRequest": {
         "properties": {
