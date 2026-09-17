@@ -56,3 +56,82 @@ def test_registrar_services_prefers_explicit_lab_routing_over_code_fallback(
     assert laboratory_rows[0]["queue_tag"] == "lab"
     assert laboratory_rows[0]["department_key"] == "lab"
     assert procedures_rows == []
+
+
+@pytest.mark.integration
+def test_registrar_services_emits_accepted_specialties_from_server_eligibility(
+    client,
+    db_session,
+    admin_user,
+    admin_password,
+):
+    """RQ-08.a: UI-потребление серверной eligibility.
+
+    Каталог регистратуры обязан отдаёт per-service accepted_specialties -
+    допустимые специальности врача для department_key, вычисленные ТОЙ ЖЕ
+    функцией (_accepted_specialty_variants_for_department_key, RQ-05.a),
+    что и серверный гейт корзины. Тогда фронтовый filterDoctorsForService
+    больше не зависит от собственной копии alias-таблицы: список UI и
+    запрет сервера буквально совпадают.
+
+    Пины:
+    - dental-услуга: весь семейство вариантов (реверсивный канон
+      "dental" -> dentistry-семейство, RQ-05.a);
+    - услуга без department_key: accepted_specialties = None
+      (проверка специальности неприменима, как в гейте);
+    - lab-услуга: {"lab", "laboratory"}.
+    """
+    dental_service = Service(
+        name="RQ-08a Стоматологическая услуга",
+        code="D88a",
+        service_code="D88a",
+        category_code="S",
+        department_key="dental",
+        price=Decimal("10000.00"),
+        currency="UZS",
+        duration_minutes=30,
+        active=True,
+    )
+    plain_service = Service(
+        name="RQ-08a Услуга без отделения",
+        code="P88a",
+        service_code="P88a",
+        category_code="O",
+        price=Decimal("5000.00"),
+        currency="UZS",
+        duration_minutes=30,
+        active=True,
+    )
+    db_session.add_all([dental_service, plain_service])
+    db_session.commit()
+    db_session.refresh(dental_service)
+    db_session.refresh(plain_service)
+
+    from tests.conftest import mint_access_token
+
+    headers = {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
+    response = client.get("/api/v1/registrar/services", headers=headers)
+
+    assert response.status_code == 200, response.text
+    payload = response.json()["services_by_group"]
+    rows = {
+        row["id"]: row
+        for group_rows in payload.values()
+        for row in group_rows
+    }
+
+    dental_row = rows[dental_service.id]
+    # Реверсивный канон RQ-05.a: "dental" - не ключ SSOT-таблицы, но входит
+    # в варианты канона "dentistry"; set lowercased + отсортирован.
+    assert dental_row["department_key"] == "dental"
+    assert dental_row["accepted_specialties"] == [
+        "dental",
+        "dentist",
+        "dentistry",
+        "stomatology",
+    ]
+
+    # Услуга без department_key - проверка неприменима (None, не []).
+    plain_row = rows[plain_service.id]
+    assert plain_row["department_key"] is None
+    assert plain_row["accepted_specialties"] is None

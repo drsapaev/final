@@ -7,6 +7,14 @@ from app.core.specialties import specialty_variants
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 
+# RQ-08.a: UI-потребление серверной eligibility — accepted_specialties
+# каталога вычисляются ТОЙ ЖЕ функцией, что и серверный гейт корзины
+# (_assert_cart_doctor_eligibility, RQ-05.a): список в UI и запрет при
+# сохранении буквально совпадают (один код, один SSOT).
+from app.api.v1.endpoints.registrar_wizard._helpers import (
+    _accepted_specialty_variants_for_department_key,
+)
+
 
 @router.get("/registrar/services", response_model=dict[str, Any])
 def get_registrar_services(
@@ -111,6 +119,18 @@ def get_registrar_services(
                 ),
                 "group": None,  # Добавим группу для frontend
             }
+
+            # RQ-08.a: серверная eligibility для UI-фильтра врачей
+            # (frontend filterDoctorsForService): допустимые специальности
+            # врача для department_key услуги из SSOT
+            # DOCTOR_QUEUE_SPECIALTY_VARIANTS. None — проверка неприменима
+            # (нет department_key), семантика ровно как в гейте RQ-05.a.
+            _accepted = _accepted_specialty_variants_for_department_key(
+                service_data["department_key"]
+            )
+            service_data["accepted_specialties"] = (
+                sorted(_accepted) if _accepted is not None else None
+            )
 
             # [OK] НОВАЯ ЛОГИКА: определяем группу только по явному routing truth
             resolved_queue_group = resolve_queue_group_key(
