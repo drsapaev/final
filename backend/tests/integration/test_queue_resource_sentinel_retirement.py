@@ -375,6 +375,32 @@ def test_upgrade_clean_pass_on_empty_database() -> None:
 
 @pytest.mark.integration
 @pytest.mark.migration
+def test_sqlite_scratch_skips_pair_row_locking_with_a_note(capsys) -> None:
+    """P1-b hardening, the dialect gate: the SQLite scratch harness is
+    single-connection and cannot race, so the FOR UPDATE pair-row locking
+    is skipped with a printed note (the P1-2 dialect-gate precedent) —
+    the semantic shape guards still run."""
+    module = _module()
+    conn = _scratch()
+    try:
+        _seed_all_pairs(conn)
+        conn.commit()
+        module.upgrade_with_conn(conn)
+        conn.commit()
+        out = capsys.readouterr().out
+        assert "pair-row locking skipped" in out, (
+            "the SQLite dialect gate must print its skip note"
+        )
+        assert "FOR UPDATE" not in out.replace(
+            "pair-row locking skipped", ""
+        ), "no locking SQL may run on the SQLite scratch dialect"
+        assert _usernames_present(conn) == set()
+    finally:
+        conn.close()
+
+
+@pytest.mark.integration
+@pytest.mark.migration
 def test_upgrade_aborts_on_role_drift_with_nothing_changed(
     committed_scratch,
 ) -> None:
@@ -862,6 +888,78 @@ def test_pg_login_attempts_rows_survive_anonymized_in_bulk(
         ).fetchall()
         assert len(rows) == 6
         assert all(row[1] is None for row in rows)
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_pg_resolution_holds_for_update_locks_until_commit(
+    retirement_pg_engine,
+) -> None:
+    """P1-b hardening (owner closure plan, post-merge window before the
+    production application): the pair resolution locks the three User
+    rows and their linked Doctor rows FOR UPDATE — users first, then
+    doctors, both ordered by id — BEFORE any shape check runs. A
+    concurrent writer must BLOCK for the life of the migration
+    transaction:
+
+    - a re-purpose of a pair row (``UPDATE users SET role = ...``) —
+      the verified 0055 shape must hold at DELETE time, not just at
+      CHECK time;
+    - an FK-referencing insert (``INSERT INTO services ... doctor_id``)
+      — the referencing INSERT takes FOR KEY SHARE on the parent
+      doctor row, which conflicts with the held FOR UPDATE, so the
+      guard inventory cannot be raced by a late reference.
+
+    The rowcount verification and the postcondition re-check stay in
+    place as the backstop (defense in depth), not the primary lock."""
+    module = _module()
+    engine = retirement_pg_engine
+
+    with engine.connect() as conn:
+        _seed_all_pairs(conn)
+        conn.commit()
+
+    locked = engine.connect()
+    trans = locked.begin()
+    try:
+        rows = module._resolve_and_assert_pairs(locked)
+        assert len(rows) == 3
+
+        rival = engine.connect()
+        try:
+            rival.exec_driver_sql("SET lock_timeout = '400ms'")
+
+            # 1) a concurrent re-purpose of a pair row must BLOCK
+            with pytest.raises(sa.exc.OperationalError, match="(?i)lock"):
+                rival.execute(
+                    sa.text(
+                        "UPDATE users SET role = 'Doctor' "
+                        "WHERE username = 'ecg_resource'"
+                    )
+                )
+            rival.rollback()  # clear the aborted transaction state
+
+            # 2) a concurrent FK-referencing insert must BLOCK as well
+            with pytest.raises(sa.exc.OperationalError, match="(?i)lock"):
+                rival.execute(
+                    sa.text(
+                        "INSERT INTO services (code, queue_tag, active,"
+                        " doctor_id, requires_doctor) "
+                        "SELECT 'X01', 'ecg', true, d.id, true "
+                        "FROM doctors d JOIN users u ON d.user_id = u.id "
+                        "WHERE u.username = 'ecg_resource'"
+                    )
+                )
+        finally:
+            rival.rollback()
+            rival.close()
+    finally:
+        trans.rollback()
+        locked.close()
+
+    # nothing changed — the migration transaction was rolled back intact
+    with engine.connect() as conn:
+        assert _usernames_present(conn) == set(_PAIR_USERNAMES)
 
 
 # ===================== D. the full alembic chain (live PostgreSQL) =====================
