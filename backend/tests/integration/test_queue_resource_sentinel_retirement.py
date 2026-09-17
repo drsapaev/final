@@ -456,9 +456,13 @@ def test_upgrade_aborts_when_a_pair_appears_after_the_locks() -> None:
         with pytest.raises(RuntimeError, match="NOT the locked pair set"):
             module.upgrade_with_conn(conn)
         conn.rollback()
-        # nothing was deleted — all three pairs survive the abort
-        assert _usernames_present(conn) == set(_PAIR_USERNAMES)
-        assert _pair_doctor_count(conn) == 3
+        # nothing was deleted: the two locked pairs survive the abort.
+        # The phantom seed was part of the aborted migration transaction
+        # on this single-connection scratch, so it unwinds with the
+        # rollback — the two-connection PostgreSQL variant below proves
+        # a COMMITTED phantom survives the abort untouched.
+        assert _usernames_present(conn) == {"ecg_resource", "lab_resource"}
+        assert _pair_doctor_count(conn) == 2
     finally:
         conn.close()
 
@@ -545,9 +549,7 @@ def test_upgrade_aborts_on_an_orphan_bridge_doctor_alongside_valid_pairs(
 
     assert _usernames_present(conn) == set(_PAIR_USERNAMES)
     assert _pair_doctor_count(conn) == 3
-    (total_doctors,) = conn.execute(
-        sa.text("SELECT COUNT(*) FROM doctors")
-    ).fetchone()
+    (total_doctors,) = conn.execute(sa.text("SELECT COUNT(*) FROM doctors")).fetchone()
     assert int(total_doctors) == 4  # three linked + the untouched orphan
 
 

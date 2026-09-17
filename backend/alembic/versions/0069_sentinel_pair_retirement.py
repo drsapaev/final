@@ -53,17 +53,34 @@ Upgrade contract (single transaction; PG DDL/DML is transactional):
      lock to the commit the inventory, the guards, and the deletion
      all see ONE stable world — the "verified 0055 shape" contract
      holds at DELETE time, not just at CHECK time;
+   - the locked id sets are RETURNED and the resolution must prove
+     EXACT set equality with them (the P2-1 phantom hardening): row
+     locks only fix the rows they SEE, so a pair that appeared AFTER
+     the lock selects (a concurrent restore of a missing half
+     committing between the locks and the resolution read) was never
+     locked — the retirement deletes only rows it locked, and the
+     mismatch is a LOUD abort (re-run the migration once the
+     concurrent writer is done), never a silent deletion of an
+     unlocked row;
    - the rowcount verification and the postcondition re-check stay in
      place as the backstop (defense in depth), not the primary lock;
    - non-PostgreSQL dialects (the SQLite scratch harness) skip the
      locking with a printed note — single-connection harnesses cannot
-     race (the P1-2 dialect-gate precedent);
+     race (the P1-2 dialect-gate precedent) — but still read the ids
+     the same way, so the phantom-set comparison below runs everywhere;
 
    - all three pairs present and shape-valid (linked doctor, the
      expected 0055 specialty, the post-0057 'Resource' role, not a
      superuser) -> the guarded paired deletion below;
-   - ALL three absent -> already retired: a printed clean no-op (the
-     CI empty database passes the chain with zero rows here);
+   - ALL three absent -> the terminal verdict is PROVABLE, not
+     assumed (the P2-2 hardening): any Doctor row still carrying the
+     bridge vocabulary (a specialty from the 0055 mapping) with NO
+     User link — the exact shape a hand-deleted User leaves behind,
+     because the ``doctors.user_id`` FK is ON DELETE SET NULL —
+     aborts loudly; the printed clean no-op pass requires zero
+     orphaned halves (the CI empty database has no doctors at all).
+     The same proof runs when the pairs are present: the bridge
+     vocabulary must leave WITH the pairs, never stranded;
    - a PARTIAL set (someone hand-deleted one pair before the
      retirement) or any shape drift (orphan user without a doctor, a
      foreign specialty, a re-purposed role, a superuser flag) -> a
@@ -122,6 +139,14 @@ sequences are touched: the pairs are identified by USERNAME, and at
 upgrade time zero FK references exist to the old numeric ids (the
 guards proved it) — the anonymized ``login_attempts`` rows stay
 anonymized (a downgrade restores PAIRS, not per-row audit links).
+An EXISTING username is an idempotent no-op only after the full
+0055+0057 shape is verified field-by-field (the P2-3 hardening: hash,
+role, is_active, is_superuser, must_change_password, exactly one
+linked Doctor, the 0055 specialty, active, caps 1/15) — a username
+captured by a foreign row (an Admin account, a live password, a
+caps-drifted doctor) is a LOUD abort, never a silent skip; a final
+postcondition re-verifies all three pairs before the migration
+claims the restore.
 """
 
 from __future__ import annotations
@@ -170,14 +195,30 @@ _SELECT_PAIRS = sa.text("""
            u.role AS role,
            u.is_active AS is_active,
            u.is_superuser AS is_superuser,
+           u.hashed_password AS hashed_password,
+           u.must_change_password AS must_change_password,
            d.id AS doctor_id,
            d.specialty AS specialty,
-           d.active AS doctor_active
+           d.active AS doctor_active,
+           d.start_number_online AS start_number_online,
+           d.max_online_per_day AS max_online_per_day
     FROM users u
     LEFT JOIN doctors d ON d.user_id = u.id
     WHERE u.username IN :usernames
     ORDER BY u.username
     """).bindparams(sa.bindparam("usernames", expanding=True))
+
+# P2-2: a Doctor row that still carries the bridge vocabulary with NO
+# User link — the exact shape a hand-deleted User leaves behind (the
+# doctors.user_id FK is ON DELETE SET NULL). Real doctors are
+# user-linked (they own a login), so an unlinked bridge-specialty row
+# is either an orphaned pair half or imported drift the operator owns.
+_SELECT_ORPHAN_BRIDGE_DOCTORS = sa.text("""
+    SELECT id, specialty, active, start_number_online, max_online_per_day
+    FROM doctors
+    WHERE user_id IS NULL AND specialty IN :specialties
+    ORDER BY id
+    """).bindparams(sa.bindparam("specialties", expanding=True))
 
 # The P1-b hardening: lock the pair rows BEFORE the resolution reads
 # them (PostgreSQL only — the dialect gate prints a note and skips on
@@ -197,6 +238,23 @@ _LOCK_PAIR_DOCTORS = sa.text("""
     WHERE u.username IN :usernames
     ORDER BY d.id
     FOR UPDATE
+    """).bindparams(sa.bindparam("usernames", expanding=True))
+
+# The same identification reads WITHOUT the locking clause — the
+# non-PostgreSQL scratch harnesses cannot race (single connection),
+# but the phantom-set comparison still runs, so the ids are collected
+# the same way (the P1-2 dialect-gate precedent: skip the LOCK, never
+# the CHECK).
+_SELECT_PAIR_USER_IDS = sa.text(
+    "SELECT id FROM users WHERE username IN :usernames ORDER BY id"
+).bindparams(sa.bindparam("usernames", expanding=True))
+
+_SELECT_PAIR_DOCTOR_IDS = sa.text("""
+    SELECT d.id
+    FROM doctors d
+    JOIN users u ON d.user_id = u.id
+    WHERE u.username IN :usernames
+    ORDER BY d.id
     """).bindparams(sa.bindparam("usernames", expanding=True))
 
 _SELECT_SERVICE_REFERENCES = sa.text("""
@@ -289,11 +347,24 @@ def _abort(message: str) -> None:
     raise RuntimeError(f"{_MIGRATION_NAME} abort: {message}")
 
 
-def _lock_pair_rows(conn) -> None:
-    """P1-b: serialize every concurrent writer away from the pairs
-    BEFORE the resolution reads them (PostgreSQL; the SQLite scratch
-    harnesses print a note and skip — single-connection harnesses
-    cannot race, the P1-2 dialect-gate precedent)."""
+# The tail every downgrade shape abort shares: what an existing
+# username must be to qualify as the idempotent no-op, and who owns
+# the decision when it is not (the P2-3 hardening).
+_FOREIGN_CAPTURE_TAIL = (
+    "an existing username is an idempotent no-op only in the exact "
+    "0055+0057 shape — a foreign capture is an explicit operator "
+    "decision, never a migration guess; refusing with no rows changed"
+)
+
+
+def _lock_pair_rows(conn) -> tuple[set[int], set[int]]:
+    """P1-b + P2-1: serialize every concurrent writer away from the
+    pairs BEFORE the resolution reads them (PostgreSQL; the SQLite
+    scratch harnesses print a note and read the ids WITHOUT locking
+    — single-connection harnesses cannot race, the P1-2 dialect-gate
+    precedent) and RETURN the locked id sets, so the resolution can
+    prove it only ever deletes rows it locked."""
+    usernames = list(SYNTHETIC_PAIR_USERNAMES)
     if conn.dialect.name != "postgresql":
         print(
             f"{_MIGRATION_NAME}: pair-row locking skipped on dialect "
@@ -301,8 +372,16 @@ def _lock_pair_rows(conn) -> None:
             "single-connection scratch harness cannot race — the "
             "semantic shape guards still run)"
         )
-        return
-    usernames = list(SYNTHETIC_PAIR_USERNAMES)
+        user_rows = conn.execute(
+            _SELECT_PAIR_USER_IDS, {"usernames": usernames}
+        ).fetchall()
+        doctor_rows = conn.execute(
+            _SELECT_PAIR_DOCTOR_IDS, {"usernames": usernames}
+        ).fetchall()
+        return (
+            {int(row.id) for row in user_rows},
+            {int(row.id) for row in doctor_rows},
+        )
     locked_users = conn.execute(_LOCK_PAIR_USERS, {"usernames": usernames}).fetchall()
     locked_doctors = conn.execute(
         _LOCK_PAIR_DOCTORS, {"usernames": usernames}
@@ -314,20 +393,98 @@ def _lock_pair_rows(conn) -> None:
         "transaction ends; the inventory, the guards, and the deletion "
         "see one stable world"
     )
+    return (
+        {int(row.id) for row in locked_users},
+        {int(row.id) for row in locked_doctors},
+    )
+
+
+def _assert_lock_covers_resolution(
+    rows: list, locked_user_ids: set[int], locked_doctor_ids: set[int]
+) -> None:
+    """P2-1: the resolved pair set must BE the locked pair set, exactly.
+    Row locks only fix the rows they SEE — a pair that appeared AFTER
+    the lock selects (a concurrent restore of the missing half
+    committing between the locks and this read) was never locked, and
+    deleting it would race every concurrent writer the locking exists
+    to stop. The retirement deletes only rows it locked: the mismatch
+    is a loud abort, never a silent inclusion of an unlocked row."""
+    resolved_user_ids = {int(row.user_id) for row in rows}
+    resolved_doctor_ids = {
+        int(row.doctor_id) for row in rows if row.doctor_id is not None
+    }
+    phantom_users = resolved_user_ids - locked_user_ids
+    phantom_doctors = resolved_doctor_ids - locked_doctor_ids
+    vanished_users = locked_user_ids - resolved_user_ids
+    if not (phantom_users or phantom_doctors or vanished_users):
+        return
+    _abort(
+        "the resolved pair set is NOT the locked pair set — users that "
+        f"appeared after the locks: {sorted(phantom_users)}, doctors "
+        "that appeared after the locks: "
+        f"{sorted(phantom_doctors)}, locked users that vanished: "
+        f"{sorted(vanished_users)} (locked users "
+        f"{sorted(locked_user_ids)} / doctors {sorted(locked_doctor_ids)} "
+        f"vs resolved users {sorted(resolved_user_ids)} / doctors "
+        f"{sorted(resolved_doctor_ids)}). A row that appeared after the "
+        "FOR UPDATE selects was never locked — the retirement deletes "
+        "only rows it locked; re-run the migration once the concurrent "
+        "writer is done; refusing with no rows changed"
+    )
+
+
+def _assert_no_orphaned_bridge_doctors(conn) -> None:
+    """P2-2: the terminal 'already retired' verdict is PROVABLE, not
+    assumed. A Doctor row that carries the bridge vocabulary with NO
+    User link is the exact shape a hand-deleted User leaves behind
+    (the doctors.user_id FK is ON DELETE SET NULL) — the retirement
+    never declares the pairs gone while halves remain, and never
+    strands an orphan next to the pairs it does retire."""
+    rows = conn.execute(
+        _SELECT_ORPHAN_BRIDGE_DOCTORS,
+        {"specialties": list(SYNTHETIC_PAIR_SPECIALTIES.values())},
+    ).fetchall()
+    if not rows:
+        return
+    for row in rows:
+        print(
+            f"{_MIGRATION_NAME}: orphaned bridge-vocabulary doctor — "
+            f"id={row.id} specialty={row.specialty!r} "
+            f"active={bool(row.active)} "
+            f"caps=({int(row.start_number_online)}, "
+            f"{int(row.max_online_per_day)}) user_id=NULL"
+        )
+    _abort(
+        f"{len(rows)} Doctor row(s) still carry the bridge vocabulary "
+        f"(specialty in {sorted(SYNTHETIC_PAIR_SPECIALTIES.values())}) "
+        "with NO User link — the doctors.user_id FK is ON DELETE SET "
+        "NULL, so a hand-deleted User leaves exactly this half behind; "
+        "the retirement never declares the pairs gone over orphaned "
+        "halves (re-link them to restored Users, delete them, or "
+        "re-specialty a real doctor that collided with the vocabulary "
+        "— an explicit operator decision); refusing with no rows changed"
+    )
 
 
 def _resolve_and_assert_pairs(conn) -> list:
     """Resolve the three pairs; enforce the all-or-nothing shape."""
-    _lock_pair_rows(conn)
+    locked_user_ids, locked_doctor_ids = _lock_pair_rows(conn)
     rows = conn.execute(
         _SELECT_PAIRS, {"usernames": list(SYNTHETIC_PAIR_USERNAMES)}
     ).fetchall()
+
+    # P2-1: the resolved world must BE the locked world, exactly — a
+    # pair that appeared after the lock selects was never locked.
+    _assert_lock_covers_resolution(rows, locked_user_ids, locked_doctor_ids)
 
     present = {row.username for row in rows}
     expected = set(SYNTHETIC_PAIR_USERNAMES)
     missing = expected - present
 
     if not present:
+        # P2-2: the terminal verdict is PROVABLE, not assumed — a
+        # hand-deleted User (SET NULL) leaves its Doctor half behind.
+        _assert_no_orphaned_bridge_doctors(conn)
         print(
             f"{_MIGRATION_NAME}: all three synthetic pairs are absent — "
             "already retired, clean no-op pass"
@@ -377,6 +534,11 @@ def _resolve_and_assert_pairs(conn) -> list:
             f"is_active={bool(row.is_active)} | doctor_id={row.doctor_id} "
             f"specialty={row.specialty!r} active={bool(row.doctor_active)}"
         )
+
+    # P2-2 (the symmetric proof): the bridge vocabulary must leave WITH
+    # the pairs — an orphaned half next to three valid pairs is drift
+    # too, invisible to every reference guard (nothing links to it).
+    _assert_no_orphaned_bridge_doctors(conn)
     return rows
 
 
@@ -559,6 +721,73 @@ def upgrade() -> None:
     upgrade_with_conn(op.get_bind())
 
 
+def _assert_downgrade_pair_shape(row) -> None:
+    """P2-3: an existing username is an idempotent no-op ONLY in the
+    exact 0055+0057 shape — every field is verified before the
+    downgrade may skip the pair, and any drift is a foreign capture
+    the operator must resolve explicitly (the downgrade restores
+    PAIRS, it does not heal or skip drift)."""
+    username = row.username
+    if row.hashed_password != SYNTHETIC_PAIR_DISABLED_HASH:
+        _abort(
+            f"downgrade: pair {username!r}: User id={row.user_id} carries "
+            f"hashed_password {row.hashed_password!r}, expected the "
+            f"unusable {SYNTHETIC_PAIR_DISABLED_HASH!r} marker — "
+            f"{_FOREIGN_CAPTURE_TAIL}"
+        )
+    if row.role != SYNTHETIC_PAIR_ROLE:
+        _abort(
+            f"downgrade: pair {username!r}: User id={row.user_id} carries "
+            f"role {row.role!r}, expected the internal "
+            f"{SYNTHETIC_PAIR_ROLE!r} sentinel spelling — "
+            f"{_FOREIGN_CAPTURE_TAIL}"
+        )
+    if not bool(row.is_active):
+        _abort(
+            f"downgrade: pair {username!r}: User id={row.user_id} is "
+            "inactive (is_active=false), expected the active 0055 shape "
+            f"— {_FOREIGN_CAPTURE_TAIL}"
+        )
+    if bool(row.is_superuser):
+        _abort(
+            f"downgrade: pair {username!r}: User id={row.user_id} is a "
+            f"superuser — {_FOREIGN_CAPTURE_TAIL}"
+        )
+    if bool(row.must_change_password):
+        _abort(
+            f"downgrade: pair {username!r}: User id={row.user_id} has "
+            "must_change_password=true, expected false (the 0055 shape) "
+            f"— {_FOREIGN_CAPTURE_TAIL}"
+        )
+    if row.doctor_id is None:
+        _abort(
+            f"downgrade: pair {username!r}: the User row (id={row.user_id}) "
+            "has NO linked Doctor row — exactly one linked Doctor is part "
+            f"of the 0055+0057 shape — {_FOREIGN_CAPTURE_TAIL}"
+        )
+        return  # unreachable: keeps the flow below readable
+    expected_specialty = SYNTHETIC_PAIR_SPECIALTIES[username]
+    if row.specialty != expected_specialty:
+        _abort(
+            f"downgrade: pair {username!r}: Doctor id={row.doctor_id} "
+            f"carries specialty {row.specialty!r}, expected "
+            f"{expected_specialty!r} (the 0055 seed shape) — "
+            f"{_FOREIGN_CAPTURE_TAIL}"
+        )
+    if not bool(row.doctor_active):
+        _abort(
+            f"downgrade: pair {username!r}: Doctor id={row.doctor_id} is "
+            f"inactive — {_FOREIGN_CAPTURE_TAIL}"
+        )
+    if int(row.start_number_online) != 1 or int(row.max_online_per_day) != 15:
+        _abort(
+            f"downgrade: pair {username!r}: Doctor id={row.doctor_id} "
+            f"carries caps ({int(row.start_number_online)}, "
+            f"{int(row.max_online_per_day)}), expected (1, 15) — "
+            f"{_FOREIGN_CAPTURE_TAIL}"
+        )
+
+
 def downgrade_with_conn(conn) -> None:
     """A TRUE inverse of the all-or-nothing upgrade: re-provision the
     three pairs in the exact 0055+0057 shape, username-identified,
@@ -566,15 +795,19 @@ def downgrade_with_conn(conn) -> None:
     sequences are touched — at upgrade time zero FK references existed
     to the old numeric ids (the guards proved it), so fresh serial ids
     are correct; the anonymized login_attempts rows stay anonymized
-    (a downgrade restores PAIRS, not per-row audit links)."""
+    (a downgrade restores PAIRS, not per-row audit links).
+
+    P2-3: an existing username is an idempotent no-op ONLY after the
+    full shape is verified field-by-field, and a final postcondition
+    re-verifies all three pairs before the restore is claimed."""
     for username, specialty in SYNTHETIC_PAIR_SPECIALTIES.items():
-        existing = conn.execute(
-            sa.text("SELECT id FROM users WHERE username = :u"), {"u": username}
-        ).fetchone()
-        if existing is not None:
+        row = conn.execute(_SELECT_PAIRS, {"usernames": [username]}).fetchone()
+        if row is not None:
+            _assert_downgrade_pair_shape(row)
             print(
                 f"{_MIGRATION_NAME} downgrade: pair {username!r} already "
-                f"present (user id={existing.id}) — idempotent no-op"
+                "present in the exact 0055+0057 shape (user "
+                f"id={row.user_id}) — idempotent no-op"
             )
             continue
         conn.execute(
@@ -594,9 +827,25 @@ def downgrade_with_conn(conn) -> None:
             f"{username!r} (role {SYNTHETIC_PAIR_ROLE!r}, specialty "
             f"{specialty!r}, unusable hash, active, caps 1/15)"
         )
+
+    # P2-3 postcondition: all three pairs, the exact shape, no more and
+    # no less — the loop above proved each pair, this proves the SET.
+    rows = conn.execute(
+        _SELECT_PAIRS, {"usernames": list(SYNTHETIC_PAIR_USERNAMES)}
+    ).fetchall()
+    if len(rows) != len(SYNTHETIC_PAIR_USERNAMES):
+        _abort(
+            "downgrade postcondition failed — "
+            f"{len(rows)} pair(s) resolved for usernames "
+            f"{[row.username for row in rows]}, expected exactly "
+            f"{len(SYNTHETIC_PAIR_USERNAMES)}; refusing with no rows "
+            "changed"
+        )
+    for row in rows:
+        _assert_downgrade_pair_shape(row)
     print(
         f"{_MIGRATION_NAME} downgrade: the three synthetic pairs are "
-        "restored to the 0055+0057 shape"
+        "restored to the 0055+0057 shape (postcondition verified)"
     )
 
 
