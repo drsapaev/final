@@ -188,7 +188,19 @@ describe('RQ-08.a: frontend consumes the server eligibility set', () => {
 
   it('transfers accepted_specialties EXPLICITLY in the SSOT adapter (rename breaks compile)', () => {
     const utils = fs.readFileSync(wizardUtilsPath, 'utf8');
-    expect(utils).toContain('accepted_specialties: Array.isArray(entry.accepted_specialties)');
+    // codex P1 #3311 раунд 2: три состояния БЕЗ коллапса — перенос через
+    // transferAcceptedSpecialties (массив | null | undefined).
+    expect(utils).toContain(
+      'accepted_specialties: transferAcceptedSpecialties(entry.accepted_specialties)',
+    );
+    expect(utils).toContain('if (raw === undefined) return undefined;');
+  });
+
+  it('treats explicit null as no-check (all doctors), not as legacy fallback', () => {
+    const utils = fs.readFileSync(wizardUtilsPath, 'utf8');
+    // codex P1 #3311 раунд 2: пустое поле Service.department_key + связь —
+    // гейт не проверяет специальность, UI обязан показать всех врачей.
+    expect(utils).toContain('if (serverAccepted === null) return all;');
   });
 
   it('wires the server entry (not the raw key) into filterDoctorsForService in CartStepV2', () => {

@@ -211,3 +211,73 @@ def test_registrar_services_eligibility_mirrors_gate_source_not_link(
         "dentistry",
         "stomatology",
     ]
+
+
+@pytest.mark.integration
+def test_registrar_services_null_field_with_link_keeps_gate_no_check_semantics(
+    client,
+    db_session,
+    admin_user,
+    admin_password,
+):
+    """Codex P1 #3311 (раунд 2): пустое поле Service.department_key + связь
+    DepartmentService (add_service_to_department не обновляет поле).
+
+    Гейт RQ-05.a при service.department_key=None специальность НЕ проверяет
+    (accepted is None). Сериализатор обязан отдать accepted_specialties=None
+    (явное «проверка неприменима»), а не набор от link-ключа — фронт по null
+    показывает всех врачей, зеркаля гейт.
+    """
+    from app.models.department import Department, DepartmentService
+
+    cardio_department = Department(
+        key="cardiology",
+        name_ru="Кардиология (link 2)",
+        name_uz="Kardiologiya",
+        active=True,
+    )
+    db_session.add(cardio_department)
+    db_session.commit()
+    db_session.refresh(cardio_department)
+
+    no_field_service = Service(
+        name="RQ-08a Услуга без поля со связью",
+        code="P90a",
+        service_code="P90a",
+        category_code="O",
+        # department_key НЕ задан (None) — источник гейта пуст
+        price=Decimal("5000.00"),
+        currency="UZS",
+        duration_minutes=30,
+        active=True,
+    )
+    db_session.add(no_field_service)
+    db_session.commit()
+    db_session.refresh(no_field_service)
+
+    db_session.add(
+        DepartmentService(
+            department_id=cardio_department.id,
+            service_id=no_field_service.id,
+        )
+    )
+    db_session.commit()
+
+    from tests.conftest import mint_access_token
+
+    headers = {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
+    response = client.get("/api/v1/registrar/services", headers=headers)
+
+    assert response.status_code == 200, response.text
+    payload = response.json()["services_by_group"]
+    rows = {
+        row["id"]: row
+        for group_rows in payload.values()
+        for row in group_rows
+    }
+
+    row = rows[no_field_service.id]
+    # Отображение — по связи (link-priority), как раньше.
+    assert row["department_key"] == "cardiology"
+    # Eligibility — ЯВНЫЙ null (не набор от link-ключа): гейт не проверяет.
+    assert row["accepted_specialties"] is None

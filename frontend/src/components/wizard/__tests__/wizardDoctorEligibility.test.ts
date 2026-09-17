@@ -72,22 +72,29 @@ describe('RQ-08.a: filterDoctorsForService — серверный набор п�
   });
 });
 
-describe('RQ-08.a: fallback без серверных данных — прежнее поведение', () => {
+describe('RQ-08.a: fallback и явный null — прежнее поведение/гейт-семантика', () => {
   it('строковый ключ (легаси-вызовы/тесты) — alias-таблица, как раньше', () => {
     const result = filterDoctorsForService(doctors, 'dental');
     // dental → канон dentistry через фронтовую таблицу (W2-PR2/Codex R10)
     expect(result.map((d) => d.id)).toEqual([1, 4]);
   });
 
-  it('объект услуги без accepted_specialties (null) — fallback на alias-таблицу', () => {
-    const service = { department_key: 'dental', accepted_specialties: null };
-    const result = filterDoctorsForService(doctors, service);
-    expect(result.map((d) => d.id)).toEqual([1, 4]);
+  it('accepted_specialties: null — сервер ЯВНО снял проверку → ВСЕ врачи (codex P1 раунд 2)', () => {
+    // Пустое поле Service.department_key + связь с отделением: гейт RQ-05.a
+    // при accepted is None специальность НЕ проверяет. UI обязан показать
+    // всех, а не фильтровать по link-priority department_key.
+    const service = { department_key: 'cardiology', accepted_specialties: null };
+    expect(filterDoctorsForService(doctors, service).map((d) => d.id)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('accepted_specialties отсутствует (undefined, старый бэкенд) — fallback на alias-таблицу', () => {
+    const service = { department_key: 'dental' };
+    expect(filterDoctorsForService(doctors, service).map((d) => d.id)).toEqual([1, 4]);
   });
 
   it('пустой accepted_specialties — fallback, а не «не кого не пускать» (defensive)', () => {
-    // Сервер при наличии department_key не отдаёт пустой набор; пустой
-    // массив трактуем как отсутствие данных.
+    // Сервер при заданном поле не отдаёт пустой набор; пустой массив
+    // трактуем как отсутствие данных.
     const service = { department_key: 'dental', accepted_specialties: [] };
     const result = filterDoctorsForService(doctors, service);
     expect(result.map((d) => d.id)).toEqual([1, 4]);
@@ -99,7 +106,7 @@ describe('RQ-08.a: fallback без серверных данных — преж�
   });
 });
 
-describe('RQ-08.a: адаптер переносит accepted_specialties ЯВНО', () => {
+describe('RQ-08.a: адаптер переносит accepted_specialties ЯВНО (три состояния без коллапса)', () => {
   it('массив сервера проходит как есть', () => {
     const data: WizardCatalogServiceData = wizardServiceFromCatalogEntry({
       id: 7,
@@ -109,6 +116,25 @@ describe('RQ-08.a: адаптер переносит accepted_specialties ЯВН
       accepted_specialties: ['dentistry', 'dental'],
     });
     expect(data.accepted_specialties).toEqual(['dentistry', 'dental']);
+  });
+
+  it('undefined (старый бэкенд) остаётся undefined — НЕ коллапсирует в null (codex P1 раунд 2)', () => {
+    const data = wizardServiceFromCatalogEntry({
+      id: 9,
+      name: 'legacy entry',
+      requires_doctor: false,
+    });
+    expect(data.accepted_specialties).toBeUndefined();
+  });
+
+  it('явный null сервера остаётся null (проверка неприменима)', () => {
+    const data = wizardServiceFromCatalogEntry({
+      id: 10,
+      name: 'no department field',
+      requires_doctor: true,
+      accepted_specialties: null,
+    });
+    expect(data.accepted_specialties).toBeNull();
   });
 
   it('не-массив нормализуется в null (грязный DTO не ломает фильтр)', () => {
