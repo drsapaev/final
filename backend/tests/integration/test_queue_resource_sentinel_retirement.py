@@ -33,6 +33,19 @@ The migration contract pinned here:
   absent -> already-retired clean no-op (the CI empty database); a
   PARTIAL set or any shape drift -> loud abort with nothing changed
   (the 0063/0066 taxonomy: the repair is an operator decision);
+- P2-1 phantom-pair pin: the resolution may only see the rows the
+  ``FOR UPDATE`` selects locked — a pair that APPEARS after the
+  locks (a concurrent restore of the missing half committing between
+  the lock selects and the resolution read) was never locked, and the
+  upgrade aborts instead of deleting an unlocked row (re-run the
+  migration once the concurrent writer is done);
+- P2-2 provable terminal state: ``all three usernames absent`` is the
+  already-retired verdict ONLY while no Doctor row carries the bridge
+  vocabulary without a User link — the ``doctors.user_id`` FK is
+  ``ON DELETE SET NULL``, so a hand-deleted User leaves exactly that
+  orphan half behind, and the retirement refuses to call it "already
+  retired" (the same proof runs when the pairs are present: the
+  bridge vocabulary must leave WITH the pairs, never stranded);
 - semantic reference guards: ANY ``services.doctor_id`` or
   ``daily_queues.specialist_id`` row referencing a synthetic doctor
   (active OR historical) aborts the deletion — the catalog and the
@@ -49,7 +62,14 @@ The migration contract pinned here:
   re-provisions the three pairs in the exact 0055+0057 shape
   (username, '!disabled:queue-resource' hash, 'Resource' role,
   specialty, caps 1/15) with ``ON CONFLICT DO NOTHING`` — no id
-  invention, no sequence games;
+  invention, no sequence games; P2-3 exact-shape pin: an EXISTING
+  username is an idempotent no-op only after the full shape is
+  verified field-by-field (hash, role, is_active, is_superuser,
+  must_change_password, exactly one linked Doctor, specialty,
+  active, caps 1/15) — a username captured by a foreign row aborts
+  the downgrade instead of being silently skipped, and a final
+  postcondition re-verifies all three pairs before the migration
+  claims the restore;
 - the full alembic chain retires the pairs on a fresh database: after
   ``alembic upgrade head`` the three usernames are gone.
 """
@@ -401,6 +421,138 @@ def test_sqlite_scratch_skips_pair_row_locking_with_a_note(capsys) -> None:
 
 @pytest.mark.integration
 @pytest.mark.migration
+def test_upgrade_aborts_when_a_pair_appears_after_the_locks() -> None:
+    """P2-1 (the phantom-pair pin): the resolution is only allowed to
+    see the rows the lock selects locked. A pair that APPEARS after
+    the locks — a concurrent restore of the missing half committing
+    between the lock selects and the resolution read — is NOT locked,
+    and the retirement must refuse to delete it, never silently
+    proceed with an unlocked row (the promised "one stable world"
+    would not exist for it: a concurrent writer could still land
+    between the guard and the DELETE).
+
+    The interposition is deterministic: the module's ``_lock_pair_rows``
+    is wrapped to seed the missing third pair AFTER the original lock
+    selects ran (the single-connection scratch sees its own seed —
+    same phantom, same proof; the two-connection PostgreSQL variant
+    below commits it from a rival session).
+    """
+    module = _module()
+    conn = _scratch()
+    try:
+        _seed_pair(conn, "ecg_resource")
+        _seed_pair(conn, "lab_resource")
+        conn.commit()
+
+        original_lock = module._lock_pair_rows
+
+        def lock_then_phantom_appears(lock_conn):
+            result = original_lock(lock_conn)  # locks 2 users + 2 doctors
+            _seed_pair(lock_conn, "general_resource")  # the phantom
+            return result
+
+        module._lock_pair_rows = lock_then_phantom_appears
+
+        with pytest.raises(RuntimeError, match="NOT the locked pair set"):
+            module.upgrade_with_conn(conn)
+        conn.rollback()
+        # nothing was deleted — all three pairs survive the abort
+        assert _usernames_present(conn) == set(_PAIR_USERNAMES)
+        assert _pair_doctor_count(conn) == 3
+    finally:
+        conn.close()
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_upgrade_aborts_on_hand_deleted_users_with_orphan_doctor_halves() -> None:
+    """P2-2 (the reviewer regression): create the pairs -> delete ONLY
+    the Users -> the real ``ON DELETE SET NULL`` fires on the linked
+    Doctors -> the upgrade MUST abort, not declare "already retired".
+
+    ``doctors.user_id`` is nullable with ``ON DELETE SET NULL``, so a
+    hand-deleted User leaves its Doctor half behind — a clean no-op
+    verdict over that state would strand the halves forever while
+    alembic stamps the retirement as done.
+    """
+    module = _module()
+    conn = _scratch()
+    try:
+        _seed_all_pairs(conn)
+        conn.commit()
+
+        deleted = conn.execute(
+            sa.text("DELETE FROM users WHERE username IN (:a, :b, :c)"),
+            {
+                "a": _PAIR_USERNAMES[0],
+                "b": _PAIR_USERNAMES[1],
+                "c": _PAIR_USERNAMES[2],
+            },
+        )
+        conn.commit()
+        assert int(deleted.rowcount) == 3
+
+        # the real SET NULL fired: three doctor halves with no User link
+        (orphan_halves,) = conn.execute(
+            sa.text(
+                "SELECT COUNT(*) FROM doctors WHERE user_id IS NULL"
+                " AND specialty IN ('ecg', 'lab', 'general')"
+            )
+        ).fetchone()
+        assert int(orphan_halves) == 3
+
+        with pytest.raises(RuntimeError, match="bridge vocabulary"):
+            module.upgrade_with_conn(conn)
+        conn.rollback()
+
+        # the migration changed nothing: the orphan halves remain
+        (still_orphans,) = conn.execute(
+            sa.text(
+                "SELECT COUNT(*) FROM doctors WHERE user_id IS NULL"
+                " AND specialty IN ('ecg', 'lab', 'general')"
+            )
+        ).fetchone()
+        assert int(still_orphans) == 3
+        assert _usernames_present(conn) == set()
+    finally:
+        conn.close()
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_upgrade_aborts_on_an_orphan_bridge_doctor_alongside_valid_pairs(
+    committed_scratch,
+) -> None:
+    """P2-2, the symmetric half: the bridge vocabulary must leave WITH
+    the pairs. A bridge-specialty Doctor with no User link sitting NEXT
+    TO the three valid pairs is also drift — retiring the pairs would
+    strand the orphan forever, invisible to every guard (it is not
+    linked, so no service/queue/FK surface ever counts it)."""
+    module = _module()
+    conn = committed_scratch
+    conn.execute(
+        sa.text(
+            "INSERT INTO doctors (user_id, specialty, active,"
+            " start_number_online, max_online_per_day)"
+            " VALUES (NULL, 'lab', true, 1, 15)"
+        )
+    )
+    conn.commit()
+
+    with pytest.raises(RuntimeError, match="bridge vocabulary"):
+        module.upgrade_with_conn(conn)
+    conn.rollback()
+
+    assert _usernames_present(conn) == set(_PAIR_USERNAMES)
+    assert _pair_doctor_count(conn) == 3
+    (total_doctors,) = conn.execute(
+        sa.text("SELECT COUNT(*) FROM doctors")
+    ).fetchone()
+    assert int(total_doctors) == 4  # three linked + the untouched orphan
+
+
+@pytest.mark.integration
+@pytest.mark.migration
 def test_upgrade_aborts_on_role_drift_with_nothing_changed(
     committed_scratch,
 ) -> None:
@@ -667,6 +819,89 @@ def test_downgrade_is_idempotent() -> None:
         assert int(user_count) == 3
     finally:
         conn.close()
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_downgrade_aborts_on_username_captured_by_a_foreign_shape() -> None:
+    """P2-3 (the reviewer counterexample): 0069 retired lab_resource;
+    later the username exists again — but as a FOREIGN row (an Admin
+    account with a real password and no Doctor). The downgrade must
+    abort: silently skipping the captured username and still printing
+    "the three pairs are restored" is exactly the broken contract this
+    pin forbids."""
+    module = _module()
+    conn = _scratch()
+    try:
+        _seed_all_pairs(conn)
+        conn.commit()
+        module.upgrade_with_conn(conn)
+        conn.commit()
+        assert _usernames_present(conn) == set()
+
+        # the capture: lab_resource exists, but as a foreign row
+        conn.execute(
+            sa.text(
+                "INSERT INTO users (username, hashed_password, role,"
+                " is_active, is_superuser, must_change_password)"
+                " VALUES ('lab_resource', 'argon2$real$hash', 'Admin',"
+                " true, false, false)"
+            )
+        )
+        conn.commit()
+
+        with pytest.raises(RuntimeError, match="foreign capture"):
+            module.downgrade_with_conn(conn)
+        conn.rollback()
+
+        # the impostor is untouched and nothing was restored around it
+        assert _usernames_present(conn) == {"lab_resource"}
+        (role,) = conn.execute(
+            sa.text("SELECT role FROM users WHERE username = :u"),
+            {"u": "lab_resource"},
+        ).fetchone()
+        assert role == "Admin"
+        (doctor_count,) = conn.execute(
+            sa.text("SELECT COUNT(*) FROM doctors")
+        ).fetchone()
+        assert int(doctor_count) == 0
+    finally:
+        conn.close()
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_downgrade_aborts_on_present_pair_with_drifted_doctor_caps(
+    committed_scratch,
+) -> None:
+    """P2-3 variant: the username exists and the USER half is the exact
+    0055 shape, but the linked Doctor carries drifted caps. The old
+    contract skipped it as an "idempotent no-op" (username present is
+    enough) and still declared the restore complete — the exact-shape
+    pin must abort instead."""
+    module = _module()
+    conn = committed_scratch
+    conn.execute(
+        sa.text(
+            "UPDATE doctors SET max_online_per_day = 30 WHERE user_id ="
+            " (SELECT id FROM users WHERE username = 'lab_resource')"
+        )
+    )
+    conn.commit()
+
+    with pytest.raises(RuntimeError, match="caps"):
+        module.downgrade_with_conn(conn)
+    conn.rollback()
+
+    assert _usernames_present(conn) == set(_PAIR_USERNAMES)
+    assert _pair_doctor_count(conn) == 3
+    (max_cap,) = conn.execute(
+        sa.text(
+            "SELECT max_online_per_day FROM doctors WHERE user_id ="
+            " (SELECT id FROM users WHERE username = 'lab_resource')"
+        )
+    ).fetchone()
+    assert int(max_cap) == 30  # the drift itself is untouched
 
 
 def _pair_ids(conn, username: str) -> tuple[int, int]:
@@ -938,6 +1173,12 @@ def test_pg_resolution_holds_for_update_locks_until_commit(
                     )
                 )
             rival.rollback()  # clear the aborted transaction state
+            # a session-level SET executed inside a rolled-back
+            # transaction unwinds with it (the GUC stack is tied to
+            # the transaction), so the 400ms above no longer holds —
+            # re-arm it or the second probe silently runs on the
+            # fixture's 8000ms default
+            rival.exec_driver_sql("SET lock_timeout = '400ms'")
 
             # 2) a concurrent FK-referencing insert must BLOCK as well
             with pytest.raises(sa.exc.OperationalError, match="(?i)lock"):
@@ -960,6 +1201,56 @@ def test_pg_resolution_holds_for_update_locks_until_commit(
     # nothing changed — the migration transaction was rolled back intact
     with engine.connect() as conn:
         assert _usernames_present(conn) == set(_PAIR_USERNAMES)
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_pg_upgrade_aborts_when_a_rival_inserts_the_missing_pair_after_the_locks(
+    retirement_pg_engine,
+) -> None:
+    """P2-1, the two-connection proof (the reviewer counterexample):
+    the lock selects only fix the rows they SEE. Start with ecg + lab
+    present and general missing; the migration takes the locks (2
+    users + 2 doctors); a RIVAL then restores the missing full pair and
+    commits; the resolution read now sees 3 valid pairs — the third one
+    was NEVER locked. The upgrade must abort (nothing deleted): a
+    phantom row is not part of the locked "one stable world", and the
+    next concurrent writer could still land between the guard and the
+    DELETE for it. Re-running the migration afterwards sees a stable
+    full set and retires it correctly."""
+    module = _module()
+    engine = retirement_pg_engine
+
+    with engine.connect() as conn:
+        _seed_pair(conn, "ecg_resource")
+        _seed_pair(conn, "lab_resource")
+        conn.commit()
+
+    locked_conn = engine.connect()
+    rival = engine.connect()
+    try:
+        original_lock = module._lock_pair_rows
+
+        def lock_then_rival_restores_the_missing_pair(lock_conn):
+            result = original_lock(lock_conn)  # locks 2 users + 2 doctors
+            _seed_pair(rival, "general_resource")  # the phantom pair
+            rival.commit()  # committed between the locks and the read
+            return result
+
+        module._lock_pair_rows = lock_then_rival_restores_the_missing_pair
+
+        with pytest.raises(RuntimeError, match="NOT the locked pair set"):
+            module.upgrade_with_conn(locked_conn)
+        locked_conn.rollback()
+    finally:
+        module._lock_pair_rows = original_lock
+        rival.close()
+        locked_conn.close()
+
+    # nothing was deleted — the rival's pair survives the abort too
+    with engine.connect() as conn:
+        assert _usernames_present(conn) == set(_PAIR_USERNAMES)
+        assert _pair_doctor_count(conn) == 3
 
 
 # ===================== D. the full alembic chain (live PostgreSQL) =====================
