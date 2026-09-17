@@ -2020,7 +2020,7 @@ const AppointmentWizardV2 = ({
             try {
               // UX Audit Stage 3: заменён raw fetch() PUT на updatePatient().
               await updatePatient(foundPatient.id as string | number, updateData);
-              // E-054 leftover 2 (superseded #3086 Fix B): 200 не доказывает
+              // E-054 leftover 2 (superseded PR 3086 Fix B): 200 не доказывает
               // сохранение — перечитываем карточку и сверяем отправленные
               // поля. Расхождение → остановка отправки без корзины.
               const cardReadBack = await getPatient(foundPatient.id as string | number);
