@@ -119,6 +119,13 @@ _INTENT_MARK_LUA = (
     "redis.call('set', KEYS[2], ARGV[1], 'EX', ARGV[2]); return 1"
 )
 
+# PR 3319: the value written by the tokenless (optional-degrade) branch of
+# mark_execution_intent. The known-outcome cleanup of a degraded attempt
+# compares against this value, so it can only ever delete the anonymous
+# marker its own SET NX inserted — never a foreign attempt's token-bound
+# unknown-outcome marker (R9).
+_TOKENLESS_INTENT_VALUE = "1"
+
 
 class _IntentClaimLost(RuntimeError):
     """Redis positively refused a stale owner or a foreign intent."""
@@ -821,6 +828,31 @@ class DistributedIdempotencyClaim:
             logger.warning("Idempotency intent owner-cleanup failed: %s", exc)
             return False
 
+    def clear_execution_intent_owned(
+        self, user_id: int | str, key: str, owner_token: str | None
+    ) -> None:
+        """PR 3319: known-outcome cleanup that deletes ONLY the marker this
+        attempt wrote. An owning attempt compares against its claim token; a
+        tokenless (optional-degrade) attempt compares against the anonymous
+        "1" value its own SET NX inserted. A foreign marker — another
+        attempt's unknown-outcome protection (R9), token-bound or anonymous
+        — is never deleted, even when this attempt's Redis view recovered
+        after a degrade. The local per-process mirror is always cleared: it
+        belongs to this attempt by construction."""
+        token = owner_token or _TOKENLESS_INTENT_VALUE
+        if self._ensure_available() and self._client is not None:
+            try:
+                self._run(
+                    self._client.eval,
+                    _INTENT_RELEASE_LUA,
+                    1,
+                    self._intent_key(user_id, key),
+                    token,
+                )
+            except Exception as exc:
+                logger.warning("Idempotency intent owned-cleanup failed: %s", exc)
+        _clear_local_execution_intent(user_id, key)
+
     def execution_intent_exists(self, user_id: int | str, key: str) -> bool:
         if self._ensure_available() and self._client is not None:
             marked = bool(self._run(self._client.exists, self._intent_key(user_id, key)))
@@ -1485,6 +1517,34 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         ),
                         media_type="application/json",
                     )
+                if not intent_confirmed and not (claim_acquired and claim_token is not None):
+                    # PR 3319 (owner P2, main 1033c3c7b3): Redis восстановился
+                    # МЕЖДУ uncertain-проверкой (пока падал — локальная ветка)
+                    # и этим гейтом. Попытка без claim-токена не имеет права
+                    # исполнять поверх чужого intent-маркера: SET NX сообщил,
+                    # что ключ уже охраняется другой попыткой (исполняющейся
+                    # или с неизвестным исходом — защита R9). Отказ
+                    # НЕИСПОЛНЯЮЩИЙ 409; распределённый маркер чужой попытки
+                    # не трогаем (своего нет — SET NX не записал), локальный
+                    # mirror снимаем как созданный этой попыткой.
+                    logger.warning(
+                        "Idempotency tokenless attempt refused over a foreign intent marker: "
+                        "user=%s key=%s path=%s",
+                        user_id,
+                        idempotency_key,
+                        request.url.path,
+                    )
+                    _clear_local_execution_intent(user_id, idempotency_key)
+                    _cancel_lease()
+                    return Response(
+                        status_code=409,
+                        headers={"Retry-After": "1", "Cache-Control": "no-store"},
+                        content=(
+                            '{"code": "idempotency_in_flight", "detail": '
+                            '"Request ownership changed. Retry with the same key."}'
+                        ),
+                        media_type="application/json",
+                    )
             elif claim is not None and claim.required:
                 # Codex R15 #3092 (P1): Redis упал между ранним гейтом и точкой
                 # исполнения — координация не может быть подтверждена прямо перед
@@ -1570,8 +1630,21 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     claim.release(user_id, idempotency_key, claim_token)
                 # Codex R9 #3092 (P1): outcome is now durable — drop the intent
                 # marker so later same-key requests replay normally.
+                # PR 3319: удаление привязано к маркеру ЭТОЙ попытки —
+                # владеющая попытка сравнивает свой claim-токен, деградировшая
+                # без токена — анонимное значение своего SET NX. Чужой маркер
+                # (неизвестный исход другой попытки, R9) не удаляется даже
+                # когда Redis-вид этой попытки восстановился после деградации.
                 if claim is not None and claim.try_available():
-                    claim.clear_execution_intent(user_id, idempotency_key)
+                    claim.clear_execution_intent_owned(
+                        user_id,
+                        idempotency_key,
+                        (
+                            claim_token
+                            if (claim_acquired and claim_token is not None)
+                            else None
+                        ),
+                    )
                 else:
                     _clear_local_execution_intent(user_id, idempotency_key)
                 logger.info(
@@ -1594,7 +1667,18 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             # documented retry-after-fixing contract keeps working. (An exception
             # AFTER a commit surfaces as a crash above — there the marker is kept.)
             if claim is not None and claim.try_available():
-                claim.clear_execution_intent(user_id, idempotency_key)
+                # PR 3319: ownership-guarded known-outcome cleanup — see the
+                # success path above; a degraded attempt removes only its own
+                # anonymous marker, never a foreign attempt's intent.
+                claim.clear_execution_intent_owned(
+                    user_id,
+                    idempotency_key,
+                    (
+                        claim_token
+                        if (claim_acquired and claim_token is not None)
+                        else None
+                    ),
+                )
             else:
                 _clear_local_execution_intent(user_id, idempotency_key)
             if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
