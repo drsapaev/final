@@ -2113,9 +2113,13 @@ const AppointmentWizardV2 = ({
           // любом 400 с телефоном автоматически привязывала форму к найденной
           // по телефону карточке — валидационная ошибка приводила к записи
           // визитов чужого пациента, а семейный телефон молча менял пациента.
-          const createErr = createError as Error & { status?: number; message: string };
+          const createErr = createError as Error & { status?: number; message: string; code?: string };
+          // E-054 leftover 3: дубль распознаётся по структурному коду
+          // patient_phone_exists (backend detail {code, message}) ИЛИ по
+          // строке (легаси/прочие источники 400) — OR conservativo.
           const isPhoneDuplicate =
-            createErr.status === 400 && isPhoneDuplicateErrorMessage(createErr.message);
+            createErr.status === 400 &&
+            (createErr.code === 'patient_phone_exists' || isPhoneDuplicateErrorMessage(createErr.message));
 
           if (isPhoneDuplicate && wizardData.patient.phone) {
             let conflictPatient: PatientRecord | null = null;
