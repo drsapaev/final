@@ -42406,7 +42406,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RequestOtpRequest"
+                "$ref": "#/components/schemas/PatientOtpRequest"
               }
             }
           },
@@ -42450,7 +42450,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VerifyOtpRequest"
+                "$ref": "#/components/schemas/PatientOtpVerifyRequest"
               }
             }
           },
@@ -42494,7 +42494,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__api__v1__endpoints__patient_access__LoginRequest"
+                "$ref": "#/components/schemas/PatientLoginRequest"
               }
             }
           },
@@ -53598,7 +53598,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__schemas__authentication__LoginRequest"
+                "$ref": "#/components/schemas/LoginRequest"
               }
             }
           },
@@ -86773,6 +86773,47 @@
         ],
         "title": "LogClickRequest"
       },
+      "LoginRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 3,
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 6,
+            "title": "Password"
+          },
+          "remember_me": {
+            "type": "boolean",
+            "title": "Remember Me",
+            "description": "Запомнить пользователя",
+            "default": false
+          },
+          "device_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Fingerprint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "description": "Схема для запроса входа"
+      },
       "LoginResponse": {
         "properties": {
           "access_token": {
@@ -90373,6 +90414,24 @@
         "title": "PatientEntriesResponse",
         "description": "Ответ с записями пациента за день"
       },
+      "PatientLoginRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "verification_grant": {
+            "type": "string",
+            "title": "Verification Grant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "verification_grant"
+        ],
+        "title": "PatientLoginRequest"
+      },
       "PatientOnboardingAuthRequest": {
         "properties": {
           "initData": {
@@ -90783,6 +90842,48 @@
           "safeNextAction"
         ],
         "title": "PatientOnboardingSubmitResponse"
+      },
+      "PatientOtpRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone"
+        ],
+        "title": "PatientOtpRequest"
+      },
+      "PatientOtpVerifyRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "code"
+        ],
+        "title": "PatientOtpVerifyRequest"
       },
       "PatientProfileOut": {
         "properties": {
@@ -97897,30 +97998,6 @@
         ],
         "title": "ReportResponse",
         "description": "Ответ с отчетом"
-      },
-      "RequestOtpRequest": {
-        "properties": {
-          "phone": {
-            "type": "string",
-            "title": "Phone"
-          },
-          "locale": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Locale"
-          }
-        },
-        "type": "object",
-        "required": [
-          "phone"
-        ],
-        "title": "RequestOtpRequest"
       },
       "RestoreRequest": {
         "properties": {
@@ -107311,24 +107388,6 @@
         "title": "VerifyCodeRequest",
         "description": "Запрос на проверку кода верификации"
       },
-      "VerifyOtpRequest": {
-        "properties": {
-          "phone": {
-            "type": "string",
-            "title": "Phone"
-          },
-          "code": {
-            "type": "string",
-            "title": "Code"
-          }
-        },
-        "type": "object",
-        "required": [
-          "phone",
-          "code"
-        ],
-        "title": "VerifyOtpRequest"
-      },
       "VisitCreate": {
         "properties": {
           "patient_id": {
@@ -109873,24 +109932,6 @@
         "title": "PasswordResetConfirmRequest",
         "description": "Запрос на подтверждение сброса пароля"
       },
-      "app__api__v1__endpoints__patient_access__LoginRequest": {
-        "properties": {
-          "phone": {
-            "type": "string",
-            "title": "Phone"
-          },
-          "verification_grant": {
-            "type": "string",
-            "title": "Verification Grant"
-          }
-        },
-        "type": "object",
-        "required": [
-          "phone",
-          "verification_grant"
-        ],
-        "title": "LoginRequest"
-      },
       "app__api__v1__endpoints__phrase_suggest__TelemetryResponse": {
         "properties": {
           "success": {
@@ -110427,47 +110468,6 @@
         ],
         "title": "DiscountType",
         "description": "Типы скидок"
-      },
-      "app__schemas__authentication__LoginRequest": {
-        "properties": {
-          "username": {
-            "type": "string",
-            "maxLength": 50,
-            "minLength": 3,
-            "title": "Username"
-          },
-          "password": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 6,
-            "title": "Password"
-          },
-          "remember_me": {
-            "type": "boolean",
-            "title": "Remember Me",
-            "description": "Запомнить пользователя",
-            "default": false
-          },
-          "device_fingerprint": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 64
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Device Fingerprint"
-          }
-        },
-        "type": "object",
-        "required": [
-          "username",
-          "password"
-        ],
-        "title": "LoginRequest",
-        "description": "Схема для запроса входа"
       },
       "app__schemas__authentication__PasswordResetConfirmRequest": {
         "properties": {

@@ -44,7 +44,7 @@ def _clean_phone(v: str) -> str:
     return _PHONE_CLEAN_RE.sub("", v or "")
 
 
-class RequestOtpRequest(BaseModel):
+class PatientOtpRequest(BaseModel):
     phone: str
     locale: str | None = None
 
@@ -66,7 +66,7 @@ class RequestOtpRequest(BaseModel):
         return v
 
 
-class VerifyOtpRequest(BaseModel):
+class PatientOtpVerifyRequest(BaseModel):
     phone: str
     code: str
 
@@ -86,7 +86,7 @@ class VerifyOtpRequest(BaseModel):
         return v
 
 
-class LoginRequest(BaseModel):
+class PatientLoginRequest(BaseModel):
     phone: str
     verification_grant: str
 
@@ -108,7 +108,7 @@ class LoginRequest(BaseModel):
 
 @router.post("/request-otp", response_model=dict[str, Any])
 @limiter.limit("5/minute")
-async def request_patient_otp(request: Request, payload: RequestOtpRequest):
+async def request_patient_otp(request: Request, payload: PatientOtpRequest):
     """Отправить OTP для входа пациента. Ответ номер-нейтрален (anti-enum)."""
     try:
         await get_patient_otp_service().send_login_otp(payload.phone, payload.locale)
@@ -126,7 +126,7 @@ async def request_patient_otp(request: Request, payload: RequestOtpRequest):
 
 @router.post("/verify-otp", response_model=dict[str, Any])
 @limiter.limit("10/minute")
-async def verify_patient_otp(request: Request, payload: VerifyOtpRequest):
+async def verify_patient_otp(request: Request, payload: PatientOtpVerifyRequest):
     """Проверить OTP -> одноразовый verification_grant (единый ответ при любой неудаче)."""
     try:
         result = get_patient_otp_service().verify_login_otp(payload.phone, payload.code)
@@ -138,7 +138,7 @@ async def verify_patient_otp(request: Request, payload: VerifyOtpRequest):
 @router.post("/login", response_model=dict[str, Any])
 @limiter.limit("10/minute")
 async def patient_login(
-    request: Request, payload: LoginRequest, db: Session = Depends(get_db)
+    request: Request, payload: PatientLoginRequest, db: Session = Depends(get_db)
 ):
     """phone + verification_grant -> JWT канонического User(role=Patient).
 

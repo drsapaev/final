@@ -30011,6 +30011,24 @@ export type components = {
             query: string;
         };
         /**
+         * LoginRequest
+         * @description Схема для запроса входа
+         */
+        LoginRequest: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+            /**
+             * Remember Me
+             * @description Запомнить пользователя
+             * @default false
+             */
+            remember_me: boolean;
+            /** Device Fingerprint */
+            device_fingerprint?: string | null;
+        };
+        /**
          * LoginResponse
          * @description Схема для ответа входа
          */
@@ -31556,6 +31574,13 @@ export type components = {
                 [key: string]: unknown;
             };
         };
+        /** PatientLoginRequest */
+        PatientLoginRequest: {
+            /** Phone */
+            phone: string;
+            /** Verification Grant */
+            verification_grant: string;
+        };
         /** PatientOnboardingAuthRequest */
         PatientOnboardingAuthRequest: {
             /** Initdata */
@@ -31645,6 +31670,20 @@ export type components = {
             messageKey: string;
             /** Safenextaction */
             safeNextAction: string;
+        };
+        /** PatientOtpRequest */
+        PatientOtpRequest: {
+            /** Phone */
+            phone: string;
+            /** Locale */
+            locale?: string | null;
+        };
+        /** PatientOtpVerifyRequest */
+        PatientOtpVerifyRequest: {
+            /** Phone */
+            phone: string;
+            /** Code */
+            code: string;
         };
         /**
          * PatientProfileOut
@@ -34496,13 +34535,6 @@ export type components = {
             size?: number | null;
             /** Error */
             error?: string | null;
-        };
-        /** RequestOtpRequest */
-        RequestOtpRequest: {
-            /** Phone */
-            phone: string;
-            /** Locale */
-            locale?: string | null;
         };
         /**
          * RestoreRequest
@@ -37876,13 +37908,6 @@ export type components = {
              */
             purpose: string;
         };
-        /** VerifyOtpRequest */
-        VerifyOtpRequest: {
-            /** Phone */
-            phone: string;
-            /** Code */
-            code: string;
-        };
         /** VisitCreate */
         VisitCreate: {
             /** Patient Id */
@@ -38782,13 +38807,6 @@ export type components = {
             /** New Password */
             new_password: string;
         };
-        /** LoginRequest */
-        app__api__v1__endpoints__patient_access__LoginRequest: {
-            /** Phone */
-            phone: string;
-            /** Verification Grant */
-            verification_grant: string;
-        };
         /**
          * TelemetryResponse
          * @description Ответ на telemetry
@@ -39000,24 +39018,6 @@ export type components = {
          * @enum {string}
          */
         app__models__dynamic_pricing__DiscountType: "percentage" | "fixed_amount" | "buy_x_get_y" | "tiered";
-        /**
-         * LoginRequest
-         * @description Схема для запроса входа
-         */
-        app__schemas__authentication__LoginRequest: {
-            /** Username */
-            username: string;
-            /** Password */
-            password: string;
-            /**
-             * Remember Me
-             * @description Запомнить пользователя
-             * @default false
-             */
-            remember_me: boolean;
-            /** Device Fingerprint */
-            device_fingerprint?: string | null;
-        };
         /**
          * PasswordResetConfirmRequest
          * @description Схема для подтверждения сброса пароля
@@ -64820,7 +64820,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RequestOtpRequest"];
+                "application/json": components["schemas"]["PatientOtpRequest"];
             };
         };
         responses: {
@@ -64855,7 +64855,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["VerifyOtpRequest"];
+                "application/json": components["schemas"]["PatientOtpVerifyRequest"];
             };
         };
         responses: {
@@ -64890,7 +64890,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__api__v1__endpoints__patient_access__LoginRequest"];
+                "application/json": components["schemas"]["PatientLoginRequest"];
             };
         };
         responses: {
@@ -70821,7 +70821,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["app__schemas__authentication__LoginRequest"];
+                "application/json": components["schemas"]["LoginRequest"];
             };
         };
         responses: {
