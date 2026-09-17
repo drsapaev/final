@@ -1,5 +1,5 @@
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { api } from '../../api/client';
@@ -75,6 +75,10 @@ interface QueueProfileDto {
   icon?: string;
   color?: string;
   queue_tags?: string[];
+  // PR 3291 P2-3: archived profiles are loaded too (active_only=false) so
+  // the report tag scope can address frozen day rows of deactivated
+  // directions (D-06); is_active === false keeps them out of edit cards.
+  is_active?: boolean;
   // D-1: canonical clinic_settings segment for this profile's
   // start_number_*/max_per_day_* rows (backend-computed via
   // core/specialties.canonical_specialty). The profile key itself may
@@ -233,7 +237,7 @@ const pickCanonicalDoctorForSpecialty = (
 };
 
 const QueueSettings = () => {
-  const { t: rawT } = useTranslation();
+  const { t: rawT, language } = useTranslation();
   const t = rawT;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -253,35 +257,37 @@ const QueueSettings = () => {
   // GET /admin/queue/settings/effective (backend RQ-23.a, PR 3289, E-050).
   const [departmentsList, setDepartmentsList] = useState<{ id: number; key: string; name_ru: string | null }[]>([]);
   const [reportScope, setReportScope] = useState<{ departmentId: number | null; tag: string | null }>({ departmentId: null, tag: null });
+  // PR 3318 codex round 2: актуальный скоуп для перечитывания после save —
+  // замыкание saveSettings могло удерживать старый скоуп, если администратор
+  // сменил селектор, пока PUT был в полёте.
+  const reportScopeRef = useRef(reportScope);
+  useEffect(() => {
+    reportScopeRef.current = reportScope;
+  }, [reportScope]);
   const [effectiveReport, setEffectiveReport] = useState<EffectiveQueueSettingsReport | null>(null);
+  // PR 3291 P2-1: monotonic request sequence — a stale report response
+  // that resolves after a newer scope request must never overwrite it.
+  const reportRequestSeq = useRef(0);
   const [reportLoading, setReportLoading] = useState(true);
   const [reportError, setReportError] = useState(false);
 
-  // ⭐ SSOT: Загружаем специальности из QueueProfiles API
-  const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  // ⭐ SSOT: Загружаем профили (включая архив — PR 3291 P2-3) и врачей
+  const [profilesAll, setProfilesAll] = useState<QueueProfileDto[]>([]);
   const [doctors, setDoctors] = useState<DoctorRecord[]>([]);
 
   // Загрузка профилей и докторов
   const loadProfiles = useCallback(async () => {
     try {
       const [profilesRes, doctorsRes] = await Promise.all([
-      api.get('/queues/profiles?active_only=true'),
+      // PR 3291 P2-3: активный фильтр применяется на клиенте — архив
+      // нужен тег-селектору отчёта (замороженные дни архивных
+      // направлений продолжают существовать по D-06).
+      api.get('/queues/profiles?active_only=false'),
       api.get('/admin/doctors').catch(() => ({ data: [] }))]
       );
 
       const profilesRaw = (profilesRes.data?.profiles ?? []) as QueueProfileDto[];
-      setSpecialties(profilesRaw.map((p) => ({
-        key: p.key,
-        name: p.title_ru || p.title || p.key,
-        icon: ICON_MAP[p.icon ?? ''] || Stethoscope,
-        color: p.color || 'var(--mac-text-primary)',
-        description: (p.queue_tags || []).join(', '),
-        tags: p.queue_tags || [],
-        // D-1: settings rows are keyed by the canonical specialty
-        // ("dentistry"), not by the profile machinery key
-        // ("stomatology"). Fall back to the key for older backends.
-        settingsKey: p.settings_key || p.key
-      })));
+      setProfilesAll(profilesRaw);
 
       const doctorsData = (doctorsRes.data ?? []) as DoctorRecord[];
       setDoctors(doctorsData);
@@ -296,9 +302,19 @@ const QueueSettings = () => {
   const loadDepartments = useCallback(async () => {
     try {
       const response = await api.get('/admin/departments');
-      const raw = Array.isArray(response.data)
-        ? response.data
-        : ((response.data?.departments ?? []) as Array<Record<string, unknown>>);
+      // PR 3291 P1: production endpoint answers the envelope
+      // { success, data, count } (admin_departments list_departments).
+      // Bare arrays and legacy { departments: [...] } shapes are kept for
+      // older backends and fixtures.
+      const payload = response.data as unknown;
+      const payloadRecord = (typeof payload === 'object' && payload !== null ? payload : {}) as Record<string, unknown>;
+      const raw = (Array.isArray(payload)
+        ? payload
+        : Array.isArray(payloadRecord.data)
+          ? payloadRecord.data
+          : Array.isArray(payloadRecord.departments)
+            ? payloadRecord.departments
+            : []) as Array<Record<string, unknown>>;
       setDepartmentsList(
         raw
           .map((dept) => ({ id: Number(dept?.id), key: String(dept?.key ?? ''), name_ru: typeof dept?.name_ru === 'string' ? dept.name_ru : null }))
@@ -311,17 +327,25 @@ const QueueSettings = () => {
   }, []);
 
   const loadEffectiveReport = useCallback(async (scope: { departmentId: number | null; tag: string | null }) => {
+    // PR 3291 P2-1: request-sequence guard — только самый свежий запрос
+    // имеет право менять состояние отчёта (данные/loading/error).
+    const seq = reportRequestSeq.current + 1;
+    reportRequestSeq.current = seq;
     try {
       setReportLoading(true);
       setReportError(false);
       const response = await api.get(buildEffectiveReportUrl(scope));
+      if (seq !== reportRequestSeq.current) return;
       setEffectiveReport(parseEffectiveQueueSettingsReport(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки отчёта эффективных настроек:', error);
+      if (seq !== reportRequestSeq.current) return;
       setEffectiveReport(null);
       setReportError(true);
     } finally {
-      setReportLoading(false);
+      if (seq === reportRequestSeq.current) {
+        setReportLoading(false);
+      }
     }
   }, []);
 
@@ -357,16 +381,35 @@ const QueueSettings = () => {
     }
   };
 
-  // Unique queue tags across loaded profiles — tag scope for the report.
+  // Активные профили — карточки настроек и тестирование (редактирование
+  // остаётся active-only, PR 3291 P2-3).
+  const specialties = useMemo<Specialty[]>(() => profilesAll
+    .filter((profile) => profile.is_active !== false)
+    .map((p) => ({
+      key: p.key,
+      name: p.title_ru || p.title || p.key,
+      icon: ICON_MAP[p.icon ?? ''] || Stethoscope,
+      color: p.color || 'var(--mac-text-primary)',
+      description: (p.queue_tags || []).join(', '),
+      tags: p.queue_tags || [],
+      // D-1: settings rows are keyed by the canonical specialty
+      // ("dentistry"), not by the profile machinery key
+      // ("stomatology"). Fall back to the key for older backends.
+      settingsKey: p.settings_key || p.key,
+    })), [profilesAll]);
+
+  // Unique queue tags across ALL loaded profiles (включая архивные) —
+  // tag scope отчёта должен видеть замороженные дни архивных направлений
+  // (PR 3291 P2-3, D-06).
   const tagOptions = useMemo(() => {
     const tags = new Set<string>();
-    for (const specialty of specialties) {
-      for (const tag of specialty.tags) {
+    for (const profile of profilesAll) {
+      for (const tag of profile.queue_tags || []) {
         if (tag) tags.add(tag);
       }
     }
     return Array.from(tags).sort();
-  }, [specialties]);
+  }, [profilesAll]);
 
   const getDoctorNameForReport = (doctorId: number): string => {
     const doctor = doctors.find((candidate) => Number(candidate?.id) === Number(doctorId)) ?? null;
@@ -404,6 +447,12 @@ const QueueSettings = () => {
       if (data.settings) {
         setSettings(data.settings);
       }
+      // PR 3291 P2-2: сохранённые строки клиники входят в отчёт
+      // эффективных значений (start_numbers / max_per_day) — перечитываем,
+      // чтобы рядом с «сохранено» не оставалось устаревшее effective-значение.
+      // PR 3318 codex round 2: читаем АКТУАЛЬНЫЙ скоуп из ref — перечитывание
+      // обязано соответствовать тому, что выбрано на момент завершения PUT.
+      loadEffectiveReport(reportScopeRef.current);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
       setMessage({ type: 'error', text: t('admin2.qs_save_error') });
@@ -780,8 +829,8 @@ const QueueSettings = () => {
                   {t('admin2.qs_eff_subtitle')}
                 </p>
               </div>
-              <div className="admin-flex-gap-12">
-                <div className="w-56">
+              <div className="admin-flex-gap-12-wrap" data-testid="qs-eff-controls">
+                <div className="w-56 max-w-full">
                   <Select
                     label={t('admin2.qs_eff_area_department')}
                     value={reportScope.departmentId ?? 'all'}
@@ -792,7 +841,7 @@ const QueueSettings = () => {
                     ]}
                     className="w-full"></Select>
                 </div>
-                <div className="w-48">
+                <div className="w-48 max-w-full">
                   <Select
                     label={t('admin2.qs_eff_area_tag')}
                     value={reportScope.tag ?? 'all'}
@@ -834,7 +883,7 @@ const QueueSettings = () => {
                           {fieldRow.snapshot_field &&
                           <div className="admin-text-xs-secondary">→ {fieldRow.snapshot_field}</div>
                           }
-                          {fieldRow.note &&
+                          {language.startsWith('ru') && fieldRow.note &&
                           <div className="admin-text-xs-secondary">{fieldRow.note}</div>
                           }
                         </div>
@@ -854,7 +903,11 @@ const QueueSettings = () => {
                 {effectiveReport.department &&
                 <div className="admin-section-divider-pt-16-border-top">
                     <h4 className="admin-text-sm-med-primary">
-                      {t('admin2.qs_eff_department_dead_title')} — {effectiveReport.department.name_ru || effectiveReport.department.key}
+                      {Object.values(effectiveReport.department.queue_settings).some((status) => status.live)
+                        ? t('admin2.qs_eff_department_mixed_title')
+                        : t('admin2.qs_eff_department_dead_title')}
+                      {' — '}
+                      {effectiveReport.department.name_ru || effectiveReport.department.key}
                     </h4>
                     <div className="flex flex-col gap-2">
                       {Object.entries(effectiveReport.department.queue_settings).map(([fieldName, status]: [string, DepartmentQueueSettingsStatus]) => {
@@ -864,7 +917,7 @@ const QueueSettings = () => {
                             <div>
                               <div className="admin-text-xs-secondary">{deptNameKey ? t(deptNameKey) : fieldName}</div>
                               <div className="admin-text-xs-secondary">{formatReportValue(status.value)}</div>
-                              {status.note &&
+                              {language.startsWith('ru') && status.note &&
                               <div className="admin-text-xs-secondary">{status.note}</div>
                               }
                             </div>
@@ -875,16 +928,28 @@ const QueueSettings = () => {
                         );
                       })}
                     </div>
-                    <h4 className="admin-text-sm-med-primary">
+                    {/* PR 3318 codex P2: нота привязана к owner-разрешению — только
+                    effective_start_number владельцев резолвится через «default»;
+                    клиника-уровень в fields показывает полные словари по тегам */}
+                    <h4 className="admin-text-sm-med-primary pt-2">
                       {t('admin2.qs_eff_owner_overrides_title')}
                     </h4>
+                    {reportScope.tag === null &&
+                    <div className="admin-text-xs-secondary pb-1" data-testid="qs-eff-default-tag-note">
+                      {t('admin2.qs_eff_default_tag_note')}
+                    </div>
+                    }
                     <div className="flex flex-col gap-2">
                       {effectiveReport.department.owner_overrides.map((override: OwnerOverride) => (
                         <div key={override.doctor_id} data-owner-row className="admin-flex-between-sm">
                           <div className="admin-text-xs-secondary">{getDoctorNameForReport(override.doctor_id)}</div>
                           <div className="admin-flex-center-12">
                             <span className="admin-range-badge">{t('admin2.qs_eff_owner_effective')}: {override.effective_start_number}</span>
+                            <span className="admin-range-badge">{t('admin2.qs_eff_owner_max_per_day', { value: override.max_online_per_day })}</span>
                             <span className="admin-range-badge">{SOURCE_LEVEL_KEYS[override.source] ? t(SOURCE_LEVEL_KEYS[override.source]) : override.source}</span>
+                            {override.active === false &&
+                            <span className="admin-range-badge">{t('admin2.qs_eff_owner_inactive')}</span>
+                            }
                           </div>
                         </div>
                       ))}
@@ -902,6 +967,7 @@ const QueueSettings = () => {
                           <div className="admin-text-xs-secondary">{resource.display_name || resource.code}</div>
                           <div className="admin-flex-center-12">
                             <span className="admin-range-badge">{t('admin2.qs_eff_owner_effective')}: {resource.effective_start_number}</span>
+                            <span className="admin-range-badge">{t('admin2.qs_eff_owner_max_per_day', { value: resource.max_online_per_day })}</span>
                             <span className="admin-range-badge">{SOURCE_LEVEL_KEYS[resource.source] ? t(SOURCE_LEVEL_KEYS[resource.source]) : resource.source}</span>
                           </div>
                         </div>
@@ -932,11 +998,11 @@ const QueueSettings = () => {
                               <span className="admin-text-xs-secondary">{t('admin2.qs_eff_day_max_entries')}: </span>
                               <strong>{dayRow.max_online_entries}</strong>
                             </div>
-                            {dayRow.note &&
+                            {language.startsWith('ru') && dayRow.note &&
                             <div className="admin-text-xs-secondary">{dayRow.note}</div>
                             }
                           </div>
-                          <span className="admin-range-badge">{t('admin2.qs_eff_frozen_badge')}</span>
+                          <span className="admin-range-badge">{dayRow.active === false ? t('admin2.qs_eff_day_inactive_badge') : t('admin2.qs_eff_frozen_badge')}</span>
                         </div>
                       ))}
                     </div>

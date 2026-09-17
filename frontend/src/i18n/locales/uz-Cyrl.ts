@@ -5333,6 +5333,11 @@ const uzCyrl = {
     qs_eff_error: 'Самарали созламалар ҳисоботини юклаб бўлмади.',
     qs_eff_loading: 'Ҳисобот юкланмоқда...',
     qs_eff_refresh: 'Ҳисоботни янгилаш',
+    qs_eff_department_mixed_title: 'Бўлим созламалари (фақат кўрсатиш учун; тирӣ майдонлар белгиланган)',
+    qs_eff_owner_inactive: 'шифокор фаол эмас',
+    qs_eff_owner_max_per_day: 'Кунлик лимит: {value}',
+    qs_eff_day_inactive_badge: 'кун ўчирилган (тарихий қатор)',
+    qs_eff_default_tag_note: 'Тег танланмаган: эгаларнинг клиник даражадаги самарали бошланғич рақамлари «default» калити орқали аниқланади — теглар бўйича қийматлар фарқ қилиши мумкин.',
 
     // ─── PaymentProviderSettings (admin2.pps_*) ────────────────────────────
     pps_loading_message: 'Загрузка настроек...',

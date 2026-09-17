@@ -5323,6 +5323,11 @@ const uzLatn = {
     qs_eff_error: 'Samarali sozlamalar hisobotini yuklab boʻlmadi.',
     qs_eff_loading: 'Hisobot yuklanmoqda...',
     qs_eff_refresh: 'Hisobotni yangilash',
+    qs_eff_department_mixed_title: "Bo'lim sozlamalari (faqat ko'rsatish uchun; tirik maydonlar belgilangan)",
+    qs_eff_owner_inactive: 'shifokor faol emas',
+    qs_eff_owner_max_per_day: 'Kunlik limit: {value}',
+    qs_eff_day_inactive_badge: "kun o'chirilgan (tarixiy qator)",
+    qs_eff_default_tag_note: "Teg tanlanmagan: egalarning klinik darajadagi samarali boshlang'ich raqamlari «default» kaliti orqali aniqlanadi — teglar bo'yicha qiymatlar farq qilishi mumkin.",
 
     // ─── PaymentProviderSettings (admin2.pps_*) ────────────────────────────
     pps_loading_message: "Sozlamalar yuklanmoqda...",
