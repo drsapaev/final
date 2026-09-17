@@ -2501,3 +2501,8 @@ def test_owned_cleanup_bypasses_reconnect_cooldown():
     assert claim._intent_key("1", "k9") not in fake.store, (
         "the owned cleanup must bypass the reconnect cooldown (direct client)"
     )
+    # codex round 3: a successful direct eval proves Redis is reachable —
+    # the worker's coordination state must be restored, so the Retry-After
+    # retry re-enters the distributed protocol instead of degrading to the
+    # optional local path while another worker may acquire the unmarked key.
+    assert claim.try_available() is True

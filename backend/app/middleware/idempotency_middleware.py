@@ -868,6 +868,14 @@ class DistributedIdempotencyClaim:
                     self._intent_key(user_id, key),
                     token,
                 )
+                # A successful direct eval PROVES Redis is reachable right
+                # now (codex PR 3319 round 3): end the cooldown, otherwise
+                # the 409's Retry-After retry on this worker would still see
+                # the coordination as unavailable, skip the distributed
+                # acquire through the optional local-degrade path, and race
+                # another worker that acquires the now-unmarked key.
+                self._available = True
+                self._failed_at = 0.0
             except Exception as exc:
                 logger.warning("Idempotency intent owned-cleanup failed: %s", exc)
         _clear_local_execution_intent(user_id, key)
