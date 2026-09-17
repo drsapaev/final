@@ -274,6 +274,8 @@ PROGRESS reconcile → STOP.
 ## D-03 — Долговечный QR для направления
 
 > **APPROVED 2026-09-15 (см. «Решение владельца»).** Утверждено как предложено с уточнениями: постоянный адрес — точка входа, выдающая короткую сессию через защищённый путь записи (не бессрочный токен); общий QR клиники сохраняется — адреса направлений его дополняют; переименование направления не меняет адрес автоматически и не требует перепечатки QR; архивирование блокирует новую запись по старому адресу; TTL, eligibility, лимиты и защита от повторной отправки сохраняются. Текст ниже — исторический PROPOSED-вариант.
+>
+> **ОТКРЫТАЯ ТОЧКА формы адреса РЕШЕНА владельцем 2026-09-17** — URL-вид `/q/<public_code>` (opaque random code) и механика slug-реестра утверждены отдельным решением владельца; см. раздел «Решение владельца по открытой точке RQ-16.c — 2026-09-17» в конце файла. Предлагавшийся ниже `/q/<direction-slug>` — только история.
 
 **Вопрос владельца.** Нужен ли постоянный (печатный) QR у направления?
 
@@ -384,3 +386,457 @@ PROGRESS reconcile → STOP.
 3. REJECTED по существу: зависимая задача остается BLOCKED/DEFERRED_BY_OWNER с записанной причиной; альтернатива из соответствующего раздела — отправная точка для нового предложения.
 4. Реализация каждого APPROVED — отдельным срезом со своим gate/fail-first/PG-доказательством (правила AGENTS и плана не ослабляются этим досье); D-01/D-06 дополнительно требуют перевернуть characterization-пины (E-033) в фикс-срезах RQ-14.b/RQ-13.
 5. Решение владельца от 2026-09-15 (раздел выше) утверждает D-01…D-07 в уточнённой редакции и имеет приоритет над противоречащими формулировками исходного PROPOSED-текста; исходный текст сохранен как история. Каждый APPROVED — отдельный срез; D-01/D-03/D-04/D-05/D-06/D-07 не реализуются автоматически вслед за RQ-12.b; APPROVED не повышает completion задач.
+
+## Решение владельца по открытой точке RQ-16.c — 2026-09-17 (форма постоянного адреса)
+
+- Источник решения: сообщение владельца продукта в рабочей сессии (IM-сессия `web-4068ec71-54a6-4b1b-845f-bda651e5fcd7`, channel `zai-web`, trace `1a0ae53e51ec7769`, 2026-09-17). Запись дословная — блок ниже без изменений; она закрывает ОТКРЫТУЮ ТОЧКУ формы адреса (DIRECTION_CONTRACT.md §5) и в части URL-вида и механики public-address registry имеет приоритет над историческим PROPOSED-текстом D-03 выше (`/q/<direction-slug>` сохранён как история).
+- APPROVED D-03 / E-039 (2026-09-15) НЕ пересматривается: утверждается только URL-форма и механика публичного address registry. Решение зафиксировано как E-055 (PROGRESS.md); реализация — срез RQ-16.c (только MODEL: реестр + модель + новая Alembic-ревизия + PG-проверка), RQ-16.d — отдельно и автоматически не начинается (HARD STOP владельца после docs-reconcile).
+
+````text
+RQ-16.c — решение владельца по ОТКРЫТОЙ ТОЧКЕ формы постоянного адреса.
+
+APPROVED D-03 / E-039 НЕ пересматривается. Ниже утверждается только URL-форма и механика публичного address registry.
+
+## 1. Форма публичного адреса — APPROVED
+
+Использовать:
+
+```text
+/q/<public_code>
+```
+
+Пример:
+
+```text
+/q/7km4p2xz8c3n
+```
+
+`/q/...` — публичный frontend route.
+
+Он НЕ является токеном записи и НЕ авторизует пациента сам по себе.
+
+RQ-16.d при открытии `/q/<public_code>` должен:
+
+```text
+public_code
+→ server-side direction resolution
+→ eligibility / visibility / rate-limit checks
+→ создание короткоживущей session
+→ существующий защищённый QueueJoin flow
+```
+
+Не создавать второй независимый механизм QR-записи.
+
+Существующий short-lived flow `/queue/join/:token` остаётся canonical session path.
+
+## 2. Тип slug — APPROVED: OPAQUE CODE
+
+Не использовать название направления в URL.
+
+Не использовать:
+
+```text
+/q/kardiologiya
+/q/dermatologiya
+/q/<QueueProfile.key>
+```
+
+Использовать случайный server-generated public code.
+
+Причины:
+
+- rename направления не должен менять адрес;
+- нет транслитерации;
+- нет semantic collisions;
+- пользовательское название не попадает в URL;
+- URL не зависит от internal QueueProfile.key;
+- старый QR нельзя случайно направить на новое направление с тем же названием.
+
+Рекомендуемая форма кода:
+
+```text
+12 символов
+lowercase Crockford/Base32-подобный alphabet
+crypto-random generation
+```
+
+Точная библиотека/алфавит — техническая деталь реализации при условии:
+
+```text
+stable
+globally unique
+URL-safe
+no PII
+no secret data
+```
+
+Важно:
+
+`public_code` является PUBLIC IDENTIFIER, а не секретом.
+
+Безопасность записи обеспечивают eligibility + short-lived session + существующий token contract.
+
+## 3. Генерация — APPROVED
+
+Код генерируется сервером автоматически **ОДИН РАЗ при первом provision/enable постоянного адреса для направления**.
+
+Не генерировать его из title.
+
+Не давать администратору свободно вводить slug.
+
+Не обязательно создавать permanent address автоматически для каждого существующего QueueProfile во время migration.
+
+RQ-16.c создаёт модель.
+
+Фактическое provisioning существующих направлений и runtime activation выполняются последующим разрешённым срезом.
+
+То есть:
+
+```text
+QueueProfile creation
+≠ обязательное создание публичного адреса
+
+Enable/provision permanent address
+→ generate once
+→ persist forever
+```
+
+## 4. Владелец public address — APPROVED
+
+Public address относится к:
+
+```text
+QueueProfile
+```
+
+как к публичному направлению/представлению.
+
+Но это НЕ означает, что QueueProfile становится владельцем DailyQueue.
+
+Сохраняется контракт:
+
+```text
+QueueProfile = direction / presentation
+Doctor        = doctor queue owner
+QueueResource = resource queue owner
+```
+
+RQ-16.d через canonical server resolver преобразует direction в допустимого конкретного исполнителя/очередь.
+
+Никакого:
+
+```text
+QueueProfile.id == Doctor.id
+QueueProfile.id == QueueResource.id
+```
+
+или определения типа по числовому совпадению.
+
+## 5. Registry model — APPROVED: ОТДЕЛЬНАЯ ТАБЛИЦА
+
+Не добавлять просто `slug` в `queue_profiles`.
+
+Создать отдельный public-address registry.
+
+Концептуально:
+
+```text
+QueueDirectionPublicAddress
+
+id
+queue_profile_id
+public_code
+created_at
+retired_at / equivalent lifecycle marker
+```
+
+Точные имена агент выбирает по repo conventions.
+
+Контракт:
+
+```text
+public_code:
+  globally UNIQUE forever
+
+queue_profile_id:
+  максимум один действующий постоянный address на профиль
+
+rename QueueProfile:
+  address unchanged
+
+archive QueueProfile:
+  address record preserved
+  runtime join blocked
+
+reactivate SAME QueueProfile:
+  same address may work again
+
+hard-delete QueueProfile:
+  old public_code MUST NOT become reusable
+
+recreate a similar/new profile:
+  NEW public_code
+```
+
+Для сохранения tombstone допустим FK lifecycle, при котором после разрешённого hard-delete профиль может исчезнуть, но использованный `public_code` остаётся зарезервированным.
+
+Никогда не назначать старый public_code новой сущности.
+
+## 6. Изменение адреса вручную — APPROVED: ЗАПРЕЩЕНО
+
+В RQ-16.c/RQ-16.d обычного edit slug нет.
+
+Администратор не может переименовать URL.
+
+Если когда-нибудь понадобится rotation/revoke permanent address — это отдельная явно согласованная операция/workstream.
+
+Не добавлять её попутно.
+
+При будущем rotation старый адрес по умолчанию должен стать недействительным, а НЕ redirect на новое направление, если владелец отдельно не утвердит redirect semantics.
+
+## 7. Поведение старого адреса — APPROVED
+
+### Rename profile
+
+```text
+same public_code
+```
+
+### Archive
+
+```text
+same public_code remains reserved
+request → anonymous unavailable response
+```
+
+### Reactivate same profile
+
+```text
+same public_code may become usable again
+```
+
+### Hard delete + later create another profile
+
+```text
+old public_code stays dead/reserved
+new profile gets new public_code
+```
+
+Никакого автоматического переиспользования.
+
+Не раскрывать анонимному клиенту:
+
+```text
+unknown
+archived
+hidden
+deleted
+```
+
+Эти случаи должны использовать одинаковую refusal semantics согласно S-15/RQ-16.b.
+
+## 8. permanent_address flag — RQ-16.d, НЕ RQ-16.c
+
+RQ-16.c = schema/model/registry.
+
+После одного только merge RQ-16.c сервер НЕ должен утверждать, что permanent address уже поддерживается.
+
+Текущий:
+
+```text
+PERMANENT_ADDRESS = false
+```
+
+сохраняется.
+
+В **RQ-16.d** флаг становится динамическим per-direction:
+
+```text
+true
+```
+
+только когда:
+
+- direction имеет provisioned public address;
+- QueueProfile active;
+- show_on_qr_page разрешён;
+- canonical eligibility/resolution позволяет запись;
+- runtime permanent-address endpoint реально доступен.
+
+До RQ-16.d UI постоянный QR НЕ показывает.
+
+## 9. Runtime shape для RQ-16.d — решение зафиксировать сейчас, но НЕ реализовывать в RQ-16.c
+
+Frontend route:
+
+```text
+/q/:publicCode
+```
+
+Backend должен иметь один canonical anonymous resolve/start operation.
+
+Он:
+
+1. принимает public_code;
+2. находит registry;
+3. получает QueueProfile;
+4. выполняет тот же visibility/eligibility contract, что QR;
+5. fail-closed для unknown/archived/hidden;
+6. применяет anonymous rate limit;
+7. создаёт КОРОТКОЖИВУЩУЮ session;
+8. передаёт пользователя существующему QueueJoin session flow.
+
+Не копировать join/business rules в новый endpoint.
+
+## 10. RQ-16.c migration
+
+Создать НОВУЮ Alembic revision от фактического fresh head.
+
+Не изменять уже merged:
+
+```text
+0063
+0065
+0066
+0067
+```
+
+и любые последующие ревизии, которые окажутся в main к моменту старта.
+
+Перед созданием revision:
+
+```text
+alembic heads
+alembic history
+open PR migration overlap
+```
+
+обязательны.
+
+Migration должна быть additive.
+
+Не выполнять backfill публичных адресов существующим профилям автоматически без отдельного основания.
+
+## 11. Uniqueness / normalization
+
+Утверждаю:
+
+```text
+public_code uniqueness = global across database
+```
+
+потому что URL `/q/<public_code>` не содержит clinic/profile namespace.
+
+Код генерируется уже в canonical lowercase форме.
+
+Input boundary может нормализовать ASCII-case перед lookup, но в БД должен храниться один canonical вариант.
+
+Не использовать locale-dependent transliteration.
+
+Не использовать title/key для collision resolution.
+
+При случайной коллизии генератор повторяет генерацию до успешной unique insert.
+
+## 12. PG acceptance для RQ-16.c
+
+На disposable PostgreSQL проверить минимум:
+
+- clean upgrade;
+- один actual Alembic head;
+- создание address row;
+- global uniqueness public_code;
+- не более одного действующего address для одного QueueProfile;
+- разные профили получают разные codes;
+- rename profile не меняет code;
+- archive profile не удаляет code;
+- hard-delete не делает старый code повторно используемым;
+- rollback не оставляет partial registry;
+- downgrade/re-upgrade только если это разрешено repo migration policy;
+- никаких PII/secret values в migration/error logs.
+
+SQLite/create_all parity проверить отдельно, если модель участвует в Base.metadata tests.
+
+## 13. Scope RQ-16.c
+
+Разрешён только MODEL slice:
+
+```text
+public-address registry
+model relationship
+new Alembic revision
+PG tests
+необходимые model/schema tests
+PROGRESS/evidence
+```
+
+НЕ реализовывать в этом PR:
+
+```text
+/q frontend route
+public resolver/start endpoint
+session issuance
+QR printing UI
+permanent_address=true
+RQ-18
+RQ-26.b
+unrelated QueueProfile lifecycle
+```
+
+Это RQ-16.d и следующие slices.
+
+## 14. Production
+
+Merge migration PR НЕ является разрешением выполнить migration на production/staging/Supabase.
+
+В финальном отчёте писать отдельно:
+
+```text
+CODE/MIGRATION: MERGED; VERIFIED
+PRODUCTION APPLICATION: NOT RUN
+```
+
+## Итоговое owner decision
+
+```text
+1. URL:
+   /q/<public_code>
+
+2. Тип:
+   opaque random public code
+
+3. Генерация:
+   server-generated once on first provision/enable
+
+4. Entity:
+   QueueProfile direction
+   (NOT queue owner)
+
+5. Manual change:
+   forbidden in this slice
+
+6. Old address:
+   never reused;
+   no redirect;
+   anonymous refusal when unavailable
+
+7. Registry:
+   separate table, not QueueProfile.slug column
+
+8. permanent_address=true:
+   RQ-16.d only
+
+9. UI before RQ-16.d:
+   no permanent QR
+
+10. Production migration:
+   separate operator authorization
+```
+
+Это сообщение является решением владельца по открытой точке RQ-16.c.
+
+Зафиксируй его в PROGRESS/DIRECTION_CONTRACT с датой и источником, затем выполняй только RQ-16.c по FAST AUTONOMOUS EXECUTION PROTOCOL.
+
+После RQ-16.c merge + post-merge verification + docs-reconcile — HARD STOP.
+
+RQ-16.d автоматически НЕ начинать.
+````
