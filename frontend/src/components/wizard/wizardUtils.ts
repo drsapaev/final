@@ -649,6 +649,56 @@ export const isPhoneDuplicateErrorMessage = (message: unknown): boolean => {
   return normalized.includes('уже существует') && normalized.includes('телефон');
 };
 
+// =====================================================================
+// CARD SAVE PERSISTENCE CHECK (E-054 leftover 2, из superseded #3086 Fix B)
+// =====================================================================
+
+// 200 OK не доказывает сохранение: сервер может ответить успехом без
+// фактической записи. После PUT карточки пациент перечитывается (getPatient)
+// и каждое отправленное поле сверяется с прочитанным. Несовпадение →
+// остановка отправки без корзины (успех никогда не показывается для
+// несохранённых правок карточки).
+export interface CardPersistMismatch {
+  field: string;
+  sent: unknown;
+  readBack: unknown;
+}
+
+// Формат-толерантная нормализация значения поля для сравнения:
+// birth_date — ДД.ММ.ГГГГ и ГГГГ-ММ-ДД сводятся к ISO; sex — к верхнему
+// регистру; остальное — trimmed string. Пустые значения не сравниваются
+// как «отправлено, но не сохранилось» только если поле реально отправлялось.
+export const normalizeCardPersistValue = (field: string, value: unknown): string => {
+  const raw = value == null ? '' : String(value).trim();
+  if (field === 'birth_date') {
+    if (!raw) return '';
+    return /^\d{2}\.\d{2}\.\d{4}$/.test(raw) ? convertDateToISO(raw) : raw;
+  }
+  if (field === 'sex') return raw.toUpperCase();
+  return raw;
+};
+
+// Сравнивает каждое ОТПРАВЛЕННОЕ поле с перечитанной карточкой.
+// readBack=null/undefined → все отправленные поля считаются несохранёнными
+// (перечитывание не удалось — «200 без эффекта» невозможно исключить).
+export const findCardPersistMismatches = (
+  sent: Record<string, unknown>,
+  readBack: Record<string, unknown> | null | undefined,
+): CardPersistMismatch[] => {
+  if (!readBack || typeof readBack !== 'object') {
+    return Object.keys(sent).map((field) => ({ field, sent: sent[field], readBack: undefined }));
+  }
+  const mismatches: CardPersistMismatch[] = [];
+  for (const field of Object.keys(sent)) {
+    const expected = normalizeCardPersistValue(field, sent[field]);
+    const actual = normalizeCardPersistValue(field, readBack[field]);
+    if (expected !== actual) {
+      mismatches.push({ field, sent: sent[field], readBack: readBack[field] });
+    }
+  }
+  return mismatches;
+};
+
 // IDEMPOTENCY KEY (Fix C: duplicate submit / lost-response retry)
 // =====================================================================
 

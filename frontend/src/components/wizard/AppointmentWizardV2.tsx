@@ -235,6 +235,7 @@ import {
   wizardContentSignature,
   getWizardDepartmentForService,
   resolveInitialPatientId,
+  findCardPersistMismatches,
   getWizardServiceTabFilter,
   serviceCodeToWizardCategory,
   activeTabToWizardCategory,
@@ -2019,9 +2020,29 @@ const AppointmentWizardV2 = ({
             try {
               // UX Audit Stage 3: заменён raw fetch() PUT на updatePatient().
               await updatePatient(foundPatient.id as string | number, updateData);
-              logger.log('✅ Patient data updated');
+              // E-054 leftover 2 (superseded PR 3086 Fix B): 200 не доказывает
+              // сохранение — перечитываем карточку и сверяем отправленные
+              // поля. Расхождение → остановка отправки без корзины.
+              const cardReadBack = await getPatient(foundPatient.id as string | number);
+              const persistMismatches = findCardPersistMismatches(
+                updateData,
+                cardReadBack as unknown as Record<string, unknown>,
+              );
+              if (persistMismatches.length > 0) {
+                logger.error('❌ Card save not persisted:', persistMismatches);
+                toast.error(t('misc.aw_patient_profile_verify_failed'));
+                return;
+              }
+              logger.log('✅ Patient data updated (read-back verified)');
             } catch (e: unknown) {
-              logger.warn('⚠️ Failed to update patient:', e);
+              // Раньше ошибка здесь проглатывалась (logger.warn + продолжение
+              // потока) и корзина создавалась с несохранёнными правками
+              // карточки — тихая потеря данных. Теперь отправка
+              // останавливается с явной ошибкой, корзина не создаётся.
+              const saveErr = e as Error & { status?: number; message?: string };
+              logger.error('❌ Failed to update patient:', saveErr.status, saveErr.message);
+              toast.error(t('misc.aw_patient_profile_save_failed', { message: saveErr.message || '' }));
+              return;
             }
           }
         } else {
