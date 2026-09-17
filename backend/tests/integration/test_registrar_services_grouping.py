@@ -135,3 +135,79 @@ def test_registrar_services_emits_accepted_specialties_from_server_eligibility(
     plain_row = rows[plain_service.id]
     assert plain_row["department_key"] is None
     assert plain_row["accepted_specialties"] is None
+
+
+@pytest.mark.integration
+def test_registrar_services_eligibility_mirrors_gate_source_not_link(
+    client,
+    db_session,
+    admin_user,
+    admin_password,
+):
+    """Codex P1 #3311: accepted_specialties считаются от ТОГО ЖЕ источника,
+    что и гейт корзины (поле Service.department_key), а не от link-priority
+    service_data['department_key'] (DepartmentService-связь).
+
+    При расхождении связи и поля: payload.department_key = ключ связи
+    ('cardiology' — им же группируется вкладка), а accepted_specialties =
+    dental-семейство поля 'dental' — иначе UI предложит врача, которого
+    POST /registrar/cart отклонит гейтом RQ-05.a.
+    """
+    from app.models.department import Department, DepartmentService
+
+    cardio_department = Department(
+        key="cardiology",
+        name_ru="Кардиология (link)",
+        name_uz="Kardiologiya",
+        active=True,
+    )
+    db_session.add(cardio_department)
+    db_session.commit()
+    db_session.refresh(cardio_department)
+
+    divergent_service = Service(
+        name="RQ-08a Расходящаяся услуга",
+        code="D89a",
+        service_code="D89a",
+        category_code="S",
+        department_key="dental",  # поле — источник гейта корзины
+        price=Decimal("10000.00"),
+        currency="UZS",
+        duration_minutes=30,
+        active=True,
+    )
+    db_session.add(divergent_service)
+    db_session.commit()
+    db_session.refresh(divergent_service)
+
+    db_session.add(
+        DepartmentService(
+            department_id=cardio_department.id,
+            service_id=divergent_service.id,
+        )
+    )
+    db_session.commit()
+
+    from tests.conftest import mint_access_token
+
+    headers = {"Authorization": f"Bearer {mint_access_token(admin_user)}"}
+    response = client.get("/api/v1/registrar/services", headers=headers)
+
+    assert response.status_code == 200, response.text
+    payload = response.json()["services_by_group"]
+    rows = {
+        row["id"]: row
+        for group_rows in payload.values()
+        for row in group_rows
+    }
+
+    row = rows[divergent_service.id]
+    # Группировка/отображение — по связи (link-priority), как раньше.
+    assert row["department_key"] == "cardiology"
+    # Eligibility — зеркало гейта: от ПОЛЯ услуги, не от связи.
+    assert row["accepted_specialties"] == [
+        "dental",
+        "dentist",
+        "dentistry",
+        "stomatology",
+    ]

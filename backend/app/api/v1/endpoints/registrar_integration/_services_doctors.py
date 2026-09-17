@@ -122,11 +122,16 @@ def get_registrar_services(
 
             # RQ-08.a: серверная eligibility для UI-фильтра врачей
             # (frontend filterDoctorsForService): допустимые специальности
-            # врача для department_key услуги из SSOT
-            # DOCTOR_QUEUE_SPECIALTY_VARIANTS. None — проверка неприменима
-            # (нет department_key), семантика ровно как в гейте RQ-05.a.
+            # врача из SSOT DOCTOR_QUEUE_SPECIALTY_VARIANTS. None — проверка
+            # неприменима, семантика ровно как в гейте RQ-05.a.
+            # Codex P1 #3311: источник department_key — ТОТ ЖЕ, что читает
+            # гейт корзины (поле Service.department_key), а НЕ link-priority
+            # service_data["department_key"]: при расхождении DepartmentService-
+            # связи и поля услуги (админ-эндпоинт это позволяет) UI обязан
+            # зеркалить именно серверный запрет, иначе предложит врача,
+            # которого POST /registrar/cart отклонит.
             _accepted = _accepted_specialty_variants_for_department_key(
-                service_data["department_key"]
+                getattr(service, 'department_key', None)
             )
             service_data["accepted_specialties"] = (
                 sorted(_accepted) if _accepted is not None else None
