@@ -346,6 +346,21 @@ explicit:
   NOTHING` — no id invention, no sequence games; the anonymized
   `login_attempts` rows stay anonymized (a downgrade restores PAIRS,
   not per-row audit links).
+- **Pair-row locking before the resolution reads (post-merge
+  hardening, E-060).** The three User rows and their linked Doctor
+  rows are locked `FOR UPDATE` — users first, then doctors, each
+  ordered by id — BEFORE the resolution SELECT and every guard runs
+  (PostgreSQL; the SQLite scratch harness skips with a printed note,
+  the P1-2 dialect-gate precedent). `FOR UPDATE` conflicts with every
+  concurrent row writer (a re-purpose of `users.role`, an orphaning
+  `doctors.user_id` update) and with the `FOR KEY SHARE` lock an
+  FK-referencing INSERT takes on the parent row, so the inventory,
+  the guards, and the deletion see ONE stable world: the "verified
+  0055 shape" contract holds at DELETE time, not just at CHECK time.
+  The rowcount verification and the postcondition re-check stay in
+  place as the backstop (defense in depth). Applied in the only
+  window where the merged 0069 body may change — BEFORE the
+  production application (the operator stage).
 
 The runtime half needed no code change: since the QD-2E cutover
 (0066, RQ-15.b) the owner resolution is fail-closed
