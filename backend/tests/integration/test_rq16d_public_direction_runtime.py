@@ -23,11 +23,12 @@ resolver (queue_svc). The slice adds:
    (E-055 §11), the ``clinic`` sentinel key refused.
 2. ``POST /api/v1/queue/public/{public_code}/start-session``
    (anonymous, rate-limited) — resolve -> visibility (S-15 anonymous
-   refusal for unknown/archived/hidden/deleted) -> eligibility probe ->
-   mint a direction-scoped short-lived QueueToken (the SAME 5..15 min
-   TTL bounds as every QR token, RQ-11) -> existing start_join_session.
-   The minted token carries the direction key in ``department`` and the
-   join path now REFUSES a direction-scoped session completing for any
+   refusal for unknown/archived/hidden/deleted/retired) -> eligibility
+   probe -> mint a direction-scoped short-lived QueueToken (the SAME
+   5..15 min TTL bounds as every QR token, RQ-11; the reserved
+   ``qdir:``-prefixed department marks the session scope — legacy
+   tokens never carry the prefix) -> existing start_join_session.
+   The join path REFUSES a direction-scoped session completing for any
    other specialist/direction (queue_svc binding check).
 3. The RQ-16.b entry-methods flag ``permanent_address`` becomes
    dynamic per-direction (E-055 §8): True only when the direction has a
@@ -423,10 +424,10 @@ def test_provision_unknown_key_refuses(pg_client, pg_admin_user, direction_world
 def test_provision_refuses_clinic_sentinel_key(
     pg_client, pg_admin_user, direction_world
 ):
-    """The ``clinic`` key is the clinic-wide QR sentinel: a direction token
-    minted with department == 'clinic' would be indistinguishable from a
-    legacy admin clinic token, so the session binding could not be
-    enforced server-side."""
+    """The ``clinic`` key is the clinic-wide QR sentinel: it must never
+    become a direction address (defense in depth — the session scope is
+    carried by the reserved ``qdir:`` prefix, and the sentinel key stays
+    out of the direction-address namespace entirely)."""
     response = _provision(pg_client, _auth_headers(pg_admin_user), "clinic")
     assert response.status_code == 400, response.text
 

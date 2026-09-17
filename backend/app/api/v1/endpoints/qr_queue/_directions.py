@@ -391,13 +391,17 @@ def start_public_direction_session(
         raise _anonymous_refusal()
 
     # Mint the direction-scoped short-lived token (uncommitted): the
-    # department carries the direction key so the join path can enforce
-    # the session scope. TTL is bounded by the shared RQ-11 contract.
+    # reserved-prefixed department carries the direction key so the join
+    # path can enforce the session scope (legacy tokens never carry the
+    # prefix). TTL is bounded by the shared RQ-11 contract.
     try:
         token_value, _token_meta = queue_service.assign_queue_token(
             db,
             specialist_id=None,
-            department=profile.key,
+            department=(
+                f"{QueueBusinessService.PUBLIC_ADDRESS_DEPARTMENT_PREFIX}"
+                f"{profile.key}"
+            ),
             generated_by_user_id=None,
             expires_hours=_PUBLIC_ADDRESS_TOKEN_TTL_HOURS,
             is_clinic_wide=True,

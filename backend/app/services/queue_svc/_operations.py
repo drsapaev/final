@@ -1065,10 +1065,16 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             candidates = doctors
         return min(candidates, key=lambda d: (active_loads.get(d.id, 0), d.id))
 
-    # RQ-16.d: the ``clinic`` key is the clinic-wide QR sentinel — a
-    # direction token minted with department == "clinic" would be
-    # indistinguishable from a legacy admin clinic token and the session
-    # binding below could not be enforced.
+    # RQ-16.d: the reserved department PREFIX of a direction-scoped
+    # token minted by the public-address start. Legacy tokens never carry
+    # it (admin clinic-wide tokens historically carry "clinic" or a raw
+    # specialty), so the session binding below can never misfire on them.
+    PUBLIC_ADDRESS_DEPARTMENT_PREFIX = "qdir:"
+
+    # The ``clinic`` key is the clinic-wide QR sentinel — a direction
+    # token minted with department == "clinic" would be indistinguishable
+    # from a legacy admin clinic token and the session binding could not
+    # be enforced.
     PUBLIC_ADDRESS_FORBIDDEN_KEYS = frozenset({"clinic"})
 
     def direction_resolves_to_bookable_surface(self, db: Session, profile) -> bool:
@@ -1237,18 +1243,26 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
             # RQ-16.d (E-055 §9): a session opened through the permanent
             # public address of a direction is scoped to THAT direction for
-            # its whole short life. The minted token carries the direction
-            # key in ``department`` (legacy admin clinic-wide tokens carry
-            # the "clinic" sentinel). Such a session can only complete for
-            # the typed profile selection of its own direction — never for
-            # another direction and never for an untyped/doctor choice.
+            # its whole short life. The minted token carries the
+            # reserved-prefixed direction key in ``department``
+            # (PUBLIC_ADDRESS_DEPARTMENT_PREFIX) — legacy tokens never
+            # carry the prefix, so only direction sessions are narrowed:
+            # they can only complete for the typed profile selection of
+            # their own direction — never for another direction and never
+            # for an untyped/doctor choice.
+            _public_department = token_obj.department or ""
             _direction_scoped = bool(
                 token_obj.is_clinic_wide
-                and token_obj.department
-                and token_obj.department != "clinic"
+                and _public_department.startswith(
+                    self.PUBLIC_ADDRESS_DEPARTMENT_PREFIX
+                )
             )
             if _direction_scoped and (
-                queue_profile is None or queue_profile.key != token_obj.department
+                queue_profile is None
+                or queue_profile.key
+                != _public_department.removeprefix(
+                    self.PUBLIC_ADDRESS_DEPARTMENT_PREFIX
+                )
             ):
                 raise QueueValidationError(
                     "Сессия ограничена направлением постоянного адреса"
