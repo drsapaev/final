@@ -42394,6 +42394,138 @@
         ]
       }
     },
+    "/api/v1/patient-access/request-otp": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Request Patient Otp",
+        "description": "Отправить OTP для входа пациента. Ответ номер-нейтрален (anti-enum).",
+        "operationId": "request_patient_otp_api_v1_patient_access_request_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Request Patient Otp Api V1 Patient Access Request Otp Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patient-access/verify-otp": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Verify Patient Otp",
+        "description": "Проверить OTP -> одноразовый verification_grant (единый ответ при любой неудаче).",
+        "operationId": "verify_patient_otp_api_v1_patient_access_verify_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Verify Patient Otp Api V1 Patient Access Verify Otp Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patient-access/login": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Patient Login",
+        "description": "phone + verification_grant -> JWT канонического User(role=Patient).\n\nFail-closed: 0 или >1 активных verified Patient-пользователей на номер ->\nединый generic 401 (endpoint не становится каталогом пациентов).",
+        "operationId": "patient_login_api_v1_patient_access_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__v1__endpoints__patient_access__LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Patient Login Api V1 Patient Access Login Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queue/reorder/reorder": {
       "put": {
         "tags": [
@@ -53466,7 +53598,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
+                "$ref": "#/components/schemas/app__schemas__authentication__LoginRequest"
               }
             }
           },
@@ -86641,47 +86773,6 @@
         ],
         "title": "LogClickRequest"
       },
-      "LoginRequest": {
-        "properties": {
-          "username": {
-            "type": "string",
-            "maxLength": 50,
-            "minLength": 3,
-            "title": "Username"
-          },
-          "password": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 6,
-            "title": "Password"
-          },
-          "remember_me": {
-            "type": "boolean",
-            "title": "Remember Me",
-            "description": "Запомнить пользователя",
-            "default": false
-          },
-          "device_fingerprint": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 64
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Device Fingerprint"
-          }
-        },
-        "type": "object",
-        "required": [
-          "username",
-          "password"
-        ],
-        "title": "LoginRequest",
-        "description": "Схема для запроса входа"
-      },
       "LoginResponse": {
         "properties": {
           "access_token": {
@@ -97807,6 +97898,30 @@
         "title": "ReportResponse",
         "description": "Ответ с отчетом"
       },
+      "RequestOtpRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone"
+        ],
+        "title": "RequestOtpRequest"
+      },
       "RestoreRequest": {
         "properties": {
           "backup_name": {
@@ -107196,6 +107311,24 @@
         "title": "VerifyCodeRequest",
         "description": "Запрос на проверку кода верификации"
       },
+      "VerifyOtpRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "code"
+        ],
+        "title": "VerifyOtpRequest"
+      },
       "VisitCreate": {
         "properties": {
           "patient_id": {
@@ -109740,6 +109873,24 @@
         "title": "PasswordResetConfirmRequest",
         "description": "Запрос на подтверждение сброса пароля"
       },
+      "app__api__v1__endpoints__patient_access__LoginRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "verification_grant": {
+            "type": "string",
+            "title": "Verification Grant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "verification_grant"
+        ],
+        "title": "LoginRequest"
+      },
       "app__api__v1__endpoints__phrase_suggest__TelemetryResponse": {
         "properties": {
           "success": {
@@ -110276,6 +110427,47 @@
         ],
         "title": "DiscountType",
         "description": "Типы скидок"
+      },
+      "app__schemas__authentication__LoginRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 3,
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 6,
+            "title": "Password"
+          },
+          "remember_me": {
+            "type": "boolean",
+            "title": "Remember Me",
+            "description": "Запомнить пользователя",
+            "default": false
+          },
+          "device_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Fingerprint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "description": "Схема для запроса входа"
       },
       "app__schemas__authentication__PasswordResetConfirmRequest": {
         "properties": {
