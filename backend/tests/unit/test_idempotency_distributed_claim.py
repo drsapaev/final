@@ -2506,3 +2506,188 @@ def test_owned_cleanup_bypasses_reconnect_cooldown():
     # retry re-enters the distributed protocol instead of degrading to the
     # optional local path while another worker may acquire the unmarked key.
     assert claim.try_available() is True
+
+
+def test_owned_cleanup_failure_keeps_local_intent_and_sets_cooldown():
+    """codex #3319 post-merge P2 (comment 4039202268): when the
+    compare-and-delete eval itself fails (Redis unavailable again), the
+    cleanup outcome is UNVERIFIED — this attempt's marker may have landed
+    despite a lost SET, or a foreign marker (R9 unknown-outcome guard) may
+    own the key. The attempt must stay fail-closed: the local intent mirror
+    is KEPT and the claim enters the reconnect cooldown — the failed eval
+    proved nothing about Redis reachability, so the success branch's
+    coordination restore must not happen either."""
+    import time as _time
+
+    class _OutageAtCleanupEval(FakeRedis):
+        def eval(self, script: str, numkeys: int, key: str, *args: str) -> int:
+            if "del" in script:
+                raise ConnectionError("simulated redis outage at owned-cleanup eval")
+            return super().eval(script, numkeys, key, *args)
+
+    fake = _OutageAtCleanupEval()
+    claim = _make_claim(fake)
+    claim._lease_seconds = 90
+    claim._failed_at = 0.0
+    foreign = "attempt-B"
+    fake.store[claim._intent_key("1", "kc1")] = foreign
+    # mark_execution_intent always re-arms the local mirror before the
+    # 409 branch calls the owned cleanup — model that state here.
+    idem_module._mark_local_execution_intent("1", "kc1")
+
+    claim.clear_execution_intent_owned("1", "kc1", "marker-A")
+
+    assert fake.store[claim._intent_key("1", "kc1")] == foreign, (
+        "the foreign unknown-outcome marker must survive the failed cleanup"
+    )
+    assert idem_module._local_execution_intent_exists("1", "kc1"), (
+        "a failed compare-and-delete must keep the local intent mirror"
+    )
+    assert claim._available is False, (
+        "a failed compare-and-delete must not leave the claim 'available'"
+    )
+    assert 0.0 < claim._failed_at <= _time.time(), (
+        "the claim must enter the reconnect cooldown on the time.time() scale"
+    )
+    idem_module._local_execution_intents.clear()
+
+
+def test_failed_owned_cleanup_keeps_fast_retries_fail_closed(monkeypatch):
+    """codex #3319 post-merge P2, full dispatch reproduction: A degrades
+    tokenless (full transport outage), Redis recovers, A's tokenless SET NX
+    is rejected over a foreign intent, and Redis goes down AGAIN before the
+    409-branch owned-cleanup eval. The failed cleanup previously deleted the
+    local mirror and left the claim 'available', so the two fast retries the
+    client sends after the 409's Retry-After behaved exactly as codex
+    described: retry 1 hit the stale-'available' acquire whose transport
+    failure finally marked Redis unavailable (409 in-flight), and retry 2 —
+    still inside the reconnect cooldown — skipped every distributed check,
+    found no mirror on the local-degrade path, and EXECUTED the handler over
+    the foreign attempt's unknown outcome. The mirror must survive and the
+    claim must sit in the cooldown so every retry reconciles (409 uncertain)
+    instead of duplicating the write."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
+    idem_module._local_execution_intents.clear()
+
+    class _FullOutageAtCleanupRedis(_RecoverableOutageRedis):
+        """A REAL transport outage: while ``down`` EVERY op raises. The
+        ping-only outage of the base class lets EXISTS/GET/SET through,
+        which would mask the degraded local path this test pins. Arms the
+        second outage when the tokenless SET NX is rejected."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.fail_cleanup_eval = False
+
+        def _raise_if_down(self) -> None:
+            if self.down:
+                raise ConnectionError("simulated redis outage")
+
+        def ping(self) -> bool:
+            self._raise_if_down()
+            return True
+
+        def get(self, key):
+            self._raise_if_down()
+            return super().get(key)
+
+        def set(self, key, value, nx=False, xx=False, ex=None):
+            self._raise_if_down()
+            result = super().set(key, value, nx=nx, xx=xx, ex=ex)
+            if nx and key.endswith(":intent") and result is None:
+                # SET NX rejected over the foreign intent: Redis goes down
+                # again right before the 409-branch owned-cleanup eval.
+                self.fail_cleanup_eval = True
+            return result
+
+        def exists(self, key):
+            self._raise_if_down()
+            return super().exists(key)
+
+        def eval(self, script, numkeys, key, *args):
+            if self.fail_cleanup_eval and "del" in script:
+                self.fail_cleanup_eval = False
+                self.down = True  # the outage persists through the retries
+                raise ConnectionError("simulated redis outage at owned-cleanup eval")
+            self._raise_if_down()
+            return super().eval(script, numkeys, key, *args)
+
+    fake = _FullOutageAtCleanupRedis()
+    saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    idem_module._distributed_claim = _wire_outage_claim(fake)
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9012
+    )
+    try:
+        key = "pr3319-cleanup-failure-fail-closed"
+        intent_key = nkey("1", key, "intent")
+
+        # Worker B guards the key with its intent marker (unknown outcome).
+        fake.store[intent_key] = "attempt-B"
+
+        counter = {"calls": 0}
+        client = TestClient(_make_app(counter), raise_server_exceptions=False)
+
+        # Recovery lands BETWEEN the uncertain-outcome check (still down —
+        # takes the LOCAL branch) and the intent gate, exactly as in the
+        # incident the sibling test pins.
+        original_local_exists = idem_module._local_execution_intent_exists
+
+        def _recovering_local_exists(user_id, key_):
+            fake.down = False
+            return original_local_exists(user_id, key_)
+
+        monkeypatch.setattr(
+            idem_module, "_local_execution_intent_exists", _recovering_local_exists
+        )
+
+        first = client.post(
+            "/echo", headers={**auth_headers("1"), "Idempotency-Key": key}
+        )
+        assert first.status_code == 409, first.text
+        assert first.json()["code"] == "idempotency_in_flight"
+        assert counter["calls"] == 0, (
+            "the tokenless attempt must never execute over a foreign intent"
+        )
+        assert fake.store.get(intent_key) == "attempt-B", (
+            "the foreign marker must survive the refused attempt"
+        )
+
+        # The outage persists; restore the PRODUCTION cooldown so the fast
+        # retries (Retry-After: 1 < 5 s) run INSIDE it and skip every
+        # distributed check onto the local-degrade path.
+        monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 5.0)
+        monkeypatch.setattr(
+            idem_module, "_local_execution_intent_exists", original_local_exists
+        )
+
+        for attempt in range(3):
+            retry = client.post(
+                "/echo", headers={**auth_headers("1"), "Idempotency-Key": key}
+            )
+            assert retry.status_code == 409, (
+                f"retry {attempt + 1} inside the cooldown executed over the "
+                f"foreign unknown outcome (duplicate write): {retry.text}"
+            )
+        assert counter["calls"] == 0, (
+            "retries inside the cooldown must stay fail-closed on the KEPT "
+            "local mirror instead of executing over the foreign outcome"
+        )
+        # Post-conditions of the FAILED owned cleanup: the local mirror is
+        # kept and the claim is in the reconnect cooldown.
+        assert any(k[1] == key for k in idem_module._local_execution_intents), (
+            "the failed compare-and-delete must keep the local intent mirror"
+        )
+        assert idem_module._distributed_claim._available is False, (
+            "the failed compare-and-delete must not leave the claim 'available'"
+        )
+        assert fake.store.get(intent_key) == "attempt-B"
+    finally:
+        idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
+        idem_module._local_execution_intents.clear()
+        monkeypatch.undo()
