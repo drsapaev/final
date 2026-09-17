@@ -2412,7 +2412,13 @@ def test_tokenless_lost_set_response_cleans_own_marker(monkeypatch):
     applied the write, the attempt saw a transport error) previously left
     the anonymous marker for a full TTL with no outcome — a recovery retry
     received a false idempotency_uncertain_outcome for an operation that
-    never ran. The 409 branch now cleans THIS attempt's unique marker."""
+    never ran. The 409 branch now cleans THIS attempt's unique marker.
+
+    The reconnect cooldown is zeroed here ONLY so the recovery lands
+    within the request window (a real 5 s cooldown keeps the intent gate
+    closed for the whole request); the cooldown-bypass of the cleanup
+    itself is pinned separately by
+    test_owned_cleanup_bypasses_reconnect_cooldown."""
     monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
     idem_module._local_execution_intents.clear()
 
@@ -2468,3 +2474,30 @@ def test_tokenless_lost_set_response_cleans_own_marker(monkeypatch):
         idem_module._resolve_principal_id_sync = saved_resolve
         idem_module._local_execution_intents.clear()
         monkeypatch.undo()
+
+
+def test_owned_cleanup_bypasses_reconnect_cooldown():
+    """codex PR 3319 P2: right after a failed mark the claim is marked
+    unavailable for the whole reconnect cooldown; the owned cleanup must
+    still reach Redis through the direct client (best-effort, same as
+    clear_execution_intent_if_owner) instead of skipping on
+    _ensure_available."""
+    import time as _time
+
+    fake = FakeRedis()
+    claim = _make_claim(fake)
+    claim._lease_seconds = 90
+    marker = "marker-abc123"
+    fake.store[claim._intent_key("1", "k9")] = marker
+
+    # Simulate the post-failed-mark state: unavailable + fresh failure time
+    # (same time.time() scale as _ensure_available) under the PRODUCTION
+    # cooldown — _ensure_available would refuse until the cooldown elapses.
+    claim._available = False
+    claim._failed_at = _time.time()
+    assert claim.try_available() is False
+
+    claim.clear_execution_intent_owned("1", "k9", marker)
+    assert claim._intent_key("1", "k9") not in fake.store, (
+        "the owned cleanup must bypass the reconnect cooldown (direct client)"
+    )

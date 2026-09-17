@@ -850,10 +850,19 @@ class DistributedIdempotencyClaim:
         after a degrade. The local per-process mirror is always cleared: it
         belongs to this attempt by construction."""
         token = owner_token or _TOKENLESS_INTENT_VALUE
-        if self._ensure_available() and self._client is not None:
+        if self._client is not None:
             try:
-                self._run(
-                    self._client.eval,
+                # Direct client call — deliberately bypasses the reconnect
+                # cooldown (_run/_ensure_available). The caller may arrive
+                # RIGHT after a failed mark whose _run flipped the claim to
+                # unavailable for the whole cooldown: the lost-response SET
+                # may have LANDED, and this cleanup is the only chance to
+                # remove the attempt's own marker within the same request
+                # (codex PR 3319 P2). Same best-effort pattern as
+                # clear_execution_intent_if_owner: a cleanup that fails here
+                # degrades to the conservative 409 reconcile, never to a
+                # duplicate execution.
+                self._client.eval(
                     _INTENT_RELEASE_LUA,
                     1,
                     self._intent_key(user_id, key),
