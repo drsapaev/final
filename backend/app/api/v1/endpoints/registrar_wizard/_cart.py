@@ -7,6 +7,7 @@ from typing import Any
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_wizard._helpers import (
     _apply_service_discount,
+    _assert_cart_doctor_eligibility,
     _check_repeat_visit_eligibility,
     _load_registration_discount_settings,
     _resolve_effective_discount_mode,
@@ -79,6 +80,15 @@ def create_cart_appointments(
         # re-read (an unlocked reload would see settings rows inserted by the
         # admin endpoint after revalidation, which FOR UPDATE cannot lock).
         registration_settings = validated_settings or _load_registration_discount_settings(db)
+
+        # RQ-05.a (server-side doctor eligibility): requires_doctor=true
+        # услуги не должны сохраняться без врача, с неактивным врачом или
+        # врачом чужой специальности (E-023: на пути корзины проверки НЕ
+        # было). Гейт стоит ДО prelock advisory-замков и первой записи:
+        # отклонённая корзина не оставляет частичного состояния. Семантика
+        # специальности зеркалирует фронтовый filterDoctorsForService
+        # (SSOT: DOCTOR_QUEUE_SPECIALTY_VARIANTS).
+        _assert_cart_doctor_eligibility(db, cart_data.visits)
 
         created_visits = []
         created_visit_amounts: dict[int, Decimal] = {}
