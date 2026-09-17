@@ -80,6 +80,7 @@ from app.api.v1.endpoints import (
     observability,
     online_queue_new,
     password_reset,
+    patient_access,
     patients,
     payment_reconciliation,
     payment_settings,
@@ -392,6 +393,11 @@ api_router.include_router(
 )
 api_router.include_router(
     password_reset.router, prefix="/password-reset", tags=["password-reset"]
+)
+# Phase 0 PR-A1: patient portal OTP foundation (public, anti-enum, Redis-backed).
+# No patient linking here — PR-A2 binds activation tokens to exact Patient.id.
+api_router.include_router(
+    patient_access.router, prefix="/patient-access", tags=["patient-access"]
 )
 # Эндпоинты переупорядочения очереди (специализированный функционал)
 api_router.include_router(
