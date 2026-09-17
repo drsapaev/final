@@ -2099,7 +2099,7 @@ def test_r19_stale_intent_writer_never_executes(two_workers, monkeypatch, requir
     key = "r19-stale-" + uuid.uuid4().hex
     original = claim.mark_execution_intent
 
-    def paused_writer(user_id, k, owner_token=None):
+    def paused_writer(user_id, k, owner_token=None, tokenless_marker=None):
         # A resumes after B acquired the expired lease and left an unknown
         # outcome. This boundary is AFTER dispatch's previous renew check.
         fake.store[nkey("1", key, "claim")] = "attempt-B"
@@ -2392,3 +2392,79 @@ def test_known_outcome_cleanup_never_deletes_foreign_marker():
     fake.store[claim._intent_key("1", "k4")] = "attempt-T"
     claim.clear_execution_intent_owned("1", "k4", "attempt-T")
     assert claim._intent_key("1", "k4") not in fake.store
+
+    # codex PR 3319 P1: unique per-attempt tokenless markers. Attempt A's
+    # cleanup (marker m-A) must never delete attempt B's marker (m-B), and
+    # the historical shared "1" fallback must not match unique markers.
+    fake.store[claim._intent_key("1", "k5")] = "marker-B"
+    claim.clear_execution_intent_owned("1", "k5", "marker-A")
+    assert fake.store[claim._intent_key("1", "k5")] == "marker-B"
+    fake.store[claim._intent_key("1", "k6")] = "marker-A"
+    claim.clear_execution_intent_owned("1", "k6", "marker-A")
+    assert claim._intent_key("1", "k6") not in fake.store
+    fake.store[claim._intent_key("1", "k7")] = "marker-B"
+    claim.clear_execution_intent_owned("1", "k7", None)
+    assert fake.store[claim._intent_key("1", "k7")] == "marker-B"
+
+
+def test_tokenless_lost_set_response_cleans_own_marker(monkeypatch):
+    """codex PR 3319 P2: a tokenless SET whose RESPONSE is lost (Redis
+    applied the write, the attempt saw a transport error) previously left
+    the anonymous marker for a full TTL with no outcome — a recovery retry
+    received a false idempotency_uncertain_outcome for an operation that
+    never ran. The 409 branch now cleans THIS attempt's unique marker."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 0.0)
+    idem_module._local_execution_intents.clear()
+
+    class _LostSetResponseRedis(_RecoverableOutageRedis):
+        """The intent SET lands, then raises — the attempt sees failure."""
+
+        def set(self, key, value, nx=False, xx=False, ex=None):
+            result = super().set(key, value, nx=nx, xx=xx, ex=ex)
+            if nx and key.endswith(":intent"):
+                raise ConnectionError("simulated lost SET response")
+            return result
+
+    fake = _LostSetResponseRedis()
+    saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    idem_module._distributed_claim = _wire_outage_claim(fake)
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9012
+    )
+    try:
+        key = "pr3319-lost-set-response"
+        intent_key = nkey("1", key, "intent")
+
+        counter = {"calls": 0}
+        client = TestClient(_make_app(counter), raise_server_exceptions=False)
+
+        original_local_exists = idem_module._local_execution_intent_exists
+
+        def _recovering_local_exists(user_id, key_):
+            fake.down = False
+            return original_local_exists(user_id, key_)
+
+        monkeypatch.setattr(
+            idem_module, "_local_execution_intent_exists", _recovering_local_exists
+        )
+
+        response = client.post(
+            "/echo", headers={**auth_headers("1"), "Idempotency-Key": key}
+        )
+
+        assert response.status_code == 409, response.text
+        assert counter["calls"] == 0, "the handler must never run after a lost SET"
+        assert intent_key not in fake.store, (
+            "the landed own marker must be cleaned by the 409 branch so the "
+            "recovery retry does not face a false unknown-outcome"
+        )
+        assert nkey("1", key, "claim") not in fake.store
+    finally:
+        idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
+        idem_module._local_execution_intents.clear()
+        monkeypatch.undo()

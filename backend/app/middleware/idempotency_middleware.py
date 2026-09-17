@@ -746,7 +746,13 @@ class DistributedIdempotencyClaim:
     def _intent_key(user_id: int | str, key: str) -> str:
         return f"idem:{user_id}:{key}:intent"
 
-    def mark_execution_intent(self, user_id: int | str, key: str, owner_token: str | None = None) -> bool:
+    def mark_execution_intent(
+        self,
+        user_id: int | str,
+        key: str,
+        owner_token: str | None = None,
+        tokenless_marker: str | None = None,
+    ) -> bool:
         """Confirm an intent without overwriting another attempt's outcome.
 
         Owner-bound calls atomically check the current lease AND the existing
@@ -754,8 +760,12 @@ class DistributedIdempotencyClaim:
         for optional Redis: this is not a transport outage eligible for the
         local fallback. Transport errors retain the existing bool contract.
 
-        Token-less legacy callers may only INSERT an absent marker. The
-        dispatch path supplies its acquired token whenever it owns a claim.
+        Token-less callers may only INSERT an absent marker. The dispatch
+        path supplies its acquired token whenever it owns a claim and a
+        UNIQUE ``tokenless_marker`` otherwise (PR 3319, codex P1): a shared
+        anonymous value would let one degraded attempt's cleanup delete
+        another attempt's marker. Direct legacy callers without a marker
+        keep the historical shared value.
         """
         confirmed = False
         if self._ensure_available() and self._client is not None:
@@ -779,7 +789,7 @@ class DistributedIdempotencyClaim:
                     self._run(
                         self._client.set,
                         self._intent_key(user_id, key),
-                        "1",
+                        tokenless_marker or _TOKENLESS_INTENT_VALUE,
                         nx=True,
                         ex=self._ttl,
                     )
@@ -989,6 +999,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         claim = get_distributed_claim()
         claim_acquired = True
         claim_token: str | None = None
+        # PR 3319 (codex P1): уникальное значение маркера tokenless-попытки.
+        # Анонимный "1" не доказывает владение: cleanup деградировавшей
+        # попытки мог удалить маркер другой tokenless-попытки. UUID делает
+        # compare-and-delete точным для tokenless-пути.
+        tokenless_marker: str | None = None
 
         # Codex R7 #3092 (P1): fail closed when coordination is REQUIRED
         # (explicit IDEMPOTENCY_REDIS_URL) but unavailable. Degrading to the
@@ -1456,10 +1471,20 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # после истечения lease приводил к повторному исполнению записи
                 # (дубликаты визитов/счетов/очереди).
                 try:
+                    if not (claim_acquired and claim_token is not None):
+                        # PR 3319 (codex P1): unique anonymous marker — the
+                        # cleanup of THIS attempt can then only delete a
+                        # marker this attempt wrote.
+                        tokenless_marker = uuid.uuid4().hex
                     intent_confirmed = claim.mark_execution_intent(
                         user_id,
                         idempotency_key,
-                        owner_token=claim_token if (claim_acquired and claim_token is not None) else None,
+                        owner_token=(
+                            claim_token
+                            if (claim_acquired and claim_token is not None)
+                            else None
+                        ),
+                        tokenless_marker=tokenless_marker,
                     )
                 except _IntentClaimLost:
                     # Keep the same key: another attempt may still be running
@@ -1524,9 +1549,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # исполнять поверх чужого intent-маркера: SET NX сообщил,
                     # что ключ уже охраняется другой попыткой (исполняющейся
                     # или с неизвестным исходом — защита R9). Отказ
-                    # НЕИСПОЛНЯЮЩИЙ 409; распределённый маркер чужой попытки
-                    # не трогаем (своего нет — SET NX не записал), локальный
-                    # mirror снимаем как созданный этой попыткой.
+                    # НЕИСПОЛНЯЮЩИЙ 409; ниже убирается маркер ЭТОЙ попытки
+                    # (уникальный tokenless_marker — чужой не задевается).
                     logger.warning(
                         "Idempotency tokenless attempt refused over a foreign intent marker: "
                         "user=%s key=%s path=%s",
@@ -1534,7 +1558,15 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         idempotency_key,
                         request.url.path,
                     )
-                    _clear_local_execution_intent(user_id, idempotency_key)
+                    # PR 3319 (codex P2): False означает и NX-конфликт, и
+                    # потерянный транспортный ответ SET (маркер мог ДОЗЕМЛИТЬСЯ).
+                    # Убираем маркер ЭТОЙ попытки (уникальное значение — чужой
+                    # маркер не задевается) и локальный mirror: повтор после
+                    # восстановления не получает ложный uncertain-outcome для
+                    # никогда не исполнявшейся операции.
+                    claim.clear_execution_intent_owned(
+                        user_id, idempotency_key, tokenless_marker
+                    )
                     _cancel_lease()
                     return Response(
                         status_code=409,
@@ -1642,7 +1674,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         (
                             claim_token
                             if (claim_acquired and claim_token is not None)
-                            else None
+                            else tokenless_marker
                         ),
                     )
                 else:
@@ -1669,14 +1701,14 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             if claim is not None and claim.try_available():
                 # PR 3319: ownership-guarded known-outcome cleanup — see the
                 # success path above; a degraded attempt removes only its own
-                # anonymous marker, never a foreign attempt's intent.
+                # unique marker, never a foreign attempt's intent.
                 claim.clear_execution_intent_owned(
                     user_id,
                     idempotency_key,
                     (
                         claim_token
                         if (claim_acquired and claim_token is not None)
-                        else None
+                        else tokenless_marker
                     ),
                 )
             else:
