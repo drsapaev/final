@@ -5322,6 +5322,11 @@ const en = {
     qs_eff_error: 'Failed to load the effective settings report.',
     qs_eff_loading: 'Loading report...',
     qs_eff_refresh: 'Refresh report',
+    qs_eff_department_mixed_title: 'Department settings (display-only; live fields marked)',
+    qs_eff_owner_inactive: 'doctor inactive',
+    qs_eff_owner_max_per_day: 'Daily cap: {value}',
+    qs_eff_day_inactive_badge: 'day deactivated (historical row)',
+    qs_eff_default_tag_note: 'No tag selected: clinic-level values are shown for the «default» key — values may differ per tag.',
 
     // ─── PaymentProviderSettings (admin2.pps_*) ────────────────────────────
     pps_loading_message: 'Загрузка настроек...',

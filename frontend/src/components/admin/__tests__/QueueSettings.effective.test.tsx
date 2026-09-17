@@ -18,6 +18,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import i18n from '@/i18n';
 import QueueSettings from '../QueueSettings';
 import { api } from '@/api/client';
 import {
@@ -117,6 +118,21 @@ const baseReport = {
       source: 'day_snapshot',
       note: 'Снимок действующего дня заморожен при создании.',
     },
+    {
+      daily_queue_id: 10,
+      day: '2026-09-17',
+      specialist_id: 78,
+      queue_resource_id: null,
+      queue_tag: 'derm_old',
+      active: false,
+      opened_at: null,
+      start_number: 1,
+      online_start_time: null,
+      online_end_time: null,
+      max_online_entries: 0,
+      source: 'day_snapshot',
+      note: 'Снимок деактивированного дня (историческая строка).',
+    },
   ],
 };
 
@@ -149,7 +165,7 @@ const scopedReport = {
       {
         doctor_id: 78,
         specialty: 'cardiology',
-        active: true,
+        active: false,
         start_number_online: 1,
         max_online_per_day: 0,
         effective_start_number: 10,
@@ -178,8 +194,22 @@ const profilesFixture = [
     color: 'synthetic-accent',
     queue_tags: ['cardiology'],
     settings_key: 'cardiology',
+    is_active: true,
   },
 ];
+
+// Mirrors production: archived profiles only come back when the panel
+// requests active_only=false (PR 3291 P2-3); the backend default keeps
+// them hidden.
+const archivedProfileFixture = {
+  key: 'legacy_derm',
+  title_ru: 'Легаси-дерматология SYNTH',
+  icon: 'Sparkles',
+  color: 'synthetic-accent',
+  queue_tags: ['legacy_tag'],
+  settings_key: 'legacy_derm',
+  is_active: false,
+};
 
 const doctorsFixture = [
   {
@@ -236,7 +266,7 @@ describe('queueSettingsEffective SSOT normalizer (RQ-23.ui)', () => {
     expect(live?.live).toBe(true);
     expect(live?.snapshot_field).toBe('DailyQueue.online_start_time');
     expect(parsed.department).toBeNull();
-    expect(parsed.active_day).toHaveLength(1);
+    expect(parsed.active_day).toHaveLength(2);
   });
 
   it('degrades to an honest empty report instead of crashing on garbage', () => {
@@ -272,13 +302,31 @@ describe('QueueSettings effective-settings report panel (RQ-23.ui, S-20)', () =>
         return { data: settingsFixture };
       }
       if (url.startsWith('/queues/profiles')) {
-        return { data: { profiles: profilesFixture } };
+        // Production semantics: archived profiles come back only for
+        // active_only=false.
+        const includeArchived = String(url).includes('active_only=false');
+        return {
+          data: {
+            profiles: includeArchived
+              ? [...profilesFixture, archivedProfileFixture]
+              : profilesFixture,
+          },
+        };
       }
       if (url.startsWith('/admin/doctors')) {
         return { data: doctorsFixture };
       }
       if (url.startsWith('/admin/departments')) {
-        return { data: departmentsFixture };
+        // PRODUCTION ENVELOPE (admin_departments list_departments):
+        // { success, data, count } — a bare array would mask the P1
+        // envelope bug this suite must catch (PR 3291).
+        return {
+          data: {
+            success: true,
+            data: departmentsFixture,
+            count: departmentsFixture.length,
+          },
+        };
       }
       return { data: {} };
     });
@@ -371,9 +419,26 @@ describe('QueueSettings effective-settings report panel (RQ-23.ui, S-20)', () =>
         throw new Error('report unavailable');
       }
       if (url.startsWith('/admin/queue/settings')) return { data: settingsFixture };
-      if (url.startsWith('/queues/profiles')) return { data: { profiles: profilesFixture } };
+      if (url.startsWith('/queues/profiles')) {
+        const includeArchived = String(url).includes('active_only=false');
+        return {
+          data: {
+            profiles: includeArchived
+              ? [...profilesFixture, archivedProfileFixture]
+              : profilesFixture,
+          },
+        };
+      }
       if (url.startsWith('/admin/doctors')) return { data: doctorsFixture };
-      if (url.startsWith('/admin/departments')) return { data: departmentsFixture };
+      if (url.startsWith('/admin/departments')) {
+        return {
+          data: {
+            success: true,
+            data: departmentsFixture,
+            count: departmentsFixture.length,
+          },
+        };
+      }
       return { data: {} };
     });
 
@@ -381,6 +446,222 @@ describe('QueueSettings effective-settings report panel (RQ-23.ui, S-20)', () =>
     const region = await getEffectiveRegion();
     expect(
       await within(region).findByText(/Не удалось загрузить отчёт эффективных настроек/),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('QueueSettings panel fixes for PR 3291 review findings (owner audit, current main)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url.startsWith('/admin/queue/settings/effective')) {
+        return {
+          data: url.includes('department_id=2') ? scopedReport : baseReport,
+        };
+      }
+      if (url.startsWith('/admin/queue/settings')) {
+        return { data: settingsFixture };
+      }
+      if (url.startsWith('/queues/profiles')) {
+        const includeArchived = String(url).includes('active_only=false');
+        return {
+          data: {
+            profiles: includeArchived
+              ? [...profilesFixture, archivedProfileFixture]
+              : profilesFixture,
+          },
+        };
+      }
+      if (url.startsWith('/admin/doctors')) {
+        return { data: doctorsFixture };
+      }
+      if (url.startsWith('/admin/departments')) {
+        return {
+          data: {
+            success: true,
+            data: departmentsFixture,
+            count: departmentsFixture.length,
+          },
+        };
+      }
+      return { data: {} };
+    });
+  });
+
+  it('P1: fills the department selector from the production { success, data, count } envelope', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await getEffectiveRegion();
+
+    await user.click(screen.getByRole('button', { name: 'Область: отделение' }));
+    expect(await screen.findByRole('option', { name: 'Кардиология SYNTH' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Дерматология SYNTH' })).toBeInTheDocument();
+  });
+
+  it('P2-1: ignores a stale report response that resolves after a newer scope request', async () => {
+    let effectiveCalls = 0;
+    let releaseStale!: (value: { data: unknown }) => void;
+    const staleGate = new Promise<{ data: unknown }>((resolve) => {
+      releaseStale = resolve;
+    });
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url.startsWith('/admin/queue/settings/effective')) {
+        effectiveCalls += 1;
+        // Call 2 = department scope (held pending), call 3 = tag scope (fast).
+        if (effectiveCalls === 2) return await staleGate;
+        return { data: baseReport };
+      }
+      if (url.startsWith('/admin/queue/settings')) return { data: settingsFixture };
+      if (url.startsWith('/queues/profiles')) return { data: { profiles: profilesFixture } };
+      if (url.startsWith('/admin/doctors')) return { data: doctorsFixture };
+      if (url.startsWith('/admin/departments')) {
+        return {
+          data: {
+            success: true,
+            data: departmentsFixture,
+            count: departmentsFixture.length,
+          },
+        };
+      }
+      return { data: {} };
+    });
+
+    const user = userEvent.setup();
+    renderPanel();
+    const region = await getEffectiveRegion();
+
+    await user.click(screen.getByRole('button', { name: 'Область: отделение' }));
+    await user.click(await screen.findByRole('option', { name: 'Дерматология SYNTH' }));
+    await waitFor(() => expect(effectiveCalls).toBe(2));
+
+    await user.click(screen.getByRole('button', { name: 'Область: тег' }));
+    await user.click(await screen.findByRole('option', { name: 'cardiology' }));
+    await waitFor(() => expect(effectiveCalls).toBe(3));
+
+    // Release the STALE department-scope response after the newer one won.
+    releaseStale({ data: scopedReport });
+    await waitFor(() => {
+      expect(within(region).queryByText(/Загрузка отчёта/)).not.toBeInTheDocument();
+    });
+
+    // The stale scoped payload must NOT win the race.
+    expect(within(region).queryByText('Д-р Синтетический')).toBeNull();
+  });
+
+  it('P2-2: refetches the effective report after a successful save', async () => {
+    mockedPut.mockResolvedValue({
+      data: { message: 'Настройки сохранены', settings: settingsFixture },
+    });
+    const user = userEvent.setup();
+    renderPanel();
+    await getEffectiveRegion();
+    const effectiveGetsBefore = mockedGet.mock.calls.filter(
+      ([url]) => String(url).includes('/admin/queue/settings/effective'),
+    ).length;
+
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => {
+      const effectiveGetsAfter = mockedGet.mock.calls.filter(
+        ([url]) => String(url).includes('/admin/queue/settings/effective'),
+      ).length;
+      expect(effectiveGetsAfter).toBeGreaterThan(effectiveGetsBefore);
+    });
+  });
+
+  it('P2-3: keeps archived-direction tags reachable while hiding their settings cards', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await getEffectiveRegion();
+
+    await user.click(screen.getByRole('button', { name: 'Область: тег' }));
+    expect(await screen.findByRole('option', { name: 'legacy_tag' })).toBeInTheDocument();
+    expect(screen.queryByText('Легаси-дерматология SYNTH')).toBeNull();
+  });
+
+  it('P2-4: marks inactive day rows honestly instead of a blanket frozen badge', async () => {
+    renderPanel();
+    const region = await getEffectiveRegion();
+
+    const inactiveRow = within(region).getByText('derm_old').closest('[data-day-row]');
+    expect(inactiveRow).not.toBeNull();
+    expect(
+      within(inactiveRow as HTMLElement).getByText('день деактивирован (историческая строка)'),
+    ).toBeInTheDocument();
+    expect(
+      within(inactiveRow as HTMLElement).queryByText('заморожено при создании'),
+    ).toBeNull();
+  });
+
+  it('P2-5: labels clinic-level effective values as a default-key lookup when no tag is selected', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await getEffectiveRegion();
+
+    await user.click(screen.getByRole('button', { name: 'Область: отделение' }));
+    await user.click(await screen.findByRole('option', { name: 'Дерматология SYNTH' }));
+
+    const region = await getEffectiveRegion();
+    expect(await within(region).findByTestId('qs-eff-default-tag-note')).toBeInTheDocument();
+  });
+
+  it('P2-6 and P2-7: mark inactive doctors and surface the daily cap on owner/resource rows', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await getEffectiveRegion();
+
+    await user.click(screen.getByRole('button', { name: 'Область: отделение' }));
+    await user.click(await screen.findByRole('option', { name: 'Дерматология SYNTH' }));
+    await user.click(screen.getByRole('button', { name: 'Область: тег' }));
+    await user.click(await screen.findByRole('option', { name: 'cardiology' }));
+
+    const region = await getEffectiveRegion();
+    const ownerRow = within(region).getByText('Д-р Синтетический').closest('[data-owner-row]');
+    expect(ownerRow).not.toBeNull();
+    expect(within(ownerRow as HTMLElement).getByText('Лимит/день: 25')).toBeInTheDocument();
+
+    const inactiveRow = within(region).getByText('Д-р Второй SYNTH').closest('[data-owner-row]');
+    expect(inactiveRow).not.toBeNull();
+    expect(within(inactiveRow as HTMLElement).getByText('врач неактивен')).toBeInTheDocument();
+
+    const resourceRow = within(region).getByText('УЗИ-кабинет SYNTH').closest('[data-resource-row]');
+    expect(resourceRow).not.toBeNull();
+    expect(within(resourceRow as HTMLElement).getByText('Лимит/день: 40')).toBeInTheDocument();
+  });
+
+  it('P2-8: renders raw backend notes for ru and suppresses them for other locales', async () => {
+    renderPanel();
+    const region = await getEffectiveRegion();
+    // ru: the raw backend note is shown as-is.
+    expect(within(region).getAllByText(/DailyQueue\.online_end_time/).length).toBeGreaterThan(0);
+
+    try {
+      await i18n.changeLanguage('en');
+      expect(within(region).queryByText(/DailyQueue\.online_end_time/)).toBeNull();
+      expect(within(region).getAllByText('not applied').length).toBeGreaterThan(0);
+    } finally {
+      await i18n.changeLanguage('ru');
+    }
+  });
+
+  it('P2-9: wraps the scope controls on narrow panels', async () => {
+    renderPanel();
+    const controls = await screen.findByTestId('qs-eff-controls');
+    expect(controls.className).toContain('admin-flex-gap-12-wrap');
+  });
+
+  it('P2-10: re-titles the department block when live fields exist inside it', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await getEffectiveRegion();
+
+    await user.click(screen.getByRole('button', { name: 'Область: отделение' }));
+    await user.click(await screen.findByRole('option', { name: 'Дерматология SYNTH' }));
+
+    const region = await getEffectiveRegion();
+    expect(
+      await within(region).findByText(
+        /Настройки отделения \(display-only; живые поля помечены\)/,
+      ),
     ).toBeInTheDocument();
   });
 });

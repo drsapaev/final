@@ -5322,6 +5322,11 @@ const kk = {
     qs_eff_error: 'Тиімді параметрлер есебін жүктей алмадық.',
     qs_eff_loading: 'Есеп жүктелуде...',
     qs_eff_refresh: 'Есепті жаңарту',
+    qs_eff_department_mixed_title: 'Бөлімше параметрлері (тек көрсетуге арналған; тірі өрістер белгіленген)',
+    qs_eff_owner_inactive: 'дәрігер белсенді емес',
+    qs_eff_owner_max_per_day: 'Күндік лимит: {value}',
+    qs_eff_day_inactive_badge: 'күн өшірілген (тарихи жол)',
+    qs_eff_default_tag_note: 'Тег таңдалмаған: клиникалық мәндер «default» кілті бойынша көрсетілген — тегтер бойынша мәндер өзгеруі мүмкін.',
 
     // ─── PaymentProviderSettings (admin2.pps_*) ────────────────────────────
     pps_loading_message: 'Загрузка настроек...',

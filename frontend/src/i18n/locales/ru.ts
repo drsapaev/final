@@ -5446,6 +5446,11 @@ const ru = {
     qs_eff_error: 'Не удалось загрузить отчёт эффективных настроек.',
     qs_eff_loading: 'Загрузка отчёта...',
     qs_eff_refresh: 'Обновить отчёт',
+    qs_eff_department_mixed_title: 'Настройки отделения (display-only; живые поля помечены)',
+    qs_eff_owner_inactive: 'врач неактивен',
+    qs_eff_owner_max_per_day: 'Лимит/день: {value}',
+    qs_eff_day_inactive_badge: 'день деактивирован (историческая строка)',
+    qs_eff_default_tag_note: 'Тег не выбран: клинические значения показаны для ключа «default» — по тегам значения могут различаться.',
 
     // ─── PaymentProviderSettings (admin2.pps_*) ────────────────────────────
     pps_loading_message: 'Загрузка настроек...',
