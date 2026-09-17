@@ -347,7 +347,7 @@ explicit:
   `login_attempts` rows stay anonymized (a downgrade restores PAIRS,
   not per-row audit links).
 - **Pair-row locking before the resolution reads (post-merge
-  hardening, E-060).** The three User rows and their linked Doctor
+  hardening, E-061).** The three User rows and their linked Doctor
   rows are locked `FOR UPDATE` — users first, then doctors, each
   ordered by id — BEFORE the resolution SELECT and every guard runs
   (PostgreSQL; the SQLite scratch harness skips with a printed note,

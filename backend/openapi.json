@@ -6118,8 +6118,8 @@
         "tags": [
           "qr-queue"
         ],
-        "summary": "Поддерживаемые способы QR-входа направления (RQ-16.b)",
-        "description": "Read-only contract surface: explicitly enumerate the QR-entry\nmethods the server supports for the direction addressed by its\nQR-visible profile key.",
+        "summary": "Поддерживаемые способы QR-входа направления (RQ-16.b/RQ-16.d)",
+        "description": "Read-only contract surface: explicitly enumerate the QR-entry\nmethods the server supports for the direction addressed by its\nQR-visible profile key. ``permanent_address`` is dynamic per\ndirection since RQ-16.d (E-055 §8).",
         "operationId": "get_direction_entry_methods_api_v1_queue_directions__profile_key__entry_methods_get",
         "parameters": [
           {
@@ -6142,6 +6142,125 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queue/admin/directions/{profile_key}/public-address/provision": {
+      "post": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Provision постоянного публичного адреса направления (RQ-16.d)",
+        "description": "Admin provision/enable of the permanent public address (E-055 §3):\nthe server generates the opaque code ONCE and persists it forever.\nIdempotent — a re-provision returns the SAME address (created=False);\narchive/reactivate cycles never regenerate (E-055 §7). Manual address\nediting and rotation are out of scope (E-055 §6).",
+        "operationId": "provision_public_address_api_v1_queue_admin_directions__profile_key__public_address_provision_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicAddressProvisionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Зарезервированный ключ направления или исчерпаны попытки генерации"
+          },
+          "401": {
+            "description": "Требуется аутентификация"
+          },
+          "403": {
+            "description": "Только роль Admin"
+          },
+          "404": {
+            "description": "Направление не найдено"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queue/public/{public_code}/start-session": {
+      "post": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Начало короткоживущей сессии по постоянному адресу направления (RQ-16.d, анонимный путь)",
+        "description": "ONE canonical anonymous resolve/start operation (E-055 §9):\n\npublic_code -> registry -> QueueProfile -> visibility/eligibility ->\nanonymous rate limit -> short-lived session -> the existing\nQueueJoin session flow. No second join mechanism: every rule stays\nin the canonical resolver, and the minted direction-scoped token is\nbound to THIS direction for the session's whole short life.",
+        "operationId": "start_public_direction_session_api_v1_queue_public__public_code__start_session_post",
+        "parameters": [
+          {
+            "name": "public_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Public Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicDirectionStartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Честный отказ существующего сессионного контракта (окно записи и т.п.)"
+          },
+          "404": {
+            "description": "Анонимный отказ (S-15): направление недоступно — unknown/archived/hidden/deleted/retired неразличимы",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Направление недоступно"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit превышен (анонимный путь)"
           },
           "422": {
             "description": "Validation Error",
@@ -42392,6 +42511,138 @@
             "OAuth2PasswordBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/patient-access/request-otp": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Request Patient Otp",
+        "description": "Отправить OTP для входа пациента. Ответ номер-нейтрален (anti-enum).",
+        "operationId": "request_patient_otp_api_v1_patient_access_request_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Request Patient Otp Api V1 Patient Access Request Otp Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patient-access/verify-otp": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Verify Patient Otp",
+        "description": "Проверить OTP -> одноразовый verification_grant (единый ответ при любой неудаче).",
+        "operationId": "verify_patient_otp_api_v1_patient_access_verify_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientOtpVerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Verify Patient Otp Api V1 Patient Access Verify Otp Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patient-access/login": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Patient Login",
+        "description": "phone + verification_grant -> JWT канонического User(role=Patient).\n\nFail-closed: 0 или >1 активных verified Patient-пользователей на номер ->\nединый generic 401 (endpoint не становится каталогом пациентов).",
+        "operationId": "patient_login_api_v1_patient_access_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Patient Login Api V1 Patient Access Login Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/queue/reorder/reorder": {
@@ -90282,6 +90533,24 @@
         "title": "PatientEntriesResponse",
         "description": "Ответ с записями пациента за день"
       },
+      "PatientLoginRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "verification_grant": {
+            "type": "string",
+            "title": "Verification Grant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "verification_grant"
+        ],
+        "title": "PatientLoginRequest"
+      },
       "PatientOnboardingAuthRequest": {
         "properties": {
           "initData": {
@@ -90692,6 +90961,48 @@
           "safeNextAction"
         ],
         "title": "PatientOnboardingSubmitResponse"
+      },
+      "PatientOtpRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone"
+        ],
+        "title": "PatientOtpRequest"
+      },
+      "PatientOtpVerifyRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "code"
+        ],
+        "title": "PatientOtpVerifyRequest"
       },
       "PatientProfileOut": {
         "properties": {
@@ -94496,6 +94807,126 @@
         ],
         "title": "ProvidersResponse",
         "description": "Список доступных провайдеров"
+      },
+      "PublicAddressProvisionResponse": {
+        "properties": {
+          "profile_id": {
+            "type": "integer",
+            "title": "Profile Id",
+            "description": "QueueProfile.id — a separate id space (D-01)"
+          },
+          "direction_key": {
+            "type": "string",
+            "title": "Direction Key",
+            "description": "Canonical profile key the address is bound to"
+          },
+          "public_code": {
+            "type": "string",
+            "title": "Public Code",
+            "description": "Opaque random 12-char lowercase public code (E-055 §2) — a PUBLIC identifier, never a secret and never derived from the direction title or key"
+          },
+          "url_path": {
+            "type": "string",
+            "title": "Url Path",
+            "description": "The permanent frontend route: /q/<public_code>"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created",
+            "description": "True when a NEW code was generated now; False when the direction already had its one active address (E-055 §3: generated ONCE, re-provision returns the SAME address)"
+          },
+          "provisioned_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provisioned At",
+            "description": "Address creation timestamp (ISO-8601)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "direction_key",
+          "public_code",
+          "url_path",
+          "created"
+        ],
+        "title": "PublicAddressProvisionResponse",
+        "description": "Result of the Admin provision/enable of a permanent address."
+      },
+      "PublicDirectionAddressInfo": {
+        "properties": {
+          "profile_id": {
+            "type": "integer",
+            "title": "Profile Id",
+            "description": "QueueProfile.id — a separate id space (D-01)"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Canonical direction key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Public display title (title_ru preferred)"
+          },
+          "public_code": {
+            "type": "string",
+            "title": "Public Code",
+            "description": "The canonical lowercase public code of the address"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "key",
+          "title",
+          "public_code"
+        ],
+        "title": "PublicDirectionAddressInfo",
+        "description": "The direction a permanent-address session is scoped to."
+      },
+      "PublicDirectionStartResponse": {
+        "properties": {
+          "session_token": {
+            "type": "string",
+            "title": "Session Token"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "permanent_address": {
+            "type": "boolean",
+            "title": "Permanent Address",
+            "description": "Always True on this surface (the address is permanent)"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/PublicDirectionAddressInfo"
+          },
+          "queue_info": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Queue Info",
+            "description": "The same token-info shape the session-QR flow consumes, with selectable_specialists narrowed to this direction's eligible owners (RQ-09.b eligibility contract)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_token",
+          "expires_at",
+          "permanent_address",
+          "direction",
+          "queue_info"
+        ],
+        "title": "PublicDirectionStartResponse",
+        "description": "Short-lived session opened through the permanent public address.\n\nThe ``session_token`` drives the EXISTING QueueJoin flow\n(``/queue/join/:token`` semantics preserved); the internal\ndirection-scoped QR token is deliberately NOT returned."
       },
       "PushDeviceErrorDetail": {
         "properties": {

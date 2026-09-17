@@ -10,11 +10,13 @@ Contract pinned RED-first by this module:
    space is exactly {session_qr, permanent_address, view_only}.
 2. A QR-visible active direction (is_active AND show_on_qr_page) answers
    200 with ALL THREE methods present (explicit enumeration — the client
-   never guesses an absent method) and the honest flags of this slice:
-   session_qr=True (short-lived protected session path; RQ-11 TTL
-   honesty), permanent_address=False (slug model + address form are the
-   OPEN POINT of RQ-16.c — not silently claimed), view_only=True (D-01 §4:
-   an overview never creates its own numbering).
+   never guesses an absent method) and honest flags: session_qr=True
+   (short-lived protected session path; RQ-11 TTL honesty),
+   permanent_address=False for a direction WITHOUT a provisioned
+   address (since RQ-16.d the flag is dynamic per-direction, E-055 §8 —
+   the provisioned flip is pinned by the RQ-16.d runtime suite),
+   view_only=True (D-01 §4: an overview never creates its own
+   numbering).
 3. Archived (is_active=False), hidden (show_on_qr_page=False) and unknown
    keys refuse 404 with the SAME anonymous detail — archived directions
    block new joins and must not leak existence (S-15).
@@ -298,8 +300,9 @@ def test_qr_visible_direction_lists_all_three_methods(pg_client, seeded_directio
     )
     assert flags["session_qr"] is True
     assert flags["permanent_address"] is False, (
-        "permanent address must NOT be claimed before RQ-16.c/.d "
-        "(the slug model and address form are the OPEN POINT)"
+        "this direction has NO provisioned public address — the dynamic "
+        "RQ-16.d flag must stay False (no backfill, E-055 §3); the "
+        "provisioned flip is pinned by the RQ-16.d runtime suite"
     )
     assert flags["view_only"] is True
 

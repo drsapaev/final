@@ -151,3 +151,67 @@ describe('RQ-05.b: api/registrar.ts types the catalog DTO', () => {
     expect(source).toContain('F-04');
   });
 });
+
+// =====================================================================
+// 4. RQ-08.a: серверная eligibility в каталоге (UI не требует alias-списков)
+// =====================================================================
+
+describe('RQ-08.a: backend emits accepted_specialties computed by the RQ-05.a gate helper', () => {
+  const readSerializer = () => fs.readFileSync(backendSerializerPath, 'utf8');
+
+  it('imports the SAME helper the cart gate uses (literal UI/server parity)', () => {
+    const source = readSerializer();
+    expect(source).toContain('from app.api.v1.endpoints.registrar_wizard._helpers import');
+    expect(source).toContain('_accepted_specialty_variants_for_department_key');
+  });
+
+  it('emits per-service accepted_specialties from the department_key', () => {
+    const source = readSerializer();
+    expect(source).toContain('service_data["accepted_specialties"] =');
+    expect(source).toContain('_accepted_specialty_variants_for_department_key(');
+  });
+
+  it('keeps the RQ-08.a traceability marker', () => {
+    expect(readSerializer()).toContain('RQ-08.a');
+  });
+});
+
+describe('RQ-08.a: frontend consumes the server eligibility set', () => {
+  it('declares accepted_specialties on the catalog DTO', () => {
+    const source = fs.readFileSync(registrarApiPath, 'utf8');
+    const block = source.slice(
+      source.indexOf('export interface RegistrarCatalogService'),
+      source.indexOf('export interface RegistrarServicesResponse'),
+    );
+    expect(block).toContain('accepted_specialties?: string[] | null;');
+  });
+
+  it('transfers accepted_specialties EXPLICITLY in the SSOT adapter (rename breaks compile)', () => {
+    const utils = fs.readFileSync(wizardUtilsPath, 'utf8');
+    // codex P1 #3311 раунд 2: три состояния БЕЗ коллапса — перенос через
+    // transferAcceptedSpecialties (массив | null | undefined).
+    expect(utils).toContain(
+      'accepted_specialties: transferAcceptedSpecialties(entry.accepted_specialties)',
+    );
+    expect(utils).toContain('if (raw === undefined) return undefined;');
+  });
+
+  it('treats explicit null as no-check (all doctors), not as legacy fallback', () => {
+    const utils = fs.readFileSync(wizardUtilsPath, 'utf8');
+    // codex P1 #3311 раунд 2: пустое поле Service.department_key + связь —
+    // гейт не проверяет специальность, UI обязан показать всех врачей.
+    expect(utils).toContain('if (serverAccepted === null) return all;');
+  });
+
+  it('wires the server entry (not the raw key) into filterDoctorsForService in CartStepV2', () => {
+    const cartPath = path.resolve(
+      __dirname,
+      '../../components/wizard/CartStepV2.tsx',
+    );
+    const cart = fs.readFileSync(cartPath, 'utf8');
+    expect(cart).toContain('filterDoctorsForService(normalizedDoctorsData, service)');
+    expect(cart).not.toContain(
+      'filterDoctorsForService(normalizedDoctorsData, serviceDepartmentKey)',
+    );
+  });
+});
