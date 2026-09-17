@@ -4,6 +4,13 @@ from __future__ import annotations
 from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
 )
+
+# Module-level (NOT function-local): the `except PatientPhoneScopeConflict`
+# clause in update_user() resolves this name at exception-handling time. A
+# function-local import would make it a local variable and the clause would
+# raise UnboundLocalError instead of matching (documented by the round-2 CI
+# failure this comment references).
+from app.services.patient_phone_scope import PatientPhoneScopeConflict
 from app.services.user_mgmt._base import *  # noqa: F401, F403
 from app.services.user_mgmt._base import (
     MEDICAL_SPECIALTY_CATALOG_REMEDIATION,
@@ -423,10 +430,15 @@ class CoreMixin(UserManagementServiceMixinBase):
             # (reactivation / role->Patient / verified-phone change).
             profile = user.profile
             if profile is not None:
+                # NOTE: PatientPhoneScopeConflict is NOT imported here — the
+                # module-level import above provides it for the `except`
+                # clause; a function-local import would make the name a
+                # local variable and the except clause would raise
+                # UnboundLocalError (the exact CI failure this comment
+                # documents).
                 from app.core.roles import Roles
                 from app.services.patient_otp_service import normalize_phone
                 from app.services.patient_phone_scope import (
-                    PatientPhoneScopeConflict,
                     ensure_phone_scope_free,
                 )
 
