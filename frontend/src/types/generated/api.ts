@@ -14925,6 +14925,69 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/patient-access/request-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Patient Otp
+         * @description Отправить OTP для входа пациента. Ответ номер-нейтрален (anti-enum).
+         */
+        post: operations["request_patient_otp_api_v1_patient_access_request_otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/verify-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Patient Otp
+         * @description Проверить OTP -> одноразовый verification_grant (единый ответ при любой неудаче).
+         */
+        post: operations["verify_patient_otp_api_v1_patient_access_verify_otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Patient Login
+         * @description phone + verification_grant -> JWT канонического User(role=Patient).
+         *
+         *     Fail-closed: 0 или >1 активных verified Patient-пользователей на номер ->
+         *     единый generic 401 (endpoint не становится каталогом пациентов).
+         */
+        post: operations["patient_login_api_v1_patient_access_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/reorder/reorder": {
         parameters: {
             query?: never;
@@ -31562,6 +31625,13 @@ export type components = {
                 [key: string]: unknown;
             };
         };
+        /** PatientLoginRequest */
+        PatientLoginRequest: {
+            /** Phone */
+            phone: string;
+            /** Verification Grant */
+            verification_grant: string;
+        };
         /** PatientOnboardingAuthRequest */
         PatientOnboardingAuthRequest: {
             /** Initdata */
@@ -31651,6 +31721,20 @@ export type components = {
             messageKey: string;
             /** Safenextaction */
             safeNextAction: string;
+        };
+        /** PatientOtpRequest */
+        PatientOtpRequest: {
+            /** Phone */
+            phone: string;
+            /** Locale */
+            locale?: string | null;
+        };
+        /** PatientOtpVerifyRequest */
+        PatientOtpVerifyRequest: {
+            /** Phone */
+            phone: string;
+            /** Code */
+            code: string;
         };
         /**
          * PatientProfileOut
@@ -64981,6 +65065,111 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    request_patient_otp_api_v1_patient_access_request_otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientOtpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_patient_otp_api_v1_patient_access_verify_otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientOtpVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_login_api_v1_patient_access_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

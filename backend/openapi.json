@@ -42513,6 +42513,138 @@
         ]
       }
     },
+    "/api/v1/patient-access/request-otp": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Request Patient Otp",
+        "description": "Отправить OTP для входа пациента. Ответ номер-нейтрален (anti-enum).",
+        "operationId": "request_patient_otp_api_v1_patient_access_request_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Request Patient Otp Api V1 Patient Access Request Otp Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patient-access/verify-otp": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Verify Patient Otp",
+        "description": "Проверить OTP -> одноразовый verification_grant (единый ответ при любой неудаче).",
+        "operationId": "verify_patient_otp_api_v1_patient_access_verify_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientOtpVerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Verify Patient Otp Api V1 Patient Access Verify Otp Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patient-access/login": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Patient Login",
+        "description": "phone + verification_grant -> JWT канонического User(role=Patient).\n\nFail-closed: 0 или >1 активных verified Patient-пользователей на номер ->\nединый generic 401 (endpoint не становится каталогом пациентов).",
+        "operationId": "patient_login_api_v1_patient_access_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Patient Login Api V1 Patient Access Login Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queue/reorder/reorder": {
       "put": {
         "tags": [
@@ -90401,6 +90533,24 @@
         "title": "PatientEntriesResponse",
         "description": "Ответ с записями пациента за день"
       },
+      "PatientLoginRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "verification_grant": {
+            "type": "string",
+            "title": "Verification Grant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "verification_grant"
+        ],
+        "title": "PatientLoginRequest"
+      },
       "PatientOnboardingAuthRequest": {
         "properties": {
           "initData": {
@@ -90811,6 +90961,48 @@
           "safeNextAction"
         ],
         "title": "PatientOnboardingSubmitResponse"
+      },
+      "PatientOtpRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone"
+        ],
+        "title": "PatientOtpRequest"
+      },
+      "PatientOtpVerifyRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "code"
+        ],
+        "title": "PatientOtpVerifyRequest"
       },
       "PatientProfileOut": {
         "properties": {
