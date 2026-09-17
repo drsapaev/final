@@ -183,6 +183,12 @@ export interface RegistrarCatalogService {
   is_consultation?: boolean;
   /** RQ-05 (F-04): сервер требует выбор врача для этой услуги. */
   requires_doctor: boolean;
+  /**
+   * RQ-08.a: серверные допустимые специальности врача для department_key —
+   * вычислены той же функцией, что и серверный гейт корзины (RQ-05.a).
+   * null — проверка неприменима (у услуги нет department_key).
+   */
+  accepted_specialties?: string[] | null;
   group?: string | null;
   [key: string]: unknown;
 }

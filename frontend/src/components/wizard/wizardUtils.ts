@@ -132,7 +132,33 @@ export interface WizardDoctorRecord {
  * Ключ услуги сначала канонизируется ("dental" → "dentistry"), затем
  * специальность врача сравнивается с каноном и его алиасами; пары вне
  * таблицы сравниваются только на точное совпадение (без подстрок).
+ *
+ * RQ-08.a (родительский критерий RQ-08 «UI не требует alias-списков»):
+ * приоритетный путь — серверная eligibility (`accepted_specialties` из
+ * каталога GET /registrar/services), вычисленная ТОЙ ЖЕ функцией, что и
+ * серверный гейт корзины (RQ-05.a): список в UI и запрет при сохранении
+ * буквально совпадают. Три состояния (codex P1 #3311): массив — фильтр
+ * строго по серверному набору; null — проверка неприменима (пустое поле
+ * Service.department_key — гейт не проверяет, UI показывает всех);
+ * undefined/мусор/[] — легаси-fallback на фронтовую таблицу алиасов
+ * (старые/частичные ответы каталога, вызовы со строковым ключом).
  */
+
+/**
+ * RQ-08.a: источник eligibility для фильтра врачей — либо строковый ключ
+ * отделения (легаси-вызовы), либо запись каталога с серверным набором
+ * допустимых специальностей (приоритетный путь).
+ */
+export type DoctorEligibilityInput =
+  | string
+  | null
+  | undefined
+  | {
+      department_key?: string | null;
+      accepted_specialties?: string[] | null;
+      [key: string]: unknown;
+    };
+
 const _specialtyAliasIndex: Record<string, Set<string>> = Object.fromEntries(
   Object.entries(SPECIALTY_ALIASES).map(([canonical, aliases]) => [
     canonical,
@@ -147,13 +173,41 @@ const _canonicalSpecialtyOf = (rawKey: string): string =>
 
 export const filterDoctorsForService = (
   doctors: Array<WizardDoctorRecord | null | undefined> | null | undefined,
-  serviceDepartmentKey: string | null | undefined,
+  service: DoctorEligibilityInput,
 ): WizardDoctorRecord[] => {
   const all: WizardDoctorRecord[] = Array.isArray(doctors)
     ? doctors.filter((d): d is WizardDoctorRecord => Boolean(d))
     : [];
-  const key = String(serviceDepartmentKey || '').toLowerCase().trim();
+  const entry = typeof service === 'string' ? null : service;
+  const key = String((entry ? entry.department_key : service) || '')
+    .toLowerCase()
+    .trim();
   if (!key) return all;
+
+  // RQ-08.a: ТРИ состояния серверных данных (codex P1 #3311, раунд 2).
+  // null — сервер ЯВНО сказал «проверка неприменима» (пустое поле
+  // Service.department_key; гейт RQ-05.a при accepted is None тоже не
+  // проверяет): показываем ВСЕХ врачей, НЕ фильтруя по link-priority
+  // department_key (иначе спрячем врачей, которых сервер принял бы).
+  const serverAccepted = entry?.accepted_specialties;
+  if (serverAccepted === null) return all;
+  if (Array.isArray(serverAccepted) && serverAccepted.length > 0) {
+    // Серверный набор (тот же код, что гейт корзины RQ-05.a) — приоритетный
+    // путь; UI не зависит от фронтовой alias-таблицы. Пустой массив
+    // невозможен от сервера при заданном поле — трактуем как отсутствие
+    // данных и уходим в fallback (defensive).
+    const acceptedSet = new Set(
+      serverAccepted.map((s) => String(s).toLowerCase().trim()),
+    );
+    return all.filter((doctor) => {
+      const docSpecialty = String(doctor.specialty || '').toLowerCase().trim();
+      if (!docSpecialty) return true; // пустая специальность — как раньше
+      return acceptedSet.has(docSpecialty);
+    });
+  }
+
+  // Fallback: undefined (старый бэкенд, поле отсутствует) / мусор / [] —
+  // прежняя alias-таблица W2-PR2 по ключу отделения.
   const canonicalKey = _canonicalSpecialtyOf(key);
   const accepted = _specialtyAliasIndex[canonicalKey];
   return all.filter((doctor) => {
@@ -916,8 +970,31 @@ export interface WizardCatalogServiceData {
   price?: number;
   is_consultation?: boolean;
   requires_doctor?: boolean;
+  /**
+   * RQ-08.a: ТРИ состояния серверной eligibility:
+   * - string[] — серверный набор допустимых специальностей (гейт-паритет);
+   * - null — сервер ЯВНО сказал «проверка неприменима» (пустое поле
+   *   Service.department_key; гейт RQ-05.a тоже не проверяет — UI показывает
+   *   всех врачей, не фильтруя по link-priority department_key);
+   * - undefined — поле отсутствует (старый бэкенд) — легаси fallback
+   *   на фронтовую alias-таблицу.
+   */
+  accepted_specialties?: string[] | null;
   [key: string]: unknown;
 }
+
+/**
+ * RQ-08.a (codex P1 #3311, раунд 2): перенос ТРЁХ состояний БЕЗ коллапса.
+ * Отсутствие поля (undefined, старый бэкенд) НЕ превращается в null:
+ * null и undefined означают разное поведение фильтра (см. DTO-комментарий).
+ */
+export const transferAcceptedSpecialties = (
+  raw: string[] | null | undefined,
+): string[] | null | undefined => {
+  if (Array.isArray(raw)) return raw;
+  if (raw === undefined) return undefined;
+  return null;
+};
 
 export const wizardServiceFromCatalogEntry = (
   entry: RegistrarCatalogService
@@ -929,6 +1006,10 @@ export const wizardServiceFromCatalogEntry = (
   queue_tag: entry.queue_tag ?? undefined,
   category_code: entry.category_code ?? undefined,
   department_key: entry.department_key ?? undefined,
+  // RQ-08.a: перенос ЯВНО — переименование/смена типа поля в DTO ломает
+  // компиляцию, а не молча возвращает фильтр к фронтовой alias-таблице;
+  // три состояния без коллапса (codex P1 #3311).
+  accepted_specialties: transferAcceptedSpecialties(entry.accepted_specialties),
 });
 
 const DEPARTMENT_NORMALIZED_MAPPING: Record<string, string> = {
