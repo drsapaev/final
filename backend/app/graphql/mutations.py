@@ -238,16 +238,25 @@ class Mutation:
                 )
 
         except HTTPException as exc:
-            detail = str(exc.detail)
+            # E-054 leftover 3: доменные дубли patients несут структурный
+            # detail {code, message} — распознаём по машиночитаемому коду;
+            # строковые детали (легаси и прочие 400/404) матчатся как раньше.
+            raw_detail = exc.detail
+            dup_code = raw_detail.get("code") if isinstance(raw_detail, dict) else None
+            detail = (
+                str(raw_detail.get("message"))
+                if isinstance(raw_detail, dict)
+                else str(raw_detail)
+            )
             if "не найден" in detail or "not found" in detail.lower():
                 return PatientMutationResponse(
                     success=False, message=detail, errors=["PATIENT_NOT_FOUND"]
                 )
-            if "номером телефона" in detail:
+            if dup_code == "patient_phone_exists" or "номером телефона" in detail:
                 return PatientMutationResponse(
                     success=False, message=detail, errors=["PHONE_EXISTS"]
                 )
-            if "документа" in detail:
+            if dup_code == "patient_doc_exists" or "документа" in detail:
                 # Codex P1 (round-15): дубликат doc_number при обновлении
                 return PatientMutationResponse(
                     success=False, message=detail, errors=["DOC_NUMBER_EXISTS"]
