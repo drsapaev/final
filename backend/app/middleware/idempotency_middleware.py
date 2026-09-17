@@ -843,12 +843,17 @@ class DistributedIdempotencyClaim:
     ) -> None:
         """PR 3319: known-outcome cleanup that deletes ONLY the marker this
         attempt wrote. An owning attempt compares against its claim token; a
-        tokenless (optional-degrade) attempt compares against the anonymous
-        "1" value its own SET NX inserted. A foreign marker — another
+        tokenless (optional-degrade) attempt compares against the unique
+        tokenless marker its own SET NX inserted. A foreign marker — another
         attempt's unknown-outcome protection (R9), token-bound or anonymous
         — is never deleted, even when this attempt's Redis view recovered
-        after a degrade. The local per-process mirror is always cleared: it
-        belongs to this attempt by construction."""
+        after a degrade. The local per-process mirror is cleared once the
+        compare-and-delete went through; if the eval ITSELF fails (transport
+        outage) the cleanup outcome is UNVERIFIED — the own marker may have
+        landed despite a lost SET, or a foreign marker may guard the key —
+        so the mirror is kept (re-armed) and the claim enters the reconnect
+        cooldown, leaving the attempt fail-closed (codex #3319 post-merge
+        P2)."""
         token = owner_token or _TOKENLESS_INTENT_VALUE
         if self._client is not None:
             try:
@@ -878,6 +883,24 @@ class DistributedIdempotencyClaim:
                 self._failed_at = 0.0
             except Exception as exc:
                 logger.warning("Idempotency intent owned-cleanup failed: %s", exc)
+                # codex #3319 post-merge P2: unlike the success branch, the
+                # failed eval proves NOTHING about Redis reachability — the
+                # attempt must stay fail-closed. Keep the local intent
+                # mirror: it is the only known-outcome guard the optional
+                # local-degrade path consults while the reconnect cooldown
+                # holds, so a Retry-After retry that skips every distributed
+                # check reconciles (409 uncertain) instead of re-executing
+                # the handler over a foreign attempt's unknown outcome. Flip
+                # the claim into the cooldown explicitly: the direct call
+                # bypasses _run, so without this the stale 'available' view
+                # (the mark's SET NX had just succeeded) would let the very
+                # next request attempt a doomed distributed round-trip and
+                # only then degrade — the deletion of the mirror is what
+                # turned that degrade into a duplicate execution.
+                _mark_local_execution_intent(user_id, key)
+                self._available = False
+                self._failed_at = time.time()
+                return
         _clear_local_execution_intent(user_id, key)
 
     def execution_intent_exists(self, user_id: int | str, key: str) -> bool:
