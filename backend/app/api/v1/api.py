@@ -81,6 +81,7 @@ from app.api.v1.endpoints import (
     online_queue_new,
     password_reset,
     patient_access,
+    patient_activation_admin,
     patients,
     payment_reconciliation,
     payment_settings,
@@ -398,6 +399,11 @@ api_router.include_router(
 # No patient linking here — PR-A2 binds activation tokens to exact Patient.id.
 api_router.include_router(
     patient_access.router, prefix="/patient-access", tags=["patient-access"]
+)
+# Phase 0 PR-A2: registrar-issued activation tokens (Admin|Registrar).
+# Separate file to keep merge pressure off patients.py (parallel RQ track).
+api_router.include_router(
+    patient_activation_admin.router, prefix="/patients", tags=["patients"]
 )
 # Эндпоинты переупорядочения очереди (специализированный функционал)
 api_router.include_router(

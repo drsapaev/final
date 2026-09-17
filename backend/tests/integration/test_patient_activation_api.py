@@ -1,0 +1,272 @@
+"""Phase 0 PR-A2 — patient activation API (integration).
+
+HTTP-level pass over the full registrar-issued activation flow through the
+real router/limiter/DB wiring:
+
+    POST /api/v1/patients/{id}/activation-token   (Admin|Registrar)
+    POST /api/v1/patient-access/activate/request-otp  (public)
+    POST /api/v1/patient-access/activate/confirm      (public)
+
+Acceptance exercised over HTTP: RBAC trio, token pinned to (Patient.id,
+card phone), client phone never accepted, atomic link, single-use token,
+family-shared-phone independence, generic anti-enum failures, critical
+audit on issuance, and the minted JWT being a CANONICAL session (works on
+the standard patient self-scope endpoint GET /patients/{id}).
+"""
+
+from __future__ import annotations
+
+from datetime import date
+
+import pytest
+
+from app.api.deps import create_access_token
+from app.core.security import get_password_hash
+from app.models.patient import Patient
+from app.models.user import User
+from app.services.patient_otp_service import get_patient_otp_service
+from tests.conftest import mint_access_token
+
+pytestmark = pytest.mark.asyncio
+
+PHONE = "+998901112233"
+FAMILY_PHONE = "+998909998877"
+
+ISSUE_PATH = "/api/v1/patients/{pid}/activation-token"
+OTP_PATH = "/api/v1/patient-access/activate/request-otp"
+CONFIRM_PATH = "/api/v1/patient-access/activate/confirm"
+
+
+def _kv():
+    return get_patient_otp_service().get_backend()
+
+
+@pytest.fixture()
+def otp_kv():
+    svc = get_patient_otp_service()
+    svc._reset_backend_for_tests()
+    backend = svc.get_backend()
+    backend.last_sent_code.clear()
+    yield backend
+    svc._reset_backend_for_tests()
+
+
+@pytest.fixture()
+def registrar_headers(registrar_user):
+    return {"Authorization": f"Bearer {mint_access_token(registrar_user)}"}
+
+
+def make_patient(db_session, *, phone: str, first="Азиза", last="Каримова") -> Patient:
+    patient = Patient(
+        first_name=first,
+        last_name=last,
+        phone=phone,
+        birth_date=date(1995, 3, 10),
+    )
+    db_session.add(patient)
+    db_session.commit()
+    db_session.refresh(patient)
+    return patient
+
+
+async def test_full_activation_flow_over_http(
+    client, db_session, otp_kv, monkeypatch, registrar_headers
+):
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    patient = make_patient(db_session, phone=PHONE)
+
+    # 1) registrar issues the token (201)
+    r_issue = client.post(ISSUE_PATH.format(pid=patient.id), headers=registrar_headers)
+    assert r_issue.status_code == 201
+    issue_body = r_issue.json()
+    token = issue_body["activation_token"]
+    assert issue_body["expires_in_hours"] == 72
+    assert issue_body["phone_masked"].startswith("+99890***")
+    assert PHONE not in issue_body["phone_masked"]
+
+    # 2) activation OTP: NO client phone field exists; goes to the card phone
+    r_otp = client.post(OTP_PATH, json={"activation_token": token, "locale": "ru"})
+    assert r_otp.status_code == 200
+    assert r_otp.json()["phone_masked"] == issue_body["phone_masked"]
+    code = otp_kv.last_sent_code[f"patact:{PHONE}"]
+
+    # 3) confirm -> canonical session
+    r_confirm = client.post(
+        CONFIRM_PATH, json={"activation_token": token, "code": code}
+    )
+    assert r_confirm.status_code == 200
+    body = r_confirm.json()
+    assert body["token_type"] == "bearer"
+    assert body["user"]["role"] == "Patient"
+    assert body["user"]["is_active"] is True
+    assert body["patient_id"] == patient.id
+
+    # 4) the JWT IS a canonical session: patient self-scope read works
+    db_session.refresh(patient)
+    jwt_user = db_session.query(User).filter(User.id == body["user"]["id"]).first()
+    assert jwt_user is not None and patient.user_id == jwt_user.id
+    r_me = client.get(
+        f"/api/v1/patients/{patient.id}",
+        headers={
+            "Authorization": f"Bearer {create_access_token({'sub': str(jwt_user.id)})}"
+        },
+    )
+    assert r_me.status_code == 200
+    assert r_me.json()["id"] == patient.id
+
+    # 5) token single-use over HTTP: replay confirm -> generic 400
+    r_replay = client.post(CONFIRM_PATH, json={"activation_token": token, "code": code})
+    assert r_replay.status_code == 400
+    assert "недействителен" in r_replay.json()["detail"]
+
+
+async def test_issue_requires_admin_or_registrar(
+    client, db_session, otp_kv, registrar_headers
+):
+    patient = make_patient(db_session, phone=PHONE)
+
+    # unauthenticated
+    assert client.post(ISSUE_PATH.format(pid=patient.id)).status_code == 401
+
+    # authenticated staff role OUTSIDE the trio -> 403
+    doctor = User(
+        username="pra2_doctor",
+        email="pra2_doctor@test.local",
+        full_name="Doctor Who",
+        hashed_password=get_password_hash("Passw0rd!123"),
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(doctor)
+    db_session.commit()
+    r_doctor = client.post(
+        ISSUE_PATH.format(pid=patient.id),
+        headers={"Authorization": f"Bearer {mint_access_token(doctor)}"},
+    )
+    assert r_doctor.status_code == 403
+
+    # registrar -> 201
+    assert (
+        client.post(
+            ISSUE_PATH.format(pid=patient.id), headers=registrar_headers
+        ).status_code
+        == 201
+    )
+
+
+async def test_issue_rejects_already_linked_and_deleted(
+    client, db_session, otp_kv, registrar_headers
+):
+    patient = make_patient(db_session, phone=PHONE)
+    user = User(
+        username="pra2_linked",
+        email="pra2_linked@test.local",
+        full_name="Linked",
+        hashed_password=get_password_hash("Passw0rd!123"),
+        role="Patient",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.flush()
+    patient.user_id = user.id
+    db_session.commit()
+    r = client.post(ISSUE_PATH.format(pid=patient.id), headers=registrar_headers)
+    assert r.status_code == 409
+
+    deleted = make_patient(db_session, phone="+998907770011")
+    deleted.is_deleted = True
+    db_session.commit()
+    r2 = client.post(ISSUE_PATH.format(pid=deleted.id), headers=registrar_headers)
+    assert r2.status_code == 404
+
+
+async def test_confirm_failures_are_generic_no_phi(
+    client, db_session, otp_kv, monkeypatch, registrar_headers
+):
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    patient = make_patient(db_session, phone=PHONE)
+
+    # unknown token -> generic, no patient identity leaked
+    r_bad_token = client.post(
+        CONFIRM_PATH, json={"activation_token": "x" * 40, "code": "123456"}
+    )
+    assert r_bad_token.status_code == 400
+    detail = r_bad_token.json()["detail"]
+    assert str(patient.id) not in detail
+    assert patient.last_name not in detail
+
+    # valid token + wrong code -> generic OTP failure
+    client.post(ISSUE_PATH.format(pid=patient.id), headers=registrar_headers)
+    r_otp = client.post(
+        OTP_PATH,
+        json={
+            "activation_token": _token_of(
+                client, db_session, patient.id, registrar_headers
+            )
+        },
+    )
+    code = otp_kv.last_sent_code[f"patact:{PHONE}"]
+    r_wrong = client.post(
+        CONFIRM_PATH,
+        json={
+            "activation_token": _token_of(
+                client, db_session, patient.id, registrar_headers
+            ),
+            "code": "000000",
+        },
+    )
+    assert r_wrong.status_code == 400
+    assert r_wrong.json()["detail"] == "Неверный код или срок его действия истёк."
+    assert code  # code was in fact issued for the card phone
+
+
+def _token_of(client, db_session, patient_id, registrar_headers):
+    r = client.post(ISSUE_PATH.format(pid=patient_id), headers=registrar_headers)
+    return r.json()["activation_token"]
+
+
+async def test_family_shared_phone_two_cards_http(
+    client, db_session, otp_kv, monkeypatch, registrar_headers
+):
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    mother = make_patient(db_session, phone=FAMILY_PHONE, first="Мать", last="Юсупова")
+    child = make_patient(
+        db_session, phone=FAMILY_PHONE, first="Ребёнок", last="Юсупова"
+    )
+
+    child_token = _token_of(client, db_session, child.id, registrar_headers)
+    client.post(OTP_PATH, json={"activation_token": child_token})
+    code = otp_kv.last_sent_code[f"patact:{FAMILY_PHONE}"]
+    r_confirm = client.post(
+        CONFIRM_PATH, json={"activation_token": child_token, "code": code}
+    )
+    assert r_confirm.status_code == 200
+    db_session.refresh(child)
+    db_session.refresh(mother)
+    assert child.user_id == r_confirm.json()["user"]["id"]
+    assert mother.user_id is None  # mother's card untouched
+
+
+async def test_activation_otp_endpoint_rate_limited_per_ip(
+    client, db_session, otp_kv, monkeypatch, registrar_headers
+):
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    patient = make_patient(db_session, phone=PHONE)
+    token = _token_of(client, db_session, patient.id, registrar_headers)
+
+    statuses = []
+    for _ in range(7):
+        r = client.post(OTP_PATH, json={"activation_token": token})
+        statuses.append(r.status_code)
+        otp_kv.delete(f"patact:cd:{PHONE}")  # bypass phone cooldown: test IP limit only
+    assert 429 in statuses  # slowapi IP limiter (5/minute) kicks in

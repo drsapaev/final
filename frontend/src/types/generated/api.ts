@@ -14988,6 +14988,77 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/patient-access/activate/request-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Activation Otp
+         * @description Отправить OTP для активации доступа.
+         *
+         *     OTP уходит ТОЛЬКО на номер карты, привязанный к токену при выпуске.
+         *     Ответ маскирует номер и не содержит PHI.
+         */
+        post: operations["request_activation_otp_api_v1_patient_access_activate_request_otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/activate/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Activation
+         * @description Токен + OTP -> каноническая сессия User(role=Patient).
+         *
+         *     Атомарно: User + UserProfile(phone, verified) + Patient.user_id в одной
+         *     транзакции (SELECT FOR UPDATE + один commit). Все отказы — единый
+         *     generic текст (anti-enum).
+         */
+        post: operations["confirm_activation_api_v1_patient_access_activate_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/activation-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Activation Token
+         * @description Выдать одноразовый токен активации портала для карты пациента.
+         *
+         *     Токен привязывается к (Patient.id, нормализованный phone) на момент
+         *     выдачи; действует 72 часа; перевыпуск отзывает предыдущий токен.
+         *     Открытый текст токена возвращается ОДИН раз и не попадает в аудит.
+         */
+        post: operations["issue_activation_token_api_v1_patients__patient_id__activation_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/reorder/reorder": {
         parameters: {
             query?: never;
@@ -31561,6 +31632,71 @@ export type components = {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** PatientActivationConfirmRequest */
+        PatientActivationConfirmRequest: {
+            /** Activation Token */
+            activation_token: string;
+            /** Code */
+            code: string;
+        };
+        /** PatientActivationConfirmResponse */
+        PatientActivationConfirmResponse: {
+            /** Access Token */
+            access_token: string;
+            /** Token Type */
+            token_type: string;
+            user: components["schemas"]["PatientActivationSessionUser"];
+            /** Patient Id */
+            patient_id: number;
+        };
+        /**
+         * PatientActivationOtpRequest
+         * @description Токен активации — БЕЗ поля phone: OTP отправляется только на номер,
+         *     зафиксированный в карте при выпуске токена (identity contract v3).
+         */
+        PatientActivationOtpRequest: {
+            /** Activation Token */
+            activation_token: string;
+            /** Locale */
+            locale?: string | null;
+        };
+        /** PatientActivationOtpResponse */
+        PatientActivationOtpResponse: {
+            /** Success */
+            success: boolean;
+            /** Phone Masked */
+            phone_masked: string;
+            /** Expires In Minutes */
+            expires_in_minutes: number;
+            /** Resend After Seconds */
+            resend_after_seconds: number;
+        };
+        /** PatientActivationSessionUser */
+        PatientActivationSessionUser: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Email */
+            email: string | null;
+            /** Full Name */
+            full_name: string | null;
+            /** Role */
+            role: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Superuser */
+            is_superuser: boolean;
+        };
+        /** PatientActivationTokenResponse */
+        PatientActivationTokenResponse: {
+            /** Activation Token */
+            activation_token: string;
+            /** Expires In Hours */
+            expires_in_hours: number;
+            /** Phone Masked */
+            phone_masked: string;
         };
         /** PatientBenefitCreate */
         PatientBenefitCreate: {
@@ -65161,6 +65297,103 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_activation_otp_api_v1_patient_access_activate_request_otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientActivationOtpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientActivationOtpResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_activation_api_v1_patient_access_activate_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientActivationConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientActivationConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_activation_token_api_v1_patients__patient_id__activation_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientActivationTokenResponse"];
                 };
             };
             /** @description Validation Error */

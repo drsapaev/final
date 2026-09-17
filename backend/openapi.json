@@ -42645,6 +42645,138 @@
         }
       }
     },
+    "/api/v1/patient-access/activate/request-otp": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Request Activation Otp",
+        "description": "Отправить OTP для активации доступа.\n\nOTP уходит ТОЛЬКО на номер карты, привязанный к токену при выпуске.\nОтвет маскирует номер и не содержит PHI.",
+        "operationId": "request_activation_otp_api_v1_patient_access_activate_request_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientActivationOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientActivationOtpResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patient-access/activate/confirm": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Confirm Activation",
+        "description": "Токен + OTP -> каноническая сессия User(role=Patient).\n\nАтомарно: User + UserProfile(phone, verified) + Patient.user_id в одной\nтранзакции (SELECT FOR UPDATE + один commit). Все отказы — единый\ngeneric текст (anti-enum).",
+        "operationId": "confirm_activation_api_v1_patient_access_activate_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientActivationConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientActivationConfirmResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/{patient_id}/activation-token": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Issue Activation Token",
+        "description": "Выдать одноразовый токен активации портала для карты пациента.\n\nТокен привязывается к (Patient.id, нормализованный phone) на момент\nвыдачи; действует 72 часа; перевыпуск отзывает предыдущий токен.\nОткрытый текст токена возвращается ОДИН раз и не попадает в аудит.",
+        "operationId": "issue_activation_token_api_v1_patients__patient_id__activation_token_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientActivationTokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queue/reorder/reorder": {
       "put": {
         "tags": [
@@ -90307,6 +90439,191 @@
           "created_at"
         ],
         "title": "Patient"
+      },
+      "PatientActivationConfirmRequest": {
+        "properties": {
+          "activation_token": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 16,
+            "title": "Activation Token"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 6,
+            "minLength": 6,
+            "pattern": "^\\d{6}$",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activation_token",
+          "code"
+        ],
+        "title": "PatientActivationConfirmRequest"
+      },
+      "PatientActivationConfirmResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type"
+          },
+          "user": {
+            "$ref": "#/components/schemas/PatientActivationSessionUser"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type",
+          "user",
+          "patient_id"
+        ],
+        "title": "PatientActivationConfirmResponse"
+      },
+      "PatientActivationOtpRequest": {
+        "properties": {
+          "activation_token": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 16,
+            "title": "Activation Token"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activation_token"
+        ],
+        "title": "PatientActivationOtpRequest",
+        "description": "Токен активации — БЕЗ поля phone: OTP отправляется только на номер,\nзафиксированный в карте при выпуске токена (identity contract v3)."
+      },
+      "PatientActivationOtpResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "phone_masked": {
+            "type": "string",
+            "title": "Phone Masked"
+          },
+          "expires_in_minutes": {
+            "type": "integer",
+            "title": "Expires In Minutes"
+          },
+          "resend_after_seconds": {
+            "type": "integer",
+            "title": "Resend After Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "phone_masked",
+          "expires_in_minutes",
+          "resend_after_seconds"
+        ],
+        "title": "PatientActivationOtpResponse"
+      },
+      "PatientActivationSessionUser": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "is_superuser": {
+            "type": "boolean",
+            "title": "Is Superuser"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "email",
+          "full_name",
+          "role",
+          "is_active",
+          "is_superuser"
+        ],
+        "title": "PatientActivationSessionUser"
+      },
+      "PatientActivationTokenResponse": {
+        "properties": {
+          "activation_token": {
+            "type": "string",
+            "title": "Activation Token"
+          },
+          "expires_in_hours": {
+            "type": "integer",
+            "title": "Expires In Hours"
+          },
+          "phone_masked": {
+            "type": "string",
+            "title": "Phone Masked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activation_token",
+          "expires_in_hours",
+          "phone_masked"
+        ],
+        "title": "PatientActivationTokenResponse"
       },
       "PatientBenefitCreate": {
         "properties": {
