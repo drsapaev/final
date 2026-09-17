@@ -21,6 +21,7 @@
 - [x] **EMR v2 Hard-Cutover + Local Staging Rehearsal** — canonical `visit_id`-based EMR v2 only, SQLite→Postgres sync, local host-based staging contour, and successful green cutover rehearsal. (Completed on 2026-03-19)
 - [x] **Local Product Stabilization and Acceptance** — use the local staging contour as the primary operating environment, run role-by-role smoke validation, and close remaining queue/data migration decisions before any remote promotion. (Completed on 2026-03-19)
 - [ ] **VPS Staging Promotion Path (Mandatory Next Milestone)** — promote the working local contour to a Linux VPS with host Postgres, `systemd` backend, Nginx frontend, TLS, and rerun EMR cutover/acceptance there before production.
+- [ ] **NURSE-V2 — Human Non-Doctor Clinical Serving** — a Nurse (human User role, never a QueueResource surrogate) serves an assigned queue at a cabinet/station: role + workplace assignment model, nurse-scoped queue serving API with real-user attribution, a mandatory two-nurse PostgreSQL concurrency proof, and a minimal tablet surface. (Owner decision 2026-09-18 — next product priority; track: `.ai-factory/plans/nurse-v2-clinical-serving.md`; design-GO pending.)
 
 ## Completed
 
