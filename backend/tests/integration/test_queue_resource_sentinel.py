@@ -593,6 +593,12 @@ def test_alembic_chain_single_head_0062() -> None:
     assert graph["0067_daily_queue_start_number"] == (
         "0066_general_retirement_cutover",
     )
+    # RQ-15.d (ADR-001 stage E): the 0055 synthetic pair retirement
+    # (paired deletion of ecg_resource/lab_resource/general_resource)
+    # chains after the day start-number snapshot.
+    assert graph["0068_sentinel_pair_retirement"] == (
+        "0067_daily_queue_start_number",
+    )
     # alembic_version.version_num is VARCHAR(32): both ends of the new
     # link must fit (CI on 40cec49 exploded on real PostgreSQL with a
     # 38-char id — scratch-SQLite ignores VARCHAR widths).
@@ -600,13 +606,14 @@ def test_alembic_chain_single_head_0062() -> None:
     assert len("0065_queue_numbering_unique") <= 32
     assert len("0066_general_retirement_cutover") <= 32
     assert len("0067_daily_queue_start_number") <= 32
+    assert len("0068_sentinel_pair_retirement") <= 32
     assert len("0063_queue_resource_contract") <= 32
     assert len("0062_telegram_webhook_dedup") <= 32
     assert len("0061_telegram_config_singleton") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
-    # single head: RQ-13.b chains after the QD-2E cutover
-    assert heads == ["0067_daily_queue_start_number"]
+    # single head: RQ-15.d retires the synthetic pairs after the snapshot
+    assert heads == ["0068_sentinel_pair_retirement"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============
