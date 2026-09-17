@@ -369,10 +369,17 @@ explicit:
   half committing between the locks and the read) was never locked,
   and the retirement aborts rather than delete an unlocked row;
   (2) "all three usernames absent" is the already-retired verdict
-  only while NO Doctor row carries the bridge vocabulary without a
-  User link — the exact half a hand-deleted User leaves behind (the
-  `doctors.user_id` FK is ON DELETE SET NULL) — and the same proof
-  runs when the pairs are present, so the bridge vocabulary always
+  only while no ACTIVE Doctor row carries the bridge vocabulary
+  without a User link — the `active` flag is the provenance-honest
+  discriminator: the sanctioned user-deletion path DEACTIVATES the
+  profile before deleting the owner, so an inactive userless
+  bridge-specialty row is preserved clinical history ('general'
+  doubles as the live `INCOMPLETE_DOCTOR_SPECIALTY` onboarding
+  sentinel), while a raw hand-deleted User (the `doctors.user_id`
+  FK is ON DELETE SET NULL, nothing deactivates the row) leaves the
+  half ACTIVE — and an ACTIVE userless row is drift either way
+  (decision #13: the linkage contract) — and the same proof runs
+  when the pairs are present, so the bridge vocabulary always
   leaves WITH the pairs; (3) the downgrade verifies an existing
   username field-by-field (hash, role, is_active, is_superuser,
   must_change_password, exactly one linked Doctor, specialty,
@@ -380,6 +387,25 @@ explicit:
   and a final postcondition re-verifies all three pairs — a
   username captured by a foreign row aborts instead of a silent
   skip.
+- **Table locks around the whole verdict window (the E-062 review
+  round 2).** Row locks fix only the rows they SEE, so two
+  read-to-commit windows stayed open to a concurrent INSERT that
+  would silently invalidate the verdict Alembic is about to stamp:
+  the already-retired no-op pass (no pair rows exist to lock at
+  all — a rival could restore a pair or insert an ACTIVE userless
+  bridge Doctor after the final guard read), and the downgrade's
+  postcondition window (a rival could delete a just-restored pair
+  after the final read). Both migrations now OPEN the transaction
+  with `LOCK TABLE users, doctors IN SHARE ROW EXCLUSIVE MODE`
+  (PostgreSQL; the SQLite scratch harness skips with a printed
+  note): SHARE ROW EXCLUSIVE conflicts with every
+  INSERT/UPDATE/DELETE (ROW EXCLUSIVE) on the two tables, while
+  plain readers (ACCESS SHARE) and row-lockers (ROW SHARE) are
+  unaffected — from the first statement to the commit, no
+  concurrent writer can land inside the window, and the stamped
+  verdict is true of a world no concurrent writer can change. The
+  P2-1 set-equality guard stays as defense-in-depth beneath the
+  table lock.
 
 The runtime half needed no code change: since the QD-2E cutover
 (0066, RQ-15.b) the owner resolution is fail-closed

@@ -38,11 +38,28 @@ guards any FUTURE internal account the operator may provision.
 
 Upgrade contract (single transaction; PG DDL/DML is transactional):
 
-1. ALL-OR-NOTHING pair resolution, inventory-before-mutation, on rows
-   locked FOR UPDATE first (PostgreSQL; the P1-b hardening of the
-   owner closure plan, applied in the post-merge window BEFORE the
-   production application — after that the migration body is frozen):
+1. ALL-OR-NOTHING pair resolution, inventory-before-mutation, behind
+   a table lock, on rows locked FOR UPDATE (PostgreSQL; the P1-b
+   hardening of the owner closure plan + the review rounds 2/3, all
+   applied in the post-merge window BEFORE the production application
+   — after that the migration body is frozen):
 
+   - the migration transaction OPENS with ``LOCK TABLE users,
+     doctors IN SHARE ROW EXCLUSIVE MODE`` (the review-round-3 P2-B
+     hardening): row locks only fix the rows they SEE, so every
+     read-to-commit window — the locks->resolution gap the P2-1 set
+     equality closes, the final-guard->commit gap, and the whole
+     already-retired no-op pass where there are no rows to lock at
+     all — stayed open to a concurrent INSERT (a restored pair, an
+     orphaned bridge-vocabulary Doctor) that would silently
+     invalidate the verdict Alembic is about to stamp. SHARE ROW
+     EXCLUSIVE conflicts with every ROW EXCLUSIVE taker — every
+     concurrent INSERT/UPDATE/DELETE on the two tables — while plain
+     readers (ACCESS SHARE) and row-lockers (ROW SHARE) are
+     unaffected: from the first statement to the commit, no
+     concurrent writer can land inside the window. The downgrade
+     opens with the same lock (its postcondition window is the same
+     class of phantom);
    - the three User rows and their linked Doctor rows are locked
      ``FOR UPDATE`` (users first, then doctors, each ordered by id — a
      deterministic acquisition order) BEFORE the resolution SELECT and
@@ -73,14 +90,24 @@ Upgrade contract (single transaction; PG DDL/DML is transactional):
      expected 0055 specialty, the post-0057 'Resource' role, not a
      superuser) -> the guarded paired deletion below;
    - ALL three absent -> the terminal verdict is PROVABLE, not
-     assumed (the P2-2 hardening): any Doctor row still carrying the
-     bridge vocabulary (a specialty from the 0055 mapping) with NO
-     User link — the exact shape a hand-deleted User leaves behind,
-     because the ``doctors.user_id`` FK is ON DELETE SET NULL —
-     aborts loudly; the printed clean no-op pass requires zero
-     orphaned halves (the CI empty database has no doctors at all).
-     The same proof runs when the pairs are present: the bridge
-     vocabulary must leave WITH the pairs, never stranded;
+     assumed (the P2-2 hardening, review round 3 narrowed to the
+     ACTIVE half): any ACTIVE Doctor row still carrying the bridge
+     vocabulary (a specialty from the 0055 mapping) with NO User
+     link aborts loudly. The ``active`` flag is the provenance-honest
+     discriminator the specialty alone cannot be: the sanctioned
+     user-deletion path DEACTIVATES the profile before deleting the
+     owner, so an INACTIVE userless bridge-specialty row is preserved
+     clinical history ('general' doubles as the live
+     INCOMPLETE_DOCTOR_SPECIALTY onboarding sentinel a Registrar->
+     Doctor promotion provisions) and does NOT block the verdict,
+     while a raw hand-deleted User (the ``doctors.user_id`` FK is ON
+     DELETE SET NULL, nothing deactivates the row) leaves the half
+     ACTIVE — and an ACTIVE userless row is drift either way
+     (decision #13 already treats it as a linkage-contract
+     violation the pre-deploy reconciler blocks on), so the abort
+     names the unprovable state, never the origin. The same proof
+     runs when the pairs are present: the bridge vocabulary must
+     leave WITH the pairs, never stranded;
    - a PARTIAL set (someone hand-deleted one pair before the
      retirement) or any shape drift (orphan user without a doctor, a
      foreign specialty, a re-purposed role, a superuser flag) -> a
@@ -208,17 +235,39 @@ _SELECT_PAIRS = sa.text("""
     ORDER BY u.username
     """).bindparams(sa.bindparam("usernames", expanding=True))
 
-# P2-2: a Doctor row that still carries the bridge vocabulary with NO
-# User link — the exact shape a hand-deleted User leaves behind (the
-# doctors.user_id FK is ON DELETE SET NULL). Real doctors are
-# user-linked (they own a login), so an unlinked bridge-specialty row
-# is either an orphaned pair half or imported drift the operator owns.
+# Review round 3 (P2-A): the ACTIVE discriminator is the honest
+# provenance the vocabulary alone cannot provide. The sanctioned
+# user-deletion path DEACTIVATES the doctor profile before the owner
+# is deleted (an inactive userless row is preserved clinical history
+# — a Registrar promoted to Doctor carries the 'general' onboarding
+# sentinel specialty, INCOMPLETE_DOCTOR_SPECIALTY, and its sanctioned
+# deletion leaves exactly that inactive historical row), while a raw
+# DELETE that bypasses the API leaves the half ACTIVE (the
+# doctors.user_id FK is ON DELETE SET NULL, nothing deactivates the
+# row). An ACTIVE userless row is drift either way — decision #13
+# already treats it as a linkage-contract violation the pre-deploy
+# reconciler blocks on — so the guard flags the drift shape without
+# claiming to know which of the two worlds the row came from.
 _SELECT_ORPHAN_BRIDGE_DOCTORS = sa.text("""
     SELECT id, specialty, active, start_number_online, max_online_per_day
     FROM doctors
-    WHERE user_id IS NULL AND specialty IN :specialties
+    WHERE user_id IS NULL AND active AND specialty IN :specialties
     ORDER BY id
     """).bindparams(sa.bindparam("specialties", expanding=True))
+
+# Review round 3 (P2-B): a SHARE ROW EXCLUSIVE table lock on the two
+# tables every verdict reasons about, taken as the FIRST statement of
+# the migration transaction. Row locks (FOR UPDATE) only fix the rows
+# they SEE — on the already-retired no-op pass there are no pair rows
+# to lock at all, so a pair (or an orphaned bridge-vocabulary Doctor)
+# INSERTED after the final read could commit before this migration and
+# silently invalidate the verdict Alembic is about to stamp. SHARE ROW
+# EXCLUSIVE conflicts with every ROW EXCLUSIVE taker — every concurrent
+# INSERT/UPDATE/DELETE on users/doctors — while plain readers (ACCESS
+# SHARE) and row-lockers (ROW SHARE) are unaffected (PostgreSQL only,
+# the P1-2 dialect-gate precedent; the single-connection SQLite scratch
+# harness cannot race).
+_LOCK_PAIR_TABLES = sa.text("LOCK TABLE users, doctors IN SHARE ROW EXCLUSIVE MODE")
 
 # The P1-b hardening: lock the pair rows BEFORE the resolution reads
 # them (PostgreSQL only — the dialect gate prints a note and skips on
@@ -357,6 +406,36 @@ _FOREIGN_CAPTURE_TAIL = (
 )
 
 
+def _lock_pair_tables(conn) -> None:
+    """Review round 3 (P2-B): take the predicate-level lock FIRST. Row
+    locks fix only the rows they SEE, so every read-to-commit window —
+    locks -> resolution, final guard -> commit, and the whole
+    already-retired no-op pass where there are no rows to lock at all
+    — stayed open to a concurrent INSERT (a restored pair, an orphaned
+    bridge-vocabulary Doctor) that would silently invalidate the
+    verdict this migration is about to stamp. SHARE ROW EXCLUSIVE
+    closes the window at the table level: no concurrent
+    INSERT/UPDATE/DELETE on users/doctors can land from this statement
+    to the transaction's commit (PostgreSQL only — the dialect-gate
+    precedent; the single-connection SQLite scratch cannot race)."""
+    if conn.dialect.name != "postgresql":
+        print(
+            f"{_MIGRATION_NAME}: pair-table locking skipped on dialect "
+            f"{conn.dialect.name!r} (PostgreSQL-only surface; the "
+            "single-connection scratch harness cannot race — the "
+            "semantic shape guards still run)"
+        )
+        return
+    conn.execute(_LOCK_PAIR_TABLES)
+    print(
+        f"{_MIGRATION_NAME}: took SHARE ROW EXCLUSIVE on users, doctors "
+        "— every concurrent INSERT/UPDATE/DELETE on the two tables "
+        "blocks until this transaction ends, so the verdict this "
+        "migration stamps is true of a world no concurrent writer "
+        "can change"
+    )
+
+
 def _lock_pair_rows(conn) -> tuple[set[int], set[int]]:
     """P1-b + P2-1: serialize every concurrent writer away from the
     pairs BEFORE the resolution reads them (PostgreSQL; the SQLite
@@ -434,12 +513,21 @@ def _assert_lock_covers_resolution(
 
 
 def _assert_no_orphaned_bridge_doctors(conn) -> None:
-    """P2-2: the terminal 'already retired' verdict is PROVABLE, not
-    assumed. A Doctor row that carries the bridge vocabulary with NO
-    User link is the exact shape a hand-deleted User leaves behind
-    (the doctors.user_id FK is ON DELETE SET NULL) — the retirement
-    never declares the pairs gone while halves remain, and never
-    strands an orphan next to the pairs it does retire."""
+    """P2-2 (review round 3 narrowed to the ACTIVE half): the terminal
+    'already retired' verdict is PROVABLE, not assumed — but the
+    provenance-honest discriminator is the ``active`` flag, not the
+    specialty alone. A userless INACTIVE Doctor row is the sanctioned
+    shape of preserved clinical history ('general' doubles as the live
+    INCOMPLETE_DOCTOR_SPECIALTY onboarding sentinel; the sanctioned
+    owner deletion deactivates and detaches the profile, it never
+    deletes it), so it does NOT block the verdict. A userless ACTIVE
+    bridge-specialty row is the exact drift shape a raw hand-deleted
+    User leaves behind (the doctors.user_id FK is ON DELETE SET NULL,
+    nothing deactivates the row) — and an ACTIVE userless row already
+    violates the linkage contract on its own (decision #13, the
+    pre-deploy reconciler), so it is drift whichever world it came
+    from. The retirement never declares the pairs gone over such
+    halves, and never strands one next to the pairs it retires."""
     rows = conn.execute(
         _SELECT_ORPHAN_BRIDGE_DOCTORS,
         {"specialties": list(SYNTHETIC_PAIR_SPECIALTIES.values())},
@@ -455,14 +543,22 @@ def _assert_no_orphaned_bridge_doctors(conn) -> None:
             f"{int(row.max_online_per_day)}) user_id=NULL"
         )
     _abort(
-        f"{len(rows)} Doctor row(s) still carry the bridge vocabulary "
-        f"(specialty in {sorted(SYNTHETIC_PAIR_SPECIALTIES.values())}) "
-        "with NO User link — the doctors.user_id FK is ON DELETE SET "
-        "NULL, so a hand-deleted User leaves exactly this half behind; "
-        "the retirement never declares the pairs gone over orphaned "
-        "halves (re-link them to restored Users, delete them, or "
-        "re-specialty a real doctor that collided with the vocabulary "
-        "— an explicit operator decision); refusing with no rows changed"
+        f"{len(rows)} ACTIVE Doctor row(s) with NO User link still "
+        f"carry the bridge vocabulary (specialty in "
+        f"{sorted(SYNTHETIC_PAIR_SPECIALTIES.values())}) — the "
+        "sanctioned user-deletion path DEACTIVATES the profile before "
+        "deleting the owner (an inactive userless row is preserved "
+        "clinical history), so an active userless half is exactly the "
+        "drift a raw hand-deleted User leaves behind (the "
+        "doctors.user_id FK is ON DELETE SET NULL), and decision #13 "
+        "already treats an ACTIVE userless row as a linkage-contract "
+        "violation. Specialty is NOT provenance — 'general' is also "
+        "the live onboarding sentinel (INCOMPLETE_DOCTOR_SPECIALTY) — "
+        "so this abort names the unprovable state, never the origin "
+        "(deactivate the row if it is preserved history, re-link it "
+        "to a restored User, or re-specialty a real doctor that "
+        "collided with the vocabulary — an explicit operator "
+        "decision); refusing with no rows changed"
     )
 
 
@@ -482,8 +578,11 @@ def _resolve_and_assert_pairs(conn) -> list:
     missing = expected - present
 
     if not present:
-        # P2-2: the terminal verdict is PROVABLE, not assumed — a
-        # hand-deleted User (SET NULL) leaves its Doctor half behind.
+        # P2-2 (review round 3 narrowed): the terminal verdict is
+        # PROVABLE — over ACTIVE halves only. An inactive userless
+        # bridge-specialty row is the sanctioned shape of preserved
+        # clinical history ('general' doubles as the onboarding
+        # sentinel); an ACTIVE one is the raw hand-delete shape.
         _assert_no_orphaned_bridge_doctors(conn)
         print(
             f"{_MIGRATION_NAME}: all three synthetic pairs are absent — "
@@ -535,9 +634,10 @@ def _resolve_and_assert_pairs(conn) -> list:
             f"specialty={row.specialty!r} active={bool(row.doctor_active)}"
         )
 
-    # P2-2 (the symmetric proof): the bridge vocabulary must leave WITH
-    # the pairs — an orphaned half next to three valid pairs is drift
-    # too, invisible to every reference guard (nothing links to it).
+    # P2-2 (the symmetric proof, ACTIVE halves only — see the guard):
+    # the bridge vocabulary must leave WITH the pairs — an orphaned
+    # ACTIVE half next to three valid pairs is drift too, invisible
+    # to every reference guard (nothing links to it).
     _assert_no_orphaned_bridge_doctors(conn)
     return rows
 
@@ -702,7 +802,14 @@ def _delete_pairs(conn, rows: list) -> dict[str, int]:
 
 
 def upgrade_with_conn(conn) -> dict[str, int]:
-    """The testable retirement entry (the 0063/0066 module pattern)."""
+    """The testable retirement entry (the 0063/0066 module pattern).
+
+    Review round 3 (P2-B): the SHARE ROW EXCLUSIVE table lock is the
+    FIRST statement of the transaction — before the row locks, the
+    resolution, the guards, and the deletion — so the whole
+    read-to-commit window is closed at the table level, including the
+    no-op pass where there are no rows to lock at all."""
+    _lock_pair_tables(conn)
     rows = _resolve_and_assert_pairs(conn)
     if not rows:
         return {"users_deleted": 0, "doctors_deleted": 0}
@@ -799,7 +906,13 @@ def downgrade_with_conn(conn) -> None:
 
     P2-3: an existing username is an idempotent no-op ONLY after the
     full shape is verified field-by-field, and a final postcondition
-    re-verifies all three pairs before the restore is claimed."""
+    re-verifies all three pairs before the restore is claimed.
+
+    Review round 3 (P2-B): the downgrade opens with the same SHARE
+    ROW EXCLUSIVE table lock — the postcondition window (a pair
+    deleted or a foreign capture inserted between the final read and
+    the commit) is the same class of phantom the upgrade closes."""
+    _lock_pair_tables(conn)
     for username, specialty in SYNTHETIC_PAIR_SPECIALTIES.items():
         row = conn.execute(_SELECT_PAIRS, {"usernames": [username]}).fetchone()
         if row is not None:
