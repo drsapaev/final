@@ -39,13 +39,28 @@ The migration contract pinned here:
   the lock selects and the resolution read) was never locked, and the
   upgrade aborts instead of deleting an unlocked row (re-run the
   migration once the concurrent writer is done);
-- P2-2 provable terminal state: ``all three usernames absent`` is the
-  already-retired verdict ONLY while no Doctor row carries the bridge
-  vocabulary without a User link — the ``doctors.user_id`` FK is
-  ``ON DELETE SET NULL``, so a hand-deleted User leaves exactly that
-  orphan half behind, and the retirement refuses to call it "already
-  retired" (the same proof runs when the pairs are present: the
-  bridge vocabulary must leave WITH the pairs, never stranded);
+- P2-2 provable terminal state (review round 3 narrowed to the ACTIVE
+  half): ``all three usernames absent`` is the already-retired verdict
+  ONLY while no ACTIVE Doctor row carries the bridge vocabulary
+  without a User link — the sanctioned user-deletion path DEACTIVATES
+  the profile before deleting the owner, so an INACTIVE userless
+  bridge-specialty row is preserved clinical history ('general'
+  doubles as the live INCOMPLETE_DOCTOR_SPECIALTY onboarding
+  sentinel) and must NOT block the verdict, while a raw hand-deleted
+  User (the ``doctors.user_id`` FK is ON DELETE SET NULL, nothing
+  deactivates the row) leaves the half ACTIVE — drift either way
+  (decision #13: an ACTIVE userless row already violates the linkage
+  contract); the same proof runs when the pairs are present: the
+  bridge vocabulary must leave WITH the pairs, never stranded;
+- P2-B table-lock pins (review round 3): the migration transaction
+  OPENS with ``LOCK TABLE users, doctors IN SHARE ROW EXCLUSIVE
+  MODE`` — row locks only fix the rows they SEE, so on the
+  already-retired no-op pass (no rows to lock at all) and between the
+  final guard read and the commit, a concurrent INSERT (a restored
+  pair, an orphaned bridge Doctor) could previously land and silently
+  invalidate the verdict Alembic is about to stamp; now every
+  concurrent INSERT/UPDATE/DELETE on the two tables blocks until the
+  migration commits (upgrade AND downgrade alike);
 - semantic reference guards: ANY ``services.doctor_id`` or
   ``daily_queues.specialist_id`` row referencing a synthetic doctor
   (active OR historical) aborts the deletion — the catalog and the
@@ -278,6 +293,28 @@ def _seed_login_attempt(conn, user_id: int) -> int:
         sa.text("SELECT id FROM login_attempts ORDER BY id DESC LIMIT 1")
     ).fetchone()
     return int(attempt_id)
+
+
+def _seed_historical_userless_doctor(conn, specialty: str, *, active: bool) -> int:
+    """A userless Doctor row the way the SANCTIONED lifecycle leaves
+    clinical history: a Registrar->Doctor promotion provisions the
+    profile with the onboarding sentinel specialty, and the sanctioned
+    owner deletion DEACTIVATES and DETACHES it (never deletes) —
+    ``Doctor(active=False, user_id=NULL)``. The ``active`` flag is the
+    discriminator between this documented history and the ACTIVE half a
+    raw hand-deleted User leaves behind (review round 3, P2-A)."""
+    conn.execute(
+        sa.text(
+            "INSERT INTO doctors (user_id, specialty, active,"
+            " start_number_online, max_online_per_day)"
+            " VALUES (NULL, :s, :a, 1, 15)"
+        ),
+        {"s": specialty, "a": active},
+    )
+    (doctor_id,) = conn.execute(
+        sa.text("SELECT id FROM doctors ORDER BY id DESC LIMIT 1")
+    ).fetchone()
+    return int(doctor_id)
 
 
 def _usernames_present(conn) -> set[str]:
@@ -551,6 +588,73 @@ def test_upgrade_aborts_on_an_orphan_bridge_doctor_alongside_valid_pairs(
     assert _pair_doctor_count(conn) == 3
     (total_doctors,) = conn.execute(sa.text("SELECT COUNT(*) FROM doctors")).fetchone()
     assert int(total_doctors) == 4  # three linked + the untouched orphan
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_upgrade_retires_pairs_over_inactive_userless_general_doctor_history(
+    committed_scratch,
+) -> None:
+    """Review round 3 (P2-A): 'general' is not only the 0055 bridge
+    vocabulary — it is the LIVE onboarding sentinel
+    (INCOMPLETE_DOCTOR_SPECIALTY) a Registrar->Doctor promotion
+    provisions. The sanctioned user deletion DEACTIVATES and DETACHES
+    that profile (preserved clinical history), leaving exactly
+    ``Doctor(active=False, user_id=NULL, specialty='general')``. The
+    orphaned-bridge-doctor guard must NOT flag it: a legitimate
+    historical row is not a stranded pair half, and blocking the FIRST
+    production run over it would be a false-positive availability
+    abort. The pairs still retire; the history stays untouched."""
+    module = _module()
+    conn = committed_scratch
+    history_id = _seed_historical_userless_doctor(conn, "general", active=False)
+    conn.commit()
+
+    result = module.upgrade_with_conn(conn)
+    conn.commit()
+
+    assert result == {"users_deleted": 3, "doctors_deleted": 3}
+    assert _usernames_present(conn) == set()
+    survivor = conn.execute(
+        sa.text("SELECT active, user_id, specialty FROM doctors WHERE id = :i"),
+        {"i": history_id},
+    ).fetchone()
+    assert bool(survivor.active) is False
+    assert survivor.user_id is None
+    assert survivor.specialty == "general"
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_upgrade_clean_noop_over_inactive_userless_general_doctor_history() -> None:
+    """Review round 3 (P2-A), the all-absent twin: the already-retired
+    no-op verdict must stay provable without false-positiving on
+    preserved clinical history — the inactive userless 'general' row
+    is the DOCUMENTED historical shape (the sanctioned deletion path
+    deactivates the profile; the reconciler's decision #13 tolerates
+    inactive userless rows), so re-running the retirement over a
+    database carrying such history is still a clean no-op."""
+    module = _module()
+    conn = _scratch()
+    try:
+        history_id = _seed_historical_userless_doctor(conn, "general", active=False)
+        conn.commit()
+
+        result = module.upgrade_with_conn(conn)
+        conn.commit()
+
+        assert result == {"users_deleted": 0, "doctors_deleted": 0}
+        (doctor_count,) = conn.execute(
+            sa.text("SELECT COUNT(*) FROM doctors")
+        ).fetchone()
+        assert int(doctor_count) == 1
+        (still_there,) = conn.execute(
+            sa.text("SELECT COUNT(*) FROM doctors WHERE id = :i"),
+            {"i": history_id},
+        ).fetchone()
+        assert int(still_there) == 1
+    finally:
+        conn.close()
 
 
 @pytest.mark.integration
@@ -1219,7 +1323,18 @@ def test_pg_upgrade_aborts_when_a_rival_inserts_the_missing_pair_after_the_locks
     phantom row is not part of the locked "one stable world", and the
     next concurrent writer could still land between the guard and the
     DELETE for it. Re-running the migration afterwards sees a stable
-    full set and retires it correctly."""
+    full set and retires it correctly.
+
+    Review round 3 (P2-B): the production window is now closed one
+    level up — ``upgrade_with_conn`` opens with a SHARE ROW EXCLUSIVE
+    table lock on users/doctors, so a rival INSERT can no longer
+    commit between the lock selects and the resolution read (it blocks
+    until the migration transaction ends; the no-op-window proof is
+    the dedicated test below). The set-equality guard stays as
+    DEFENSE-IN-DEPTH — if a future refactor ever drops or loosens the
+    table lock, this pin must still hold — so this proof drives the
+    resolution DIRECTLY (``_resolve_and_assert_pairs``, bypassing the
+    table lock) to keep the guard covered at its own seam."""
     module = _module()
     engine = retirement_pg_engine
 
@@ -1242,7 +1357,7 @@ def test_pg_upgrade_aborts_when_a_rival_inserts_the_missing_pair_after_the_locks
         module._lock_pair_rows = lock_then_rival_restores_the_missing_pair
 
         with pytest.raises(RuntimeError, match="NOT the locked pair set"):
-            module.upgrade_with_conn(locked_conn)
+            module._resolve_and_assert_pairs(locked_conn)
         locked_conn.rollback()
     finally:
         module._lock_pair_rows = original_lock
@@ -1250,6 +1365,107 @@ def test_pg_upgrade_aborts_when_a_rival_inserts_the_missing_pair_after_the_locks
         locked_conn.close()
 
     # nothing was deleted — the rival's pair survives the abort too
+    with engine.connect() as conn:
+        assert _usernames_present(conn) == set(_PAIR_USERNAMES)
+        assert _pair_doctor_count(conn) == 3
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_pg_noop_verdict_blocks_a_rival_restore_until_commit(
+    retirement_pg_engine,
+) -> None:
+    """Review round 3 (P2-B): ``FOR UPDATE`` locks only the rows they
+    SEE — on the already-retired no-op pass there are no pair rows to
+    lock at all, so a rival could INSERT a full pair (or an orphaned
+    bridge-vocabulary Doctor) after the final guard read and commit
+    before this migration, silently invalidating the "already
+    retired" verdict Alembic is about to stamp. The migration
+    transaction now OPENS with a SHARE ROW EXCLUSIVE table lock on
+    users/doctors: every concurrent INSERT/UPDATE/DELETE on the two
+    tables blocks until the migration commits, so the stamped verdict
+    is true of a world no concurrent writer can change."""
+    module = _module()
+    engine = retirement_pg_engine
+
+    mig = engine.connect()
+    rival = engine.connect()
+    try:
+        result = module.upgrade_with_conn(mig)  # the no-op verdict; txn open
+        assert result == {"users_deleted": 0, "doctors_deleted": 0}
+
+        rival.exec_driver_sql("SET lock_timeout = '400ms'")
+
+        # 1) the reviewer counterexample: a full pair restored after
+        # the final read, before the migration commit — must BLOCK
+        with pytest.raises(sa.exc.OperationalError, match="(?i)lock"):
+            _seed_pair(rival, "general_resource")
+        rival.rollback()  # the GUC unwinds with the transaction — re-arm
+        rival.exec_driver_sql("SET lock_timeout = '400ms'")
+
+        # 2) the same window for the orphaned-bridge-Doctor guard: an
+        # ACTIVE userless bridge row inserted after the check — blocked
+        with pytest.raises(sa.exc.OperationalError, match="(?i)lock"):
+            rival.execute(
+                sa.text(
+                    "INSERT INTO doctors (user_id, specialty, active,"
+                    " start_number_online, max_online_per_day)"
+                    " VALUES (NULL, 'general', true, 1, 15)"
+                )
+            )
+        rival.rollback()
+        rival.exec_driver_sql("SET lock_timeout = '400ms'")
+
+        mig.commit()  # the verdict is stamped over a stable world
+    finally:
+        rival.close()
+        mig.close()
+
+    # after the stamp the concurrent writer is free to land — and the
+    # contract handles it: a FULL three-pair restore re-runs cleanly
+    with engine.connect() as conn:
+        _seed_pair(conn, "ecg_resource")
+        _seed_pair(conn, "lab_resource")
+        _seed_pair(conn, "general_resource")
+        conn.commit()
+
+    with engine.connect() as conn:
+        result = module.upgrade_with_conn(conn)
+        conn.commit()
+        assert result == {"users_deleted": 3, "doctors_deleted": 3}
+        assert _usernames_present(conn) == set()
+
+
+@pytest.mark.integration
+@pytest.mark.migration
+def test_pg_downgrade_blocks_a_rival_deletion_until_commit(
+    retirement_pg_engine,
+) -> None:
+    """Review round 3 (P2-B), the downgrade twin: the same phantom
+    window sits between the downgrade's final postcondition read and
+    its commit — a rival deleting a just-restored pair would leave
+    "restored (postcondition verified)" stamped over a missing pair.
+    The downgrade takes the same SHARE ROW EXCLUSIVE lock, so the
+    deletion (and any pair INSERT) blocks until the restore commits."""
+    module = _module()
+    engine = retirement_pg_engine
+
+    mig = engine.connect()
+    rival = engine.connect()
+    try:
+        module.downgrade_with_conn(mig)  # pairs restored; txn open
+
+        rival.exec_driver_sql("SET lock_timeout = '400ms'")
+        with pytest.raises(sa.exc.OperationalError, match="(?i)lock"):
+            rival.execute(sa.text("DELETE FROM users WHERE username = 'ecg_resource'"))
+        rival.rollback()  # the GUC unwinds with the transaction — re-arm
+        rival.exec_driver_sql("SET lock_timeout = '400ms'")
+
+        mig.commit()  # the restore is stamped over a stable world
+    finally:
+        rival.close()
+        mig.close()
+
     with engine.connect() as conn:
         assert _usernames_present(conn) == set(_PAIR_USERNAMES)
         assert _pair_doctor_count(conn) == 3
