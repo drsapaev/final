@@ -790,6 +790,13 @@ def test_alembic_chain_single_head_0063() -> None:
     assert graph["0067_daily_queue_start_number"] == (
         "0066_general_retirement_cutover",
     )
+    # RQ-15.d (ADR-001 stage E): the 0055 synthetic pair retirement
+    # (paired deletion of ecg_resource/lab_resource/general_resource)
+    # chains after the direction public-address registry (0068,
+    # RQ-16.c), which chains after the day start-number snapshot.
+    assert graph["0069_sentinel_pair_retirement"] == (
+        "0068_direction_public_address",
+    )
     assert len("0066_general_retirement_cutover") <= 32
     assert len("0067_daily_queue_start_number") <= 32
     # RQ-16.c: the head moved to 0068 with the direction public-address
@@ -798,10 +805,12 @@ def test_alembic_chain_single_head_0063() -> None:
         "0067_daily_queue_start_number",
     )
     assert len("0068_direction_public_address") <= 32
+    assert len("0069_sentinel_pair_retirement") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    # single head: RQ-16.c chains after the 0067 start-number snapshot
-    assert heads == ["0068_direction_public_address"]
+    # single head: RQ-15.d retires the synthetic pairs after the
+    # public-address registry
+    assert heads == ["0069_sentinel_pair_retirement"]
 
 
 # ===================== D. parity + ADR =====================
