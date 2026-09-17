@@ -21,6 +21,9 @@ from sqlalchemy import String, literal  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.api.deps import get_db, require_roles  # noqa: F401
+from app.api.v1.endpoints.doctor_integration._helpers import (
+    DOCTOR_QUEUE_SPECIALTY_VARIANTS,
+)
 from app.crud import clinic as crud_clinic  # noqa: F401
 from app.crud import online_queue as crud_queue  # noqa: F401
 from app.crud.appointment import appointment as crud_appointment  # noqa: F401
@@ -365,6 +368,116 @@ class CartQuoteResponse(BaseModel):
 
 
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
+
+
+def _accepted_specialty_variants_for_department_key(
+    department_key: str | None,
+) -> set[str] | None:
+    """Набор допустимых специальностей врача для department_key услуги.
+
+    RQ-05.a: серверная сторона фильтра ``filterDoctorsForService`` (wizard
+    UI, W2-PR2). SSOT — DOCTOR_QUEUE_SPECIALTY_VARIANTS (doctor_integration):
+    фронтовая SPECIALTY_ALIASES сознательно выровнена с этой таблицей, поэтому
+    сервер зеркалирует ЕЁ семантику, а не изобретает отдельный маппинг:
+    - ключ ищется РЕВЕРСИВНО: "dental" не является ключом таблицы, но входит
+      в варианты канона "dentistry" (подстрочный матч здесь запрещён так же,
+      как на фронте — он отбрасывал валидные пары dental/dentistry);
+    - пара вне таблицы → точное совпадение (канон = сам ключ);
+    - None/пустой ключ → None (проверка специальности неприменима).
+    """
+    key = (department_key or "").strip().lower()
+    if not key:
+        return None
+    for variants in DOCTOR_QUEUE_SPECIALTY_VARIANTS.values():
+        lowered = {v.strip().lower() for v in variants}
+        if key in lowered:
+            return lowered
+    return {key}
+
+
+def _assert_cart_doctor_eligibility(db: Session, visits: list[Any]) -> None:
+    """RQ-05.a: серверная валидация допустимости врача при записи в корзину.
+
+    E-023 трассировка: requires_doctor на пути сохранения корзины не
+    проверялся НИГДЕ — визит с requires_doctor=true услугой сохранялся без
+    врача (DTO делает doctor_id опциональным «для лабораторных»), с
+    неактивным врачом, с врачом чужой специальности; несуществующий врач
+    падал 500-й по FK IntegrityError. Гейт вызывается ДО prelock
+    advisory-замков и первой записи корзины: отклонённая корзина не
+    оставляет частичного состояния и не участвует в lock-ordering.
+
+    Семантика зеркалирует фронтовый filterDoctorsForService (W2-PR2):
+    - услуга с requires_doctor=true требует doctor_id на визите;
+    - врач обязан существовать и быть активным;
+    - при наличии у услуги department_key специальность врача сверяется
+      с SSOT-таблицей вариантов; услуги без department_key специальность
+      не проверяют (существующие тесты/данные key не заполняют), а врач
+      с пустой специальностью проходит «как раньше» — фронт таких врачей
+      тоже показывает.
+    """
+    service_ids = sorted(
+        {item.service_id for visit in visits for item in visit.services}
+    )
+    if not service_ids:
+        return
+    services = db.query(Service).filter(Service.id.in_(service_ids)).all()
+    service_map = {service.id: service for service in services}
+
+    doctor_ids = sorted({visit.doctor_id for visit in visits if visit.doctor_id})
+    doctor_map: dict[int, Doctor] = {}
+    if doctor_ids:
+        doctors = db.query(Doctor).filter(Doctor.id.in_(doctor_ids)).all()
+        doctor_map = {doctor.id: doctor for doctor in doctors}
+
+    for visit in visits:
+        required = [
+            service
+            for item in visit.services
+            if (service := service_map.get(item.service_id)) is not None
+            and service.requires_doctor
+        ]
+        if not required:
+            continue
+        if not visit.doctor_id:
+            names = ", ".join(sorted({s.name for s in required}))
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Услуга ({names}) требует выбора врача: "
+                    "сохранение визита без врача недоступно"
+                ),
+            )
+        doctor = doctor_map.get(visit.doctor_id)
+        if doctor is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Врач с ID {visit.doctor_id} не найден",
+            )
+        if not doctor.active:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Выбранный врач (ID {doctor.id}) неактивен: "
+                    "выберите действующего врача"
+                ),
+            )
+        doctor_specialty = (doctor.specialty or "").strip().lower()
+        if not doctor_specialty:
+            continue
+        for service in required:
+            accepted = _accepted_specialty_variants_for_department_key(
+                service.department_key
+            )
+            if accepted is None or doctor_specialty in accepted:
+                continue
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Врач (ID {doctor.id}, специальность "
+                    f"«{doctor.specialty}») не подходит для услуги "
+                    f"«{service.name}» (отделение «{service.department_key}»)"
+                ),
+            )
 
 
 def _check_repeat_visit_eligibility(
