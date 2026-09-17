@@ -38,6 +38,7 @@ import {
 import { useQueueApi } from '../../hooks/useQueueApi';
 import { usePatientsApi } from '../../hooks/usePatientsApi';
 import { api } from '../../api/client';
+import { fetchRegistrarServices } from '../../api/registrar';
 // UX Audit Stage 3 (Wizard issue 5.1):
 // Все 13 raw fetch() к /patients/* и /registrar/cart заменены на
 // централизованный patients API client. Это убирает дублирование
@@ -93,18 +94,6 @@ interface PatientRecord {
   middle_name?: string;
   gender?: string;
   birth_date?: string;
-  [k: string]: unknown;
-}
-
-interface ServiceData {
-  id?: string | number;
-  name: string;
-  service_code?: string;
-  queue_tag?: string;
-  category_code?: string;
-  price?: number;
-  is_consultation?: boolean;
-  requires_doctor?: boolean;
   [k: string]: unknown;
 }
 
@@ -241,6 +230,8 @@ import {
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
   findMissingDoctorItems,
+  wizardServiceFromCatalogEntry,
+  type WizardCatalogServiceData as ServiceData,
   categories
 } from './wizardUtils';
 
@@ -914,7 +905,11 @@ const AppointmentWizardV2 = ({
 
   const loadServices = useCallback(async () => {
     try {
-      const { data } = await api.get('/registrar/services');
+      // Codex P2 PR 3309 / RQ-05.b: каталог идёт через типизированный
+      // wrapper — RegistrarCatalogService доезжает до потребителя, и
+      // переименование/удаление requires_doctor в DTO ломает компиляцию,
+      // а не молча пропускает шаг 2 без врача.
+      const data = await fetchRegistrarServices();
 
         // PR-25: load queue profiles for dynamic department filtering
         let profiles: QueueProfileDto[] = queueProfiles;
@@ -928,12 +923,13 @@ const AppointmentWizardV2 = ({
           }
         }
 
-        // Извлекаем все услуги из групп
+        // Извлекаем все услуги из групп — конверсия из типизированного DTO
+        // через SSOT-адаптер wizardServiceFromCatalogEntry (codex P2 PR 3309).
         let allServices: ServiceData[] = [];
         if (data.services_by_group) {
-          Object.values(data.services_by_group as Record<string, unknown>).forEach((groupServices) => {
+          Object.values(data.services_by_group).forEach((groupServices) => {
             if (Array.isArray(groupServices)) {
-              allServices = allServices.concat(groupServices as ServiceData[]);
+              allServices = allServices.concat(groupServices.map(wizardServiceFromCatalogEntry));
             }
           });
         }

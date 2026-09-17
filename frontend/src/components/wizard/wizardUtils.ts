@@ -15,6 +15,9 @@ import { toast } from 'react-toastify';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+// RQ-05.b: тип записи каталога — импорт связывает утилиты мастера с DTO
+// (переименование/удаление requires_doctor ломает компиляцию здесь).
+import type { RegistrarCatalogService } from '../../api/registrar';
 // Codex R10 PR 3118 (P1): канонизация специальностей — через УСТАНОВЛЕННУЮ
 // SSOT-таблицу алиасов (doctorPanelShared), выровненную с backend
 // DOCTOR_QUEUE_SPECIALTY_VARIANTS (AGENTS.md: не допускать дрейфа SSOT между
@@ -898,6 +901,35 @@ export const findMissingDoctorItems = (
     return Boolean(service?.requires_doctor) && !item.doctor_id;
   });
 };
+
+// RQ-05.b (codex P2 PR 3309): типизированная конверсия записи каталога
+// GET /registrar/services в форму мастера. Флаг requires_doctor переносится
+// ЯВНО — смена DTO-контракта ломает компиляцию, а не молча пропускает шаг 2
+// без врача. Nullable-строки DTO нормализуются в undefined.
+export interface WizardCatalogServiceData {
+  id?: string | number;
+  name: string;
+  service_code?: string;
+  queue_tag?: string;
+  category_code?: string;
+  department_key?: string;
+  price?: number;
+  is_consultation?: boolean;
+  requires_doctor?: boolean;
+  [key: string]: unknown;
+}
+
+export const wizardServiceFromCatalogEntry = (
+  entry: RegistrarCatalogService
+): WizardCatalogServiceData => ({
+  ...entry,
+  requires_doctor: Boolean(entry.requires_doctor),
+  is_consultation: Boolean(entry.is_consultation),
+  service_code: entry.service_code ?? undefined,
+  queue_tag: entry.queue_tag ?? undefined,
+  category_code: entry.category_code ?? undefined,
+  department_key: entry.department_key ?? undefined,
+});
 
 const DEPARTMENT_NORMALIZED_MAPPING: Record<string, string> = {
   'specialists': 'cardiology', // Консультации специалистов (только если не 'D' или 'S') -> cardiology

@@ -72,7 +72,54 @@ describe('RQ-05.b: backend emits requires_doctor per registrar service (F-04)', 
 });
 
 // =====================================================================
-// 2. Frontend: типизация DTO по актуальному ответу бэкенда
+// 2. Frontend: проводка типизированного каталога в мастер (codex P2, PR 3309)
+// =====================================================================
+
+const wizardPath = path.resolve(
+  __dirname,
+  '../../components/wizard/AppointmentWizardV2.tsx',
+);
+const wizardUtilsPath = path.resolve(
+  __dirname,
+  '../../components/wizard/wizardUtils.ts',
+);
+
+describe('RQ-05.b: wizard consumes the typed catalog (end-to-end linkage)', () => {
+  const readWizard = () => fs.readFileSync(wizardPath, 'utf8');
+  const loadServicesBlock = () => {
+    const source = readWizard();
+    return source.slice(
+      source.indexOf('const loadServices = useCallback(async () => {'),
+      source.indexOf('// ===================== РЕЗОЛВИНГ УСЛУГ (SSOT) =====================')
+    );
+  };
+
+  it('loads the catalog through the typed wrapper fetchRegistrarServices', () => {
+    expect(loadServicesBlock()).toContain('await fetchRegistrarServices()');
+  });
+
+  it('maps catalog groups through the typed SSOT adapter', () => {
+    expect(loadServicesBlock()).toContain('groupServices.map(wizardServiceFromCatalogEntry)');
+  });
+
+  it('transfers requires_doctor EXPLICITLY in the adapter (DTO rename breaks compile, not the gate)', () => {
+    expect(fs.readFileSync(wizardUtilsPath, 'utf8'))
+      .toContain('requires_doctor: Boolean(entry.requires_doctor)');
+  });
+
+  it('drops the untyped ServiceData[] cast in the catalog extraction', () => {
+    expect(loadServicesBlock()).not.toContain('as ServiceData[]');
+  });
+
+  it('normalizes nullable DTO strings for the wizard shape', () => {
+    const utils = fs.readFileSync(wizardUtilsPath, 'utf8');
+    expect(utils).toContain('service_code: entry.service_code ?? undefined');
+    expect(utils).toContain('department_key: entry.department_key ?? undefined');
+  });
+});
+
+// =====================================================================
+// 3. Frontend: типизация DTO по актуальному ответу бэкенда
 // =====================================================================
 
 describe('RQ-05.b: api/registrar.ts types the catalog DTO', () => {
