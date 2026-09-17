@@ -301,6 +301,60 @@ landing made explicit:
   alembic head and the deterministic conversion is a clean no-op on
   the second pass.
 
+### Stage E landing note (2026-09-17, RQ-15.d — migration 0068)
+
+Stage E retired the 0055 synthetic User+Doctor pairs
+(`ecg_resource` / `lab_resource` / `general_resource`) by the paired
+deletion the stage table prescribes — the terminal state has doctorless
+queues owned by `queue_resources` rows, a reference registry with no
+User, no role, no login. The pre-state was verified on production by
+the 2026-09-12 inventory (`evidence/stage_e_inventory_20260912_rerun.json`:
+`general_queues.total = 0`, zero active services on the synthetic
+doctors, and exactly ONE inbound FK row across 103 introspected
+surfaces — a failed-login probe). Four clarifications the landing made
+explicit:
+
+- **All-or-nothing, inventory-before-mutation.** The three pairs are
+  resolved as a SET: all present and shape-valid (linked doctor, the
+  0055 specialty, the post-0057 'Resource' role, not a superuser) →
+  the guarded deletion; all absent → a printed clean no-op (the
+  re-deploy path); a PARTIAL set or any shape drift → a loud abort
+  with nothing changed. The all-or-nothing invariant is also what
+  keeps the downgrade a TRUE inverse.
+- **Semantic guards before FK machinery.** ANY `services.doctor_id`
+  or `daily_queues.specialist_id` row referencing a synthetic doctor —
+  active OR historical — aborts with the per-row inventory: the
+  catalog and the queue history are never silently doctor-stripped
+  (0063 consumed every canonical bridge, so any survivor is drift).
+- **The FK catch-all.** On PostgreSQL every FK surface referencing
+  `users.id`/`doctors.id` is enumerated from `information_schema` and
+  counted BEFORE the deletion: NO ACTION/RESTRICT or CASCADE surfaces
+  with rows abort (the latter because the retirement never silently
+  cascade-deletes history), any SET NULL surface other than
+  `login_attempts` aborts (a future surface is an operator decision),
+  composite FKs abort as unsupported, and the pair's own
+  `doctors.user_id` self-reference is excluded. `login_attempts` is
+  the only allow-listed SET NULL surface — the designed security
+  semantic ("preserve failed attempts even if user deleted"): the
+  probe rows survive the deletion ANONYMIZED. Non-PostgreSQL
+  dialects skip the introspection with a printed note (the 0066
+  dialect-gate precedent); the semantic guards still run.
+- **A TRUE-inverse downgrade.** `downgrade` re-provisions the three
+  pairs in the exact 0055+0057 shape (username,
+  `!disabled:queue-resource` unusable hash, 'Resource' role, the 0055
+  specialty mapping, active, caps 1/15) with `ON CONFLICT DO
+  NOTHING` — no id invention, no sequence games; the anonymized
+  `login_attempts` rows stay anonymized (a downgrade restores PAIRS,
+  not per-row audit links).
+
+The runtime half needed no code change: since the QD-2E cutover
+(0066, RQ-15.b) the owner resolution is fail-closed
+(`queue_owner_policy`) and the internal-account guards are ROLE-based,
+not username-based (the gate-5 vocabulary ruling) — deleting the rows
+leaves no dangling vocabulary in runtime code. The 0056/0057
+'Resource' role machinery stays: it guards any FUTURE internal account
+the operator may provision.
+
 ### Guidance for readers of this ADR
 
 Anything that routes, authorizes, or reports on queues must treat ownership
@@ -321,7 +375,10 @@ writes a resource-owned row; stage D enforces the XOR at the DB level.
   constraints and does NOT restore consumed bridge links (the upgrade
   log inventory is the audit trail).
 - Existing doctor-owned rows: byte-compatible, untouched at every stage.
-- Synthetic identities: removed only in stage E, after zero references.
+- Synthetic identities: removed only in stage E, after zero references
+  (`0068_sentinel_pair_retirement` — the paired deletion with the guard
+  taxonomy above; a pre-E backup is the restore path, the migration log
+  inventory is the audit trail).
 
 ---
 
