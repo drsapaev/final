@@ -568,6 +568,45 @@ describe('QueueSettings panel fixes for PR 3291 review findings (owner audit, cu
     });
   });
 
+  it('P2-2 round 2: post-save refresh targets the LATEST selected scope', async () => {
+    let releasePut!: (value: { data: unknown }) => void;
+    const putGate = new Promise<{ data: unknown }>((resolve) => {
+      releasePut = resolve;
+    });
+    mockedPut.mockImplementation(async () => {
+      return await putGate;
+    });
+
+    const user = userEvent.setup();
+    renderPanel();
+    await getEffectiveRegion();
+
+    // Save starts under department scope 2 (PUT held pending).
+    await user.click(screen.getByRole('button', { name: 'Область: отделение' }));
+    await user.click(await screen.findByRole('option', { name: 'Дерматология SYNTH' }));
+    await waitFor(() => {
+      expect(mockedGet.mock.calls.some(([url]) => String(url).includes('department_id=2'))).toBe(true);
+    });
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    // While the PUT is in flight the admin switches the scope back to clinic.
+    await user.click(screen.getByRole('button', { name: 'Область: отделение' }));
+    await user.click(await screen.findByRole('option', { name: 'Уровень клиники (без отделения)' }));
+
+    releasePut({ data: { message: 'Настройки сохранены', settings: settingsFixture } });
+    await waitFor(() => {
+      // 1: mount, 2: department scope, 3: back to clinic, 4: post-save refresh.
+      const effectiveGets = mockedGet.mock.calls.filter(([url]) =>
+        String(url).includes('/admin/queue/settings/effective'),
+      );
+      expect(effectiveGets.length).toBeGreaterThanOrEqual(4);
+      // The LAST request must match the CURRENT (clinic) scope: the save
+      // refresh may not resurrect the stale department scope.
+      const lastUrl = String(effectiveGets[effectiveGets.length - 1][0]);
+      expect(lastUrl).not.toContain('department_id=2');
+    });
+  });
+
   it('P2-3: keeps archived-direction tags reachable while hiding their settings cards', async () => {
     const user = userEvent.setup();
     renderPanel();

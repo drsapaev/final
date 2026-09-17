@@ -257,6 +257,13 @@ const QueueSettings = () => {
   // GET /admin/queue/settings/effective (backend RQ-23.a, PR 3289, E-050).
   const [departmentsList, setDepartmentsList] = useState<{ id: number; key: string; name_ru: string | null }[]>([]);
   const [reportScope, setReportScope] = useState<{ departmentId: number | null; tag: string | null }>({ departmentId: null, tag: null });
+  // PR 3318 codex round 2: актуальный скоуп для перечитывания после save —
+  // замыкание saveSettings могло удерживать старый скоуп, если администратор
+  // сменил селектор, пока PUT был в полёте.
+  const reportScopeRef = useRef(reportScope);
+  useEffect(() => {
+    reportScopeRef.current = reportScope;
+  }, [reportScope]);
   const [effectiveReport, setEffectiveReport] = useState<EffectiveQueueSettingsReport | null>(null);
   // PR 3291 P2-1: monotonic request sequence — a stale report response
   // that resolves after a newer scope request must never overwrite it.
@@ -443,7 +450,9 @@ const QueueSettings = () => {
       // PR 3291 P2-2: сохранённые строки клиники входят в отчёт
       // эффективных значений (start_numbers / max_per_day) — перечитываем,
       // чтобы рядом с «сохранено» не оставалось устаревшее effective-значение.
-      loadEffectiveReport(reportScope);
+      // PR 3318 codex round 2: читаем АКТУАЛЬНЫЙ скоуп из ref — перечитывание
+      // обязано соответствовать тому, что выбрано на момент завершения PUT.
+      loadEffectiveReport(reportScopeRef.current);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
       setMessage({ type: 'error', text: t('admin2.qs_save_error') });
