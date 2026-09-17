@@ -347,7 +347,7 @@ explicit:
   `login_attempts` rows stay anonymized (a downgrade restores PAIRS,
   not per-row audit links).
 - **Pair-row locking before the resolution reads (post-merge
-  hardening, E-061).** The three User rows and their linked Doctor
+  hardening, E-062).** The three User rows and their linked Doctor
   rows are locked `FOR UPDATE` — users first, then doctors, each
   ordered by id — BEFORE the resolution SELECT and every guard runs
   (PostgreSQL; the SQLite scratch harness skips with a printed note,
@@ -362,7 +362,7 @@ explicit:
   window where the merged 0069 body may change — BEFORE the
   production application (the operator stage).
 - **The locked SET, the provable terminal state, the exact-shape
-  downgrade (the E-061 review round).** Three hardenings close the
+  downgrade (the E-062 review round).** Three hardenings close the
   gaps a lock-on-rows cannot: (1) the lock selects return the locked
   id sets and the resolution must prove EXACT set equality — a pair
   that appeared AFTER the locks (a concurrent restore of a missing
