@@ -55083,6 +55083,16 @@
               }
             }
           },
+          "409": {
+            "description": "Номер телефона уже используется другим активным аккаунтом пациента портала (инвариант phone-scope Phase 0)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPhoneScopeConflictDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -55280,6 +55290,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/app__schemas__user_management__UserProfileResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Номер телефона уже используется другим активным аккаунтом пациента портала (инвариант phone-scope Phase 0)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPhoneScopeConflictDetail"
                 }
               }
             }
@@ -106337,6 +106357,20 @@
           "groups"
         ],
         "title": "UserPermissionsResponse"
+      },
+      "UserPhoneScopeConflictDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "UserPhoneScopeConflictDetail",
+        "description": "Body of the HTTP 409 phone-scope conflict on the user-management\nsurfaces (Phase 0, PR #3320 round 2): ``{\"detail\": ...}``.\n\nRaised when a mutation would create a SECOND active verified\nPatient-user on a phone that already backs another active patient\nportal account (the login resolver is fail-closed at >1 candidates)."
       },
       "UserPreferencesRequest": {
         "properties": {},

@@ -154,23 +154,42 @@ class _RedisBackend:
         )
         self._client.ping()
 
+    def _run(self, operation, *args, **kwargs):
+        """Normalize INFRASTRUCTURE failures into PatientOtpError(503).
+
+        Codex P2 (PR #3320 round 2): a backend that was created SUCCESSFULLY
+        can still DROP mid-session (connection reset / socket timeout).
+        Callers contract on PatientOtpError — a raw redis.ConnectionError
+        escaping from get/set/delete/getdel/pipeline surfaced as an
+        undocumented 500 (including AFTER the activation DB commit).
+        Only connection/timeout failures are translated; ResponseError
+        (a programming bug) must stay loud, not masquerade as 503.
+        Logged WITHOUT key material (keys embed normalized phones)."""
+        import redis  # local import: keeps TESTING path dependency-free
+
+        try:
+            return operation(*args, **kwargs)
+        except (redis.ConnectionError, redis.TimeoutError) as exc:
+            logger.error("patient OTP KV backend failure: %s", type(exc).__name__)
+            raise PatientOtpError(503, ERR_SMS_UNAVAILABLE) from exc
+
     def get(self, key: str) -> str | None:
-        return self._client.get(key)
+        return self._run(self._client.get, key)
 
     def set(self, key: str, value: str, ttl: int) -> None:
-        self._client.set(key, value, ex=ttl)
+        self._run(self._client.set, key, value, ex=ttl)
 
     def delete(self, key: str) -> None:
-        self._client.delete(key)
+        self._run(self._client.delete, key)
 
     def getdel(self, key: str) -> str | None:
-        return self._client.execute_command("GETDEL", key)
+        return self._run(self._client.execute_command, "GETDEL", key)
 
     def incr_with_ttl(self, key: str, ttl: int) -> int:
         pipe = self._client.pipeline()
         pipe.incr(key)
         pipe.expire(key, ttl, nx=True)
-        count, _ = pipe.execute()
+        count, _ = self._run(pipe.execute)
         return int(count)
 
 

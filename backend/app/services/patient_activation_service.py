@@ -47,10 +47,11 @@ import secrets
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import func, select, text
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.audit import log_critical_change
 from app.core.pii_masker import mask_phone as _canonical_mask_phone
 from app.core.roles import Roles
 from app.core.security import get_password_hash
@@ -62,6 +63,13 @@ from app.services.patient_otp_service import (
     get_patient_otp_service,
     normalize_phone,
 )
+from app.services.patient_phone_scope import (
+    acquire_phone_scope_lock as _acquire_phone_scope_lock_impl,
+)
+from app.services.patient_phone_scope import (
+    count_active_verified_patient_users as _portal_user_count_impl,
+)
+from app.services.patient_phone_scope import phone_lock_key as _phone_lock_key_impl
 
 logger = logging.getLogger(__name__)
 
@@ -122,15 +130,20 @@ def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+# Review round 2 (P1): the phone-scope primitives moved to the systemic
+# guard module app.services.patient_phone_scope so User Management and
+# profile mutations serialize on the SAME advisory lock and count with the
+# SAME resolver-predicate mirror. These module-level wrappers keep the
+# historical monkeypatch hooks (tests patch these names) as single-source
+# delegations.
 def _phone_lock_key(normalized: str) -> int:
-    """Stable signed-int64 advisory-lock key for a phone scope
-    (domain-salted sha256 fingerprint — never the number itself)."""
-    digest = hashlib.sha256(b"patact:phone-lock:" + normalized.encode("utf-8")).digest()
-    return int.from_bytes(digest[:8], "big", signed=True)
+    """Stable signed-int64 advisory-lock key (delegates to the systemic
+    patient_phone_scope module — identical salt, identical lock)."""
+    return _phone_lock_key_impl(normalized)
 
 
 def _acquire_phone_scope_lock(db: Session, normalized: str) -> None:
-    """Serialize activations across DIFFERENT patient rows sharing a phone.
+    """Serialize mutations across DIFFERENT patient rows sharing a phone.
 
     A single `Patient ... FOR UPDATE` locks ONE row — two family cards are
     different rows and would not block each other (owner GO point 3). The
@@ -138,12 +151,7 @@ def _acquire_phone_scope_lock(db: Session, normalized: str) -> None:
     serializes the whole phone scope and is released automatically at
     commit/rollback. Non-PG dialects (SQLite unit tests) skip the lock;
     the pre/under-lock re-checks and the UNIQUE backstops still apply."""
-    if db.get_bind().dialect.name != "postgresql":
-        return
-    db.execute(
-        text("SELECT pg_advisory_xact_lock(:key)"),
-        {"key": _phone_lock_key(normalized)},
-    )
+    _acquire_phone_scope_lock_impl(db, normalized)
 
 
 def _portal_user_count_for_phone(db: Session, normalized: str) -> int:
@@ -154,18 +162,7 @@ def _portal_user_count_for_phone(db: Session, normalized: str) -> int:
     candidates — ambiguous for a guard that must fire on >= 1. Counting the
     SAME WHERE-clause answers exactly "would this activation create
     candidate #2?"."""
-    stmt = (
-        select(func.count())
-        .select_from(User)
-        .join(UserProfile, UserProfile.user_id == User.id)
-        .where(
-            UserProfile.phone == normalized,
-            UserProfile.phone_verified.is_(True),
-            User.role == Roles.PATIENT,
-            User.is_active.is_(True),
-        )
-    )
-    return int(db.execute(stmt).scalar_one())
+    return _portal_user_count_impl(db, normalized)
 
 
 class PatientActivationService:
@@ -203,16 +200,24 @@ class PatientActivationService:
         token = secrets.token_urlsafe(32)
         t_hash = _token_hash(token)
 
-        # Reissue revokes any outstanding token for this patient.
-        old_hash = backend.get(f"{_PATIENT_IDX_NS}:{patient.id}")
-        if old_hash:
-            backend.delete(f"{_TOKEN_NS}:{old_hash}")
+        # Codex P2 (round 2): the backend may be CREATED successfully and
+        # STILL drop mid-operation (connection reset/timeout after init).
+        # _RedisBackend now normalizes infra failures into PatientOtpError,
+        # so every KV door here surfaces as the documented 503 instead of
+        # an undocumented 500.
+        try:
+            # Reissue revokes any outstanding token for this patient.
+            old_hash = backend.get(f"{_PATIENT_IDX_NS}:{patient.id}")
+            if old_hash:
+                backend.delete(f"{_TOKEN_NS}:{old_hash}")
 
-        entry = json.dumps({"patient_id": patient.id, "phone": normalized})
-        backend.set(f"{_TOKEN_NS}:{t_hash}", entry, ACTIVATION_TOKEN_TTL_SECONDS)
-        backend.set(
-            f"{_PATIENT_IDX_NS}:{patient.id}", t_hash, ACTIVATION_TOKEN_TTL_SECONDS
-        )
+            entry = json.dumps({"patient_id": patient.id, "phone": normalized})
+            backend.set(f"{_TOKEN_NS}:{t_hash}", entry, ACTIVATION_TOKEN_TTL_SECONDS)
+            backend.set(
+                f"{_PATIENT_IDX_NS}:{patient.id}", t_hash, ACTIVATION_TOKEN_TTL_SECONDS
+            )
+        except PatientOtpError as err:
+            raise ActivationError(err.status_code, err.detail) from err
 
         logger.info(
             "activation token issued: patient_id=%s phone=%s",
@@ -351,10 +356,16 @@ class PatientActivationService:
 
         username = self._generate_unique_username(db, patient.id)
 
+        # Codex P2 (round 2): users.full_name is VARCHAR(100) while Patient
+        # names are 3 x VARCHAR(128) — compute ONE bounded display name for
+        # BOTH rows, or a schema-valid long name would fail the PostgreSQL
+        # flush AFTER the single-use OTP was already consumed.
+        display_name = patient.short_name()[:100]
+
         # Owner correction #4: normal hash of a random unknown secret.
         user = User(
             username=username,
-            full_name=patient.short_name(),
+            full_name=display_name,
             hashed_password=get_password_hash(secrets.token_urlsafe(32)),
             role=Roles.PATIENT,
             is_active=True,
@@ -365,7 +376,7 @@ class PatientActivationService:
 
         profile = UserProfile(
             user_id=user.id,
-            full_name=patient.short_name()[:100],
+            full_name=display_name,
             first_name=(patient.first_name or "")[:50] or None,
             last_name=(patient.last_name or "")[:50] or None,
             phone=entry["phone"],
@@ -375,6 +386,25 @@ class PatientActivationService:
         db.flush()
 
         patient.user_id = user.id  # UNIQUE(patients.user_id) = race backstop
+
+        # Codex P2 (round 2): durable audit of the IDENTITY LINKING itself
+        # ("Patient.id N was bound to User.id M — a new authentication
+        # principal was created"), written in the SAME transaction as the
+        # link so "link committed without audit" is impossible. The
+        # activation is self-service: the new principal is the actor.
+        log_critical_change(
+            db,
+            user_id=user.id,
+            action="UPDATE",
+            table_name="patients",
+            row_id=patient.id,
+            old_data={"user_id": None},
+            new_data={"user_id": user.id},
+            description=(
+                "Patient portal activation: patient card linked to a newly "
+                "created portal account (authentication principal created)"
+            ),
+        )
         try:
             db.commit()
         except IntegrityError as exc:
@@ -391,11 +421,14 @@ class PatientActivationService:
         # Token is single-use: consumed ONLY after a successful commit. A KV
         # outage here must NOT fail an already-committed activation — the
         # linked card makes the token unusable anyway (state revalidation).
+        # Codex P2 (round 2): best-effort by contract — ANY cleanup failure
+        # (PatientOtpError from the normalized backend, or anything else
+        # unexpected) must never turn a committed activation into a 500.
         try:
             backend = otp_service.get_backend()
             backend.getdel(f"{_TOKEN_NS}:{_token_hash(token)}")
             backend.delete(f"{_PATIENT_IDX_NS}:{entry['patient_id']}")
-        except PatientOtpError:
+        except Exception:  # noqa: BLE001 - post-commit cleanup is best-effort
             logger.warning("activation token cleanup skipped: KV unavailable")
 
         logger.info("patient activated: patient_id=%s user_id=%s", patient.id, user.id)

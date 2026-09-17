@@ -414,6 +414,61 @@ class CoreMixin(UserManagementServiceMixinBase):
             if admin_privileges_removed and self._count_other_active_admins(db, user_id) == 0:
                 return False, "Нельзя деактивировать или понизить последнего активного администратора"
 
+            # Phase 0 (PR #3320 round 2, review P1): SYSTEMIC phone-scope
+            # invariant. The activation flow guards its own path; any OTHER
+            # mutation that can turn THIS record into a login-resolver
+            # candidate (active + role=Patient + verified phone) must pass
+            # the same check under the same advisory lock, or an admin
+            # could recreate the two-candidates fail-closed login lockout
+            # (reactivation / role->Patient / verified-phone change).
+            profile = user.profile
+            if profile is not None:
+                from app.core.roles import Roles
+                from app.services.patient_otp_service import normalize_phone
+                from app.services.patient_phone_scope import (
+                    PatientPhoneScopeConflict,
+                    ensure_phone_scope_free,
+                )
+
+                raw_new_phone = update_data.get("phone")
+                old_normalized = normalize_phone(profile.phone or "")
+                new_normalized = (
+                    normalize_phone(raw_new_phone)
+                    if "phone" in update_data
+                    else old_normalized
+                )
+                phone_changed = (
+                    "phone" in update_data
+                    and new_normalized != old_normalized
+                )
+                if phone_changed:
+                    if target_role == Roles.PATIENT:
+                        # Fail fast: the number is already a live portal
+                        # phone of another active patient account.
+                        ensure_phone_scope_free(
+                            db, raw_new_phone, exclude_user_id=user.id
+                        )
+                    # Possession is NOT proven for an admin-entered number:
+                    # parity with the self-service phone change — the record
+                    # leaves the resolver predicate until a verified re-bind.
+                    profile.phone_verified = False
+                elif (
+                    target_is_active
+                    and target_role == Roles.PATIENT
+                    and profile.phone_verified
+                    and (
+                        (target_is_active and not old_is_active)
+                        or old_role != Roles.PATIENT
+                    )
+                ):
+                    # Reactivation of a Patient-user or a role change ->
+                    # Patient on an already-verified phone: the record joins
+                    # the login-resolver predicate — the phone scope must
+                    # still be free of ANOTHER active candidate.
+                    ensure_phone_scope_free(
+                        db, profile.phone, exclude_user_id=user.id
+                    )
+
             for field, value in update_data.items():
                 if hasattr(user, field):
                     setattr(user, field, value)
@@ -476,6 +531,13 @@ class CoreMixin(UserManagementServiceMixinBase):
             db.rollback()
             logger.warning("Role change rejected by catalog guard: %s", e)
             return False, str(e)
+        except PatientPhoneScopeConflict:
+            # Phase 0 phone-scope invariant (round-2 P1): the mutation would
+            # create a SECOND active verified Patient-user on a live portal
+            # phone. Roll back (releases the advisory lock) and re-raise —
+            # the API boundary maps this to a controlled HTTP 409.
+            db.rollback()
+            raise
         except MedicalSpecialtyCatalogError as e:
             # Codex #3031 round-1: an UNUSABLE catalog must not degrade into
             # the generic internal-error fallback — on PostgreSQL the failed

@@ -25,6 +25,7 @@ from app.api.deps import create_access_token
 from app.core.security import get_password_hash
 from app.models.patient import Patient
 from app.models.user import User
+from app.models.user_profile import UserProfile
 from app.services.patient_otp_service import get_patient_otp_service
 from tests.conftest import mint_access_token
 
@@ -321,3 +322,148 @@ async def test_activation_otp_endpoint_rate_limited_per_ip(
         statuses.append(r.status_code)
         otp_kv.delete(f"patact:cd:{PHONE}")  # bypass phone cooldown: test IP limit only
     assert 429 in statuses  # slowapi IP limiter (5/minute) kicks in
+
+
+async def test_user_management_reactivation_409_owner_regression_http(
+    client, db_session, otp_kv, monkeypatch, registrar_headers, auth_headers
+):
+    """Review round 2 P1 — the owner regression over REAL HTTP through the
+    User Management surface:
+
+        activate A(X) -> admin deactivates A -> activate B(X)
+        -> admin reactivates A -> controlled 409
+        -> B remains the ONLY active candidate on X (login B works)
+
+    Proves the phone-scope invariant is SYSTEMIC (not activation-local):
+    PUT /api/v1/users/{id} is the second write path into the login-resolver
+    predicate and must honor the same Phase 0 contract."""
+    from app.core.rate_limiter import limiter
+    from app.services.patient_otp_service import get_patient_otp_service
+
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    limiter.reset()  # deterministic IP-limit state (5/min shared per test run)
+
+    mother = make_patient(
+        db_session, phone=FAMILY_PHONE, first="SYNTHETIC-Mother", last="FamilyCard"
+    )
+
+    # 1) A activates on X
+    mother_token = _token_of(client, db_session, mother.id, registrar_headers)
+    client.post(OTP_PATH, json={"activation_token": mother_token})
+    code = otp_kv.last_sent_code[f"patact:{FAMILY_PHONE}"]
+    r_confirm = client.post(
+        CONFIRM_PATH, json={"activation_token": mother_token, "code": code}
+    )
+    assert r_confirm.status_code == 200
+    user_a_id = r_confirm.json()["user"]["id"]
+
+    # 2) admin deactivates A -> zero active candidates on X
+    r_off = client.put(
+        f"/api/v1/users/users/{user_a_id}",
+        json={"is_active": False},
+        headers=auth_headers,
+    )
+    assert r_off.status_code == 200
+
+    # 3) B (second card, SAME phone) activates — legal while A is off
+    child = make_patient(
+        db_session, phone=FAMILY_PHONE, first="SYNTHETIC-Child", last="FamilyCard"
+    )
+    child_token = _token_of(client, db_session, child.id, registrar_headers)
+    limiter.reset()  # 2 request-otp calls in one minute would trip 5/min alone
+    otp_kv.delete(f"patact:cd:{FAMILY_PHONE}")  # bypass 60s phone cooldown
+    client.post(OTP_PATH, json={"activation_token": child_token})
+    code_b = otp_kv.last_sent_code[f"patact:{FAMILY_PHONE}"]
+    r_confirm_b = client.post(
+        CONFIRM_PATH, json={"activation_token": child_token, "code": code_b}
+    )
+    assert r_confirm_b.status_code == 200
+    user_b_id = r_confirm_b.json()["user"]["id"]
+    db_session.refresh(child)
+    assert child.user_id == user_b_id
+
+    # 4) admin reactivates A -> SYSTEMIC phone-scope 409 (documented body)
+    r_on = client.put(
+        f"/api/v1/users/users/{user_a_id}",
+        json={"is_active": True},
+        headers=auth_headers,
+    )
+    assert r_on.status_code == 409
+    assert "уже используется другим активным аккаунтом" in r_on.json()["detail"]
+
+    # 5) B remains the single active candidate; A stays deactivated
+    db_session.refresh(mother)
+    assert mother.user_id == user_a_id  # card still linked, user NOT reactivated
+    resolved = get_patient_otp_service().resolve_patient_user_by_phone(
+        db_session, FAMILY_PHONE
+    )
+    assert resolved is not None and resolved.id == user_b_id
+
+
+async def test_user_management_phone_reaim_409_http(
+    client, db_session, otp_kv, monkeypatch, registrar_headers, auth_headers
+):
+    """Review round 2 P1 ('short repro'): admin must not be able to re-aim
+    one active Patient-user's verified phone at ANOTHER active
+    Patient-user's live portal phone — PUT /api/v1/users/{id} returns 409
+    and nothing changes."""
+    from app.core.rate_limiter import limiter
+
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    limiter.reset()
+
+    first = make_patient(
+        db_session, phone=FAMILY_PHONE, first="SYNTHETIC-First", last="FamilyCard"
+    )
+    token = _token_of(client, db_session, first.id, registrar_headers)
+    client.post(OTP_PATH, json={"activation_token": token})
+    code = otp_kv.last_sent_code[f"patact:{FAMILY_PHONE}"]
+    r_confirm = client.post(
+        CONFIRM_PATH, json={"activation_token": token, "code": code}
+    )
+    assert r_confirm.status_code == 200
+    # activation of the first card succeeded; its user id is not needed here
+
+    # second patient user with its OWN phone (created directly)
+    from app.core.security import get_password_hash
+
+    mover = User(
+        username="pra2_mover",
+        email="pra2_mover@test.local",
+        full_name="SYNTHETIC Mover",
+        hashed_password=get_password_hash("Passw0rd!123"),
+        role="Patient",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(mover)
+    db_session.flush()
+    db_session.add(
+        UserProfile(
+            user_id=mover.id,
+            full_name="SYNTHETIC Mover",
+            phone="+998900000009",
+            phone_verified=True,
+        )
+    )
+    db_session.commit()
+
+    # admin re-aims mover at the live portal phone -> 409, nothing changes
+    r = client.put(
+        f"/api/v1/users/users/{mover.id}",
+        json={"phone": FAMILY_PHONE},
+        headers=auth_headers,
+    )
+    assert r.status_code == 409
+    db_session.refresh(mover)
+    profile = (
+        db_session.query(UserProfile).filter(UserProfile.user_id == mover.id).one()
+    )
+    assert profile.phone == "+998900000009"
+    assert profile.phone_verified is True
+    # nothing changed: mover keeps its own phone with the verified flag,
+    # the family phone still belongs exclusively to the first account.

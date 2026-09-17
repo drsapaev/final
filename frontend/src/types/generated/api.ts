@@ -37717,6 +37717,19 @@ export type components = {
             groups: string[];
         };
         /**
+         * UserPhoneScopeConflictDetail
+         * @description Body of the HTTP 409 phone-scope conflict on the user-management
+         *     surfaces (Phase 0, PR #3320 round 2): ``{"detail": ...}``.
+         *
+         *     Raised when a mutation would create a SECOND active verified
+         *     Patient-user on a phone that already backs another active patient
+         *     portal account (the login resolver is fail-closed at >1 candidates).
+         */
+        UserPhoneScopeConflictDetail: {
+            /** Detail */
+            detail: string;
+        };
+        /**
          * UserPreferencesRequest
          * @description Request body for PUT /users/me/preferences.
          *
@@ -72121,6 +72134,15 @@ export interface operations {
                     "application/json": components["schemas"]["UserResponse"];
                 };
             };
+            /** @description Номер телефона уже используется другим активным аккаунтом пациента портала (инвариант phone-scope Phase 0) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPhoneScopeConflictDetail"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72221,6 +72243,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__user_management__UserProfileResponse"];
+                };
+            };
+            /** @description Номер телефона уже используется другим активным аккаунтом пациента портала (инвариант phone-scope Phase 0) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPhoneScopeConflictDetail"];
                 };
             };
             /** @description Validation Error */

@@ -568,3 +568,206 @@ async def test_kv_outage_translated_to_activation_503(db_session, svc, monkeypat
     with pytest.raises(ActivationError) as err:
         svc.activate(db_session, token, "123456")
     assert err.value.status_code == 503
+
+
+# ----------------------------------------------- round 2: KV mid-session
+class _DroppingRedisClient:
+    """Models the round-2 Codex P2 scenario EXACTLY: the backend was
+    created successfully (init + ping passed), THEN the Redis connection
+    drops — every subsequent operation raises redis.ConnectionError."""
+
+    def get(self, key):
+        import redis
+
+        raise redis.ConnectionError("connection dropped mid-session")
+
+    def set(self, *args, **kwargs):
+        import redis
+
+        raise redis.ConnectionError("connection dropped mid-session")
+
+    def delete(self, *args, **kwargs):
+        import redis
+
+        raise redis.ConnectionError("connection dropped mid-session")
+
+    def execute_command(self, *args, **kwargs):
+        import redis
+
+        raise redis.ConnectionError("connection dropped mid-session")
+
+    def pipeline(self):
+        import redis
+
+        raise redis.ConnectionError("connection dropped mid-session")
+
+
+def _dropped_backend():
+    from app.services.patient_otp_service import _RedisBackend
+
+    backend = _RedisBackend.__new__(_RedisBackend)
+    backend._client = _DroppingRedisClient()
+    return backend
+
+
+def test_redis_backend_normalizes_midsession_infra_failures():
+    """_RedisBackend normalizes connection/timeout failures into
+    PatientOtpError(503) so EVERY caller contract holds after init."""
+    import redis
+
+    from app.services.patient_otp_service import PatientOtpError, _RedisBackend
+
+    backend = _dropped_backend()
+    for call in (
+        lambda: backend.get("k"),
+        lambda: backend.set("k", "v", 60),
+        lambda: backend.delete("k"),
+        lambda: backend.getdel("k"),
+    ):
+        with pytest.raises(PatientOtpError) as err:
+            call()
+        assert err.value.status_code == 503
+
+    # ResponseError (a programming bug) must NOT masquerade as 503
+    class _Buggy:
+        def execute_command(self, *a, **k):
+            raise redis.ResponseError("unknown command")
+
+    backend2 = _RedisBackend.__new__(_RedisBackend)
+    backend2._client = _Buggy()
+    with pytest.raises(redis.ResponseError):
+        backend2.getdel("k")
+
+
+async def test_midsession_kv_drop_is_503_at_every_activation_door(
+    db_session, svc, monkeypatch
+):
+    """Backend created OK, THEN Redis drops: issue/request-otp/activate all
+    surface the documented ActivationError(503) — never a raw
+    redis.ConnectionError (undocumented 500)."""
+    patient = make_patient(db_session, phone=PHONE)
+    token = issued_token(db_session, svc, patient)  # backend was healthy here
+
+    otp = get_patient_otp_service()
+    monkeypatch.setattr(otp, "_backend", _dropped_backend())
+
+    with pytest.raises(ActivationError) as err:
+        svc.issue_activation_token(db_session, patient.id)
+    assert err.value.status_code == 503
+
+    with pytest.raises(ActivationError) as err:
+        await svc.request_activation_otp(db_session, token)
+    assert err.value.status_code == 503
+
+    with pytest.raises(ActivationError) as err:
+        svc.activate(db_session, token, "123456")
+    assert err.value.status_code == 503
+
+
+async def test_post_commit_cleanup_failure_still_returns_jwt(
+    db_session, svc, monkeypatch
+):
+    """Codex round-2 P2 (post-commit): DB commit SUCCEEDS, then the KV
+    cleanup (getdel/delete) fails with a raw redis.ConnectionError — the
+    committed activation MUST still return 200 + JWT, never a 500."""
+    from app.services.patient_otp_service import _MemoryBackend
+
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    patient = make_patient(db_session, phone=PHONE)
+    token = issued_token(db_session, svc, patient)
+    await svc.request_activation_otp(db_session, token)
+    code = _kv().last_sent_code[f"patact:{PHONE}"]
+
+    real = _kv()
+
+    class _CleanupFailsBackend(_MemoryBackend):
+        """Healthy for reads/writes; the POST-COMMIT cleanup doors explode
+        raw (token GETDEL + revocation-index DELETE) — everything needed
+        BEFORE the commit (OTP code consume) stays healthy."""
+
+        def getdel(self, key):
+            import redis
+
+            raise redis.ConnectionError("dropped right after commit")
+
+        def delete(self, key):
+            import redis
+
+            if key.startswith("patact:idx:"):
+                raise redis.ConnectionError("dropped right after commit")
+            return super().delete(key)
+
+    failing = _CleanupFailsBackend()
+    failing._store = real._store
+    failing._counters = real._counters
+    failing.last_sent_code = real.last_sent_code
+    otp = get_patient_otp_service()
+    monkeypatch.setattr(otp, "_backend", failing)
+
+    out = svc.activate(db_session, token, code)
+    assert out["access_token"]  # JWT issued despite the cleanup failure
+    db_session.refresh(patient)
+    assert patient.user_id == out["user"]["id"]  # link committed
+
+
+async def test_long_name_bounded_for_user_and_profile(db_session, svc, monkeypatch):
+    """Codex round-2 P2: users.full_name is VARCHAR(100) while Patient
+    names are 3 x VARCHAR(128). A schema-valid name longer than 100 chars
+    must NOT break the activation after the single-use OTP was consumed —
+    ONE bounded display name for BOTH User and UserProfile."""
+    monkeypatch.setattr(
+        "app.services.patient_otp_service.settings.SMS_DEFAULT_PROVIDER", "mock"
+    )
+    long_last = "S" * 50  # SYNTHETIC-only letter run
+    long_first = "y" * 60
+    assert len(long_last) + 1 + len(long_first) > 100
+    patient = make_patient(db_session, phone=PHONE, first=long_first, last=long_last)
+    token = issued_token(db_session, svc, patient)
+    await svc.request_activation_otp(db_session, token)
+    code = _kv().last_sent_code[f"patact:{PHONE}"]
+
+    out = svc.activate(db_session, token, code)
+
+    user = db_session.get(User, out["user"]["id"])
+    profile = db_session.execute(
+        select(UserProfile).where(UserProfile.user_id == user.id)
+    ).scalar_one()
+    assert len(user.full_name) <= 100  # flushes on PostgreSQL VARCHAR(100)
+    assert user.full_name == profile.full_name  # computed ONCE, same value
+    assert user.full_name == patient.short_name()[:100]
+
+
+async def test_activation_linking_audited_in_same_transaction(db_session, svc):
+    """Codex round-2 P2: the IDENTITY LINKING itself (Patient.id N bound to
+    User.id M — a new authentication principal) needs a durable audit row
+    written in the SAME transaction as the link, so the state
+    'link committed, audit missing' is impossible."""
+    patient = make_patient(db_session, phone=PHONE)
+    token = issued_token(db_session, svc, patient)
+    await svc.request_activation_otp(db_session, token)
+    code = _kv().last_sent_code[f"patact:{PHONE}"]
+
+    out = svc.activate(db_session, token, code)
+
+    from app.models.user_profile import UserAuditLog
+
+    rows = (
+        db_session.query(UserAuditLog)
+        .filter(
+            UserAuditLog.resource_type == "patients",
+            UserAuditLog.resource_id == patient.id,
+            UserAuditLog.action == "UPDATE",
+        )
+        .all()
+    )
+    assert rows, "activation linking must leave a critical audit row"
+    linked = [
+        r
+        for r in rows
+        if (r.new_values or {}).get("user_id") == out["user"]["id"]
+        and (r.old_values or {}).get("user_id", "missing") is None
+    ]
+    assert linked, "audit must record user_id: NULL -> <new user id>"
+    assert "activation" in linked[0].description.lower()
