@@ -1,4 +1,4 @@
-"""Patient portal OTP foundation (Phase 0, PR-A1).
+"""Patient portal OTP foundation (Phase 0, PR-A1; extended by PR-A2).
 
 Identity contract (plan v2/v3, owner-approved):
     Phone is a POSSESSION factor, not patient identity. This module
@@ -74,8 +74,14 @@ ERR_SMS_UNAVAILABLE = "Не удалось отправить SMS. Попроб�
 ERR_OTP_INVALID = "Неверный код или срок его действия истёк."
 ERR_LOGIN_GENERIC = "Не удалось выполнить вход. Проверьте номер и код."
 
-# --- Redis key namespace ---
+# --- Redis key namespaces ---
+# Login OTP keys (PR-A1): patotp:{cd,cap,code,meta,grant}:{...}
 _PREFIX = "patotp"
+_NS_LOGIN = _PREFIX
+# Activation OTP keys (PR-A2): patact:{cd,cap,code,meta}:{...} — isolated
+# from login limits/codes so neither flow can consume the other's state.
+_NS_ACTIVATION = "patact"
+_OTP_NAMESPACES = (_NS_LOGIN, _NS_ACTIVATION)
 
 
 def normalize_phone(raw: str) -> str | None:
@@ -148,23 +154,42 @@ class _RedisBackend:
         )
         self._client.ping()
 
+    def _run(self, operation, *args, **kwargs):
+        """Normalize INFRASTRUCTURE failures into PatientOtpError(503).
+
+        Codex P2 (PR #3320 round 2): a backend that was created SUCCESSFULLY
+        can still DROP mid-session (connection reset / socket timeout).
+        Callers contract on PatientOtpError — a raw redis.ConnectionError
+        escaping from get/set/delete/getdel/pipeline surfaced as an
+        undocumented 500 (including AFTER the activation DB commit).
+        Only connection/timeout failures are translated; ResponseError
+        (a programming bug) must stay loud, not masquerade as 503.
+        Logged WITHOUT key material (keys embed normalized phones)."""
+        import redis  # local import: keeps TESTING path dependency-free
+
+        try:
+            return operation(*args, **kwargs)
+        except (redis.ConnectionError, redis.TimeoutError) as exc:
+            logger.error("patient OTP KV backend failure: %s", type(exc).__name__)
+            raise PatientOtpError(503, ERR_SMS_UNAVAILABLE) from exc
+
     def get(self, key: str) -> str | None:
-        return self._client.get(key)
+        return self._run(self._client.get, key)
 
     def set(self, key: str, value: str, ttl: int) -> None:
-        self._client.set(key, value, ex=ttl)
+        self._run(self._client.set, key, value, ex=ttl)
 
     def delete(self, key: str) -> None:
-        self._client.delete(key)
+        self._run(self._client.delete, key)
 
     def getdel(self, key: str) -> str | None:
-        return self._client.execute_command("GETDEL", key)
+        return self._run(self._client.execute_command, "GETDEL", key)
 
     def incr_with_ttl(self, key: str, ttl: int) -> int:
         pipe = self._client.pipeline()
         pipe.incr(key)
         pipe.expire(key, ttl, nx=True)
-        count, _ = pipe.execute()
+        count, _ = self._run(pipe.execute)
         return int(count)
 
 
@@ -187,6 +212,12 @@ class PatientOtpService:
                     raise PatientOtpError(503, ERR_SMS_UNAVAILABLE) from exc
         return self._backend
 
+    def get_backend(self) -> _MemoryBackend | _RedisBackend:
+        """Public KV access for the patient-access domain (PR-A2 activation
+        service reuses the SAME backend selection: TESTING in-memory /
+        production Redis with fail-closed 503)."""
+        return self._get_backend()
+
     def _reset_backend_for_tests(self) -> None:
         self._backend = None
 
@@ -197,17 +228,32 @@ class PatientOtpService:
         """Send a login OTP. Raises PatientOtpError only for number-neutral
         failures (rate limits / infrastructure); response body is identical
         regardless of any patient state."""
+        return await self._send_otp(_NS_LOGIN, phone, locale)
+
+    async def send_activation_otp(
+        self, phone: str, locale: str | None = None
+    ) -> dict[str, Any]:
+        """Send an ACTIVATION OTP (PR-A2). Same guarantees as login OTP,
+        but fully isolated namespace: activation codes/limits never
+        interact with login OTP state."""
+        return await self._send_otp(_NS_ACTIVATION, phone, locale)
+
+    async def _send_otp(
+        self, namespace: str, phone: str, locale: str | None = None
+    ) -> dict[str, Any]:
+        if namespace not in _OTP_NAMESPACES:
+            raise ValueError(f"unknown OTP namespace: {namespace}")
         normalized = normalize_phone(phone)
         if not normalized:
             raise PatientOtpError(400, ERR_OTP_INVALID)
         lang = locale if locale in LOCALES else _DEFAULT_LOCALE
 
         backend = self._get_backend()
-        cooldown_key = f"{_PREFIX}:cd:{normalized}"
+        cooldown_key = f"{namespace}:cd:{normalized}"
         if backend.get(cooldown_key) is not None:
             raise PatientOtpError(429, ERR_RATE_LIMITED)
 
-        cap_key = f"{_PREFIX}:cap:{normalized}"
+        cap_key = f"{namespace}:cap:{normalized}"
         if backend.incr_with_ttl(cap_key, 3600) > HOURLY_SEND_CAP:
             raise PatientOtpError(429, ERR_RATE_LIMITED)
 
@@ -232,14 +278,22 @@ class PatientOtpService:
             )
             raise PatientOtpError(503, ERR_SMS_UNAVAILABLE)
 
-        backend.set(f"{_PREFIX}:code:{normalized}", _hash_code(code), CODE_TTL_SECONDS)
+        backend.set(
+            f"{namespace}:code:{normalized}", _hash_code(code), CODE_TTL_SECONDS
+        )
         backend.set(cooldown_key, "1", RESEND_COOLDOWN_SECONDS)
 
         if _testing_mode():
-            backend.last_sent_code[normalized] = code  # type: ignore[attr-defined]
+            # Backward-compat: login-OTP hook keeps bare-phone keys (PR-A1
+            # tests); namespaced keys avoid cross-flow test ambiguity.
+            hook_key = (
+                normalized if namespace == _NS_LOGIN else f"{namespace}:{normalized}"
+            )
+            backend.last_sent_code[hook_key] = code  # type: ignore[attr-defined]
 
         logger.info(
-            "patient OTP sent: phone_fingerprint=%s provider=%s",
+            "patient OTP sent: flow=%s phone_fingerprint=%s provider=%s",
+            namespace,
             hashlib.sha256(normalized.encode()).hexdigest()[:12],
             getattr(result, "provider", "unknown"),
         )
@@ -250,12 +304,28 @@ class PatientOtpService:
         """Verify code, return single-use verification grant.
 
         All failure modes share ONE generic 400 response (anti-enum)."""
+        normalized = self._verify_otp_code(_NS_LOGIN, phone, code)
+        grant = secrets.token_urlsafe(32)
+        self._get_backend().set(
+            f"{_NS_LOGIN}:grant:{grant}", normalized, GRANT_TTL_SECONDS
+        )
+        return {"verification_grant": grant, "expires_in": GRANT_TTL_SECONDS}
+
+    def verify_activation_otp(self, phone: str, code: str) -> str:
+        """Verify an ACTIVATION OTP (PR-A2); returns the normalized phone.
+        No grant is issued — activation proceeds directly in one service
+        call (OTP single-use, same generic 400 on every failure)."""
+        return self._verify_otp_code(_NS_ACTIVATION, phone, code)
+
+    def _verify_otp_code(self, namespace: str, phone: str, code: str) -> str:
+        if namespace not in _OTP_NAMESPACES:
+            raise ValueError(f"unknown OTP namespace: {namespace}")
         normalized = normalize_phone(phone)
         if not normalized or not re.fullmatch(r"\d{6}", code or ""):
             raise PatientOtpError(400, ERR_OTP_INVALID)
 
         backend = self._get_backend()
-        code_key = f"{_PREFIX}:code:{normalized}"
+        code_key = f"{namespace}:code:{normalized}"
         raw = backend.get(code_key)
         if raw is None:
             raise PatientOtpError(400, ERR_OTP_INVALID)
@@ -268,16 +338,14 @@ class PatientOtpService:
             raise PatientOtpError(400, ERR_OTP_INVALID)
 
         backend.delete(code_key)  # single-use code
-        grant = secrets.token_urlsafe(32)
-        backend.set(f"{_PREFIX}:grant:{grant}", normalized, GRANT_TTL_SECONDS)
-        return {"verification_grant": grant, "expires_in": GRANT_TTL_SECONDS}
+        return normalized
 
     def _bump_attempts(self, backend: Any, code_key: str) -> int:
         """Best-effort attempt counter; corrupt/missing entries stay generic."""
         try:
-            record = backend.get(f"{_PREFIX}:meta:{code_key}")
+            record = backend.get(f"meta:{code_key}")
             attempts = (int(record) if record else 0) + 1
-            backend.set(f"{_PREFIX}:meta:{code_key}", str(attempts), CODE_TTL_SECONDS)
+            backend.set(f"meta:{code_key}", str(attempts), CODE_TTL_SECONDS)
             return attempts
         except Exception:  # noqa: BLE001
             return 0

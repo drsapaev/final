@@ -1,9 +1,17 @@
 """Operations mixin for UserManagementService. Split from user_management_service.py."""
 from __future__ import annotations
 
+from app.core.roles import Roles
 from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
     MedicalSpecialtyCatalogService,
+)
+from app.services.patient_otp_service import normalize_phone
+from app.services.patient_phone_scope import (
+    ERR_PHONE_SCOPE_CONFLICT,
+    acquire_phone_scope_lock,
+    ensure_phone_scope_free,
+    lock_candidate_state_rows,
 )
 from app.services.user_mgmt._base import *  # noqa: F401, F403
 from app.services.user_mgmt._base import (
@@ -98,6 +106,20 @@ class OperationsMixin(UserManagementServiceMixinBase):
             processed_count = 0
             failed_count = 0
             failed_users = []
+
+            # Round-4 P1 (review, concurrency): serialize the
+            # candidate-defining state of EVERY target row (users.role,
+            # users.is_active, user_profiles.phone, user_profiles.
+            # phone_verified) BEFORE any preflight reads it. The round-3
+            # preflight computed `entering_ids` from UNLOCKED rows: a
+            # concurrent update_user could flip role/is_active between the
+            # preflight and the mutation, the batch would keep the stale
+            # "not entering" verdict and the two operations would still
+            # combine into a second login-resolver candidate. Row locks
+            # make preflight state authoritative until commit. Same global
+            # lock order as update_user: users rows ascending ->
+            # user_profiles rows -> phone advisory locks (sorted).
+            lock_candidate_state_rows(db, action_data.user_ids)
 
             # Codex #3031 round-3 P2 (narrowed per round-4 P2): catalog probes
             # inside the lifecycle helpers are SELECTs — when the catalog is
@@ -245,6 +267,69 @@ class OperationsMixin(UserManagementServiceMixinBase):
                         },
                     )
 
+            # Phase 0 (PR #3320 round 3, review P1): bulk activate and bulk
+            # change_role -> Patient are write paths into the login-resolver
+            # predicate (active + role=Patient + UserProfile.phone +
+            # phone_verified) and must honor the SAME phone-scope invariant
+            # as update_user and the activation flow — otherwise the
+            # two-candidates fail-closed login lockout reproduces over the
+            # bulk surface.
+            #
+            # Batch semantics (session autoflush=False): sequential per-row
+            # COUNT checks cannot see intra-batch pending activations, so
+            # two inactive verified Patient-users sharing a phone would BOTH
+            # pass. The preflight therefore (a) identifies every record this
+            # batch would move INTO the resolver predicate, (b) takes the
+            # per-phone advisory locks in DETERMINISTIC (sorted) order so
+            # concurrent bulk batches cannot ABBA-deadlock, and (c) allows
+            # at most ONE entering candidate per phone per batch (first in
+            # the request's user_ids order wins; the rest fail per-user).
+            phone_scope_blocked: dict[int, str] = {}
+            entering_ids: set[int] = set()
+            if action_data.action in ("activate", "change_role"):
+                entering: list[tuple[int, str]] = []
+                if action_data.action == "activate":
+                    entering_rows = (
+                        db.query(User.id, UserProfile.phone)
+                        .join(UserProfile, UserProfile.user_id == User.id)
+                        .filter(
+                            User.id.in_(action_data.user_ids),
+                            User.role == Roles.PATIENT,
+                            User.is_active.is_(False),
+                            UserProfile.phone_verified.is_(True),
+                        )
+                        .all()
+                    )
+                elif (action_data.role or "") == Roles.PATIENT:
+                    entering_rows = (
+                        db.query(User.id, UserProfile.phone)
+                        .join(UserProfile, UserProfile.user_id == User.id)
+                        .filter(
+                            User.id.in_(action_data.user_ids),
+                            User.role != Roles.PATIENT,
+                            User.is_active.is_(True),
+                            UserProfile.phone_verified.is_(True),
+                        )
+                        .all()
+                    )
+                else:
+                    entering_rows = []
+                batch_order = {uid: i for i, uid in enumerate(action_data.user_ids)}
+                for row in entering_rows:
+                    normalized = normalize_phone(row.phone or "")
+                    if normalized:
+                        entering.append((row.id, normalized))
+                entering.sort(key=lambda item: batch_order.get(item[0], len(batch_order)))
+                for normalized in sorted({p for _, p in entering}):
+                    acquire_phone_scope_lock(db, normalized)
+                seen_phones: set[str] = set()
+                for uid, normalized in entering:
+                    if normalized in seen_phones:
+                        phone_scope_blocked[uid] = ERR_PHONE_SCOPE_CONFLICT
+                    else:
+                        seen_phones.add(normalized)
+                entering_ids = {uid for uid, _ in entering}
+
             for user_id in action_data.user_ids:
                 try:
                     user = db.query(User).filter(User.id == user_id).first()
@@ -267,7 +352,30 @@ class OperationsMixin(UserManagementServiceMixinBase):
                         )
                         continue
 
+                    # Round-3 P1: intra-batch losers (second+ entering
+                    # candidate on an already-claimed phone) fail per-user
+                    # BEFORE any mutation — the winner is settled by the
+                    # preflight, not by flush visibility.
+                    if user_id in phone_scope_blocked:
+                        failed_count += 1
+                        failed_users.append(
+                            {"user_id": user_id, "error": phone_scope_blocked[user_id]}
+                        )
+                        continue
+
                     if action_data.action == "activate":
+                        # Round-3 P1: the record is about to JOIN the
+                        # login-resolver predicate — the authoritative
+                        # per-row check under the (already held, reentrant)
+                        # phone-scope lock. Committed-state collisions
+                        # (candidates OUTSIDE the batch) fail here;
+                        # intra-batch collisions were settled by the
+                        # preflight above. Raised BEFORE any mutation, so
+                        # the restore contract below is not even entered.
+                        if user_id in entering_ids:
+                            ensure_phone_scope_free(
+                                db, user.profile.phone, exclude_user_id=user.id
+                            )
                         # Codex #3031 round-4 P1: capture the pre-mutation
                         # state — if the shared-mirror catalog guard rejects
                         # this user, the per-user catch below records the
@@ -305,6 +413,13 @@ class OperationsMixin(UserManagementServiceMixinBase):
                             user.profile.status = UserStatus.ACTIVE
                     elif action_data.action == "change_role":
                         if action_data.role and action_data.role != user.role:
+                            # Round-3 P1: same entering-the-predicate check
+                            # as bulk activate (active + verified phone +
+                            # target role Patient).
+                            if user_id in entering_ids:
+                                ensure_phone_scope_free(
+                                    db, user.profile.phone, exclude_user_id=user.id
+                                )
                             old_role = user.role
                             # Codex #3031 round-4 P1: same restore contract —
                             # if the lifecycle's catalog guard rejects the
