@@ -341,7 +341,13 @@ _SELECT_QUEUE_REFERENCES = sa.text("""
     """).bindparams(sa.bindparam("doctor_ids", expanding=True))
 
 # Every single-column FK surface referencing users.id / doctors.id in
-# the CURRENT schema, from ANY source schema, with its ON DELETE rule.
+# the CURRENT schema, from ANY source schema, with its ON DELETE rule
+# and its REFERENCED COLUMN (the 2026-09-18 owner-review P1: the
+# reference-TARGET identity must travel with the surface — PostgreSQL
+# allows an FK to land on ANY unique key, and this schema has live
+# alternates, doctors.user_id / users.username / users.email are
+# UNIQUE; counting id values against such a surface returns a false 0
+# while the DELETE still fires the ON DELETE action through it).
 #
 # Direct pg_catalog discovery (the 2026-09-18 Supabase compatibility
 # fix): the multi-view information_schema join hung on the production
@@ -356,12 +362,20 @@ _SELECT_QUEUE_REFERENCES = sa.text("""
 # pair DELETE fire a cross-schema cascade the migration never saw.
 # src_schema travels with every row so the per-surface counting can
 # address the table schema-qualified (review of PR #3324, P1).
+#
+# conkey/confkey are unnested IN PARALLEL (element i of each array is
+# the same FK column pair), so every row carries the exact
+# (column_name, ref_column) pairing even for a composite constraint;
+# composite FKs are already aborted upstream by
+# _SELECT_COMPOSITE_FK_CONSTRAINTS, and the parallel form keeps the
+# pairing correct should a row ever reach this query.
 _SELECT_FK_SURFACES = sa.text("""
     SELECT DISTINCT
            src_ns.nspname AS src_schema,
            src.relname AS table_name,
            att.attname AS column_name,
            ref.relname AS ref_table,
+           ref_att.attname AS ref_column,
            CASE con.confdeltype
                 WHEN 'a' THEN 'NO ACTION'
                 WHEN 'r' THEN 'RESTRICT'
@@ -374,13 +388,16 @@ _SELECT_FK_SURFACES = sa.text("""
     JOIN pg_namespace src_ns ON src_ns.oid = src.relnamespace
     JOIN pg_class ref ON ref.oid = con.confrelid
     JOIN pg_namespace ref_ns ON ref_ns.oid = ref.relnamespace
-    JOIN unnest(con.conkey) WITH ORDINALITY AS ck(attnum, ord) ON true
+    JOIN unnest(con.conkey, con.confkey)
+         WITH ORDINALITY AS cols(src_attnum, ref_attnum, ord) ON true
     JOIN pg_attribute att
-      ON att.attrelid = con.conrelid AND att.attnum = ck.attnum
+      ON att.attrelid = con.conrelid AND att.attnum = cols.src_attnum
+    JOIN pg_attribute ref_att
+      ON ref_att.attrelid = con.confrelid AND ref_att.attnum = cols.ref_attnum
     WHERE con.contype = 'f'
       AND ref_ns.nspname = current_schema()
       AND ref.relname IN ('users', 'doctors')
-    ORDER BY src_schema, table_name, column_name
+    ORDER BY src_schema, table_name, column_name, ref_column
     """)
 
 # Composite FK guard: any constraint referencing the pairs that spans
@@ -741,7 +758,17 @@ def _inventory_fk_surfaces(conn, user_ids: list[int], doctor_ids: list[int]) -> 
     self-reference / login_attempts exemptions are LOCAL to the current
     schema: name collisions across schemas never inherit them. A
     surface the migration role cannot SELECT is a loud abort, never an
-    empty count."""
+    empty count.
+
+    The reference-TARGET identity is part of the contract (the
+    2026-09-18 owner-review P1): the counts below compare the source
+    column against user_ids/doctor_ids — the pairs' PRIMARY KEY values.
+    An FK landing on any other unique key (doctors.user_id,
+    users.username, users.email) can neither be counted (a false 0)
+    nor verified, so it is a loud unsupported-reference-surface abort
+    BEFORE any counting and any deletion — checked before the
+    self-reference skip, which is keyed without the referenced column
+    and must never buy an alternate-key FK a silent pass."""
     if conn.dialect.name != "postgresql":
         print(
             f"{_MIGRATION_NAME}: FK introspection skipped on dialect "
@@ -778,6 +805,35 @@ def _inventory_fk_surfaces(conn, user_ids: list[int], doctor_ids: list[int]) -> 
         # Audit-display name: bare inside the current schema (log
         # parity with the pre-fix inventory), schema-qualified outside.
         display = table if local else f"{src_schema}.{table}"
+
+        # Reference-target identity FIRST (the 2026-09-18 owner-review
+        # P1): every count below compares the source column against the
+        # pairs' primary-key values. PostgreSQL allows an FK to target
+        # ANY unique key, and this schema has live alternates —
+        # doctors.user_id, users.username, users.email are UNIQUE.
+        # Against such a surface the id-valued count is meaningless (a
+        # false 0) while the pair DELETE still fires the ON DELETE
+        # action through the alternate-key FK — a doctors.user_id
+        # CASCADE would silently wipe foreign rows the guard just
+        # declared nonexistent. The check runs BEFORE the self-reference
+        # skip: that exclusion is keyed by (table, column, ref_table)
+        # alone and must never buy an alternate-key FK a silent pass.
+        if surface.ref_column != "id":
+            print(
+                f"{_MIGRATION_NAME}: FK surface {display}.{column} -> "
+                f"{ref_table}.{surface.ref_column} (ON DELETE "
+                f"{delete_rule}) — unsupported reference target"
+            )
+            _abort(
+                f"FK surface {display}.{column} references "
+                f"{ref_table}.{surface.ref_column}, not the primary key "
+                "id — unsupported reference surface: the retirement "
+                "counts id values only, so an FK into an alternate "
+                "unique key (doctors.user_id / users.username / "
+                "users.email) can neither be counted nor verified and "
+                "is never silently ignored; the operator handles it "
+                "explicitly; refusing with no rows changed"
+            )
 
         # The self-reference exclusion is a statement about THE pairs'
         # own tables: a foreign-schema "doctors" must not inherit it by
