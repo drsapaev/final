@@ -341,17 +341,24 @@ _SELECT_QUEUE_REFERENCES = sa.text("""
     """).bindparams(sa.bindparam("doctor_ids", expanding=True))
 
 # Every single-column FK surface referencing users.id / doctors.id in
-# the CURRENT schema, with its ON DELETE rule.
+# the CURRENT schema, from ANY source schema, with its ON DELETE rule.
 #
 # Direct pg_catalog discovery (the 2026-09-18 Supabase compatibility
 # fix): the multi-view information_schema join hung on the production
 # Supabase catalog (permission-checked views over every internal
-# schema) before the deletion. BOTH the source and the reference side
-# are scoped to current_schema() — a bare table-name match on the
-# referenced side would pull in foreign-schema worlds (Supabase's
-# auth.users is a real one).
+# schema) before the deletion. The REFERENCE side is strictly scoped
+# to current_schema() — a bare table-name match would pull in foreign
+# "users" worlds (Supabase's auth.users is a real one). The SOURCE
+# side is deliberately UNRESTRICTED: an FK from ANY schema landing on
+# the pairs (a reporting.audit_rows -> public.users CASCADE on a
+# multi-schema Supabase) is inventoried and fail-closed like a local
+# surface — a silently skipped foreign-schema child would make the
+# pair DELETE fire a cross-schema cascade the migration never saw.
+# src_schema travels with every row so the per-surface counting can
+# address the table schema-qualified (review of PR #3324, P1).
 _SELECT_FK_SURFACES = sa.text("""
     SELECT DISTINCT
+           src_ns.nspname AS src_schema,
            src.relname AS table_name,
            att.attname AS column_name,
            ref.relname AS ref_table,
@@ -371,19 +378,21 @@ _SELECT_FK_SURFACES = sa.text("""
     JOIN pg_attribute att
       ON att.attrelid = con.conrelid AND att.attnum = ck.attnum
     WHERE con.contype = 'f'
-      AND src_ns.nspname = current_schema()
       AND ref_ns.nspname = current_schema()
       AND ref.relname IN ('users', 'doctors')
-    ORDER BY table_name, column_name
+    ORDER BY src_schema, table_name, column_name
     """)
 
 # Composite FK guard: any constraint referencing the pairs that spans
 # more than one column is unsupported surface — never guessed.
 # column_count is the FK's OWN column count (cardinality of conkey);
 # the pre-fix information_schema join inflated it by multiplying with
-# the referenced-side columns of the composite unique constraint.
+# the referenced-side columns of the composite unique constraint. The
+# source side is unrestricted (any schema), mirroring the surface
+# query: a foreign-schema composite FK is unsupported surface too.
 _SELECT_COMPOSITE_FK_CONSTRAINTS = sa.text("""
-    SELECT con.conname AS constraint_name,
+    SELECT src_ns.nspname AS src_schema,
+           con.conname AS constraint_name,
            cardinality(con.conkey) AS column_count
     FROM pg_constraint con
     JOIN pg_class src ON src.oid = con.conrelid
@@ -391,10 +400,10 @@ _SELECT_COMPOSITE_FK_CONSTRAINTS = sa.text("""
     JOIN pg_class ref ON ref.oid = con.confrelid
     JOIN pg_namespace ref_ns ON ref_ns.oid = ref.relnamespace
     WHERE con.contype = 'f'
-      AND src_ns.nspname = current_schema()
       AND ref_ns.nspname = current_schema()
       AND ref.relname IN ('users', 'doctors')
       AND cardinality(con.conkey) > 1
+    ORDER BY src_schema, constraint_name
     """)
 
 _DELETE_DOCTORS = sa.text("DELETE FROM doctors WHERE id IN :doctor_ids").bindparams(
@@ -714,10 +723,25 @@ def _assert_no_queue_references(conn, doctor_ids: list[int]) -> None:
     )
 
 
+def _quote_ident(name: str) -> str:
+    """A pg_catalog identifier is catalog data, not trusted SQL text:
+    quoted and quote-doubled into a safe identifier."""
+    return '"' + name.replace('"', '""') + '"'
+
+
 def _inventory_fk_surfaces(conn, user_ids: list[int], doctor_ids: list[int]) -> None:
     """The PostgreSQL catch-all: every FK surface referencing the pairs
     is counted before the deletion (dialect-gated — the P1-2 precedent;
-    SQLite scratch harnesses skip it, the semantic guards still run)."""
+    SQLite scratch harnesses skip it, the semantic guards still run).
+
+    Sources in ANY schema are inventoried (the 2026-09-18 review P1:
+    a foreign-schema child landing on the pairs is a live FK surface —
+    silently skipping it would turn the pair DELETE into a cross-schema
+    cascade). Foreign surfaces are addressed schema-qualified, and the
+    self-reference / login_attempts exemptions are LOCAL to the current
+    schema: name collisions across schemas never inherit them. A
+    surface the migration role cannot SELECT is a loud abort, never an
+    empty count."""
     if conn.dialect.name != "postgresql":
         print(
             f"{_MIGRATION_NAME}: FK introspection skipped on dialect "
@@ -726,12 +750,17 @@ def _inventory_fk_surfaces(conn, user_ids: list[int], doctor_ids: list[int]) -> 
         )
         return
 
+    (current_schema,) = conn.execute(sa.text("SELECT current_schema()")).fetchone()
+
     composite = conn.execute(_SELECT_COMPOSITE_FK_CONSTRAINTS).fetchall()
     if composite:
         for row in composite:
+            label = row.constraint_name
+            if row.src_schema != current_schema:
+                label = f"{row.src_schema}.{label}"
             print(
                 f"{_MIGRATION_NAME}: composite FK constraint "
-                f"{row.constraint_name!r} spans {row.column_count} columns "
+                f"{label!r} spans {row.column_count} columns "
                 "referencing users/doctors"
             )
         _abort(
@@ -742,12 +771,20 @@ def _inventory_fk_surfaces(conn, user_ids: list[int], doctor_ids: list[int]) -> 
 
     surfaces = conn.execute(_SELECT_FK_SURFACES).fetchall()
     for surface in surfaces:
-        table, column = surface.table_name, surface.column_name
+        src_schema, table = surface.src_schema, surface.table_name
+        column = surface.column_name
         ref_table, delete_rule = surface.ref_table, surface.delete_rule
+        local = src_schema == current_schema
+        # Audit-display name: bare inside the current schema (log
+        # parity with the pre-fix inventory), schema-qualified outside.
+        display = table if local else f"{src_schema}.{table}"
 
-        if (table, column, ref_table) in _SELF_REFERENCE_SURFACES:
+        # The self-reference exclusion is a statement about THE pairs'
+        # own tables: a foreign-schema "doctors" must not inherit it by
+        # name collision (review P1).
+        if local and (table, column, ref_table) in _SELF_REFERENCE_SURFACES:
             print(
-                f"{_MIGRATION_NAME}: FK surface {table}.{column} -> "
+                f"{_MIGRATION_NAME}: FK surface {display}.{column} -> "
                 f"{ref_table} (ON DELETE {delete_rule}) — the pair's own "
                 "self-reference, excluded"
             )
@@ -756,9 +793,32 @@ def _inventory_fk_surfaces(conn, user_ids: list[int], doctor_ids: list[int]) -> 
         ids = user_ids if ref_table == "users" else doctor_ids
         if not ids:
             continue
+
+        qualified = f"{_quote_ident(src_schema)}.{_quote_ident(table)}"
+        (readable,) = conn.execute(
+            sa.text(
+                "SELECT has_table_privilege(CAST(:qualified AS regclass), 'SELECT')"
+            ),
+            {"qualified": qualified},
+        ).fetchone()
+        if not readable:
+            print(
+                f"{_MIGRATION_NAME}: FK surface {display}.{column} -> "
+                f"{ref_table} (ON DELETE {delete_rule}) — NOT SELECT-"
+                "readable by the migration role"
+            )
+            _abort(
+                f"FK surface {display}.{column} (ON DELETE {delete_rule}) "
+                "is not SELECT-privileged for the migration role — the "
+                "inventory cannot count it, and an uncountable FK "
+                "surface is never assumed empty; refusing with no rows "
+                "changed"
+            )
+
         (count,) = conn.execute(
             sa.text(
-                f'SELECT COUNT(*) FROM "{table}" WHERE "{column}" IN :ids'
+                f"SELECT COUNT(*) FROM {qualified} WHERE "
+                f"{_quote_ident(column)} IN :ids"
             ).bindparams(sa.bindparam("ids", expanding=True)),
             {"ids": ids},
         ).fetchone()
@@ -766,14 +826,22 @@ def _inventory_fk_surfaces(conn, user_ids: list[int], doctor_ids: list[int]) -> 
 
         if count == 0:
             print(
-                f"{_MIGRATION_NAME}: FK surface {table}.{column} -> "
+                f"{_MIGRATION_NAME}: FK surface {display}.{column} -> "
                 f"{ref_table} (ON DELETE {delete_rule}) — 0 rows, pass"
             )
             continue
 
-        if (table, column) in _SET_NULL_ROW_ALLOWLIST and delete_rule == "SET NULL":
+        # The SET NULL anonymization exemption is a statement about THE
+        # migration's own login_attempts: a foreign-schema
+        # "login_attempts" must not inherit it by name collision
+        # (review P1).
+        if (
+            local
+            and (table, column) in _SET_NULL_ROW_ALLOWLIST
+            and delete_rule == "SET NULL"
+        ):
             print(
-                f"{_MIGRATION_NAME}: FK surface {table}.{column} -> "
+                f"{_MIGRATION_NAME}: FK surface {display}.{column} -> "
                 f"{ref_table} (ON DELETE SET NULL) — {count} row(s) "
                 "survive the deletion ANONYMIZED (the designed security "
                 "semantic: failed-login probes are preserved)"
@@ -781,12 +849,12 @@ def _inventory_fk_surfaces(conn, user_ids: list[int], doctor_ids: list[int]) -> 
             continue
 
         print(
-            f"{_MIGRATION_NAME}: FK surface {table}.{column} -> "
+            f"{_MIGRATION_NAME}: FK surface {display}.{column} -> "
             f"{ref_table} (ON DELETE {delete_rule}) — {count} row(s) "
             "reference the synthetic pairs"
         )
         _abort(
-            f"FK surface {table}.{column} (ON DELETE {delete_rule}) holds "
+            f"FK surface {display}.{column} (ON DELETE {delete_rule}) holds "
             f"{count} row(s) referencing the synthetic pairs — only "
             f"login_attempts may carry rows (SET NULL anonymization); "
             "every other surface is an explicit operator decision; "
