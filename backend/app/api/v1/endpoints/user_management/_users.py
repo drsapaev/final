@@ -394,10 +394,18 @@ async def update_user_profile(
             target_user = db.query(User).filter(User.id == user_id).first()
             old_normalized = normalize_phone(profile.phone or "")
             new_normalized = normalize_phone(update_data.get("phone") or "")
+            if new_normalized:
+                # Round-3 P2: persist the CANONICAL normalized value, not
+                # the admin-entered representation — the login resolver and
+                # the phone-scope count compare SQL equality against the
+                # normalized phone, so a reformatted duplicate would keep
+                # phone_verified=True while silently dropping the record
+                # out of the resolver predicate (generic login 401).
+                update_data["phone"] = new_normalized
             if new_normalized != old_normalized:
                 if target_user is not None and target_user.role == Roles.PATIENT:
                     ensure_phone_scope_free(
-                        db, update_data.get("phone"), exclude_user_id=user_id
+                        db, new_normalized, exclude_user_id=user_id
                     )
                 profile.phone_verified = False
 

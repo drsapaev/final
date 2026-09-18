@@ -376,3 +376,229 @@ async def test_conflicting_change_spends_nothing_and_releases_scope(
         db_session, FAMILY_PHONE
     )
     assert resolved is not None and resolved.id == user_b.id
+
+
+# ================================================= round 3 (review P1+P2)
+# P1: bulk User Management is the THIRD door into the login-resolver
+# predicate — bulk activate / bulk change_role -> Patient must pass the
+# SAME phone-scope primitive, or the owner chain reproduces over the bulk
+# surface. Batch nuance (autoflush=False): sequential per-row counts can
+# not see intra-batch pending activations, so the preflight guarantees at
+# most ONE entering candidate per phone per batch, and phones take their
+# advisory locks in deterministic (sorted) order.
+# P2: the generic field updater persisted the RAW admin-entered phone —
+# a reformatted (normalized-equal) input kept phone_verified=True while
+# SQL equality against the normalized value silently dropped the record
+# out of the resolver predicate (login 401).
+from app.schemas.user_management import UserBulkActionRequest  # noqa: E402
+from app.services.patient_phone_scope import (  # noqa: E402
+    count_active_verified_patient_users,
+)
+
+
+async def test_bulk_activate_blocked_after_second_card_took_the_phone(
+    db_session, svc, ums
+):
+    """THE owner round-3 regression over the BULK surface:
+    activate A(X) -> bulk deactivate A -> activate B(X)
+    -> bulk activate [A] -> A stays inactive (failed_count=1);
+    B remains the ONLY active verified candidate; login B works."""
+    admin = _admin(db_session)
+
+    patient_a, user_a = await _activated_card(
+        db_session, svc, FAMILY_PHONE, label="Mother"
+    )
+    ok, msg, result = ums.bulk_action_users(
+        db_session,
+        UserBulkActionRequest(user_ids=[user_a.id], action="deactivate"),
+        admin.id,
+    )
+    assert ok, msg
+    assert result["processed_count"] == 1
+    db_session.refresh(user_a)
+    assert user_a.is_active is False
+
+    # B activates on the SAME phone — legal while A is deactivated
+    patient_b, user_b = await _activated_card(
+        db_session, svc, FAMILY_PHONE, label="Child"
+    )
+
+    # bulk activate A -> per-user phone-scope failure, batch succeeds
+    ok, msg, result = ums.bulk_action_users(
+        db_session,
+        UserBulkActionRequest(user_ids=[user_a.id], action="activate"),
+        admin.id,
+    )
+    assert ok  # batch-level success with a PER-USER phone-scope failure
+    assert result["processed_count"] == 0
+    assert result["failed_count"] == 1
+    assert result["failed_users"][0]["user_id"] == user_a.id
+    assert result["failed_users"][0]["error"] == ERR_PHONE_SCOPE_CONFLICT
+
+    db_session.refresh(user_a)
+    assert user_a.is_active is False  # nothing changed
+    resolved = get_patient_otp_service().resolve_patient_user_by_phone(
+        db_session, FAMILY_PHONE
+    )
+    assert resolved is not None and resolved.id == user_b.id
+
+
+async def test_bulk_change_role_to_patient_blocked_when_phone_taken(
+    db_session, ums
+):
+    """Bulk change_role -> Patient on an ACTIVE verified user whose phone
+    already backs another active patient portal account: per-user
+    phone-scope failure; the role stays unchanged; the existing candidate
+    keeps the phone."""
+    admin = _admin(db_session)
+    holder = _patient_user(
+        db_session, username="syn_bulk_holder", phone=FAMILY_PHONE
+    )
+
+    staff = User(
+        username="syn_bulk_registrar",
+        email="syn_bulk_registrar@synthetic.local",
+        full_name="SYNTHETIC Registrar",
+        hashed_password=get_password_hash("Passw0rd!123"),
+        role="Registrar",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(staff)
+    db_session.flush()
+    db_session.add(
+        UserProfile(
+            user_id=staff.id,
+            full_name="SYNTHETIC Registrar",
+            phone=FAMILY_PHONE,
+            phone_verified=True,
+        )
+    )
+    db_session.commit()
+    db_session.refresh(staff)
+
+    ok, msg, result = ums.bulk_action_users(
+        db_session,
+        UserBulkActionRequest(
+            user_ids=[staff.id], action="change_role", role="Patient"
+        ),
+        admin.id,
+    )
+    assert ok  # batch-level success with a PER-USER phone-scope failure
+    assert result["processed_count"] == 0
+    assert result["failed_count"] == 1
+    assert result["failed_users"][0]["user_id"] == staff.id
+    assert result["failed_users"][0]["error"] == ERR_PHONE_SCOPE_CONFLICT
+
+    db_session.refresh(staff)
+    assert staff.role == "Registrar"  # nothing changed
+    resolved = get_patient_otp_service().resolve_patient_user_by_phone(
+        db_session, FAMILY_PHONE
+    )
+    assert resolved is not None and resolved.id == holder.id
+
+
+async def test_bulk_activate_same_phone_in_batch_single_winner(db_session, ums):
+    """autoflush=False batch nuance (owner round-3 note): two INACTIVE
+    verified Patient-users sharing a phone in ONE bulk activate must not
+    BOTH pass sequential per-row counts — at most ONE entering candidate
+    per phone per batch; the other fails per-user."""
+    admin = _admin(db_session)
+    first = _patient_user(
+        db_session, username="syn_bulk_first", phone=FAMILY_PHONE
+    )
+    second = _patient_user(
+        db_session, username="syn_bulk_second", phone=FAMILY_PHONE
+    )
+
+    # bulk deactivate both — legal (leaves the predicate)
+    ok, msg, result = ums.bulk_action_users(
+        db_session,
+        UserBulkActionRequest(
+            user_ids=[first.id, second.id], action="deactivate"
+        ),
+        admin.id,
+    )
+    assert ok, msg
+    assert result["processed_count"] == 2
+
+    # one batch, one phone, two entering candidates -> single winner
+    ok, msg, result = ums.bulk_action_users(
+        db_session,
+        UserBulkActionRequest(
+            user_ids=[first.id, second.id], action="activate"
+        ),
+        admin.id,
+    )
+    assert ok
+    assert result["processed_count"] == 1
+    assert result["failed_count"] == 1
+
+    db_session.refresh(first)
+    db_session.refresh(second)
+    winner, loser = (first, second) if first.is_active else (second, first)
+    assert winner.is_active is True
+    assert loser.is_active is False  # blocked, nothing changed
+    assert count_active_verified_patient_users(db_session, FAMILY_PHONE) == 1
+    resolved = get_patient_otp_service().resolve_patient_user_by_phone(
+        db_session, FAMILY_PHONE
+    )
+    assert resolved is not None and resolved.id == winner.id
+
+
+async def test_bulk_activate_free_phone_still_works(db_session, ums):
+    """Control: bulk activate on a FREE phone keeps working (the guard
+    only fires on an occupied scope)."""
+    admin = _admin(db_session)
+    user = _patient_user(
+        db_session, username="syn_bulk_free", phone=FREE_PHONE
+    )
+    ok, msg, result = ums.bulk_action_users(
+        db_session,
+        UserBulkActionRequest(user_ids=[user.id], action="deactivate"),
+        admin.id,
+    )
+    assert ok, msg
+    ok, msg, result = ums.bulk_action_users(
+        db_session,
+        UserBulkActionRequest(user_ids=[user.id], action="activate"),
+        admin.id,
+    )
+    assert ok, msg
+    assert result["processed_count"] == 1
+    assert result["failed_count"] == 0
+    db_session.refresh(user)
+    assert user.is_active is True
+    resolved = get_patient_otp_service().resolve_patient_user_by_phone(
+        db_session, FREE_PHONE
+    )
+    assert resolved is not None and resolved.id == user.id
+
+
+async def test_phone_change_stores_canonical_normalized_value(db_session, ums):
+    """Round-3 P2: a reformatted (normalized-equal) phone input must
+    persist the CANONICAL value, keep phone_verified=True and keep the
+    record resolver-visible — otherwise SQL equality against the
+    normalized value silently drops the user out of OTP login (401)."""
+    admin = _admin(db_session)
+    user = _patient_user(
+        db_session, username="syn_canonical", phone=FAMILY_PHONE
+    )
+
+    reformatted = "+998 90 000 00 02"  # normalizes to FAMILY_PHONE
+    ok, msg = ums.update_user(
+        db_session, user.id, UserUpdateRequest(phone=reformatted), admin.id
+    )
+    assert ok, msg
+
+    profile = (
+        db_session.query(UserProfile)
+        .filter(UserProfile.user_id == user.id)
+        .first()
+    )
+    assert profile.phone == FAMILY_PHONE  # canonical, NOT the raw input
+    assert profile.phone_verified is True  # normalized-equal: no re-bind
+    resolved = get_patient_otp_service().resolve_patient_user_by_phone(
+        db_session, FAMILY_PHONE
+    )
+    assert resolved is not None and resolved.id == user.id

@@ -449,6 +449,15 @@ class CoreMixin(UserManagementServiceMixinBase):
                     if "phone" in update_data
                     else old_normalized
                 )
+                if "phone" in update_data and new_normalized:
+                    # Round-3 P2: persist the CANONICAL normalized value,
+                    # not the admin-entered representation — the login
+                    # resolver and the phone-scope count compare SQL
+                    # equality against the normalized phone, so a
+                    # reformatted duplicate would keep phone_verified=True
+                    # while silently dropping the record out of the
+                    # resolver predicate (generic login 401).
+                    update_data["phone"] = new_normalized
                 phone_changed = (
                     "phone" in update_data
                     and new_normalized != old_normalized

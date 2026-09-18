@@ -467,3 +467,57 @@ async def test_user_management_phone_reaim_409_http(
     assert profile.phone_verified is True
     # nothing changed: mover keeps its own phone with the verified flag,
     # the family phone still belongs exclusively to the first account.
+
+
+async def test_phone_change_stores_canonical_http(client, db_session, auth_headers):
+    """Review round 3 P2 over the LIVE admin door (PUT /users/{id}, the
+    update_user service path): a reformatted (normalized-equal) phone
+    input must persist the CANONICAL value, keep phone_verified=True and
+    keep the record resolver-visible — otherwise SQL equality against the
+    normalized value silently drops the user out of OTP login (generic
+    401) while the flag still claims possession.
+
+    (The PUT /users/{id}/profile door also received the same fix, but is
+    NOT usable as a probe: it is a documented pre-existing dead surface —
+    request-state auth with no middleware feeding request.state.user_id;
+    see test_manager_deprecation.py M-2 note.)"""
+    user = User(
+        username="syn_profile_canon",
+        email="syn_profile_canon@synthetic.local",
+        full_name="SYNTHETIC Canonical",
+        hashed_password=get_password_hash("Passw0rd!123"),
+        role="Patient",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.flush()
+    db_session.add(
+        UserProfile(
+            user_id=user.id,
+            full_name="SYNTHETIC Canonical",
+            phone=FAMILY_PHONE,
+            phone_verified=True,
+        )
+    )
+    db_session.commit()
+    db_session.refresh(user)
+
+    r = client.put(
+        f"/api/v1/users/users/{user.id}",
+        json={"phone": "+998 90 000 00 02"},  # reformatted, same number
+        headers=auth_headers,
+    )
+    assert r.status_code == 200, r.text[:300]
+
+    profile = (
+        db_session.query(UserProfile)
+        .filter(UserProfile.user_id == user.id)
+        .first()
+    )
+    assert profile.phone == FAMILY_PHONE  # canonical, NOT the raw input
+    assert profile.phone_verified is True  # normalized-equal: no re-bind
+    resolved = get_patient_otp_service().resolve_patient_user_by_phone(
+        db_session, FAMILY_PHONE
+    )
+    assert resolved is not None and resolved.id == user.id
