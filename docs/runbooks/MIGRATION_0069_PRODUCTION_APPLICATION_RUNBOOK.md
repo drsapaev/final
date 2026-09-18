@@ -1,14 +1,53 @@
 # Migration 0069 Production Application Runbook (Sentinel Pair Retirement)
 
+## Status: COMPLETED / VERIFIED — 2026-09-18
+
+```text
+Status: COMPLETED / VERIFIED — 2026-09-18
+
+Applied implementation: PR #3324 (merged)
+Merge SHA: 6d35eb0c675fb7e2020acf3c37fbf4df43f6e797
+PR #3315: closed as superseded; hardening incorporated into #3324
+Production version: 0069_sentinel_pair_retirement
+
+Backup artifact:
+  file:     backup_pre_0069_fixed_20260918_162405.dump
+  SHA256:   F53B479D2607C4836B7E8B9DA6DAC5D376FC86E5547D3DF1FE34281D83C90DAF
+  storage:  production-хост, операторский каталог бэкапов (BACKUP_DIR;
+            канонические значения: /opt/clinic/output/backups —
+            ops/vps/clinic_lifecycle.env.sample, <app-root>/output/backups —
+            default backup_db.py; точный путь подтверждает оператор);
+            offsite-копия в R2-бакете при настроенном r2_uploader
+            (sha256-верифицированная PutObject+HeadObject)
+  access:   только владелец/оператор (суперпользователь production-хоста);
+            R2-токен bucket-scoped Object Read & Write — без Delete/List
+  retention: 30 дней / максимум 100 артефактов (BACKUP_RETENTION_DAYS /
+            MAX_BACKUPS — repo policy, BackupService defaults; R2 —
+            owner-managed lifecycle rules); порядок удаления: подтверждённое
+            удаление из BACKUP_DIR + R2 lifecycle expiry после закрытия
+            rollback-окна (решение владельца) — дамп содержит PII
+            users/doctors, бессрочное хранение запрещено
+
+Postchecks (2026-09-18):
+  alembic_version = 0069
+  sentinel users = 0
+  sentinel-linked doctors = 0
+  ACTIVE userless bridge doctors = 0
+
+QD-2 / RQ-15 = FROZEN / DONE с 2026-09-18
+```
+
+Всё ниже статус-блока — **историческая / переиспользуемая процедурная запись** (review fix, 2026-09-18). Не выполнять повторно против уже migrated production. Процедура применима только к средам из списка: production — migrated (VERIFIED, эта запись); остальные persistent-контуры — сверка Step 0 перед любым применением; CI-базы эфемерны и средами для этой процедуры не являются. Если все persistent-среды на 0069 — процедура нигде не применима.
+
 ## Purpose
 
-- Apply `0069_sentinel_pair_retirement` to the production database exactly once, safely, and with recorded proof.
-- Authority: merging PR #3315 does **NOT** authorize this application. The owner (operator) decides when to run this runbook. Merge of #3315 is a code gate, not a deployment gate.
-- Scope: the production clinic host (Windows, `deploy_restart.ps1` toolchain) and every persistent staging contour. CI databases are ephemeral and do not count.
+- Зафиксировать применение `0069_sentinel_pair_retirement` к production-БД: ровно один раз, безопасно, с записанным пруфом (завершено 2026-09-18 — см. статус-блок).
+- Authority: merge PR **НЕ** авторизует применение. Исходный кандидат #3315 закрыт как superseded; в main вошла unified 0069 через #3324. Применение — отдельное операторское решение владельца: merge — код-гейт, не deployment-гейт.
+- Scope: production-хост клиники (Windows, `deploy_restart.ps1` toolchain) и каждый persistent staging-контур. CI-базы эфемерны и не считаются.
 
 ## Preconditions
 
-- PR #3315 is merged into `main` with required CI green on the merge commit.
+- Unified `0069` в `main`: #3315 закрыт как superseded → unified 0069 вошла через #3324 (squash `6d35eb0c6`), обязательный CI зелёный на merge-коммите.
 - A maintenance window is scheduled (the canonical deploy stops the backend runtime).
 - The operator has access to the production host, the PostgreSQL superuser credentials, and the repository at the merge commit.
 
@@ -93,9 +132,9 @@ WHERE user_id IS NULL AND active AND specialty IN ('ecg','lab','general');  -- e
 - Preferred: restore the pre-deploy backup / snapshot per [CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md](CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md).
 - Alternative: the 0069 downgrade is a TRUE inverse (restores the exact 0055+0057 shape, field-verified with a final postcondition) — valid for operator-verified states, but backup-restore remains the default.
 
-## Step 6 — Close out
+## Step 6 — Close out (completed 2026-09-18)
 
-- Record the application in `.ai-factory/plans/registrar-queue-remediation/PROGRESS.md` (E-062 follow-up): date, outputs of Steps 0/2/4, deploy commit, smoke results.
-- Declare **QD-2 / RQ-15 = FROZEN / DONE**.
-- Freeze rule (owner decision, 2026-09-18): no new QD-2 hardening PRs without a production incident or a proven P0/P1.
-- Idempotency note: a re-run of 0069 on an already-retired database is a clean no-op only when the terminal state is provable — this is by design and safe.
+- Применение зафиксировано в PROGRESS.md (E-063, PR #3326) и подтверждением владельца на PR #3323 (2026-09-18): postchecks — версия 0069, пары удалены, ноль ACTIVE userless bridge doctors (статус-блок выше); инцидент первого прогона (откат без изменений БД) и цепочка fix — в записи E-063.
+- **QD-2 / RQ-15 = FROZEN / DONE с 2026-09-18.**
+- Freeze rule (решение владельца, 2026-09-18): никаких новых QD-2 hardening PR без production-инцидента или доказанного P0/P1.
+- Idempotency note: повторный прогон 0069 на уже-retired БД — чистый no-op при доказуемом терминальном состоянии — это by design и безопасно.
