@@ -130,8 +130,9 @@ Upgrade contract (single transaction; PG DDL/DML is transactional):
 
 3. PostgreSQL FK introspection (the future-proof catch-all): every
    FK surface referencing ``users.id``/``doctors.id`` is enumerated
-   from ``information_schema`` and counted against the resolved pair
-   ids BEFORE the deletion:
+   from ``pg_catalog`` (direct ``pg_constraint`` discovery,
+   schema-scoped on the source and the reference side) and counted
+   against the resolved pair ids BEFORE the deletion:
 
    - a NO ACTION/RESTRICT surface with rows aborts (the FK would
      fire mid-delete);
@@ -174,6 +175,25 @@ captured by a foreign row (an Admin account, a live password, a
 caps-drifted doctor) is a LOUD abort, never a silent skip; a final
 postcondition re-verifies all three pairs before the migration
 claims the restore.
+
+2026-09-18 Supabase compatibility fix (guard implementation only): the
+PostgreSQL FK discovery moved from multi-view information_schema joins
+to direct pg_catalog queries (pg_constraint / pg_class / pg_namespace /
+pg_attribute) — the multi-view join hung on the production Supabase
+catalog before the deletion. The REFERENCE side is strictly scoped to
+current_schema(); the SOURCE side is deliberately UNRESTRICTED: an FK
+from ANY schema landing on the pairs (a ``reporting.audit_rows`` ->
+``public.users`` CASCADE on a multi-schema Supabase) is inventoried,
+counted and fail-closed exactly like a local surface — a foreign
+schema's silence can never turn a live FK into a silent cascade. The
+per-surface counting is schema-qualified, the self-reference exclusion
+and the login_attempts SET NULL allowlist apply ONLY to the current
+schema (name collisions across schemas do not inherit the exemption),
+and a surface the migration role cannot SELECT is a loud abort, not a
+skip. All other guard semantics are unchanged: the composite-FK abort,
+the all-or-nothing deletion contract (the composite column_count now
+reports the FK's own column count instead of the pre-fix cross-product
+inflation).
 """
 
 from __future__ import annotations
@@ -322,47 +342,59 @@ _SELECT_QUEUE_REFERENCES = sa.text("""
 
 # Every single-column FK surface referencing users.id / doctors.id in
 # the CURRENT schema, with its ON DELETE rule.
+#
+# Direct pg_catalog discovery (the 2026-09-18 Supabase compatibility
+# fix): the multi-view information_schema join hung on the production
+# Supabase catalog (permission-checked views over every internal
+# schema) before the deletion. BOTH the source and the reference side
+# are scoped to current_schema() — a bare table-name match on the
+# referenced side would pull in foreign-schema worlds (Supabase's
+# auth.users is a real one).
 _SELECT_FK_SURFACES = sa.text("""
     SELECT DISTINCT
-           tc.table_name AS table_name,
-           kcu.column_name AS column_name,
-           ccu.table_name AS ref_table,
-           rc.delete_rule AS delete_rule
-    FROM information_schema.table_constraints tc
-    JOIN information_schema.key_column_usage kcu
-      ON tc.constraint_name = kcu.constraint_name
-     AND tc.constraint_schema = kcu.constraint_schema
-    JOIN information_schema.referential_constraints rc
-      ON tc.constraint_name = rc.constraint_name
-     AND tc.constraint_schema = rc.constraint_schema
-    JOIN information_schema.constraint_column_usage ccu
-      ON rc.unique_constraint_name = ccu.constraint_name
-     AND rc.unique_constraint_schema = ccu.constraint_schema
-    WHERE tc.constraint_type = 'FOREIGN KEY'
-      AND tc.table_schema = current_schema()
-      AND ccu.table_name IN ('users', 'doctors')
-    ORDER BY tc.table_name, kcu.column_name
+           src.relname AS table_name,
+           att.attname AS column_name,
+           ref.relname AS ref_table,
+           CASE con.confdeltype
+                WHEN 'a' THEN 'NO ACTION'
+                WHEN 'r' THEN 'RESTRICT'
+                WHEN 'c' THEN 'CASCADE'
+                WHEN 'n' THEN 'SET NULL'
+                WHEN 'd' THEN 'SET DEFAULT'
+           END AS delete_rule
+    FROM pg_constraint con
+    JOIN pg_class src ON src.oid = con.conrelid
+    JOIN pg_namespace src_ns ON src_ns.oid = src.relnamespace
+    JOIN pg_class ref ON ref.oid = con.confrelid
+    JOIN pg_namespace ref_ns ON ref_ns.oid = ref.relnamespace
+    JOIN unnest(con.conkey) WITH ORDINALITY AS ck(attnum, ord) ON true
+    JOIN pg_attribute att
+      ON att.attrelid = con.conrelid AND att.attnum = ck.attnum
+    WHERE con.contype = 'f'
+      AND src_ns.nspname = current_schema()
+      AND ref_ns.nspname = current_schema()
+      AND ref.relname IN ('users', 'doctors')
+    ORDER BY table_name, column_name
     """)
 
 # Composite FK guard: any constraint referencing the pairs that spans
 # more than one column is unsupported surface — never guessed.
+# column_count is the FK's OWN column count (cardinality of conkey);
+# the pre-fix information_schema join inflated it by multiplying with
+# the referenced-side columns of the composite unique constraint.
 _SELECT_COMPOSITE_FK_CONSTRAINTS = sa.text("""
-    SELECT tc.constraint_name, COUNT(kcu.column_name) AS column_count
-    FROM information_schema.table_constraints tc
-    JOIN information_schema.key_column_usage kcu
-      ON tc.constraint_name = kcu.constraint_name
-     AND tc.constraint_schema = kcu.constraint_schema
-    JOIN information_schema.referential_constraints rc
-      ON tc.constraint_name = rc.constraint_name
-     AND tc.constraint_schema = rc.constraint_schema
-    JOIN information_schema.constraint_column_usage ccu
-      ON rc.unique_constraint_name = ccu.constraint_name
-     AND rc.unique_constraint_schema = ccu.constraint_schema
-    WHERE tc.constraint_type = 'FOREIGN KEY'
-      AND tc.table_schema = current_schema()
-      AND ccu.table_name IN ('users', 'doctors')
-    GROUP BY tc.constraint_name
-    HAVING COUNT(kcu.column_name) > 1
+    SELECT con.conname AS constraint_name,
+           cardinality(con.conkey) AS column_count
+    FROM pg_constraint con
+    JOIN pg_class src ON src.oid = con.conrelid
+    JOIN pg_namespace src_ns ON src_ns.oid = src.relnamespace
+    JOIN pg_class ref ON ref.oid = con.confrelid
+    JOIN pg_namespace ref_ns ON ref_ns.oid = ref.relnamespace
+    WHERE con.contype = 'f'
+      AND src_ns.nspname = current_schema()
+      AND ref_ns.nspname = current_schema()
+      AND ref.relname IN ('users', 'doctors')
+      AND cardinality(con.conkey) > 1
     """)
 
 _DELETE_DOCTORS = sa.text("DELETE FROM doctors WHERE id IN :doctor_ids").bindparams(
