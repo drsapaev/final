@@ -53,7 +53,7 @@ Postchecks (2026-09-18):
 QD-2 / RQ-15 = FROZEN / DONE с 2026-09-18
 ```
 
-Всё ниже статус-блока — **историческая / переиспользуемая процедурная запись** (review fix, 2026-09-18). Не выполнять повторно против уже migrated production. Процедура применима только к средам из списка: production — migrated (VERIFIED, эта запись); остальные persistent-контуры — сверка Step 0 перед любым применением; CI-базы эфемерны и средами для этой процедуры не являются. Если все persistent-среды на 0069 — процедура нигде не применима.
+Всё ниже статус-блока — **историческая / переиспользуемая процедурная запись** (review fix, 2026-09-18). Не выполнять повторно против уже migrated production. Процедура применима только к средам из списка: production — migrated (VERIFIED, эта запись); остальные persistent-контуры — сверка Step 0 перед любым применением; CI-базы эфемерны и средами для этой процедуры не являются. Если все persistent-среды на 0069 — процедура нигде не применима. Переиспользуемость дополнительно ограничена repo freshness-гейтом Step 0: Alembic head актуального `origin/main` должен быть ровно `0069_sentinel_pair_retirement`; как только в main появится следующая миграция (0070+), процедура автоматически становится archival-only и доведение отстающего контура до актуального состояния идёт по текущему migration/deployment runbook.
 
 ## Purpose
 
@@ -101,6 +101,32 @@ pass — when running against another eligible TARGET, substitute that target
 environment throughout. If ALL persistent environments report `0069`, the
 procedure is applicable nowhere (Steps 0–5 are archival-only).
 
+**Repo freshness gate (mandatory for any TARGET).** `deploy_restart.ps1
+-Deploy` (Step 3) does NOT pin the historical revision — its actual
+contract is "deploy the latest `origin/main` + apply the current Alembic
+head" (`C:\final`, branch `main`, `git fetch origin` +
+`git merge --ff-only origin/main`, then `alembic upgrade head`; see the
+contract note in Step 3). A lagging TARGET is therefore not sufficient by
+itself — the repository state must also be verified before Steps 1–5 are
+reused:
+
+1. Check the Alembic head of the current `origin/main` (read-only; from any
+   checkout with access to origin): `git fetch origin`, then
+   `git ls-tree --name-only origin/main backend/alembic/versions`
+   (filenames carry the revision ids), or — on the operator host after a
+   fast-forward — `alembic heads` (lists heads, applies nothing).
+2. The procedure is reusable ONLY if that head is exactly
+   `0069_sentinel_pair_retirement` (verified for this record: `0069` is the
+   single head on `origin/main` @ `981e3143e`, 2026-09-18).
+3. If `origin/main` already contains 0070+ — **STOP**: this historical
+   runbook can no longer be used as a deploy procedure. Bring the TARGET
+   environment up to date via the current migration/deployment runbook,
+   with a separate review of every intermediate revision between the
+   TARGET's recorded version and the current head. Under this gate
+   `alembic upgrade head` in Step 3 applies exactly up to `0069` and no
+   further, which is what makes the Step 4 postcheck "expect exactly 0069"
+   sound.
+
 ## Step 1 — Backup (mandatory, before touching anything)
 
 - Take a full backup / VM snapshot per [CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md](CLINIC_BACKUP_RESTORE_REHEARSAL_RUNBOOK.md).
@@ -141,6 +167,7 @@ scripts/deploy_restart.ps1 -Deploy
 
 - The script stops and verifies the uvicorn listener ABSENT **before** any migration runs (commit d5e585861). This closes the migration's verification windows by deploy discipline — no concurrent runtime writers exist while 0069 holds its verdict; defense-in-depth: on PostgreSQL the migration itself takes `LOCK TABLE users, doctors IN SHARE ROW EXCLUSIVE MODE` for the whole verdict.
 - `alembic upgrade head` applies `0068_direction_public_address` (if still pending) and then `0069_sentinel_pair_retirement`.
+- Contract note (review fix, 2026-09-18): the script does NOT pin the historical revision `6d35eb0c` / 0069 — by design it deploys the latest `origin/main` (`C:\final`, branch `main`, `git fetch origin` + `git merge --ff-only origin/main`) and applies the current Alembic head. Today the single head on `origin/main` @ `981e3143e` is exactly `0069`, so the contract and this runbook coincide; that is precisely why the Step 0 repo freshness gate (head == 0069) is a mandatory precondition for reusing Steps 1–5 against any TARGET. Once 0070+ lands in `main`, this procedure is archival-only (Step 0, item 3).
 - A failed migration leaves the listener stopped — do not restart the runtime manually until the failure is resolved and understood.
 
 ## Step 4 — Postchecks (immediately after the deploy)
