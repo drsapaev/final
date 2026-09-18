@@ -9,7 +9,7 @@
 
 ## Приоритет владельца (2026-09-18) — роутинг обязателен
 
-Следующий продуктовый приоритет — трек **NURSE-V2** ([.ai-factory/plans/nurse-v2-clinical-serving.md](../nurse-v2-clinical-serving.md), статус PROPOSED, ожидает design-GO владельца). Незакрытые RQ-задачи этого плана (RQ-17/RQ-18/RQ-26 и другие) — **DEFER, если не P0/P1-блокер для Nurse: не выбирать автоматически**. QD-2/RQ-15 замораживается после успешного прод-применения миграции 0069 (operator runbook + авторизация владельца); новые QD-2 hardening PR — только по production incident или доказанному P0/P1. Ничего не merge/deploy автоматически.
+Следующий продуктовый приоритет — трек **NURSE-V2** ([.ai-factory/plans/nurse-v2-clinical-serving.md](../nurse-v2-clinical-serving.md), статус APPROVED — план принят владельцем через merge-checklist 2026-09-18; N2-2 стартует после merge плана; runtime-код до design-gate N2-2 не пишется). Незакрытые RQ-задачи этого плана (RQ-17/RQ-18/RQ-26 и другие) — **DEFER, если не P0/P1-блокер для Nurse: не выбирать автоматически**. QD-2/RQ-15 — FROZEN / DONE с 2026-09-18 (миграция 0069 применена на production и VERIFIED владельцем); новые QD-2 hardening PR — только по production incident или доказанному P0/P1. Ничего не merge/deploy автоматически.
 
 ## Готовый стартовый запрос
 

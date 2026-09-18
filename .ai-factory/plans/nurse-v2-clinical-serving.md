@@ -1,8 +1,8 @@
 # План трека NURSE-V2: человек-медсестра, не-врачебное клиническое обслуживание
 
-Создан: 2026-09-18. Версия плана: 1 (track definition).
-Статус: **PROPOSED — ожидает design-GO владельца. Runtime-работы НЕТ до явной команды.**
-Основание: решение владельца о приоритетной корректировке (IM-сессия `web-dff6f17a-e319-45e3-a564-42a853cd3f0e`, channel `zai-web`, trace `1a0b0a46d285c559`, 2026-09-18). Дословные ключевые директивы:
+Создан: 2026-09-18. Версия плана: 2 (коррекции merge-checklist владельца 2026-09-18: нумерация миграций, service-level execution, ownership-маппинг, Nurse role enum, статус QD-2/RQ-15).
+Статус: **APPROVED — план принят владельцем (merge-checklist 2026-09-18 закрыт в этом PR). N2-2 стартует после merge плана (раздел «После merge — старт N2-2»); runtime-код до design-gate N2-2 не пишется. Ничего не deploy автоматически.**
+Основание: решение владельца о приоритетной корректировке (IM-сессия `web-dff6f17a-e319-45e3-a564-42a853cd3f0e`, channel `zai-web`, trace `1a0b0a46d285c559`, 2026-09-18). Коррекции версии 2: merge-checklist владельца (комментарий к PR #3322, 2026-09-18T16:45Z) + вердикт владельца по docs-PR #3326 (trace `1a0b5807929665e5`, 2026-09-19: route «merge #3322 first, потом #3326 после fresh sync»). Дословные ключевые директивы:
 
 > «Наш следующий продуктовый приоритет — NURSE V2.»
 > «Записать следующий новый track: NURSE-V2 — human non-doctor clinical serving»
@@ -51,21 +51,29 @@
 - **EMR-граница (денайл «бесплатный»):** `EMR_V2_WRITE_ROLES` + `ensure_emr_visit_access` (`emr_v2.py:68-138`) уже 403 для любой роли без активного Doctor-профиля — Nurse не добавлять в grant-листы, и отрицание работает без нового кода.
 - **Visit-граница:** `VisitLifecycleService` (`visit_lifecycle_service.py:85-478`): `complete_visit` не требует EMR-подписи; `close_visit` (`L457`, терминал «EMR signed + payment») остаётся врачебным/кассирским/админским — Nurse не закрывает визит.
 - **Frontend:** React 19 + Vite; `routeRegistry.ts` (`ROUTE_REGISTRY`, `SIDEBAR_PRESETS`) + `App.tsx` `ROUTE_COMPONENTS`; паттерн зеркала — `DoctorPanel.tsx` + `components/doctor/DoctorQueuePanel.tsx`; i18n `ru` default (+uz-Latn/uz-Cyrl/en/kk).
-- **Миграции:** следующая ревизия — **0070** (текущий head `0069_sentinel_pair_retirement`).
+- **Миграции:** следующая ревизия — **next available Alembic revision от fresh origin/main; номер не резервируется заранее** (текущий head `0069_sentinel_pair_retirement`). Перед каждым migration PR: fetch + rebase на fresh main; `alembic heads` — ровно один head; сверка: fresh main == alembic_version production.
 - **PG-concurrency паттерны тестов:** двухсоединечные `threading.Barrier` (`test_rq14a1_numbering_integrity_pg.py:402-424`); scratch-БД + `alembic upgrade head` (`test_rq14_qr_desk_owner_consistency_pg.py:131-146`).
 
-## Минимальная модель назначения (design-цель, финализируется на design-GO)
+## Минимальная модель назначения (design-цель, финализируется на design-gate N2-2)
 
 `Nurse User → allowed QueueResource / workplace → cabinet/station → active assignment`.
 
-Сегодня связи nurse↔resource нет вовсе (greenfield). Предложение к design-GO: одна новая таблица назначения (рабочее имя `nurse_workplace_assignments`, миграция 0070): `user_id FK users.id`, `queue_resource_id FK queue_resources.id`, `cabinet/station` (по умолчанию — `QueueResource.default_cabinet`, переопределяемо), `is_active`, временные метки; инвариант — не более одного активного назначения на пару (user, resource); QueueResource остаётся справочником без логина. Никаких человеческих полей в QueueResource не добавлять.
+Сегодня связи nurse↔resource нет вовсе (greenfield). Предложение: одна новая таблица назначения (рабочее имя `nurse_workplace_assignments`, отдельная миграция — номер по правилу «Миграции» выше): `user_id FK users.id`, `queue_resource_id FK queue_resources.id`, `cabinet/station` (по умолчанию — `QueueResource.default_cabinet`, переопределяемо), `is_active`, временные метки; инвариант — partial `UNIQUE(user_id, queue_resource_id) WHERE is_active`; явное решение «одно активное назначение или несколько» фиксируется на design-gate N2-2; inactive-назначения = исторические записи (не drift); QueueResource остаётся справочником без логина. Никаких человеческих полей в QueueResource не добавлять.
+
+## N2-2 фиксации по merge-checklist владельца (2026-09-18)
+
+Решения ниже зафиксированы ДО старта N2-2 по merge-checklist владельца (комментарий к PR #3322, 2026-09-18); раздел — SSOT-перенос директив, формулировки владельца сохранены дословно, где возможно.
+
+- **Nurse role — enum-решение (одна строка):** re-open retired-значения — каноническая роль `Nurse` возвращается в ролевую модель (дешевле миграционно: `users.role` — строка-SSOT, без нового enum-значения и без ALTER TYPE); `test_nurse_retirement.py` и retirement-гварды переосмысляются как «старые N-3 поверхности закрыты» (вместо «Nurse не существует»); исторические записи N-3 не переписываются.
+- **Service-level execution (модель по умолчанию + узкий gate):** `VisitService` + status (pending / in_progress / completed / incomplete / cancelled) + `started_at` + `completed_at` + `performed_by_user_id` → `users.id`, либо child-table `ServiceExecution` — по результату gate. Gate узкий, без общего аудита: read-only inventory — только существование `VisitService.qty > 1` (negative evidence); решения по сеансам/исполнителям/повторам — от domain-источника (сверка с владельцем клинического workflow): текущая схема эти факты не записывает, «нет данных» ≠ «нет потребности»; зафиксировать escalation trigger — какое наблюдение переводит модель на ServiceExecution. STOP для human-GO — только на решении VisitService vs ServiceExecution.
+- **Ownership-маппинг (правило принадлежности услуг станции):** правило — таблица соответствия (не поле каталога): `queue_resource_services` (`queue_resource_id` ↔ `service_id`, `is_active`) — услуга визита принадлежит данной станции / queue-resource ⟺ существует активная строка соответствия. Таблица соответствия выбрана потому, что услуга может обслуживаться более чем на одной станции (M:N), а QueueResource остаётся справочником без человеческих полей (контракт владельца). Без этого правила «QueueEntry → served только после завершения всех услуг станции» невычислимо; с ним — entry разрешено флипать в served, когда все услуги визита, привязанные к станции активными строками соответствия, достигли терминального статуса по service-level модели выше. Финальная сверка правила с владельцем клинического workflow — в design-gate N2-2.
 
 ## Срезы (предполагаемые PR boundaries)
 
 | Срез | Содержание | Затрагиваемые поверхности | Gate |
 |---|---|---|---|
-| N2-1 | Этот план (track definition + discovery) | только docs | **design-GO владельца** — STOP до получения |
-| N2-2 | Роль Nurse + модель назначения | миграция 0070; `core/roles.py`, `core/rbac.py`, `StaffAuthorizationService`, `_USER_MANAGEMENT_ROLE_PATTERN`, `user_mgmt` (создание/назначение), admin-эндпоинты назначения; амендация retirement-пинов (`test_nurse_retirement.py` — история N-3 сохраняется); frontend `BackendRole` union + parity-тесты | PR отдельно; owner review |
+| N2-1 | Этот план (track definition + discovery) | только docs | **design-GO владельца** — получен через merge-checklist 2026-09-18 (merge плана после закрытия пунктов) |
+| N2-2 | Роль Nurse + модель назначения | отдельная миграция (номер — next available от fresh main); `core/roles.py`, `core/rbac.py`, `StaffAuthorizationService`, `_USER_MANAGEMENT_ROLE_PATTERN`, `user_mgmt` (создание/назначение), admin-эндпоинты назначения; амендация retirement-пинов (`test_nurse_retirement.py` — история N-3 сохраняется); frontend `BackendRole` union + parity-тесты | PR отдельно; owner review |
 | N2-3 | Nurse serving API в назначенной очереди: list waiting / call-next / start / complete-service / no-show / incomplete | новые nurse-эндпоинты или расширение существующих (`qr_queue`, `doctor_integration` паттерны); переиспользование call-next локинга; атрибуция `called_by_user_id`/`served_by_user_id` реальному User; авторизация строго по активному назначению | PR отдельно; owner review |
 | N2-4 | Обязательный PG concurrency-proof (сценарий владельца §6 ниже) — acceptance-сьют среза N2-3 (или отдельный PR, границу зафиксирует design-GO) | PG-тесты по паттернам rq14a1/rq16c | PR; owner review |
 | N2-5 | Минимальная tablet-поверхность (после backend-фундамента) | `frontend/src/pages/` (новая страница), `routeRegistry.ts`, `App.tsx`, `types/roles.ts`; НЕ большая клиническая панель | PR отдельно; owner review |
@@ -114,11 +122,28 @@
 
 ## STOP discipline
 
-- До design-GO владельца — никакой runtime-работы по этому треку.
+- До design-gate N2-2 — никакой runtime-работы по этому треку (track-level GO получен через merge-checklist 2026-09-18; runtime открывается только после design-gate N2-2).
 - После #3315 старые RQ-задачи автоматически не брать; если следующий старый RQ не P0/P1-блокер для Nurse — DEFER.
-- QD-2/RQ-15 после успешного прод-применения 0069 — FROZEN/DONE; новые QD-2 hardening PR — только по production incident или доказанному P0/P1.
+- QD-2/RQ-15 — FROZEN / DONE с 2026-09-18 (0069 применена на production и VERIFIED владельцем); новые QD-2 hardening PR — только по production incident или доказанному P0/P1.
+
+## После merge — старт N2-2 (директива владельца, 2026-09-18)
+
+1. Preflight: fetch + rebase fresh origin/main; `alembic heads` = single head; fresh main == alembic_version production.
+2. N2-2 scope: enum-решение из раздела «N2-2 фиксации» (re-open); NurseWorkplaceAssignment — partial `UNIQUE(user_id, queue_resource_id) WHERE is_active`, явное решение «одно активное назначение или несколько», inactive-назначения = исторические записи (не drift); service execution model по gate из раздела «N2-2 фиксации».
+3. STOP для human-GO — только на решении VisitService vs ServiceExecution.
+4. Не переаудировать Visit/EMR. Не трогать EMR/финансы/Doctor-алиасы. Runtime-код до design-gate N2-2 не писать.
+5. Ничего не deploy автоматически.
+
+## N2-3 brief (зафиксировано владельцем 2026-09-18; не merge-blocking, не потерять)
+
+- матрица переходов status + кто триггерит каждый; эффект no-show на sibling-pending услуги;
+- updated_at/updated_by или append-only лог переходов (billing/мед. аудит);
+- влияние cancelled/incomplete на итоги визита — записать scope явно;
+- N2-3 DoD: atomic claim на call-next, last-completer флипает entry, идемпотентный complete — иначе feature-flag до N2-4;
+- tablet: повтор POST тем же nurse = no-op, другим = 409; поведение при деактивации назначения mid-flight (403 или graceful drain).
 - Ничего не merge/deploy автоматически.
 
 ## Текущее состояние
 
 - 2026-09-18: план создан (срез N2-1), discovery поверхностей зафиксирован выше (Task 3-a, read-only). Ожидает **design-GO владельца**. Runtime-изменений нет.
+- 2026-09-19: merge-checklist владельца закрыт в этом PR — коррекции 1–6 применены: нумерация миграций (next available от fresh main, номер не резервируется); service-level execution + ownership-маппинг добавлены (раздел «N2-2 фиксации»); Nurse role enum — re-open retired-значений; статус QD-2/RQ-15 = FROZEN / DONE с 2026-09-18; CLOUD-START.md актуализирован тем же фактом; N2-3 brief владельца перенесён в план. Версия плана 1 → 2. Runtime-изменений по-прежнему нет.
