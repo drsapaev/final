@@ -10,23 +10,39 @@ Merge SHA: 6d35eb0c675fb7e2020acf3c37fbf4df43f6e797
 PR #3315: closed as superseded; hardening incorporated into #3324
 Production version: 0069_sentinel_pair_retirement
 
-Backup artifact:
-  file:     backup_pre_0069_fixed_20260918_162405.dump
-  SHA256:   F53B479D2607C4836B7E8B9DA6DAC5D376FC86E5547D3DF1FE34281D83C90DAF
-  storage:  production-хост, операторский каталог бэкапов (BACKUP_DIR;
-            канонические значения: /opt/clinic/output/backups —
-            ops/vps/clinic_lifecycle.env.sample, <app-root>/output/backups —
-            default backup_db.py; точный путь подтверждает оператор);
-            offsite-копия в R2-бакете при настроенном r2_uploader
-            (sha256-верифицированная PutObject+HeadObject)
-  access:   только владелец/оператор (суперпользователь production-хоста);
-            R2-токен bucket-scoped Object Read & Write — без Delete/List
-  retention: 30 дней / максимум 100 артефактов (BACKUP_RETENTION_DAYS /
-            MAX_BACKUPS — repo policy, BackupService defaults; R2 —
-            owner-managed lifecycle rules); порядок удаления: подтверждённое
-            удаление из BACKUP_DIR + R2 lifecycle expiry после закрытия
-            rollback-окна (решение владельца) — дамп содержит PII
-            users/doctors, бессрочное хранение запрещено
+Backup artifact (review fix 2026-09-18: verified-факты отделены от
+operator-confirmed/required-policy; автоматические BackupService
+retention/R2 guarantees этому .dump НЕ приписываются):
+
+  Verified (repo code + owner-confirmed record):
+  - file:     backup_pre_0069_fixed_20260918_162405.dump
+  - SHA256:   F53B479D2607C4836B7E8B9DA6DAC5D376FC86E5547D3DF1FE34281D83C90DAF
+  - результат применения к production — postchecks ниже в этом блоке
+  - артефакт НЕ управляется автоматическим retention/R2-pipeline репо:
+    ops/vps/scripts/backup_db.py (pg_dump -F c → *.dump в BACKUP_DIR) не
+    выполняет retention-cleanup и не вызывает r2_uploader; BackupService
+    (BACKUP_RETENTION_DAYS=30 / MAX_BACKUPS=100) чистит только
+    backup_*.db* (glob этот .dump не покрывает — подстроки .db в имени
+    нет) и загружает в R2 только собственные create_backup()-артефакты
+    (backup_<type>_<ts>.db[.gz])
+  - r2_uploader выполняет только PutObject + HeadObject с sha256-верификацией;
+    Delete/List-операций в коде uploader'а НЕТ — это факт о коде, а не
+    доказательство неспособности R2-токена к Delete/List
+
+  Operator-confirmed / must verify separately (этой записью не подтверждено):
+  - точный локальный путь (канонические BACKUP_DIR: /opt/clinic/output/backups
+    — ops/vps/clinic_lifecycle.env.sample; <app-root>/output/backups —
+    default backup_db.py)
+  - фактические filesystem ACL (ожидание: только владелец/оператор,
+    суперпользователь production-хоста)
+  - скопирован ли именно этот .dump в R2 — автоматически этого не произошло
+  - R2 object key + совпадающий SHA256, если offsite-копия существует
+  - явная дата удаления/retention именно для этого .dump
+
+  Required policy (явное решение/действие, автоматикой не покрывается):
+  - подтверждённое удаление из BACKUP_DIR (и из R2, если копия есть) после
+    закрытия rollback-окна — решение владельца; дамп содержит PII
+    users/doctors, бессрочное хранение запрещено
 
 Postchecks (2026-09-18):
   alembic_version = 0069
@@ -51,17 +67,39 @@ QD-2 / RQ-15 = FROZEN / DONE с 2026-09-18
 - A maintenance window is scheduled (the canonical deploy stops the backend runtime).
 - The operator has access to the production host, the PostgreSQL superuser credentials, and the repository at the merge commit.
 
-## Step 0 — Confirm no database has 0069 applied (mandatory gate)
+## Step 0 — Per-target environment gate (mandatory)
 
-For EVERY persistent staging/production database:
+The gate is evaluated **per target environment**, not "ANY persistent DB
+anywhere" (review fix, 2026-09-18): production already reports 0069 (this
+record), and that fact must not block the procedure for a lagging
+persistent contour.
+
+Inventory every persistent environment (production, every persistent
+staging contour; CI bases are ephemeral and do not count) and record the
+version per environment:
 
 ```sql
 SELECT version_num FROM alembic_version;
 ```
 
-- The result MUST NOT contain `0069_sentinel_pair_retirement` anywhere.
-- Expected production state: `0067_daily_queue_start_number_snapshot` (the 2026-09-16 deploy applied 0064-0067) or `0068_direction_public_address` if that migration was already deployed separately. Anything else — STOP and investigate before proceeding.
-- Record the output per environment. If ANY persistent database already reports 0069 — STOP, escalate to the owner with the inventory, do not proceed.
+Classification and the required action per environment:
+
+- `0069_sentinel_pair_retirement` → **COMPLETED / SKIP** for that
+  environment — do not re-run the procedure against it.
+- `0067_daily_queue_start_number_snapshot` or
+  `0068_direction_public_address` → eligible **TARGET** — the procedure
+  (Steps 1–5) may proceed against exactly this environment. These are the
+  expected pre-0069 states: `0067` (the 2026-09-16 deploy applied
+  0064-0067) or `0068` if that migration was already deployed separately.
+- Anything else → **STOP**, investigate, escalate to the owner with the
+  full inventory before proceeding.
+
+The procedure runs against exactly one TARGET per pass; environments
+classified COMPLETED / SKIP are recorded in the inventory and are not
+touched. Steps 1–5 below read "production" from the historical 2026-09-18
+pass — when running against another eligible TARGET, substitute that target
+environment throughout. If ALL persistent environments report `0069`, the
+procedure is applicable nowhere (Steps 0–5 are archival-only).
 
 ## Step 1 — Backup (mandatory, before touching anything)
 
