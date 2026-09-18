@@ -12,7 +12,10 @@ from app.api.v1.endpoints.user_management._helpers import (
 )  # noqa: F401
 from app.schemas.clinic import ServiceUnavailableDetail
 from app.schemas.user_management import UserPhoneScopeConflictDetail
-from app.services.patient_phone_scope import PatientPhoneScopeConflict
+from app.services.patient_phone_scope import (
+    PatientPhoneScopeConflict,
+    lock_user_candidate_state,
+)
 
 
 @router.post(
@@ -370,7 +373,15 @@ async def update_user_profile(
                 detail="Недостаточно прав для обновления профиля",
             )
 
-        profile = user_profile.get_by_user_id(db, user_id)
+        # Round-4 P1 (review, concurrency): same serialization contract as
+        # update_user / bulk — the candidate-defining state (users.role,
+        # user_profiles.phone, user_profiles.phone_verified) is read under
+        # FOR UPDATE before any guard decision is computed from it. The
+        # locked instances double as the records mutated below (identity
+        # map), so no unlocked re-read can re-enter between guard and
+        # mutation. Global lock order: users row -> user_profiles row ->
+        # phone advisory lock.
+        target_user, profile = lock_user_candidate_state(db, user_id)
         if not profile:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -391,7 +402,6 @@ async def update_user_profile(
             from app.services.patient_otp_service import normalize_phone
             from app.services.patient_phone_scope import ensure_phone_scope_free
 
-            target_user = db.query(User).filter(User.id == user_id).first()
             old_normalized = normalize_phone(profile.phone or "")
             new_normalized = normalize_phone(update_data.get("phone") or "")
             if new_normalized:

@@ -23,6 +23,31 @@ proven for an admin-entered number — same convention as the self-service
 phone change in authentication_api_service), so an edited record leaves
 the resolver predicate until a verified re-bind.
 
+Review round 4 (P1, concurrency): the guard decision is computed from
+``users.role`` / ``users.is_active`` / ``user_profiles.phone`` /
+``user_profiles.phone_verified`` — the CANDIDATE-DEFINING state of a
+record. Two parallel PARTIAL mutations of the same record (e.g.
+``role -> Patient`` and ``is_active -> true``) each read the pre-mutation
+state under READ COMMITTED, each individually see a guard that does not
+arm, and their combined commit still creates the second candidate. The
+candidate-defining state is therefore serialized under row locks BEFORE
+any decision is computed from it (``lock_user_candidate_state`` /
+``lock_candidate_state_rows``), and every User Management write path
+follows the SAME global lock order:
+
+    1. users rows              — ascending user_id
+    2. user_profiles rows      — ascending user_id
+    3. phone advisory locks    — sorted normalized phone
+    4. guards / re-checks
+    5. mutation
+    6. commit
+
+Transactions that follow one global order cannot ABBA-deadlock on these
+resources. The activation flow is compatible by construction: it takes
+the phone advisory lock first but only INSERTS fresh User/UserProfile
+rows and locks Patient cards — resources the User Management paths never
+hold or request.
+
 No UNIQUE is introduced on patients.phone / UserProfile.phone — the
 restriction guards the portal identity only (owner decision; family
 phones on cards remain legal).
@@ -87,6 +112,49 @@ def acquire_phone_scope_lock(db: Session, normalized: str) -> None:
         text("SELECT pg_advisory_xact_lock(:key)"),
         {"key": phone_lock_key(normalized)},
     )
+
+
+def lock_user_candidate_state(
+    db: Session, user_id: int
+) -> tuple[User | None, UserProfile | None]:
+    """``FOR UPDATE`` on the candidate-defining rows of ONE user, in the
+    canonical order (users row, then its user_profiles row).
+
+    The caller must call this BEFORE reading role/is_active/phone/
+    phone_verified and BEFORE taking any phone-scope advisory lock —
+    prefix of the global lock order documented in the module docstring.
+    Returns the locked instances (identity-map objects: every later
+    ``user.profile`` access in the same session resolves to the SAME
+    locked profile row). On non-PG dialects (SQLite unit tests) the
+    FOR UPDATE clause is a dialect no-op; the deterministic reads remain.
+    A missing row locks nothing and reads as None."""
+    user = (
+        db.query(User)
+        .filter(User.id == user_id)
+        .with_for_update()
+        .first()
+    )
+    profile = (
+        db.query(UserProfile)
+        .filter(UserProfile.user_id == user_id)
+        .with_for_update()
+        .first()
+    )
+    return user, profile
+
+
+def lock_candidate_state_rows(db: Session, user_ids: list[int]) -> None:
+    """``FOR UPDATE`` on the candidate-defining rows of MANY users
+    (bulk paths), in the SAME canonical order: user_id ascending, and
+    per user the users row before its user_profiles row.
+
+    Deterministic order is what makes concurrent bulk batches (and any
+    mix of bulk / single-user / profile-door operations with overlapping
+    target sets) deadlock-free: every transaction requests the shared
+    row resources in one global sequence. Must run BEFORE the batch
+    preflights read state and BEFORE any phone-scope advisory lock."""
+    for uid in sorted(set(user_ids)):
+        lock_user_candidate_state(db, uid)
 
 
 def count_active_verified_patient_users(

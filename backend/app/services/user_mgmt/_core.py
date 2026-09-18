@@ -10,7 +10,10 @@ from app.services.medical_specialty_catalog import (
 # function-local import would make it a local variable and the clause would
 # raise UnboundLocalError instead of matching (documented by the round-2 CI
 # failure this comment references).
-from app.services.patient_phone_scope import PatientPhoneScopeConflict
+from app.services.patient_phone_scope import (
+    PatientPhoneScopeConflict,
+    lock_user_candidate_state,
+)
 from app.services.user_mgmt._base import *  # noqa: F401, F403
 from app.services.user_mgmt._base import (
     MEDICAL_SPECIALTY_CATALOG_REMEDIATION,
@@ -351,7 +354,21 @@ class CoreMixin(UserManagementServiceMixinBase):
     ) -> tuple[bool, str]:
         """Обновляет пользователя"""
         try:
-            user = db.query(User).filter(User.id == user_id).first()
+            # Round-4 P1 (review, concurrency): serialize the
+            # candidate-defining state of THIS record (users.role,
+            # users.is_active, user_profiles.phone, user_profiles.
+            # phone_verified) under FOR UPDATE before ANY decision is
+            # computed from it. Without the row lock two parallel PARTIAL
+            # mutations (e.g. `role -> Patient` and `is_active -> true`)
+            # each read the pre-mutation state under READ COMMITTED, each
+            # guard independently stays disarmed, and the combined commit
+            # still creates a SECOND login-resolver candidate on the shared
+            # phone — the fail-closed OTP-login lockout this PR excludes.
+            # The lock is held until commit/rollback; the guard decisions
+            # below and the mutation itself all run inside the same
+            # serialized window (global lock order: users row ->
+            # user_profiles row -> phone advisory lock).
+            user, profile = lock_user_candidate_state(db, user_id)
             if not user:
                 return False, "Пользователь не найден"
 
@@ -428,7 +445,7 @@ class CoreMixin(UserManagementServiceMixinBase):
             # the same check under the same advisory lock, or an admin
             # could recreate the two-candidates fail-closed login lockout
             # (reactivation / role->Patient / verified-phone change).
-            profile = user.profile
+            # `profile` is the row locked above (identity-map object).
             if profile is not None:
                 # NOTE: PatientPhoneScopeConflict is NOT imported here — the
                 # module-level import above provides it for the `except`

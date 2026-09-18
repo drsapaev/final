@@ -11,6 +11,7 @@ from app.services.patient_phone_scope import (
     ERR_PHONE_SCOPE_CONFLICT,
     acquire_phone_scope_lock,
     ensure_phone_scope_free,
+    lock_candidate_state_rows,
 )
 from app.services.user_mgmt._base import *  # noqa: F401, F403
 from app.services.user_mgmt._base import (
@@ -105,6 +106,20 @@ class OperationsMixin(UserManagementServiceMixinBase):
             processed_count = 0
             failed_count = 0
             failed_users = []
+
+            # Round-4 P1 (review, concurrency): serialize the
+            # candidate-defining state of EVERY target row (users.role,
+            # users.is_active, user_profiles.phone, user_profiles.
+            # phone_verified) BEFORE any preflight reads it. The round-3
+            # preflight computed `entering_ids` from UNLOCKED rows: a
+            # concurrent update_user could flip role/is_active between the
+            # preflight and the mutation, the batch would keep the stale
+            # "not entering" verdict and the two operations would still
+            # combine into a second login-resolver candidate. Row locks
+            # make preflight state authoritative until commit. Same global
+            # lock order as update_user: users rows ascending ->
+            # user_profiles rows -> phone advisory locks (sorted).
+            lock_candidate_state_rows(db, action_data.user_ids)
 
             # Codex #3031 round-3 P2 (narrowed per round-4 P2): catalog probes
             # inside the lifecycle helpers are SELECTs — when the catalog is
