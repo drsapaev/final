@@ -4,6 +4,8 @@ Split from authentication_service.py.
 """
 from __future__ import annotations
 
+from sqlalchemy.orm import joinedload
+
 from app.core.pii_masker import mask_identifier  # PR-31: mask usernames in logs
 from app.core.roles import is_login_blocked_role
 from app.services.auth_svc._base import *  # noqa: F401, F403
@@ -125,9 +127,12 @@ class TokensMixin(AuthenticationServiceMixinBase):
             logger.debug("authenticate_user called with username=%s", mask_identifier(username))
 
             # Ищем пользователя по username или email
+            # Eager-load two_factor_auth: login_user checks it on every login,
+            # and a lazy load here would cost an extra RTT to the remote DB.
             timer.mark("user_lookup")
             user = (
                 db.query(User)
+                .options(joinedload(User.two_factor_auth))
                 .filter(or_(User.username == username, User.email == username))
                 .first()
             )
