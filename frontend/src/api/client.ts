@@ -97,6 +97,21 @@ async function performTokenRefresh(): Promise<string | null> {
     });
 
     if (response.data && response.data.access_token) {
+      // Session-replacement guard (Phase 0 PR-B review P1): if the stored
+      // refresh token changed while this refresh was in flight — e.g.
+      // replaceAccessOnlySession() cleared it during a patient login or
+      // activation — the rotated tokens below belong to the REPLACED
+      // principal. Persisting them would resurrect the old staff session
+      // on top of the freshly installed patient one. Drop them and let the
+      // pending request continue under the current (replacement) session;
+      // the 401-recovery path already refuses to clear a replaced session
+      // (failedToken !== currentToken guard), so null is safe there too.
+      if (tokenManager.getRefreshToken() !== refreshToken) {
+        logger.warn('🔄 Refresh token changed mid-flight — dropping rotated tokens of the replaced session');
+        pendingRequestsQueue.forEach(resolve => resolve(null));
+        pendingRequestsQueue = [];
+        return null;
+      }
       const newToken = response.data.access_token;
       tokenManager.setAccessToken(newToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
@@ -184,7 +199,17 @@ const AUTH_BOOTSTRAP_SUFFIXES = [
   '/password-reset',
   '/password-reset/confirm',
   '/auth/logout',
-  '/authentication/logout'
+  '/authentication/logout',
+  // Patient portal (Phase 0 PR-A1/A2): pre-session endpoints whose uniform
+  // anti-enum 400/401/429 must surface as form errors — they must never
+  // trigger the reactive refresh/retry path (a patient session has no
+  // refresh_token, and a 401 here means "wrong code / not activated",
+  // not "token expired").
+  '/patient-access/request-otp',
+  '/patient-access/verify-otp',
+  '/patient-access/login',
+  '/patient-access/activate/request-otp',
+  '/patient-access/activate/confirm'
 ];
 
 function isAuthBootstrapEndpoint(url: string | undefined): boolean {
@@ -302,7 +327,7 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
       if (!isAuthEndpoint) {
         return Promise.reject(new Error(
           `[FIX:CSRF] Strict mode: refusing ${method.toUpperCase()} ${url} without CSRF token. `
-          + `Set VITE_CSRF_STRICT=0 to revert to fail-open behaviour.`
+          + 'Set VITE_CSRF_STRICT=0 to revert to fail-open behaviour.'
         ));
       }
     }
@@ -357,7 +382,6 @@ api.interceptors.response.use(
       const hadAuthHeader = !!config.headers?.Authorization;
       const failedToken = String(config.headers?.Authorization || '')
         .replace(/^Bearer\s+/i, '');
-      const currentToken = tokenManager.getAccessToken();
       const refreshToken = tokenManager.getRefreshToken();
 
       if (hadAuthHeader && refreshToken && !config._retriedAfterRefresh) {
@@ -371,7 +395,19 @@ api.interceptors.response.use(
           return api.request(config);
         }
         // Session is dead only if no newer session took its place meanwhile.
-        if (!currentToken || failedToken === currentToken) {
+        // Phase 0 PR-B review round 2 (P1): the decision MUST be made on the
+        // LIVE access token re-read AFTER the await — not on a snapshot taken
+        // before it. Interleaving: 401 on a staff request → refresh starts →
+        // patient login replaces the session mid-flight (replaceAccessOnlySession)
+        // → the stale staff refresh is dropped by the performTokenRefresh
+        // guard → resolve null here. With the old pre-await snapshot
+        // (failedToken === snapshot) clearAll() wiped the freshly installed
+        // Patient session right after a successful login. liveToken now
+        // differs from failedToken (or the new session is access-only and
+        // still present), so the replacement survives; a genuinely dead
+        // session still fails the check and gets cleared.
+        const liveToken = tokenManager.getAccessToken();
+        if (!liveToken || failedToken === liveToken) {
           logger.warn('🔒 Token refresh failed — clearing session');
           tokenManager.clearAll();
           delete api.defaults.headers.common['Authorization'];
