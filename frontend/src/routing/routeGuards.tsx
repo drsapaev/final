@@ -98,36 +98,47 @@ export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProp
   const location = useLocation();
 
   const missingTokenRedirect = route !== null && route.auth !== 'public' && !state.token;
-  // Codex P2 (round 8): read the expired-principal kind from the NOTIFIED
-  // SNAPSHOT (carried atomically with the token-clear by stores/auth) — not
-  // from the mutable global, which a stale already-scheduled passive effect
-  // could wipe before this render observes it.
-  const expiredPatientRedirect = missingTokenRedirect && state.expiredPrincipalWasPatient === true;
 
-  // Codex P2 (round 4): the hint is consumed ONCE per missing-token episode
-  // and the selected target is FROZEN for that episode (ref) — duplicate
-  // clears on the same 401 trigger extra re-renders, and a re-computed
-  // target after the hint was consumed must never flip the redirect back
-  // to the staff login.
+  // Codex P2 (rounds 8+9): the expired-principal kind arrives INSIDE the
+  // notified snapshot (atomic with the token-clear — immune to stale
+  // passive-effect ordering) and is consumed EXACTLY ONCE per clear
+  // episode, wherever this boundary instance happens to be mounted:
+  //   - protected route + missing token → the frozen redirect target
+  //     becomes the patient login (the expiry case this PR fixes);
+  //   - public route (explicit logout navigation) → retired without a
+  //     redirect.
+  // Consuming once per episode keeps the retained boundary snapshot
+  // (App.tsx renders sibling routes through one RouteRenderer instance, so
+  // boundary state survives navigation) from misdirecting a LATER anonymous
+  // visit to the patient login.
+  // The redirect target is FROZEN once selected for the episode — duplicate
+  // clears trigger extra re-renders and must never flip an already-chosen
+  // redirect back to the staff login. Re-armed when a session is
+  // (re-)established (effect below).
   const redirectTargetRef = useRef<string | null>(null);
+  const consumeEpisodeRef = useRef(false);
+  if (state.expiredPrincipalWasPatient === true && !consumeEpisodeRef.current) {
+    consumeEpisodeRef.current = true;
+    if (missingTokenRedirect) {
+      redirectTargetRef.current = '/patient/login';
+    }
+  }
+
+  // Any anonymous protected render without a consumed patient episode keeps
+  // the staff login; a frozen patient target from an earlier episode stays.
   if (missingTokenRedirect && redirectTargetRef.current === null) {
-    redirectTargetRef.current = expiredPatientRedirect ? '/patient/login' : '/login';
+    redirectTargetRef.current = '/login';
   }
 
   useEffect(() => {
-    if (!missingTokenRedirect) {
-      // Session (re-)established — arm the ref for a future expiry episode.
+    if (!missingTokenRedirect && state.token) {
+      // Session (re-)established — arm the refs for a future expiry episode.
       redirectTargetRef.current = null;
+      consumeEpisodeRef.current = false;
     }
-    // Codex P2 (rounds 5+7): the hint lives only BETWEEN the session clear
-    // and the next boundary evaluation, so it is consumed on EVERY
-    // auth-state transition or missing-token flip — including re-renders of
-    // an ALREADY-MOUNTED public boundary where missingTokenRedirect stays
-    // false but state.token changes (a delayed 401 clear while the patient
-    // browses a public page). On the protected missing-token path the
-    // target was already frozen into the ref during render, so consuming
-    // here cannot flip that redirect.
-    void state.token;
+    // Codex P2 (rounds 5+7): the global hint lives only BETWEEN the session
+    // clear and the next boundary evaluation — every auth-state transition
+    // drops it, so fresh mounts can never inherit a stale marker.
     resetExpiredPrincipalHint();
   }, [state.token, missingTokenRedirect]);
 
@@ -195,13 +206,13 @@ export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProp
   }
 
   if (missingTokenRedirect) {
-    // Phase 0 follow-up (Codex P1, rounds 2-4): the redirect target follows
-    // the EXPIRED PRINCIPAL, not the route — patient-home is shared with
-    // support staff (Admin/Registrar/Doctor), so route metadata cannot
-    // identify whose session died. The auth store remembers the cleared
-    // session's kind: an expired PATIENT lands on the phone/OTP entry point
-    // (/patient/login); expired staff and anonymous visitors keep /login.
-    // The target is frozen per episode and the hint consumed (ref above).
+    // Phase 0 follow-up (Codex P1/P2, rounds 2-9): the redirect target
+    // follows the EXPIRED PRINCIPAL, not the route — patient-home is shared
+    // with support staff (Admin/Registrar/Doctor), so route metadata cannot
+    // identify whose session died. The kind arrives in the notified auth
+    // snapshot and is consumed exactly once per clear episode (refs above);
+    // an expired PATIENT lands on the phone/OTP entry point (/patient/login),
+    // expired staff and anonymous visitors keep /login.
     return (
       <Navigate
         to={redirectTargetRef.current ?? '/login'}

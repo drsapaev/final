@@ -6,7 +6,7 @@
  * (the phone/OTP entry point); expired staff and anonymous visitors keep
  * /login — including staff whose session dies ON the shared patient panel.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -239,5 +239,78 @@ describe('RouteAccessBoundary redirect target for missing tokens (Phase 0 follow
     await waitFor(() => {
       expect(seen[seen.length - 1]).toBe('/patient/login');
     });
+  });
+
+  it('does not reuse the consumed patient episode on a later protected visit (round 9)', async () => {
+    // Codex P2 (round 9): App.tsx renders sibling routes through ONE
+    // RouteRenderer instance, so the boundary state survives navigation.
+    // A patient episode consumed on a public route must stay consumed —
+    // a later anonymous visit to a protected staff route keeps /login.
+    replaceAccessOnlySession(createJwt(3600), {
+      id: 42,
+      username: 'patient-42',
+      role: 'Patient',
+    } as never);
+
+    const ADMIN_ROUTE: BoundaryRoute = {
+      id: 'admin',
+      group: 'admin',
+      auth: 'role-scoped',
+      roles: ['Admin'],
+      homeForRoles: ['admin'],
+    };
+
+    const PUBLIC_LOGIN_ROUTE: BoundaryRoute = {
+      id: 'login',
+      group: 'public',
+      auth: 'public',
+      roles: [],
+    };
+    const seen: string[] = [];
+    const LocationProbe = () => {
+      const { pathname } = useLocation();
+      if (seen[seen.length - 1] !== pathname) {
+        seen.push(pathname);
+      }
+      return null;
+    };
+
+    const routeSwitchController = { set: (_next: BoundaryRoute) => {} };
+
+    function Harness() {
+      const [route, setRoute] = useState<BoundaryRoute>(PUBLIC_LOGIN_ROUTE);
+      routeSwitchController.set = (next: BoundaryRoute) => setRoute(next);
+      return (
+        <>
+          <RouteAccessBoundary route={route}>
+            <div data-testid="panel-content">panel</div>
+          </RouteAccessBoundary>
+          <LocationProbe />
+        </>
+      );
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Harness />
+      </MemoryRouter>
+    );
+
+    // Live patient session on the public route; the session dies (delayed
+    // 401) — the episode is consumed on this public boundary render and the
+    // global hint is dropped by the boundary's hygiene effect.
+    clearToken();
+    await waitFor(() => {
+      expect(getExpiredPrincipalWasPatient()).toBe(false);
+    });
+
+    // Navigate to a protected staff route through the SAME boundary
+    // instance (retained snapshot must not misdirect).
+    routeSwitchController.set(ADMIN_ROUTE);
+
+    await waitFor(() => {
+      expect(seen[seen.length - 1]).toBe('/login');
+    });
+    expect(screen.queryByTestId('panel-content')).not.toBeInTheDocument();
   });
 });
