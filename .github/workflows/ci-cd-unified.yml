@@ -893,11 +893,17 @@ jobs:
       continue-on-error: true
 
     - name: 📤 Upload visual regression artifacts
+      # PR7 follow-up: when the dispatch asked for baseline regeneration,
+      # --update-snapshots rewrites files in e2e/visual-regression.spec.ts-snapshots/
+      # (the __screenshots__/ dir only holds failure diffs) — upload them too,
+      # so the operator can commit the regenerated linux baselines.
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: visual-regression-screenshots
-        path: frontend/e2e/__screenshots__/
+        path: |
+          frontend/e2e/__screenshots__/
+          frontend/e2e/visual-regression.spec.ts-snapshots/
         retention-days: 14
         if-no-files-found: ignore
 
