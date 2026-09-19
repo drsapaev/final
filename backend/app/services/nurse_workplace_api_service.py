@@ -11,6 +11,25 @@ Boundary validations (the assignment boundary of the track):
   guarantee is the migration-0071 partial unique index (PG), this check
   gives the API its deterministic, user-readable error.
 
+Creation serializes against Nurse lifecycle writers on the SAME row
+locks (review P2, round 2 — TOCTOU): ``create_assignment`` re-reads the
+target User with ``SELECT ... FOR UPDATE`` and then the QueueResource
+the same way BEFORE any eligibility decision. ``update_user()`` already
+takes the users-row lock via ``lock_user_candidate_state(...)`` before
+mutating ``users.role`` / ``users.is_active``; by sharing that lock the
+eligibility read and the lifecycle commit become strictly linear —
+either the assignment committed first (lifecycle change applies
+afterwards to an already-created row) or the lifecycle change committed
+first and create re-reads the NEW state and answers 400. A plain
+(unlocked) read here used to pass stale eligibility and commit an ACTIVE
+assignment for a user who is already a Registrar / deactivated — a state
+the 0071 partial UNIQUE knows nothing about. The lock order is the
+canonical one (users row first, then queue_resources row — the same
+head element as the global order documented in patient_phone_scope) and
+both locks are held until the INSERT commits. On SQLite (unit tests)
+FOR UPDATE is a dialect no-op; the deterministic re-read
+(``populate_existing``) still applies.
+
 Deactivation keeps the row (inactive assignments are historical
 records, not drift); a NEW active row for the same pair may be created
 afterwards — exactly what the partial (WHERE is_active) uniqueness
@@ -62,16 +81,51 @@ class NurseWorkplaceApiService:
 
     # ---------------- helpers ----------------
 
-    def _get_user_or_error(self, user_id: int) -> User:
-        user = self.db.get(User, user_id)
+    def _lock_user_or_error(self, user_id: int) -> User:
+        """Row-locked re-read of the target user (review P2, round 2).
+
+        ``with_for_update()`` takes the SAME users-row lock that
+        ``update_user()`` acquires via ``lock_user_candidate_state``
+        before changing ``role`` / ``is_active`` — the eligibility
+        decision computed from the returned instance therefore cannot
+        interleave with a concurrent lifecycle commit (see the module
+        docstring for the linearization contract).
+        ``populate_existing()`` forces a fresh SELECT even when an
+        instance for the row is already loaded in this session (and
+        possibly stale after a concurrent writer committed first).
+        On non-PG dialects (SQLite unit tests) the FOR UPDATE clause is
+        a dialect no-op; the deterministic re-read remains.
+        """
+        user = (
+            self.db.query(User)
+            .filter(User.id == user_id)
+            .populate_existing()
+            .with_for_update()
+            .first()
+        )
         if user is None:
             raise NurseWorkplaceApiDomainError(
                 404, f"Пользователь id={user_id} не найден"
             )
         return user
 
-    def _get_resource_or_error(self, queue_resource_id: int) -> QueueResource:
-        resource = self.db.get(QueueResource, queue_resource_id)
+    def _lock_resource_or_error(self, queue_resource_id: int) -> QueueResource:
+        """Row-locked re-read of the target QueueResource (review P2,
+        round 2).
+
+        Same serialization intent as ``_lock_user_or_error``: an
+        in-flight resource deactivation must not be outrun by a stale
+        eligibility read. Taken AFTER the users-row lock — the canonical
+        order (users row first) shared with the user-management write
+        paths; both locks are held until the assignment INSERT commits.
+        """
+        resource = (
+            self.db.query(QueueResource)
+            .filter(QueueResource.id == queue_resource_id)
+            .populate_existing()
+            .with_for_update()
+            .first()
+        )
         if resource is None:
             raise NurseWorkplaceApiDomainError(
                 404, f"QueueResource id={queue_resource_id} не найден"
@@ -129,7 +183,14 @@ class NurseWorkplaceApiService:
         queue_resource_id: int,
         cabinet_override: str | None,
     ) -> dict[str, Any]:
-        user = self._get_user_or_error(user_id)
+        # Review P2 (round 2 — TOCTOU): every eligibility read below runs
+        # UNDER the target row locks (users row, then queue_resources row)
+        # and the locks stay held until the INSERT commits — a concurrent
+        # Nurse deactivation / demotion via update_user() (which takes the
+        # same users-row FOR UPDATE) can only be strictly BEFORE (this
+        # request re-reads the new state and answers 400) or strictly AFTER
+        # (the lifecycle change applies to an already-committed assignment).
+        user = self._lock_user_or_error(user_id)
         if not bool(getattr(user, "is_active", False)):
             raise NurseWorkplaceApiDomainError(
                 400, f"Пользователь id={user_id} деактивирован"
@@ -141,7 +202,7 @@ class NurseWorkplaceApiService:
                 f"(role={getattr(user, 'role', None)!r})",
             )
 
-        resource = self._get_resource_or_error(queue_resource_id)
+        resource = self._lock_resource_or_error(queue_resource_id)
         if not bool(getattr(resource, "active", False)):
             raise NurseWorkplaceApiDomainError(
                 400, f"QueueResource id={queue_resource_id} неактивен"

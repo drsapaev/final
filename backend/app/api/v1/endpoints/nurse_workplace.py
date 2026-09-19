@@ -14,6 +14,14 @@ Review P2 (PR #3333): the domain-error contract (400/404/409) is
 published on the FastAPI decorators via NurseWorkplaceErrorDetail so
 backend/openapi.json and the generated frontend api.ts describe the
 responses the service actually returns.
+
+Review P2, round 2 (PR #3333): the auth-error contract (401/403) is
+published too — on ALL FOUR operations. The runtime already proves
+both codes (test_nurse_workplace_endpoints.py: no JWT -> 401, wrong
+role -> 403, deactivated Admin with an unexpired JWT -> 403 via
+require_active_roles); the generated clients must not silently drop
+them. Same typed {"detail": ...} body (NurseWorkplaceErrorDetail) —
+the shape FastAPI's HTTPException returns for the auth failures.
 """
 
 from __future__ import annotations
@@ -43,6 +51,27 @@ def _to_response(data: dict) -> NurseWorkplaceAssignmentResponse:
     return NurseWorkplaceAssignmentResponse(**data)
 
 
+# Review P2 round 2 (PR #3333): the shared auth-error contract of the
+# whole control plane. 401 — JWT missing/invalid (get_current_user);
+# 403 — not Admin (role gate), or a DEACTIVATED Admin / superuser holding
+# an unexpired JWT (require_active_roles fails closed). Published on every
+# operation below so backend/openapi.json and the generated frontend
+# api.ts describe the auth failures the runtime actually returns.
+_AUTH_ERROR_RESPONSES = {
+    401: {
+        "model": NurseWorkplaceErrorDetail,
+        "description": "Требуется аутентификация (JWT отсутствует или недействителен)",
+    },
+    403: {
+        "model": NurseWorkplaceErrorDetail,
+        "description": (
+            "Только активная роль Admin: не Admin, либо деактивированный "
+            "(супер)админ с ещё действующим JWT"
+        ),
+    },
+}
+
+
 @router.post(
     _BASE_PATH,
     response_model=NurseWorkplaceAssignmentResponse,
@@ -65,6 +94,7 @@ def _to_response(data: dict) -> NurseWorkplaceAssignmentResponse:
                 "Активное назначение для пары (user, queue_resource) уже существует"
             ),
         },
+        **_AUTH_ERROR_RESPONSES,
     },
 )
 def create_nurse_workplace_assignment(
@@ -76,7 +106,9 @@ def create_nurse_workplace_assignment(
 
     404 — referenced user/resource not found; 400 — the user is not an
     active Nurse or the resource is inactive; 409 — an active
-    assignment for the same (user, resource) pair already exists.
+    assignment for the same (user, resource) pair already exists;
+    401/403 — the control-plane auth contract (see
+    _AUTH_ERROR_RESPONSES).
     """
     try:
         data = NurseWorkplaceApiService(db).create_assignment(
@@ -89,7 +121,11 @@ def create_nurse_workplace_assignment(
     return _to_response(data)
 
 
-@router.get(_BASE_PATH, response_model=NurseWorkplaceAssignmentListResponse)
+@router.get(
+    _BASE_PATH,
+    response_model=NurseWorkplaceAssignmentListResponse,
+    responses={**_AUTH_ERROR_RESPONSES},
+)
 def list_nurse_workplace_assignments(
     user_id: int | None = Query(None, description="Filter by target Nurse user"),
     queue_resource_id: int | None = Query(None, description="Filter by QueueResource"),
@@ -120,6 +156,7 @@ def list_nurse_workplace_assignments(
             "model": NurseWorkplaceErrorDetail,
             "description": "Назначение не найдено",
         },
+        **_AUTH_ERROR_RESPONSES,
     },
 )
 def get_nurse_workplace_assignment(
@@ -147,6 +184,7 @@ def get_nurse_workplace_assignment(
             "model": NurseWorkplaceErrorDetail,
             "description": "Назначение уже деактивировано",
         },
+        **_AUTH_ERROR_RESPONSES,
     },
 )
 def deactivate_nurse_workplace_assignment(
@@ -157,7 +195,9 @@ def deactivate_nurse_workplace_assignment(
     """Deactivate an assignment (the row stays as history; D2 FINAL).
 
     404 — assignment not found; 409 — already inactive. A new active row
-    for the same (user, resource) pair may be created afterwards.
+    for the same (user, resource) pair may be created afterwards;
+    401/403 — the control-plane auth contract (see
+    _AUTH_ERROR_RESPONSES).
     """
     try:
         data = NurseWorkplaceApiService(db).deactivate_assignment(assignment_id)

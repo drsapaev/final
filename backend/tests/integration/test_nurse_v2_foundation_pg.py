@@ -26,6 +26,15 @@ by ``alembic upgrade`` (SQLite is never a substitute):
    statuses outside the D1 vocabulary and non-positive attempt numbers
    are rejected by the CHECK constraints (review P2-2).
 4. Downgrade reverses cleanly (head -> 0070 -> head).
+5. Review P2 round 2 (PR #3333) — TOCTOU serialization on TWO real
+   connections: ``create_assignment`` (the REAL service, on its own
+   connection) versus a Nurse lifecycle writer that reproduces
+   ``update_user()``'s critical section (``lock_user_candidate_state``
+   users-row FOR UPDATE + role/is_active mutation). Only the linear
+   outcomes are legal: assignment-first (A) or lifecycle-first -> create
+   answers 400 (B); an ACTIVE assignment committed on stale eligibility
+   after the lifecycle COMMIT is impossible. The queue_resources row
+   lock gets the same symmetric proof.
 """
 
 from __future__ import annotations
@@ -567,3 +576,272 @@ def test_downgrade_reverses_cleanly():
             engine.dispose()
     finally:
         _drop(db_name)
+
+
+# ---------------- review P2 round 2 (PR #3333): TOCTOU serialization ----------------
+#
+# create_assignment <-> Nurse lifecycle change (deactivation / demotion)
+# on TWO real PostgreSQL connections. T2 reproduces update_user()'s
+# critical section — lock_user_candidate_state() takes the users-row
+# FOR UPDATE and mutates role / is_active inside the same transaction.
+# T1 runs the REAL NurseWorkplaceApiService.create_assignment on a
+# separate connection. Only linear outcomes are legal:
+#
+#   A) assignment commits first -> the lifecycle change applies
+#      afterwards to the already-created row (companion test below);
+#   B) lifecycle commits first  -> create re-reads the NEW state -> 400,
+#      no assignment row (the parametrized race tests below).
+#
+# The forbidden outcome — lifecycle COMMIT followed by create COMMIT on
+# stale eligibility (an ACTIVE assignment for a user who is already a
+# Registrar / deactivated) — is what the users-row FOR UPDATE re-read in
+# create_assignment excludes; the 0071 partial UNIQUE cannot catch it
+# (it knows nothing about users.role / users.is_active).
+
+
+def _assignment_pair_count(engine, user_id: int, resource_id: int) -> int:
+    with engine.connect() as conn:
+        return conn.execute(
+            text(
+                "SELECT count(*) FROM nurse_workplace_assignments "
+                f"WHERE user_id = {user_id} "
+                f"AND queue_resource_id = {resource_id}"
+            )
+        ).scalar_one()
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "mutation",
+    ["demote", "deactivate"],
+    ids=["demote-to-registrar", "deactivate"],
+)
+def test_create_assignment_cannot_commit_on_stale_nurse_eligibility(head_url, mutation):
+    """Race B (the reviewer's forbidden interleaving): the lifecycle
+    writer's FOR UPDATE is held with the mutation UNCOMMITTED while the
+    real create_assignment runs — it must block on the same row lock,
+    then re-read the committed lifecycle change and answer 400."""
+    from threading import Thread
+
+    from sqlalchemy.orm import sessionmaker
+
+    from app.services.nurse_workplace_api_service import (
+        NurseWorkplaceApiDomainError,
+        NurseWorkplaceApiService,
+    )
+    from app.services.patient_phone_scope import lock_user_candidate_state
+
+    engine = create_engine(head_url, future=True)
+    factory = sessionmaker(bind=engine)
+    try:
+        with engine.begin() as conn:
+            nurse_id = _insert_user(conn, f"n2v2_race_{mutation}")
+            resource_id = _insert_resource(conn, f"n2v2_race_res_{mutation}")
+
+        # T2 — the lifecycle writer: update_user()'s critical section.
+        t2 = factory()
+        try:
+            user_row, _profile = lock_user_candidate_state(t2, nurse_id)
+            assert user_row is not None
+            if mutation == "demote":
+                user_row.role = "Registrar"
+            else:
+                user_row.is_active = False
+            t2.flush()  # mutation written, lock held, NOT committed
+
+            # T1 — the real service on its own connection, in a worker
+            # thread (the FOR UPDATE read must block on T2's row lock).
+            outcome: dict = {}
+
+            def _create() -> None:
+                t1 = factory()
+                try:
+                    outcome["result"] = NurseWorkplaceApiService(t1).create_assignment(
+                        user_id=nurse_id,
+                        queue_resource_id=resource_id,
+                        cabinet_override=None,
+                    )
+                except NurseWorkplaceApiDomainError as exc:
+                    outcome["error"] = exc
+                finally:
+                    t1.close()
+
+            worker = Thread(target=_create, daemon=True)
+            worker.start()
+
+            # Serialization proof: while T2 holds the users-row FOR UPDATE
+            # with the lifecycle mutation uncommitted, T1 CANNOT finish.
+            # Without the locked re-read in create_assignment, T1 would
+            # complete right here on the stale (pre-mutation) eligibility
+            # and commit — the exact regression this test pins.
+            worker.join(timeout=1.0)
+            assert worker.is_alive(), (
+                "create_assignment finished while the lifecycle writer held "
+                "the users-row FOR UPDATE — stale-eligibility TOCTOU is back"
+            )
+
+            t2.commit()  # release the lock; T1 re-reads the NEW state
+        finally:
+            t2.close()
+
+        worker.join(timeout=30.0)
+        assert (
+            not worker.is_alive()
+        ), "create_assignment did not finish after the lifecycle commit"
+
+        assert "error" in outcome, (
+            f"create_assignment must answer 400 after the committed "
+            f"{mutation}; got success: {outcome.get('result')!r}"
+        )
+        assert outcome["error"].status_code == 400, outcome["error"].detail
+        if mutation == "demote":
+            assert "не имеет роли Nurse" in outcome["error"].detail
+        else:
+            assert "деактивирован" in outcome["error"].detail
+
+        # The forbidden end state did not happen: no assignment row.
+        assert _assignment_pair_count(engine, nurse_id, resource_id) == 0
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.integration
+def test_lifecycle_change_after_committed_assignment_is_linear_state_a(head_url):
+    """Race A (the allowed opposite order): create commits first and
+    RELEASES its locks; the lifecycle writer then takes the users-row
+    lock and commits without deadlock. The result — an ACTIVE assignment
+    for a since-demoted user — is the legal linear state A; the N2-3
+    serving surface re-checks role/activity at serve time."""
+    from sqlalchemy.orm import sessionmaker
+
+    from app.services.nurse_workplace_api_service import (
+        NurseWorkplaceApiService,
+    )
+    from app.services.patient_phone_scope import lock_user_candidate_state
+
+    engine = create_engine(head_url, future=True)
+    factory = sessionmaker(bind=engine)
+    try:
+        with engine.begin() as conn:
+            nurse_id = _insert_user(conn, "n2v2_race_a_first")
+            resource_id = _insert_resource(conn, "n2v2_race_a_res")
+
+        # T1 — create commits (and releases the users/resource locks).
+        t1 = factory()
+        try:
+            data = NurseWorkplaceApiService(t1).create_assignment(
+                user_id=nurse_id,
+                queue_resource_id=resource_id,
+                cabinet_override=None,
+            )
+            assert data["is_active"] is True
+        finally:
+            t1.close()
+
+        # T2 — the lifecycle writer is NOT blocked and NOT deadlocked.
+        t2 = factory()
+        try:
+            user_row, _profile = lock_user_candidate_state(t2, nurse_id)
+            assert user_row is not None
+            user_row.role = "Registrar"
+            t2.commit()
+        finally:
+            t2.close()
+
+        with engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT a.is_active, u.role FROM nurse_workplace_assignments a "
+                    f"JOIN users u ON u.id = a.user_id WHERE a.user_id = {nurse_id} "
+                    f"AND a.queue_resource_id = {resource_id}"
+                )
+            ).one()
+        assert row[0] is True, "assignment stays active (linear state A)"
+        assert row[1] == "Registrar"
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.integration
+def test_create_assignment_cannot_commit_on_stale_resource_activity(head_url):
+    """Symmetric serialization on the queue_resources row: the lifecycle
+    writer holds the resource FOR UPDATE with active -> false
+    uncommitted; the real create_assignment must block on the same row
+    lock, then re-read active=false and answer 400 (an inactive resource
+    must not receive new assignments — not even mid-flight ones)."""
+    from threading import Thread
+
+    from sqlalchemy.orm import sessionmaker
+
+    from app.services.nurse_workplace_api_service import (
+        NurseWorkplaceApiDomainError,
+        NurseWorkplaceApiService,
+    )
+
+    engine = create_engine(head_url, future=True)
+    factory = sessionmaker(bind=engine)
+    try:
+        with engine.begin() as conn:
+            nurse_id = _insert_user(conn, "n2v2_race_res_user")
+            resource_id = _insert_resource(conn, "n2v2_race_res_lock")
+
+        # T2 — resource lifecycle writer: row lock held, flip uncommitted.
+        t2 = factory()
+        try:
+            t2.execute(
+                text(
+                    f"SELECT id FROM queue_resources WHERE id = {resource_id} "
+                    "FOR UPDATE"
+                )
+            )
+            t2.execute(
+                text(
+                    f"UPDATE queue_resources SET active = false "
+                    f"WHERE id = {resource_id}"
+                )
+            )
+
+            outcome: dict = {}
+
+            def _create() -> None:
+                t1 = factory()
+                try:
+                    outcome["result"] = NurseWorkplaceApiService(t1).create_assignment(
+                        user_id=nurse_id,
+                        queue_resource_id=resource_id,
+                        cabinet_override=None,
+                    )
+                except NurseWorkplaceApiDomainError as exc:
+                    outcome["error"] = exc
+                finally:
+                    t1.close()
+
+            worker = Thread(target=_create, daemon=True)
+            worker.start()
+
+            worker.join(timeout=1.0)
+            assert worker.is_alive(), (
+                "create_assignment finished while the resource lifecycle "
+                "writer held the queue_resources FOR UPDATE — stale "
+                "resource-activity TOCTOU is back"
+            )
+
+            t2.commit()
+        finally:
+            t2.close()
+
+        worker.join(timeout=30.0)
+        assert (
+            not worker.is_alive()
+        ), "create_assignment did not finish after the resource commit"
+
+        assert "error" in outcome, (
+            f"create_assignment must answer 400 after the resource "
+            f"deactivation commit; got success: {outcome.get('result')!r}"
+        )
+        assert outcome["error"].status_code == 400, outcome["error"].detail
+        assert "неактивен" in outcome["error"].detail
+
+        assert _assignment_pair_count(engine, nurse_id, resource_id) == 0
+    finally:
+        engine.dispose()

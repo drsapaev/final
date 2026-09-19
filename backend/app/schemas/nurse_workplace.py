@@ -63,14 +63,19 @@ class NurseWorkplaceAssignmentResponse(BaseModel):
 
 
 class NurseWorkplaceErrorDetail(BaseModel):
-    """Body of the documented domain errors (400/404/409) on the
-    assignment control plane.
+    """Body of the documented errors on the assignment control plane:
+    the domain errors (400/404/409) AND the auth errors (401/403, review
+    P2 round 2 — PR #3333).
 
     Review P2 (PR #3333): the PR body declares 400/404/409 part of the
     canonical admin contract; this model gives the generated clients the
     typed ``{"detail": ...}`` shape FastAPI's HTTPException actually
     returns — the same pattern as ServiceUnavailableDetail (admin-doctors
-    503) and UserPhoneScopeConflictDetail (user-management 409)."""
+    503) and UserPhoneScopeConflictDetail (user-management 409). The
+    401/403 publications reuse the same model because the auth failures
+    (get_current_user / require_active_roles) also surface as
+    HTTPException ``{"detail": ...}`` bodies — proven at runtime by
+    test_nurse_workplace_endpoints.py."""
 
     model_config = ConfigDict(protected_namespaces=())
 

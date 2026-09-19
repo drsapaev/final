@@ -6037,7 +6037,7 @@
           "nurse-workplace-assignments"
         ],
         "summary": "Create Nurse Workplace Assignment",
-        "description": "Assign a Nurse User to a QueueResource workplace (D2 FINAL).\n\n404 — referenced user/resource not found; 400 — the user is not an\nactive Nurse or the resource is inactive; 409 — an active\nassignment for the same (user, resource) pair already exists.",
+        "description": "Assign a Nurse User to a QueueResource workplace (D2 FINAL).\n\n404 — referenced user/resource not found; 400 — the user is not an\nactive Nurse or the resource is inactive; 409 — an active\nassignment for the same (user, resource) pair already exists;\n401/403 — the control-plane auth contract (see\n_AUTH_ERROR_RESPONSES).",
         "operationId": "create_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments_post",
         "security": [
           {
@@ -6087,6 +6087,26 @@
           },
           "409": {
             "description": "Активное назначение для пары (user, queue_resource) уже существует",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется аутентификация (JWT отсутствует или недействителен)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT",
             "content": {
               "application/json": {
                 "schema": {
@@ -6213,6 +6233,26 @@
               }
             }
           },
+          "401": {
+            "description": "Требуется аутентификация (JWT отсутствует или недействителен)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -6271,6 +6311,26 @@
               }
             }
           },
+          "401": {
+            "description": "Требуется аутентификация (JWT отсутствует или недействителен)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -6290,7 +6350,7 @@
           "nurse-workplace-assignments"
         ],
         "summary": "Deactivate Nurse Workplace Assignment",
-        "description": "Deactivate an assignment (the row stays as history; D2 FINAL).\n\n404 — assignment not found; 409 — already inactive. A new active row\nfor the same (user, resource) pair may be created afterwards.",
+        "description": "Deactivate an assignment (the row stays as history; D2 FINAL).\n\n404 — assignment not found; 409 — already inactive. A new active row\nfor the same (user, resource) pair may be created afterwards;\n401/403 — the control-plane auth contract (see\n_AUTH_ERROR_RESPONSES).",
         "operationId": "deactivate_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__deactivate_post",
         "security": [
           {
@@ -6331,6 +6391,26 @@
           },
           "409": {
             "description": "Назначение уже деактивировано",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется аутентификация (JWT отсутствует или недействителен)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT",
             "content": {
               "application/json": {
                 "schema": {
@@ -90164,7 +90244,7 @@
           "detail"
         ],
         "title": "NurseWorkplaceErrorDetail",
-        "description": "Body of the documented domain errors (400/404/409) on the\nassignment control plane.\n\nReview P2 (PR #3333): the PR body declares 400/404/409 part of the\ncanonical admin contract; this model gives the generated clients the\ntyped ``{\"detail\": ...}`` shape FastAPI's HTTPException actually\nreturns — the same pattern as ServiceUnavailableDetail (admin-doctors\n503) and UserPhoneScopeConflictDetail (user-management 409)."
+        "description": "Body of the documented errors on the assignment control plane:\nthe domain errors (400/404/409) AND the auth errors (401/403, review\nP2 round 2 — PR #3333).\n\nReview P2 (PR #3333): the PR body declares 400/404/409 part of the\ncanonical admin contract; this model gives the generated clients the\ntyped ``{\"detail\": ...}`` shape FastAPI's HTTPException actually\nreturns — the same pattern as ServiceUnavailableDetail (admin-doctors\n503) and UserPhoneScopeConflictDetail (user-management 409). The\n401/403 publications reuse the same model because the auth failures\n(get_current_user / require_active_roles) also surface as\nHTTPException ``{\"detail\": ...}`` bodies — proven at runtime by\ntest_nurse_workplace_endpoints.py."
       },
       "OnboardingAnalyticsDashboard": {
         "properties": {

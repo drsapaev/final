@@ -11,7 +11,13 @@ Owner's required list (design-GO 2026-09-19):
 - invalid/inactive QueueResource is rejected at the assignment boundary;
 - review P2-1: deactivation is an atomic guarded UPDATE — under an
   interleaved concurrent flip exactly ONE request wins, the loser gets
-  409 (not a second 200).
+  409 (not a second 200);
+- review P2 round 2 (TOCTOU): the create eligibility reads are
+  deterministic FRESH reads — a lifecycle change committed by a
+  concurrent session is observed (400) even when this session already
+  holds a stale identity-map instance (populate_existing). The
+  PostgreSQL FOR UPDATE linearization itself is proven by
+  test_nurse_v2_foundation_pg.py.
 """
 
 from __future__ import annotations
@@ -162,6 +168,75 @@ def test_create_rejects_inactive_resource_with_400(session) -> None:
             user_id=nurse.id, queue_resource_id=resource.id, cabinet_override=None
         )
     assert exc.value.status_code == 400
+
+
+# ---------------- review P2 round 2: locked re-read semantics ----------------
+#
+# SQLite has no FOR UPDATE, but the OTHER half of the TOCTOU fix is
+# provable here: the eligibility reads in create_assignment must be
+# deterministic FRESH reads (populate_existing), not identity-map
+# lookups. A concurrent session on the same engine commits a lifecycle
+# change AFTER this session has loaded the user; the service must
+# observe the committed state and answer 400 instead of trusting the
+# cached (stale) Nurse instance. The full two-connection FOR UPDATE
+# linearization is proven on PostgreSQL by
+# test_nurse_v2_foundation_pg.py (race A / race B / resource race).
+
+
+def _stale_cache_pin(session, mutation: str) -> None:
+    from sqlalchemy.orm import Session
+
+    # 1. This session has already loaded the user (identity map holds
+    #    the pre-mutation Nurse state).
+    nurse = _user(session, "nurse_stale")
+    resource = _resource(session, "procedures")
+    cached = session.get(User, nurse.id)
+    assert cached is not None and cached.role == "Nurse"
+
+    # 2. A concurrent writer (separate session, same engine — the unit
+    #    stand-in for update_user()'s committed lifecycle change).
+    other = Session(bind=session.get_bind())
+    try:
+        if mutation == "demote":
+            other.query(User).filter(User.id == nurse.id).update(
+                {User.role: "Registrar"}
+            )
+        else:
+            other.query(User).filter(User.id == nurse.id).update(
+                {User.is_active: False}
+            )
+        other.commit()
+    finally:
+        other.close()
+
+    # 3. create_assignment must NOT trust the stale identity-map state.
+    with pytest.raises(NurseWorkplaceApiDomainError) as exc:
+        _svc(session).create_assignment(
+            user_id=nurse.id, queue_resource_id=resource.id, cabinet_override=None
+        )
+    assert exc.value.status_code == 400
+    assert (
+        session.query(NurseWorkplaceAssignment)
+        .filter(NurseWorkplaceAssignment.user_id == nurse.id)
+        .count()
+        == 0
+    )
+
+
+def test_create_rereads_committed_demotion_despite_stale_identity_map(
+    session,
+) -> None:
+    """Concurrent role demotion is observed even when this session
+    already cached the user as an active Nurse."""
+    _stale_cache_pin(session, mutation="demote")
+
+
+def test_create_rereads_committed_deactivation_despite_stale_identity_map(
+    session,
+) -> None:
+    """Concurrent deactivation is observed even when this session
+    already cached the user as an active Nurse."""
+    _stale_cache_pin(session, mutation="deactivate")
 
 
 # ---------------- D2 multiplicity ----------------

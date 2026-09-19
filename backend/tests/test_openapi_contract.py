@@ -401,27 +401,48 @@ def test_openapi_nurse_workplace_assignments_publish_domain_errors(
     """NURSE-V2 N2-2 review P2 (PR #3333): 400/404/409 are part of the
     canonical admin contract — the generated clients (backend/openapi.json
     -> frontend api.ts) must describe the responses the service actually
-    returns instead of a bare 201/422 (or 200/422) surface."""
+    returns instead of a bare 201/422 (or 200/422) surface.
+
+    Review P2, round 2 (PR #3333): the FULL runtime surface is
+    200/201 + 400/401/403/404/409/422 — 401 (no JWT) and 403 (not Admin /
+    deactivated Admin with an unexpired JWT) are proven at runtime by
+    test_nurse_workplace_endpoints.py, so the drift between the runtime
+    auth-error contract and what openapi.json publishes is pinned here
+    with exact status-code sets per operation."""
 
     schema = _get_openapi_schema(client)
     base = "/api/v1/admin/nurse-workplace-assignments"
 
     create_operation = schema["paths"][base]["post"]
-    assert {"201", "400", "404", "409", "422"} <= set(create_operation["responses"])
+    assert {"201", "400", "401", "403", "404", "409", "422"} <= set(
+        create_operation["responses"]
+    )
+
+    list_operation = schema["paths"][base]["get"]
+    assert {"200", "401", "403", "422"} <= set(list_operation["responses"])
 
     get_operation = schema["paths"][f"{base}/{{assignment_id}}"]["get"]
-    assert {"200", "404", "422"} <= set(get_operation["responses"])
+    assert {"200", "401", "403", "404", "422"} <= set(get_operation["responses"])
 
     deactivate_operation = schema["paths"][f"{base}/{{assignment_id}}/deactivate"][
         "post"
     ]
-    assert {"200", "404", "409", "422"} <= set(deactivate_operation["responses"])
+    assert {"200", "401", "403", "404", "409", "422"} <= set(
+        deactivate_operation["responses"]
+    )
 
     # Every published domain error carries the typed {"detail": ...} body
     # (NurseWorkplaceErrorDetail) — the same convention as the 503/409
-    # detail models on the admin-doctors / user-management surfaces.
-    for operation in (create_operation, get_operation, deactivate_operation):
-        for code in ("400", "404", "409"):
+    # detail models on the admin-doctors / user-management surfaces. The
+    # round-2 401/403 publications reuse the same model (the auth failures
+    # also surface as HTTPException {"detail": ...} bodies).
+    for operation in (
+        create_operation,
+        list_operation,
+        get_operation,
+        deactivate_operation,
+    ):
+        for code in ("400", "401", "403", "404", "409"):
             if code not in operation["responses"]:
                 continue
             error_schema = operation["responses"][code]["content"]["application/json"][

@@ -2247,7 +2247,9 @@ export type paths = {
          *
          *     404 — referenced user/resource not found; 400 — the user is not an
          *     active Nurse or the resource is inactive; 409 — an active
-         *     assignment for the same (user, resource) pair already exists.
+         *     assignment for the same (user, resource) pair already exists;
+         *     401/403 — the control-plane auth contract (see
+         *     _AUTH_ERROR_RESPONSES).
          */
         post: operations["create_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments_post"];
         delete?: never;
@@ -2290,7 +2292,9 @@ export type paths = {
          * @description Deactivate an assignment (the row stays as history; D2 FINAL).
          *
          *     404 — assignment not found; 409 — already inactive. A new active row
-         *     for the same (user, resource) pair may be created afterwards.
+         *     for the same (user, resource) pair may be created afterwards;
+         *     401/403 — the control-plane auth contract (see
+         *     _AUTH_ERROR_RESPONSES).
          */
         post: operations["deactivate_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__deactivate_post"];
         delete?: never;
@@ -31453,14 +31457,19 @@ export type components = {
         };
         /**
          * NurseWorkplaceErrorDetail
-         * @description Body of the documented domain errors (400/404/409) on the
-         *     assignment control plane.
+         * @description Body of the documented errors on the assignment control plane:
+         *     the domain errors (400/404/409) AND the auth errors (401/403, review
+         *     P2 round 2 — PR #3333).
          *
          *     Review P2 (PR #3333): the PR body declares 400/404/409 part of the
          *     canonical admin contract; this model gives the generated clients the
          *     typed ``{"detail": ...}`` shape FastAPI's HTTPException actually
          *     returns — the same pattern as ServiceUnavailableDetail (admin-doctors
-         *     503) and UserPhoneScopeConflictDetail (user-management 409).
+         *     503) and UserPhoneScopeConflictDetail (user-management 409). The
+         *     401/403 publications reuse the same model because the auth failures
+         *     (get_current_user / require_active_roles) also surface as
+         *     HTTPException ``{"detail": ...}`` bodies — proven at runtime by
+         *     test_nurse_workplace_endpoints.py.
          */
         NurseWorkplaceErrorDetail: {
             /** Detail */
@@ -43539,6 +43548,24 @@ export interface operations {
                     "application/json": components["schemas"]["NurseWorkplaceAssignmentListResponse"];
                 };
             };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -43574,6 +43601,24 @@ export interface operations {
             };
             /** @description Целевой пользователь не Nurse / деактивирован, либо QueueResource неактивен */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -43630,6 +43675,24 @@ export interface operations {
                     "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
                 };
             };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
             /** @description Назначение не найдено */
             404: {
                 headers: {
@@ -43668,6 +43731,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
                 };
             };
             /** @description Назначение не найдено */
