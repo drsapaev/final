@@ -2417,6 +2417,8 @@ const en = {
   },
   admin2: {
     // RQ-17 (E-065): экран-вход настройки направлений + реестр QueueResource
+    qrm_edit: 'Edit resource',
+    // RQ-17 (E-065): экран-вход настройки направлений + реестр QueueResource
     qrm_col_actions: 'Actions',
     // RQ-17 (E-065): экран-вход настройки направлений + реестр QueueResource
     sdx_title: 'Direction Setup',
