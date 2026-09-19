@@ -31451,6 +31451,21 @@ export type components = {
             /** Effective Cabinet */
             effective_cabinet?: string | null;
         };
+        /**
+         * NurseWorkplaceErrorDetail
+         * @description Body of the documented domain errors (400/404/409) on the
+         *     assignment control plane.
+         *
+         *     Review P2 (PR #3333): the PR body declares 400/404/409 part of the
+         *     canonical admin contract; this model gives the generated clients the
+         *     typed ``{"detail": ...}`` shape FastAPI's HTTPException actually
+         *     returns — the same pattern as ServiceUnavailableDetail (admin-doctors
+         *     503) and UserPhoneScopeConflictDetail (user-management 409).
+         */
+        NurseWorkplaceErrorDetail: {
+            /** Detail */
+            detail: string;
+        };
         /** OnboardingAnalyticsDashboard */
         OnboardingAnalyticsDashboard: {
             /**
@@ -43557,6 +43572,33 @@ export interface operations {
                     "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
                 };
             };
+            /** @description Целевой пользователь не Nurse / деактивирован, либо QueueResource неактивен */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Пользователь или QueueResource не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Активное назначение для пары (user, queue_resource) уже существует */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -43588,6 +43630,15 @@ export interface operations {
                     "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
                 };
             };
+            /** @description Назначение не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -43617,6 +43668,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
+                };
+            };
+            /** @description Назначение не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Назначение уже деактивировано */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
                 };
             };
             /** @description Validation Error */

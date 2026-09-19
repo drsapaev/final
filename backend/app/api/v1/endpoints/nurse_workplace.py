@@ -2,9 +2,18 @@
 
 Scope item 4 of the owner design-GO (2026-09-19): the admin/backend
 contract for CREATE / READ / DEACTIVATE of NurseWorkplaceAssignment
-rows. Admin-only (require_roles("Admin")); superuser bypasses per the
-standard require_roles contract. No serving endpoints here — call-next
-/ start / complete-service are N2-3, the tablet surface is N2-5.
+rows. Admin-only, and — review P1 (PR #3333) — gated by
+require_active_roles("Admin"): the control plane fails closed for a
+DEACTIVATED Admin holding an unexpired JWT (403, no DB writes).
+Superuser bypasses the role check per the standard require_roles
+contract (an active superuser only). No serving endpoints here —
+call-next / start / complete-service are N2-3, the tablet surface is
+N2-5.
+
+Review P2 (PR #3333): the domain-error contract (400/404/409) is
+published on the FastAPI decorators via NurseWorkplaceErrorDetail so
+backend/openapi.json and the generated frontend api.ts describe the
+responses the service actually returns.
 """
 
 from __future__ import annotations
@@ -12,12 +21,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_db, require_active_roles
 from app.models.user import User
 from app.schemas.nurse_workplace import (
     NurseWorkplaceAssignmentCreateRequest,
     NurseWorkplaceAssignmentListResponse,
     NurseWorkplaceAssignmentResponse,
+    NurseWorkplaceErrorDetail,
 )
 from app.services.nurse_workplace_api_service import (
     NurseWorkplaceApiDomainError,
@@ -37,11 +47,30 @@ def _to_response(data: dict) -> NurseWorkplaceAssignmentResponse:
     _BASE_PATH,
     response_model=NurseWorkplaceAssignmentResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {
+            "model": NurseWorkplaceErrorDetail,
+            "description": (
+                "Целевой пользователь не Nurse / деактивирован, либо "
+                "QueueResource неактивен"
+            ),
+        },
+        404: {
+            "model": NurseWorkplaceErrorDetail,
+            "description": "Пользователь или QueueResource не найден",
+        },
+        409: {
+            "model": NurseWorkplaceErrorDetail,
+            "description": (
+                "Активное назначение для пары (user, queue_resource) уже существует"
+            ),
+        },
+    },
 )
 def create_nurse_workplace_assignment(
     payload: NurseWorkplaceAssignmentCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: User = Depends(require_active_roles("Admin")),
 ):
     """Assign a Nurse User to a QueueResource workplace (D2 FINAL).
 
@@ -68,7 +97,7 @@ def list_nurse_workplace_assignments(
     limit: int = Query(100, ge=1, le=500, description="Page size"),
     offset: int = Query(0, ge=0, description="Page offset"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: User = Depends(require_active_roles("Admin")),
 ):
     """Paged list of workplace assignments (active first, newest first)."""
     items, total = NurseWorkplaceApiService(db).list_assignments(
@@ -86,11 +115,17 @@ def list_nurse_workplace_assignments(
 @router.get(
     f"{_BASE_PATH}/{{assignment_id}}",
     response_model=NurseWorkplaceAssignmentResponse,
+    responses={
+        404: {
+            "model": NurseWorkplaceErrorDetail,
+            "description": "Назначение не найдено",
+        },
+    },
 )
 def get_nurse_workplace_assignment(
     assignment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: User = Depends(require_active_roles("Admin")),
 ):
     """Read a single workplace assignment by id (404 when missing)."""
     try:
@@ -103,11 +138,21 @@ def get_nurse_workplace_assignment(
 @router.post(
     f"{_BASE_PATH}/{{assignment_id}}/deactivate",
     response_model=NurseWorkplaceAssignmentResponse,
+    responses={
+        404: {
+            "model": NurseWorkplaceErrorDetail,
+            "description": "Назначение не найдено",
+        },
+        409: {
+            "model": NurseWorkplaceErrorDetail,
+            "description": "Назначение уже деактивировано",
+        },
+    },
 )
 def deactivate_nurse_workplace_assignment(
     assignment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: User = Depends(require_active_roles("Admin")),
 ):
     """Deactivate an assignment (the row stays as history; D2 FINAL).
 

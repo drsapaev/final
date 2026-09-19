@@ -62,6 +62,21 @@ class NurseWorkplaceAssignmentResponse(BaseModel):
     effective_cabinet: str | None = None
 
 
+class NurseWorkplaceErrorDetail(BaseModel):
+    """Body of the documented domain errors (400/404/409) on the
+    assignment control plane.
+
+    Review P2 (PR #3333): the PR body declares 400/404/409 part of the
+    canonical admin contract; this model gives the generated clients the
+    typed ``{"detail": ...}`` shape FastAPI's HTTPException actually
+    returns — the same pattern as ServiceUnavailableDetail (admin-doctors
+    503) and UserPhoneScopeConflictDetail (user-management 409)."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    detail: str
+
+
 class NurseWorkplaceAssignmentListResponse(BaseModel):
     """Paged list of assignments with the total count for the filter."""
 

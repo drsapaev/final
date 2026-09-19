@@ -25,8 +25,11 @@ export type BackendRole =
   // product capability (human non-doctor clinical serving) — mirrors the
   // backend core/roles.py enum re-open. N-3 history stands: the old role
   // never shipped as a product surface (0 rows, census 2026-09-05). The
-  // new Nurse starts privilege-zero: no routes/sidebar/homeForRoles here
-  // until the N2-3 serving API and the N2-5 tablet surface land.
+  // new Nurse starts privilege-zero: no role-scoped routes/sidebar here
+  // until the N2-3 serving API and the N2-5 tablet surface land. The one
+  // sanctioned exception (review P2, PR #3333): the Nurse login landing
+  // is the auth:'authenticated' /clinical/profile page — a safe home so a
+  // successful login does not bounce to /forbidden; it grants nothing.
   | 'Nurse'
   // E-4 (Receptionist alias removal): 'Receptionist' removed — mirrors the
   // backend core/roles.py enum decommission (§4.1.27). Canonical Registrar

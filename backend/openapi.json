@@ -6065,6 +6065,36 @@
               }
             }
           },
+          "400": {
+            "description": "Целевой пользователь не Nurse / деактивирован, либо QueueResource неактивен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Пользователь или QueueResource не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Активное назначение для пары (user, queue_resource) уже существует",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -6231,6 +6261,16 @@
               }
             }
           },
+          "404": {
+            "description": "Назначение не найдено",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -6275,6 +6315,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NurseWorkplaceAssignmentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Назначение не найдено",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Назначение уже деактивировано",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseWorkplaceErrorDetail"
                 }
               }
             }
@@ -90091,6 +90151,20 @@
         ],
         "title": "NurseWorkplaceAssignmentResponse",
         "description": "Admin read model for a NurseWorkplaceAssignment row.\n\nEnriched with the referenced user/resource mirror fields so the admin\nsurface does not need follow-up requests; ``effective_cabinet`` is the\nresolved cabinet (override ?? QueueResource.default_cabinet)."
+      },
+      "NurseWorkplaceErrorDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "NurseWorkplaceErrorDetail",
+        "description": "Body of the documented domain errors (400/404/409) on the\nassignment control plane.\n\nReview P2 (PR #3333): the PR body declares 400/404/409 part of the\ncanonical admin contract; this model gives the generated clients the\ntyped ``{\"detail\": ...}`` shape FastAPI's HTTPException actually\nreturns — the same pattern as ServiceUnavailableDetail (admin-doctors\n503) and UserPhoneScopeConflictDetail (user-management 409)."
       },
       "OnboardingAnalyticsDashboard": {
         "properties": {
