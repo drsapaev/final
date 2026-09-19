@@ -324,6 +324,14 @@ pytest_add_cli_args_test_selection = [
     # Uses deprecated asyncio.get_event_loop().run_until_complete() — breaks
     # under Python 3.12 in-process pytest (mutmut); needs asyncio.run() fix.
     "--deselect", "tests/integration/test_ai_upload_limits.py::test_legacy_ai_image_upload_rejects_oversized_payload_before_provider_call",
+    # tests/unit/test_lab_reporting_service.py — whole-file deselect (#3335):
+    # its catalog-seed state leak (raw-SQL template deletion + process-global
+    # seed cache) surfaces only under the mutmut sandbox's single-process
+    # run (L01 mapped->unmapped, nightly 2026-09-18/19). Zero mutation value:
+    # only_mutate covers the four crud modules and the file imports none of
+    # them (lab_reporting service/repository only). It keeps running green
+    # in the normal backend-tests job and locally (63 passed).
+    "--deselect", "tests/unit/test_lab_reporting_service.py",
 ]
 only_mutate = [
     "app/crud/appointment.py",
