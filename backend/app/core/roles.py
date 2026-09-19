@@ -33,11 +33,19 @@ class Roles(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration needs
     DENTIST = "dentist"
 
     # Дополнительные роли
-    # N-3 (Nurse retirement): NURSE removed — production census 2026-09-05
-    # found 0 stored rows (normalized census clean); every grant list
-    # (analytics/files/notifications/patients/require_staff) dropped the
-    # spelling in this change. No canonical successor: the role never
-    # shipped as a product surface.
+    # N-3 history (kept verbatim — the retirement was the correct
+    # decision at its time): Nurse removed 2026-09-05, production census
+    # found 0 stored rows; the role never shipped as a product surface,
+    # every grant list dropped the spelling, no canonical successor.
+    # NURSE-V2 (owner design-GO 2026-09-19, slice N2-2): the canonical
+    # role `Nurse` is RE-OPENED as a NEW product capability (human
+    # non-doctor clinical serving). This is NOT an N-3 undo: no legacy
+    # grants return — the new Nurse starts privilege-zero (absent
+    # from STAFF_ROLES, the AI RBAC matrix, EMR/finance/user-management
+    # grant lists) and receives serving permissions only in N2-3,
+    # strictly via an active workplace assignment. users.role stays the
+    # string SSOT (String(20)).
+    NURSE = "Nurse"
     # E-4 (Receptionist alias removal): RECEPTIONIST decommissioned — the
     # legacy spelling had a canonical successor (Registrar, REC track), the
     # production table held 0 rows (SQL evidence 2026-09-02), and the last
@@ -74,15 +82,18 @@ ADMIN_ROLES = {
 # M-2b (Codex review follow-up on #3049): spellings decommissioned from the
 # RBAC vocabulary that must ALSO stay out of the DB-backed role catalog
 # (public.roles / /api/v1/roles). Manager was closed by M-2 (2026-09-05,
-# ops-deactivated tombstone row); Receptionist was closed by E-4;
-# Nurse was closed by N-3 (2026-09-05, production census found 0 stored
-# rows - the role never shipped as a product surface).
+# ops-deactivated tombstone row); Receptionist was closed by E-4.
+# NURSE-V2 (owner design-GO 2026-09-19): 'nurse' REMOVED from this set
+# — the canonical role is re-opened as a new product capability
+# (N2-2), so the roles-catalog boundary (RoleCreate validation +
+# /roles/options filtering) no longer blocks the spelling. Manager and
+# Receptionist remain retired; their closures are permanent.
 # (§4.1.27, canonical successor Registrar). The roles-catalog boundary
 # (RoleCreate validation + /roles/options filtering) checks this set so a
 # hand-created catalog row cannot resurrect a retired spelling into the
 # user-management dropdown mirror. Case-insensitive by design (catalog
 # names are free-form strings; 'manager'/'Manager' both match).
-RETIRED_ROLE_SPELLINGS: frozenset[str] = frozenset({"manager", "receptionist", "nurse"})
+RETIRED_ROLE_SPELLINGS: frozenset[str] = frozenset({"manager", "receptionist"})
 
 def is_retired_role_spelling(value: object) -> bool:
     """Case-insensitive check against the retired RBAC vocabulary."""
@@ -176,6 +187,10 @@ DOCTOR_FAMILY_GATE_ROLES: tuple[str, ...] = tuple(sorted(DOCTOR_ROLE_SPELLINGS))
 # Роли персонала
 # E-4: Roles.RECEPTIONIST removed — canonical Registrar is the front-desk
 # staff role (REC track); the legacy spelling is decommissioned.
+# NURSE-V2 (owner design-GO 2026-09-19): Roles.NURSE is deliberately NOT
+# a member — this set feeds generic staff grants and the new Nurse
+# must not inherit any of them (privilege-zero until N2-3 serving
+# permissions, which are assignment-scoped, not role-wide).
 STAFF_ROLES = {
     Roles.REGISTRAR,
     Roles.LAB,
@@ -215,8 +230,14 @@ def get_role_hierarchy(role: str) -> int:
     """Возвращает уровень иерархии роли (чем выше число, тем больше прав)"""
     hierarchy = {
         Roles.PATIENT: 1,
-        # N-3: Roles.NURSE: 2 retired with the spelling (the level table
-        # covers the canonical vocabulary only).
+        # N-3 history: the old Roles.NURSE level-2 entry was retired with
+        # the spelling (2026-09-05).
+        # NURSE-V2 (owner design-GO 2026-09-19): re-opened at level 2 —
+        # descriptive only (has_role_permission has zero external callers,
+        # verified by exhaustive search); grants are governed by the
+        # require_roles() allow-lists and StaffAuthorizationService, where
+        # Nurse stays absent (privilege-zero until N2-3).
+        Roles.NURSE: 2,
         # E-4: Roles.RECEPTIONIST: 3 removed — the level table covers the
         # canonical vocabulary only (level 3 retired with the spelling).
         Roles.CASHIER: 4,

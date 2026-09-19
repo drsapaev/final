@@ -77,6 +77,7 @@ from app.api.v1.endpoints import (
     mobile_api_extended,
     notification_websocket,
     notifications,
+    nurse_workplace,
     observability,
     online_queue_new,
     password_reset,
@@ -210,6 +211,9 @@ api_router.include_router(security_management_router, tags=["security-management
 api_router.include_router(migration_management_router, tags=["migration-management"])
 # Эндпоинты управления фича-флагами
 api_router.include_router(feature_flags.router, tags=["feature-flags"])
+# NURSE-V2 N2-2 (owner design-GO 2026-09-19): nurse workplace
+# assignment admin contract (create/read/deactivate).
+api_router.include_router(nurse_workplace.router, tags=["nurse-workplace-assignments"])
 # Эндпоинты QR очередей (основной роутер для queue)
 api_router.include_router(qr_queue.router, prefix="/queue", tags=["qr-queue"])
 # Эндпоинты лимитов очередей

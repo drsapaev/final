@@ -2228,6 +2228,77 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/nurse-workplace-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Nurse Workplace Assignments
+         * @description Paged list of workplace assignments (active first, newest first).
+         */
+        get: operations["list_nurse_workplace_assignments_api_v1_admin_nurse_workplace_assignments_get"];
+        put?: never;
+        /**
+         * Create Nurse Workplace Assignment
+         * @description Assign a Nurse User to a QueueResource workplace (D2 FINAL).
+         *
+         *     404 — referenced user/resource not found; 400 — the user is not an
+         *     active Nurse or the resource is inactive; 409 — an active
+         *     assignment for the same (user, resource) pair already exists.
+         */
+        post: operations["create_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/nurse-workplace-assignments/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Nurse Workplace Assignment
+         * @description Read a single workplace assignment by id (404 when missing).
+         */
+        get: operations["get_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/nurse-workplace-assignments/{assignment_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate Nurse Workplace Assignment
+         * @description Deactivate an assignment (the row stays as history; D2 FINAL).
+         *
+         *     404 — assignment not found; 409 — already inactive. A new active row
+         *     for the same (user, resource) pair may be created afterwards.
+         */
+        post: operations["deactivate_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/admin/queue-analytics/{specialist_id}": {
         parameters: {
             query?: never;
@@ -30921,7 +30992,7 @@ export type components = {
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            role: "Admin" | "Registrar" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
+            role: "Admin" | "Registrar" | "Nurse" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
             /** Doctor Profile */
             doctor_profile?: null;
         };
@@ -31310,6 +31381,75 @@ export type components = {
             by_severity: {
                 [key: string]: number;
             };
+        };
+        /**
+         * NurseWorkplaceAssignmentCreateRequest
+         * @description Admin request to assign a Nurse User to a QueueResource workplace.
+         */
+        NurseWorkplaceAssignmentCreateRequest: {
+            /**
+             * User Id
+             * @description Target User id (role must be Nurse)
+             */
+            user_id: number;
+            /**
+             * Queue Resource Id
+             * @description QueueResource registry id
+             */
+            queue_resource_id: number;
+            /**
+             * Cabinet Override
+             * @description Station/cabinet for this assignment; NULL falls back to QueueResource.default_cabinet (D2 FINAL)
+             */
+            cabinet_override?: string | null;
+        };
+        /**
+         * NurseWorkplaceAssignmentListResponse
+         * @description Paged list of assignments with the total count for the filter.
+         */
+        NurseWorkplaceAssignmentListResponse: {
+            /** Items */
+            items: components["schemas"]["NurseWorkplaceAssignmentResponse"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * NurseWorkplaceAssignmentResponse
+         * @description Admin read model for a NurseWorkplaceAssignment row.
+         *
+         *     Enriched with the referenced user/resource mirror fields so the admin
+         *     surface does not need follow-up requests; ``effective_cabinet`` is the
+         *     resolved cabinet (override ?? QueueResource.default_cabinet).
+         */
+        NurseWorkplaceAssignmentResponse: {
+            /** Id */
+            id: number;
+            /** User Id */
+            user_id: number;
+            /** Queue Resource Id */
+            queue_resource_id: number;
+            /** Cabinet Override */
+            cabinet_override?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** User Username */
+            user_username?: string | null;
+            /** User Full Name */
+            user_full_name?: string | null;
+            /** Resource Code */
+            resource_code?: string | null;
+            /** Resource Display Name */
+            resource_display_name?: string | null;
+            /** Resource Queue Tag */
+            resource_queue_tag?: string | null;
+            /** Resource Default Cabinet */
+            resource_default_cabinet?: string | null;
+            /** Effective Cabinet */
+            effective_cabinet?: string | null;
         };
         /** OnboardingAnalyticsDashboard */
         OnboardingAnalyticsDashboard: {
@@ -43342,6 +43482,141 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_nurse_workplace_assignments_api_v1_admin_nurse_workplace_assignments_get: {
+        parameters: {
+            query?: {
+                /** @description Filter by target Nurse user */
+                user_id?: number | null;
+                /** @description Filter by QueueResource */
+                queue_resource_id?: number | null;
+                /** @description Filter by is_active (default: all) */
+                active?: boolean | null;
+                /** @description Page size */
+                limit?: number;
+                /** @description Page offset */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NurseWorkplaceAssignmentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
                 };
             };
             /** @description Validation Error */

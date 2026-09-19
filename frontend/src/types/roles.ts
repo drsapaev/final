@@ -21,8 +21,13 @@ export type BackendRole =
   | 'cardio'
   | 'derma'
   | 'dentist'
-  // N-3 (Nurse retirement): 'Nurse' removed — 0 backend rows (production
-  // census 2026-09-05); mirrors the backend core/roles.py enum closure.
+  // NURSE-V2 (owner design-GO 2026-09-19): 'Nurse' re-opened as a NEW
+  // product capability (human non-doctor clinical serving) — mirrors the
+  // backend core/roles.py enum re-open. N-3 history stands: the old role
+  // never shipped as a product surface (0 rows, census 2026-09-05). The
+  // new Nurse starts privilege-zero: no routes/sidebar/homeForRoles here
+  // until the N2-3 serving API and the N2-5 tablet surface land.
+  | 'Nurse'
   // E-4 (Receptionist alias removal): 'Receptionist' removed — mirrors the
   // backend core/roles.py enum decommission (§4.1.27). Canonical Registrar
   // is the front-desk role; the legacy spelling had 0 stored rows.
@@ -69,7 +74,9 @@ export const STAFF_ROLES: readonly BackendRole[] = [
 
 export const ROLE_LEVEL: Readonly<Record<BackendRole, number>> = {
   Patient: 1,
-  // N-3: Nurse: 2 retired with the spelling (census 2026-09-05).
+  // NURSE-V2 (owner design-GO 2026-09-19): Nurse re-opened at level 2 —
+  // mirrors backend get_role_hierarchy(); descriptive only.
+  Nurse: 2,
   // E-4: Receptionist: 3 retired with the spelling (§4.1.27).
   Cashier: 4,
   Lab: 5,
@@ -92,6 +99,9 @@ export const ROLE_LEVEL: Readonly<Record<BackendRole, number>> = {
 // spelling no longer reaches registrar routes (route parity test pins the
 // deny). N-3 (Nurse retirement): the nurse -> doctor alias removed
 // (0 stored rows, production census 2026-09-05).
+// NURSE-V2 (owner design-GO 2026-09-19): the alias STAYS removed — the
+// new Nurse is NOT a doctor alias and gets no doctor routes; serving
+// surfaces arrive with the N2-3 API and the N2-5 tablet page.
 // ============================================================================
 
 export const ROLE_ALIASES: Readonly<Record<string, FrontendRoleKey>> = {} as const;
@@ -109,6 +119,8 @@ export function isBackendRole(value: unknown): value is BackendRole {
       // M-2: 'Manager' removed from the guard — the deprecated spelling
       // fails the type guard (mirrors the backend enum closure).
       value === 'cardio' || value === 'derma' || value === 'dentist' ||
+      // NURSE-V2: 'Nurse' re-opened — mirrors the backend enum.
+      value === 'Nurse' ||
       value === 'Patient' ||
       value === 'SuperAdmin'
     )

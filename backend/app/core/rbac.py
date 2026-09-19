@@ -22,8 +22,13 @@ class UserRole(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration ne
     DOCTOR = "doctor"
     REGISTRAR = "registrar"
     LAB = "lab"
-    # N-3 (Nurse retirement): NURSE removed — production census
-    # 2026-09-05 found 0 stored rows; no shipped UI/product surface.
+    # N-3 history: NURSE removed 2026-09-05 (production census found 0
+    # stored rows; no shipped UI/product surface).
+    # NURSE-V2 (owner design-GO 2026-09-19): UserRole.NURSE re-opened as
+    # the canonical product role. It is deliberately ABSENT from
+    # ROLE_PERMISSIONS below — the new Nurse gets no AI grants
+    # (privilege-zero until N2-3 serving permissions).
+    NURSE = "Nurse"
     CASHIER = "cashier"
 
     # Специализации (алиасы для doctor с дополнительными permissions)
@@ -89,7 +94,10 @@ class UserRole(str, Enum):  # noqa: UP042  # manual-review: StrEnum migration ne
             "Lab": cls.LAB,
             "laborant": cls.LAB,
 
-            # N-3 (Nurse retirement): nurse aliases removed (0 stored rows).
+            # NURSE-V2 (owner design-GO 2026-09-19): nurse aliases
+            # re-opened alongside the canonical role.
+            "nurse": cls.NURSE,
+            "Nurse": cls.NURSE,
 
             # Cashier aliases
             "cashier": cls.CASHIER,
