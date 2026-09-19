@@ -25,3 +25,6 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+## 2024-09-04 - Native tooltips vs custom Tooltips
+**Learning:** [UX/a11y insight] Native `title` attributes on icon-only buttons create redundant screen reader announcements (when `aria-label` is also used) and ignore design system styling, resulting in an inconsistent UI.
+**Action:** [How to apply next time] For icon-only buttons, wrap them in the design system's `<Tooltip>` component and ensure they have an `aria-label`. Always remove the native `title` attribute to prevent double tooltips.
