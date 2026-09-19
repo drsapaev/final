@@ -82,7 +82,7 @@ const openRoleSelect = async () => {
 
 const pickDoctorRole = async () => {
   const options = await openRoleSelect();
-  const doctor = options.find((el) => el.textContent === 'Врач');
+  const doctor = options.find((el) => el.textContent === 'Врач' || el.textContent === 'Doctor' || el.textContent === 'admin2.umdl_role_doctor_general');
   expect(doctor).toBeDefined();
   fireEvent.click(doctor as HTMLElement);
 };
