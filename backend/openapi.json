@@ -65188,6 +65188,229 @@
           }
         }
       }
+    },
+    "/api/v1/queue/admin/queue-resources": {
+      "get": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Список QueueResource (реестр ресурсных владельцев тегов)",
+        "operationId": "list_queue_resources_api_v1_queue_admin_queue_resources_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "active_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Active Only"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QueueResourceOut"
+                  },
+                  "title": "Response List Queue Resources Api V1 Queue Admin Queue Resources Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется аутентификация"
+          },
+          "403": {
+            "description": "Только роль Admin"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Создать QueueResource (draft по умолчанию; active=true — через gate §3.1)",
+        "operationId": "create_queue_resource_api_v1_queue_admin_queue_resources_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueResourceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueResourceOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Невалидный payload"
+          },
+          "401": {
+            "description": "Требуется аутентификация"
+          },
+          "403": {
+            "description": "Только роль Admin"
+          },
+          "409": {
+            "description": "Дубликат code/queue_tag или отказ инварианта §3.1"
+          },
+          "422": {
+            "description": "Неизвестные поля payload"
+          }
+        }
+      }
+    },
+    "/api/v1/queue/admin/queue-resources/{resource_id}": {
+      "get": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "QueueResource по id",
+        "operationId": "get_queue_resource_api_v1_queue_admin_queue_resources__resource_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueResourceOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется аутентификация"
+          },
+          "403": {
+            "description": "Только роль Admin"
+          },
+          "404": {
+            "description": "QueueResource не найден"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "PATCH QueueResource (ordinary-поля; code/queue_tag immutable; active — lifecycle §3.2)",
+        "operationId": "update_queue_resource_api_v1_queue_admin_queue_resources__resource_id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resource_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resource Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueResourceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueResourceOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется аутентификация"
+          },
+          "403": {
+            "description": "Только роль Admin"
+          },
+          "404": {
+            "description": "QueueResource не найден"
+          },
+          "409": {
+            "description": "Отказ инварианта §3.1 при активации"
+          },
+          "422": {
+            "description": "Попытка изменить immutable code/queue_tag или невалидный payload"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -112371,6 +112594,212 @@
         ],
         "title": "UserProfileResponse",
         "description": "Схема ответа профиля пользователя"
+      },
+      "QueueResourceCreate": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "queue_tag": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Queue Tag"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "start_number_online": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Start Number Online",
+            "default": 1
+          },
+          "max_online_per_day": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Online Per Day",
+            "default": 15
+          },
+          "default_cabinet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Cabinet"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "queue_tag",
+          "display_name"
+        ],
+        "title": "QueueResourceCreate",
+        "description": "Draft-by-default (S-14: услуги/профиль → draft-ресурс → активация\nчерез gate §3.1); `active=true` сразу — только при пройденном gate."
+      },
+      "QueueResourceOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "queue_tag": {
+            "type": "string",
+            "title": "Queue Tag"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "start_number_online": {
+            "type": "integer",
+            "title": "Start Number Online"
+          },
+          "max_online_per_day": {
+            "type": "integer",
+            "title": "Max Online Per Day"
+          },
+          "default_cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Cabinet"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "queue_tag",
+          "display_name",
+          "active",
+          "start_number_online",
+          "max_online_per_day"
+        ],
+        "title": "QueueResourceOut"
+      },
+      "QueueResourceUpdate": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "start_number_online": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Number Online"
+          },
+          "max_online_per_day": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Online Per Day"
+          },
+          "default_cabinet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Cabinet"
+          },
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "QueueResourceUpdate",
+        "description": "§3.2: ordinary PATCH — `display_name`/`start_number_online`/\n`max_online_per_day`/`default_cabinet`; `active` — lifecycle-переход\nпод serialization-scope §3.1(б). `code`/`queue_tag` immutable\n(extra=\"forbid\" -> 422 на попытку)."
       }
     },
     "securitySchemes": {
