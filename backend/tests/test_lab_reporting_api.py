@@ -1207,3 +1207,49 @@ def test_bulk_values_optimistic_locking_bumps_token_and_rejects_stale(
     assert wbc_field["value_text"] == "5.4", (
         "stale save не должен перезаписывать значения актуальной версии"
     )
+
+
+@pytest.mark.integration
+def test_lab_queue_today_paginates_honestly(client, auth_headers, monkeypatch):
+    """PR7: total — весь день (до слайса), entries — только запрошенный
+    slice; порядок registrar не меняется. Фасад принимает limit/offset
+    и обязан их применять (раньше параметры игнорировались, а total
+    был длиной возвращённого slice)."""
+    from app.api.v1.endpoints import registrar_integration as ri
+
+    entries = [
+        {"id": i, "patient_name": f"Синтетический пациент {i}", "status": "waiting"}
+        for i in range(1, 121)
+    ]
+    fake_payload = {
+        "queues": [{"specialty": "lab", "entries": entries}],
+        "date": "2026-09-19",
+        "timezone": "Asia/Tashkent",
+    }
+    monkeypatch.setattr(ri, "get_today_queues", lambda **kwargs: fake_payload)
+
+    page2 = client.get(
+        "/api/v1/lab/queue/today?limit=50&offset=50", headers=auth_headers
+    )
+    assert page2.status_code == 200, page2.text
+    body = page2.json()
+    assert body["total"] == 120, "total must be the whole day, not the slice"
+    assert len(body["entries"]) == 50
+    assert body["entries"][0]["id"] == 51
+    assert body["entries"][-1]["id"] == 100
+
+    page3 = client.get(
+        "/api/v1/lab/queue/today?limit=50&offset=100", headers=auth_headers
+    )
+    assert page3.status_code == 200, page3.text
+    body3 = page3.json()
+    assert body3["total"] == 120
+    assert len(body3["entries"]) == 20
+    assert body3["entries"][0]["id"] == 101
+
+    # Порядок внутри slice — канонический порядок registrar (без пересорт).
+    page1 = client.get(
+        "/api/v1/lab/queue/today?limit=50&offset=0", headers=auth_headers
+    )
+    body1 = page1.json()
+    assert [e["id"] for e in body1["entries"]] == [i for i in range(1, 51)]
