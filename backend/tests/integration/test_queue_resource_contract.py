@@ -217,7 +217,12 @@ def test_partial_unique_allows_inactive_and_null_resource_duplicates(
     # indexes — the 0053 users.email precedent): the doctor axis keeps
     # its per-doctor rows untouched by the resource index
     doctor_queue_a = DailyQueue(day=_DAY, specialist_id=doctor.id, queue_tag="lab")
-    doctor_queue_b = DailyQueue(day=_DAY, specialist_id=doctor.id, queue_tag="lab")
+    # RQ-14.a.1: two ACTIVE duplicates on the doctor axis are now
+    # rejected (that fork was the RQ-14.a defect); an inactive history
+    # row stays legal.
+    doctor_queue_b = DailyQueue(
+        day=_DAY, specialist_id=doctor.id, queue_tag="lab", active=False
+    )
     db_session.add(doctor_queue_a)
     db_session.add(doctor_queue_b)
     db_session.commit()
@@ -771,9 +776,41 @@ def test_alembic_chain_single_head_0063() -> None:
     # canonical multi-device store; write-maintained only, no push
     # activation in this migration).
     assert graph["0064_push_devices_registry"] == ("0063_queue_resource_contract",)
+    # RQ-14.a.1 (main #3252): DB-level UNIQUE for queue numbering and
+    # the doctor axis claimed the 0065 slot from 0064.
+    assert graph["0065_queue_numbering_unique"] == ("0064_push_devices_registry",)
+    # QD-2E (RQ-15.b): the cutover was renumbered 0065 -> 0066 after
+    # main's RQ-14.a.1 claimed the 0065 slot from the same parent — the
+    # chain stays single-headed.
+    assert graph["0066_general_retirement_cutover"] == (
+        "0065_queue_numbering_unique",
+    )
+    # RQ-13.b (D-06, E-039): the day's applied start-number snapshot
+    # chains after the QD-2E cutover (additive column + owner backfill).
+    assert graph["0067_daily_queue_start_number"] == (
+        "0066_general_retirement_cutover",
+    )
+    # RQ-15.d (ADR-001 stage E): the 0055 synthetic pair retirement
+    # (paired deletion of ecg_resource/lab_resource/general_resource)
+    # chains after the direction public-address registry (0068,
+    # RQ-16.c), which chains after the day start-number snapshot.
+    assert graph["0069_sentinel_pair_retirement"] == (
+        "0068_direction_public_address",
+    )
+    assert len("0066_general_retirement_cutover") <= 32
+    assert len("0067_daily_queue_start_number") <= 32
+    # RQ-16.c: the head moved to 0068 with the direction public-address
+    # registry (owner decision E-055, additive MODEL slice).
+    assert graph["0068_direction_public_address"] == (
+        "0067_daily_queue_start_number",
+    )
+    assert len("0068_direction_public_address") <= 32
+    assert len("0069_sentinel_pair_retirement") <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    assert heads == ["0064_push_devices_registry"]
+    # single head: RQ-15.d retires the synthetic pairs after the
+    # public-address registry
+    assert heads == ["0070_lab_results_lineage"]
 
 
 # ===================== D. parity + ADR =====================

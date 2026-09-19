@@ -101,6 +101,7 @@ jobs:
           # i.e. backend/backend/alembic. Provide that depth too.
           mkdir -p backend
           cp -r alembic backend/alembic
+          cp alembic.ini backend/alembic.ini
           # nurse-retirement mirror tests read frontend/src/{types,routing}
           #/*.ts via parents-traversal resolving to backend/frontend/src.
           mkdir -p frontend/src

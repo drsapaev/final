@@ -10,6 +10,7 @@
 | [DOCTOR_AUTOCOMPLETE_LAWS_FOR_AI.md](./DOCTOR_AUTOCOMPLETE_LAWS_FOR_AI.md) | Autocomplete rules | 🔴 CRITICAL |
 | [ROLE_SYSTEM_PROTECTION.md](./ROLE_SYSTEM_PROTECTION.md) | Role protection | 🔴 CRITICAL |
 | [AUTHENTICATION_SYSTEM_FINAL_GUIDE.md](./AUTHENTICATION_SYSTEM_FINAL_GUIDE.md) | Auth full guide | 🟡 Important |
+| [PATIENT_PORTAL_ACCESS.md](./PATIENT_PORTAL_ACCESS.md) | Patient portal OTP login + card activation (Phase 0 PR-A1/A2/PR-B) | 🟡 Important |
 
 ---
 

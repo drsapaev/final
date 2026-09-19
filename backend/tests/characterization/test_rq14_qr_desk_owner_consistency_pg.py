@@ -23,12 +23,19 @@ slice — defects pinned here are registered as plan children):
    concurrent writers committing the same number. When the integrity fix
    lands, this test must be rewritten to assert uniqueness.
 
-3. ``test_qr_and_desk_owner_fork_when_service_tag_differs_from_specialty``
-   — pins the owner fork (plan child RQ-14.b, fix waits D-01): the desk
-   path resolves the queue by ``service.queue_tag`` while the live QR
-   path (clinic-wide token + Doctor.id override) resolves it by
-   ``doctor.specialty``/profile key — with a differing service tag the
-   same doctor/day gets TWO queue rows, both numbering from 1.
+3. ``test_qr_override_and_desk_share_row_for_registered_direction`` —
+   RQ-14.b FIXED (was the E-033 owner-fork pin, flipped per D-01
+   APPROVED): a doctor whose stored specialty spelling drifted from the
+   direction registry + a service registered under the direction's
+   canonical key — desk and the clinic-wide QR doctor-override join
+   land on the SAME ``(day, doctor, canonical tag)`` row.
+
+4. ``test_distinct_direction_tags_keep_separate_rows_without_raw_specialty``
+   — the no-collapse half of D-01: a service tag OUTSIDE the doctor's
+   direction vocabulary keeps a separate desk row (service tag
+   verbatim); no queue row is tagged with the RAW specialty spelling
+   anymore (the per-surface fallback source is gone, nothing is
+   merged or renumbered).
 
 Disposable PostgreSQL: the module provisions its own scratch database
 (rq14_check), runs ``alembic upgrade head`` and drops it at the end;
@@ -167,9 +174,24 @@ def _clinic_day(session) -> object:
     return clinic_today(session)
 
 
-def _seed_join_world(session, *, suffix: str, service_tag: str) -> dict:
+def _seed_join_world(
+    session,
+    *,
+    suffix: str,
+    service_tag: str,
+    doctor_specialty: str | None = None,
+    profile_queue_tags: list[str] | None = None,
+) -> dict:
     """SYNTHETIC world: active doctor, visible cardiology profile, service,
-    clinic-wide QR token, two patients, one confirmed visit (desk side)."""
+    clinic-wide QR token, two patients, one confirmed visit (desk side).
+
+    ``doctor_specialty`` seeds a DRIFTED stored specialty spelling (the
+    documented live case: the dental family where the canonical stored
+    value diverged from the profile registry key — D-1 vocabulary).
+    ``profile_queue_tags`` widens the profile's tag vocabulary so the
+    drifted spelling still resolves to the SAME QR-visible direction
+    (mirroring the stomatology profile carrying ["dental", "stomatology",
+    "dentist"]). Default ``None`` keeps the pre-RQ-14.b aligned shape."""
     from app.core.security import get_password_hash
     from app.models.clinic import Doctor
     from app.models.online_queue import QueueToken
@@ -211,7 +233,11 @@ def _seed_join_world(session, *, suffix: str, service_tag: str) -> dict:
         key=profile_key,
         title=f"Cardiology {suffix}",
         title_ru=f"Кардиология {suffix}",
-        queue_tags=[profile_key],
+        queue_tags=(
+            profile_queue_tags
+            if profile_queue_tags is not None
+            else [profile_key]
+        ),
         is_active=True,
         show_on_qr_page=True,
     )
@@ -254,7 +280,9 @@ def _seed_join_world(session, *, suffix: str, service_tag: str) -> dict:
         session.refresh(filler_doctor)
         if filler_doctor.id > max_profile_id:
             doctor = filler_doctor
-    doctor.specialty = profile_key
+    doctor.specialty = (
+        doctor_specialty if doctor_specialty is not None else profile_key
+    )
     session.add(doctor)
     session.commit()
     session.refresh(doctor)
@@ -510,6 +538,7 @@ def test_concurrent_desk_and_qr_numbering_stay_unique_within_one_queue(
     snapshot after the first one's number landed. Per-queue uniqueness
     is asserted here; numbers repeating ACROSS queues is a different
     (preserved) contract."""
+
     _patch_online_window()
     world = _seed_join_world(pg_session, suffix="race", service_tag="cardiology_race")
 
@@ -569,15 +598,101 @@ def test_concurrent_desk_and_qr_numbering_stay_unique_within_one_queue(
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_qr_and_desk_owner_fork_when_service_tag_differs_from_specialty(
+def test_qr_override_and_desk_share_row_for_registered_direction(
     pg_engine, pg_session
 ):
-    """Pins RQ-14.b (owner fork, fix waits D-01): desk routes by
-    service.queue_tag, live QR routes by doctor.specialty/profile key —
-    the same doctor/day gets TWO rows, each numbering from 1."""
+    """RQ-14.b FIXED (was the E-033 owner-fork pin, flipped per D-01):
+    desk and the QR doctor-override join resolve ONE row for the same
+    registered direction.
+
+    Pre-fix behavior (the E-033 pin): the clinic-wide doctor-override
+    branch derived ``queue_tag`` from the RAW ``doctor.specialty``
+    string — a per-surface fallback source. With the stored specialty
+    spelling drifted from the profile registry key (the documented
+    dental-family case) the same (day, doctor) got TWO rows numbered
+    independently — the desk patient and the QR patient of the SAME
+    direction landed in different queues.
+
+    D-01 (APPROVED 2026-09-15): one server-side resolution method for
+    desk and QR, no per-surface fallbacks, no name guessing. The QR
+    override branch now resolves the tag through the SAME direction
+    registry source as the profile-pick branch — the QR-visible
+    profile's canonical key. The desk keeps the approved source
+    (``service.queue_tag``); when the service is registered under the
+    direction's canonical key, both surfaces share the row and
+    numbering continues (1, 2) with sources desk/online preserved."""
     _patch_online_window()
+    drifted = "cardio_legacy_flip"
     world = _seed_join_world(
-        pg_session, suffix="fork", service_tag="cardiology_common_fork"
+        pg_session,
+        suffix="flip",
+        service_tag="cardiology_flip",
+        doctor_specialty=drifted,
+        profile_queue_tags=["cardiology_flip", drifted],
+    )
+
+    desk = _desk_assignment(pg_engine, world["visit"].id, world["day"])
+    assert desk["error"] is None, desk
+    assert desk["assignments"], "desk assignment must produce queue numbers"
+    desk_visit_id = world["visit"].id
+    desk_number = desk["assignments"][desk_visit_id][0]["number"]
+
+    qr = _qr_join(
+        pg_engine,
+        world["token"].token,
+        world["doctor"].id,
+        "RQ-14 QR Patient Flip",
+        "+998901000002",
+    )
+    assert qr["error"] is None, qr
+    assert qr["duplicate"] is False
+
+    queues = [
+        q
+        for q in _queues_for_doctor(pg_engine, world["day"])
+        if q["specialist_id"] == world["doctor"].id
+    ]
+    # THE CONTRACT (D-01/RQ-14.b): ONE canonical row for the registered
+    # direction — the profile registry key — shared by both surfaces.
+    assert len(queues) == 1, f"expected ONE shared queue row, got {queues}"
+    assert queues[0]["queue_tag"] == "cardiology_flip"
+
+    entries = _entries(pg_engine, queues[0]["id"])
+    assert len(entries) == 2
+    by_source = {e["source"]: e for e in entries}
+    assert set(by_source) == {"desk", "online"}
+    assert by_source["desk"]["number"] == desk_number
+    assert qr["number"] == max(e["number"] for e in entries)
+    for e in entries:
+        assert e["status"] == "waiting"
+        assert e["queue_time"] is not None
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_distinct_direction_tags_keep_separate_rows_without_raw_specialty(
+    pg_engine, pg_session
+):
+    """RQ-14.b no-collapse half (D-01): separate tags stay separate rows;
+    no queue row carries the RAW specialty spelling anymore.
+
+    A service tag OUTSIDE the doctor's direction vocabulary is a
+    different direction: the desk row keeps the service tag verbatim,
+    the QR override join lands on the doctor's registry direction
+    (profile key). D-01 forbids auto-collapsing different tags of one
+    doctor and forbids merging/renumbering existing queues — so TWO
+    rows is the correct outcome here; the flipped part is the tag
+    SOURCE: the QR row must be the registry key, not the raw
+    ``doctor.specialty`` string the legacy branch used before."""
+    _patch_online_window()
+    drifted = "cardio_legacy_noc"
+    outside_tag = "cardiology_outside_noc"
+    world = _seed_join_world(
+        pg_session,
+        suffix="noc",
+        service_tag=outside_tag,
+        doctor_specialty=drifted,
+        profile_queue_tags=["cardiology_noc", drifted],
     )
 
     desk = _desk_assignment(pg_engine, world["visit"].id, world["day"])
@@ -588,7 +703,7 @@ def test_qr_and_desk_owner_fork_when_service_tag_differs_from_specialty(
         pg_engine,
         world["token"].token,
         world["doctor"].id,
-        "RQ-14 QR Patient Fork",
+        "RQ-14 QR Patient NoCollapse",
         "+998901000002",
     )
     assert qr["error"] is None, qr
@@ -600,16 +715,14 @@ def test_qr_and_desk_owner_fork_when_service_tag_differs_from_specialty(
         if q["specialist_id"] == world["doctor"].id
     ]
     tags = {q["queue_tag"] for q in queues}
-    # THE FORK: two queue rows for the same (day, doctor).
-    assert tags == {world["service"].queue_tag, world["doctor"].specialty}, (
-        f"expected the desk/QR tag fork, got {tags}"
+    # Distinct directions stay distinct (no silent collapse)…
+    assert len(queues) == 2, f"expected separate direction rows, got {queues}"
+    # …both tags are CANONICAL sources: the service tag verbatim (desk)
+    # and the direction registry key (QR).
+    assert tags == {outside_tag, "cardiology_noc"}, (
+        f"expected canonical tags only, got {tags}"
     )
-    assert len(queues) == 2
-
-    entries = _entries(pg_engine)
-    mine = [e for e in entries if e["queue_id"] in {q["id"] for q in queues}]
-    assert len(mine) == 2
-    # Per-row numbering: BOTH surfaces issued number 1 for the same day/doctor.
-    assert {e["number"] for e in mine} == {1}, (
-        f"expected number 1 on both forked rows, got {mine}"
+    # The per-surface raw-specialty fallback is gone.
+    assert drifted not in tags, (
+        f"raw specialty spelling must not own a queue row: {tags}"
     )

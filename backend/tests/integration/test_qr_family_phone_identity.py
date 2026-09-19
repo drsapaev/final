@@ -352,6 +352,7 @@ def test_clinic_wide_duplicate_scoped_to_identity(pg_session, pg_engine):
         [world["profile_id"]],
         "SYNTHETIC-First Cwtest",
         "+998900777888",
+        specialist_entity_types=["profile"],  # RQ-09.b (D-01): explicit entity type
     )
     assert res_a["success"] is True, res_a
     entry_a_id = res_a["entries"][0]["queue_entry_id"]
@@ -362,6 +363,7 @@ def test_clinic_wide_duplicate_scoped_to_identity(pg_session, pg_engine):
         [world["profile_id"]],
         "SYNTHETIC-Second Cwtest",
         "+998900777888",
+        specialist_entity_types=["profile"],  # RQ-09.b (D-01): explicit entity type
     )
     assert res_b["success"] is True, res_b
     entry_b_id = res_b["entries"][0]["queue_entry_id"]

@@ -1764,10 +1764,17 @@ def test_graphql_round14(gql_data, monkeypatch):
     # между get_or_create_daily_queue и with_for_update видна мутации.
     # Патч изолирован в context()-сабменеджере.
     with monkeypatch.context() as m:
-        original_goc = gql_mutations.crud_queue.get_or_create_daily_queue
+        original_goc = gql_mutations.queue_service.get_or_create_daily_queue
 
         def _goc_deactivate(db, **kwargs):
             queue = original_goc(db, **kwargs)
+            # QD-2E: the canonical queue_service seam is flush-only (it
+            # must not end the mutation transaction), so the row is
+            # invisible to a second session until THIS transaction
+            # commits. Commit here - the deactivation below stays a
+            # genuinely EXTERNAL change that the mutation's
+            # with_for_update + populate_existing re-fetch must catch.
+            db.commit()
             with S() as s2:
                 stale = s2.query(DailyQueue).filter(DailyQueue.id == queue.id).first()
                 stale.active = False
@@ -1775,7 +1782,7 @@ def test_graphql_round14(gql_data, monkeypatch):
             return queue
 
         m.setattr(
-            gql_mutations.crud_queue, "get_or_create_daily_queue", _goc_deactivate
+            gql_mutations.queue_service, "get_or_create_daily_queue", _goc_deactivate
         )
         data = _execute(
             """mutation($input: QueueEntryInput!) { joinQueue(input: $input) {
@@ -1912,10 +1919,14 @@ def test_graphql_round15(gql_data, monkeypatch, caplog):
     # get_or_create_daily_queue -> повторная eligibility-проверка видит
     # свежее состояние и отклоняет join (DOCTOR_INACTIVE).
     with monkeypatch.context() as m:
-        original_goc = gql_mutations.crud_queue.get_or_create_daily_queue
+        original_goc = gql_mutations.queue_service.get_or_create_daily_queue
 
         def _goc_deactivate_doctor(db, **kwargs):
             queue = original_goc(db, **kwargs)
+            # QD-2E: flush-only canonical seam — end the write txn so
+            # the external doctor deactivation below is not blocked by
+            # the SQLite single-writer lock (round-14 helper, same shape).
+            db.commit()
             with S() as s2:
                 d2 = s2.query(Doctor).filter(Doctor.id == d["doctor"].id).first()
                 d2.active = False
@@ -1923,7 +1934,7 @@ def test_graphql_round15(gql_data, monkeypatch, caplog):
             return queue
 
         m.setattr(
-            gql_mutations.crud_queue,
+            gql_mutations.queue_service,
             "get_or_create_daily_queue",
             _goc_deactivate_doctor,
         )

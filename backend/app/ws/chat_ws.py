@@ -488,6 +488,16 @@ async def chat_websocket_handler(websocket: WebSocket):
         chat_manager.disconnect(user.id)
         websocket_rate_limiter.remove_connection(ip_address)
     except Exception as e:
-        logger.error(f"Chat WebSocket error: {e}")
+        # Starlette: 'WebSocket is not connected. Need to call "accept"
+        # first.' — приложение шлёт в сокет, который уже разорвала вторая
+        # сторона (типично для простаивающих WS за Cloudflare-туннелем).
+        # Это штатная гонка отключения, а не ошибка — не создаём issue.
+        if isinstance(e, RuntimeError) and "not connected" in str(e):
+            logger.info(
+                "Chat WebSocket peer dropped mid-send (treated as disconnect): user_id=%s",
+                user.id,
+            )
+        else:
+            logger.error(f"Chat WebSocket error: {e}")
         chat_manager.disconnect(user.id)
         websocket_rate_limiter.remove_connection(ip_address)

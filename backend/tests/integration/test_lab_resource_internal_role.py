@@ -708,13 +708,16 @@ def test_visit_confirmation_resolver_preserves_lab_resource(
 def test_batch_create_resolution_preserves_lab_resource(
     db_session: Session,
 ) -> None:
-    """Live resolver #2 — batch create: the _BATCH_CREATE_RESOURCE_
-    MAPPING ('lab' → 'lab_resource') resolves through the
-    Doctor.active/User.is_active join and returns the resource
-    Doctor.id with the 'Resource' role in place."""
+    """Live resolver #2 — batch create. QD-1.2 pinned the lab_resource
+    synthetic resolution (the pre-QD-2C bridge); QD-2E (RQ-15.b)
+    FLIPS the pin: the synthetic is NEVER an owner — without an ACTIVE
+    queue_resources row the resolution is fail-closed (D-08), and the
+    specialty-matching fallback skips internal 'Resource'-role accounts
+    too, so the synthetic is unreachable by ANY path."""
+    from app.crud.queue_owner_policy import QueueOwnerConfigurationError
     from app.services.batch_patient_service import BatchPatientService, EntryAction
 
-    sentinel, sentinel_doctor = _make_lab_sentinel(db_session)
+    _make_lab_sentinel(db_session)
 
     service = BatchPatientService(db_session)
     action = EntryAction(
@@ -724,23 +727,25 @@ def test_batch_create_resolution_preserves_lab_resource(
         service_code=None,
         doctor_id=None,
     )
-    resolved_id = service._resolve_create_action_specialist_id(
-        action=action, queue_tag="lab", service=None
-    )
-    assert resolved_id == sentinel_doctor.id
+    with pytest.raises(QueueOwnerConfigurationError, match="D-08"):
+        service._resolve_create_action_specialist_id(
+            action=action, queue_tag="lab", service=None
+        )
 
 
 def test_wizard_prepare_resolution_preserves_lab_resource(
     db_session: Session,
 ) -> None:
     """Live resolver #3 — wizard/morning prepare (the shared
-    prepare_wizard_queue_assignment): a doctorless lab visit resolves
-    lab_resource → Doctor.id and the DailyQueue is created with that
-    specialist — with the 'Resource' role in place (QD-0 never
-    filters by role)."""
+    prepare_wizard_queue_assignment). QD-1.2 pinned the lab_resource
+    synthetic resolution; QD-2E (RQ-15.b) FLIPS the pin: no registry
+    row → no owner → the explicit QueueOwnerConfigurationError (the
+    pre-2E silent None was the QD-0 root cause), synthetic present in
+    the database but never consulted."""
+    from app.crud.queue_owner_policy import QueueOwnerConfigurationError
     from app.services.morning_assignment import MorningAssignmentService
 
-    sentinel, sentinel_doctor = _make_lab_sentinel(db_session)
+    _make_lab_sentinel(db_session)
 
     patient = Patient(
         first_name="Лаборатория",
@@ -763,20 +768,10 @@ def test_wizard_prepare_resolution_preserves_lab_resource(
     db_session.refresh(visit)
 
     service = MorningAssignmentService(db_session)
-    prepared = service.prepare_wizard_queue_assignment(
-        visit, "lab", date.today(), source="pytest_qd12"
-    )
-
-    handoff = prepared.create_handoff
-    assert handoff is not None, "doctorless lab visit must resolve, not None"
-    assert handoff.queue_tag == "lab"
-    assert handoff.daily_queue is not None
-    assert handoff.daily_queue.specialist_id == sentinel_doctor.id
-
-    create_kwargs = handoff.create_entry_kwargs
-    assert create_kwargs["patient_id"] == patient.id
-    assert create_kwargs["visit_id"] == visit.id
-    assert create_kwargs["source"] == "pytest_qd12"
+    with pytest.raises(QueueOwnerConfigurationError, match="lab"):
+        service.prepare_wizard_queue_assignment(
+            visit, "lab", date.today(), source="pytest_qd2e"
+        )
 
 
 # ===================== human Lab preservation =====================

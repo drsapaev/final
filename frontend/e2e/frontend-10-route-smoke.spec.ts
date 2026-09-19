@@ -4,6 +4,8 @@ import type { Page } from '@playwright/test';
 
 const PUBLIC_ROUTES = [
   { path: '/login', name: 'login' },
+  { path: '/patient/login', name: 'patient login' },
+  { path: '/patient/activate', name: 'patient activation' },
   { path: '/queue/join', name: 'queue join' },
   { path: '/payment/success', name: 'payment success callback' },
   { path: '/payment/cancel', name: 'payment cancel callback' },

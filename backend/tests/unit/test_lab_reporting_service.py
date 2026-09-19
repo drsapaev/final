@@ -270,20 +270,17 @@ class TestLabReportingService:
             f"Backfill должен создать 2 LabResult, got {after}"
         )
 
-    def test_revise_and_additional_blank_refresh_legacy_projection(
+    def test_revise_and_additional_blank_refresh_managed_projection(
         self, db_session, test_patient, test_visit
     ):
-        """PR2: legacy lab_results должна отражать последнюю финализированную
-        версию каждого показателя и не блокироваться наличием любых строк
-        того же order_id.
+        """A+ runtime (решение владельца, см.
+        .ai-factory/plans/lab-results-lineage-decision.md): управляемая
+        проекция ключуется (source_root_instance_id, test_code).
 
-        Сценарий плана PR2:
-          - финализировать бланк A (hgb, wbc);
-          - revise → изменить один показатель → финализировать: legacy
-            consumer видит новое значение;
-          - дополнительный бланк B (ige_total, другой test_code) того же
-            visit (тот же order): показатели A сохраняются, показатель B
-            появляется.
+          - ревизия обновляет проекцию СВОЕЙ цепочки (hgb 100 → 140);
+          - дополнительный бланк того же визита — другая цепочка: его
+            total_ige появляется, показатели A не тронуты;
+          - исторические/чужие строки заказа не затрагиваются.
         """
         test_patient.sex = "M"
         test_patient.birth_date = date(1990, 1, 1)
@@ -307,7 +304,6 @@ class TestLabReportingService:
                 {"field_key": "wbc", "value_text": "5.2"},
             ],
         )
-        # Чистим возможные legacy строки, как в соседних тестах проекции
         db_session.execute(
             delete(LabResult).where(LabResult.order_id == instance_a.order_id)
         )
@@ -316,7 +312,7 @@ class TestLabReportingService:
         finalized_a = service.finalize(instance_a.id)
         assert finalized_a.status == "FINALIZED"
 
-        def _legacy_rows() -> dict:
+        def _managed_rows() -> dict:
             return {
                 row.test_code: row
                 for row in db_session.query(LabResult)
@@ -324,10 +320,12 @@ class TestLabReportingService:
                 .all()
             }
 
-        assert _legacy_rows()["hgb"].value == "100"
-        assert _legacy_rows()["wbc"].value == "5.2"
+        rows = _managed_rows()
+        assert rows["hgb"].value == "100"
+        assert rows["hgb"].source_root_instance_id == instance_a.id
+        assert rows["hgb"].source_instance_id == instance_a.id
 
-        # Revise → изменить один синтетический показатель → финализировать
+        # Ревизия обновляет проекцию своей цепочки
         revision = service.revise(finalized_a.id)
         service.bulk_upsert_values(
             revision.id,
@@ -335,16 +333,17 @@ class TestLabReportingService:
         )
         service.finalize(revision.id)
 
-        rows = _legacy_rows()
-        assert rows["hgb"].value == "140", (
-            "legacy projection must show the revised value after re-finalize"
-        )
+        rows = _managed_rows()
+        assert len(rows) == 2, "no duplicate rows from the revision"
+        assert rows["hgb"].value == "140"
+        assert rows["hgb"].source_instance_id == revision.id
+        assert rows["hgb"].source_root_instance_id == instance_a.id
         assert rows["wbc"].value == "5.2", (
-            "unrelated indicator of the same order must be preserved"
+            "unrelated indicator of the chain is preserved"
         )
 
         # Дополнительный бланк B (другой шаблон/test_code) того же visit:
-        # _resolve_or_create_order переиспользует order визита
+        # другая цепочка — его показатель появляется, показатели A целы.
         ige_template = next(t for t in templates if t.code == "ige_total")
         instance_b = service.create_instance(
             {
@@ -353,23 +352,19 @@ class TestLabReportingService:
                 "template_id": ige_template.id,
             }
         )
-        assert instance_b.order_id == instance_a.order_id, (
-            "additional blank for the same visit must reuse the same order"
-        )
+        assert instance_b.order_id == instance_a.order_id
         service.bulk_upsert_values(
             instance_b.id,
             [{"field_key": "total_ige", "value_text": "150"}],
         )
         service.finalize(instance_b.id)
 
-        rows = _legacy_rows()
-        assert rows["hgb"].value == "140", (
-            "blank B finalize must not drop blank A indicators"
-        )
+        rows = _managed_rows()
+        assert rows["hgb"].value == "140"
         assert rows["wbc"].value == "5.2"
-        assert rows["total_ige"].value == "150", (
-            "additional blank must reach the legacy projection"
-        )
+        assert rows["total_ige"].value == "150"
+        assert rows["total_ige"].source_root_instance_id == instance_b.id
+        assert rows["total_ige"].source_root_instance_id != rows["hgb"].source_root_instance_id
 
     def test_create_instance_prefills_signer_snapshot_from_actor_name(
         self, db_session, test_patient

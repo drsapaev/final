@@ -106,44 +106,75 @@ class FinalizeMixin(LabReportingServiceMixinBase):
     # ============================================================
 
 
+    def _resolve_chain_root(self, instance: LabReportInstance) -> tuple[int, set[int]]:
+        """Walk the supersedes_instance_id chain up to the root blank.
+
+        Returns ``(root_id, chain)`` where ``chain`` is the set of ALL
+        member ids of this revision chain (the instance itself plus every
+        ancestor) — the membership test used by the competing-revision
+        guard: the chain projection may be refreshed only by a member of
+        its own chain.
+        """
+        chain: set[int] = set()
+        root_id = instance.id
+        current = instance
+        while True:
+            chain.add(current.id)
+            parent_id = current.supersedes_instance_id
+            if not parent_id:
+                break
+            if parent_id in chain:
+                raise LabReportingDomainError(
+                    500,
+                    "Corrupt revision chain: cycle detected; "
+                    "automatic current-value selection is forbidden "
+                    "(owner contract, .ai-factory/plans/"
+                    "lab-results-lineage-decision.md)",
+                )
+            parent = self.db.get(LabReportInstance, parent_id)
+            if parent is None:
+                raise LabReportingDomainError(
+                    500,
+                    "Corrupt revision chain: unresolved ancestor; "
+                    "automatic current-value selection is forbidden "
+                    "(owner contract)",
+                )
+            root_id = parent.id
+            current = parent
+        return root_id, chain
+
     def _sync_legacy_lab_results(
         self,
         instance: LabReportInstance,
         field_map: dict[str, LabReportFieldDef],
     ) -> None:
-        """P-01 bridge: projection LabReportValue → LabResult.
+        """P-01 bridge, A+ runtime: managed lineage projection.
 
-        Создаёт соответствующие записи в legacy таблице lab_results при
-        финализации бланка, чтобы read-only потребители (mobile app
-        /mobile/lab/results, EMR /patients/{id}/lab-results, statistics,
-        critical value notifications, Telegram) видели новые бланки.
+        Проекция LabReportValue → lab_results для read-only потребителей
+        (mobile app /mobile/lab-results, EMR, statistics, critical-value
+        scanner, Telegram). Контракт: решение владельца C → A+, зафиксировано
+        в .ai-factory/plans/lab-results-lineage-decision.md.
 
-        Контекст: в кодовой базе 2 модели lab results:
-          - Новая: lab_report_instances + lab_report_values (используется
-            LabReportWorkbench через /lab/report-instances)
-          - Legacy: lab_results (используется mobile app, EMR, и т.д.)
+        Ключ управляемой проекции — (source_root_instance_id, test_code):
+        - root цепочки определяется по supersedes_instance_id (актуальность
+          задаётся связями ревизий, не max id / timestamp / порядком);
+        - source_instance_id — утверждённая версия, давшая текущее значение;
+        - строки ДРУГИХ цепочек того же заказа (например glucose крови и
+          мочи) и исторические строки без lineage никогда не трогаются;
+        - очищенный в ревизии показатель перестаёт быть актуальным
+          (value=NULL, актуальный source, abnormal сброшен) — «пустота»
+          не превращается в старое значение или «норму»;
+        - повторный sync идемпотентен и не трогает created_at, поэтому
+          critical-value сканер не порождает повторных уведомлений;
+        - конкурирующие ревизии одного предшественника не разрешаются
+          last-write-wins: проекцию обновляет только член своей цепочки,
+          чужая ревизия получает контролируемый конфликт 409.
 
-        Раньше bridge не было — новые бланки были невидимы для legacy
-        потребителей. Этот метод создаёт LabResult projection при
-        finalize(), используя order_id как связь (instance.order_id →
-        lab_results.order_id).
-
-        Upsert по (order_id, test_code): показатель, уже спроецированный
-        из этого заказа, обновляется значением последней финализированной
-        версии, остальные показатели заказа сохраняются. Повторный sync
-        не создаёт дубликатов; revise() (тот же order_id) обновляет
-        значения в legacy, а дополнительный бланк того же визита
-        (переиспользует order через _resolve_or_create_order) добавляет
-        свои показатели, не трогая чужие.
-
-        Маппинг полей:
-          field_def.label              → test_name
-          field_def.field_key          → test_code
-          value.value_text/value_numeric → value (string representation)
-          field_def.unit               → unit
-          value.resolved_reference_text → ref_range
-          value.resolved_flag in
-            {high, low, abnormal, critical, warning} → abnormal=True
+        Сериализация: SELECT … FOR UPDATE на root-instance удерживается до
+        коммита окружающего finalize; состояние управляемых строк
+        перечитывается ПОСЛЕ захвата блокировки (read committed видит
+        строки победителя). SQLite игнорирует FOR UPDATE; семантика
+        сериализации доказана двухсоединечным PostgreSQL-тестом.
         """
         if not instance.order_id:
             logger.warning(
@@ -153,29 +184,53 @@ class FinalizeMixin(LabReportingServiceMixinBase):
             )
             return
 
-        # Upsert-проекция по (order_id, test_code). Ранний return при наличии
-        # любых строк этого order недопустим: revise() сохраняет order_id,
-        # а дополнительный бланк визита переиспользует тот же order — в обоих
-        # случаях legacy lab_results должен актуализироваться.
-        existing_by_code = {
-            result.test_code: result
-            for result in self.db.query(LabResult)
-            .filter(LabResult.order_id == instance.order_id)
+        root_id, chain = self._resolve_chain_root(instance)
+
+        # Chain-level serialization: все члены цепочки (и только они)
+        # обновляют строки этого root; блокировка корневой строки
+        # упорядочивает конкурирующие ревизии и гонки COUNT→INSERT.
+        self.db.query(LabReportInstance).filter(
+            LabReportInstance.id == root_id
+        ).with_for_update().first()
+
+        # Re-read AFTER the lock: read committed уже видит строки
+        # победителя. Исторические (NULL lineage) и чужие цепочки не
+        # попадают в выборку и потому не могут быть изменены.
+        existing_managed = {
+            row.test_code: row
+            for row in self.db.query(LabResult)
+            .filter(
+                LabResult.source_root_instance_id == root_id,
+                LabResult.test_code.isnot(None),
+            )
             .all()
         }
 
+        # Competing-revision guard: текущий source каждой строки обязан
+        # быть членом этой цепочки (предок или сам instance). Иначе
+        # цепочку уже продвинула сиблинг-ревизия — контролируемый
+        # конфликт, никакой перезаписи.
+        for code, row in existing_managed.items():
+            source_id = row.source_instance_id
+            if source_id is None or source_id in chain:
+                continue
+            raise LabReportingDomainError(
+                409,
+                f"Competing finalized revision: indicator '{code}' of this "
+                f"order was already refreshed by revision {source_id}, which "
+                f"is not superseded by revision {instance.id}. Reload the "
+                f"chain history; last-write-wins is forbidden by the owner "
+                f"contract.",
+            )
+
         created_count = 0
         updated_count = 0
+        cleared_count = 0
         for value in instance.values:
             field_def = field_map.get(value.field_key)
             if not field_def:
                 continue
-
-            # Пропускаем пустые значения — нет смысла создавать LabResult
-            # для незаполненного показателя.
-            effective_value = self._extract_effective_value(value)
-            if effective_value in (None, ""):
-                continue
+            code = value.field_key
 
             # value_numeric имеет приоритет для numeric fields, иначе value_text.
             # Нормализуем Decimal: LabReportValue.value_numeric хранится как
@@ -197,24 +252,43 @@ class FinalizeMixin(LabReportingServiceMixinBase):
             # (high, low, abnormal, critical, warning). None/empty → False.
             abnormal = bool(value.resolved_flag)
 
+            row = existing_managed.get(code)
+
+            if result_value == "":
+                # Очищенный показатель: прежнее значение перестаёт быть
+                # актуальным. Строка уже спроецирована — помечаем отсутствие
+                # актуального значения; никогда не проецированный пустой
+                # показатель строку не создаёт.
+                if row is not None and (
+                    row.value is not None
+                    or row.source_instance_id != instance.id
+                ):
+                    row.value = None
+                    row.abnormal = False
+                    row.source_instance_id = instance.id
+                    cleared_count += 1
+                continue
+
             projected = {
-                "test_name": field_def.label or value.field_key,
-                "value": result_value[:128] if result_value else None,
+                "test_name": field_def.label or code,
+                "value": result_value[:128],
                 "unit": (field_def.unit or "")[:32] or None,
                 "ref_range": (value.resolved_reference_text or "")[:64] or None,
                 "abnormal": abnormal,
             }
 
-            lab_result = existing_by_code.get(value.field_key)
-            if lab_result is not None:
+            if row is not None:
                 for attr, projected_value in projected.items():
-                    setattr(lab_result, attr, projected_value)
+                    setattr(row, attr, projected_value)
+                row.source_instance_id = instance.id
                 updated_count += 1
             else:
                 self.db.add(
                     LabResult(
                         order_id=instance.order_id,
-                        test_code=value.field_key,
+                        test_code=code,
+                        source_root_instance_id=root_id,
+                        source_instance_id=instance.id,
                         notes=None,
                         **projected,
                     )
@@ -222,10 +296,12 @@ class FinalizeMixin(LabReportingServiceMixinBase):
                 created_count += 1
 
         logger.info(
-            "[LAB] _sync_legacy_lab_results: created %d, updated %d LabResult "
-            "projections for instance %s (order %s)",
+            "[LAB] _sync_legacy_lab_results: root=%s created %d, updated %d, "
+            "cleared %d managed projections for instance %s (order %s)",
+            root_id,
             created_count,
             updated_count,
+            cleared_count,
             instance.id,
             instance.order_id,
         )

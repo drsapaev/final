@@ -4,12 +4,25 @@ Split from queue_service.py.
 """
 from __future__ import annotations
 
+from typing import NoReturn
+
 from sqlalchemy import select, text  # RQ-14.a: row-lock + advisory lock
+from sqlalchemy.exc import IntegrityError
 
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import expand_queue_tags
 from app.crud import queue_resource_routing
+from app.crud.queue_resource_routing import effective_day_start_number
 from app.models.online_queue import QueueResource
+
+# RQ-16.d (E-055 §11): the provision retry loop generates FRESH opaque
+# codes; imported by NAME at module level so tests can monkeypatch the
+# generator on this module (the global UNIQUE constraint arbitrates).
+from app.models.queue_direction_public_address import generate_public_code
+from app.services.queue_claim_service import (
+    QueueClaimConflictError,
+    lock_and_resolve_active_tag_claim,
+)
 from app.services.queue_svc._base import *  # noqa: F401, F403
 from app.services.queue_svc._base import QueueBusinessServiceMixinBase, _now
 from app.services.user_mgmt._base import (
@@ -102,63 +115,54 @@ def _unbookable_doctor_ids(
     return unbookable
 
 
-def _find_clinic_wide_duplicate(
+def _lock_and_resolve_tag_claim(
     db: Session,
-    doctors: list[Doctor],
     *,
     day,
     queue_tag: str,
+    patient_id: int | None,
     phone: str | None,
-    telegram_id: str | None,
-    patient_id: int | None = None,
+    telegram_id: int | str | None,
     patient_name: str | None = None,
-) -> tuple[OnlineQueueEntry | None, DailyQueue | None]:
-    """The patient's existing entry across ALL candidate doctors'
-    active same-day queues for ``queue_tag`` (Codex round-4 P1):
-    duplicates must be resolved BEFORE least-load routing — a retry or
-    double submit raises the first doctor's load, so routing would
-    pick a sibling and the per-queue ``check_uniqueness`` would let a
-    SECOND entry for the same patient through under another doctor.
+):
+    """Acquire the tag/day claim lock and expose domain-safe conflicts.
 
-    RQ-25.a.1 (S-22): identity scope is the PATIENT, not the phone.
-    A shared family phone must not hand the first member's ticket to
-    the second: primary match is ``entry.patient_id`` (always filled by
-    the QR join path); the phone match applies only to legacy entries
-    that carry no ``patient_id``, narrowed by the typed entry name so
-    family members on legacy rows still stay separate."""
-    if not phone and not telegram_id and not patient_id:
-        return None, None
-    base = (
-        db.query(OnlineQueueEntry)
-        .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
-        .filter(
-            DailyQueue.day == day,
-            DailyQueue.specialist_id.in_([d.id for d in doctors]),
-            DailyQueue.active.is_(True),
-            DailyQueue.queue_tag == queue_tag,
-            OnlineQueueEntry.status.in_(["waiting", "called"]),
+    RQ-25.a.1 (S-22, the merged-main ruling reconciled onto the claim
+    coordinator): pass the typed ``patient_name`` so the coordinator's
+    legacy-phone bridge is name-narrowed — family members sharing one
+    phone each keep their own claim (the identity scope is the PATIENT;
+    ``patient_id`` is primary, the phone arm only bridges legacy rows
+    with no patient link). The coordinator replaces main's inline
+    `_find_clinic_wide_duplicate` with the wider tag-scoped search plus
+    explicit cross-owner conflict checks at every call site."""
+    try:
+        return lock_and_resolve_active_tag_claim(
+            db,
+            day=day,
+            queue_tag=queue_tag,
+            patient_id=patient_id,
+            phone=phone,
+            telegram_id=telegram_id,
+            patient_name=patient_name,
         )
+    except QueueClaimConflictError as exc:
+        raise QueueConflictError(
+            "У пациента уже есть неоднозначная активная запись в этом направлении"
+        ) from exc
+
+
+def _queue_owner_matches(left: DailyQueue, right: DailyQueue) -> bool:
+    """Return whether two queue rows name the same exact routing owner."""
+    return (
+        left.specialist_id == right.specialist_id
+        and left.queue_resource_id == right.queue_resource_id
     )
-    entry = None
-    if patient_id:
-        entry = base.filter(OnlineQueueEntry.patient_id == patient_id).first()
-    if entry is None and phone:
-        legacy = base.filter(
-            OnlineQueueEntry.phone == phone,
-            OnlineQueueEntry.patient_id.is_(None),
-        )
-        if patient_name:
-            legacy = legacy.filter(
-                func.lower(func.trim(OnlineQueueEntry.patient_name))
-                == patient_name.strip().casefold()
-            )
-        entry = legacy.first()
-    if entry is None and telegram_id:
-        entry = base.filter(OnlineQueueEntry.telegram_id == telegram_id).first()
-    if entry is None:
-        return None, None
-    queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
-    return entry, queue
+
+
+def _raise_cross_owner_claim_conflict() -> NoReturn:
+    raise QueueConflictError(
+        "У пациента уже есть активная запись в другую очередь этого направления"
+    )
 
 
 class OperationsMixin(QueueBusinessServiceMixinBase):
@@ -355,6 +359,9 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             .scalar()
         ) or 0
 
+        # RQ-13.b (D-06, E-039): колонка существует с 0067 — снапшот дня
+        # (заморожен при создании) теперь реально читается; живые рериды
+        # ниже — defense для строк без снапшота (легаси/восстановление).
         start_number = getattr(daily_queue, "start_number", None)
         if not start_number and daily_queue.queue_resource_id:
             resource = db.get(QueueResource, daily_queue.queue_resource_id)
@@ -514,6 +521,12 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                             "max_online_entries"
                         ]
                     ),
+                    # RQ-13.b (D-06, E-039): снимок применённого стартового
+                    # номера реестра — дальнейшие изменения живой строки
+                    # реестра не сдвигают базовую линию действующего дня.
+                    start_number=effective_day_start_number(
+                        db, resource=resource, queue_tag=queue_tag
+                    ),
                     # Codex round-7 P1: кабинет ОБЩЕЙ очереди тега — из
                     # реестра (default_cabinet; сиды 0059 держат NULL —
                     # канонического источника нет), НЕ из кабинета
@@ -627,6 +640,11 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             online_start_time=f"{int(queue_start_hour):02d}:00",
             online_end_time=f"{int(queue_end_hour):02d}:00",
             max_online_entries=defaults.get("max_online_entries"),
+            # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
+            # дня (владелец → клиника) — живые настройки не сдвигают день.
+            start_number=effective_day_start_number(
+                db, doctor=doctor, queue_tag=queue_tag
+            ),
             cabinet_number=defaults.get("cabinet_number"),
             cabinet_floor=defaults.get("cabinet_floor"),
             cabinet_building=defaults.get("cabinet_building"),
@@ -692,15 +710,18 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
 
         fallback_start = default_start
         if fallback_start is None:
-            # QD-2C: ресурсная очередь стартует с нумерации реестра
-            # (QueueResource.start_number_online — сиды 0059 перенесли
-            # LIVE-значения синтетика, до QD-2E значения совпадают)
-            if daily_queue is not None and daily_queue.queue_resource_id:
+            # RQ-13.b: снимок дня (0067) СТАРШЕ живого реестра — при
+            # наличии снапшота живое значение реестра игнорируется
+            # (D-06: «новые настройки не меняют ... текущего дня»).
+            if daily_queue is not None and getattr(daily_queue, "start_number", None):
+                fallback_start = int(daily_queue.start_number)
+            elif daily_queue is not None and daily_queue.queue_resource_id:
+                # QD-2C: ресурсная очередь стартует с нумерации реестра
+                # (QueueResource.start_number_online — сиды 0059 перенесли
+                # LIVE-значения синтетика, до QD-2E значения совпадают)
                 resource = db.get(QueueResource, daily_queue.queue_resource_id)
                 if resource is not None and resource.start_number_online:
                     fallback_start = int(resource.start_number_online)
-            elif daily_queue and getattr(daily_queue, "start_number", None):
-                fallback_start = daily_queue.start_number
         if fallback_start is None:
             tag_key = queue_tag or "default"
             fallback_start = start_numbers.get(
@@ -736,9 +757,6 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 .where(DailyQueue.id == daily_queue.id)
                 .with_for_update()
             )
-
-        # start_number не является полем DailyQueue, используется только для вычисления номера записи
-        # Не нужно устанавливать его в daily_queue
 
         return self.calculate_next_number(db, daily_queue)
 
@@ -1047,6 +1065,118 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             candidates = doctors
         return min(candidates, key=lambda d: (active_loads.get(d.id, 0), d.id))
 
+    # RQ-16.d: the reserved department PREFIX of a direction-scoped
+    # token minted by the public-address start. Legacy tokens never carry
+    # it (admin clinic-wide tokens historically carry "clinic" or a raw
+    # specialty), so the session binding below can never misfire on them.
+    PUBLIC_ADDRESS_DEPARTMENT_PREFIX = "qdir:"
+
+    # The ``clinic`` key is the clinic-wide QR sentinel — a direction
+    # token minted with department == "clinic" would be indistinguishable
+    # from a legacy admin clinic token and the session binding could not
+    # be enforced.
+    PUBLIC_ADDRESS_FORBIDDEN_KEYS = frozenset({"clinic"})
+
+    def direction_resolves_to_bookable_surface(self, db: Session, profile) -> bool:
+        """RQ-16.d read-only eligibility probe (E-055 §8: "canonical
+        eligibility/resolution allows booking").
+
+        Consumes the SAME primitives the join path uses — the registry-
+        backed resource surface first (QD-2C tag-first), then the canonical
+        owner-eligibility doctor filter (active Doctor, completed specialty,
+        active owner with a doctor-family role, decision #13) — and answers
+        ONE question: can this direction resolve to a concrete bookable
+        owner at all? No routing decision and no queue mutation happens
+        here; the join itself (``join_queue_with_token``) keeps every
+        routing rule and enforces time windows / limits at booking time.
+        """
+        profile_key = getattr(profile, "key", None)
+        if not profile_key:
+            return False
+        queue_tags = expand_queue_tags(
+            list(getattr(profile, "queue_tags", None) or [profile_key])
+        )
+        for tag in queue_tags:
+            if queue_resource_routing.resolve_tag_resource(db, tag) is not None:
+                return True
+        eligible_doctor = (
+            db.query(Doctor.id)
+            .join(User, Doctor.user_id == User.id)
+            .filter(
+                Doctor.active.is_(True),
+                Doctor.specialty.in_(queue_tags),
+                Doctor.specialty != INCOMPLETE_DOCTOR_SPECIALTY,
+                User.is_active.is_(True),
+                func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
+            )
+            .first()
+        )
+        return eligible_doctor is not None
+
+    def provision_public_address(self, db: Session, *, profile):
+        """RQ-16.d provision/enable of the permanent public address
+        (E-055 §3): the code is generated by the server ONCE and persisted
+        forever. Idempotent: an existing active (retired_at IS NULL) row is
+        returned unchanged (archive/reactivate cycles keep the SAME
+        address, E-055 §7). On the astronomically unlikely global-UNIQUE
+        collision the loop retries with a FRESH code (E-055 §11); the
+        savepoint keeps a failed insert from poisoning the outer
+        transaction. Rotation/revoke is a separate future workstream
+        (E-055 §6) — nothing here retires an address.
+
+        Returns ``(row, created)``.
+        """
+        from app.models.queue_direction_public_address import (
+            QueueDirectionPublicAddress,
+        )
+
+        existing = (
+            db.query(QueueDirectionPublicAddress)
+            .filter(
+                QueueDirectionPublicAddress.queue_profile_id == profile.id,
+                QueueDirectionPublicAddress.retired_at.is_(None),
+            )
+            .first()
+        )
+        if existing is not None:
+            return existing, False
+
+        last_error: IntegrityError | None = None
+        for _ in range(8):
+            code = generate_public_code()
+            try:
+                with db.begin_nested():
+                    row = QueueDirectionPublicAddress(
+                        queue_profile_id=profile.id,
+                        public_code=code,
+                    )
+                    db.add(row)
+                    db.flush()
+            except IntegrityError as exc:
+                # Either a burned code collision (retry with a fresh code)
+                # or a concurrent provision of the SAME profile won the
+                # one-active-per-profile race — re-check idempotency before
+                # the next attempt.
+                db.rollback()
+                winner = (
+                    db.query(QueueDirectionPublicAddress)
+                    .filter(
+                        QueueDirectionPublicAddress.queue_profile_id == profile.id,
+                        QueueDirectionPublicAddress.retired_at.is_(None),
+                    )
+                    .first()
+                )
+                if winner is not None:
+                    return winner, False
+                last_error = exc
+                continue
+            db.commit()
+            db.refresh(row)
+            return row, True
+        raise QueueValidationError(
+            "Не удалось сгенерировать уникальный публичный код направления"
+        ) from last_error
+
     def join_queue_with_token(
         self,
         db: Session,
@@ -1056,6 +1186,7 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         phone: str | None = None,
         telegram_id: int | None = None,
         specialist_id_override: int | None = None,
+        specialist_type: str | None = None,
         patient_id: int | None = None,
         source: str = "online",
     ) -> dict[str, Any]:
@@ -1072,32 +1203,70 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         daily_queue: DailyQueue | None = token_meta.get("daily_queue")
         specialist_name = token_meta.get("specialist_name")
         cabinet = token_meta.get("cabinet")
+        queue_tag = daily_queue.queue_tag if daily_queue is not None else None
+        resolved_claim_entry: OnlineQueueEntry | None = None
 
         # Поддержка общего QR (clinic-wide)
         if token_obj.is_clinic_wide:
             if specialist_id_override is None:
                 raise QueueValidationError("Выберите специалиста для записи")
 
-            # ⭐ SSOT FIX: specialist_id_override может быть:
-            # 1. QueueProfile.id (когда пользователь выбирает профиль на QR странице)
-            # 2. Doctor.id (legacy)
-            # Сначала проверяем, не является ли это QueueProfile.id
-            from app.models.queue_profile import QueueProfile
+            # RQ-09.b (D-01 APPROVED 2026-09-15): Doctor.id,
+            # QueueResource.id и QueueProfile.id — разные пространства; тип
+            # выбора передаётся ЯВНО и никогда не выводится из совпадения
+            # числового ID. Удалённый probe ``QueueProfile.id ==
+            # specialist_id_override`` молча переадресовывал выбранного
+            # пациентом врача на профильный маршрут (least-loaded /
+            # ресурс-поверхность), когда малый QueueProfile.id совпадал с
+            # переданным Doctor.id. Нетипизированный payload означает
+            # выбор ВРАЧА: публичная подборка (selectable_specialists)
+            # испускает только Doctor.id; профильный выбор остаётся
+            # доступным только при явно переданном типе "profile".
+            if specialist_type is not None:
+                specialist_type = str(specialist_type).strip().lower()
+            if specialist_type == "profile":
+                from app.models.queue_profile import QueueProfile
 
-            queue_profile_by_id = db.query(QueueProfile).filter(
-                QueueProfile.id == specialist_id_override,
-            ).first()
-            if queue_profile_by_id and not self._is_qr_visible_profile(
-                queue_profile_by_id
-            ):
-                raise QueueValidationError("Специалист недоступен для QR-записи")
+                queue_profile = (
+                    db.query(QueueProfile)
+                    .filter(QueueProfile.id == specialist_id_override)
+                    .first()
+                )
+                if queue_profile is None or not self._is_qr_visible_profile(
+                    queue_profile
+                ):
+                    raise QueueValidationError("Специалист недоступен для QR-записи")
+            elif specialist_type in (None, "doctor"):
+                queue_profile = None
+            else:
+                raise QueueValidationError("Недопустимый тип специалиста")
 
-            queue_profile = (
-                queue_profile_by_id
-                if queue_profile_by_id
-                and self._is_qr_visible_profile(queue_profile_by_id)
-                else None
+            # RQ-16.d (E-055 §9): a session opened through the permanent
+            # public address of a direction is scoped to THAT direction for
+            # its whole short life. The minted token carries the
+            # reserved-prefixed direction key in ``department``
+            # (PUBLIC_ADDRESS_DEPARTMENT_PREFIX) — legacy tokens never
+            # carry the prefix, so only direction sessions are narrowed:
+            # they can only complete for the typed profile selection of
+            # their own direction — never for another direction and never
+            # for an untyped/doctor choice.
+            _public_department = token_obj.department or ""
+            _direction_scoped = bool(
+                token_obj.is_clinic_wide
+                and _public_department.startswith(
+                    self.PUBLIC_ADDRESS_DEPARTMENT_PREFIX
+                )
             )
+            if _direction_scoped and (
+                queue_profile is None
+                or queue_profile.key
+                != _public_department.removeprefix(
+                    self.PUBLIC_ADDRESS_DEPARTMENT_PREFIX
+                )
+            ):
+                raise QueueValidationError(
+                    "Сессия ограничена направлением постоянного адреса"
+                )
 
             if queue_profile:
                 # ⭐ Это QueueProfile.id - ищем врача по specialty, соответствующему профилю
@@ -1140,13 +1309,48 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     None,
                 )
                 if resource_tag is not None:
-                    daily_queue = self.get_or_create_daily_queue(
+                    tag_claim = _lock_and_resolve_tag_claim(
                         db,
                         day=day,
-                        specialist_id=None,
                         queue_tag=resource_tag,
+                        patient_id=patient_id,
+                        phone=phone,
+                        telegram_id=telegram_id,
+                        patient_name=patient_name,
                     )
                     queue_tag = resource_tag
+                    if tag_claim is not None:
+                        expected_surface = queue_resource_routing.tag_routes_to_resource(
+                            db, resource_tag, day
+                        )
+                        expected_resource = queue_resource_routing.resolve_tag_resource(
+                            db, resource_tag
+                        )
+                        expected_resource_id = (
+                            expected_surface.queue_resource_id
+                            if expected_surface is not None
+                            else (
+                                expected_resource.id
+                                if expected_resource is not None
+                                else None
+                            )
+                        )
+                        claim_queue = tag_claim.daily_queue
+                        if (
+                            expected_resource_id is None
+                            or claim_queue.specialist_id is not None
+                            or claim_queue.queue_resource_id != expected_resource_id
+                        ):
+                            _raise_cross_owner_claim_conflict()
+                        daily_queue = claim_queue
+                        resolved_claim_entry = tag_claim.entry
+                    else:
+                        daily_queue = self.get_or_create_daily_queue(
+                            db,
+                            day=day,
+                            specialist_id=None,
+                            queue_tag=resource_tag,
+                        )
                     # Round-18 pattern (validate_queue_token): the join
                     # metadata advertises the REGISTRY owner — display_name
                     # over the 0055 synthetic's «Врач ID ...» — and the
@@ -1166,6 +1370,15 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                         resource.default_cabinet if resource is not None else None
                     )
                 else:
+                    tag_claim = _lock_and_resolve_tag_claim(
+                        db,
+                        day=day,
+                        queue_tag=profile_key,
+                        patient_id=patient_id,
+                        phone=phone,
+                        telegram_id=telegram_id,
+                        patient_name=patient_name,
+                    )
                     # Ищем врачей с specialty из queue_tags профиля.
                     # Incomplete ("general" sentinel) profiles are explicitly
                     # excluded: they are not clinical-eligible for specialty QR
@@ -1197,21 +1410,21 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     # (waiting+called), ties break to the lowest Doctor.id.
                     # queue_tag scopes the bookability pre-check to the exact
                     # (day, doctor, tag) row the join will use (Codex round-1 P1).
-                    # Codex round-4 P1: resolve the patient's EXISTING entry
-                    # across the profile's candidate queues BEFORE least-load
-                    # routing (see _find_clinic_wide_duplicate) — otherwise a
-                    # retry lands a second entry under another doctor.
-                    existing_entry, existing_queue = _find_clinic_wide_duplicate(
-                        db,
-                        eligible_doctors,
-                        day=day,
-                        queue_tag=profile_key,
-                        phone=phone,
-                        telegram_id=telegram_id,
-                        patient_id=patient_id,
-                        patient_name=patient_name,
-                    )
-                    if existing_queue is not None:
+                    # Resolve an existing identity claim while the common
+                    # tag/day transaction lock is held, before least-load
+                    # routing can select a sibling owner. RQ-25.a.1 (S-22):
+                    # the claim coordinator resolves the patient's identity
+                    # (patient_id primary, the phone arm bridges only legacy
+                    # rows, name-narrowed) — the merged-main ruling.
+                    eligible_doctor_ids = {doctor.id for doctor in eligible_doctors}
+                    if tag_claim is not None:
+                        existing_queue = tag_claim.daily_queue
+                        if (
+                            existing_queue.queue_resource_id is not None
+                            or existing_queue.specialist_id not in eligible_doctor_ids
+                        ):
+                            _raise_cross_owner_claim_conflict()
+                        resolved_claim_entry = tag_claim.entry
                         doctor = existing_queue.specialist or (
                             db.query(Doctor)
                             .filter(Doctor.id == existing_queue.specialist_id)
@@ -1295,19 +1508,48 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 if not qr_profile:
                     raise QueueValidationError("Специалист недоступен для QR-записи")
 
-                queue_tag = doctor.specialty
+                # RQ-14.b (D-01 APPROVED 2026-09-15): the canonical queue tag
+                # of the doctor's QR direction is the QR-visible profile's
+                # registry key — the SAME source the profile-pick branch uses
+                # (queue_tag = profile_key). The raw ``doctor.specialty`` was
+                # a per-surface fallback that forked the (day, doctor)
+                # identity whenever the stored specialty spelling drifted
+                # from the profile key (E-033 pin; the dental family is the
+                # documented live case). Desk keeps its approved source
+                # (service.queue_tag); nothing is merged or renumbered —
+                # rows with genuinely different tags stay separate.
+                queue_tag = qr_profile.key
                 defaults = {
                     "start_number": doctor.start_number_online,
                     "max_online_entries": doctor.max_online_per_day,
                     "cabinet_number": doctor.cabinet,
                 }
-                daily_queue = self.get_or_create_daily_queue(
+                tag_claim = _lock_and_resolve_tag_claim(
                     db,
                     day=day,
-                    specialist_id=doctor.id,
                     queue_tag=queue_tag,
-                    defaults=defaults,
+                    patient_id=patient_id,
+                    phone=phone,
+                    telegram_id=telegram_id,
+                    patient_name=patient_name,
                 )
+                if tag_claim is not None:
+                    claim_queue = tag_claim.daily_queue
+                    if (
+                        claim_queue.specialist_id != doctor.id
+                        or claim_queue.queue_resource_id is not None
+                    ):
+                        _raise_cross_owner_claim_conflict()
+                    daily_queue = claim_queue
+                    resolved_claim_entry = tag_claim.entry
+                else:
+                    daily_queue = self.get_or_create_daily_queue(
+                        db,
+                        day=day,
+                        specialist_id=doctor.id,
+                        queue_tag=queue_tag,
+                        defaults=defaults,
+                    )
                 if doctor.user:
                     specialist_name = doctor.user.full_name or doctor.user.username
                 specialist_name = specialist_name or f"Врач #{doctor.id}"
@@ -1327,6 +1569,24 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                     )
             if not daily_queue:
                 raise QueueNotFoundError("Очередь ещё не активна")
+            queue_tag = daily_queue.queue_tag
+            if queue_tag:
+                tag_claim = _lock_and_resolve_tag_claim(
+                    db,
+                    day=day,
+                    queue_tag=queue_tag,
+                    patient_id=patient_id,
+                    phone=phone,
+                    telegram_id=telegram_id,
+                    patient_name=patient_name,
+                )
+                if tag_claim is not None:
+                    if not _queue_owner_matches(
+                        tag_claim.daily_queue, daily_queue
+                    ):
+                        _raise_cross_owner_claim_conflict()
+                    daily_queue = tag_claim.daily_queue
+                    resolved_claim_entry = tag_claim.entry
 
             # RQ-09.c: the token names a Doctor.id — mirror the Path A/B
             # owner-eligibility predicate, but ONLY when the resolved
@@ -1359,25 +1619,29 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if not is_valid:
             raise QueueValidationError(validation_message)
 
-        time_allowed, time_message = self.check_queue_time_window(
-            day, daily_queue.opened_at
-        )
-        if not time_allowed:
-            raise QueueValidationError(time_message)
-
-        limits_ok, limits_message = self.check_queue_limits(db, daily_queue)
-        if not limits_ok:
-            raise QueueConflictError(limits_message)
-
-        existing_entry, duplicate_reason = self.check_uniqueness(
-            db,
-            daily_queue,
-            phone,
-            telegram_id,
-            source=source,
-            patient_id=patient_id,
-            patient_name=patient_name,
-        )
+        # The claim coordinator's resolved entry is THE duplicate for
+        # this patient (identity resolved under the (day, tag) lock:
+        # patient_id primary, the legacy-phone bridge name-narrowed —
+        # RQ-25.a.1 S-22). The time window and the limits deliberately
+        # run AFTER the duplicate return: an exact-token re-scan must
+        # hand the patient's existing ticket back even when the queue
+        # has since filled or closed (the QD-2E re-scan contract,
+        # pinned by test_exact_token_returns_same_owner_claim_without_
+        # capacity_rejection); a genuinely NEW entry still passes both
+        # gates below.
+        if resolved_claim_entry is not None:
+            existing_entry = resolved_claim_entry
+            duplicate_reason = "существующей активной записи"
+        else:
+            existing_entry, duplicate_reason = self.check_uniqueness(
+                db,
+                daily_queue,
+                phone,
+                telegram_id,
+                source=source,
+                patient_id=patient_id,
+                patient_name=patient_name,
+            )
 
         queue_length_before = (
             db.query(func.count(OnlineQueueEntry.id))
@@ -1404,6 +1668,16 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
                 "daily_queue": daily_queue,
                 "token": token_obj,
             }
+
+        time_allowed, time_message = self.check_queue_time_window(
+            day, daily_queue.opened_at
+        )
+        if not time_allowed:
+            raise QueueValidationError(time_message)
+
+        limits_ok, limits_message = self.check_queue_limits(db, daily_queue)
+        if not limits_ok:
+            raise QueueConflictError(limits_message)
 
         entry = self.create_queue_entry(
             db,

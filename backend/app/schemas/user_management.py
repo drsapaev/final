@@ -7,13 +7,11 @@ import os
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Literal, Union
+from typing import Annotated, Any, Literal
 
 from email_validator import EmailNotValidError
 from email_validator import validate_email as validate_email_address
-from typing_extensions import Annotated
-
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic.config import ConfigDict
 
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
@@ -744,9 +742,20 @@ class NonDoctorUserCreateRequest(_UserCreateCommon):
 # discriminator, so OpenAPI/generated TS distinguish the Doctor variant
 # (doctor_profile REQUIRED) from every non-Doctor create.
 UserCreateRequest = Annotated[
-    Union[DoctorUserCreateRequest, NonDoctorUserCreateRequest],
+    DoctorUserCreateRequest | NonDoctorUserCreateRequest,
     Field(discriminator="role"),
 ]
+
+
+class UserPhoneScopeConflictDetail(BaseModel):
+    """Body of the HTTP 409 phone-scope conflict on the user-management
+    surfaces (Phase 0, PR #3320 round 2): ``{"detail": ...}``.
+
+    Raised when a mutation would create a SECOND active verified
+    Patient-user on a phone that already backs another active patient
+    portal account (the login resolver is fail-closed at >1 candidates)."""
+
+    detail: str
 
 
 class UserUpdateRequest(BaseModel):

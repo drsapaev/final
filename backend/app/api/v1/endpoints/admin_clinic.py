@@ -258,6 +258,31 @@ def update_queue_settings(
         raise _admin_clinic_http_error(e) from e
 
 
+@router.get("/queue/settings/effective", response_model=dict[str, Any])
+def get_effective_queue_settings(
+    department_id: int | None = None,
+    tag: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """RQ-23.a (D-06 APPROVED, S-20): отчёт эффективных настроек очереди.
+
+    Read-only вычисление над существующими строками: каждый управляемый
+    параметр получает источник (клиника → отделение → владелец → снимок
+    дня), флаг «живое/не применяется» и время применения. Фронтенд
+    отображает результат и источник уровня (D-06); поведение очередей
+    отчёт не меняет.
+    """
+    try:
+        return crud_clinic.get_effective_queue_settings_report(
+            db, department_id=department_id, tag=tag
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _admin_clinic_http_error(e) from e
+
+
 @router.post("/queue/test", response_model=dict[str, Any])
 def test_queue_generation(
     request: QueueTestRequest,

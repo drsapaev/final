@@ -548,6 +548,352 @@ def update_queue_settings(
     return get_queue_settings(db)
 
 
+# ===================== ЭФФЕКТИВНЫЕ НАСТРОЙКИ ОЧЕРЕДЕЙ (RQ-23.a) =====================
+
+_CHAIN_ORDER = ["clinic", "department", "owner", "day_snapshot"]
+
+
+def _report_field(
+    field: str,
+    level: str,
+    value: Any,
+    *,
+    live: bool,
+    applied_when: list[str],
+    note: str,
+    runtime_consumers: list[str] | None = None,
+    snapshot_field: str | None = None,
+) -> dict[str, Any]:
+    entry: dict[str, Any] = {
+        "field": field,
+        "level": level,
+        "value": value,
+        "live": live,
+        "applied_when": applied_when,
+        "note": note,
+    }
+    if runtime_consumers is not None:
+        entry["runtime_consumers"] = runtime_consumers
+    if snapshot_field is not None:
+        entry["snapshot_field"] = snapshot_field
+    return entry
+
+
+def _dead_department_queue_settings(
+    settings_row: Any | None,
+) -> dict[str, dict[str, Any]]:
+    """Honest per-field report for the DepartmentQueueSettings block.
+
+    The queue runtime reads NONE of these fields today (verified RQ-23.a
+    discovery: the only live consumer of the block is ``queue_prefix`` in
+    the registrar department list). Visibility/recordability is governed
+    by ``Department.active`` + ``QueueProfile.is_active`` (RQ-13.a), day
+    limits come from the OWNER snapshot and clinic per-specialty caps.
+    The report flags each field explicitly so nothing stays SILENTLY
+    non-working (F-19 / RQ-23 result criterion).
+    """
+    if settings_row is None:
+        raw: dict[str, Any] = {}
+    else:
+        raw = {
+            "enabled": settings_row.enabled,
+            "queue_type": settings_row.queue_type,
+            "queue_prefix": settings_row.queue_prefix,
+            "max_daily_queue": settings_row.max_daily_queue,
+            "max_concurrent_queue": settings_row.max_concurrent_queue,
+            "avg_wait_time": settings_row.avg_wait_time,
+            "show_on_display": settings_row.show_on_display,
+            "auto_close_time": settings_row.auto_close_time,
+        }
+
+    prefix = raw.get("queue_prefix")
+    return {
+        "queue_prefix": {
+            "value": prefix,
+            "live": True,
+            "runtime_consumers": ["registrar_department_list_display"],
+            "note": (
+                "Единственное живое поле блока: префикс в списке отделений "
+                "регистратуры; при отсутствии строки — первая буква ключа."
+            ),
+        },
+        "enabled": {
+            "value": raw.get("enabled"),
+            "live": False,
+            "note": (
+                "Runtime не читает: видимость вкладок и направлений "
+                "управляется Department.active + QueueProfile.is_active "
+                "(RQ-13.a, D-06 деактивационная семантика)."
+            ),
+        },
+        "queue_type": {
+            "value": raw.get("queue_type"),
+            "live": False,
+            "note": (
+                "Runtime не читает: тип/состав дня определяется queue_tag "
+                "и владельцем строки дня, не этим полем."
+            ),
+        },
+        "max_daily_queue": {
+            "value": raw.get("max_daily_queue"),
+            "live": False,
+            "note": (
+                "Runtime не читает: дневная капа строки дня снимается с "
+                "владельца (Doctor/QueueResource.max_online_per_day) при "
+                "создании дня; онлайн-выдача ограничена клиникой "
+                "(max_per_day_<спец>). Подключение этого поля — "
+                "отдельное продуктовое решение (механика не определена)."
+            ),
+        },
+        "max_concurrent_queue": {
+            "value": raw.get("max_concurrent_queue"),
+            "live": False,
+            "note": "Runtime не читает: параллельные записи движком очереди не ограничиваются этим полем.",
+        },
+        "avg_wait_time": {
+            "value": raw.get("avg_wait_time"),
+            "live": False,
+            "note": "Runtime не читает: оценки ожидания строятся из позиций в строке, не из этого поля.",
+        },
+        "show_on_display": {
+            "value": raw.get("show_on_display"),
+            "live": False,
+            "note": "Runtime не читает: показ на табло определяется данными очереди, не этим полем.",
+        },
+        "auto_close_time": {
+            "value": raw.get("auto_close_time"),
+            "live": False,
+            "note": (
+                "Runtime не читает: тень одноимённого клиника-поля. "
+                "Движок автозакрытия работает на снимке дня "
+                "DailyQueue.online_end_time."
+            ),
+        },
+    }
+
+
+def get_effective_queue_settings_report(
+    db: Session,
+    *,
+    department_id: int | None = None,
+    tag: str | None = None,
+) -> dict[str, Any]:
+    """RQ-23.a (D-06 APPROVED, E-039; S-20): effective settings REPORT.
+
+    Pure read-model computation over EXISTING rows (owner decision:
+    «SSOT-функция — чистое вычисление над существующими строками»). It
+    attributes a source level to every managed setting, reuses the
+    RQ-13.b SSOT helper ``effective_day_start_number`` for start-number
+    values (anti-drift), flags fields the runtime never reads, and
+    reports today's frozen day snapshots (D-06: активная очередь не
+    переписывается задним числом). No writes, no behavior change.
+    """
+    from app.models.department import Department, DepartmentQueueSettings
+    from app.models.online_queue import DailyQueue, QueueResource
+
+    clinic = get_queue_settings(db)
+    today = clinic_today(db)
+
+    tag_key = tag or "default"
+
+    fields: list[dict[str, Any]] = [
+        _report_field(
+            "timezone",
+            "clinic",
+            clinic.get("timezone", "Asia/Tashkent"),
+            live=True,
+            applied_when=["immediate"],
+            runtime_consumers=["clinic_today_day_boundary"],
+            note=(
+                "Time SSOT (#3142): календарный день клиники и границы "
+                "дня следуют этой таймзоне; host-дата не используется."
+            ),
+        ),
+        _report_field(
+            "queue_start_hour",
+            "clinic",
+            clinic.get("queue_start_hour", 7),
+            live=True,
+            applied_when=["immediate", "day_creation_snapshot"],
+            runtime_consumers=["online_entry_gate", "day_creation_snapshot"],
+            snapshot_field="DailyQueue.online_start_time",
+            note=(
+                "Гейт онлайн-записи до стартового часа — живое чтение; "
+                "одновременно снимается в строку дня при создании. "
+                "Активный день продолжает работать на снимке (D-06: "
+                "новые настройки применяются со следующего дня/строки)."
+            ),
+        ),
+        _report_field(
+            "auto_close_time",
+            "clinic",
+            clinic.get("auto_close_time", "09:00"),
+            live=False,
+            applied_when=[],
+            runtime_consumers=["display_only"],
+            note=(
+                "Движок автозакрытия читает СНИМОК дня "
+                "DailyQueue.online_end_time, а не это поле; "
+                "online_end_time фиксируется при создании дня из ключа "
+                "queue_end_hour, который не персистится и не читается "
+                "(жёсткий дефолт 9). Значение отображается, но на "
+                "закрытие не влияет — F-19 зафиксирован отчётом, "
+                "переподключение требует отдельного решения."
+            ),
+        ),
+        _report_field(
+            "start_numbers",
+            "clinic",
+            clinic.get("start_numbers", {}),
+            live=True,
+            applied_when=["day_creation_snapshot"],
+            runtime_consumers=["effective_day_start_number"],
+            snapshot_field="DailyQueue.start_number",
+            note=(
+                "Цепочка D-06 для НОВОГО дня: владелец "
+                "(start_number_online > 1) → клиника "
+                "(start_numbers[tag] → SPECIALTY_START_NUMBERS[tag] → 1); "
+                "ресурсная ось (QD-2C) — значение реестра безусловно. "
+                "Отделение-уровень стартового номера: у "
+                "DepartmentQueueSettings поля нет — уровень фактически "
+                "отсутствует (отчёт фиксирует это честно)."
+            ),
+        ),
+        _report_field(
+            "max_per_day",
+            "clinic",
+            clinic.get("max_per_day", {}),
+            live=True,
+            applied_when=["immediate"],
+            runtime_consumers=["online_issuance_cap"],
+            note=(
+                "Лимит онлайн-выдачи по специальности на живое чтение "
+                "(дефолт 15); отдельный сервисный путь использует env "
+                "ONLINE_MAX_PER_DAY. Дневная капа строки дня — снимок "
+                "владельца (max_online_per_day) при создании дня."
+            ),
+        ),
+    ]
+
+    report: dict[str, Any] = {
+        "timezone": clinic.get("timezone", "Asia/Tashkent"),
+        "clinic_today": today.isoformat(),
+        "chain_order": _CHAIN_ORDER,
+        "clinic_settings": clinic,
+        "fields": fields,
+        "department": None,
+        "resources": [],
+        "active_day": [],
+    }
+
+    # --- Owner axis (department scope): the chain value per doctor ----
+    dept_doctor_ids: list[int] = []
+    if department_id is not None:
+        dept = (
+            db.query(Department).filter(Department.id == department_id).first()
+        )
+        if dept is None:
+            raise ValueError(f"department {department_id} not found")
+
+        # Lazy import: the SSOT helper lives in the queue-domain crud and
+        # lazily imports get_queue_settings from THIS module — a module
+        # level import would be circular.
+        from app.crud.queue_resource_routing import effective_day_start_number
+
+        doctors = (
+            db.query(Doctor).filter(Doctor.department_id == department_id).all()
+        )
+        dept_doctor_ids = [int(d.id) for d in doctors]
+
+        owner_overrides = []
+        for d in doctors:
+            effective = effective_day_start_number(
+                db, doctor=d, queue_tag=tag
+            )
+            owner_overrides.append(
+                {
+                    "doctor_id": int(d.id),
+                    "specialty": d.specialty,
+                    "active": bool(d.active),
+                    "start_number_online": int(d.start_number_online or 1),
+                    "max_online_per_day": int(d.max_online_per_day or 0),
+                    "effective_start_number": int(effective),
+                    "source": "owner" if int(d.start_number_online or 0) > 1 else "clinic",
+                }
+            )
+
+        settings_row = (
+            db.query(DepartmentQueueSettings)
+            .filter(DepartmentQueueSettings.department_id == department_id)
+            .first()
+        )
+        report["department"] = {
+            "department_id": int(dept.id),
+            "key": dept.key,
+            "name_ru": dept.name_ru,
+            "active": bool(dept.active),
+            "queue_settings": _dead_department_queue_settings(settings_row),
+            "owner_overrides": owner_overrides,
+        }
+
+    # --- Resource axis (tag scope): registry value unconditional ------
+    if tag:
+        from app.crud.queue_resource_routing import effective_day_start_number
+
+        resources = (
+            db.query(QueueResource)
+            .filter(QueueResource.queue_tag == tag_key, QueueResource.active.is_(True))
+            .all()
+        )
+        report["resources"] = [
+            {
+                "queue_resource_id": int(r.id),
+                "code": r.code,
+                "display_name": r.display_name,
+                "start_number_online": int(r.start_number_online or 1),
+                "max_online_per_day": int(r.max_online_per_day or 0),
+                "effective_start_number": int(
+                    effective_day_start_number(db, resource=r, queue_tag=tag)
+                ),
+                "source": "registry",
+            }
+            for r in resources
+        ]
+
+    # --- Day-snapshot axis: today's frozen rows (D-06 boundary) -------
+    day_query = db.query(DailyQueue).filter(DailyQueue.day == today)
+    if department_id is not None:
+        # Doctor-axis scope: an empty department yields no day rows
+        # (never fall back to «all of today» — that would be misleading).
+        day_query = day_query.filter(DailyQueue.specialist_id.in_(dept_doctor_ids))
+    if tag:
+        day_query = day_query.filter(DailyQueue.queue_tag == tag_key)
+    for row in day_query.all():
+        report["active_day"].append(
+            {
+                "daily_queue_id": int(row.id),
+                "day": row.day.isoformat(),
+                "specialist_id": row.specialist_id,
+                "queue_resource_id": row.queue_resource_id,
+                "queue_tag": row.queue_tag,
+                "active": bool(row.active),
+                "opened_at": row.opened_at.isoformat() if row.opened_at else None,
+                "start_number": int(row.start_number or 1),
+                "online_start_time": row.online_start_time,
+                "online_end_time": row.online_end_time,
+                "max_online_entries": int(row.max_online_entries or 0),
+                "source": "day_snapshot",
+                "note": (
+                    "Снимок действующего дня заморожен при создании "
+                    "(время/лимиты/стартовый номер); живые настройки не "
+                    "переписывают его задним числом (D-06, E-039)."
+                ),
+            }
+        )
+
+    return report
+
+
 # === PR-1: Mobile API wrappers ===
 
 from datetime import date as _date  # noqa: E402

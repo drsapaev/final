@@ -30,6 +30,16 @@ from app.services.patient_validation import PatientValidationService
 logger = logging.getLogger(__name__)
 
 
+def duplicate_patient_error(code: str, message: str) -> HTTPException:
+    """Структурированная 400 для доменных дублей patients (E-054 leftover 3)."""
+    # detail={"code", "message"}: машиночитаемый код для потребителей
+    # (wizard/api-клиент/GraphQL распознают дубль по коду, а не по
+    # формулировкам русской строки); человекочитаемый текст сохранён в
+    # message — прежние str(detail)-паттерны и строковые матчеры продолжают
+    # работать. Коды: patient_phone_exists, patient_doc_exists.
+    return HTTPException(status_code=400, detail={"code": code, "message": message})
+
+
 class PatientReadAccessDenied(Exception):
     """Raised when a principal may not read the requested patient resource."""
 
@@ -240,9 +250,9 @@ class PatientService:
                 self.db, phone=patient_in.phone
             )
             if existing_patient:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Пациент с таким номером телефона уже существует",
+                raise duplicate_patient_error(
+                    "patient_phone_exists",
+                    "Пациент с таким номером телефона уже существует",
                 )
 
         if patient_in.doc_number:
@@ -252,9 +262,9 @@ class PatientService:
                 .first()
             )
             if existing_by_doc:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Пациент с таким номером документа уже зарегистрирован",
+                raise duplicate_patient_error(
+                    "patient_doc_exists",
+                    "Пациент с таким номером документа уже зарегистрирован",
                 )
 
         has_full_name = patient_in.full_name and patient_in.full_name.strip()
@@ -474,9 +484,9 @@ class PatientService:
                 self.db, phone=patient_in.phone
             )
             if existing_patient and existing_patient.id != patient_id:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Пациент с таким номером телефона уже существует",
+                raise duplicate_patient_error(
+                    "patient_phone_exists",
+                    "Пациент с таким номером телефона уже существует",
                 )
 
         # Codex round-15 P1: дубликат doc_number при обновлении -- тот же
@@ -490,9 +500,9 @@ class PatientService:
                 .first()
             )
             if existing_by_doc and existing_by_doc.id != patient_id:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Пациент с таким номером документа уже зарегистрирован",
+                raise duplicate_patient_error(
+                    "patient_doc_exists",
+                    "Пациент с таким номером документа уже зарегистрирован",
                 )
 
         # Codex round-10 P1: маскируем PHI в old-снапшоте (см. create;

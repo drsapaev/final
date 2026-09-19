@@ -2249,6 +2249,79 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/directions/{profile_key}/entry-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Поддерживаемые способы QR-входа направления (RQ-16.b/RQ-16.d)
+         * @description Read-only contract surface: explicitly enumerate the QR-entry
+         *     methods the server supports for the direction addressed by its
+         *     QR-visible profile key. ``permanent_address`` is dynamic per
+         *     direction since RQ-16.d (E-055 §8).
+         */
+        get: operations["get_direction_entry_methods_api_v1_queue_directions__profile_key__entry_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/admin/directions/{profile_key}/public-address/provision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Provision постоянного публичного адреса направления (RQ-16.d)
+         * @description Admin provision/enable of the permanent public address (E-055 §3):
+         *     the server generates the opaque code ONCE and persists it forever.
+         *     Idempotent — a re-provision returns the SAME address (created=False);
+         *     archive/reactivate cycles never regenerate (E-055 §7). Manual address
+         *     editing and rotation are out of scope (E-055 §6).
+         */
+        post: operations["provision_public_address_api_v1_queue_admin_directions__profile_key__public_address_provision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/public/{public_code}/start-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Начало короткоживущей сессии по постоянному адресу направления (RQ-16.d, анонимный путь)
+         * @description ONE canonical anonymous resolve/start operation (E-055 §9):
+         *
+         *     public_code -> registry -> QueueProfile -> visibility/eligibility ->
+         *     anonymous rate limit -> short-lived session -> the existing
+         *     QueueJoin session flow. No second join mechanism: every rule stays
+         *     in the canonical resolver, and the minted direction-scoped token is
+         *     bound to THIS direction for the session's whole short life.
+         */
+        post: operations["start_public_direction_session_api_v1_queue_public__public_code__start_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/admin/qr-tokens/generate": {
         parameters: {
             query?: never;
@@ -5276,6 +5349,32 @@ export type paths = {
          *     Используется на странице /queue/join для выбора специальности.
          */
         get: operations["get_queue_profiles_public_api_v1_queues_profiles_public_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queues/profiles/{profile_key}/impact-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Queue Profile Impact Preview
+         * @description RQ-12.b (D-02): server-side impact preview of what a lifecycle
+         *     action on this profile would touch.
+         *
+         *     Read-only: this endpoint never mutates anything and its report is
+         *     informational only — the delete endpoint re-verifies the same links
+         *     at execution time, so a stale preview cannot authorize destruction
+         *     (ACCEPTANCE S-10: "повторить со stale preview").
+         */
+        get: operations["get_queue_profile_impact_preview_api_v1_queues_profiles__profile_key__impact_preview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8820,6 +8919,32 @@ export type paths = {
          * @description Обновить настройки системы очередей
          */
         put: operations["update_queue_settings_api_v1_admin_queue_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/queue/settings/effective": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Effective Queue Settings
+         * @description RQ-23.a (D-06 APPROVED, S-20): отчёт эффективных настроек очереди.
+         *
+         *     Read-only вычисление над существующими строками: каждый управляемый
+         *     параметр получает источник (клиника → отделение → владелец → снимок
+         *     дня), флаг «живое/не применяется» и время применения. Фронтенд
+         *     отображает результат и источник уровня (D-06); поведение очередей
+         *     отчёт не меняет.
+         */
+        get: operations["get_effective_queue_settings_api_v1_admin_queue_settings_effective_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -14794,6 +14919,140 @@ export type paths = {
         get: operations["get_password_reset_statistics_api_v1_password_reset_statistics_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/request-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Patient Otp
+         * @description Отправить OTP для входа пациента. Ответ номер-нейтрален (anti-enum).
+         */
+        post: operations["request_patient_otp_api_v1_patient_access_request_otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/verify-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Patient Otp
+         * @description Проверить OTP -> одноразовый verification_grant (единый ответ при любой неудаче).
+         */
+        post: operations["verify_patient_otp_api_v1_patient_access_verify_otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Patient Login
+         * @description phone + verification_grant -> JWT канонического User(role=Patient).
+         *
+         *     Fail-closed: 0 или >1 активных verified Patient-пользователей на номер ->
+         *     единый generic 401 (endpoint не становится каталогом пациентов).
+         */
+        post: operations["patient_login_api_v1_patient_access_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/activate/request-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Activation Otp
+         * @description Отправить OTP для активации доступа.
+         *
+         *     OTP уходит ТОЛЬКО на номер карты, привязанный к токену при выпуске.
+         *     Ответ маскирует номер и не содержит PHI.
+         */
+        post: operations["request_activation_otp_api_v1_patient_access_activate_request_otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/activate/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Activation
+         * @description Токен + OTP -> каноническая сессия User(role=Patient).
+         *
+         *     Атомарно: User + UserProfile(phone, verified) + Patient.user_id в одной
+         *     транзакции (SELECT FOR UPDATE + один commit). Все отказы — единый
+         *     generic текст (anti-enum).
+         */
+        post: operations["confirm_activation_api_v1_patient_access_activate_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/activation-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Activation Token
+         * @description Выдать одноразовый токен активации портала для карты пациента.
+         *
+         *     Токен привязывается к (Patient.id, нормализованный phone) на момент
+         *     выдачи; действует 72 часа; перевыпуск отзывает предыдущий токен.
+         *     Открытый текст токена возвращается ОДИН раз и не попадает в аудит.
+         */
+        post: operations["issue_activation_token_api_v1_patients__patient_id__activation_token_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -25720,6 +25979,47 @@ export type components = {
              */
             provider?: string | null;
         };
+        /**
+         * DirectionEntryMethod
+         * @description The contract methods space (DIRECTION_CONTRACT.md §6.2).
+         * @enum {string}
+         */
+        DirectionEntryMethod: "session_qr" | "permanent_address" | "view_only";
+        /**
+         * DirectionEntryMethodSupport
+         * @description One method with its honest support flag for this direction.
+         */
+        DirectionEntryMethodSupport: {
+            method: components["schemas"]["DirectionEntryMethod"];
+            /** Supported */
+            supported: boolean;
+        };
+        /**
+         * DirectionEntryMethodsResponse
+         * @description Explicit entry-methods enumeration for one QR-visible direction.
+         */
+        DirectionEntryMethodsResponse: {
+            /**
+             * Direction Key
+             * @description Canonical QR-visible profile key (normalized)
+             */
+            direction_key: string;
+            /**
+             * Profile Id
+             * @description QueueProfile.id — a separate id space (D-01)
+             */
+            profile_id: number;
+            /**
+             * Title
+             * @description Public display title (title_ru preferred)
+             */
+            title: string;
+            /**
+             * Entry Methods
+             * @description The WHOLE methods space, always fully present: every contract method carries an honest supported flag; clients must not infer methods absent from this enumeration
+             */
+            entry_methods: components["schemas"]["DirectionEntryMethodSupport"][];
+        };
         /** DiscountCalculationRequest */
         DiscountCalculationRequest: {
             /** Patient Id */
@@ -28723,6 +29023,11 @@ export type components = {
              * @description Список ID специалистов (для общего QR)
              */
             specialist_ids?: number[] | null;
+            /**
+             * Specialist Entity Types
+             * @description Типы сущностей specialist_ids, выровненные по индексам ('doctor' | 'profile'); тип выбора передаётся явно (D-01), тип сущности не определяется по совпадению числового ID
+             */
+            specialist_entity_types?: string[] | null;
         };
         /**
          * JoinSessionCompleteResponse
@@ -31328,6 +31633,71 @@ export type components = {
              */
             created_at: string;
         };
+        /** PatientActivationConfirmRequest */
+        PatientActivationConfirmRequest: {
+            /** Activation Token */
+            activation_token: string;
+            /** Code */
+            code: string;
+        };
+        /** PatientActivationConfirmResponse */
+        PatientActivationConfirmResponse: {
+            /** Access Token */
+            access_token: string;
+            /** Token Type */
+            token_type: string;
+            user: components["schemas"]["PatientActivationSessionUser"];
+            /** Patient Id */
+            patient_id: number;
+        };
+        /**
+         * PatientActivationOtpRequest
+         * @description Токен активации — БЕЗ поля phone: OTP отправляется только на номер,
+         *     зафиксированный в карте при выпуске токена (identity contract v3).
+         */
+        PatientActivationOtpRequest: {
+            /** Activation Token */
+            activation_token: string;
+            /** Locale */
+            locale?: string | null;
+        };
+        /** PatientActivationOtpResponse */
+        PatientActivationOtpResponse: {
+            /** Success */
+            success: boolean;
+            /** Phone Masked */
+            phone_masked: string;
+            /** Expires In Minutes */
+            expires_in_minutes: number;
+            /** Resend After Seconds */
+            resend_after_seconds: number;
+        };
+        /** PatientActivationSessionUser */
+        PatientActivationSessionUser: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Email */
+            email: string | null;
+            /** Full Name */
+            full_name: string | null;
+            /** Role */
+            role: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Superuser */
+            is_superuser: boolean;
+        };
+        /** PatientActivationTokenResponse */
+        PatientActivationTokenResponse: {
+            /** Activation Token */
+            activation_token: string;
+            /** Expires In Hours */
+            expires_in_hours: number;
+            /** Phone Masked */
+            phone_masked: string;
+        };
         /** PatientBenefitCreate */
         PatientBenefitCreate: {
             /** Patient Id */
@@ -31390,6 +31760,13 @@ export type components = {
             aggregated: {
                 [key: string]: unknown;
             };
+        };
+        /** PatientLoginRequest */
+        PatientLoginRequest: {
+            /** Phone */
+            phone: string;
+            /** Verification Grant */
+            verification_grant: string;
         };
         /** PatientOnboardingAuthRequest */
         PatientOnboardingAuthRequest: {
@@ -31480,6 +31857,20 @@ export type components = {
             messageKey: string;
             /** Safenextaction */
             safeNextAction: string;
+        };
+        /** PatientOtpRequest */
+        PatientOtpRequest: {
+            /** Phone */
+            phone: string;
+            /** Locale */
+            locale?: string | null;
+        };
+        /** PatientOtpVerifyRequest */
+        PatientOtpVerifyRequest: {
+            /** Phone */
+            phone: string;
+            /** Code */
+            code: string;
         };
         /**
          * PatientProfileOut
@@ -33026,6 +33417,95 @@ export type components = {
         ProvidersResponse: {
             /** Providers */
             providers: components["schemas"]["ProviderInfo"][];
+        };
+        /**
+         * PublicAddressProvisionResponse
+         * @description Result of the Admin provision/enable of a permanent address.
+         */
+        PublicAddressProvisionResponse: {
+            /**
+             * Profile Id
+             * @description QueueProfile.id — a separate id space (D-01)
+             */
+            profile_id: number;
+            /**
+             * Direction Key
+             * @description Canonical profile key the address is bound to
+             */
+            direction_key: string;
+            /**
+             * Public Code
+             * @description Opaque random 12-char lowercase public code (E-055 §2) — a PUBLIC identifier, never a secret and never derived from the direction title or key
+             */
+            public_code: string;
+            /**
+             * Url Path
+             * @description The permanent frontend route: /q/<public_code>
+             */
+            url_path: string;
+            /**
+             * Created
+             * @description True when a NEW code was generated now; False when the direction already had its one active address (E-055 §3: generated ONCE, re-provision returns the SAME address)
+             */
+            created: boolean;
+            /**
+             * Provisioned At
+             * @description Address creation timestamp (ISO-8601)
+             */
+            provisioned_at?: string | null;
+        };
+        /**
+         * PublicDirectionAddressInfo
+         * @description The direction a permanent-address session is scoped to.
+         */
+        PublicDirectionAddressInfo: {
+            /**
+             * Profile Id
+             * @description QueueProfile.id — a separate id space (D-01)
+             */
+            profile_id: number;
+            /**
+             * Key
+             * @description Canonical direction key
+             */
+            key: string;
+            /**
+             * Title
+             * @description Public display title (title_ru preferred)
+             */
+            title: string;
+            /**
+             * Public Code
+             * @description The canonical lowercase public code of the address
+             */
+            public_code: string;
+        };
+        /**
+         * PublicDirectionStartResponse
+         * @description Short-lived session opened through the permanent public address.
+         *
+         *     The ``session_token`` drives the EXISTING QueueJoin flow
+         *     (``/queue/join/:token`` semantics preserved); the internal
+         *     direction-scoped QR token is deliberately NOT returned.
+         */
+        PublicDirectionStartResponse: {
+            /** Session Token */
+            session_token: string;
+            /** Expires At */
+            expires_at: string;
+            /**
+             * Permanent Address
+             * @description Always True on this surface (the address is permanent)
+             */
+            permanent_address: boolean;
+            direction: components["schemas"]["PublicDirectionAddressInfo"];
+            /**
+             * Queue Info
+             * @description The same token-info shape the session-QR flow consumes, with selectable_specialists narrowed to this direction's eligible owners (RQ-09.b eligibility contract)
+             */
+            queue_info: {
+                [key: string]: unknown;
+            };
         };
         /**
          * PushDeviceErrorDetail
@@ -37235,6 +37715,19 @@ export type components = {
             roles: string[];
             /** Groups */
             groups: string[];
+        };
+        /**
+         * UserPhoneScopeConflictDetail
+         * @description Body of the HTTP 409 phone-scope conflict on the user-management
+         *     surfaces (Phase 0, PR #3320 round 2): ``{"detail": ...}``.
+         *
+         *     Raised when a mutation would create a SECOND active verified
+         *     Patient-user on a phone that already backs another active patient
+         *     portal account (the login resolver is fail-closed at >1 candidates).
+         */
+        UserPhoneScopeConflictDetail: {
+            /** Detail */
+            detail: string;
         };
         /**
          * UserPreferencesRequest
@@ -42898,6 +43391,155 @@ export interface operations {
             };
         };
     };
+    get_direction_entry_methods_api_v1_queue_directions__profile_key__entry_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectionEntryMethodsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    provision_public_address_api_v1_queue_admin_directions__profile_key__public_address_provision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicAddressProvisionResponse"];
+                };
+            };
+            /** @description Зарезервированный ключ направления или исчерпаны попытки генерации */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Направление не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_public_direction_session_api_v1_queue_public__public_code__start_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                public_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicDirectionStartResponse"];
+                };
+            };
+            /** @description Честный отказ существующего сессионного контракта (окно записи и т.п.) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Анонимный отказ (S-15): направление недоступно — unknown/archived/hidden/deleted/retired неразличимы */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "detail": "Направление недоступно"
+                     *     }
+                     */
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limit превышен (анонимный путь) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     generate_qr_token_api_v1_queue_admin_qr_tokens_generate_post: {
         parameters: {
             query?: never;
@@ -48131,6 +48773,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    get_queue_profile_impact_preview_api_v1_queues_profiles__profile_key__impact_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -54075,6 +54750,40 @@ export interface operations {
                 "application/json": components["schemas"]["QueueSettingsUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_effective_queue_settings_api_v1_admin_queue_settings_effective_get: {
+        parameters: {
+            query?: {
+                department_id?: number | null;
+                tag?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -64509,6 +65218,208 @@ export interface operations {
             };
         };
     };
+    request_patient_otp_api_v1_patient_access_request_otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientOtpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_patient_otp_api_v1_patient_access_verify_otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientOtpVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_login_api_v1_patient_access_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_activation_otp_api_v1_patient_access_activate_request_otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientActivationOtpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientActivationOtpResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_activation_api_v1_patient_access_activate_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientActivationConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientActivationConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_activation_token_api_v1_patients__patient_id__activation_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientActivationTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     reorder_queue_api_v1_queue_reorder_reorder_put: {
         parameters: {
             query?: never;
@@ -71223,6 +72134,15 @@ export interface operations {
                     "application/json": components["schemas"]["UserResponse"];
                 };
             };
+            /** @description Номер телефона уже используется другим активным аккаунтом пациента портала (инвариант phone-scope Phase 0) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPhoneScopeConflictDetail"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71323,6 +72243,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__user_management__UserProfileResponse"];
+                };
+            };
+            /** @description Номер телефона уже используется другим активным аккаунтом пациента портала (инвариант phone-scope Phase 0) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPhoneScopeConflictDetail"];
                 };
             };
             /** @description Validation Error */
