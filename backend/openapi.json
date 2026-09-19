@@ -97196,7 +97196,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "QueueResourceUpdate",
-        "description": "§3.2: ordinary PATCH — `display_name`/`start_number_online`/\n`max_online_per_day`/`default_cabinet`; `active` — lifecycle-переход\nпод serialization-scope §3.1(б). `code`/`queue_tag` immutable\n(extra=\"forbid\" -> 422 на попытку)."
+        "description": "§3.2: ordinary PATCH — `display_name`/`start_number_online`/\n`max_online_per_day`/`default_cabinet`; `active` — lifecycle-переход\nпод serialization-scope §3.1(б). `code`/`queue_tag` immutable\n(extra=\"forbid\" -> 422 на попытку).\n\nNullable здесь только `default_cabinet` (единственная nullable-колонка\nв таблице). Explicit `null` для остальных полей — 422 (round-3\nowner-ревью P2): DB-колонки NOT NULL, и без этого пина explicit null\nпроходил Pydantic (`exclude_unset` сохранял его) и падал на\nconstraint violation уже в БД -> 500 вместо 422. Отличать explicit\nnull от unset позволяет `model_fields_set` — absent-поле в него не\nпопадает и остаётся «нет изменения»."
       },
       "QueueSettingsUpdate": {
         "properties": {
