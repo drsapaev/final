@@ -405,6 +405,21 @@ def require_roles(*roles: str) -> Callable[..., Any]:
     return _require_roles(*roles)
 
 
+def require_active_roles(*roles: str) -> Callable[..., Any]:
+    """
+    Dependency factory: роли + User.is_active (перенаправляет на SSOT).
+
+    Алиас для app.core.security.require_active_roles(). NURSE-V2 N2-2 review
+    P1 (PR #3333): require_roles() не проверяет is_active — деактивированная
+    привилегированная учётная запись с непросроченным JWT продолжает проходить
+    роль-гейт. Контрольные поверхности авторизационных примитивов (nurse
+    workplace assignments) должны закрываться по деактивации: 403.
+    """
+    from app.core.security import require_active_roles as _require_active_roles
+
+    return _require_active_roles(*roles)
+
+
 def get_current_user_from_request(request: Request) -> User | None:
     """Получить текущего пользователя из состояния запроса (для middleware)"""
     user_id = getattr(request.state, 'user_id', None)

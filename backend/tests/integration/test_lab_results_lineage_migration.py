@@ -166,7 +166,9 @@ def test_single_alembic_head(fresh_head_url):
     assert r.returncode == 0, r.stderr[-800:]
     head_lines = [line for line in r.stdout.splitlines() if "(head)" in line]
     assert len(head_lines) == 1, f"multi-head detected: {r.stdout!r}"
-    assert "0070_lab_results_lineage" in head_lines[0]
+    # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved to
+    # 0072; this file still proves 0070's own links via the graph pins below.
+    assert "0072_service_executions" in head_lines[0]
 
 
 @pytest.mark.integration

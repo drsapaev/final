@@ -572,6 +572,9 @@ def test_roles_enum_has_no_manager_member() -> None:
     assert not hasattr(Roles, "MANAGER")
     with _pytest.raises(ValueError):
         Roles("Manager")
+    # NURSE-V2 (owner design-GO 2026-09-19): the canonical 'Nurse'
+    # spelling is re-opened — it sits between the doctor spellings and
+    # Patient in the enum order.
     assert [r.value for r in Roles] == [
         "Admin",
         "Registrar",
@@ -581,6 +584,7 @@ def test_roles_enum_has_no_manager_member() -> None:
         "cardio",
         "derma",
         "dentist",
+        "Nurse",
         "Patient",
         "SuperAdmin",
     ]
@@ -752,7 +756,12 @@ def test_roles_catalog_rejects_retired_spelling(
     spelling the user-management write schema then 422s. RoleCreate rejects
     it at the schema boundary (case-insensitive), same freeze discipline as
     the user-management write vocabulary."""
-    for retired_name in ("Manager", "manager", "Receptionist", "Nurse", "nurse"):
+    # NURSE-V2 (owner design-GO 2026-09-19): 'Nurse' left the retired
+    # set — the catalog boundary no longer rejects the re-opened
+    # canonical spelling (creating a catalog row is legal product
+    # vocabulary now, though NOT an N2-2 requirement). Manager and
+    # Receptionist stay frozen.
+    for retired_name in ("Manager", "manager", "Receptionist", "receptionist"):
         response = client.post(
             "/api/v1/roles/",
             headers=admin_headers_fixture,
@@ -770,6 +779,24 @@ def test_roles_catalog_rejects_retired_spelling(
             response.status_code,
             response.text[:300],
         )
+
+    # the re-opened 'Nurse' spelling is NOT schema-rejected anymore
+    response = client.post(
+        "/api/v1/roles/",
+        headers=admin_headers_fixture,
+        json={
+            "name": "Nurse",
+            "display_name": "Nurse",
+            "description": "nurse-v2 re-open probe",
+            "level": 2,
+            "is_active": True,
+            "is_system": False,
+        },
+    )
+    assert response.status_code == 201, (
+        response.status_code,
+        response.text[:300],
+    )
 
 
 def test_roles_options_filter_retired_spelling(

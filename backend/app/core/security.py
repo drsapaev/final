@@ -270,6 +270,59 @@ def require_roles(*roles: Any):
     return _dep
 
 
+def require_active_roles(*roles: Any):
+    """
+    Dependency factory: SSOT role gate + User.is_active enforcement.
+
+    NURSE-V2 N2-2 review P1 (PR #3333): ``require_roles()`` authenticates the
+    JWT but does not enforce ``User.is_active`` — a deactivated privileged
+    account keeps its role-scoped access until the token expires (there is no
+    token-blacklist revoke in ``update_user()`` on ``is_active → false``).
+    Control planes that mint or revoke authorization primitives (nurse
+    workplace assignments) must fail closed on deactivation: this factory
+    composes the SSOT role check with ``app.api.deps.get_current_active_user``
+    (403 «Пользователь деактивирован» on ``is_active=False``) — the same
+    active-user semantics the rest of the API already exposes through
+    ``get_current_active_user``.
+
+    Использование:
+        @router.post("/admin/nurse-workplace-assignments")
+        def create(user=Depends(require_active_roles("Admin"))):
+            ...
+
+    Superuser bypass and 403 audit logging stay owned by the inner
+    ``require_roles`` gate; the active check applies to superusers too
+    (a deactivated superuser must not operate the control plane either).
+
+    NOTE: making ``require_roles()`` itself active-aware (834 endpoint call
+    sites) is deliberately NOT done here — that is a separate owner-gated
+    task; this factory is the in-scope closure for the NURSE-V2 control-plane
+    endpoints (and the pattern for N2-3 serving endpoints).
+    """
+    from fastapi import Depends
+
+    from app.api.deps import get_current_active_user
+    from app.models.user import User
+
+    role_gate = require_roles(*roles)
+
+    def _dep(
+        current_user: User = Depends(get_current_active_user),
+        _role_gated: User = Depends(role_gate),
+    ) -> User:
+        # get_current_active_user already raised 403 for deactivated
+        # accounts (before the role gate runs); the audit-logged role check
+        # has passed for every active account that reaches this line.
+        return current_user
+
+    # Codex R6 #3092 contract: publish the normalized roles exactly the way
+    # require_roles() does, so the idempotency middleware's replay-time RBAC
+    # evaluation is unchanged for endpoints gated by this factory.
+    _dep.required_roles = role_gate.required_roles
+
+    return _dep
+
+
 def check_permission(user: Any, permission: str) -> bool:
     """
     Проверить разрешение пользователя (SSOT).
