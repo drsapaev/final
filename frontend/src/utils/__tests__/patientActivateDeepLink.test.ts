@@ -43,6 +43,20 @@ describe('patientActivateDeepLink (Phase 0 follow-up)', () => {
     expect(window.location.hash).toBe('');
   });
 
+  it('strips the fragment on the trailing-slash activate route too', () => {
+    // Codex P1 (round 3): /patient/activate/ is served by the catch-all
+    // rewrite and accepted by React Router — the credential must still be
+    // stripped BEFORE telemetry init.
+    const token = 'd'.repeat(43);
+    window.history.replaceState(null, '', `/patient/activate/#token=${token}`);
+
+    extractPatientActivationFragment();
+
+    expect(takePatientActivationFragmentToken()).toBe(token);
+    expect(window.location.hash).toBe('');
+    expect(window.location.pathname).toBe('/patient/activate/');
+  });
+
   it('is a no-op on other routes even when a token-shaped fragment is present', () => {
     const token = 'c'.repeat(43);
     window.history.replaceState(null, '', `/some/page#token=${token}`);

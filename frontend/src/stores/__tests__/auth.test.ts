@@ -180,4 +180,40 @@ describe('auth store', () => {
       expect(JSON.parse(storage.auth_profile)).toEqual(patientProfile);
     });
   });
+
+  describe('expired principal kind marker (Phase 0 follow-up, Codex P1 round 3)', () => {
+    it('remembers an expired PATIENT principal and resets on the next login', async () => {
+      primeSessionStorage({
+        auth_token: 'jwt',
+        auth_profile: JSON.stringify({ id: 9, username: 'patient-9', role: 'Patient' }),
+      });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(true);
+
+      // A freshly installed session resets the marker.
+      auth.setToken('fresh-jwt');
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(false);
+    });
+
+    it('does not flag staff principals on clearToken', async () => {
+      primeSessionStorage({
+        auth_token: 'jwt',
+        auth_profile: JSON.stringify({ id: 2, username: 'registrar', role: 'Registrar' }),
+      });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(false);
+    });
+
+    it('flags nothing when the cleared session had no profile', async () => {
+      primeSessionStorage({ auth_token: 'jwt' });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(false);
+    });
+  });
 });

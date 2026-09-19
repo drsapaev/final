@@ -41,6 +41,30 @@ let sessionValidationPromise: Promise<AuthState> | null = null;
 let lastValidatedAt = 0;
 let lastValidatedToken: string | null = null;
 
+// Phase 0 follow-up (Codex P1, round 3): the patient panel route is SHARED
+// with support staff (Admin/Registrar/Doctor retain access for support /
+// debug purposes), so the ROUTE alone cannot identify the principal whose
+// session was just cleared. When a session dies we remember the dying
+// principal's kind: RouteAccessBoundary sends an expired PATIENT to
+// /patient/login (the phone/OTP entry point) while expired staff and
+// anonymous visitors keep /login. In-memory only, reset by the next
+// setToken() — never persisted anywhere.
+let expiredPrincipalWasPatient = false;
+
+function rememberExpiredPrincipalKind(): void {
+  const profile = getProfileFromStorage() as Record<string, unknown> | null;
+  expiredPrincipalWasPatient =
+    String(profile?.role ?? '').toLowerCase() === 'patient';
+}
+
+/**
+ * True when the most recently CLEARED session in this tab belonged to a
+ * Patient principal. Reset by any subsequent setToken() with a real token.
+ */
+export function getExpiredPrincipalWasPatient(): boolean {
+  return expiredPrincipalWasPatient;
+}
+
 function notify(): void {
   const state = getState();
   for (const s of subscribers) {
@@ -117,6 +141,12 @@ function clearProfileStorageOnly(): void {
 export function setToken(token: string | null): void {
   const previousToken = getToken();
 
+  // A freshly installed session invalidates the expired-principal marker
+  // (Phase 0 follow-up: see rememberExpiredPrincipalKind).
+  if (token) {
+    expiredPrincipalWasPatient = false;
+  }
+
   try {
     if (token === null || token === undefined) {
       sessionStorage.removeItem(TOKEN_KEY);
@@ -152,6 +182,11 @@ export function setToken(token: string | null): void {
  * Clear token & profile.
  */
 export function clearToken(): void {
+  // Phase 0 follow-up (Codex P1): identify WHOSE session is dying BEFORE the
+  // profile is wiped, so the route boundary can pick the correct login
+  // surface (patient vs staff).
+  rememberExpiredPrincipalKind();
+
   profileLoadPromise = null;
   sessionValidationPromise = null;
   lastValidatedAt = 0;
