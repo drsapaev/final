@@ -20,6 +20,18 @@ projection, и mobile app / EMR / statistics их не видят.
     - Идемпотентный: пропускает instances у которых уже есть LabResult
     - Логирование каждого instance
     - Transaction per instance (atomic, isolated)
+
+C-контракт (решение владельца, см.
+.ai-factory/plans/lab-results-lineage-decision.md):
+    - Проекция создаётся ТОЛЬКО для заказа без единой строки LabResult И
+      с единственным финализированным бланком.
+    - Заказы с несколькими FINALIZED/PRINTED instances
+      (ambiguous_shared_order) НЕ обрабатываются автоматически: их
+      происхождение недоказуемо, требуется read-only census и решение
+      владельца.
+    - Значения ревизий и сиблинговых бланков НЕ попадают в legacy до
+      трека A+ — это утверждённое временное ограничение, поэтому фраза
+      про "mobile app видит все исторические отчёты" после #3235/C неверна.
 """
 from __future__ import annotations
 
@@ -113,36 +125,62 @@ def main() -> int:
             print("Нечего backfill'ить.")
             return 0
 
-        # 2. Разделить на needing backfill и already has projection
+        # 2. Классификация по заказам (C-контракт, см.
+        # .ai-factory/plans/lab-results-lineage-decision.md)
+        orders_finalized: dict = {}
+        for r in instances:
+            if r.order_id is not None:
+                orders_finalized[r.order_id] = orders_finalized.get(r.order_id, 0) + 1
+        shared_orders = {oid for oid, n in orders_finalized.items() if n > 1}
+
         needing_backfill = [r for r in instances if r.existing_lab_results_count == 0]
         already_has = [r for r in instances if r.existing_lab_results_count > 0]
+        ambiguous = [r for r in needing_backfill if r.order_id in shared_orders]
+        eligible = [r for r in needing_backfill if r.order_id not in shared_orders]
 
         print(f"  Уже имеют LabResult projection: {len(already_has)}")
-        print(f"  Нуждается в backfill:           {len(needing_backfill)}")
+        print(f"  Нуждаются в backfill:           {len(needing_backfill)}")
+        print(f"    из них eligible (одиночный бланк заказа): {len(eligible)}")
+        print(f"    из них ambiguous_shared_order:            {len(ambiguous)}")
+
+        if ambiguous:
+            print(
+                "\n[!] ambiguous_shared_order — заказы с несколькими "
+                "финализированными бланками (авто-выбор запрещён C-контрактом):"
+            )
+            by_order: dict = {}
+            for r in ambiguous:
+                by_order.setdefault(r.order_id, []).append(r)
+            for oid in sorted(by_order):
+                ids = ", ".join(f"#{r.instance_id}" for r in by_order[oid])
+                print(f"    order #{oid}: instances {ids}")
 
         if not needing_backfill:
-            print("\n✅ Все instances уже имеют LabResult projection. Backfill не нужен.")
+            print("\n[OK] Все instances уже имеют LabResult projection. Backfill не нужен.")
             return 0
 
         # 3. Показать детали для dry-run
         if dry_run:
             print(f"\n{'─' * 70}")
-            print("DRY RUN — будут созданы LabResult projection для:")
+            print("DRY RUN — будут созданы LabResult projection только для eligible:")
             print(f"{'─' * 70}")
             print(f"  {'Instance #':<12}  {'Order #':<10}  {'Patient #':<12}  {'Status':<12}  {'Finalized':<20}")
             print(f"  {'-'*12}  {'-'*10}  {'-'*12}  {'-'*12}  {'-'*20}")
-            for r in needing_backfill[:20]:
+            for r in eligible[:20]:
                 finalized = str(r.finalized_at)[:19] if r.finalized_at else "—"
                 print(f"  {r.instance_id:<12}  {r.order_id or '—':<10}  {r.patient_id:<12}  {r.status:<12}  {finalized:<20}")
-            if len(needing_backfill) > 20:
-                print(f"  ... и ещё {len(needing_backfill) - 20}")
-            print(f"\nДля применения запустите с --apply:")
-            print(f"  DATABASE_URL=... python backfill_lab_results.py --apply")
+            if len(eligible) > 20:
+                print(f"  ... и ещё {len(eligible) - 20}")
+            print("\nДля применения запустите с --apply:")
+            print("  DATABASE_URL=... python backfill_lab_results.py --apply")
             return 0
 
-        # 4. APPLY: выполнить backfill через LabReportingService
+        # 4. APPLY: обрабатываем ТОЛЬКО eligible; ambiguous не трогаем
         print(f"\n{'─' * 70}")
-        print(f"Применение backfill для {len(needing_backfill)} instances...")
+        print(
+            f"Применение backfill для {len(eligible)} eligible instances "
+            f"(ambiguous_shared_order пропущены: {len(ambiguous)})..."
+        )
         print(f"{'─' * 70}")
 
         try:
@@ -153,50 +191,68 @@ def main() -> int:
             return 1
 
         service = LabReportingService(db)
-        success_count = 0
+        projected_count = 0
+        skipped_existing_count = 0
         error_count = 0
-        skipped_count = 0
 
-        for r in needing_backfill:
+        def _rows_for(order_id):
+            return db.execute(text(
+                "SELECT COUNT(*) FROM lab_results WHERE order_id = :order_id"
+            ), {"order_id": order_id}).scalar()
+
+        for r in eligible:
             instance_id = r.instance_id
             try:
                 instance = service.get_instance(instance_id)
                 if not instance.order_id:
-                    print(f"  ⚠️  Instance #{instance_id}: нет order_id, skip")
-                    skipped_count += 1
+                    print(f"  [!] Instance #{instance_id}: нет order_id, skip")
+                    skipped_existing_count += 1
                     continue
 
+                rows_before = _rows_for(instance.order_id)
                 field_map = service._field_map(instance.template_version)
                 service._sync_legacy_lab_results(instance, field_map)
                 db.commit()
+                rows_after = _rows_for(instance.order_id)
+                created = rows_after - rows_before
 
-                # Подсчитать созданные LabResult
-                created = db.execute(text(
-                    "SELECT COUNT(*) FROM lab_results WHERE order_id = :order_id"
-                ), {"order_id": instance.order_id}).scalar()
-
-                print(f"  ✅ Instance #{instance_id}: создано {created} LabResult projection")
-                success_count += 1
+                if created > 0:
+                    print(f"  [OK] Instance #{instance_id}: создано {created} LabResult projection")
+                    projected_count += 1
+                else:
+                    # C-guard пропустил заказ (строки уже есть) — это НЕ успех.
+                    print(
+                        f"  [--] Instance #{instance_id}: projection пропущена "
+                        f"C-guard'ом (у заказа уже есть строки) [skipped_existing]"
+                    )
+                    skipped_existing_count += 1
             except Exception as exc:
                 db.rollback()
-                print(f"  ❌ Instance #{instance_id}: {exc}")
+                print(f"  [X] Instance #{instance_id}: {exc}")
                 error_count += 1
 
         print(f"\n{'=' * 70}")
-        print(f"BACKFILL ЗАВЕРШЁН")
+        print("BACKFILL ЗАВЕРШЁН")
         print(f"{'=' * 70}")
-        print(f"  Успешно:  {success_count}")
-        print(f"  Ошибки:   {error_count}")
-        print(f"  Пропущено: {skipped_count}")
-        print(f"  Всего:    {len(needing_backfill)}")
+        print(f"  projected:              {projected_count}")
+        print(f"  skipped_existing:       {skipped_existing_count}")
+        print(f"  ambiguous_shared_order: {len(ambiguous)} (не обрабатывались)")
+        print(f"  failed:                 {error_count}")
+        print(f"  Всего FINALIZED/PRINTED: {len(instances)}")
 
         if error_count > 0:
-            print(f"\n⚠️  {error_count} instances с ошибками — проверьте логи выше.")
+            print(f"\n[!] {error_count} instances с ошибками — проверьте логи выше.")
             return 1
 
-        print(f"\n✅ Все {success_count} instances обработаны. Mobile app теперь видит все исторические отчёты.")
+        print(
+            "\n[i] C-контракт (.ai-factory/plans/lab-results-lineage-decision.md): "
+            "создание проекции ограничено заказами без строк и с единственным "
+            "финализированным бланком. Значения ревизий и сиблинговых бланков НЕ "
+            "видны в legacy до трека A+; ambiguous заказы требуют read-only census "
+            "и решения владельца. Backfill НЕ восстанавливает полноту исторической "
+            "проекции."
+        )
         return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

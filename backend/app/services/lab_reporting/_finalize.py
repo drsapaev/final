@@ -159,6 +159,19 @@ class FinalizeMixin(LabReportingServiceMixinBase):
             )
             return
 
+        # C-track guard (P1 review fix): сериализация проекции на общем
+        # LabOrder. Без блокировки COUNT→INSERT позволял двум параллельным
+        # финализациям сиблинговых бланков (один order) обоим увидеть ноль
+        # строк и создать конфликтующую пару (например две glucose) в
+        # PostgreSQL. FOR UPDATE держится до коммита окружающего finalize;
+        # count перечитывается ПОСЛЕ получения блокировки (read committed
+        # видит строки победителя). SQLite игнорирует FOR UPDATE (глобально
+        # сериализует запись); семантика доказывается двухсоединечным
+        # PostgreSQL-тестом (tests/integration/test_lab_projection_pg_concurrency.py).
+        self.db.query(LabOrder).filter(
+            LabOrder.id == instance.order_id
+        ).with_for_update().first()
+
         # C-track guard: наличие любых строк этого order означает, что их
         # происхождение недоказуемо на текущей схеме (нет lineage-полей).
         # Перезапись запрещена решением владельца; создание строк разрешено
