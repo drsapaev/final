@@ -8,6 +8,7 @@ from app.core.pii_masker import mask_identifier  # PR-31: mask usernames in logs
 from app.core.roles import is_login_blocked_role
 from app.services.auth_svc._base import *  # noqa: F401, F403
 from app.services.auth_svc._base import AuthenticationServiceMixinBase
+from app.services.auth_svc._login_profiling import LoginPhaseTimer
 
 
 class TokensMixin(AuthenticationServiceMixinBase):
@@ -119,15 +120,18 @@ class TokensMixin(AuthenticationServiceMixinBase):
         user_agent: str = None,
     ) -> tuple[User | None, str]:
         """Аутентифицирует пользователя"""
+        timer = LoginPhaseTimer()
         try:
             logger.debug("authenticate_user called with username=%s", mask_identifier(username))
 
             # Ищем пользователя по username или email
+            timer.mark("user_lookup")
             user = (
                 db.query(User)
                 .filter(or_(User.username == username, User.email == username))
                 .first()
             )
+            timer.mark("user_lookup_done")
 
             if not user:
                 logger.debug("User not found for username=%s", mask_identifier(username))
@@ -173,8 +177,10 @@ class TokensMixin(AuthenticationServiceMixinBase):
                 )
                 return None, "Аккаунт технический, вход запрещён"
 
+            timer.mark("pre_verify")
             logger.debug("Verifying password...")
             password_valid = verify_password(password, user.hashed_password)
+            timer.mark("password_verify")
             logger.debug("Password verification result: %s", password_valid)
 
             if not password_valid:
@@ -188,8 +194,10 @@ class TokensMixin(AuthenticationServiceMixinBase):
                     False,
                     "invalid_password",
                 )
+                timer.report(mask_identifier(username))
                 return None, "Неверный пароль"
 
+            timer.mark("pre_lockout")
             # Проверяем блокировку
             if self._is_user_locked(db, user.id):
                 logger.debug("User is locked")
@@ -203,16 +211,20 @@ class TokensMixin(AuthenticationServiceMixinBase):
 
             # Успешный вход
             logger.debug("Authentication successful")
+            timer.mark("pre_audit")
             self._log_login_attempt(
                 db, user.id, username, ip_address, user_agent, True, None
             )
             self._log_user_activity(
                 db, user.id, "login", "Успешный вход в систему", ip_address, user_agent
             )
+            timer.mark("audit_writes")
+            timer.report(mask_identifier(username))
 
             return user, "Успешная аутентификация"
 
         except Exception as e:
+            timer.report(mask_identifier(username))
             logger.debug("Exception in authenticate_user: %s", e, exc_info=True)
             logger.error("Error authenticating user: %s", e, exc_info=True)
             return None, "Ошибка аутентификации"
@@ -241,7 +253,13 @@ class TokensMixin(AuthenticationServiceMixinBase):
             message,
         )
 
+        # Post-auth phase timer (continues the login latency story from
+        # authenticate_user's own profile line).
+        timer = LoginPhaseTimer()
+        timer.mark("auth_complete")
+
         if not user:
+            timer.report(mask_identifier(username))
             logger.debug("Authentication failed, returning error")
             return {"success": False, "message": message, "user": None, "tokens": None}
 
@@ -267,6 +285,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
         # двухстадийная аутентификация: пароль уже верен, поэтому выдаём
         # строго ограниченный одноразовый enrollment-токен (сервер-сайд,
         # НЕ JWT), который принимают ТОЛЬКО /2fa/setup и /2fa/verify-setup.
+        timer.mark("twofa_check")
         if is_critical_role and not has_2fa_enabled:
             enrollment_token = secrets.token_urlsafe(32)
             db.add(
@@ -344,8 +363,10 @@ class TokensMixin(AuthenticationServiceMixinBase):
         # M4-P0-3: Session fixation protection — revoke all existing sessions
         # before creating a new one. Prevents stolen sessions from remaining
         # valid after a fresh login.
+        timer.mark("pre_revoke")
         if getattr(settings, "REVOKE_SESSIONS_ON_NEW_LOGIN", True):
             self._revoke_all_user_sessions(db, user.id, reason="new_login")
+        timer.mark("sessions_revoked")
 
         jti = str(uuid.uuid4())
         access_token = self.create_access_token(
@@ -370,6 +391,8 @@ class TokensMixin(AuthenticationServiceMixinBase):
         )
         db.add(refresh_token_obj)
         db.commit()
+        timer.mark("tokens_issued")
+        timer.report(mask_identifier(username))
 
         return {
             "success": True,
