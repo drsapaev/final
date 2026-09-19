@@ -526,73 +526,28 @@ async def batch_update_services(
 
     Позволяет изменить одинаковые поля у группы услуг.
     Например: изменить цену, активность, категорию и т.д.
+
+    RQ-17 round-2 (P1-1): batch — равноправный writer serialization-scope
+    §3.1 (не прямой setattr-обход): row-locks sorted по id + owner-config
+    -локи всех affected-тегов (sorted) + пост-валидация инварианта каждого
+    тега до single commit. Атомарно: нарушение инварианта -> 409, при
+    котором ни одна услуга batch не изменена.
     """
-    updated_services = []
-    failed_services = []
-    audit_service = ServiceAuditService(db)
-
-    for service_id in request.service_ids:
-        try:
-            service = db.query(Service).filter(Service.id == service_id).first()
-            if not service:
-                failed_services.append({
-                    "service_id": service_id,
-                    "error": "Услуга не найдена"
-                })
-                continue
-
-            # Snapshot old state for audit
-            old_service_snapshot = Service(
-                id=service.id,
-                code=service.code,
-                service_code=service.service_code,
-                name=service.name,
-                category_id=service.category_id,
-                category_code=service.category_code,
-                price=service.price,
-                currency=service.currency,
-                duration_minutes=service.duration_minutes,
-                doctor_id=service.doctor_id,
-                department_key=service.department_key,
-                queue_tag=service.queue_tag,
-                requires_doctor=service.requires_doctor,
-                is_consultation=service.is_consultation,
-                allow_doctor_price_override=service.allow_doctor_price_override,
-                active=service.active,
-            )
-
-            # Apply updates
-            for field, value in request.updates.items():
-                if hasattr(service, field):
-                    setattr(service, field, value)
-
-            db.add(service)
-            db.flush()  # Flush to catch any DB errors before commit
-
-            # Log audit
-            try:
-                audit_service.log_service_update(
-                    service_id=service.id,
-                    old_service=old_service_snapshot,
-                    new_service=service,
-                    user_id=None,
-                    comment=f"Batch update: {request.comment}" if request.comment else "Batch update",
-                )
-            except Exception as e:
-                logger.warning(f"Failed to log batch audit for service {service_id}: {e}")
-
-            updated_services.append(service_id)
-
-        except Exception as e:
-            logger.error(f"Failed to update service {service_id}: {e}")
-            failed_services.append({
-                "service_id": service_id,
-                "error": str(e)
-            })
-
-    # Commit all changes
-    if updated_services:
-        db.commit()
+    try:
+        updated_services, failed_services = ServicesApiService(
+            db
+        ).batch_update_services(
+            service_ids=request.service_ids,
+            updates=request.updates,
+            comment=request.comment,
+        )
+    except OwnerInvariantViolation as exc:
+        # RQ-17 §3.1: batch-мутация owner-sensitive полей
+        # (active/requires_doctor/queue_tag) при живой RESOURCE_SURFACE
+        # -> атомарный 409, batch не применён
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return ServiceBatchUpdateResponse(
         updated_count=len(updated_services),
