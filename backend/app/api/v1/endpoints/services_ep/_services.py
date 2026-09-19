@@ -528,10 +528,10 @@ async def batch_update_services(
     Например: изменить цену, активность, категорию и т.д.
 
     RQ-17 round-2 (P1-1): batch — равноправный writer serialization-scope
-    §3.1 (не прямой setattr-обход): row-locks sorted по id + owner-config
-    -локи всех affected-тегов (sorted) + пост-валидация инварианта каждого
-    тега до single commit. Атомарно: нарушение инварианта -> 409, при
-    котором ни одна услуга batch не изменена.
+    §3.1 (не прямой setattr-обход): row-locks sorted по id,
+    owner-config-локи всех affected-тегов (sorted) и пост-валидация
+    инварианта каждого тега до single commit. Атомарно: нарушение
+    инварианта -> 409, при котором ни одна услуга batch не изменена.
     """
     try:
         updated_services, failed_services = ServicesApiService(
