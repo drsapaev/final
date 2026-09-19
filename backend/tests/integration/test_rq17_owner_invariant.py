@@ -1306,7 +1306,13 @@ def test_pin17_create_duplicate_code_or_tag_409(
         )
     assert exc_info.value.status_code == 409
     assert "code" in exc_info.value.detail
-    assert db_session.query(QueueResource).count() == 1
+    # изоляция от общего CI-харнесса: считаем только СВОИ теги
+    own_rows = (
+        db_session.query(QueueResource)
+        .filter(QueueResource.queue_tag.in_(["duptag", "othertag"]))
+        .count()
+    )
+    assert own_rows == 1
 
 
 def test_pin18_patch_rereads_row_under_serialization_scope(
@@ -1523,8 +1529,18 @@ def test_pin21_batch_audit_rows_share_single_commit_transaction(
     calls = []
 
     def spy(self, *, commit=True, **kwargs):
-        calls.append({"commit": commit, "in_txn": self.db.in_transaction()})
-        return original(self, commit=commit, **kwargs)
+        row = original(self, commit=commit, **kwargs)
+        # PK audit-строки глобально уникален — в общем CI-харнессе
+        # (сессионная БД, rollback'и предыдущих тестов) только привязка
+        # к PK даёт изоляцию; service_id НЕ уникален между тестами
+        calls.append(
+            {
+                "commit": commit,
+                "in_txn": self.db.in_transaction(),
+                "audit_id": row.id,
+            }
+        )
+        return row
 
     monkeypatch.setattr(ServiceAuditService, "log_service_change", spy)
 
@@ -1534,25 +1550,20 @@ def test_pin21_batch_audit_rows_share_single_commit_transaction(
         comment="single-commit boundary pin",
     )
 
-    assert calls, "audit rows must be written for every batch member"
+    assert len(calls) == 1, calls  # один service в batch — одна audit-строка
     assert all(call["commit"] is False for call in calls), calls
     # каждая audit-строка создавалась в ОТКРЫТОЙ транзакции batch'а
     # (legacy-поведение: после внутреннего commit первого audit-вызова
     # последующие вызовы видели бы in_txn=False)
     assert all(call["in_txn"] is True for call in calls), calls
 
-    # audit-строки закоммичены вместе с изменением
-    count = db_session.query(ServiceAuditLog).filter(
-        ServiceAuditLog.service_id == service.id
-    ).count()
-    assert count == 1
+    # audit-строка закоммичена вместе с изменением (по PK — изоляция
+    # от audit-следов других тестов общего харнесса)
     db_session.expire_all()
     assert db_session.get(Service, service.id).price == 777
-    audit_row = (
-        db_session.query(ServiceAuditLog)
-        .filter(ServiceAuditLog.service_id == service.id)
-        .one()
-    )
+    audit_row = db_session.get(ServiceAuditLog, calls[0]["audit_id"])
+    assert audit_row is not None, "audit row must be committed with the batch"
+    assert audit_row.service_id == service.id
     assert audit_row.comment == "Batch update: single-commit boundary pin"
     assert "price" in (audit_row.changes or {})
     assert not sa_inspect(audit_row).pending
