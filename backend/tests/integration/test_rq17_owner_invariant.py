@@ -567,7 +567,9 @@ def _pg_cleanup(admin_engine, engine, schema) -> None:
 
     engine.dispose()
     with admin_engine.begin() as connection:
-        connection.execute(DropSchema(schema))
+        # cascade=True: прецедент claim-concurrency; без него DROP падает
+        # DependentObjectsStillExist, пока пул не освободил все соединения
+        connection.execute(DropSchema(schema, cascade=True))
     admin_engine.dispose()
 
 

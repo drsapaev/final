@@ -2418,6 +2418,8 @@ const uzLatn = {
   },
   admin2: {
     // RQ-17 (E-065): экран-вход настройки направлений + реестр QueueResource
+    qrm_edit: 'Resursni tahrirlash',
+    // RQ-17 (E-065): экран-вход настройки направлений + реестр QueueResource
     qrm_col_actions: 'Amallar',
     // RQ-17 (E-065): экран-вход настройки направлений + реестр QueueResource
     sdx_title: 'Yo\'nalishlarni sozlash',

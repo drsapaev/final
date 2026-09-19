@@ -448,6 +448,7 @@ const QueueResourceManager = ({
                                                 size="sm"
                                                 onClick={() => openEdit(resource)}
                                                 disabled={saving}
+                                                aria-label={t('admin2.qrm_edit')}
                                             >
                                                 <Edit2 size={13} />
                                             </Button>
@@ -457,6 +458,7 @@ const QueueResourceManager = ({
                                                 onClick={() => void handleActivateToggle(resource)}
                                                 disabled={saving}
                                                 title={resource.active ? t('admin2.qrm_deactivate') : t('admin2.qrm_activate')}
+                                                aria-label={resource.active ? t('admin2.qrm_deactivate') : t('admin2.qrm_activate')}
                                                 data-testid={`qr-resource-toggle-${resource.id}`}
                                             >
                                                 {resource.active ? (

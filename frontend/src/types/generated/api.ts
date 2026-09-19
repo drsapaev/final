@@ -39074,6 +39074,40 @@ export type components = {
              */
             use_new_wizard: boolean;
         };
+        /**
+         * DepartmentCreate
+         * @description Схема для создания отделения
+         */
+        app__api__v1__endpoints__admin_departments___helpers__DepartmentCreate: {
+            /** Key */
+            key: string;
+            /** Name Ru */
+            name_ru: string;
+            /** Name Uz */
+            name_uz?: string | null;
+            /**
+             * Icon
+             * @default folder
+             */
+            icon: string | null;
+            /** Color */
+            color?: string | null;
+            /** Gradient */
+            gradient?: string | null;
+            /**
+             * Display Order
+             * @default 999
+             */
+            display_order: number | null;
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean | null;
+            /** Description */
+            description?: string | null;
+            integration?: components["schemas"]["DepartmentIntegrationOptions"] | null;
+        };
         /** PaymentResponse */
         app__api__v1__endpoints__billing__PaymentResponse: {
             /** Id */
@@ -39107,6 +39141,40 @@ export type components = {
              */
             created_at: string;
         };
+        /**
+         * PaymentResponse
+         * @description Ответ при создании/получении платежа
+         */
+        app__api__v1__endpoints__cashier___helpers__PaymentResponse: {
+            /** Id */
+            id: number;
+            /** Visit Id */
+            visit_id?: number | null;
+            /** Patient Id */
+            patient_id?: number | null;
+            /** Amount */
+            amount: string;
+            /** Method */
+            method: string;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Paid At */
+            paid_at?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** PriceOverrideApprovalRequest */
+        app__api__v1__endpoints__dental__PriceOverrideApprovalRequest: {
+            /** Action */
+            action: string;
+            /** Rejection Reason */
+            rejection_reason?: string | null;
+        };
         /** RoleResponse */
         app__api__v1__endpoints__group_permissions__RoleResponse: {
             /** Id */
@@ -39125,6 +39193,26 @@ export type components = {
             is_system: boolean;
             /** Permissions Count */
             permissions_count: number;
+        };
+        /**
+         * PasswordResetConfirmRequest
+         * @description Запрос на подтверждение сброса пароля
+         */
+        app__api__v1__endpoints__password_reset__PasswordResetConfirmRequest: {
+            /** Token */
+            token: string;
+            /** New Password */
+            new_password: string;
+        };
+        /**
+         * TelemetryResponse
+         * @description Ответ на telemetry
+         */
+        app__api__v1__endpoints__phrase_suggest__TelemetryResponse: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
         };
         /**
          * QRTokenResponse
@@ -39213,6 +39301,55 @@ export type components = {
             /** Entries */
             entries: components["schemas"]["QueueEntryResponse"][];
         };
+        /**
+         * QueueStatusResponse
+         * @description Статус очереди с лимитами
+         */
+        app__api__v1__endpoints__queue_limits__QueueStatusResponse: {
+            /** Doctor Id */
+            doctor_id: number;
+            /** Doctor Name */
+            doctor_name: string;
+            /** Specialty */
+            specialty: string;
+            /** Cabinet */
+            cabinet: string | null;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Current Entries */
+            current_entries: number;
+            /** Max Entries */
+            max_entries: number;
+            /** Limit Reached */
+            limit_reached: boolean;
+            /** Queue Opened */
+            queue_opened: boolean;
+            /** Online Available */
+            online_available: boolean;
+        };
+        /**
+         * NotificationStatsResponse
+         * @description Схема статистики уведомлений
+         */
+        app__api__v1__endpoints__registrar_notifications__NotificationStatsResponse: {
+            /** Total Sent */
+            total_sent: number;
+            /** Successful Deliveries */
+            successful_deliveries: number;
+            /** Failed Deliveries */
+            failed_deliveries: number;
+            /** Channels Stats */
+            channels_stats: {
+                [key: string]: number;
+            };
+            /** Recent Notifications */
+            recent_notifications: {
+                [key: string]: unknown;
+            }[];
+        };
         /** PriceOverrideApprovalRequest */
         app__api__v1__endpoints__registrar_wizard___cart__PriceOverrideApprovalRequest: {
             /** Override Id */
@@ -39272,6 +39409,12 @@ export type components = {
          * @enum {string}
          */
         app__models__discount_benefits__DiscountType: "percentage" | "fixed_amount" | "buy_x_get_y" | "loyalty_points" | "seasonal" | "referral";
+        /**
+         * DiscountType
+         * @description Типы скидок
+         * @enum {string}
+         */
+        app__models__dynamic_pricing__DiscountType: "percentage" | "fixed_amount" | "buy_x_get_y" | "tiered";
         /**
          * PasswordResetConfirmRequest
          * @description Схема для подтверждения сброса пароля
@@ -39341,203 +39484,6 @@ export type components = {
              */
             two_factor_enabled: boolean;
         };
-        /**
-         * DepartmentCreate
-         * @description Создание отделения
-         */
-        app__schemas__department__DepartmentCreate: {
-            /** Key */
-            key: string;
-            /** Name Ru */
-            name_ru: string;
-            /** Name Uz */
-            name_uz?: string | null;
-            /**
-             * Icon
-             * @default folder
-             */
-            icon: string | null;
-            /** Color */
-            color?: string | null;
-            /** Gradient */
-            gradient?: string | null;
-            /**
-             * Display Order
-             * @default 999
-             */
-            display_order: number;
-            /**
-             * Active
-             * @default true
-             */
-            active: boolean;
-            /** Description */
-            description?: string | null;
-        };
-        /** NotificationStatsResponse */
-        app__schemas__notification__NotificationStatsResponse: {
-            /** Total Sent */
-            total_sent: number;
-            /** Successful */
-            successful: number;
-            /** Failed */
-            failed: number;
-            /** Pending */
-            pending: number;
-            /** By Channel */
-            by_channel: {
-                [key: string]: number;
-            };
-            /** By Type */
-            by_type: {
-                [key: string]: number;
-            };
-            /** Recent Activity */
-            recent_activity: components["schemas"]["NotificationStatsItem"][];
-        };
-        /**
-         * DepartmentCreate
-         * @description Схема для создания отделения
-         */
-        app__api__v1__endpoints__admin_departments___helpers__DepartmentCreate: {
-            /** Key */
-            key: string;
-            /** Name Ru */
-            name_ru: string;
-            /** Name Uz */
-            name_uz?: string | null;
-            /**
-             * Icon
-             * @default folder
-             */
-            icon: string | null;
-            /** Color */
-            color?: string | null;
-            /** Gradient */
-            gradient?: string | null;
-            /**
-             * Display Order
-             * @default 999
-             */
-            display_order: number | null;
-            /**
-             * Active
-             * @default true
-             */
-            active: boolean | null;
-            /** Description */
-            description?: string | null;
-            integration?: components["schemas"]["DepartmentIntegrationOptions"] | null;
-        };
-        /**
-         * PaymentResponse
-         * @description Ответ при создании/получении платежа
-         */
-        app__api__v1__endpoints__cashier___helpers__PaymentResponse: {
-            /** Id */
-            id: number;
-            /** Visit Id */
-            visit_id?: number | null;
-            /** Patient Id */
-            patient_id?: number | null;
-            /** Amount */
-            amount: string;
-            /** Method */
-            method: string;
-            /** Status */
-            status: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Paid At */
-            paid_at?: string | null;
-            /** Note */
-            note?: string | null;
-        };
-        /** PriceOverrideApprovalRequest */
-        app__api__v1__endpoints__dental__PriceOverrideApprovalRequest: {
-            /** Action */
-            action: string;
-            /** Rejection Reason */
-            rejection_reason?: string | null;
-        };
-        /**
-         * PasswordResetConfirmRequest
-         * @description Запрос на подтверждение сброса пароля
-         */
-        app__api__v1__endpoints__password_reset__PasswordResetConfirmRequest: {
-            /** Token */
-            token: string;
-            /** New Password */
-            new_password: string;
-        };
-        /**
-         * TelemetryResponse
-         * @description Ответ на telemetry
-         */
-        app__api__v1__endpoints__phrase_suggest__TelemetryResponse: {
-            /** Success */
-            success: boolean;
-            /** Message */
-            message: string;
-        };
-        /**
-         * QueueStatusResponse
-         * @description Статус очереди с лимитами
-         */
-        app__api__v1__endpoints__queue_limits__QueueStatusResponse: {
-            /** Doctor Id */
-            doctor_id: number;
-            /** Doctor Name */
-            doctor_name: string;
-            /** Specialty */
-            specialty: string;
-            /** Cabinet */
-            cabinet: string | null;
-            /**
-             * Day
-             * Format: date
-             */
-            day: string;
-            /** Current Entries */
-            current_entries: number;
-            /** Max Entries */
-            max_entries: number;
-            /** Limit Reached */
-            limit_reached: boolean;
-            /** Queue Opened */
-            queue_opened: boolean;
-            /** Online Available */
-            online_available: boolean;
-        };
-        /**
-         * NotificationStatsResponse
-         * @description Схема статистики уведомлений
-         */
-        app__api__v1__endpoints__registrar_notifications__NotificationStatsResponse: {
-            /** Total Sent */
-            total_sent: number;
-            /** Successful Deliveries */
-            successful_deliveries: number;
-            /** Failed Deliveries */
-            failed_deliveries: number;
-            /** Channels Stats */
-            channels_stats: {
-                [key: string]: number;
-            };
-            /** Recent Notifications */
-            recent_notifications: {
-                [key: string]: unknown;
-            }[];
-        };
-        /**
-         * DiscountType
-         * @description Типы скидок
-         * @enum {string}
-         */
-        app__models__dynamic_pricing__DiscountType: "percentage" | "fixed_amount" | "buy_x_get_y" | "tiered";
         /** DoctorOut */
         app__schemas__clinic__DoctorOut: {
             /** User Id */
@@ -39623,6 +39569,60 @@ export type components = {
             id: number;
             /** Created At */
             created_at?: string | null;
+        };
+        /**
+         * DepartmentCreate
+         * @description Создание отделения
+         */
+        app__schemas__department__DepartmentCreate: {
+            /** Key */
+            key: string;
+            /** Name Ru */
+            name_ru: string;
+            /** Name Uz */
+            name_uz?: string | null;
+            /**
+             * Icon
+             * @default folder
+             */
+            icon: string | null;
+            /** Color */
+            color?: string | null;
+            /** Gradient */
+            gradient?: string | null;
+            /**
+             * Display Order
+             * @default 999
+             */
+            display_order: number;
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+            /** Description */
+            description?: string | null;
+        };
+        /** NotificationStatsResponse */
+        app__schemas__notification__NotificationStatsResponse: {
+            /** Total Sent */
+            total_sent: number;
+            /** Successful */
+            successful: number;
+            /** Failed */
+            failed: number;
+            /** Pending */
+            pending: number;
+            /** By Channel */
+            by_channel: {
+                [key: string]: number;
+            };
+            /** By Type */
+            by_type: {
+                [key: string]: number;
+            };
+            /** Recent Activity */
+            recent_activity: components["schemas"]["NotificationStatsItem"][];
         };
         /**
          * QRTokenResponse

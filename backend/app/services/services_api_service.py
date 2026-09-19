@@ -34,6 +34,7 @@ class ServicesApiService:
         db: Session,
         repository: ServicesApiRepository | None = None,
     ):
+        self.db = db
         self.repository = repository or ServicesApiRepository(db)
 
     @staticmethod
@@ -353,7 +354,7 @@ class ServicesApiService:
         # RQ-17 §3.1: gate мутации service-set тега (пин 3: create
         # requires_doctor=true на resource-backed теге -> reject;
         # пост-валидация — defense-in-depth для любого create с тегом).
-        db = self.repository.db
+        db = self.db
         create_tag = payload.get("queue_tag")
         if create_tag:
             if payload.get("requires_doctor"):
@@ -447,7 +448,7 @@ class ServicesApiService:
         old_tag = service.queue_tag
         new_tag = update_data["queue_tag"] if "queue_tag" in update_data else old_tag
         affected_tags = affected_service_tags(old_tag, new_tag)
-        db = self.repository.db
+        db = self.db
         today = clinic_today(db)
         lock_owner_config_scopes(db, affected_tags)
 
@@ -486,7 +487,7 @@ class ServicesApiService:
         visit_services_count = self.repository.count_visit_services_for_service(
             service_id,
         )
-        db = self.repository.db
+        db = self.db
         today = clinic_today(db)
         if service.queue_tag:
             # RQ-17 §3.1(б): soft-delete — равноправный writer той же
