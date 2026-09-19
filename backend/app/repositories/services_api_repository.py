@@ -60,6 +60,23 @@ class ServicesApiRepository:
             .first()
         )
 
+    def get_services_for_update(self, service_ids: list[int]):
+        """RQ-17 round-2 (P1-1): batch row-level serialization.
+
+        Детерминированный порядок строк (sorted by id) + SELECT ...
+        FOR UPDATE: конкурентные writer-ы тех же строк сериализуются
+        на row-lock; READ COMMITTED отдаёт пост-состояние закоммиченных
+        ретегов. SQLite: FOR UPDATE игнорируется диалектом.
+        """
+        return (
+            self.db.query(Service)
+            .filter(Service.id.in_(service_ids))
+            .order_by(Service.id)
+            .with_for_update()
+            .populate_existing()
+            .all()
+        )
+
     def get_service_by_code(self, code: str):
         return (
             self.db.query(Service)

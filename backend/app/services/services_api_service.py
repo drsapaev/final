@@ -561,14 +561,9 @@ class ServicesApiService:
         """
         from sqlalchemy.exc import SQLAlchemyError
 
-        rows = (
-            self.db.query(Service)
-            .filter(Service.id.in_(service_ids))
-            .order_by(Service.id)
-            .with_for_update()
-            .populate_existing()
-            .all()
-        )
+        # repository-boundary: ORM-запрос batch-локов живёт в
+        # ServicesApiRepository (гейт прямых ORM-вызовов сервис-слоя)
+        rows = self.repository.get_services_for_update(service_ids)
         by_id = {row.id: row for row in rows}
         failed_services = [
             {"service_id": service_id, "error": "Услуга не найдена"}
