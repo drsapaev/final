@@ -60,6 +60,8 @@ const PaymentCancel = lazy(() => import('./pages/PaymentCancel'));
 const PaymentTest = lazy(() => import('./pages/PaymentTest'));
 const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage'));
 const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired'));
+const PatientLoginPage = lazy(() => import('./pages/auth/PatientLoginPage'));
+const PatientActivatePage = lazy(() => import('./pages/auth/PatientActivatePage'));
 const PatientPickupView = lazy(() => import('./pages/PatientPickupView'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
 // SW-01 fix: removed ButtonShowcase (dead code, components/buttons/ deleted)
@@ -97,6 +99,8 @@ const ROUTE_COMPONENTS = {
   ResetPasswordPage,
   LoginFormStyled,
   ChangePasswordRequired,
+  PatientLoginPage,
+  PatientActivatePage,
   Health,
   QueueJoin,
   PaymentSuccess,

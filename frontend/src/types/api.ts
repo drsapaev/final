@@ -112,6 +112,26 @@ export type AuthStatusResponse = Schemas['AuthStatusResponse'];
 export type CSRFTokenResponse = Schemas['CSRFTokenResponse'];
 
 // ============================================================================
+// Patient portal access (Phase 0 PR-A1 login + PR-A2 activation)
+// ============================================================================
+// NOTE: `/patient-access/request-otp`, `/verify-otp` and `/login` are typed on
+// the backend as `dict[str, Any]` (anti-enum uniform responses), so the
+// generated operations carry untyped 200 payloads. The typed aliases below
+// mirror the backend service payload shapes (patient_otp_service /
+// patient_activation_service); the activation endpoints have concrete pydantic
+// response models and are fully typed in generated/api.ts.
+
+export type PatientOtpRequestDto = Schemas['PatientOtpRequest'];
+export type PatientOtpVerifyRequestDto = Schemas['PatientOtpVerifyRequest'];
+export type PatientLoginRequestDto = Schemas['PatientLoginRequest'];
+export type PatientActivationOtpRequestDto = Schemas['PatientActivationOtpRequest'];
+export type PatientActivationOtpResponseDto = Schemas['PatientActivationOtpResponse'];
+export type PatientActivationConfirmRequestDto = Schemas['PatientActivationConfirmRequest'];
+export type PatientActivationConfirmResponseDto = Schemas['PatientActivationConfirmResponse'];
+export type PatientActivationTokenResponseDto = Schemas['PatientActivationTokenResponse'];
+export type PatientActivationSessionUserDto = Schemas['PatientActivationSessionUser'];
+
+// ============================================================================
 // Queue (online queue + clinic queue)
 // ============================================================================
 
