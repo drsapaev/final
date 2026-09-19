@@ -42,6 +42,7 @@ import {
   requestActivationOtp,
 } from '../../../api/patientAccess';
 import { replaceAccessOnlySession, setProfile, setToken } from '../../../stores/auth';
+import { extractPatientActivationFragment, takePatientActivationFragmentToken } from '../../../utils/patientActivateDeepLink';
 
 const mockedRequestOtp = vi.mocked(requestActivationOtp);
 const mockedConfirm = vi.mocked(confirmActivation);
@@ -168,6 +169,23 @@ describe('PatientActivatePage (Phase 0 PR-B)', () => {
     const tokenInput = screen.getByLabelText('patientPortal.pa_token_label') as HTMLInputElement;
     expect(tokenInput.value).toBe(TOKEN);
     expect(mockedRequestOtp).not.toHaveBeenCalled();
+  });
+
+  it('prefills from the bootstrap-extracted fragment stash (telemetry-safe path)', () => {
+    // Phase 0 follow-up (Codex P1): main.tsx extracts the fragment BEFORE
+    // telemetry init, so by the time the page mounts the router location is
+    // already clean — the token arrives via the one-shot stash instead.
+    window.history.replaceState(null, '', `/patient/activate#token=${TOKEN}`);
+    extractPatientActivationFragment();
+    expect(window.location.hash).toBe('');
+
+    renderPage(); // MemoryRouter at /patient/activate — no fragment anywhere
+
+    const tokenInput = screen.getByLabelText('patientPortal.pa_token_label') as HTMLInputElement;
+    expect(tokenInput.value).toBe(TOKEN);
+    expect(mockedRequestOtp).not.toHaveBeenCalled();
+    // The stash was one-shot consumed by the page effect — nothing left.
+    expect(takePatientActivationFragmentToken()).toBeNull();
   });
 
   it('accepts tokens up to the backend contract boundary (maxLength 256)', async () => {

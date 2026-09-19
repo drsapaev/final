@@ -50,7 +50,12 @@ credential on the first HTTP navigation (the legacy `?token=...` query
 form was visible to that infrastructure before the SPA booted and could
 only be stripped after JS load). The legacy query form keeps working for
 links already handed out within the TTL; both forms are copied into state
-and immediately stripped from the URL/history after prefill.
+and immediately stripped from the URL/history after prefill. The fragment
+is additionally extracted and stripped during app bootstrap BEFORE
+telemetry (Sentry) initialization (`utils/patientActivateDeepLink.ts`,
+called from `main.tsx` before `initSentry()`): the Sentry scrubber redacts
+token-keyed object fields but not URL-valued telemetry fields, so a
+pageload trace or startup error must never observe the credential at all.
 
 ## Staff issuance (PR-A2)
 

@@ -33,6 +33,7 @@ import { Alert, Button, Card, CardContent, CardHeader, CardTitle, Input } from '
 import { ensureCSRFToken } from '../../api/client';
 import { confirmActivation, requestActivationOtp } from '../../api/patientAccess';
 import { replaceAccessOnlySession } from '../../stores/auth';
+import { takePatientActivationFragmentToken } from '../../utils/patientActivateDeepLink';
 import { getRouteForProfile } from '../../constants/routes';
 import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
@@ -73,19 +74,21 @@ const PatientActivatePage = () => {
 
   // Deep-link prefill (#token=... fragment, legacy ?token=... query) —
   // prefill only, never auto-submit. Phase 0 PR-B review P2 + follow-up
-  // (owner P2): after copying the credential into state it is immediately
-  // stripped from the URL (address bar, browser history, copy-paste) with
-  // replace:true — the history entry no longer carries the secret. The
-  // fragment form is read via router location (works identically under
-  // BrowserRouter and MemoryRouter in tests); the query form is kept for
-  // links already handed out (72h TTL). Unrelated query params are
-  // preserved; the re-run of this effect after the strip resolves to an
-  // empty prefill, so this cannot loop.
+  // (owner P2, Codex P1): after copying the credential into state it is
+  // immediately stripped from the URL (address bar, browser history,
+  // copy-paste) with replace:true. The fragment is normally extracted and
+  // stripped BEFORE telemetry init by main.tsx (utils/patientActivate-
+  // DeepLink) — this page then consumes the one-shot stash first; the
+  // router-location fragment/query reads below remain as the fallback for
+  // environments without the bootstrap extraction (tests). The legacy
+  // query form is kept for links already handed out (72h TTL). Unrelated
+  // query params are preserved; the re-run of this effect after the strip
+  // resolves to an empty prefill, so this cannot loop.
   useEffect(() => {
     const hashParams = new URLSearchParams((location.hash || '').replace(/^#/, ''));
     const fromHash = (hashParams.get('token') || '').trim();
     const fromQuery = (searchParams.get('token') || '').trim();
-    const prefill = fromHash || fromQuery;
+    const prefill = takePatientActivationFragmentToken() || fromHash || fromQuery;
     if (!prefill) {
       return;
     }
