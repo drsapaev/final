@@ -2665,6 +2665,42 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/admin/queue-resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Список QueueResource (реестр ресурсных владельцев тегов) */
+        get: operations["list_queue_resources_api_v1_queue_admin_queue_resources_get"];
+        put?: never;
+        /** Создать QueueResource (draft по умолчанию; active=true — через gate §3.1) */
+        post: operations["create_queue_resource_api_v1_queue_admin_queue_resources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/admin/queue-resources/{resource_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** QueueResource по id */
+        get: operations["get_queue_resource_api_v1_queue_admin_queue_resources__resource_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** PATCH QueueResource (ordinary-поля; code/queue_tag immutable; active — lifecycle §3.2) */
+        patch: operations["update_queue_resource_api_v1_queue_admin_queue_resources__resource_id__patch"];
+        trace?: never;
+    };
     "/api/v1/queue/available-specialists": {
         parameters: {
             query?: never;
@@ -22135,42 +22171,6 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/queue/admin/queue-resources": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Список QueueResource (реестр ресурсных владельцев тегов) */
-        get: operations["list_queue_resources_api_v1_queue_admin_queue_resources_get"];
-        put?: never;
-        /** Создать QueueResource (draft по умолчанию; active=true — через gate §3.1) */
-        post: operations["create_queue_resource_api_v1_queue_admin_queue_resources_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/queue/admin/queue-resources/{resource_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** QueueResource по id */
-        get: operations["get_queue_resource_api_v1_queue_admin_queue_resources__resource_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** PATCH QueueResource (ordinary-поля; code/queue_tag immutable; active — lifecycle §3.2) */
-        patch: operations["update_queue_resource_api_v1_queue_admin_queue_resources__resource_id__patch"];
-        trace?: never;
-    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -34149,6 +34149,78 @@ export type components = {
             doctor_id?: number | null;
         };
         /**
+         * QueueResourceCreate
+         * @description Draft-by-default (S-14: услуги/профиль → draft-ресурс → активация
+         *     через gate §3.1); `active=true` сразу — только при пройденном gate.
+         */
+        QueueResourceCreate: {
+            /** Code */
+            code: string;
+            /** Queue Tag */
+            queue_tag: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Start Number Online
+             * @default 1
+             */
+            start_number_online: number;
+            /**
+             * Max Online Per Day
+             * @default 15
+             */
+            max_online_per_day: number;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /**
+             * Active
+             * @default false
+             */
+            active: boolean;
+        };
+        /** QueueResourceOut */
+        QueueResourceOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Queue Tag */
+            queue_tag: string;
+            /** Display Name */
+            display_name: string;
+            /** Active */
+            active: boolean;
+            /** Start Number Online */
+            start_number_online: number;
+            /** Max Online Per Day */
+            max_online_per_day: number;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * QueueResourceUpdate
+         * @description §3.2: ordinary PATCH — `display_name`/`start_number_online`/
+         *     `max_online_per_day`/`default_cabinet`; `active` — lifecycle-переход
+         *     под serialization-scope §3.1(б). `code`/`queue_tag` immutable
+         *     (extra="forbid" -> 422 на попытку).
+         */
+        QueueResourceUpdate: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Start Number Online */
+            start_number_online?: number | null;
+            /** Max Online Per Day */
+            max_online_per_day?: number | null;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /** Active */
+            active?: boolean | null;
+        };
+        /**
          * QueueSettingsUpdate
          * @description Настройки системы очередей
          */
@@ -39002,40 +39074,6 @@ export type components = {
              */
             use_new_wizard: boolean;
         };
-        /**
-         * DepartmentCreate
-         * @description Схема для создания отделения
-         */
-        app__api__v1__endpoints__admin_departments___helpers__DepartmentCreate: {
-            /** Key */
-            key: string;
-            /** Name Ru */
-            name_ru: string;
-            /** Name Uz */
-            name_uz?: string | null;
-            /**
-             * Icon
-             * @default folder
-             */
-            icon: string | null;
-            /** Color */
-            color?: string | null;
-            /** Gradient */
-            gradient?: string | null;
-            /**
-             * Display Order
-             * @default 999
-             */
-            display_order: number | null;
-            /**
-             * Active
-             * @default true
-             */
-            active: boolean | null;
-            /** Description */
-            description?: string | null;
-            integration?: components["schemas"]["DepartmentIntegrationOptions"] | null;
-        };
         /** PaymentResponse */
         app__api__v1__endpoints__billing__PaymentResponse: {
             /** Id */
@@ -39069,40 +39107,6 @@ export type components = {
              */
             created_at: string;
         };
-        /**
-         * PaymentResponse
-         * @description Ответ при создании/получении платежа
-         */
-        app__api__v1__endpoints__cashier___helpers__PaymentResponse: {
-            /** Id */
-            id: number;
-            /** Visit Id */
-            visit_id?: number | null;
-            /** Patient Id */
-            patient_id?: number | null;
-            /** Amount */
-            amount: string;
-            /** Method */
-            method: string;
-            /** Status */
-            status: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Paid At */
-            paid_at?: string | null;
-            /** Note */
-            note?: string | null;
-        };
-        /** PriceOverrideApprovalRequest */
-        app__api__v1__endpoints__dental__PriceOverrideApprovalRequest: {
-            /** Action */
-            action: string;
-            /** Rejection Reason */
-            rejection_reason?: string | null;
-        };
         /** RoleResponse */
         app__api__v1__endpoints__group_permissions__RoleResponse: {
             /** Id */
@@ -39121,26 +39125,6 @@ export type components = {
             is_system: boolean;
             /** Permissions Count */
             permissions_count: number;
-        };
-        /**
-         * PasswordResetConfirmRequest
-         * @description Запрос на подтверждение сброса пароля
-         */
-        app__api__v1__endpoints__password_reset__PasswordResetConfirmRequest: {
-            /** Token */
-            token: string;
-            /** New Password */
-            new_password: string;
-        };
-        /**
-         * TelemetryResponse
-         * @description Ответ на telemetry
-         */
-        app__api__v1__endpoints__phrase_suggest__TelemetryResponse: {
-            /** Success */
-            success: boolean;
-            /** Message */
-            message: string;
         };
         /**
          * QRTokenResponse
@@ -39229,55 +39213,6 @@ export type components = {
             /** Entries */
             entries: components["schemas"]["QueueEntryResponse"][];
         };
-        /**
-         * QueueStatusResponse
-         * @description Статус очереди с лимитами
-         */
-        app__api__v1__endpoints__queue_limits__QueueStatusResponse: {
-            /** Doctor Id */
-            doctor_id: number;
-            /** Doctor Name */
-            doctor_name: string;
-            /** Specialty */
-            specialty: string;
-            /** Cabinet */
-            cabinet: string | null;
-            /**
-             * Day
-             * Format: date
-             */
-            day: string;
-            /** Current Entries */
-            current_entries: number;
-            /** Max Entries */
-            max_entries: number;
-            /** Limit Reached */
-            limit_reached: boolean;
-            /** Queue Opened */
-            queue_opened: boolean;
-            /** Online Available */
-            online_available: boolean;
-        };
-        /**
-         * NotificationStatsResponse
-         * @description Схема статистики уведомлений
-         */
-        app__api__v1__endpoints__registrar_notifications__NotificationStatsResponse: {
-            /** Total Sent */
-            total_sent: number;
-            /** Successful Deliveries */
-            successful_deliveries: number;
-            /** Failed Deliveries */
-            failed_deliveries: number;
-            /** Channels Stats */
-            channels_stats: {
-                [key: string]: number;
-            };
-            /** Recent Notifications */
-            recent_notifications: {
-                [key: string]: unknown;
-            }[];
-        };
         /** PriceOverrideApprovalRequest */
         app__api__v1__endpoints__registrar_wizard___cart__PriceOverrideApprovalRequest: {
             /** Override Id */
@@ -39337,12 +39272,6 @@ export type components = {
          * @enum {string}
          */
         app__models__discount_benefits__DiscountType: "percentage" | "fixed_amount" | "buy_x_get_y" | "loyalty_points" | "seasonal" | "referral";
-        /**
-         * DiscountType
-         * @description Типы скидок
-         * @enum {string}
-         */
-        app__models__dynamic_pricing__DiscountType: "percentage" | "fixed_amount" | "buy_x_get_y" | "tiered";
         /**
          * PasswordResetConfirmRequest
          * @description Схема для подтверждения сброса пароля
@@ -39412,6 +39341,203 @@ export type components = {
              */
             two_factor_enabled: boolean;
         };
+        /**
+         * DepartmentCreate
+         * @description Создание отделения
+         */
+        app__schemas__department__DepartmentCreate: {
+            /** Key */
+            key: string;
+            /** Name Ru */
+            name_ru: string;
+            /** Name Uz */
+            name_uz?: string | null;
+            /**
+             * Icon
+             * @default folder
+             */
+            icon: string | null;
+            /** Color */
+            color?: string | null;
+            /** Gradient */
+            gradient?: string | null;
+            /**
+             * Display Order
+             * @default 999
+             */
+            display_order: number;
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+            /** Description */
+            description?: string | null;
+        };
+        /** NotificationStatsResponse */
+        app__schemas__notification__NotificationStatsResponse: {
+            /** Total Sent */
+            total_sent: number;
+            /** Successful */
+            successful: number;
+            /** Failed */
+            failed: number;
+            /** Pending */
+            pending: number;
+            /** By Channel */
+            by_channel: {
+                [key: string]: number;
+            };
+            /** By Type */
+            by_type: {
+                [key: string]: number;
+            };
+            /** Recent Activity */
+            recent_activity: components["schemas"]["NotificationStatsItem"][];
+        };
+        /**
+         * DepartmentCreate
+         * @description Схема для создания отделения
+         */
+        app__api__v1__endpoints__admin_departments___helpers__DepartmentCreate: {
+            /** Key */
+            key: string;
+            /** Name Ru */
+            name_ru: string;
+            /** Name Uz */
+            name_uz?: string | null;
+            /**
+             * Icon
+             * @default folder
+             */
+            icon: string | null;
+            /** Color */
+            color?: string | null;
+            /** Gradient */
+            gradient?: string | null;
+            /**
+             * Display Order
+             * @default 999
+             */
+            display_order: number | null;
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean | null;
+            /** Description */
+            description?: string | null;
+            integration?: components["schemas"]["DepartmentIntegrationOptions"] | null;
+        };
+        /**
+         * PaymentResponse
+         * @description Ответ при создании/получении платежа
+         */
+        app__api__v1__endpoints__cashier___helpers__PaymentResponse: {
+            /** Id */
+            id: number;
+            /** Visit Id */
+            visit_id?: number | null;
+            /** Patient Id */
+            patient_id?: number | null;
+            /** Amount */
+            amount: string;
+            /** Method */
+            method: string;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Paid At */
+            paid_at?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** PriceOverrideApprovalRequest */
+        app__api__v1__endpoints__dental__PriceOverrideApprovalRequest: {
+            /** Action */
+            action: string;
+            /** Rejection Reason */
+            rejection_reason?: string | null;
+        };
+        /**
+         * PasswordResetConfirmRequest
+         * @description Запрос на подтверждение сброса пароля
+         */
+        app__api__v1__endpoints__password_reset__PasswordResetConfirmRequest: {
+            /** Token */
+            token: string;
+            /** New Password */
+            new_password: string;
+        };
+        /**
+         * TelemetryResponse
+         * @description Ответ на telemetry
+         */
+        app__api__v1__endpoints__phrase_suggest__TelemetryResponse: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
+        };
+        /**
+         * QueueStatusResponse
+         * @description Статус очереди с лимитами
+         */
+        app__api__v1__endpoints__queue_limits__QueueStatusResponse: {
+            /** Doctor Id */
+            doctor_id: number;
+            /** Doctor Name */
+            doctor_name: string;
+            /** Specialty */
+            specialty: string;
+            /** Cabinet */
+            cabinet: string | null;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Current Entries */
+            current_entries: number;
+            /** Max Entries */
+            max_entries: number;
+            /** Limit Reached */
+            limit_reached: boolean;
+            /** Queue Opened */
+            queue_opened: boolean;
+            /** Online Available */
+            online_available: boolean;
+        };
+        /**
+         * NotificationStatsResponse
+         * @description Схема статистики уведомлений
+         */
+        app__api__v1__endpoints__registrar_notifications__NotificationStatsResponse: {
+            /** Total Sent */
+            total_sent: number;
+            /** Successful Deliveries */
+            successful_deliveries: number;
+            /** Failed Deliveries */
+            failed_deliveries: number;
+            /** Channels Stats */
+            channels_stats: {
+                [key: string]: number;
+            };
+            /** Recent Notifications */
+            recent_notifications: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
+         * DiscountType
+         * @description Типы скидок
+         * @enum {string}
+         */
+        app__models__dynamic_pricing__DiscountType: "percentage" | "fixed_amount" | "buy_x_get_y" | "tiered";
         /** DoctorOut */
         app__schemas__clinic__DoctorOut: {
             /** User Id */
@@ -39497,60 +39623,6 @@ export type components = {
             id: number;
             /** Created At */
             created_at?: string | null;
-        };
-        /**
-         * DepartmentCreate
-         * @description Создание отделения
-         */
-        app__schemas__department__DepartmentCreate: {
-            /** Key */
-            key: string;
-            /** Name Ru */
-            name_ru: string;
-            /** Name Uz */
-            name_uz?: string | null;
-            /**
-             * Icon
-             * @default folder
-             */
-            icon: string | null;
-            /** Color */
-            color?: string | null;
-            /** Gradient */
-            gradient?: string | null;
-            /**
-             * Display Order
-             * @default 999
-             */
-            display_order: number;
-            /**
-             * Active
-             * @default true
-             */
-            active: boolean;
-            /** Description */
-            description?: string | null;
-        };
-        /** NotificationStatsResponse */
-        app__schemas__notification__NotificationStatsResponse: {
-            /** Total Sent */
-            total_sent: number;
-            /** Successful */
-            successful: number;
-            /** Failed */
-            failed: number;
-            /** Pending */
-            pending: number;
-            /** By Channel */
-            by_channel: {
-                [key: string]: number;
-            };
-            /** By Type */
-            by_type: {
-                [key: string]: number;
-            };
-            /** Recent Activity */
-            recent_activity: components["schemas"]["NotificationStatsItem"][];
         };
         /**
          * QRTokenResponse
@@ -39784,78 +39856,6 @@ export type components = {
              * Format: date-time
              */
             updated_at: string;
-        };
-        /**
-         * QueueResourceCreate
-         * @description Draft-by-default (S-14: услуги/профиль → draft-ресурс → активация
-         *     через gate §3.1); `active=true` сразу — только при пройденном gate.
-         */
-        QueueResourceCreate: {
-            /** Code */
-            code: string;
-            /** Queue Tag */
-            queue_tag: string;
-            /** Display Name */
-            display_name: string;
-            /**
-             * Start Number Online
-             * @default 1
-             */
-            start_number_online: number;
-            /**
-             * Max Online Per Day
-             * @default 15
-             */
-            max_online_per_day: number;
-            /** Default Cabinet */
-            default_cabinet?: string | null;
-            /**
-             * Active
-             * @default false
-             */
-            active: boolean;
-        };
-        /** QueueResourceOut */
-        QueueResourceOut: {
-            /** Id */
-            id: number;
-            /** Code */
-            code: string;
-            /** Queue Tag */
-            queue_tag: string;
-            /** Display Name */
-            display_name: string;
-            /** Active */
-            active: boolean;
-            /** Start Number Online */
-            start_number_online: number;
-            /** Max Online Per Day */
-            max_online_per_day: number;
-            /** Default Cabinet */
-            default_cabinet?: string | null;
-            /** Created At */
-            created_at?: string | null;
-            /** Updated At */
-            updated_at?: string | null;
-        };
-        /**
-         * QueueResourceUpdate
-         * @description §3.2: ordinary PATCH — `display_name`/`start_number_online`/
-         *     `max_online_per_day`/`default_cabinet`; `active` — lifecycle-переход
-         *     под serialization-scope §3.1(б). `code`/`queue_tag` immutable
-         *     (extra="forbid" -> 422 на попытку).
-         */
-        QueueResourceUpdate: {
-            /** Display Name */
-            display_name?: string | null;
-            /** Start Number Online */
-            start_number_online?: number | null;
-            /** Max Online Per Day */
-            max_online_per_day?: number | null;
-            /** Default Cabinet */
-            default_cabinet?: string | null;
-            /** Active */
-            active?: boolean | null;
         };
     };
     responses: never;
@@ -44193,6 +44193,223 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    list_queue_resources_api_v1_queue_admin_queue_resources_get: {
+        parameters: {
+            query?: {
+                active_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"][];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_queue_resource_api_v1_queue_admin_queue_resources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueResourceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Невалидный payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Дубликат code/queue_tag или отказ инварианта §3.1 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Неизвестные поля payload */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_queue_resource_api_v1_queue_admin_queue_resources__resource_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description QueueResource не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_queue_resource_api_v1_queue_admin_queue_resources__resource_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueResourceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description QueueResource не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Отказ инварианта §3.1 при активации */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Попытка изменить immutable code/queue_tag или невалидный payload */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -78239,223 +78456,6 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
-            };
-        };
-    };
-    list_queue_resources_api_v1_queue_admin_queue_resources_get: {
-        parameters: {
-            query?: {
-                active_only?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueueResourceOut"][];
-                };
-            };
-            /** @description Требуется аутентификация */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Только роль Admin */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_queue_resource_api_v1_queue_admin_queue_resources_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QueueResourceCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueueResourceOut"];
-                };
-            };
-            /** @description Невалидный payload */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Требуется аутентификация */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Только роль Admin */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Дубликат code/queue_tag или отказ инварианта §3.1 */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Неизвестные поля payload */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    get_queue_resource_api_v1_queue_admin_queue_resources__resource_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                resource_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueueResourceOut"];
-                };
-            };
-            /** @description Требуется аутентификация */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Только роль Admin */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description QueueResource не найден */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_queue_resource_api_v1_queue_admin_queue_resources__resource_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                resource_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QueueResourceUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueueResourceOut"];
-                };
-            };
-            /** @description Требуется аутентификация */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Только роль Admin */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description QueueResource не найден */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Отказ инварианта §3.1 при активации */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Попытка изменить immutable code/queue_tag или невалидный payload */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
