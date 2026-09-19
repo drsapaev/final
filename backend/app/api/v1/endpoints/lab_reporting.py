@@ -349,9 +349,16 @@ target_date: str | None = Query(default=None, description="Дата (YYYY-MM-DD)
                 "max_flag_severity": latest_lab_report.get("max_flag_severity") if latest_lab_report else None,
             })
 
+    # PR7: честная серверная пагинация lab-facade. Registrar canonical
+    # ordering не меняется (get_today_queues отдаёт весь день); lab-facade
+    # применяет запрошенный slice к своему плоскому представлению:
+    # total = весь день, entries = только запрошенный slice.
+    total = len(flat_entries)
+    flat_entries = flat_entries[offset : offset + limit]
+
     return {
         "entries": flat_entries,
-        "total": len(flat_entries),
+        "total": total,
         "date": raw_payload.get("date"),
         "timezone": raw_payload.get("timezone", "Asia/Tashkent"),
     }
