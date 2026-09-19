@@ -12,7 +12,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RouteAccessBoundary } from '../routeGuards';
-import { clearToken, getExpiredPrincipalWasPatient, setToken } from '../../stores/auth';
+import {
+  clearToken,
+  getExpiredPrincipalWasPatient,
+  replaceAccessOnlySession,
+  setToken,
+} from '../../stores/auth';
 
 vi.mock('../../i18n/useTranslation', () => ({
   useTranslation: () => ({
@@ -164,6 +169,38 @@ describe('RouteAccessBoundary redirect target for missing tokens (Phase 0 follow
     };
     renderAt('/login', PUBLIC_LOGIN_ROUTE);
 
+    await waitFor(() => {
+      expect(getExpiredPrincipalWasPatient()).toBe(false);
+    });
+  });
+
+  it('drops the hint when an already-mounted public boundary re-renders after a delayed 401', async () => {
+    // Codex P2 (round 7): the patient browses a public page with a live
+    // session; a business request returns 401 and the interceptor clears
+    // the session. The mounted public boundary re-renders with an UNCHANGED
+    // missingTokenRedirect (false) — the consumption must key on the
+    // auth-state update, not on the boolean.
+    replaceAccessOnlySession('patient-jwt', {
+      id: 42,
+      username: 'patient-42',
+      role: 'Patient',
+    } as never);
+
+    const PUBLIC_ROUTE: BoundaryRoute = {
+      id: 'some-public',
+      group: 'public',
+      auth: 'public',
+      roles: [],
+    };
+    renderAt('/public-page', PUBLIC_ROUTE);
+    await waitFor(() => {
+      expect(screen.getByTestId('panel-content')).toBeInTheDocument();
+    });
+
+    clearToken();
+    expect(getExpiredPrincipalWasPatient()).toBe(true);
+
+    // The auth-state-driven re-render must consume the hint.
     await waitFor(() => {
       expect(getExpiredPrincipalWasPatient()).toBe(false);
     });
