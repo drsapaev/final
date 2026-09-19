@@ -1063,7 +1063,7 @@ def test_alembic_chain_single_head_0069() -> None:
     assert len(module.revision) <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    assert heads == ["0069_sentinel_pair_retirement"]
+    assert heads == ["0070_lab_results_lineage"]
 
 
 # ===================== C. PostgreSQL FK introspection =====================
@@ -1553,7 +1553,10 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
                 version = conn.execute(
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar()
-                assert version == module.revision
+                # The chain grew past the retirement (0070 lineage); the
+                # retirement end-state (no synthetic usernames/doctors)
+                # is a head-agnostic invariant.
+                assert version == "0070_lab_results_lineage"
 
                 usernames = {
                     row[0]

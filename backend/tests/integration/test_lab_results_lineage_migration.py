@@ -95,9 +95,15 @@ def _provision(db_name: str, target: str) -> str:
         )
 
     u = make_url(admin_url)
-    with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{db_name}"')
-        c.execute(f'CREATE DATABASE "{db_name}"')
+    try:
+        with psycopg.connect(admin_url, autocommit=True) as c:
+            c.execute(f'DROP DATABASE IF EXISTS "{db_name}"')
+            c.execute(f'CREATE DATABASE "{db_name}"')
+    except Exception as exc:  # noqa: BLE001 - нет прав CREATE DATABASE и т.п.
+        pytest.skip(
+            f"cannot create a scratch database on this PostgreSQL server "
+            f"({type(exc).__name__}); run against a server with CREATEDB"
+        )
     sa_url = (
         f"postgresql+psycopg://{u.username}:{u.password}"
         f"@{u.host}:{u.port}/{db_name}"

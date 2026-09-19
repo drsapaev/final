@@ -621,7 +621,7 @@ def test_alembic_chain_single_head_0062() -> None:
     heads = sorted(rev for rev in graph if rev not in referenced)
     # single head: RQ-15.d retires the synthetic pairs after the
     # public-address registry (RQ-16.c chained after the 0067 snapshot)
-    assert heads == ["0069_sentinel_pair_retirement"]
+    assert heads == ["0070_lab_results_lineage"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============
