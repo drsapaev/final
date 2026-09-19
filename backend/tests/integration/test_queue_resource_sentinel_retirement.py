@@ -1539,7 +1539,10 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
             [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
             capture_output=True,
             text=True,
-            cwd=str(BACKEND_ROOT),
+            cwd=str(next(
+                p for p in Path(__file__).resolve().parents
+                if (p / "alembic.ini").is_file()
+            )),
             env=env,
             timeout=600,
         )
