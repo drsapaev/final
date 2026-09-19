@@ -161,7 +161,22 @@ export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProp
   }
 
   if (route.auth !== 'public' && !state.token) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    // Phase 0 follow-up (Codex P1): an expired access-only PATIENT session
+    // must land on the patient phone/OTP entry point (/patient/login), not
+    // on the staff login screen — the staff form offers no route into the
+    // patient flow. The CURRENT route decides: a patient surface is the one
+    // whose home role is the patient (routeRegistry patient-home, also
+    // serving /patient?tab=forms). Staff routes keep the staff /login.
+    const isPatientSurface = ((route.homeForRoles as string[] | undefined) || []).some(
+      (role) => normalizeRole(role) === 'patient'
+    );
+    return (
+      <Navigate
+        to={isPatientSurface ? '/patient/login' : '/login'}
+        replace
+        state={{ from: location }}
+      />
+    );
   }
 
   if (!canAccessRoute(route, state.profile as RouteProfile | null)) {
