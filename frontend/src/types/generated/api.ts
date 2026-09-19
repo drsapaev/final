@@ -816,6 +816,12 @@ export type paths = {
          *
          *     Позволяет изменить одинаковые поля у группы услуг.
          *     Например: изменить цену, активность, категорию и т.д.
+         *
+         *     RQ-17 round-2 (P1-1): batch — равноправный writer serialization-scope
+         *     §3.1 (не прямой setattr-обход): row-locks sorted по id,
+         *     owner-config-локи всех affected-тегов (sorted) и пост-валидация
+         *     инварианта каждого тега до single commit. Атомарно: нарушение
+         *     инварианта -> 409, при котором ни одна услуга batch не изменена.
          */
         post: operations["batch_update_services_api_v1_services_admin_batch_update_post"];
         delete?: never;
