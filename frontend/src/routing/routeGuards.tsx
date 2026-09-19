@@ -131,16 +131,25 @@ export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProp
   }
 
   useEffect(() => {
-    if (!missingTokenRedirect && state.token) {
-      // Session (re-)established — arm the refs for a future expiry episode.
+    // Codex P2 (round 10): the episode ends when a session is
+    // (re-)established AND when the redirect reaches its anonymous
+    // destination — the public login route can render through the SAME
+    // preserved boundary instance (React Router preserves RouteRenderer),
+    // so a public render must also re-arm the refs and strip the consumed
+    // snapshot flag; otherwise a later anonymous visit to a protected
+    // staff route is sent back to /patient/login.
+    if (state.token || route?.auth === 'public') {
       redirectTargetRef.current = null;
       consumeEpisodeRef.current = false;
+      if (state.expiredPrincipalWasPatient) {
+        setState((prev) => ({ ...prev, expiredPrincipalWasPatient: false }));
+      }
     }
     // Codex P2 (rounds 5+7): the global hint lives only BETWEEN the session
     // clear and the next boundary evaluation — every auth-state transition
     // drops it, so fresh mounts can never inherit a stale marker.
     resetExpiredPrincipalHint();
-  }, [state.token, missingTokenRedirect]);
+  }, [state.token, missingTokenRedirect, route, state.expiredPrincipalWasPatient]);
 
   useEffect(() => {
     let isMounted = true;

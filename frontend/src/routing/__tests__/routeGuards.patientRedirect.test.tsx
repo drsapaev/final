@@ -7,8 +7,8 @@
  * /login — including staff whose session dies ON the shared patient panel.
  */
 import React, { useState } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RouteAccessBoundary } from '../routeGuards';
@@ -242,10 +242,6 @@ describe('RouteAccessBoundary redirect target for missing tokens (Phase 0 follow
   });
 
   it('does not reuse the consumed patient episode on a later protected visit (round 9)', async () => {
-    // Codex P2 (round 9): App.tsx renders sibling routes through ONE
-    // RouteRenderer instance, so the boundary state survives navigation.
-    // A patient episode consumed on a public route must stay consumed —
-    // a later anonymous visit to a protected staff route keeps /login.
     replaceAccessOnlySession(createJwt(3600), {
       id: 42,
       username: 'patient-42',
@@ -312,5 +308,87 @@ describe('RouteAccessBoundary redirect target for missing tokens (Phase 0 follow
       expect(seen[seen.length - 1]).toBe('/login');
     });
     expect(screen.queryByTestId('panel-content')).not.toBeInTheDocument();
+  });
+
+  it('re-arms after the redirect reaches the patient login (round 10)', async () => {
+    // Codex P2 (round 10): protected-expiry → patient-login → staff-route
+    // transition through ONE preserved boundary instance. Once the Navigate
+    // reaches the public login route, the episode must end — a later
+    // anonymous visit to a staff route keeps /login.
+    replaceAccessOnlySession(createJwt(3600), {
+      id: 42,
+      username: 'patient-42',
+      role: 'Patient',
+    } as never);
+
+    const routeMap: Record<string, BoundaryRoute> = {
+      '/patient': PATIENT_HOME_ROUTE,
+      '/patient/login': {
+        id: 'patient-login',
+        group: 'public',
+        auth: 'public',
+        roles: [],
+      },
+      '/admin': {
+        id: 'admin',
+        group: 'admin',
+        auth: 'role-scoped',
+        roles: ['Admin'],
+        homeForRoles: ['admin'],
+      },
+      '/login': {
+        id: 'login',
+        group: 'public',
+        auth: 'public',
+        roles: [],
+      },
+    };
+    const seen: string[] = [];
+    const LocationProbe = () => {
+      const { pathname } = useLocation();
+      if (seen[seen.length - 1] !== pathname) {
+        seen.push(pathname);
+      }
+      return null;
+    };
+
+    function Harness() {
+      const location = useLocation();
+      const navigate = useNavigate();
+      const route = routeMap[location.pathname] ?? null;
+      return (
+        <>
+          <RouteAccessBoundary route={route}>
+            <div data-testid="panel-content">panel</div>
+          </RouteAccessBoundary>
+          <button data-testid="go-admin" onClick={() => navigate('/admin')}>admin</button>
+          <LocationProbe />
+        </>
+      );
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/patient']}>
+        <Harness />
+      </MemoryRouter>
+    );
+
+    // Live patient session on /patient: the panel renders.
+    await waitFor(() => {
+      expect(screen.getByTestId('panel-content')).toBeInTheDocument();
+    });
+
+    // JWT dies mid-session: the frozen redirect fires to /patient/login —
+    // the SAME boundary instance renders the public route afterwards.
+    clearToken();
+    await waitFor(() => {
+      expect(seen[seen.length - 1]).toBe('/patient/login');
+    });
+
+    // A later anonymous visit to a protected staff route keeps /login.
+    fireEvent.click(screen.getByTestId('go-admin'));
+    await waitFor(() => {
+      expect(seen[seen.length - 1]).toBe('/login');
+    });
   });
 });
