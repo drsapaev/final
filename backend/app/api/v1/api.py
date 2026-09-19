@@ -82,6 +82,7 @@ from app.api.v1.endpoints import (
     password_reset,
     patient_access,
     patient_activation_admin,
+    patient_portal,
     patients,
     payment_reconciliation,
     payment_settings,
@@ -173,6 +174,13 @@ api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 # Legacy simple/minimal auth routers were deleted in PR #1942; the
 # ENABLE_FALLBACK_AUTH flag now only gates the legacy /auth/login and
 # /auth/json-login endpoints inside auth.py itself.
+# Phase 1 PR-C1: JWT patient portal self-service (cabinet summary, booking,
+# read-only forms). Reuses the Mini App service layer; identity = JWT patient.
+# Included BEFORE patients.router: static paths (/patients/forms,
+# /patients/booking) must win over GET /patients/{patient_id}.
+api_router.include_router(
+    patient_portal.router, prefix="/patients", tags=["patients"]
+)
 api_router.include_router(patients.router, prefix="/patients", tags=["patients"])
 api_router.include_router(visits.router, prefix="/visits", tags=["visits"])
 api_router.include_router(services.router, prefix="/services")

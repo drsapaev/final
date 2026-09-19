@@ -1,0 +1,633 @@
+"""Patient portal JWT endpoints (Phase 1 / PR-C1).
+
+Canonical JWT-authenticated patient self-service endpoints for the web
+portal (`/patient` after Phase 0 OTP login). They deliberately REUSE the
+Telegram Mini App service layer as the single source of truth:
+
+- booking draft/preview/validation: `build_telegram_mini_app_appointment_booking_preview`
+- forms metadata + saved answers (read-only): `build_telegram_mini_app_patient_forms_preview`
+- cabinet summary payload assembly: `_mini_app_patient_cabinet_summary_payload`
+  (SSOT delegation into the mini-app module — no duplicated aggregation logic)
+
+Identity differs only at the scope boundary: a JWT session resolves to
+`current_user.patient` and builds a `TelegramMiniAppSessionScope` without
+Telegram identity (telegram ids stay None). The Mini App endpoints keep
+resolving identity from initData/entry tokens and are NOT modified.
+
+Deliberately OUT of scope here (Telegram-only write path, no schema change
+in this PR): `POST` form submissions — `telegram_patient_form_submissions
+.telegram_chat_id` is NOT NULL, a web submission path needs its own schema
+decision first.
+
+Review hardening (round 2, PR #3340):
+
+- P1 (soft-deleted card): `_require_patient` rejects `Patient.is_deleted`,
+  matching the Mini App SSOT (`patient_link_invalid`) — soft deletion only
+  flips the flag, `User.patient` keeps resolving, so the check must be
+  explicit or a soft-deleted card keeps full PHI/booking access.
+- P1 (deactivated user): the shared dependency composes
+  `get_current_active_user` + `require_roles("Patient")` — `require_roles`
+  alone delegates to `get_current_user`, which never checks `is_active`,
+  so an admin-deactivated account would keep a valid JWT until expiry.
+- P1 (department persistence): a provided `department` is resolved through
+  the canonical `Department.key` (active rows only) and the created
+  `Appointment` gets `department_id` — the raw string is display metadata,
+  the routing context lives in `departments.id`.
+- P2 (typed contract): all four endpoints publish explicit response/error
+  Pydantic DTOs (no more `dict[str, Any]`), so the generated TypeScript
+  gives PR-C2 a compile-time contract and the OpenAPI documents the real
+  4xx surface.
+- P2 (booking idempotency): `POST /patients/booking` REQUIRES an
+  `Idempotency-Key` header. The global idempotency middleware is opt-in —
+  without a mandated key a lost response + browser retry would double-book
+  date-only/department-only requests (no slot lock covers those shapes).
+"""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+from typing import Any
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from app.api import deps
+from app.api.v1.endpoints.telegram_webhook._clinic_bot import (
+    _mini_app_patient_cabinet_summary_payload,
+)
+from app.api.v1.endpoints.telegram_webhook._helpers import (
+    MINI_APP_BOOKING_REQUEST_ERROR_REASONS,
+    MINI_APP_FORMS_REQUEST_ERROR_REASONS,
+)
+from app.crud.appointment import appointment as appointment_crud
+from app.models.department import Department
+from app.models.user import User
+from app.schemas import appointment as appointment_schemas
+from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
+from app.services.patient_access_audit import log_patient_access
+from app.services.telegram_mini_app_init_data import (
+    TelegramMiniAppSessionScope,
+    TelegramMiniAppSessionScopeError,
+    build_telegram_mini_app_appointment_booking_preview,
+    build_telegram_mini_app_patient_forms_preview,
+)
+
+router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Request DTO
+# ---------------------------------------------------------------------------
+
+
+class PatientPortalBookingRequest(BaseModel):
+    """Same validation contract as the Mini App booking preview request."""
+
+    appointment_date: date = Field(alias="appointmentDate")
+    appointment_time: str | None = Field(default=None, alias="appointmentTime")
+    doctor_id: int | None = Field(default=None, alias="doctorId")
+    department: str | None = None
+    notes: str | None = None
+    services: list[str] | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# Response DTOs (P2: explicit public contract — no dict[str, Any])
+# ---------------------------------------------------------------------------
+
+
+class PatientPortalErrorDetail(BaseModel):
+    """Structured portal error body (scope / request-shaped failures)."""
+
+    reason: str
+    message: str | None = None
+
+
+class PatientPortalErrorResponse(BaseModel):
+    # The 401/403 layer (get_current_user / require_roles SSOT) raises plain
+    # string details; portal scope guards raise {"reason": ...}. The union
+    # keeps the published schema honest about both runtime shapes.
+    detail: PatientPortalErrorDetail | str
+
+
+class PatientPortalScope(BaseModel):
+    type: str
+    patient_id: int
+
+
+class PatientPortalBookingAppointment(BaseModel):
+    """Draft appointment echo (Mini App payload + resolved department_id)."""
+
+    patient_id: int
+    doctor_id: int | None = None
+    department: str | None = None
+    department_id: int | None = None
+    appointment_date: date
+    appointment_time: str | None = None
+    notes: str | None = None
+    status: str
+    visit_type: str | None = None
+    payment_type: str | None = None
+    services: list[str] = []
+    payment_amount: float | None = None
+    payment_currency: str | None = None
+    payment_provider: str | None = None
+    payment_transaction_id: str | None = None
+    payment_webhook_id: int | None = None
+    payment_processed_at: datetime | None = None
+
+
+class PatientPortalBookingPreviewResponse(BaseModel):
+    preview_only: bool
+    mutation_allowed: bool
+    message_key: str
+    scope: PatientPortalScope
+    appointment: PatientPortalBookingAppointment
+
+
+class PatientPortalBookingCreatedResponse(BaseModel):
+    created: bool
+    appointment_id: int
+    preview: PatientPortalBookingPreviewResponse
+
+
+class PatientPortalCabinetAppointmentsItem(BaseModel):
+    id: int
+    date: str | None = None
+    time: str | None = None
+    status: str
+    department: str | None = None
+
+
+class PatientPortalCabinetVisitsItem(BaseModel):
+    id: int
+    date: str | None = None
+    status: str
+
+
+class PatientPortalCabinetQueueItem(BaseModel):
+    number: int
+    status: str
+    cabinet: str | None = None
+
+
+class PatientPortalCabinetPayments(BaseModel):
+    billed: str
+    paid: str
+    pending: str
+    debt: str
+    linked_visit_count: int
+    active_queue_count: int
+
+
+class PatientPortalCabinetReportsItem(BaseModel):
+    id: int
+    name: str
+    ready_at: str | None = None
+    status: str
+
+
+class PatientPortalCabinetPolicy(BaseModel):
+    plain_telegram_chat_allowed: bool
+    pdf_included: bool
+
+
+class PatientPortalCabinetSummaryResponse(BaseModel):
+    scope: PatientPortalScope
+    patient: dict[str, str]
+    appointments: list[PatientPortalCabinetAppointmentsItem]
+    visits: list[PatientPortalCabinetVisitsItem]
+    queue: list[PatientPortalCabinetQueueItem]
+    payments: PatientPortalCabinetPayments
+    reports: list[PatientPortalCabinetReportsItem]
+    policy: PatientPortalCabinetPolicy
+
+
+class PatientPortalFormField(BaseModel):
+    key: str
+    label: str
+    type: str
+    required: bool
+    max_length: int | None = None
+    options: list[str] = []
+
+
+class PatientPortalFormSubmission(BaseModel):
+    id: int
+    form_id: str
+    schema_version: int
+    status: str
+    answers: dict[str, Any]
+    submitted_at: str | None = None
+    updated_at: str | None = None
+
+
+class PatientPortalFormItem(BaseModel):
+    id: str
+    title: str
+    description: str
+    fields: list[PatientPortalFormField]
+    submission: PatientPortalFormSubmission | None = None
+
+
+class PatientPortalFormsPolicy(BaseModel):
+    plain_telegram_chat_allowed: bool
+    medical_details_in_chat: bool
+    storage_enabled: bool
+
+
+class PatientPortalFormsResponse(BaseModel):
+    preview_only: bool
+    mutation_allowed: bool
+    message_key: str
+    scope: PatientPortalScope
+    forms: list[PatientPortalFormItem]
+    policy: PatientPortalFormsPolicy
+
+
+# ---------------------------------------------------------------------------
+# Principal / scope guards (P1: active user + non-deleted patient)
+# ---------------------------------------------------------------------------
+
+
+def _require_active_portal_user(
+    current_user: User = Depends(deps.get_current_active_user),
+    _role_guard: User = Depends(deps.require_roles("Patient")),
+) -> User:
+    """Portal principal: an ACTIVE user holding the Patient role.
+
+    P1 (round 2): `require_roles("Patient")` alone delegates to
+    `get_current_user`, which never checks `is_active` — an admin-deactivated
+    account would keep reading PHI and creating appointments until the JWT
+    expires. Activity is enforced here for ALL four portal endpoints.
+    """
+    return current_user
+
+
+# Publish the RBAC policy for the idempotency middleware (Codex R6 #3092
+# convention: the middleware reads `required_roles` off the endpoint's
+# dependency callable — it never re-implements the check).
+_require_active_portal_user.required_roles = ("Patient",)  # type: ignore[attr-defined]
+
+
+def _patient_portal_scope(patient_id: int) -> TelegramMiniAppSessionScope:
+    """JWT portal scope: patient identity without Telegram linkage."""
+    return TelegramMiniAppSessionScope(
+        scope_type="patient",
+        telegram_user_id=None,
+        telegram_chat_id=None,
+        patient_id=int(patient_id),
+    )
+
+
+def _require_patient(current_user: User) -> int:
+    patient = current_user.patient
+    if patient is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"reason": "patient_profile_required"},
+        )
+    # P1 (round 2): soft deletion only flips `Patient.is_deleted` — the
+    # `User.patient` relationship keeps resolving and `user_id` stays linked.
+    # Same SSOT check as the Mini App scope resolver (`patient_link_invalid`):
+    # a soft-deleted card must not read PHI or create appointments.
+    if getattr(patient, "is_deleted", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": "patient_link_invalid"},
+        )
+    return int(patient.id)
+
+
+# ---------------------------------------------------------------------------
+# Error mapping helpers
+# ---------------------------------------------------------------------------
+
+# Portal booking extends the Mini App request-shaped reasons with the
+# canonical department resolution failures (P1 round 2).
+_PORTAL_BOOKING_REQUEST_ERROR_REASONS = frozenset(
+    MINI_APP_BOOKING_REQUEST_ERROR_REASONS
+) | {"department_unknown", "department_inactive"}
+
+
+def _booking_scope_status_code(reason: str) -> int:
+    # Same public contract as the Mini App booking endpoints: request-shaped
+    # problems are 400, identity/scope problems are 403.
+    if reason in _PORTAL_BOOKING_REQUEST_ERROR_REASONS:
+        return status.HTTP_400_BAD_REQUEST
+    return status.HTTP_403_FORBIDDEN
+
+
+def _forms_scope_status_code(reason: str) -> int:
+    if reason in MINI_APP_FORMS_REQUEST_ERROR_REASONS:
+        return status.HTTP_400_BAD_REQUEST
+    return status.HTTP_403_FORBIDDEN
+
+
+def _raise_scope_error(
+    exc: TelegramMiniAppSessionScopeError, status_code: int
+) -> HTTPException:
+    return HTTPException(
+        status_code=status_code,
+        detail={"reason": exc.reason},
+    )
+
+
+def _resolve_portal_department(
+    db: Session, department: str | None
+) -> Department | None:
+    """Resolve a booking `department` to an ACTIVE department row (P1).
+
+    The request carries the canonical `Department.key`; the persisted
+    routing context is `departments.id`. Unknown keys and deactivated
+    departments are rejected with 400 BEFORE any appointment is created —
+    a silently-dropped department produced `department_id = NULL` rows
+    (routing context loss: preview echoed a department the row never got).
+    """
+    if department is None or not department.strip():
+        return None
+    department_row = db.query(Department).filter(Department.key == department).first()
+    if department_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "department_unknown"},
+        )
+    if not getattr(department_row, "active", True):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "department_inactive"},
+        )
+    return department_row
+
+
+def _with_resolved_department(
+    payload: dict[str, Any], department_row: Department | None
+) -> dict[str, Any]:
+    """Attach the resolved `department_id` to an echo payload (typed field)."""
+    if department_row is not None:
+        payload["appointment"]["department_id"] = int(department_row.id)
+    return payload
+
+
+# Shared OpenAPI error responses (P2: documented error surface).
+_PORTAL_400 = {
+    "description": "Request-shaped validation failure (see detail.reason)",
+    "model": PatientPortalErrorResponse,
+}
+_PORTAL_401 = {
+    "description": "Missing/invalid JWT or revoked token",
+    "model": PatientPortalErrorResponse,
+}
+_PORTAL_403 = {
+    "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+    "model": PatientPortalErrorResponse,
+}
+_PORTAL_404 = {
+    "description": "JWT user has no linked Patient profile",
+    "model": PatientPortalErrorResponse,
+}
+_PORTAL_409 = {
+    "description": "Doctor time slot already occupied (or idempotency payload mismatch)",
+    "model": PatientPortalErrorResponse,
+}
+
+
+@router.get(
+    "/cabinet/summary",
+    response_model=PatientPortalCabinetSummaryResponse,
+    responses={401: _PORTAL_401, 403: _PORTAL_403, 404: _PORTAL_404},
+)
+def get_patient_cabinet_summary(
+    request: Request,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(_require_active_portal_user),
+):
+    """Home-screen summary for the JWT patient portal (own scope only)."""
+    patient_id = _require_patient(current_user)
+    scope = _patient_portal_scope(patient_id)
+    # SSOT: payload assembly lives in the mini-app module (Phase 1 C1 keeps
+    # aggregation in one place; the function reads only scope.scope_type and
+    # scope.patient_id, both identical for the JWT portal scope).
+    payload = _mini_app_patient_cabinet_summary_payload(db, scope)
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="cabinet_summary",
+        action="view",
+        outcome="success",
+        request=request,
+    )
+    return payload
+
+
+@router.post(
+    "/booking/preview",
+    response_model=PatientPortalBookingPreviewResponse,
+    responses={400: _PORTAL_400, 401: _PORTAL_401, 403: _PORTAL_403},
+)
+def preview_patient_portal_booking(
+    request_body: PatientPortalBookingRequest,
+    request: Request,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(_require_active_portal_user),
+):
+    """Non-mutating booking preview for the JWT patient portal."""
+    patient_id = _require_patient(current_user)
+    scope = _patient_portal_scope(patient_id)
+    try:
+        preview = build_telegram_mini_app_appointment_booking_preview(
+            scope,
+            patient_id=patient_id,
+            appointment_date=request_body.appointment_date,
+            appointment_time=request_body.appointment_time,
+            doctor_id=request_body.doctor_id,
+            department=request_body.department,
+            notes=request_body.notes,
+            services=request_body.services,
+        )
+    except TelegramMiniAppSessionScopeError as exc:
+        raise _raise_scope_error(exc, _booking_scope_status_code(exc.reason)) from exc
+    # P1 (round 2): the department must resolve (canonical key, active) even
+    # for a preview — PR-C2 submits what preview accepted, so a failure here
+    # must surface BEFORE the create call.
+    department_row = _resolve_portal_department(db, request_body.department)
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="appointment",
+        action="preview",
+        outcome="success",
+        request=request,
+        extra_data={
+            "appointment_date": str(preview.draft.appointment_date),
+            "appointment_time": preview.draft.appointment_time,
+            "department": preview.draft.department,
+            "department_id": int(department_row.id) if department_row else None,
+        },
+    )
+    return _with_resolved_department(preview.to_response_payload(), department_row)
+
+
+@router.post(
+    "/booking",
+    status_code=status.HTTP_201_CREATED,
+    response_model=PatientPortalBookingCreatedResponse,
+    responses={
+        400: _PORTAL_400,
+        401: _PORTAL_401,
+        403: _PORTAL_403,
+        409: _PORTAL_409,
+    },
+)
+def create_patient_portal_booking(
+    request_body: PatientPortalBookingRequest,
+    request: Request,
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+        min_length=1,
+        description=(
+            "Required. Retries of the SAME booking attempt must reuse the "
+            "same key — the middleware replays the committed response instead "
+            "of creating a second appointment."
+        ),
+    ),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(_require_active_portal_user),
+):
+    """Create one trusted patient-portal appointment (own scope only).
+
+    Mirrors the Mini App creation contract: same draft validation, same
+    per-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same
+    409 on occupied slots, same lifecycle eligibility for the doctor.
+
+    P2 (round 2): the `Idempotency-Key` header is REQUIRED. The global
+    idempotency middleware only protects requests that carry a key —
+    without a mandated key a lost response + automatic browser retry of a
+    date-only/department-only request (no doctor slot lock applies) would
+    create duplicate appointments. Same key + same payload replays the
+    committed 201; same key + changed payload is a 409.
+    """
+    patient_id = _require_patient(current_user)
+    scope = _patient_portal_scope(patient_id)
+    try:
+        preview = build_telegram_mini_app_appointment_booking_preview(
+            scope,
+            patient_id=patient_id,
+            appointment_date=request_body.appointment_date,
+            appointment_time=request_body.appointment_time,
+            doctor_id=request_body.doctor_id,
+            department=request_body.department,
+            notes=request_body.notes,
+            services=request_body.services,
+        )
+    except TelegramMiniAppSessionScopeError as exc:
+        raise _raise_scope_error(exc, _booking_scope_status_code(exc.reason)) from exc
+    # P1 (round 2): resolve BEFORE any mutation — unknown/inactive keys are a
+    # 400, never a silently-NULL routing context on the created row.
+    department_row = _resolve_portal_department(db, request_body.department)
+
+    draft_payload = preview.draft.to_appointment_create_payload()
+
+    if preview.draft.doctor_id is not None:
+        # Atomic slot reservation — concurrent same-slot writers
+        # (web/mobile/telegram) serialize on the doctor row. The lock is
+        # taken BEFORE eligibility so a concurrent deactivation must commit
+        # first (same ordering as the Mini App create path).
+        lock_doctor_for_slot_reservation(db, preview.draft.doctor_id)
+
+        try:
+            ensure_doctor_eligible_for_appointment(db, preview.draft.doctor_id)
+        except HTTPException as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={
+                    "reason": "doctor_not_eligible",
+                    "message": exc.detail,
+                },
+            ) from exc
+
+        if preview.draft.appointment_time:
+            if appointment_crud.is_time_slot_occupied(
+                db,
+                doctor_id=preview.draft.doctor_id,
+                appointment_date=preview.draft.appointment_date,
+                appointment_time=preview.draft.appointment_time,
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"reason": "appointment_time_slot_occupied"},
+                )
+
+    appointment_create_payload = dict(draft_payload)
+    appointment_create_payload.pop("department", None)
+    if department_row is not None:
+        # P1 (round 2): persist the routing context — `department` as a raw
+        # string is display metadata; `departments.id` is what the schedule,
+        # queues and department-schedule reads actually join on.
+        appointment_create_payload["department_id"] = int(department_row.id)
+    appointment_in = appointment_schemas.AppointmentCreate(**appointment_create_payload)
+    appointment = appointment_crud.create(db=db, obj_in=appointment_in)
+
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="appointment",
+        resource_id=str(appointment.id),
+        action="create",
+        outcome="success",
+        request=request,
+        extra_data={
+            "appointment_date": str(preview.draft.appointment_date),
+            "appointment_time": preview.draft.appointment_time,
+            "department": preview.draft.department,
+            "department_id": int(department_row.id) if department_row else None,
+        },
+    )
+
+    return {
+        "created": True,
+        "appointment_id": int(appointment.id),
+        "preview": _with_resolved_department(
+            preview.to_response_payload(), department_row
+        ),
+    }
+
+
+@router.get(
+    "/forms",
+    response_model=PatientPortalFormsResponse,
+    responses={400: _PORTAL_400, 401: _PORTAL_401, 403: _PORTAL_403},
+)
+def get_patient_portal_forms(
+    request: Request,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(_require_active_portal_user),
+):
+    """Read-only protected forms metadata + saved answers for the JWT portal.
+
+    Submissions remain Telegram-only in this PR (see module docstring).
+    """
+    patient_id = _require_patient(current_user)
+    scope = _patient_portal_scope(patient_id)
+    try:
+        forms_preview = build_telegram_mini_app_patient_forms_preview(
+            db,
+            scope,
+            patient_id=patient_id,
+        )
+    except TelegramMiniAppSessionScopeError as exc:
+        raise _raise_scope_error(exc, _forms_scope_status_code(exc.reason)) from exc
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="patient_form",
+        action="view",
+        outcome="success",
+        request=request,
+    )
+    return forms_preview.to_response_payload()

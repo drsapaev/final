@@ -11,6 +11,12 @@ class AppointmentBase(ORMModel):
     patient_id: int
     doctor_id: int | None = None
     department: str | None = Field(None, max_length=64)
+    # departments.id — the persisted routing context. `department` above is a
+    # display label; callers that resolve a canonical Department.key set this
+    # id explicitly (patient portal booking, PR #3340 round-2 P1). Optional
+    # and additive: existing creators never set it, model_dump(exclude_unset)
+    # keeps it out of their INSERTs.
+    department_id: int | None = None
     appointment_date: date
     appointment_time: str | None = Field(None, max_length=8)  # HH:MM
     notes: str | None = Field(None, max_length=1000)
