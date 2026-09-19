@@ -6,39 +6,36 @@ decision on history repair. This script is REPRODUCIBLE evidence tooling:
 it only reads, prints aggregates and technical identifiers (no patient
 PII), never prints the DSN, and never modifies data.
 
-Usage (from backend/ with the backend venv):
-    LAB_LINEAGE_CENSUS_DSN=postgresql://... python \
-        ../scripts/ops/lab_results_lineage_census.py
+Evidence integrity (review P2 fix on #3334): the target database is
+chosen EXCLUSIVELY via LAB_LINEAGE_CENSUS_DSN — there is NO fallback to
+DATABASE_URL or backend/.env, because a silent fallback could produce
+authoritative-looking zeros from a staging/dev database. The report
+opens with a safe database identity (current_database, current_user,
+server address, server version — no credentials) so the reader can
+confirm which environment produced the numbers.
 
-Falls back to DATABASE_URL (backend/.env or environment) when the
-dedicated variable is unset. The transaction is READ ONLY with a
-statement timeout and always rolls back.
+Usage:
+    LAB_LINEAGE_CENSUS_DSN=postgresql://... python \
+        scripts/ops/lab_results_lineage_census.py
+
+The transaction is READ ONLY with a statement timeout and always rolls
+back.
 """
 from __future__ import annotations
 
-import io
 import os
 import sys
-from pathlib import Path
 
 import psycopg
-
-BACKEND_ENV = Path(__file__).resolve().parents[2] / "backend" / ".env"
 
 
 def load_dsn() -> str:
     dsn = os.getenv("LAB_LINEAGE_CENSUS_DSN", "").strip()
     if not dsn:
-        dsn = os.getenv("DATABASE_URL", "").strip()
-    if not dsn and BACKEND_ENV.exists():
-        for line in io.open(BACKEND_ENV, encoding="utf-8", errors="ignore"):
-            line = line.strip()
-            if line.startswith("DATABASE_URL="):
-                dsn = line.split("=", 1)[1].strip().strip('"').strip("'")
-                break
-    if not dsn:
         raise SystemExit(
-            "no DSN: set LAB_LINEAGE_CENSUS_DSN (preferred) or DATABASE_URL"
+            "refusing to guess the environment: set LAB_LINEAGE_CENSUS_DSN "
+            "to the database the census must read (no DATABASE_URL/.env "
+            "fallback — evidence must not silently come from the wrong DB)"
         )
     for prefix in ("postgresql+psycopg://", "postgresql+asyncpg://"):
         if dsn.startswith(prefix):
@@ -60,6 +57,18 @@ def main() -> int:
     def rows(sql: str, params: tuple | None = None):
         cur.execute(sql, params or ())
         return cur.fetchall()
+
+    print("== census target identity (safe; no credentials) ==")
+    try:
+        print(
+            one(
+                "select current_database() || ' | user=' || current_user "
+                "|| ' | server=' || coalesce(inet_server_addr()::text, 'unix-socket') "
+                "|| ' | ' || version()"
+            )
+        )
+    except Exception as exc:  # noqa: BLE001
+        print("identity query unavailable:", type(exc).__name__)
 
     print("== migration state ==")
     try:
