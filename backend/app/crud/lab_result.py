@@ -10,6 +10,22 @@ from app.models.lab import LabOrder, LabResult
 from app.schemas.lab import LabResultCreate, LabResultUpdate
 
 
+def _ensure_not_managed(db_result: LabResult) -> None:
+    """A+ контракт (решение владельца, см.
+    .ai-factory/plans/lab-results-lineage-decision.md): управляемая строка
+    (с lineage) принадлежит каноническому проектору бланка. Legacy-CRUD не
+    изменяет и не удаляет такие строки в обход канонического бланка — путь
+    исправления: revise() исходного бланка. Строки без lineage (NULL)
+    пишутся как раньше."""
+    if db_result.source_root_instance_id is not None:
+        raise ValueError(
+            f"LabResult #{db_result.id} is a managed lineage projection "
+            f"(root {db_result.source_root_instance_id}); correct the source "
+            f"blank via lab report revise() — legacy CRUD must not bypass "
+            f"the canonical projector"
+        )
+
+
 def get_lab_result(db: Session, result_id: int) -> LabResult | None:
     """Получить лабораторный результат по ID"""
     return db.query(LabResult).filter(LabResult.id == result_id).first()
@@ -53,6 +69,7 @@ def update_lab_result(
     db_result = get_lab_result(db, result_id)
     if not db_result:
         return None
+    _ensure_not_managed(db_result)
 
     for field, value in result_data.dict(exclude_unset=True).items():
         setattr(db_result, field, value)
@@ -67,6 +84,7 @@ def delete_lab_result(db: Session, result_id: int) -> bool:
     db_result = get_lab_result(db, result_id)
     if not db_result:
         return False
+    _ensure_not_managed(db_result)
 
     db.delete(db_result)
     db.commit()
