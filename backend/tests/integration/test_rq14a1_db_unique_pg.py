@@ -151,7 +151,8 @@ def _assert_pg_head(engine) -> None:
     # assert advances with the chain (0065 -> 0066 cutover -> 0067
     # snapshot -> 0068 direction public-address registry, RQ-16.c /
     # E-055 -> 0069 sentinel pair retirement).
-    assert version == "0069_sentinel_pair_retirement", version
+    # 0070 extends the chain; the 0065 objects are the invariant here.
+    assert version == "0070_lab_results_lineage", version
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:

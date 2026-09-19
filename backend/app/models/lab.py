@@ -9,6 +9,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -17,6 +18,7 @@ from sqlalchemy import (
     event,
     inspect,
     select,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, object_session, relationship
 
@@ -56,6 +58,17 @@ class LabOrder(Base):
 
 class LabResult(Base):
     __tablename__ = "lab_results"
+    __table_args__ = (
+        Index(
+            "uq_lab_results_lineage_root_code",
+            "source_root_instance_id",
+            "test_code",
+            unique=True,
+            postgresql_where=text(
+                "source_root_instance_id IS NOT NULL AND test_code IS NOT NULL"
+            ),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     order_id: Mapped[int] = mapped_column(
@@ -71,6 +84,20 @@ class LabResult(Base):
     ref_range: Mapped[str | None] = mapped_column(String(64), nullable=True)
     abnormal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+
+    # A+ lineage (owner decision, .ai-factory/plans/lab-results-lineage-decision.md):
+    # server-assigned only; NULL = historical row of unknown provenance.
+    # root = stable chain identity (root blank of the revise chain);
+    # source = the concrete finalized version that produced this value.
+    # No cascade: source blanks are corrected via revise(), never deleted.
+    source_root_instance_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lab_report_instances.id", ondelete="RESTRICT"), nullable=True
+    )
+    source_instance_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lab_report_instances.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)

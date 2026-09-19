@@ -810,7 +810,7 @@ def test_alembic_chain_single_head_0063() -> None:
     heads = sorted(revision for revision in graph if revision not in referenced)
     # single head: RQ-15.d retires the synthetic pairs after the
     # public-address registry
-    assert heads == ["0069_sentinel_pair_retirement"]
+    assert heads == ["0070_lab_results_lineage"]
 
 
 # ===================== D. parity + ADR =====================
