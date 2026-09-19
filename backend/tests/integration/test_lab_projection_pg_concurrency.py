@@ -1,9 +1,11 @@
-"""C-track P1 regression: two-connection PostgreSQL concurrency proof.
+"""A+ runtime regression: two-connection PostgreSQL concurrency proof.
 
-Проецирование legacy lab_results сериализуется блокировкой общего LabOrder
-(FOR UPDATE): две параллельные финализации сиблинговых бланков одного заказа
-не могут одновременно пройти COUNT→INSERT и создать конфликтующую пару
-(например две строки glucose — кровь и моча) без lineage.
+Две параллельные финализации сиблинговых бланков одного заказа (разные
+цепочки lineage) обязаны создать ДВЕ независимые управляемые проекции —
+по одной на цепочку (managed-ключ source_root_instance_id + test_code
+делает дубликат внутри цепочки невозможным на уровне схемы) — и обе
+финализации завершаются. Сериализация цепочек: SELECT … FOR UPDATE на
+root-instance в _sync_legacy_lab_results.
 
 Требует реального PostgreSQL: SQLite игнорирует FOR UPDATE и глобально
 сериализует запись, поэтому на SQLite этот тест ничего не доказывает.
@@ -50,7 +52,7 @@ def _server_dsn(dsn: str) -> str:
 
 
 @pytest.mark.integration
-def test_concurrent_sibling_finalize_creates_single_projection():
+def test_concurrent_sibling_finalize_creates_independent_chain_projections():
     admin_dsn = _admin_dsn()
     if not admin_dsn:
         pytest.skip(
@@ -173,15 +175,19 @@ def test_concurrent_sibling_finalize_creates_single_projection():
         with ScratchSession() as session:
             rows = session.execute(
                 text(
-                    "SELECT test_code, COUNT(*) AS n FROM lab_results "
-                    "WHERE order_id = :oid GROUP BY test_code"
+                    "SELECT source_root_instance_id, COUNT(*) AS n "
+                    "FROM lab_results "
+                    "WHERE order_id = :oid AND test_code = 'glucose' "
+                    "GROUP BY source_root_instance_id"
                 ),
                 {"oid": order_id},
             ).fetchall()
-            codes = {row.test_code: row.n for row in rows}
-            assert codes.get("glucose") == 1, (
-                "concurrent sibling finalizes must produce exactly ONE "
-                f"glucose projection, got {codes!r}"
+            assert len(rows) == 2, (
+                "A+: concurrent sibling finalizes must produce TWO "
+                f"independent chain projections, got {rows!r}"
+            )
+            assert all(row.n == 1 for row in rows), (
+                "each chain keeps exactly one current glucose projection"
             )
             statuses = session.execute(
                 text(
