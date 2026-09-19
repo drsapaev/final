@@ -21,11 +21,12 @@
 let pendingActivationFragmentToken: string | null = null;
 
 function isActivateRoutePathname(pathname: string): boolean {
-  // Codex P1 (round 3): normalize a trailing slash — /patient/activate/ is
-  // served by the catch-all rewrite and accepted by React Router, and the
-  // credential must be stripped BEFORE initSentry() for that form too.
-  const normalized =
-    pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+  // Codex P1 (rounds 3+6): normalize a trailing slash AND casing. React
+  // Router matches routes case-insensitively (no caseSensitive flag in
+  // App.tsx), so /Patient/Activate/#token=... reaches the activation page
+  // and the credential must be stripped BEFORE initSentry() for that form
+  // too.
+  const normalized = pathname.toLowerCase().replace(/\/+$/, '');
   // Tolerate an optional deployment base prefix; the route itself is flat.
   return normalized === '/patient/activate' || normalized.endsWith('/patient/activate');
 }

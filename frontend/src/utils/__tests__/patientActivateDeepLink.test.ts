@@ -57,6 +57,19 @@ describe('patientActivateDeepLink (Phase 0 follow-up)', () => {
     expect(window.location.pathname).toBe('/patient/activate/');
   });
 
+  it('strips the fragment on case-insensitive route matches too', () => {
+    // Codex P1 (round 6): React Router matches without caseSensitive, so
+    // /Patient/Activate reaches the same page — the pre-telemetry strip
+    // must accept that casing as well.
+    const token = 'e'.repeat(43);
+    window.history.replaceState(null, '', `/Patient/Activate#token=${token}`);
+
+    extractPatientActivationFragment();
+
+    expect(takePatientActivationFragmentToken()).toBe(token);
+    expect(window.location.hash).toBe('');
+  });
+
   it('is a no-op on other routes even when a token-shaped fragment is present', () => {
     const token = 'c'.repeat(43);
     window.history.replaceState(null, '', `/some/page#token=${token}`);
