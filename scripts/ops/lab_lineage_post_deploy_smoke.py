@@ -6,7 +6,10 @@ STAGING_VALIDATION runbook does NOT cover:
   1. deployed SHA — printed as a reminder: verify with
      `git -C <deploy-tree> rev-parse HEAD` (expected: the merged A+ head,
      eaaa08f896... or later; the DB-side script cannot see it);
-  2. alembic_version == 0070_lab_results_lineage (or later);
+  2. the deployed alembic chain includes 0070_lab_results_lineage —
+     the DB's version_num must resolve (via the DEPLOYED tree's
+     revision graph) to a head that has 0070 as an ancestor, so a
+     future 0071_* head passes while a pre-lineage head fails;
   3. both lineage columns + FKs (RESTRICT, targeting lab_report_instances)
      + the exact partial unique index (columns AND predicate) exist;
   4. synthetic blank A -> fill -> finalize -> exactly ONE managed row with
@@ -37,6 +40,12 @@ SAFETY CONTRACT (review P1 fix on #3334):
   notification_deliveries);
 - ALL checks are fail-closed `if not ...: raise RuntimeError(...)` —
   they survive `python -O` (no assert statements).
+- OPERATOR SPLIT (review guidance): staging proves the write path
+  (STAGING_VALIDATION -> upgrade 0070 -> this script --apply -> checks
+  1-7 PASS, notification delta 0); production proves the read path only
+  (deploy -> this script WITHOUT --apply -> checks 1-3 PASS + the
+  committed census). Production synthetic write smoke is intentionally
+  unsupported.
 
 Usage (from anywhere with the backend venv):
     LAB_LINEAGE_SMOKE_DSN=postgresql://... python \
@@ -47,6 +56,7 @@ Usage (from anywhere with the backend venv):
 from __future__ import annotations
 
 import os
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -62,7 +72,11 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 SMOKE_DSN = os.getenv("LAB_LINEAGE_SMOKE_DSN", "").strip()
-EXPECTED_HEAD_PREFIX = "0070_lab_results_lineage"
+EXPECTED_LINEAGE_REVISION = "0070_lab_results_lineage"
+LINEAGE_IN_CHAIN_MESSAGE = (
+    "the deployed alembic chain does not include "
+    + EXPECTED_LINEAGE_REVISION
+)
 
 
 def fail(message: str) -> None:
@@ -91,19 +105,71 @@ def _print_deployed_sha_reminder() -> None:
     )
 
 
+def _lineage_in_deployed_chain(version_num: str) -> bool:
+    """True when 0070 is the deployed version or one of its ancestors.
+
+    Parses the DEPLOYED tree's alembic revision graph (this script ships
+    from the same tree the operator deployed) and walks the ancestor
+    closure of the database's version_num. A future head descending from
+    0070 passes; a pre-lineage head fails.
+    """
+    versions_dir = BACKEND_DIR / "alembic" / "versions"
+    if not versions_dir.is_dir():
+        fail(f"deployed alembic versions directory not found: {versions_dir}")
+    graph: dict[str, tuple[str, ...]] = {}
+    for path in versions_dir.glob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        revision_match = re.search(
+            r"^revision\s*=\s*['\"]([^'\"]+)['\"]", source, re.M
+        )
+        if not revision_match:
+            continue
+        down_match = re.search(r"^down_revision\s*=\s*(.+)$", source, re.M)
+        parents = (
+            tuple(re.findall(r"['\"]([^'\"]+)['\"]", down_match.group(1)))
+            if down_match
+            else ()
+        )
+        graph[revision_match.group(1)] = parents
+    if version_num not in graph:
+        fail(
+            f"the deployed alembic code does not know version {version_num!r} — "
+            f"this script and the deployed backend appear to be from "
+            f"different trees"
+        )
+    # The history is a DAG (branch/merge points exist): a shared ancestor
+    # reached via two paths is legal and must NOT be flagged as a cycle.
+    # Cycle = a node re-entered while still on the current walk path.
+    visited: set[str] = set()
+    on_path: set[str] = set()
+
+    def _walk(node: str) -> None:
+        if node in visited:
+            return
+        if node in on_path:
+            fail(f"corrupt revision chain: cycle at {node!r}")
+        visited.add(node)
+        on_path.add(node)
+        for parent in graph.get(node, ()):
+            _walk(parent)
+        on_path.discard(node)
+
+    _walk(version_num)
+    return EXPECTED_LINEAGE_REVISION in visited
+
+
 def check_migration_state(engine) -> None:
     print("== [2] migration state ==")
     with engine.connect() as conn:
         version = conn.execute(
             text("select version_num from alembic_version")
         ).scalar()
-    if not str(version).startswith(EXPECTED_HEAD_PREFIX):
+    if not _lineage_in_deployed_chain(str(version)):
         fail(
-            f"expected lineage migration ({EXPECTED_HEAD_PREFIX}...), got "
-            f"{version!r}; deployment incomplete — DO NOT run the synthetic "
-            f"data path"
+            f"{LINEAGE_IN_CHAIN_MESSAGE}: version_num={version!r}; "
+            f"deployment incomplete — DO NOT run the synthetic data path"
         )
-    print("alembic_version:", version)
+    print("alembic_version:", version, "(0070 in chain)")
 
 
 def check_schema_shape(engine) -> None:
