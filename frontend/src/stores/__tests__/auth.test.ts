@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../api/client', () => ({
   me: vi.fn(),
   setToken: vi.fn(),
+  // Phase 0 follow-up: the store registers its session-termination listener
+  // in the client at module scope — stub it so registration is a no-op.
+  setSessionInvalidationListener: vi.fn(),
 }));
 
 import { me, setToken as setClientToken } from '../../api/client';
@@ -175,6 +178,61 @@ describe('auth store', () => {
       expect(storage.refresh_token).toBeUndefined();
       expect(storage.auth_token).toBe(patientJwt);
       expect(JSON.parse(storage.auth_profile)).toEqual(patientProfile);
+    });
+  });
+
+  describe('expired principal kind marker (Phase 0 follow-up, Codex P1 round 3)', () => {
+    it('remembers an expired PATIENT principal and resets on the next login', async () => {
+      primeSessionStorage({
+        auth_token: 'jwt',
+        auth_profile: JSON.stringify({ id: 9, username: 'patient-9', role: 'Patient' }),
+      });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(true);
+
+      // A freshly installed session resets the marker.
+      auth.setToken('fresh-jwt');
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(false);
+    });
+
+    it('does not flag staff principals on clearToken', async () => {
+      primeSessionStorage({
+        auth_token: 'jwt',
+        auth_profile: JSON.stringify({ id: 2, username: 'registrar', role: 'Registrar' }),
+      });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(false);
+    });
+
+    it('flags nothing when the cleared session had no profile', async () => {
+      primeSessionStorage({ auth_token: 'jwt' });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(false);
+    });
+
+    it('preserves the patient hint across duplicate clears on the same 401', async () => {
+      // Codex P1 (round 4): the response interceptor clears first (hint set
+      // from the live profile), then getProfile() catches the SAME 401 and
+      // clears again — the second call sees NO profile and must not flip
+      // the hint back to false.
+      primeSessionStorage({
+        auth_token: 'jwt',
+        auth_profile: JSON.stringify({ id: 9, username: 'patient-9', role: 'Patient' }),
+      });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(true);
+
+      primeSessionStorage({});
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(true);
     });
   });
 });
