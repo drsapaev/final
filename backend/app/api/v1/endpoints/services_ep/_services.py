@@ -7,6 +7,7 @@ from app.api.v1.endpoints.services_ep._helpers import (
     _row_to_out,
     router,
 )  # noqa: F401
+from app.crud.queue_owner_invariant import OwnerInvariantViolation
 
 
 @router.get("", response_model=list[ServiceOut], summary="Каталог услуг")
@@ -247,6 +248,9 @@ async def create_service(
     try:
         service = ServicesApiService(db).create_service(service_data=service_data)
         return _row_to_out(service)
+    except OwnerInvariantViolation as exc:
+        # RQ-17 §3.1: RESOURCE_SURFACE live + forbidden service-set -> 409
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -267,6 +271,10 @@ async def update_service(
         return _row_to_out(service)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OwnerInvariantViolation as exc:
+        # RQ-17 §3.1(в): двухтеговый протокол ретега / флип
+        # requires_doctor при живой поверхности -> 409 (пины 4, 10-11)
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -282,6 +290,10 @@ async def delete_service(
         return ServicesApiService(db).delete_service(service_id=service_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OwnerInvariantViolation as exc:
+        # RQ-17 §3.1(б): пост-delete service-set с живой
+        # RESOURCE_SURFACE -> 409 (пины 8-9)
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 # ==================== ВРЕМЕННЫЙ ENDPOINT ДЛЯ ВРАЧЕЙ ====================
