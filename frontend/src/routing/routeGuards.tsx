@@ -111,14 +111,18 @@ export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProp
   }
 
   useEffect(() => {
-    if (missingTokenRedirect) {
-      // Consume the hint once the target is selected — it must not keep
-      // redirecting LATER anonymous visits in this tab to the patient login.
-      resetExpiredPrincipalHint();
-    } else {
+    if (!missingTokenRedirect) {
       // Session (re-)established — arm the ref for a future expiry episode.
       redirectTargetRef.current = null;
     }
+    // Codex P2 (round 5): the hint lives only BETWEEN the session clear and
+    // the next boundary evaluation. The missing-token branch above already
+    // used it to select the frozen target; every other boundary render —
+    // e.g. the PUBLIC route mounted right after an explicit logout (React
+    // batches navigate('/login') with the auth update and can unmount the
+    // protected boundary before its effect sees the missing-token state), or
+    // an authenticated session — proves the hint is stale and must drop it.
+    resetExpiredPrincipalHint();
   }, [missingTokenRedirect]);
 
   useEffect(() => {

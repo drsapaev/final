@@ -143,4 +143,29 @@ describe('RouteAccessBoundary redirect target for missing tokens (Phase 0 follow
       expect(seen[seen.length - 1]).toBe('/login');
     });
   });
+
+  it('drops the stale hint when a public route mounts after an explicit logout', async () => {
+    // Codex P2 (round 5): HeaderNew logout calls clearToken() then batches
+    // navigate('/login') with the auth update — the protected boundary can
+    // be unmounted BEFORE its missing-token effect runs, so the public
+    // boundary's evaluation must drop the hint instead.
+    sessionStorage.setItem(
+      'auth_profile',
+      JSON.stringify({ id: 42, username: 'patient-42', role: 'Patient' })
+    );
+    clearToken();
+    expect(getExpiredPrincipalWasPatient()).toBe(true);
+
+    const PUBLIC_LOGIN_ROUTE: BoundaryRoute = {
+      id: 'login',
+      group: 'public',
+      auth: 'public',
+      roles: [],
+    };
+    renderAt('/login', PUBLIC_LOGIN_ROUTE);
+
+    await waitFor(() => {
+      expect(getExpiredPrincipalWasPatient()).toBe(false);
+    });
+  });
 });
