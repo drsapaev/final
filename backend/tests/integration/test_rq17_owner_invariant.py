@@ -544,7 +544,7 @@ def _pg_seed_and_metadata(engine):
     Base.metadata.create_all(engine)
 
 
-def _run_two_writers(engine, writer_a, writer_b) -> tuple[object, object]:
+def _run_two_writers(writer_a, writer_b) -> tuple[object, object]:
     """Оба writer-а стартуют одновременно; возвращает (outcome_a, outcome_b),
     где outcome = None (успех) или исключение."""
     from concurrent.futures import ThreadPoolExecutor
