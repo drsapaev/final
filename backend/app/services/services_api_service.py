@@ -8,6 +8,14 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import clinic_today
+from app.crud.queue_owner_invariant import (
+    affected_service_tags,
+    lock_owner_config_scope,
+    lock_owner_config_scopes,
+    validate_service_gate_for_requires_doctor,
+    validate_tag_owner_invariant,
+)
 from app.models.clinic import ServiceCategory
 from app.models.service import Service
 from app.repositories.services_api_repository import ServicesApiRepository
@@ -342,6 +350,19 @@ class ServicesApiService:
 
         service = Service(**payload)
         self.repository.add(service)
+        # RQ-17 §3.1: gate мутации service-set тега (пин 3: create
+        # requires_doctor=true на resource-backed теге -> reject;
+        # пост-валидация — defense-in-depth для любого create с тегом).
+        db = self.repository.db
+        create_tag = payload.get("queue_tag")
+        if create_tag:
+            if payload.get("requires_doctor"):
+                validate_service_gate_for_requires_doctor(
+                    db, create_tag, clinic_today(db)
+                )
+            lock_owner_config_scope(db, create_tag)
+            db.flush()
+            validate_tag_owner_invariant(db, create_tag, clinic_today(db))
         self.repository.commit()
         self.repository.refresh(service)
         self._log_service_creation(service, user_id=user_id)
@@ -418,8 +439,33 @@ class ServicesApiService:
             if not category:
                 raise ValueError("Selected category not found")
 
+        # RQ-17 §3.1(б)/(в): serialization-scope мутации Service. Ретег
+        # Service.queue_tag (поле writable: ServiceUpdate.queue_tag,
+        # PUT /services/{service_id}) меняет ДВА service-set разом —
+        # локи ВСЕХ affected-тегов в каноническом sorted-порядке;
+        # мутации одного тега — вырожденный одно-теговый случай.
+        old_tag = service.queue_tag
+        new_tag = update_data["queue_tag"] if "queue_tag" in update_data else old_tag
+        affected_tags = affected_service_tags(old_tag, new_tag)
+        db = self.repository.db
+        today = clinic_today(db)
+        lock_owner_config_scopes(db, affected_tags)
+
         for field, value in update_data.items():
             setattr(service, field, value)
+
+        if affected_tags:
+            if update_data.get("requires_doctor"):
+                # пины 3-4: перевод в requires_doctor=true при живой
+                # RESOURCE_SURFACE целевого тега — быстрый отказ до flush
+                for tag in affected_tags:
+                    validate_service_gate_for_requires_doctor(db, tag, today)
+            db.flush()
+            # валидация ПОСТ-состояния КАЖДОГО affected-тега до commit:
+            # requires_doctor-флип, деактивация последней doctorless и
+            # ретег A->B / A->NULL / NULL->B (пины 4, 10-11)
+            for tag in affected_tags:
+                validate_tag_owner_invariant(db, tag, today)
 
         self.repository.commit()
         self.repository.refresh(service)
@@ -440,8 +486,19 @@ class ServicesApiService:
         visit_services_count = self.repository.count_visit_services_for_service(
             service_id,
         )
+        db = self.repository.db
+        today = clinic_today(db)
+        if service.queue_tag:
+            # RQ-17 §3.1(б): soft-delete — равноправный writer той же
+            # критической секции (round-4 brief)
+            lock_owner_config_scope(db, service.queue_tag)
         service.active = False
         self.repository.add(service)
+        if service.queue_tag:
+            db.flush()
+            # пост-delete service-set тега: RESOURCE_SURFACE != ∅ при
+            # 0 активных doctorless -> reject (пины 8-9)
+            validate_tag_owner_invariant(db, service.queue_tag, today)
         self.repository.commit()
         self.repository.refresh(service)
         self._log_service_update(
