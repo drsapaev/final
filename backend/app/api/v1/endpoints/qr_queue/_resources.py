@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 from fastapi import Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -56,6 +57,47 @@ def _reject_invariant(exc: OwnerInvariantViolation) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_409_CONFLICT,
         detail=str(exc),
+    )
+
+
+def _find_duplicate(db: Session, *, code: str, queue_tag: str) -> QueueResource | None:
+    return (
+        db.query(QueueResource)
+        .filter(
+            sa.or_(
+                QueueResource.code == code,
+                QueueResource.queue_tag == queue_tag,
+            )
+        )
+        .first()
+    )
+
+
+def _duplicate_conflict(code: str, queue_tag: str, duplicate: QueueResource) -> HTTPException:
+    field = "code" if duplicate.code == code else "queue_tag"
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=(
+            f"QueueResource {field}='{code if field == 'code' else queue_tag}' already exists "
+            f"(row id={duplicate.id}, tag='{duplicate.queue_tag}')"
+        ),
+    )
+
+
+def _unique_violation_conflict(exc: IntegrityError) -> HTTPException:
+    """Гонка POST-ов мимо общего serialization-scope (одинаковый `code` при
+    разных `queue_tag` — advisory-локи разные) упирается в UNIQUE-индекс:
+    обещанный контракт — 409, а не неперехваченный IntegrityError (500).
+    Round-3 owner-ревью P2: mapping уникального нарушения обязателен при
+    любом исходе гонки."""
+    message = str(getattr(exc, "orig", exc)).lower()
+    field = "queue_tag" if "queue_tag" in message else "code"
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=(
+            f"QueueResource {field} already exists (unique constraint "
+            "violated by a concurrent create)"
+        ),
     )
 
 
@@ -120,34 +162,30 @@ def create_queue_resource(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
 ) -> QueueResourceOut:
-    duplicate = (
-        db.query(QueueResource)
-        .filter(
-            sa.or_(
-                QueueResource.code == payload.code,
-                QueueResource.queue_tag == payload.queue_tag,
-            )
-        )
-        .first()
+    # быстрый путь: дубликат, уже видимый до лока (Read-side fast fail)
+    duplicate = _find_duplicate(
+        db, code=payload.code, queue_tag=payload.queue_tag
     )
     if duplicate is not None:
-        field = (
-            "code"
-            if duplicate.code == payload.code
-            else "queue_tag"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"QueueResource {field}='{getattr(payload, field)}' already exists "
-                f"(row id={duplicate.id}, tag='{duplicate.queue_tag}')"
-            ),
-        )
+        raise _duplicate_conflict(payload.code, payload.queue_tag, duplicate)
 
     today = clinic_today(db)
     try:
         # serialization-scope §3.1(б) — наравне с Service-мутациями тега
         lock_owner_config_scope(db, payload.queue_tag)
+        # Round-3 P2: RE-CHECK ПОД ЛОКОМ. Дубликат-проверка ДО advisory
+        # lock не сериализована: два конкурентных POST одного тега оба
+        # видят «дубликата нет», затем второй упирается в UNIQUE
+        # (queue_tag/code) -> IntegrityError/500. После входа в
+        # serialization-scope перечитываем: дубликат, закоммиченный
+        # пока мы ждали лок, здесь видим и отвечаем 409.
+        duplicate = _find_duplicate(
+            db, code=payload.code, queue_tag=payload.queue_tag
+        )
+        if duplicate is not None:
+            # rollback отпускает txn-scoped advisory lock до выхода
+            db.rollback()
+            raise _duplicate_conflict(payload.code, payload.queue_tag, duplicate)
         if payload.active:
             # gate §3.1 (пины 1-2): тег доказанно doctorless
             validate_queue_resource_activation(db, payload.queue_tag, today)
@@ -160,6 +198,12 @@ def create_queue_resource(
     except OwnerInvariantViolation as exc:
         db.rollback()
         raise _reject_invariant(exc) from exc
+    except IntegrityError as exc:
+        # разные advisory-локи (одинаковый code при разных queue_tag)
+        # не сериализуют гонку целиком: UNIQUE-индекс — последняя линия;
+        # контракт обещает 409, а не 500 (round-3 P2)
+        db.rollback()
+        raise _unique_violation_conflict(exc) from exc
     db.refresh(row)
     return _out(row)
 
@@ -188,13 +232,37 @@ def update_queue_resource(
             status_code=status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND
         )
 
+    # queue_tag immutable (§3.2) — scope лока стабилен; сам лок нужен ДО
+    # повторного чтения, поэтому первый read — без блокировки
+    tag_scope = row.queue_tag
+
     changes = payload.model_dump(exclude_unset=True)
     today = clinic_today(db)
     try:
-        lock_owner_config_scope(db, row.queue_tag)
+        lock_owner_config_scope(db, tag_scope)
+        # Round-3 P2: re-read ПОД row-lock внутри serialization-scope —
+        # тот же протокол, что у Service writer-а (get_service_for_update).
+        # db.get ДО лока мог вернуть stale identity-map строку: advisory-лок
+        # не инвалидирует уже загруженные ORM-объекты, и после ожидания лока
+        # решения (gate активации, dirty-set) принимались бы по pre-lock
+        # снапшоту — вплоть до потери изменения (stale False->False не
+        # помечается dirty, хотя первый writer уже закоммитил True).
+        row = (
+            db.query(QueueResource)
+            .filter(QueueResource.id == resource_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        if row is None:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND
+            )
         if changes.get("active") is True and not row.active:
             # gate §3.1 на повторную активацию (POST active=true и
-            # последующий PATCH active: true — равные write-surfaces)
+            # последующий PATCH active: true — равные write-surfaces);
+            # решение — по перечитанной под локом строке
             validate_queue_resource_activation(db, row.queue_tag, today)
         for field, value in changes.items():
             setattr(row, field, value)
@@ -207,5 +275,8 @@ def update_queue_resource(
     except OwnerInvariantViolation as exc:
         db.rollback()
         raise _reject_invariant(exc) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise _unique_violation_conflict(exc) from exc
     db.refresh(row)
     return _out(row)

@@ -21,6 +21,16 @@ SQLite-матрица ниже (атомарный reject по owner-sensitive �
 batch-writer <-> canonical single writer, sorted, без deadlock).
 Round-2 (P1-2): same-Service конкурентные мутации валидируются по
 перечитанной locked-строке (SELECT ... FOR UPDATE) — пины 13/14.
+
+Round-3 (owner-ревью PR #3339, P2-волна): пин 16 — explicit `null` для
+NOT NULL полей PATCH QueueResource -> 422 (DTO-валидатор, nullable
+только `default_cabinet`); пин 17 — дубликат code/queue_tag -> 409;
+пин 18 — PATCH перечитывает строку ПОД serialization-scope (stale
+identity-map не участвует в решениях); пины 19/20 — конкурентные POST
+QueueResource: same-tag (post-lock re-check) и same-code/different-tag
+(UNIQUE-нарушение -> 409, не 500), PG-only; пин 21 — batch: audit-строки
+внутри batch-транзакции (commit=False), ОДИН commit на изменения +
+audit.
 """
 
 from __future__ import annotations
@@ -1241,3 +1251,308 @@ def test_pin15_batch_writer_vs_single_retag_sorted_no_deadlock(
             check.close()
     finally:
         _pg_cleanup(admin_engine, engine, schema)
+
+
+# ===================== round-3 P2-волна: пины 16-21 =====================
+
+
+def test_pin16_patch_explicit_null_not_null_field_rejected_422() -> None:
+    """Пин 16 (round-3 P2): explicit `null` для NOT NULL полей
+    PATCH-схемы -> ValidationError (FastAPI -> 422 на входе); nullable
+    только `default_cabinet`; absent-поля остаются «нет изменения»."""
+    from pydantic import ValidationError
+
+    for field in ("display_name", "start_number_online", "max_online_per_day", "active"):
+        with pytest.raises(ValidationError) as exc_info:
+            QueueResourceUpdate.model_validate({field: None})
+        # причина — наш валидатор, а не неудавшееся приведение типа
+        assert "NOT NULL" in str(exc_info.value)
+
+    # nullable-поле: explicit null легален (очистка кабинета)
+    cleared = QueueResourceUpdate.model_validate({"default_cabinet": None})
+    assert cleared.model_dump(exclude_unset=True) == {"default_cabinet": None}
+
+    # absent = нет изменения (exclude_unset-семантика endpoint'а)
+    assert QueueResourceUpdate().model_dump(exclude_unset=True) == {}
+
+
+def test_pin17_create_duplicate_code_or_tag_409(
+    db_session: Session,
+) -> None:
+    """Пин 17 (round-3 P2): POST QueueResource с уже существующим
+    queue_tag или code -> 409 (быстрый путь ДО лока)."""
+    admin = _make_user(db_session, username="rq17_admin_dup")
+    _make_resource(db_session, code="dup-r", queue_tag="duptag")
+    from app.api.v1.endpoints.qr_queue import _resources
+
+    with pytest.raises(HTTPException) as exc_info:
+        _resources.create_queue_resource(
+            payload=QueueResourceCreate(
+                code="dup-r2", queue_tag="duptag", display_name="Дубль-тег"
+            ),
+            db=db_session,
+            current_user=admin,
+        )
+    assert exc_info.value.status_code == 409
+    assert "queue_tag" in exc_info.value.detail
+
+    with pytest.raises(HTTPException) as exc_info:
+        _resources.create_queue_resource(
+            payload=QueueResourceCreate(
+                code="dup-r", queue_tag="othertag", display_name="Дубль-код"
+            ),
+            db=db_session,
+            current_user=admin,
+        )
+    assert exc_info.value.status_code == 409
+    assert "code" in exc_info.value.detail
+    assert db_session.query(QueueResource).count() == 1
+
+
+def test_pin18_patch_rereads_row_under_serialization_scope(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Пин 18 (round-3 P2): PATCH перечитывает строку под row-lock после
+    входа в serialization-scope — gate активации решает по ФАКТИЧЕСКОМУ
+    состоянию строки, а не по stale identity-map снапшоту."""
+    admin = _make_user(db_session, username="rq17_admin_stale")
+    _make_service(db_session, name="Анализ ST1", queue_tag="stale1")
+    row = _make_resource(
+        db_session, code="stale1-r", queue_tag="stale1", active=True
+    )
+
+    # внешний writer деактивирует строку ПОЗА identity-map db_session
+    from sqlalchemy.orm import sessionmaker
+
+    Other = sessionmaker(bind=db_session.get_bind(), expire_on_commit=False)
+    other = Other()
+    try:
+        other.query(QueueResource).filter(QueueResource.id == row.id).update(
+            {"active": False}
+        )
+        other.commit()
+    finally:
+        other.close()
+
+    # db_session держит stale active=True; контроль: запрос ДО endpoint
+    # возвращает ТОТ ЖЕ identity-map объект, который db.get в endpoint'е
+    # отдаст без обращения к БД — именно этот stale снапшот re-read под
+    # локом обязан перезатереть (populate_existing)
+    stale_view = db_session.query(QueueResource).filter(
+        QueueResource.id == row.id
+    ).first()
+    assert stale_view.active is True  # stale снапшот ещё жив
+
+    from app.api.v1.endpoints.qr_queue import _resources
+
+    calls = []
+    real_gate = _resources.validate_queue_resource_activation
+
+    def gate_spy(db, queue_tag, today):
+        calls.append(queue_tag)
+        return real_gate(db, queue_tag, today)
+
+    monkeypatch.setattr(_resources, "validate_queue_resource_activation", gate_spy)
+
+    # PATCH active=true при ФАКТИЧЕСКИ деактивированной строке: re-read под
+    # локом обязан вернуть active=False -> gate вызывается ровно один раз
+    updated = _resources.update_queue_resource(
+        resource_id=row.id,
+        payload=QueueResourceUpdate(active=True),
+        db=db_session,
+        current_user=admin,
+    )
+    assert calls == ["stale1"], (
+        "gate must run against the re-read (post-lock) row state"
+    )
+    assert updated.active is True
+
+
+def test_pin19_concurrent_post_same_tag_second_waits_then_409(
+    db_session: Session,
+) -> None:
+    """Пин 19 (round-3 P2): конкурентные POST одного queue_tag — второй
+    writer после ожидания advisory-лока перечитывает дубликат ПОД локом и
+    получает 409 (не IntegrityError/500). PG-only."""
+    engine, admin_engine, schema = _pg_engine_factory()
+    if engine is None:
+        pytest.skip("requires PostgreSQL (CI or disposable clinic_test db)")
+    try:
+        _pg_seed_and_metadata(engine)
+        sessionmaker = __import__(
+            "sqlalchemy.orm", fromlist=["sessionmaker"]
+        ).sessionmaker
+        SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+        setup = SessionLocal()
+        admin = _make_user(setup, username="rq17_pg_admin19")
+        setup.commit()
+        setup.close()
+
+        from app.api.v1.endpoints.qr_queue import _resources
+
+        def writer_tag():
+            s = SessionLocal()
+            try:
+                _resources.create_queue_resource(
+                    payload=QueueResourceCreate(
+                        code="race19-a", queue_tag="race19", display_name="A"
+                    ),
+                    db=s,
+                    current_user=admin,
+                )
+            finally:
+                s.close()
+
+        def writer_tag2():
+            s = SessionLocal()
+            try:
+                _resources.create_queue_resource(
+                    payload=QueueResourceCreate(
+                        code="race19-b", queue_tag="race19", display_name="B"
+                    ),
+                    db=s,
+                    current_user=admin,
+                )
+            finally:
+                s.close()
+
+        outcome_a, outcome_b = _run_two_writers(writer_tag, writer_tag2)
+        outcomes = [outcome_a, outcome_b]
+        succeeded = [o for o in outcomes if o is None]
+        rejected = [o for o in outcomes if o is not None]
+        assert len(succeeded) == 1, f"expected exactly one success, got {outcomes!r}"
+        assert len(rejected) == 1, f"expected exactly one reject, got {outcomes!r}"
+        assert isinstance(rejected[0], HTTPException), type(rejected[0])
+        assert rejected[0].status_code == 409
+
+        check = SessionLocal()
+        try:
+            assert check.query(QueueResource).count() == 1
+        finally:
+            check.close()
+    finally:
+        _pg_cleanup(admin_engine, engine, schema)
+
+
+def test_pin20_concurrent_post_same_code_different_tags_unique_maps_409(
+    db_session: Session,
+) -> None:
+    """Пин 20 (round-3 P2): конкурентные POST с ОДИНАКОВЫМ code при
+    РАЗНЫХ queue_tag — advisory-локи разные, serialization-scope не общий;
+    проигравший упирается в UNIQUE-индекс и ДОЛЖЕН получить 409 (маппинг
+    IntegrityError), а не 500. PG-only."""
+    engine, admin_engine, schema = _pg_engine_factory()
+    if engine is None:
+        pytest.skip("requires PostgreSQL (CI or disposable clinic_test db)")
+    try:
+        _pg_seed_and_metadata(engine)
+        sessionmaker = __import__(
+            "sqlalchemy.orm", fromlist=["sessionmaker"]
+        ).sessionmaker
+        SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+        setup = SessionLocal()
+        admin = _make_user(setup, username="rq17_pg_admin20")
+        setup.commit()
+        setup.close()
+
+        from app.api.v1.endpoints.qr_queue import _resources
+
+        def writer_tag1():
+            s = SessionLocal()
+            try:
+                _resources.create_queue_resource(
+                    payload=QueueResourceCreate(
+                        code="race20", queue_tag="race20a", display_name="A"
+                    ),
+                    db=s,
+                    current_user=admin,
+                )
+            finally:
+                s.close()
+
+        def writer_tag2():
+            s = SessionLocal()
+            try:
+                _resources.create_queue_resource(
+                    payload=QueueResourceCreate(
+                        code="race20", queue_tag="race20b", display_name="B"
+                    ),
+                    db=s,
+                    current_user=admin,
+                )
+            finally:
+                s.close()
+
+        outcome_a, outcome_b = _run_two_writers(writer_tag1, writer_tag2)
+        outcomes = [outcome_a, outcome_b]
+        succeeded = [o for o in outcomes if o is None]
+        rejected = [o for o in outcomes if o is not None]
+        assert len(succeeded) == 1, f"expected exactly one success, got {outcomes!r}"
+        assert len(rejected) == 1, f"expected exactly one reject, got {outcomes!r}"
+        # IntegrityError НЕ допускается наружу — только маппнутый 409
+        assert isinstance(rejected[0], HTTPException), type(rejected[0])
+        assert rejected[0].status_code == 409
+
+        check = SessionLocal()
+        try:
+            assert check.query(QueueResource).count() == 1
+        finally:
+            check.close()
+    finally:
+        _pg_cleanup(admin_engine, engine, schema)
+
+
+def test_pin21_batch_audit_rows_share_single_commit_transaction(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Пин 21 (round-3 P2): batch_update_services пишет audit-строки ВНУТРИ
+    своей транзакции (commit=False), и ОДИН commit применяет изменения +
+    audit атомарно. Внутренний commit audit-хелпера ломал single-commit
+    границу: первый же audit коммитил batch и отпускал локи до конца
+    критической секции."""
+    from sqlalchemy import inspect as sa_inspect
+
+    from app.models.service_audit import ServiceAuditLog
+    from app.services.service_audit_service import ServiceAuditService
+
+    service = _make_service(db_session, name="Анализ AUD1", queue_tag="audtag1")
+
+    original = ServiceAuditService.log_service_change
+    calls = []
+
+    def spy(self, *, commit=True, **kwargs):
+        calls.append({"commit": commit, "in_txn": self.db.in_transaction()})
+        return original(self, commit=commit, **kwargs)
+
+    monkeypatch.setattr(ServiceAuditService, "log_service_change", spy)
+
+    ServicesApiService(db_session).batch_update_services(
+        service_ids=[service.id],
+        updates={"price": 777},
+        comment="single-commit boundary pin",
+    )
+
+    assert calls, "audit rows must be written for every batch member"
+    assert all(call["commit"] is False for call in calls), calls
+    # каждая audit-строка создавалась в ОТКРЫТОЙ транзакции batch'а
+    # (legacy-поведение: после внутреннего commit первого audit-вызова
+    # последующие вызовы видели бы in_txn=False)
+    assert all(call["in_txn"] is True for call in calls), calls
+
+    # audit-строки закоммичены вместе с изменением
+    count = db_session.query(ServiceAuditLog).filter(
+        ServiceAuditLog.service_id == service.id
+    ).count()
+    assert count == 1
+    db_session.expire_all()
+    assert db_session.get(Service, service.id).price == 777
+    audit_row = (
+        db_session.query(ServiceAuditLog)
+        .filter(ServiceAuditLog.service_id == service.id)
+        .one()
+    )
+    assert audit_row.comment == "Batch update: single-commit boundary pin"
+    assert "price" in (audit_row.changes or {})
+    assert not sa_inspect(audit_row).pending

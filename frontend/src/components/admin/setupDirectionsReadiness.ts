@@ -8,8 +8,14 @@
  * Steps per tag row:
  *  (а) исполнитель по оси D-01: resource-owned — ACTIVE QueueResource с
  *      exact queue_tag (resource routing predicate); doctor-owned —
- *      активная услуга тега с requires_doctor=true и назначенным врачом
- *      (doctor-owner fallback morning pipeline);
+ *      ЭЛИГИБЕЛЬНАЯ активная Doctor-запись соответствующей specialty
+ *      (brief §3(а) буквально; round-3 owner-ревью P1): read-side
+ *      `/services/admin/doctors` отдаёт только активных врачей, а
+ *      specialty сопоставляется тегу направления (specialty/tag
+ *      mapping). FK `Service.doctor_id` НЕ является критерием (а):
+ *      деактивированный врач с оставшимся FK давал ложное «готово», а
+ *      новый канонический Doctor без проставленного FK — ложное «нет
+ *      исполнителя»;
  *  (б) ≥ 1 активная услуга с этим queue_tag;
  *  (в) активный QueueProfile владеет тегом;
  *  (г) профиль visible (show_on_qr_page);
@@ -45,6 +51,15 @@ export interface ChecklistResourceDto {
   [key: string]: unknown;
 }
 
+/** Read-side `GET /services/admin/doctors` — активные Doctor-записи. */
+export interface ChecklistDoctorDto {
+  id: number;
+  specialty?: string | null;
+  cabinet?: string | null;
+  active?: boolean;
+  [key: string]: unknown;
+}
+
 /** Read-side `GET /queue/directions/{profile_key}/entry-methods`. */
 export interface EntryMethodsDto {
   direction_key?: string;
@@ -59,8 +74,18 @@ export interface TagReadiness {
   axis: DirectionAxis;
   /** (а) — ACTIVE QueueResource (resource-owned leg). */
   activeResource: ChecklistResourceDto | null;
-  /** (а) — doctor-owned leg: активная doctor-required услуга тега с врачом. */
-  doctorService: ChecklistServiceDto | null;
+  /**
+   * (а) — doctor-owned leg: элигибельная активная Doctor-запись
+   * соответствующей specialty (brief §3(а)). Сервис-привязка
+   * (требуется runtime-владельцу тега — single_active_service_doctor)
+   * отражена отдельно в doctorBoundService.
+   */
+  eligibleDoctors: ChecklistDoctorDto[];
+  /**
+   * Инфо-поле: активная requires_doctor-услуга тега с назначенным врачом
+   * (сервис-привязка runtime-владельца; НЕ критерий (а)).
+   */
+  doctorBoundService: ChecklistServiceDto | null;
   /** (а) — исполнитель готов хотя бы по одной оси. */
   executorReady: boolean;
   /** (б) — активные услуги тега (все). */
@@ -108,6 +133,52 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+/**
+ * Нормализация для specialty/tag mapping: теги направлений в этой системе
+ * каноничны по naming'у specialty (QUEUE_GROUPS: cardiology, dermatology,
+ * stomatology, laboratory, …), поэтому принадлежность врача направлению —
+ * нормализованное равенство specialty и queue_tag.
+ */
+export function specialtyTagKey(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+/** Sentinel незаполненного профиля врача (core/specialties.py; incomplete
+ * profile не может быть владельцем очереди — тот же контракт, что и у
+ * runtime-элигибельности `eligible_real_doctor`). */
+const INCOMPLETE_SPECIALTY_SENTINEL = 'general';
+
+/**
+ * (а) doctor-owned leg: элигибельные активные Doctor-записи, чья specialty
+ * соответствует тегу направления. Read-side `/services/admin/doctors`
+ * возвращает только активных записей; элигибельность дополнительно требует
+ * реальной (не-sentinel/непустой) specialty — строка с пустой/`general`
+ * specialty не может быть владельцем направления.
+ */
+export function eligibleDoctorsForTag(
+  doctors: ChecklistDoctorDto[],
+  tag: string,
+): ChecklistDoctorDto[] {
+  const tagKey = specialtyTagKey(tag);
+  if (!tagKey) {
+    return [];
+  }
+  return doctors.filter((doctor) => {
+    if (doctor.active === false) {
+      return false;
+    }
+    const specialtyKey = specialtyTagKey(doctor.specialty);
+    if (
+      !specialtyKey ||
+      specialtyKey === INCOMPLETE_SPECIALTY_SENTINEL ||
+      specialtyKey !== tagKey
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
 /** `permanent_address.supported` из перечисления entry-methods (brief §3(д)). */
 export function readPermanentAddressSupported(response: unknown): boolean | null {
   if (!isRecord(response)) {
@@ -130,6 +201,7 @@ export function buildChecklist(
   profiles: ChecklistProfileDto[],
   resources: ChecklistResourceDto[],
   entryMethodsByProfileKey: Record<string, EntryMethodsDto | null> = {},
+  doctors: ChecklistDoctorDto[] = [],
 ): Checklist {
   const checklist: Checklist = {};
   const tags = collectKnownTags(services, profiles, resources);
@@ -143,7 +215,11 @@ export function buildChecklist(
     );
     const activeResource =
       resources.find((r) => r.queue_tag === tag && r.active === true) || null;
-    const doctorService =
+
+    // (а) doctor-owned leg — по реальным Doctor-записям specialty/tag
+    // mapping (brief §3(а)), НЕ по FK услуги; сервис-привязка — инфо
+    const eligibleDoctors = eligibleDoctorsForTag(doctors, tag);
+    const doctorBoundService =
       activeServices.find(
         (s) => s.requires_doctor === true && s.doctor_id != null,
       ) || null;
@@ -167,7 +243,7 @@ export function buildChecklist(
 
     const axis: DirectionAxis = activeResource
       ? 'resource'
-      : doctorService
+      : eligibleDoctors.length > 0
         ? 'doctor'
         : null;
 
@@ -175,8 +251,9 @@ export function buildChecklist(
       tag,
       axis,
       activeResource,
-      doctorService,
-      executorReady: activeResource != null || doctorService != null,
+      eligibleDoctors,
+      doctorBoundService,
+      executorReady: activeResource != null || eligibleDoctors.length > 0,
       activeServices,
       activeDoctorlessServices,
       owningProfile,

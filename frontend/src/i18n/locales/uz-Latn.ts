@@ -2451,6 +2451,7 @@ const uzLatn = {
     sdx_axis_resource_desc: 'Kun + QueueResource.id. Xizmatlar/profil avval tayyorlanadi, resurs draft sifatida yaratilib, gate orqali faollashtiriladi.',
     sdx_choose: 'Tanlash',
     sdx_wizard_tag_placeholder: 'Yo\'nalish tegi (mavjuddan)',
+    sdx_wizard_tag_optional_hint: 'Ro\'yxatda yangi teg hali yo\'qmi? Tanlamasdan davom eting — u profil/xizmat yaratilgandan keyin paydo bo\'ladi va qaytgandan keyin shu yerdan tanlanadi.',
     sdx_wizard_services_hint: 'Xizmat yarating va uni yo\'nalish tegiga bog\'lang (mavjud teglardan tanlash).',
     sdx_wizard_services_link: '"Xizmatlar"ni ochish (katalog)',
     sdx_next: 'Keyingi',
