@@ -70,6 +70,28 @@ describe('patientActivateDeepLink (Phase 0 follow-up)', () => {
     expect(window.location.hash).toBe('');
   });
 
+  it('decodes percent-encoded activation paths before matching (round 11)', () => {
+    // Codex P1 (round 11): React Router decodes the pathname before
+    // matching, so /patient/%61ctivate reaches the activation page while
+    // window.location.pathname stays encoded — the pre-telemetry strip
+    // must decode before comparing.
+    const token = 'f'.repeat(43);
+    window.history.replaceState(null, '', `/patient/%61ctivate#token=${token}`);
+
+    extractPatientActivationFragment();
+
+    expect(takePatientActivationFragmentToken()).toBe(token);
+    expect(window.location.hash).toBe('');
+  });
+
+  it('is a no-op for a malformed percent-encoded path', () => {
+    window.history.replaceState(null, '', '/patient/%E0%A4%A#token=abc');
+
+    extractPatientActivationFragment();
+
+    expect(takePatientActivationFragmentToken()).toBeNull();
+  });
+
   it('is a no-op on other routes even when a token-shaped fragment is present', () => {
     const token = 'c'.repeat(43);
     window.history.replaceState(null, '', `/some/page#token=${token}`);
