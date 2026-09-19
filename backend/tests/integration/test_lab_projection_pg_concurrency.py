@@ -61,8 +61,15 @@ def test_concurrent_sibling_finalize_creates_single_projection():
 
     scratch_name = f"lab_cguard_{uuid4().hex[:10]}"
     admin_engine = create_engine(_server_dsn(admin_dsn), isolation_level="AUTOCOMMIT")
-    with admin_engine.connect() as conn:
-        conn.execute(text(f'CREATE DATABASE "{scratch_name}"'))
+    try:
+        with admin_engine.connect() as conn:
+            conn.execute(text(f'CREATE DATABASE "{scratch_name}"'))
+    except Exception as exc:  # noqa: BLE001 - нет прав CREATE DATABASE и т.п.
+        admin_engine.dispose()
+        pytest.skip(
+            f"cannot create a scratch database on this PostgreSQL server "
+            f"({type(exc).__name__}); run against a server with CREATEDB"
+        )
 
     scratch_dsn = _server_dsn(admin_dsn).rsplit("/", 1)[0] + f"/{scratch_name}"
     scratch_engine = create_engine(scratch_dsn)
