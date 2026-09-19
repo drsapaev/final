@@ -34213,6 +34213,14 @@ export type components = {
          *     `max_online_per_day`/`default_cabinet`; `active` — lifecycle-переход
          *     под serialization-scope §3.1(б). `code`/`queue_tag` immutable
          *     (extra="forbid" -> 422 на попытку).
+         *
+         *     Nullable здесь только `default_cabinet` (единственная nullable-колонка
+         *     в таблице). Explicit `null` для остальных полей — 422 (round-3
+         *     owner-ревью P2): DB-колонки NOT NULL, и без этого пина explicit null
+         *     проходил Pydantic (`exclude_unset` сохранял его) и падал на
+         *     constraint violation уже в БД -> 500 вместо 422. Отличать explicit
+         *     null от unset позволяет `model_fields_set` — absent-поле в него не
+         *     попадает и остаётся «нет изменения».
          */
         QueueResourceUpdate: {
             /** Display Name */
