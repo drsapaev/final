@@ -803,6 +803,8 @@ jobs:
         npx playwright test e2e/registrar-time.spec.ts --project=chromium
 
     - name: 📸 UX Audit e2e + Visual regression (Chromium)
+      env:
+        UPDATE_SNAPSHOTS_FLAG: ${{ github.event.inputs.update_snapshots == 'true' && '--update-snapshots' || '' }}
       run: |
         cd frontend
         # --retries=0 is MANDATORY for UX/Visual E2E. These tests must pass
@@ -822,7 +824,10 @@ jobs:
         # with its own seeded pre-existing-findings baseline
         # (e2e/a11y-baseline-auth.json — same shrink-only ratchet contract;
         # remediation increments must shrink it toward zero).
-        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts e2e/a11y-axe-authenticated.spec.ts --project=chromium --retries=0 2>&1 | tee ux-audit-output.txt
+        # PR7: dispatch with update_snapshots=true regenerates the LINUX
+        # visual baselines in-place (the dedicated update step below runs
+        # only after this step and cannot fix an already-failed spec run).
+        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts e2e/a11y-axe-authenticated.spec.ts --project=chromium --retries=0 $UPDATE_SNAPSHOTS_FLAG 2>&1 | tee ux-audit-output.txt
       # E2E root-cause fix: removed continue-on-error. All non-fixme tests
       # must pass. Tests marked test.fixme have documented root causes and
       # are tracked for follow-up. See PR description for details.
