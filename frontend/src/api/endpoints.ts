@@ -42,6 +42,19 @@ export const API_ENDPOINTS = {
     STATS: '/patients/stats'
   },
 
+  // Портал пациента (Phase 0: PR-A1 OTP-вход + PR-A2 активация карты)
+  PATIENT_ACCESS: {
+    // PR-A1: телефонный OTP-вход уже активированного пациента
+    REQUEST_OTP: '/patient-access/request-otp',
+    VERIFY_OTP: '/patient-access/verify-otp',
+    LOGIN: '/patient-access/login',
+    // PR-A2: активация карты по staff-токену (публичные шаги)
+    ACTIVATE_REQUEST_OTP: '/patient-access/activate/request-otp',
+    ACTIVATE_CONFIRM: '/patient-access/activate/confirm',
+    // PR-A2: выдача токена активации (Admin|Registrar)
+    ISSUE_ACTIVATION_TOKEN: (patientId: string | number) => `/patients/${patientId}/activation-token`
+  },
+
   // Врачи
   DOCTORS: {
     LIST: '/doctors',
