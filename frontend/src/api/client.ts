@@ -382,7 +382,6 @@ api.interceptors.response.use(
       const hadAuthHeader = !!config.headers?.Authorization;
       const failedToken = String(config.headers?.Authorization || '')
         .replace(/^Bearer\s+/i, '');
-      const currentToken = tokenManager.getAccessToken();
       const refreshToken = tokenManager.getRefreshToken();
 
       if (hadAuthHeader && refreshToken && !config._retriedAfterRefresh) {
@@ -396,7 +395,19 @@ api.interceptors.response.use(
           return api.request(config);
         }
         // Session is dead only if no newer session took its place meanwhile.
-        if (!currentToken || failedToken === currentToken) {
+        // Phase 0 PR-B review round 2 (P1): the decision MUST be made on the
+        // LIVE access token re-read AFTER the await — not on a snapshot taken
+        // before it. Interleaving: 401 on a staff request → refresh starts →
+        // patient login replaces the session mid-flight (replaceAccessOnlySession)
+        // → the stale staff refresh is dropped by the performTokenRefresh
+        // guard → resolve null here. With the old pre-await snapshot
+        // (failedToken === snapshot) clearAll() wiped the freshly installed
+        // Patient session right after a successful login. liveToken now
+        // differs from failedToken (or the new session is access-only and
+        // still present), so the replacement survives; a genuinely dead
+        // session still fails the check and gets cleared.
+        const liveToken = tokenManager.getAccessToken();
+        if (!liveToken || failedToken === liveToken) {
           logger.warn('🔒 Token refresh failed — clearing session');
           tokenManager.clearAll();
           delete api.defaults.headers.common['Authorization'];

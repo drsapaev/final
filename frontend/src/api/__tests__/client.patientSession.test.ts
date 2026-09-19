@@ -13,7 +13,7 @@
  *       written back over the patient session.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { type AxiosResponse } from 'axios';
+import { AxiosError, AxiosHeaders, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 
 const tokenState = vi.hoisted(() => ({
   access: null as string | null,
@@ -83,6 +83,52 @@ function make200(data: unknown): AxiosResponse {
     data,
     config: {} as never
   } as AxiosResponse;
+}
+
+function make401(configUrl: string, method = 'get'): AxiosError {
+  const config = {
+    url: configUrl,
+    method,
+    headers: AxiosHeaders.from({ Authorization: 'Bearer placeholder' })
+  } as never;
+  const response: Partial<AxiosResponse> = {
+    status: 401,
+    statusText: 'Unauthorized',
+    headers: {},
+    data: { detail: 'Not authenticated' },
+    config
+  };
+  return new AxiosError(
+    'Request failed with status code 401',
+    'ERR_BAD_REQUEST',
+    config,
+    null,
+    response as AxiosResponse
+  );
+}
+
+/**
+ * 401 carrying the REAL request config (like the browser xhr adapter does).
+ * Using a static config here would put a placeholder Authorization into
+ * failedToken and silently bypass the failedToken === liveToken cleanup
+ * comparison — the race test must reproduce the production interceptor
+ * inputs exactly.
+ */
+function make401FromRealConfig(config: InternalAxiosRequestConfig): AxiosError {
+  const response: Partial<AxiosResponse> = {
+    status: 401,
+    statusText: 'Unauthorized',
+    headers: {},
+    data: { detail: 'Not authenticated' },
+    config
+  };
+  return new AxiosError(
+    'Request failed with status code 401',
+    'ERR_BAD_REQUEST',
+    config,
+    null,
+    response as AxiosResponse
+  );
 }
 
 const PATIENT_PROFILE = { id: 42, username: 'patient-42', role: 'Patient' } as Record<string, unknown>;
@@ -180,5 +226,96 @@ describe('access-only patient session replacement (P1)', () => {
     expect(tokenState.access).toBe(patientJwt);
     expect(tokenState.refresh).toBeNull();
     expect(tokenState.cleared).toBe(0);
+  });
+
+  it('does NOT wipe the replaced patient session in the reactive 401 cleanup (round-2 P1 race)', async () => {
+    // Deterministic interleaving prescribed by the owner review:
+    //   staff access + staff refresh
+    //   → business request gets 401
+    //   → hold the refresh response pending (snapshot + await already taken
+    //     by the interceptor — proven by the refresh being in flight)
+    //   → replaceAccessOnlySession(Patient)
+    //   → resolve the old staff refresh (guard drops rotated credentials)
+    //   → the post-await cleanup decision must keep the patient session.
+    const staffJwt = createJwt(3600);
+    expect(tokenState.access).toBe(staffJwt);
+    expect(tokenState.refresh).toBe('staff-refresh-token');
+
+    api.defaults.adapter = async (config) => {
+      const url = String(config.url || '');
+      if (url.includes('/visits/')) throw make401FromRealConfig(config);
+      throw new Error(`unexpected adapter call: ${url}`);
+    };
+
+    const refreshResolvers: Array<(value: AxiosResponse) => void> = [];
+    vi.spyOn(axios, 'post').mockImplementation(
+      () => new Promise<AxiosResponse>((resolve) => {
+        refreshResolvers.push(resolve);
+      })
+    );
+
+    const requestPromise = api.get('/api/v1/visits/42');
+
+    // Flush microtasks until the reactive refresh POST is actually in
+    // flight — the interceptor has taken its pre-await state and is parked
+    // inside `await forceRefreshToken()`.
+    for (let i = 0; i < 100 && refreshResolvers.length === 0; i++) {
+      await Promise.resolve();
+    }
+    expect(refreshResolvers.length).toBe(1);
+
+    // The patient logs in while the staff refresh is pending. The patient
+    // JWT must differ from the staff one BYTE-WISE (distinct exp) —
+    // otherwise failedToken === liveToken degenerates to string equality of
+    // two identical tokens and the test proves nothing.
+    const patientJwt = createJwt(7200);
+    replaceAccessOnlySession(patientJwt, PATIENT_PROFILE);
+    expect(tokenState.access).toBe(patientJwt);
+    expect(patientJwt).not.toBe(staffJwt);
+    expect(tokenState.refresh).toBeNull();
+
+    // The stale staff refresh resolves with rotated credentials;
+    // performTokenRefresh correctly drops them (returns null).
+    refreshResolvers[0](
+      make200({ access_token: 'rotated-staff-access', refresh_token: 'rotated-staff-refresh' })
+    );
+
+    // The business request itself still surfaces the original 401 (nothing
+    // to retry with — that path is unchanged), but the cleanup must NOT
+    // take the replaced session with it.
+    await expect(requestPromise).rejects.toMatchObject({ response: { status: 401 } });
+
+    // Patient session survives:
+    expect(tokenState.access).toBe(patientJwt);
+    expect(tokenState.refresh).toBeNull();
+    expect(tokenState.user).toEqual(PATIENT_PROFILE);
+    // clearAll() was NOT called — the pre-await snapshot would have matched
+    // failedToken and wiped everything.
+    expect(tokenState.cleared).toBe(0);
+    // Rotated staff tokens were not installed either.
+    expect(tokenState.access).not.toBe('rotated-staff-access');
+    expect(tokenState.refresh).not.toBe('rotated-staff-refresh');
+  });
+
+  it('still clears a genuinely dead staff session (no replacement) after a failed reactive refresh', async () => {
+    // Guard against over-correcting: without a mid-flight replacement the
+    // live token still equals failedToken → cleanup must happen as before.
+    const staffJwt = createJwt(3600);
+    expect(tokenState.access).toBe(staffJwt);
+
+    api.defaults.adapter = async (config) => {
+      const url = String(config.url || '');
+      if (url.includes('/visits/')) throw make401FromRealConfig(config);
+      throw new Error(`unexpected adapter call: ${url}`);
+    };
+    vi.spyOn(axios, 'post').mockRejectedValue(
+      make401('/api/v1/authentication/refresh', 'post')
+    );
+
+    await expect(api.get('/api/v1/visits/42')).rejects.toMatchObject({
+      response: { status: 401 }
+    });
+    expect(tokenState.cleared).toBe(1);
+    expect(tokenState.access).toBeNull();
   });
 });
