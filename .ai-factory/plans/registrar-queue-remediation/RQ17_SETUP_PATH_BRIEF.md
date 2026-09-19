@@ -4,7 +4,7 @@
 Старт-команда владельца: «продолжать план по регистратуру» (trace `1a0b5807929665e5`, 2026-09-18) — снимает note «RQ-17/RQ-18/RQ-26.b автоматически не начаты» (E-061) для этого среза; NURSE-V2 ведёт отдельный агент-исполнитель.
 Зависимости: RQ-05, RQ-06, RQ-16 — DONE; D-01 APPROVED (E-039, владелец 2026-09-15); D-03 APPROVED + форма адреса решена владельцем 2026-09-17 (E-055, `/q/<public_code>`). Открытых D-решений, блокирующих срез, нет (проверка DECISION_PROPOSALS 2026-09-18).
 Границы среза (Stop conditions из плана): без массового routing-refactor; без второй системы справочников; без второго User/Doctor-мастера. L-UI.
-Единственное допустимое новое backend-изменение среза — минимальный admin-контракт СУЩЕСТВУЮЩЕГО справочника QueueResource (owner-ревью #3327, trace `1a0b5baabe1bef79`, P1: без него resource-owned ось буквального acceptance S-14 «новый врач/ресурс» неисполнима — admin-CRUD QueueResource сегодня отсутствует); второй системы справочников это не создаёт — таблица и модель существуют с QD-2A, добавляется отсутствующая admin-поверхность. Следующий runtime-PR поэтому backend+frontend, а не frontend-only.
+Единственное допустимое новое backend-изменение среза — минимальный admin-контракт СУЩЕСТВУЮЩЕГО справочника QueueResource (owner-ревью #3327, trace `1a0b5baabe1bef79`, P1: без него resource-owned ось буквального acceptance S-14 «новый врач/ресурс» неисполнима — admin-CRUD QueueResource сегодня отсутствует); второй системы справочников это не создаёт — таблица и модель существуют с QD-2A, добавляется отсутствующая admin-поверхность. Следующий runtime-PR поэтому backend+frontend, а не frontend-only. Второй fix-round (owner-ревью #3327 round 2, trace `1a0b753b8bba6041`): контракт обязан нести системный инвариант владельца тега resource-tag ⇔ doctorless-service (§3.1, обе write-surfaces) и точный mutability contract QueueResource (§3.2) — без них один admin-POST активной строки меняет owner-семантику doctor-owned направления (нарушение D-01/RQ-05).
 
 ## 1. Карта существующих экранов (разведка 2026-09-18)
 
@@ -36,18 +36,65 @@ Baseline: **doctor-owned — 2 admin-раздела из разных секци
 
 Путь собирается из существующих экранов поверх уже принятых решений; единственное новое backend-изменение — минимальный admin-контракт QueueResource для resource-owned оси:
 
-- **Исполнитель** (D-01: doctor-owned `День + Doctor.id + канонический queue_tag` ИЛИ resource-owned `День + QueueResource.id`): doctor-owned — User(role=Doctor)+doctor_profile в `/admin/users`; Doctor-запись создаётся атомарно в той же транзакции (canonical onboarding), `/admin/doctors` — опциональная проверка/редактирование, НЕ второй creation step (S-14 «нет второго onboarding» соблюдается самой архитектурой). resource-owned — создание/настройка QueueResource требует минимального нового admin-контракта: `QueueResourceCreate`/Update DTO + `POST/PATCH /api/v1/queue/admin/queue-resources` + минимальная UI-поверхность менеджера (сегодня создания нет: только миграции 0059/0066, `backend/app/scripts/qd2e_setup.py`, тест-фикстуры). NURSE-V2 не затрагивается и не пересекается: QueueResource — существующий справочник QD-2A, добавляется отсутствующая admin-поверхность, не второй справочник.
+- **Исполнитель** (D-01: doctor-owned `День + Doctor.id + канонический queue_tag` ИЛИ resource-owned `День + QueueResource.id`): doctor-owned — User(role=Doctor)+doctor_profile в `/admin/users`; Doctor-запись создаётся атомарно в той же транзакции (canonical onboarding), `/admin/doctors` — опциональная проверка/редактирование, НЕ второй creation step (S-14 «нет второго onboarding» соблюдается самой архитектурой). resource-owned — создание/настройка QueueResource требует минимального нового admin-контракта: `QueueResourceCreate`/Update DTO + `POST/PATCH /api/v1/queue/admin/queue-resources` + минимальная UI-поверхность менеджера (сегодня создания нет: только миграции 0059/0066, `backend/app/scripts/qd2e_setup.py`, тест-фикстуры). NURSE-V2 не затрагивается и не пересекается: QueueResource — существующий справочник QD-2A, добавляется отсутствующая admin-поверхность, не второй справочник. Последовательность ресурсной оси подчинена gate §3.1: ACTIVE-ресурс нельзя создать до доказательства doctorless-услуги — ресурс создаётся draft (`active=false`) и активируется после готовности услуг/профиля (service/profile → активация ресурса); create `active=true` сразу — только при уже пройденном gate.
 - **Услуги**: `ServiceCatalog` — услуга с `queue_tag` из существующих профилей; `requires_doctor`/`department_key` синхронизируются из контракта профиля (уже реализовано, RQ-06).
 - **Отображение**: `QueueProfilesManager` — профиль (`queue_tags[]`, `show_on_qr_page`, департамент, кабинет/цвет/иконка). Профиль-обзор ≠ отдельная очередь (D-01: «QueueProfile — представление/направление, не ресурс-владелец»; «Обзор нескольких очередей не создаёт собственной нумерации»).
 - **Проверка (готовность)**: проверяемые связи шага — (а) исполнитель по оси D-01: для doctor-owned — активная Doctor-запись, принадлежащая specialty; для resource-owned — **ACTIVE QueueResource с exact `queue_tag`** (именно наличие такой строки определяет resource routing: `resolve_tag_resource` — `queue_tag == tag AND active`); (б) ≥1 активная услуга с этим `queue_tag`; (в) активный QueueProfile владеет тегом; (г) профиль visible (`show_on_qr_page`); (д) provision-статус постоянного адреса (D-03: provision идемпотентен, переименование не меняет адрес). Read-side: `/services`, `/queues/profiles?active_only=false`, `/services/admin/doctors` — существующие; read-side постоянного адреса — `GET /api/v1/queue/directions/{profile_key}/entry-methods` (поле `permanent_address.supported` в перечислении entry-methods; отдельного GET provision-эндпоинта НЕ существует), write-side — `POST /api/v1/queue/admin/directions/{profile_key}/public-address/provision`. Для doctor-owned оси все API существуют; готовность (а) resource-owned оси читается через новый минимальный контракт QueueResource (list-read включён в него) — следующий runtime-PR поэтому **backend+frontend, не frontend-only**.
 - **QR**: выдача/показ/скачивание постоянного `/q/<public_code>` — **RQ-18** (готовый бэкенд RQ-16.d: provision + анонимный start-session). RQ-17 останавливается на provision-статусе и явном указании «QR появится здесь после RQ-18» — не дублируем и не опережаем.
+
+## 3.1. Системный инвариант владельца тега: resource-tag ⇔ doctorless-service (обязательная часть admin-контракта; owner-ревью round 2, P1)
+
+QueueResource — не безобидная справочная строка. Runtime выбирает ось маршрутизации по единственному предикату `resolve_tag_resource` = `queue_tag == tag AND active` (`backend/app/crud/queue_resource_routing.py:46-64`), и `MorningAssignmentService` при наличии такой строки пре-создаёт очередь на РЕСУРСНОЙ оси (`specialist_id=NULL + queue_resource_id`), не доходя до doctor-owner fallback (`backend/app/services/morning_assignment.py:151-176` — ветка `continue` мимо `single_active_service_doctor`). Поэтому один admin-POST активной строки по тегу, фактически принадлежащему врачу, делает тег registry-backed и меняет owner-семантику doctor-owned направления — хотя ни одна другая таблица не менялась. Это нарушение D-01/RQ-05 самой архитектурой write-пути, а не неточность чек-листа.
+
+В репозитории уже есть безопасный прецедент: миграция 0059 перед созданием каждой QueueResource-строки применяет `_evaluate_service_gate` (`backend/alembic/versions/0059_resource_seed_backfill.py:290-314`): tag доказан doctorless (≥1 активная doctorless-услуга, 0 активных `requires_doctor=true`), иначе ABORT; mixed-семантика внутри одного тега запрещена. Новый admin-контракт обязан перенести этот инвариант в runtime как ЕДИНОЕ межтабличное правило обеих write-surfaces:
+
+    ACTIVE QueueResource(tag)  ⇒  tag доказан doctorless:
+      ≥ 1 активная doctorless-услуга (requires_doctor=false)
+      0 активных услуг с requires_doctor=true
+
+Проверки обязаны стоять:
+
+- при создании/активации QueueResource (POST `active=true` и последующий PATCH `active: true`);
+- при изменении `queue_tag` (по §3.2 исключено из обычного PATCH; gate сохраняется в контракте любой будущей retag-операции);
+- при create/update/активации Service, если тег уже resource-backed: сегодня `ServicesApiService.create_service`/`update_service` НЕ проверяют наличие ACTIVE QueueResource (`backend/app/services/services_api_service.py:303,350`) — без гейта mixed-семантика собирается в два шага: безопасный ресурс на doctorless-теге → позже Service(`requires_doctor=true`) на том же теге, и система внутренне противоречива.
+
+Негативные тест-пины минимума (обязательны в runtime-PR):
+
+1. POST ресурса на тег с активной `requires_doctor=true`-услугой → reject;
+2. POST ресурса на mixed-тег (одновременно doctorless и requires_doctor) → reject;
+3. Service(`requires_doctor=true`) на тег с ACTIVE ресурсом → reject;
+4. перевод doctorless-услуги в `requires_doctor=true` при существующем ACTIVE ресурсе → reject.
+
+Из gate следует и коррекция последовательности S-14: ACTIVE-ресурс нельзя безопасно создать до доказательства doctorless-услуги, поэтому целевой путь ресурсной оси — «service/profile → QueueResource activation»: услуги/профиль готовятся первыми, ресурс создаётся draft (`active=false`) и активируется после прохождения gate; допустимый эквивалент — create сразу `active=true`, когда gate уже пройден. Без этого правила формально красивый CRUD следующего runtime-PR меняет маршрутизацию пациентов неверно.
+
+## 3.2. Mutability contract QueueResource (обязательная часть admin-контракта; owner-ревью round 2, P2)
+
+Модель несёт поля разной семантики (`backend/app/models/online_queue.py:107-120`); brief «QueueResourceCreate/Update DTO» без mutability-контракта недоопределён. Контракт минимального admin-контракта:
+
+| Поле | После create | Обоснование |
+|---|---|---|
+| `id` | immutable | технический PK |
+| `code` | immutable | машинный идентификатор строки реестра (unique) |
+| `queue_tag` | **immutable** | routing-ключ, на который завязаны исторические `DailyQueue.queue_tag`, `Service.queue_tag`, `QueueProfile.queue_tags[]`: обычный PATCH «lab → diagnostics» не обновит эти поверхности — один `QueueResource.id` останется с историческими очередями старого тега и новым routing-тегом, следующий день маршрутизируется иначе (S-26: существующие номера/владелец/история не мигрируют молча) |
+| `display_name` | PATCH (ordinary) | отображение |
+| `start_number_online` | PATCH (ordinary) | нумерация (эквивалент `Doctor.start_number_online` для ресурсных очередей) |
+| `max_online_per_day` | PATCH (ordinary) | лимит онлайн-талонов |
+| `default_cabinet` | PATCH (ordinary) | кабинет (nullable) |
+| `active` | PATCH — только с lifecycle-семантикой ниже | переключатель оси маршрутизации тега |
+
+Изменение `queue_tag` — НЕ обычный PATCH: если такая потребность когда-либо подтвердится, это отдельная lifecycle/retag-операция с preview, проверкой service/profile-consistency и историческими гарантиями (S-26) — вне scope минимального контракта RQ-17.
+
+Lifecycle-семантика `active` записывается в API-контракт и тесты явно (не как случайное следствие существующего кода):
+
+- `active=true` — тег маршрутизируется на ресурсную ось (`resolve_tag_resource`), утренний пайплайн пре-создаёт ресурсную DailyQueue;
+- `active=false` — НОВЫЕ ресурсные очереди тега не создаются (утренний пайплайн уходит в doctor-owner/fail-closed ветку), при этом существующая resource-owned DailyQueue остаётся маршрутизируемой для завершения обслуживания (деактивация не осиротяет открытую очередь; новая очередь требует ACTIVE registry-строки).
 
 ## 4. Экран-вход (shape, реализация — следующий срез)
 
 Один новый admin-route (кандидат: `/admin/setup-directions`, id `admin-setup-directions`, секция `nav.section_clinic_queue`; точное место — по текущей навигации), который:
 
 1. показывает **checklist готовности направлений** по профиль/тег-строкам: шаги §3 (а)–(д) со статусами «готово / не хватает X / где исправить» — каждая «не хватает» ведёт прямой ссылкой в соответствующий экран и открывает соответствующую форму (существующий экран; для resource-owned готовности (а) — новая минимальная поверхность менеджера QueueResource; без дублирования CRUD);
-2. начинает **мастер нового направления** S-14 с пустой формы: последовательность §3, каждый шаг = переход в соответствующий экран с возвратом на checklist (существующий экран; для resource-owned — новая минимальная поверхность менеджера QueueResource, единственное новое UI-изменение среза; никаких новых форм-дублей; сохранение/возврат/ошибка шага/повтор — обязательные состояния). Doctor-шаг ведёт в `/admin/users` (canonical onboarding, атомарное создание User+Doctor); `/admin/doctors` доступен из checklist только как опциональная проверка/редактирование — не как шаг создания;
+2. начинает **мастер нового направления** S-14 с пустой формы: последовательность §3, каждый шаг = переход в соответствующий экран с возвратом на checklist (существующий экран; для resource-owned — новая минимальная поверхность менеджера QueueResource, единственное новое UI-изменение среза; никаких новых форм-дублей; сохранение/возврат/ошибка шага/повтор — обязательные состояния). Doctor-шаг ведёт в `/admin/users` (canonical onboarding, атомарное создание User+Doctor); `/admin/doctors` доступен из checklist только как опциональная проверка/редактирование — не как шаг создания; для resource-owned мастер ведёт услуги/профиль до активации executor-шага: QueueResource создаётся draft (`active=false`) и активируется через gate §3.1 (service/profile → активация ресурса);
 3. не требует технических ключей: `queue_tag`/`profile_key`/`department_key` в UI пути не вводятся руками — выбор из существующих значений, синхронизации уже реализованы (RQ-06);
 4. после RQ-18 покажет колонку QR (provision → «Показать/скачать QR») — точка расширения зашита, но не реализуется в RQ-17.
 
@@ -55,11 +102,11 @@ Baseline: **doctor-owned — 2 admin-раздела из разных секци
 
 ## 5. Проверка среза (из плана §RQ-17)
 
-- **S-14** (`ACCEPTANCE.md:34`): новая specialty или существующая; новый врач/ресурс; синтетическая услуга → пройти предлагаемую настройку с пустой формы до статуса готовности; видны обязательные связи и ошибки; нет второго onboarding; профиль-обзор отличается от отдельной очереди; нет необходимости редактировать код. Admin browser + REAL_API. «Новый врач/ресурс» читается буквально — e2e покрывает ОБЕ оси D-01: новый врач (doctor-owned — атомарный canonical onboarding в `/admin/users`) и новый ресурс (resource-owned — через минимальный QueueResource admin-контракт); осевая готовность (а) проверяется на обоих вариантах. (Department-atomicity RQ-04 — отдельная обязательная проверка вне S-14, `ACCEPTANCE.md:52-59`.)
+- **S-14** (`ACCEPTANCE.md:34`): новая specialty или существующая; новый врач/ресурс; синтетическая услуга → пройти предлагаемую настройку с пустой формы до статуса готовности; видны обязательные связи и ошибки; нет второго onboarding; профиль-обзор отличается от отдельной очереди; нет необходимости редактировать код. Admin browser + REAL_API. «Новый врач/ресурс» читается буквально — e2e покрывает ОБЕ оси D-01: новый врач (doctor-owned — атомарный canonical onboarding в `/admin/users`) и новый ресурс (resource-owned — через минимальный QueueResource admin-контракт); осевая готовность (а) проверяется на обоих вариантах. Resource-owned вариант проходит gate §3.1 (услуги/профиль → draft-ресурс → активация); негативные комбинации инварианта §3.1 покрываются интеграционными пинами контракта (§6), не e2e-сценарием. (Department-atomicity RQ-04 — отдельная обязательная проверка вне S-14, `ACCEPTANCE.md:52-59`.)
 - **Число переходов до/после**: baseline §2 (doctor-owned: 2 раздела, 3+ экрана, цикл тег↔профиль, 0 индикаторов; resource-owned: 0 путей) → после: 1 вход + переходы только на существующие экраны и новую минимальную поверхность QueueResource; каждый шаг показывает, что осталось.
 - **Состояния шага**: сохранение / возврат / ошибка шага / повтор — каждое не теряет прогресс checklist (статус всегда пересчитывается из API, не хранится локально).
 - **Ноль технических ключей** как обязательного знания пользователя — фиксируется тестом-пином на тексты форм пути.
 
 ## 6. Следующий шаг после этого brief
 
-Реализация экрана-входа §4 отдельным runtime-PR: **backend + frontend, не frontend-only** (owner-ревью #3327, P1): (1) минимальный QueueResource admin-контракт — `QueueResourceCreate`/Update DTO, list/detail `GET`, `POST`/`PATCH /api/v1/queue/admin/queue-resources`, интеграционные тесты (Admin-only; без изменения существующих контрактов и routing-семантики `resolve_tag_resource`); (2) новый route + checklist-компонент + минимальный менеджер QueueResource + e2e-проверка S-14 на REAL_API (обе оси D-01), body по канону, owner review. Этот brief — docs-PR, merge по команде владельца (стоячая политика), автоматического merge/deploy нет.
+Реализация экрана-входа §4 отдельным runtime-PR: **backend + frontend, не frontend-only** (owner-ревью #3327, P1): (1) минимальный QueueResource admin-контракт — `QueueResourceCreate`/Update DTO, list/detail `GET`, `POST`/`PATCH /api/v1/queue/admin/queue-resources`, интеграционные тесты (Admin-only; без изменения существующих контрактов и routing-семантики `resolve_tag_resource`) + системный инвариант §3.1 на ОБЕИХ write-surfaces — QueueResource create/активация И Service create/update/активация (`ServicesApiService`) — с негативными пинами §3.1 (минимум 4) и mutability contract §3.2: immutable `code`/`queue_tag` (пин: PATCH `queue_tag` → reject), lifecycle-семантика `active` (пин деактивации: новая ресурсная очередь тега не создаётся, существующая завершается); (2) новый route + checklist-компонент + минимальный менеджер QueueResource + e2e-проверка S-14 на REAL_API (обе оси D-01), body по канону, owner review. Этот brief — docs-PR, merge по команде владельца (стоячая политика), автоматического merge/deploy нет.
