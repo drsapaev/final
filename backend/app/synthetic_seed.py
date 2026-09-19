@@ -57,13 +57,18 @@ class SyntheticSeedSafetyError(RuntimeError):
 
 
 def _check_db_safety(database_url: str) -> None:
-    """Refuse to seed production-looking databases."""
+    """Refuse to seed production-looking databases.
+
+    The error messages name the DATABASE ONLY (never the URL): these
+    exceptions travel to operator consoles/logs (e.g. via the stage-4
+    lineage smoke), and a DSN prefix would leak credentials there.
+    """
     db_name = database_url.rsplit("/", 1)[-1].split("?")[0].lower()
     for protected in PROTECTED_DB_NAMES:
         if db_name == protected:
             raise SyntheticSeedSafetyError(
-                f"Refusing to seed database matching protected name '{protected}'. "
-                f"Synthetic seed is for staging/dev only. URL: {database_url[:80]}..."
+                f"Refusing to seed protected database '{protected}'. "
+                "Synthetic seed is for staging/dev only."
             )
 
     # Require explicit dev/staging/test marker in DB name
