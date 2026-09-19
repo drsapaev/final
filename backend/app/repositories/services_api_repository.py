@@ -41,6 +41,25 @@ class ServicesApiRepository:
     def get_service(self, service_id: int):
         return self.db.query(Service).filter(Service.id == service_id).first()
 
+    def get_service_for_update(self, service_id: int):
+        """RQ-17 round-2 (P1-2): row-level serialization writer-а.
+
+        Конкурентный writer той же строки (canonical update/delete/
+        batch) сериализуется на row-lock; READ COMMITTED возвращает
+        последнюю закоммиченную версию строки на момент взятия лока,
+        поэтому stale-pre-lock чтение тега невозможно.
+        ``populate_existing`` перезатирает возможный stale identity-map
+        той же сессии. SQLite: FOR UPDATE игнорируется диалектом
+        (последовательные семантики тестов).
+        """
+        return (
+            self.db.query(Service)
+            .filter(Service.id == service_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+
     def get_service_by_code(self, code: str):
         return (
             self.db.query(Service)

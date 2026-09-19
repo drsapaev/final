@@ -9,9 +9,18 @@ advisory owner-config lock) на QueueResource-админ и ЛЮБОЙ мута
 Service (create/update/активация/деактивация/soft-delete, включая
 двухтеговый протокол ретега `Service.queue_tag`).
 
-Пины 1-12 обязательны в runtime-PR (§3.1/§6). Пины 5/9/12 —
-конкурентные writer-ы: двухсоединечные PostgreSQL-пруфы (как
+Пины 1-15 обязательны в runtime-PR (§3.1/§6 + round-2 owner-ревью
+PR #3339). Пины 5/9/12/13/14/15 — конкурентные writer-ы:
+двухсоединечные PostgreSQL-пруфы (как
 `test_visit_confirmation_claim_concurrency_pg.py`), на SQLite skip.
+
+Round-2 (P1-1): batch-мутация `POST /services/admin/batch-update` —
+равноправный writer serialization-scope §3.1 (не setattr-обход):
+SQLite-матрица ниже (атомарный reject по owner-sensitive полям,
+не-owner batch вне scope, endpoint-маппинг 409) + пин 15 (PG:
+batch-writer <-> canonical single writer, sorted, без deadlock).
+Round-2 (P1-2): same-Service конкурентные мутации валидируются по
+перечитанной locked-строке (SELECT ... FOR UPDATE) — пины 13/14.
 """
 
 from __future__ import annotations
@@ -500,6 +509,141 @@ def test_mutability_patch_queue_tag_and_code_rejected(
     assert updated.default_cabinet == "101"
 
 
+# ===================== round-2 P1-1: batch writer =====================
+
+
+def test_batch_update_requires_doctor_on_resource_tag_rejected_atomic(
+    db_session: Session,
+) -> None:
+    """P1-1 regression pin: ACTIVE QueueResource + batch-update
+    requires_doctor=true -> 409-класс reject; атомарность: ни одно поле
+    batch (включая безобидную цену) не применено; инвариант валиден."""
+    _make_resource(db_session, code="btch-r", queue_tag="btag1", active=True)
+    service = _make_service(db_session, name="Анализ B1", queue_tag="btag1")
+    with pytest.raises(OwnerInvariantViolation):
+        ServicesApiService(db_session).batch_update_services(
+            service_ids=[service.id],
+            updates={"price": 555, "requires_doctor": True},
+        )
+    db_session.expire_all()
+    row = db_session.get(Service, service.id)
+    assert row.price == 0
+    assert row.requires_doctor is False
+    assert row.active is True
+    validate_tag_owner_invariant(db_session, "btag1", clinic_today(db_session))
+
+
+def test_batch_update_deactivate_last_doctorless_rejected(
+    db_session: Session,
+) -> None:
+    """P1-1 pin: batch active=false последней doctorless-услуги при
+    живой RESOURCE_SURFACE -> reject (пост-валидация), active сохранён."""
+    _make_resource(db_session, code="btch-r2", queue_tag="btag2", active=True)
+    service = _make_service(db_session, name="Анализ B2", queue_tag="btag2")
+    with pytest.raises(OwnerInvariantViolation):
+        ServicesApiService(db_session).batch_update_services(
+            service_ids=[service.id], updates={"active": False}
+        )
+    db_session.expire_all()
+    assert db_session.get(Service, service.id).active is True
+    validate_tag_owner_invariant(db_session, "btag2", clinic_today(db_session))
+
+
+def test_batch_update_retag_last_doctorless_out_rejected(
+    db_session: Session,
+) -> None:
+    """P1-1 pin: batch queue_tag away последней doctorless-услуги
+    ресурсного тега -> двухтеговый протокол, reject по нижней ноге
+    (пин 10 в batch-исполнении)."""
+    _make_resource(db_session, code="btch-r3", queue_tag="btag3", active=True)
+    service = _make_service(db_session, name="Анализ B3", queue_tag="btag3")
+    with pytest.raises(OwnerInvariantViolation):
+        ServicesApiService(db_session).batch_update_services(
+            service_ids=[service.id], updates={"queue_tag": "btag3-out"}
+        )
+    db_session.expire_all()
+    assert db_session.get(Service, service.id).queue_tag == "btag3"
+    validate_tag_owner_invariant(db_session, "btag3", clinic_today(db_session))
+
+
+def test_batch_update_price_only_skips_invariant_scope(
+    db_session: Session,
+) -> None:
+    """Не-owner-sensitive batch (цена/длительность) не входит в
+    serialization-scope: affected-теги = ∅, обычный commit."""
+    service_a = _make_service(db_session, name="Услуга A", queue_tag="btag4")
+    service_b = _make_service(db_session, name="Услуга B", queue_tag="btag4")
+    updated, failed = ServicesApiService(db_session).batch_update_services(
+        service_ids=[service_a.id, service_b.id],
+        updates={"price": 100, "duration_minutes": 30},
+    )
+    assert updated == [service_a.id, service_b.id]
+    assert failed == []
+    db_session.expire_all()
+    assert db_session.get(Service, service_a.id).price == 100
+    assert db_session.get(Service, service_b.id).duration_minutes == 30
+
+
+def test_batch_update_flip_without_surface_allowed(db_session: Session) -> None:
+    """Позитивный контроль: тег без RESOURCE_SURFACE — owner-sensitive
+    batch применяется канонически (локи + валидация проходят)."""
+    service = _make_service(db_session, name="Обычная", queue_tag="btag5")
+    updated, failed = ServicesApiService(db_session).batch_update_services(
+        service_ids=[service.id], updates={"requires_doctor": True}
+    )
+    assert updated == [service.id]
+    assert failed == []
+    db_session.expire_all()
+    assert db_session.get(Service, service.id).requires_doctor is True
+
+
+def test_batch_update_missing_ids_reported_found_updated(
+    db_session: Session,
+) -> None:
+    """Не найденные id -> failed_services (прецедент прежнего поведения
+    endpoint'а), найденные обновляются в той же транзакции."""
+    service = _make_service(db_session, name="Есть", queue_tag="btag6")
+    updated, failed = ServicesApiService(db_session).batch_update_services(
+        service_ids=[service.id, 10_000_001], updates={"price": 42}
+    )
+    assert updated == [service.id]
+    assert failed == [
+        {"service_id": 10_000_001, "error": "Услуга не найдена"}
+    ]
+
+
+def test_batch_update_endpoint_maps_invariant_to_409(
+    db_session: Session,
+) -> None:
+    """Endpoint-контракт round-2: OwnerInvariantViolation из batch
+    -> HTTP 409 (атомарно, batch не применён)."""
+    import asyncio
+
+    from app.api.v1.endpoints.services_ep._services import (
+        ServiceBatchUpdateRequest,
+    )
+    from app.api.v1.endpoints.services_ep._services import (
+        batch_update_services as batch_endpoint,
+    )
+
+    _make_resource(db_session, code="btch-r7", queue_tag="btag7", active=True)
+    service = _make_service(db_session, name="Анализ B7", queue_tag="btag7")
+    admin = _make_user(db_session, username="rq17_admin_b7")
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            batch_endpoint(
+                request=ServiceBatchUpdateRequest(
+                    service_ids=[service.id], updates={"requires_doctor": True}
+                ),
+                db=db_session,
+                current_user=admin,
+            )
+        )
+    assert exc_info.value.status_code == 409
+    db_session.expire_all()
+    assert db_session.get(Service, service.id).requires_doctor is False
+
+
 # ===================== пины 5/9/12: конкурентные writer-ы (PostgreSQL) =====================
 
 def _pg_engine_factory():
@@ -560,6 +704,31 @@ def _run_two_writers(writer_a, writer_b) -> tuple[object, object]:
         future_a = pool.submit(run, writer_a)
         future_b = pool.submit(run, writer_b)
         return future_a.result(), future_b.result()
+
+
+def _wait_lock_waits(engine, timeout: float = 5.0) -> bool:
+    """Best-effort детекция ожидающего лока бэкенда (writer2 стоит на
+    row-lock writer1). Исход пинов 13/14 детерминирован и без сигнала
+    (READ COMMITTED + row-lock на первом чтении writer2); сигнал лишь
+    укрепляет доказательную ценность stale-window-оркестрации."""
+    import time
+
+    import sqlalchemy as sa
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        with engine.connect() as conn:
+            waiting = conn.execute(
+                sa.text(
+                    "SELECT count(*) FROM pg_stat_activity "
+                    "WHERE datname = current_database() "
+                    "AND wait_event_type = 'Lock'"
+                )
+            ).scalar_one()
+        if waiting:
+            return True
+        time.sleep(0.05)
+    return False
 
 
 def _pg_cleanup(admin_engine, engine, schema) -> None:
@@ -752,6 +921,322 @@ def test_pin12_concurrent_reverse_retags_sorted_locks_no_deadlock(
             today = clinic_today(check)
             validate_tag_owner_invariant(check, "taga12", today)
             validate_tag_owner_invariant(check, "tagb12", today)
+        finally:
+            check.close()
+    finally:
+        _pg_cleanup(admin_engine, engine, schema)
+
+
+def test_pin13_same_service_concurrent_retag_vs_requires_doctor_flip(
+    db_session: Session,
+) -> None:
+    """Пин 13 (round-2 P1-2): same-Service конкурентные «ретег A->B» и
+    «requires_doctor false->true» при resource-backed B. Writer2 стартует
+    ДО commit writer1 (stale-window): row-level serialization (SELECT ...
+    FOR UPDATE) обязывает writer2 вычислить affected_tags из перечитанной
+    locked-строки (queue_tag=B), поэтому forbidden mixed-финал
+    (B live + активная requires_doctor) недостижим: ровно один reject,
+    инвариант валиден."""
+    engine, admin_engine, schema = _pg_engine_factory()
+    if engine is None:
+        pytest.skip("requires PostgreSQL (CI or disposable clinic_test db)")
+    try:
+        import threading
+
+        import sqlalchemy as sa
+
+        _pg_seed_and_metadata(engine)
+        sessionmaker = __import__(
+            "sqlalchemy.orm", fromlist=["sessionmaker"]
+        ).sessionmaker
+        SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+        setup = SessionLocal()
+        _make_resource(setup, code="rq13-r", queue_tag="rq13b", active=True)
+        _make_service(setup, name="Остаток B", queue_tag="rq13b")
+        service = _make_service(
+            setup, name="Переезд rq13a->rq13b", queue_tag="rq13a"
+        )
+        setup.commit()
+        setup.close()
+
+        row_locked = threading.Event()
+        commit_go = threading.Event()
+        writer1_outcome: list[object] = []
+
+        def writer1_midflight() -> None:
+            """Эмуляция writer1 в mid-flight: канонический lock-footprint
+            (advisory {A,B} sorted + row-lock Service) и некоммитнутый
+            ретег; commit -- только по сигналу, когда writer2 уже стоит
+            на row-lock."""
+            conn = engine.connect()
+            try:
+                tx = conn.begin()
+                try:
+                    for tag in ("rq13a", "rq13b"):
+                        conn.execute(
+                            sa.text(
+                                "SELECT pg_advisory_xact_lock(hashtext(:k))"
+                            ),
+                            {"k": f"owner_config:tag:{tag}"},
+                        )
+                    conn.execute(
+                        sa.text(
+                            "SELECT id FROM services WHERE id = :i FOR UPDATE"
+                        ),
+                        {"i": service.id},
+                    )
+                    conn.execute(
+                        sa.text(
+                            "UPDATE services SET queue_tag = 'rq13b' "
+                            "WHERE id = :i"
+                        ),
+                        {"i": service.id},
+                    )
+                    row_locked.set()
+                    if not commit_go.wait(timeout=15):
+                        raise RuntimeError("pin13: writer1 commit gate timed out")
+                    tx.commit()
+                except Exception:
+                    tx.rollback()
+                    raise
+            finally:
+                conn.close()
+
+        def writer1_wrapped() -> None:
+            try:
+                writer1_midflight()
+                writer1_outcome.append(None)
+            except Exception as exc:  # noqa: BLE001
+                writer1_outcome.append(exc)
+
+        thread1 = threading.Thread(target=writer1_wrapped)
+        thread1.start()
+        assert row_locked.wait(timeout=15), (
+            "pin13: writer1 never reached row lock"
+        )
+
+        def writer2_flip() -> object:
+            try:
+                s = SessionLocal()
+                try:
+                    ServicesApiService(s).update_service(
+                        service_id=service.id,
+                        service_data={"requires_doctor": True},
+                    )
+                finally:
+                    s.close()
+                return None
+            except Exception as exc:  # noqa: BLE001
+                return exc
+
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future2 = pool.submit(writer2_flip)
+            _wait_lock_waits(engine)
+            commit_go.set()
+            outcome2 = future2.result()
+        thread1.join(timeout=15)
+        assert writer1_outcome == [None], (
+            f"pin13: writer1 must commit the retag, got {writer1_outcome!r}"
+        )
+        assert isinstance(outcome2, OwnerInvariantViolation), (
+            "pin13: writer2 must be rejected on the actual post-lock tag B, "
+            f"got {outcome2!r}"
+        )
+        check = SessionLocal()
+        try:
+            check.expire_all()
+            row = check.get(Service, service.id)
+            assert row.queue_tag == "rq13b"
+            assert row.requires_doctor is False
+            assert row.active is True
+            validate_tag_owner_invariant(check, "rq13b", clinic_today(check))
+        finally:
+            check.close()
+    finally:
+        _pg_cleanup(admin_engine, engine, schema)
+
+
+def test_pin14_same_service_concurrent_retag_vs_delete(
+    db_session: Session,
+) -> None:
+    """Пин 14 (round-2 P1-2): same-Service «ретег A->B» <-> «soft-delete».
+    Валидация delete обязана использовать фактический post-lock тег
+    (B resource-backed; S после ретега — последняя doctorless B), а не
+    stale pre-lock тег A (без поверхности — выглядел бы легальным):
+    stale-семантика осиротила бы B. Row-level serialization -> ровно
+    один reject, active сохранён, инвариант валиден."""
+    engine, admin_engine, schema = _pg_engine_factory()
+    if engine is None:
+        pytest.skip("requires PostgreSQL (CI or disposable clinic_test db)")
+    try:
+        import threading
+
+        import sqlalchemy as sa
+
+        _pg_seed_and_metadata(engine)
+        sessionmaker = __import__(
+            "sqlalchemy.orm", fromlist=["sessionmaker"]
+        ).sessionmaker
+        SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+        setup = SessionLocal()
+        _make_resource(setup, code="rq14-r", queue_tag="rq14b", active=True)
+        service = _make_service(
+            setup, name="Последняя doctorless", queue_tag="rq14a"
+        )
+        setup.commit()
+        setup.close()
+
+        row_locked = threading.Event()
+        commit_go = threading.Event()
+        writer1_outcome: list[object] = []
+
+        def writer1_midflight() -> None:
+            conn = engine.connect()
+            try:
+                tx = conn.begin()
+                try:
+                    for tag in ("rq14a", "rq14b"):
+                        conn.execute(
+                            sa.text(
+                                "SELECT pg_advisory_xact_lock(hashtext(:k))"
+                            ),
+                            {"k": f"owner_config:tag:{tag}"},
+                        )
+                    conn.execute(
+                        sa.text(
+                            "SELECT id FROM services WHERE id = :i FOR UPDATE"
+                        ),
+                        {"i": service.id},
+                    )
+                    conn.execute(
+                        sa.text(
+                            "UPDATE services SET queue_tag = 'rq14b' "
+                            "WHERE id = :i"
+                        ),
+                        {"i": service.id},
+                    )
+                    row_locked.set()
+                    if not commit_go.wait(timeout=15):
+                        raise RuntimeError("pin14: writer1 commit gate timed out")
+                    tx.commit()
+                except Exception:
+                    tx.rollback()
+                    raise
+            finally:
+                conn.close()
+
+        def writer1_wrapped() -> None:
+            try:
+                writer1_midflight()
+                writer1_outcome.append(None)
+            except Exception as exc:  # noqa: BLE001
+                writer1_outcome.append(exc)
+
+        thread1 = threading.Thread(target=writer1_wrapped)
+        thread1.start()
+        assert row_locked.wait(timeout=15), (
+            "pin14: writer1 never reached row lock"
+        )
+
+        def writer2_delete() -> object:
+            try:
+                s = SessionLocal()
+                try:
+                    ServicesApiService(s).delete_service(service_id=service.id)
+                finally:
+                    s.close()
+                return None
+            except Exception as exc:  # noqa: BLE001
+                return exc
+
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future2 = pool.submit(writer2_delete)
+            _wait_lock_waits(engine)
+            commit_go.set()
+            outcome2 = future2.result()
+        thread1.join(timeout=15)
+        assert writer1_outcome == [None], (
+            f"pin14: writer1 must commit the retag, got {writer1_outcome!r}"
+        )
+        assert isinstance(outcome2, OwnerInvariantViolation), (
+            "pin14: delete must be rejected on the actual post-lock tag B, "
+            f"got {outcome2!r}"
+        )
+        check = SessionLocal()
+        try:
+            check.expire_all()
+            row = check.get(Service, service.id)
+            assert row.queue_tag == "rq14b"
+            assert row.active is True
+            validate_tag_owner_invariant(check, "rq14b", clinic_today(check))
+        finally:
+            check.close()
+    finally:
+        _pg_cleanup(admin_engine, engine, schema)
+
+
+def test_pin15_batch_writer_vs_single_retag_sorted_no_deadlock(
+    db_session: Session,
+) -> None:
+    """Пин 15 (round-2 P1-1): batch-writer (ретег S1 rq15a->rq15b через
+    batch_update_services) против canonical single writer (ретег S2
+    rq15b->rq15a): row-locks + owner-config-локи {A,B} в sorted-порядке
+    с обеих сторон — сериализация без deadlock, оба легальных переноса
+    применены, инварианты обоих тегов валидны."""
+    engine, admin_engine, schema = _pg_engine_factory()
+    if engine is None:
+        pytest.skip("requires PostgreSQL (CI or disposable clinic_test db)")
+    try:
+        _pg_seed_and_metadata(engine)
+        sessionmaker = __import__(
+            "sqlalchemy.orm", fromlist=["sessionmaker"]
+        ).sessionmaker
+        SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+        setup = SessionLocal()
+        _make_service(setup, name="Остаток A", queue_tag="rq15a")
+        _make_service(setup, name="Остаток B", queue_tag="rq15b")
+        s1 = _make_service(setup, name="Переезд A->B", queue_tag="rq15a")
+        s2 = _make_service(setup, name="Переезд B->A", queue_tag="rq15b")
+        setup.commit()
+        setup.close()
+
+        def writer_batch_a_to_b():
+            s = SessionLocal()
+            try:
+                ServicesApiService(s).batch_update_services(
+                    service_ids=[s1.id], updates={"queue_tag": "rq15b"}
+                )
+            finally:
+                s.close()
+
+        def writer_single_b_to_a():
+            s = SessionLocal()
+            try:
+                ServicesApiService(s).update_service(
+                    service_id=s2.id, service_data={"queue_tag": "rq15a"}
+                )
+            finally:
+                s.close()
+
+        outcome_a, outcome_b = _run_two_writers(
+            writer_batch_a_to_b, writer_single_b_to_a
+        )
+        assert outcome_a is None and outcome_b is None, (
+            f"sorted-order serialization must complete both legal retags, "
+            f"got {outcome_a!r}, {outcome_b!r}"
+        )
+        check = SessionLocal()
+        try:
+            check.expire_all()
+            assert check.get(Service, s1.id).queue_tag == "rq15b"
+            assert check.get(Service, s2.id).queue_tag == "rq15a"
+            today = clinic_today(check)
+            validate_tag_owner_invariant(check, "rq15a", today)
+            validate_tag_owner_invariant(check, "rq15b", today)
         finally:
             check.close()
     finally:

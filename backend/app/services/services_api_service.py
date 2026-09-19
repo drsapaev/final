@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today
 from app.crud.queue_owner_invariant import (
+    OwnerInvariantViolation,
     affected_service_tags,
     lock_owner_config_scope,
     lock_owner_config_scopes,
@@ -372,7 +373,12 @@ class ServicesApiService:
     def update_service(
         self, *, service_id: int, service_data, user_id: int | None = None
     ):
-        service = self.repository.get_service(service_id)
+        # RQ-17 round-2 (P1-2): row-level serialization ДО вычисления
+        # effective old_tag -- конкурентный writer той же Service
+        # сериализуется на row-lock; old_tag читается из перечитанной
+        # locked-строки (READ COMMITTED), а не из stale pre-lock
+        # снапшота (пин 13).
+        service = self.repository.get_service_for_update(service_id)
         if not service:
             raise LookupError("Service not found")
         old_service = self._service_snapshot(service)
@@ -479,7 +485,10 @@ class ServicesApiService:
         return service
 
     def delete_service(self, *, service_id: int) -> dict[str, Any]:
-        service = self.repository.get_service(service_id)
+        # RQ-17 round-2 (P1-2): row-level serialization и для soft-delete --
+        # ретег <-> delete остаётся в той же stale-object категории
+        # (пин 14): валидация по фактическому post-lock тегу.
+        service = self.repository.get_service_for_update(service_id)
         if not service:
             raise LookupError("Service not found")
 
@@ -519,6 +528,115 @@ class ServicesApiService:
             "visit_usage_count": visit_services_count,
             "visit_service_links": visit_services_count,
         }
+
+    def batch_update_services(
+        self,
+        *,
+        service_ids: list[int],
+        updates: dict[str, Any],
+        comment: str | None = None,
+        user_id: int | None = None,
+    ) -> tuple[list[int], list[dict[str, Any]]]:
+        """RQ-17 round-2 (P1-1): batch -- равноправный writer того же
+        serialization-scope, а не прямой setattr-обход инварианта §3.1.
+
+        Протокол (атомарно, один commit):
+          1. load + lock Service-строк детерминированно (sorted by id,
+             SELECT ... FOR UPDATE -- та же row-level serialization,
+             что и у canonical update/delete);
+          2. affected-теги ВСЕГО batch (ретег old->new; флипы
+             active/requires_doctor меняют membership/owner-семантику
+             активного service-set текущего тега);
+          3. owner-config-локи ВСЕХ affected-тегов (sorted, §3.1(в));
+          4. применение пост-состояния всего batch;
+          5. flush + валидация инварианта КАЖДОГО affected-тега
+             (пины 3-4: быстрый отказ для requires_doctor=true);
+          6. single commit.
+
+        Нарушение инварианта -> rollback ВСЕГО batch +
+        OwnerInvariantViolation (endpoint маппит в 409): ничего
+        не применяется частично. Не найденные id попадают в
+        failed_services и не прерывают batch (прецедент прежнего
+        поведения endpoint'а).
+        """
+        from sqlalchemy.exc import SQLAlchemyError
+
+        rows = (
+            self.db.query(Service)
+            .filter(Service.id.in_(service_ids))
+            .order_by(Service.id)
+            .with_for_update()
+            .populate_existing()
+            .all()
+        )
+        by_id = {row.id: row for row in rows}
+        failed_services = [
+            {"service_id": service_id, "error": "Услуга не найдена"}
+            for service_id in service_ids
+            if service_id not in by_id
+        ]
+        services = [
+            by_id[service_id]
+            for service_id in service_ids
+            if service_id in by_id
+        ]
+        if not services:
+            return [], failed_services
+
+        retag_requested = "queue_tag" in updates
+        owner_sensitive_flip = ("active" in updates) or (
+            "requires_doctor" in updates
+        )
+        affected: set[str] = set()
+        for service in services:
+            old_tag = service.queue_tag
+            new_tag = updates["queue_tag"] if retag_requested else old_tag
+            affected.update(affected_service_tags(old_tag, new_tag))
+            if owner_sensitive_flip and old_tag:
+                affected.add(old_tag)
+        affected_tags = sorted(affected)
+
+        db = self.db
+        today = clinic_today(db)
+        lock_owner_config_scopes(db, affected_tags)
+
+        old_snapshots = {
+            service.id: self._service_snapshot(service) for service in services
+        }
+        try:
+            for service in services:
+                for field, value in updates.items():
+                    if hasattr(service, field):
+                        setattr(service, field, value)
+
+            if affected_tags:
+                if updates.get("requires_doctor"):
+                    # пины 3-4: быстрый отказ до flush -- та же семантика,
+                    # что и у canonical update_service
+                    for tag in affected_tags:
+                        validate_service_gate_for_requires_doctor(db, tag, today)
+                db.flush()
+                for tag in affected_tags:
+                    validate_tag_owner_invariant(db, tag, today)
+        except OwnerInvariantViolation:
+            db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            db.rollback()
+            raise ValueError(f"Batch update failed: {exc}") from exc
+
+        for service in services:
+            self._log_service_update(
+                service_id=service.id,
+                old_service=old_snapshots[service.id],
+                new_service=service,
+                user_id=user_id,
+                comment=f"Batch update: {comment}" if comment else "Batch update",
+            )
+        self.repository.commit()
+        for service in services:
+            self.repository.refresh(service)
+        return [service.id for service in services], failed_services
 
     def list_doctors_temp(self):
         return self.repository.list_active_doctors()
