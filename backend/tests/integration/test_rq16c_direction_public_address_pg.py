@@ -62,7 +62,9 @@ SCRATCH_DB = "rq16c_check"
 # The head pin advances with the chain (established pattern: #3306
 # advanced the 0067-era pins; the RQ-15.d repair chains 0069 above the
 # 0068 registry revision — owner directive trace 1a0aef280204950d).
-EXPECTED_HEAD = "0070_lab_results_lineage"
+# NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved
+# to 0072 (nurse workplace assignments 0071 + service executions 0072).
+EXPECTED_HEAD = "0072_service_executions"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
