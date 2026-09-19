@@ -20,6 +20,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Экран НЕ редактирует данные сам (только ссылки/статусы; QueueResource
  * CRUD живёт своей поверхностью QueueResourceManager, экран-вход
  * ссылается на него). Статусы всегда пересчитываются из API.
+ * Стили — в admin.css (секция RQ-17), без inline-styles (UI ratchet).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -161,29 +162,34 @@ const AdminSetupDirections = () => {
     const openChecklist = useCallback(() => setView('checklist'), []);
 
     const statusIcon = (ready: boolean | null) => {
-        if (ready === true) {
-            return <CheckCircle2 size={15} color="var(--mac-green, #34c759)" aria-hidden />;
-        }
-        if (ready === false) {
-            return <XCircle size={15} color="var(--mac-error, #ff3b30)" aria-hidden />;
-        }
-        return <CircleAlert size={15} color="var(--mac-text-secondary)" aria-hidden />;
+        const cls =
+            ready === true
+                ? 'admin-sdx-status-ok'
+                : ready === false
+                  ? 'admin-sdx-status-err'
+                  : 'admin-sdx-status-unknown';
+        const Icon = ready === true ? CheckCircle2 : ready === false ? XCircle : CircleAlert;
+        return (
+            <span className={cls}>
+                <Icon size={15} aria-hidden />
+            </span>
+        );
     };
 
     return (
-        <div style={{ padding: 16, maxWidth: 980, margin: '0 auto' }} data-testid="setup-directions-screen">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                <h1 style={{ fontSize: 20, margin: 0 }} data-testid="setup-directions-heading">
+        <div className="admin-sdx-wrap" data-testid="setup-directions-screen">
+            <div className="admin-sdx-header">
+                <h1 className="admin-page-title" data-testid="setup-directions-heading">
                     {t('admin2.sdx_title')}
                 </h1>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div className="admin-sdx-header-actions">
                     <Button
                         variant={view === 'checklist' ? 'primary' : 'secondary'}
                         size="sm"
                         onClick={openChecklist}
                         data-testid="setup-view-checklist"
                     >
-                        <ListChecks size={14} style={{ marginRight: 4 }} />
+                        <ListChecks className="admin-sdx-icon-l" size={14} />
                         {t('admin2.sdx_view_checklist')}
                     </Button>
                     <Button
@@ -201,45 +207,33 @@ const AdminSetupDirections = () => {
                         disabled={loading}
                         data-testid="setup-refresh"
                     >
-                        <RefreshCw size={14} style={{ marginRight: 4 }} />
+                        <RefreshCw className="admin-sdx-icon-l" size={14} />
                         {t('admin2.sdx_refresh')}
                     </Button>
                 </div>
             </div>
 
-            <p style={{ fontSize: 12, color: 'var(--mac-text-secondary)', margin: '0 0 14px' }}>
-                {t('admin2.sdx_subtitle')}
-            </p>
+            <p className="admin-sdx-subtitle">{t('admin2.sdx_subtitle')}</p>
 
             {error && (
-                <div
-                    role="alert"
-                    data-testid="setup-directions-error"
-                    style={{
-                        padding: '8px 10px',
-                        marginBottom: 12,
-                        borderRadius: 8,
-                        background: 'var(--mac-error-bg, rgba(255,59,48,0.08))',
-                        color: 'var(--mac-error, #ff3b30)',
-                        fontSize: 12,
-                    }}
-                >
+                <div role="alert" className="admin-sdx-alert" data-testid="setup-directions-error">
                     {error}
                 </div>
             )}
 
             {view === 'resources' ? (
                 <>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={openChecklist}
-                        style={{ marginBottom: 10 }}
-                        data-testid="setup-back-to-checklist"
-                    >
-                        <RotateCcw size={14} style={{ marginRight: 4 }} />
-                        {t('admin2.sdx_back_to_checklist')}
-                    </Button>
+                    <div className="admin-sdx-step-nav">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={openChecklist}
+                            data-testid="setup-back-to-checklist"
+                        >
+                            <RotateCcw className="admin-sdx-icon-l" size={14} />
+                            {t('admin2.sdx_back_to_checklist')}
+                        </Button>
+                    </div>
                     <QueueResourceManager
                         services={services}
                         profiles={profiles}
@@ -250,12 +244,12 @@ const AdminSetupDirections = () => {
                 <>
                     {/* —— Мастер нового направления S-14 (пустая форма) —— */}
                     {!wizard.open ? (
-                        <Card style={{ marginBottom: 14 }} data-testid="setup-wizard-teaser">
+                        <Card className="admin-sdx-header" data-testid="setup-wizard-teaser">
                             <CardContent>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                                    <div style={{ fontSize: 13 }}>
+                                <div className="admin-sdx-teaser">
+                                    <div className="admin-sdx-teaser-title">
                                         <strong>{t('admin2.sdx_wizard_teaser_title')}</strong>
-                                        <div style={{ color: 'var(--mac-text-secondary)', fontSize: 12 }}>
+                                        <div className="admin-sdx-teaser-desc">
                                             {t('admin2.sdx_wizard_teaser_desc')}
                                         </div>
                                     </div>
@@ -265,20 +259,20 @@ const AdminSetupDirections = () => {
                                         onClick={() => setWizard({ ...emptyWizard(), open: true })}
                                         data-testid="setup-wizard-open"
                                     >
-                                        <Plus size={14} style={{ marginRight: 4 }} />
+                                        <Plus className="admin-sdx-icon-l" size={14} />
                                         {t('admin2.sdx_wizard_open')}
                                     </Button>
                                 </div>
                             </CardContent>
                         </Card>
                     ) : (
-                        <Card style={{ marginBottom: 14 }} data-testid="setup-wizard">
+                        <Card className="admin-sdx-card-gap" data-testid="setup-wizard">
                             <CardHeader>
                                 <CardTitle>{t('admin2.sdx_wizard_title')}</CardTitle>
                                 <CardDescription>{t('admin2.sdx_wizard_subtitle')}</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                                <div className="admin-sdx-steps">
                                     {WIZARD_STEP_KEYS.map((key, index) => (
                                         <Badge
                                             key={key}
@@ -292,35 +286,35 @@ const AdminSetupDirections = () => {
 
                                 {wizard.step === 0 && (
                                     <div data-testid="setup-wizard-step-executor">
-                                        <p style={{ fontSize: 12, margin: '0 0 8px' }}>
+                                        <p className="admin-sdx-step-hint">
                                             {t('admin2.sdx_wizard_executor_hint')}
                                         </p>
-                                        <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-                                            <div style={{ border: '1px solid var(--mac-border, rgba(0,0,0,0.1))', borderRadius: 10, padding: 10 }}>
-                                                <strong style={{ fontSize: 13 }}>{t('admin2.sdx_axis_doctor_title')}</strong>
-                                                <p style={{ fontSize: 12, color: 'var(--mac-text-secondary)', margin: '6px 0' }}>
+                                        <div className="admin-sdx-axis-grid">
+                                            <div className="admin-sdx-axis-card">
+                                                <strong className="admin-sdx-axis-title">{t('admin2.sdx_axis_doctor_title')}</strong>
+                                                <p className="admin-sdx-axis-desc">
                                                     {t('admin2.sdx_axis_doctor_desc')}
                                                 </p>
-                                                <Link to="/admin/users" style={{ fontSize: 12 }}>
-                                                    {t('admin2.sdx_axis_doctor_link')} <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
+                                                <Link className="admin-sdx-link" to="/admin/users">
+                                                    {t('admin2.sdx_axis_doctor_link')} <ExternalLink className="admin-sdx-icon-m" size={11} />
                                                 </Link>
-                                                <div style={{ marginTop: 8 }}>
+                                                <div className="admin-sdx-step-nav">
                                                     <Button
                                                         variant="secondary"
                                                         size="sm"
                                                         onClick={() => setWizard((w) => ({ ...w, axis: 'doctor', step: 1 }))}
                                                         data-testid="setup-wizard-axis-doctor"
                                                     >
-                                                        {t('admin2.sdx_choose')} <ArrowRight size={12} style={{ marginLeft: 4 }} />
+                                                        {t('admin2.sdx_choose')} <ArrowRight className="admin-sdx-icon-r" size={12} />
                                                     </Button>
                                                 </div>
                                             </div>
-                                            <div style={{ border: '1px solid var(--mac-border, rgba(0,0,0,0.1))', borderRadius: 10, padding: 10 }}>
-                                                <strong style={{ fontSize: 13 }}>{t('admin2.sdx_axis_resource_title')}</strong>
-                                                <p style={{ fontSize: 12, color: 'var(--mac-text-secondary)', margin: '6px 0' }}>
+                                            <div className="admin-sdx-axis-card">
+                                                <strong className="admin-sdx-axis-title">{t('admin2.sdx_axis_resource_title')}</strong>
+                                                <p className="admin-sdx-axis-desc">
                                                     {t('admin2.sdx_axis_resource_desc')}
                                                 </p>
-                                                <div style={{ marginBottom: 8 }}>
+                                                <div className="admin-sdx-axis-select">
                                                     <Select
                                                         placeholder={t('admin2.sdx_wizard_tag_placeholder')}
                                                         options={wizardTagOptions}
@@ -336,7 +330,7 @@ const AdminSetupDirections = () => {
                                                     onClick={() => setWizard((w) => ({ ...w, axis: 'resource', step: 1 }))}
                                                     data-testid="setup-wizard-axis-resource"
                                                 >
-                                                    {t('admin2.sdx_choose')} <ArrowRight size={12} style={{ marginLeft: 4 }} />
+                                                    {t('admin2.sdx_choose')} <ArrowRight className="admin-sdx-icon-r" size={12} />
                                                 </Button>
                                             </div>
                                         </div>
@@ -345,20 +339,20 @@ const AdminSetupDirections = () => {
 
                                 {wizard.step === 1 && (
                                     <div data-testid="setup-wizard-step-services">
-                                        <p style={{ fontSize: 12, margin: '0 0 8px' }}>
+                                        <p className="admin-sdx-step-hint">
                                             {t('admin2.sdx_wizard_services_hint')}
                                         </p>
-                                        <Link to="/admin/services?servicesTab=catalog" style={{ fontSize: 12 }}>
-                                            {t('admin2.sdx_wizard_services_link')} <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
+                                        <Link className="admin-sdx-link" to="/admin/services?servicesTab=catalog">
+                                            {t('admin2.sdx_wizard_services_link')} <ExternalLink className="admin-sdx-icon-m" size={11} />
                                         </Link>
-                                        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                                        <div className="admin-sdx-step-nav">
                                             <Button
                                                 variant="secondary"
                                                 size="sm"
                                                 onClick={() => setWizard((w) => ({ ...w, step: 2 }))}
                                                 data-testid="setup-wizard-services-next"
                                             >
-                                                {t('admin2.sdx_next')} <ArrowRight size={12} style={{ marginLeft: 4 }} />
+                                                {t('admin2.sdx_next')} <ArrowRight className="admin-sdx-icon-r" size={12} />
                                             </Button>
                                             <Button variant="ghost" size="sm" onClick={() => setWizard((w) => ({ ...w, step: 0 }))}>
                                                 {t('admin2.sdx_back')}
@@ -369,25 +363,25 @@ const AdminSetupDirections = () => {
 
                                 {wizard.step === 2 && (
                                     <div data-testid="setup-wizard-step-display">
-                                        <p style={{ fontSize: 12, margin: '0 0 8px' }}>
+                                        <p className="admin-sdx-step-hint">
                                             {t('admin2.sdx_wizard_display_hint')}
                                         </p>
                                         {wizard.axis === 'resource' && (
-                                            <p style={{ fontSize: 12, margin: '0 0 8px', color: 'var(--mac-text-secondary)' }}>
+                                            <p className="admin-sdx-step-hint admin-sdx-muted">
                                                 {t('admin2.sdx_wizard_display_resource_note')}
                                             </p>
                                         )}
-                                        <Link to="/admin/services?servicesTab=queue-profiles" style={{ fontSize: 12 }}>
-                                            {t('admin2.sdx_wizard_display_link')} <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
+                                        <Link className="admin-sdx-link" to="/admin/services?servicesTab=queue-profiles">
+                                            {t('admin2.sdx_wizard_display_link')} <ExternalLink className="admin-sdx-icon-m" size={11} />
                                         </Link>
-                                        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                                        <div className="admin-sdx-step-nav">
                                             <Button
                                                 variant="secondary"
                                                 size="sm"
                                                 onClick={() => setWizard((w) => ({ ...w, step: 3 }))}
                                                 data-testid="setup-wizard-display-next"
                                             >
-                                                {t('admin2.sdx_next')} <ArrowRight size={12} style={{ marginLeft: 4 }} />
+                                                {t('admin2.sdx_next')} <ArrowRight className="admin-sdx-icon-r" size={12} />
                                             </Button>
                                             <Button variant="ghost" size="sm" onClick={() => setWizard((w) => ({ ...w, step: 1 }))}>
                                                 {t('admin2.sdx_back')}
@@ -398,15 +392,15 @@ const AdminSetupDirections = () => {
 
                                 {wizard.step === 3 && (
                                     <div data-testid="setup-wizard-step-verify">
-                                        <p style={{ fontSize: 12, margin: '0 0 8px' }}>
+                                        <p className="admin-sdx-step-hint">
                                             {t('admin2.sdx_wizard_verify_hint')}
                                         </p>
                                         {wizard.axis === 'resource' && (
-                                            <p style={{ fontSize: 12, margin: '0 0 8px' }}>
+                                            <p className="admin-sdx-step-hint">
                                                 {t('admin2.sdx_wizard_verify_resource_note')}
                                             </p>
                                         )}
-                                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                        <div className="admin-sdx-step-nav">
                                             <Button
                                                 variant="secondary"
                                                 size="sm"
@@ -417,7 +411,7 @@ const AdminSetupDirections = () => {
                                                 }}
                                                 data-testid="setup-wizard-verify-open"
                                             >
-                                                {t('admin2.sdx_wizard_verify_open')} <ArrowRight size={12} style={{ marginLeft: 4 }} />
+                                                {t('admin2.sdx_wizard_verify_open')} <ArrowRight className="admin-sdx-icon-r" size={12} />
                                             </Button>
                                             <Button variant="ghost" size="sm" onClick={() => setWizard((w) => ({ ...w, step: 2 }))}>
                                                 {t('admin2.sdx_back')}
@@ -428,10 +422,10 @@ const AdminSetupDirections = () => {
 
                                 {wizard.step === 4 && (
                                     <div data-testid="setup-wizard-step-qr">
-                                        <p style={{ fontSize: 12, margin: '0 0 8px' }}>
+                                        <p className="admin-sdx-step-hint">
                                             {t('admin2.sdx_wizard_qr_hint')}
                                         </p>
-                                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                        <div className="admin-sdx-step-nav">
                                             <Button
                                                 variant="primary"
                                                 size="sm"
@@ -451,7 +445,7 @@ const AdminSetupDirections = () => {
                                     </div>
                                 )}
 
-                                <div style={{ marginTop: 10 }}>
+                                <div className="admin-sdx-step-nav">
                                     <Button variant="ghost" size="sm" onClick={() => setWizard(emptyWizard())} data-testid="setup-wizard-close">
                                         {t('admin2.sdx_wizard_close')}
                                     </Button>
@@ -468,27 +462,17 @@ const AdminSetupDirections = () => {
                         </CardHeader>
                         <CardContent>
                             {loading ? (
-                                <div style={{ padding: 12, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
-                                    {t('admin2.sdx_loading')}
-                                </div>
+                                <div className="admin-sdx-note">{t('admin2.sdx_loading')}</div>
                             ) : Object.keys(checklist).length === 0 ? (
-                                <div style={{ padding: 12, fontSize: 12, color: 'var(--mac-text-secondary)' }} data-testid="setup-checklist-empty">
+                                <div className="admin-sdx-note" data-testid="setup-checklist-empty">
                                     {t('admin2.sdx_checklist_empty')}
                                 </div>
                             ) : (
-                                <div style={{ display: 'grid', gap: 10 }}>
+                                <div className="admin-sdx-rows">
                                     {Object.values(checklist).map((row) => (
-                                        <div
-                                            key={row.tag}
-                                            data-testid={`setup-checklist-row-${row.tag}`}
-                                            style={{
-                                                border: '1px solid var(--mac-border, rgba(0,0,0,0.1))',
-                                                borderRadius: 10,
-                                                padding: 10,
-                                            }}
-                                        >
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                                                <code style={{ fontSize: 12 }}>{row.tag}</code>
+                                        <div key={row.tag} className="admin-sdx-card" data-testid={`setup-checklist-row-${row.tag}`}>
+                                            <div className="admin-sdx-row-head">
+                                                <code className="admin-sdx-code">{row.tag}</code>
                                                 {row.axis === 'resource' && (
                                                     <Badge variant="info" data-testid="setup-row-axis-resource">
                                                         {t('admin2.sdx_axis_resource_badge')}
@@ -500,84 +484,84 @@ const AdminSetupDirections = () => {
                                                     </Badge>
                                                 )}
                                                 {row.owningProfile?.title_ru && (
-                                                    <span style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>
+                                                    <span className="admin-sdx-row-sub">
                                                         {String(row.owningProfile.title_ru)}
                                                     </span>
                                                 )}
                                             </div>
-                                            <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                                            <table className="admin-sdx-table">
                                                 <tbody>
                                                     <tr data-testid="setup-row-executor">
-                                                        <td style={{ padding: '3px 6px', width: 20 }}>{statusIcon(row.executorReady)}</td>
-                                                        <td style={{ padding: '3px 6px' }}>{t('admin2.sdx_step_executor')}</td>
-                                                        <td style={{ padding: '3px 6px', textAlign: 'right' }}>
+                                                        <td className="admin-sdx-cell-icon">{statusIcon(row.executorReady)}</td>
+                                                        <td className="admin-sdx-cell">{t('admin2.sdx_step_executor')}</td>
+                                                        <td className="admin-sdx-cell-right">
                                                             {!row.executorReady && (
-                                                                <Link to="/admin/users" style={{ fontSize: 12 }}>
-                                                                    {t('admin2.sdx_fix_executor')} <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
+                                                                <Link className="admin-sdx-link" to="/admin/users">
+                                                                    {t('admin2.sdx_fix_executor')} <ExternalLink className="admin-sdx-icon-m" size={11} />
                                                                 </Link>
                                                             )}
                                                         </td>
                                                     </tr>
                                                     <tr data-testid="setup-row-services">
-                                                        <td style={{ padding: '3px 6px' }}>{statusIcon(row.activeServices.length > 0)}</td>
-                                                        <td style={{ padding: '3px 6px' }}>
+                                                        <td className="admin-sdx-cell-icon">{statusIcon(row.activeServices.length > 0)}</td>
+                                                        <td className="admin-sdx-cell">
                                                             {t('admin2.sdx_step_services', { n: row.activeServices.length })}
                                                         </td>
-                                                        <td style={{ padding: '3px 6px', textAlign: 'right' }}>
+                                                        <td className="admin-sdx-cell-right">
                                                             {row.activeServices.length === 0 && (
-                                                                <Link to="/admin/services?servicesTab=catalog" style={{ fontSize: 12 }}>
-                                                                    {t('admin2.sdx_fix_services')} <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
+                                                                <Link className="admin-sdx-link" to="/admin/services?servicesTab=catalog">
+                                                                    {t('admin2.sdx_fix_services')} <ExternalLink className="admin-sdx-icon-m" size={11} />
                                                                 </Link>
                                                             )}
                                                         </td>
                                                     </tr>
                                                     {row.axis === 'resource' && (
                                                         <tr data-testid="setup-row-doctorless">
-                                                            <td style={{ padding: '3px 6px' }}>
+                                                            <td className="admin-sdx-cell-icon">
                                                                 {statusIcon(row.activeDoctorlessServices.length > 0)}
                                                             </td>
-                                                            <td style={{ padding: '3px 6px' }}>
+                                                            <td className="admin-sdx-cell">
                                                                 {t('admin2.sdx_step_doctorless', { n: row.activeDoctorlessServices.length })}
                                                             </td>
-                                                            <td style={{ padding: '3px 6px', textAlign: 'right' }}>
+                                                            <td className="admin-sdx-cell-right">
                                                                 {row.activeDoctorlessServices.length === 0 && (
-                                                                    <Link to="/admin/services?servicesTab=catalog" style={{ fontSize: 12 }}>
-                                                                        {t('admin2.sdx_fix_services')} <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
+                                                                    <Link className="admin-sdx-link" to="/admin/services?servicesTab=catalog">
+                                                                        {t('admin2.sdx_fix_services')} <ExternalLink className="admin-sdx-icon-m" size={11} />
                                                                     </Link>
                                                                 )}
                                                             </td>
                                                         </tr>
                                                     )}
                                                     <tr data-testid="setup-row-profile">
-                                                        <td style={{ padding: '3px 6px' }}>{statusIcon(row.owningProfile != null)}</td>
-                                                        <td style={{ padding: '3px 6px' }}>{t('admin2.sdx_step_profile')}</td>
-                                                        <td style={{ padding: '3px 6px', textAlign: 'right' }}>
+                                                        <td className="admin-sdx-cell-icon">{statusIcon(row.owningProfile != null)}</td>
+                                                        <td className="admin-sdx-cell">{t('admin2.sdx_step_profile')}</td>
+                                                        <td className="admin-sdx-cell-right">
                                                             {!row.owningProfile && (
-                                                                <Link to="/admin/services?servicesTab=queue-profiles" style={{ fontSize: 12 }}>
-                                                                    {t('admin2.sdx_fix_profile')} <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
+                                                                <Link className="admin-sdx-link" to="/admin/services?servicesTab=queue-profiles">
+                                                                    {t('admin2.sdx_fix_profile')} <ExternalLink className="admin-sdx-icon-m" size={11} />
                                                                 </Link>
                                                             )}
                                                         </td>
                                                     </tr>
                                                     <tr data-testid="setup-row-visible">
-                                                        <td style={{ padding: '3px 6px' }}>{statusIcon(row.owningProfileVisible)}</td>
-                                                        <td style={{ padding: '3px 6px' }}>{t('admin2.sdx_step_visible')}</td>
-                                                        <td style={{ padding: '3px 6px', textAlign: 'right' }}>
+                                                        <td className="admin-sdx-cell-icon">{statusIcon(row.owningProfileVisible)}</td>
+                                                        <td className="admin-sdx-cell">{t('admin2.sdx_step_visible')}</td>
+                                                        <td className="admin-sdx-cell-right">
                                                             {row.owningProfile && !row.owningProfileVisible && (
-                                                                <Link to="/admin/services?servicesTab=queue-profiles" style={{ fontSize: 12 }}>
-                                                                    {t('admin2.sdx_fix_visible')} <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
+                                                                <Link className="admin-sdx-link" to="/admin/services?servicesTab=queue-profiles">
+                                                                    {t('admin2.sdx_fix_visible')} <ExternalLink className="admin-sdx-icon-m" size={11} />
                                                                 </Link>
                                                             )}
                                                         </td>
                                                     </tr>
                                                     <tr data-testid="setup-row-permanent-address">
-                                                        <td style={{ padding: '3px 6px' }}>{statusIcon(row.permanentAddress)}</td>
-                                                        <td style={{ padding: '3px 6px' }}>
+                                                        <td className="admin-sdx-cell-icon">{statusIcon(row.permanentAddress)}</td>
+                                                        <td className="admin-sdx-cell">
                                                             {row.permanentAddress === null
                                                                 ? t('admin2.sdx_step_address_unknown')
                                                                 : t('admin2.sdx_step_address')}
                                                         </td>
-                                                        <td style={{ padding: '3px 6px', textAlign: 'right', color: 'var(--mac-text-secondary)' }}>
+                                                        <td className={`admin-sdx-cell-right admin-sdx-muted`}>
                                                             {row.permanentAddress !== true && t('admin2.sdx_step_address_hint')}
                                                         </td>
                                                     </tr>

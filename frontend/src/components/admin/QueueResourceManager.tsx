@@ -15,6 +15,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  *
  * «Ноль технических ключей» (§4(3)): queue_tag выбирается из существующих
  * значений (теги профилей/услуг), не вводится руками.
+ * Стили — в admin.css (секция RQ-17), без inline-styles (UI ratchet).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -244,7 +245,7 @@ const QueueResourceManager = ({
                 <CardDescription>{t('admin2.qrm_subtitle')}</CardDescription>
             </CardHeader>
             <CardContent>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div className="admin-qrm-toolbar">
                     <Button
                         variant="secondary"
                         size="sm"
@@ -252,7 +253,7 @@ const QueueResourceManager = ({
                         disabled={loading}
                         data-testid="qr-resource-refresh"
                     >
-                        <RefreshCw size={14} style={{ marginRight: 4 }} />
+                        <RefreshCw className="admin-sdx-icon-l" size={14} />
                         {t('admin2.qrm_refresh')}
                     </Button>
                     <Button
@@ -264,46 +265,20 @@ const QueueResourceManager = ({
                         }}
                         data-testid="qr-resource-create-toggle"
                     >
-                        <Plus size={14} style={{ marginRight: 4 }} />
+                        <Plus className="admin-sdx-icon-l" size={14} />
                         {t('admin2.qrm_create')}
                     </Button>
                 </div>
 
                 {error && (
-                    <div
-                        role="alert"
-                        data-testid="qr-resource-error"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: 6,
-                            padding: '8px 10px',
-                            marginBottom: 12,
-                            borderRadius: 8,
-                            background: 'var(--mac-error-bg, rgba(255,59,48,0.08))',
-                            color: 'var(--mac-error, #ff3b30)',
-                            fontSize: 12,
-                            whiteSpace: 'pre-wrap',
-                        }}
-                    >
+                    <div role="alert" className="admin-sdx-alert" data-testid="qr-resource-error">
                         <AlertCircle size={14} />
                         <span>{error}</span>
                     </div>
                 )}
 
                 {showCreateForm && (
-                    <div
-                        data-testid="qr-resource-create-form"
-                        style={{
-                            border: '1px solid var(--mac-border, rgba(0,0,0,0.1))',
-                            borderRadius: 10,
-                            padding: 12,
-                            marginBottom: 12,
-                            display: 'grid',
-                            gap: 10,
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                        }}
-                    >
+                    <div className="admin-qrm-form" data-testid="qr-resource-create-form">
                         <Select
                             label={t('admin2.qrm_field_tag')}
                             placeholder={t('admin2.qrm_field_tag_placeholder')}
@@ -350,7 +325,7 @@ const QueueResourceManager = ({
                             label={t('admin2.qrm_field_active_hint')}
                             data-testid="qr-resource-active-draft"
                         />
-                        <div style={{ display: 'flex', gap: 8, gridColumn: '1 / -1' }}>
+                        <div className="admin-qrm-form-span admin-sdx-step-nav">
                             <Button
                                 variant="primary"
                                 size="sm"
@@ -358,7 +333,7 @@ const QueueResourceManager = ({
                                 disabled={saving}
                                 data-testid="qr-resource-submit"
                             >
-                                <Check size={14} style={{ marginRight: 4 }} />
+                                <Check className="admin-sdx-icon-l" size={14} />
                                 {t('admin2.qrm_save')}
                             </Button>
                             <Button
@@ -376,21 +351,11 @@ const QueueResourceManager = ({
                 )}
 
                 {editing && (
-                    <div
-                        data-testid="qr-resource-edit-form"
-                        style={{
-                            border: '1px solid var(--mac-border, rgba(0,0,0,0.1))',
-                            borderRadius: 10,
-                            padding: 12,
-                            marginBottom: 12,
-                            display: 'grid',
-                            gap: 10,
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                        }}
-                    >
-                        <div style={{ fontSize: 12, gridColumn: '1 / -1', color: 'var(--mac-text-secondary)' }}>
+                    <div className="admin-qrm-form" data-testid="qr-resource-edit-form">
+                        <div className="admin-qrm-immutable">
                             <strong>{t('admin2.qrm_edit_immutable')}</strong>{' '}
-                            code=<code>{editing.code}</code>, queue_tag=<code>{editing.queue_tag}</code>{' '}
+                            <code className="admin-sdx-code">{editing.code}</code>,{' '}
+                            <code className="admin-sdx-code">{editing.queue_tag}</code>{' '}
                             — {t('admin2.qrm_edit_immutable_hint')}
                         </div>
                         <Input
@@ -417,7 +382,7 @@ const QueueResourceManager = ({
                             value={editDraft.default_cabinet}
                             onChange={(e) => setEditDraft((p) => ({ ...p, default_cabinet: e.target.value }))}
                         />
-                        <div style={{ display: 'flex', gap: 8, gridColumn: '1 / -1' }}>
+                        <div className="admin-qrm-form-span admin-sdx-step-nav">
                             <Button
                                 variant="primary"
                                 size="sm"
@@ -425,11 +390,11 @@ const QueueResourceManager = ({
                                 disabled={saving}
                                 data-testid="qr-resource-edit-submit"
                             >
-                                <Check size={14} style={{ marginRight: 4 }} />
+                                <Check className="admin-sdx-icon-l" size={14} />
                                 {t('admin2.qrm_save')}
                             </Button>
                             <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>
-                                <X size={14} style={{ marginRight: 4 }} />
+                                <X className="admin-sdx-icon-l" size={14} />
                                 {t('admin2.cancel')}
                             </Button>
                         </div>
@@ -437,49 +402,47 @@ const QueueResourceManager = ({
                 )}
 
                 {loading ? (
-                    <div style={{ padding: 16, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
-                        {t('admin2.qrm_loading')}
-                    </div>
+                    <div className="admin-sdx-note">{t('admin2.qrm_loading')}</div>
                 ) : resources.length === 0 ? (
-                    <div style={{ padding: 16, fontSize: 12, color: 'var(--mac-text-secondary)' }} data-testid="qr-resource-empty">
+                    <div className="admin-sdx-note" data-testid="qr-resource-empty">
                         {t('admin2.qrm_empty')}
                     </div>
                 ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }} data-testid="qr-resource-table">
+                    <div className="admin-qrm-table-wrap">
+                        <table className="admin-qrm-table" data-testid="qr-resource-table">
                             <thead>
-                                <tr style={{ textAlign: 'left', color: 'var(--mac-text-secondary)' }}>
-                                    <th style={{ padding: '6px 8px' }}>{t('admin2.qrm_col_code')}</th>
-                                    <th style={{ padding: '6px 8px' }}>{t('admin2.qrm_col_tag')}</th>
-                                    <th style={{ padding: '6px 8px' }}>{t('admin2.qrm_col_display_name')}</th>
-                                    <th style={{ padding: '6px 8px' }}>{t('admin2.qrm_col_numbers')}</th>
-                                    <th style={{ padding: '6px 8px' }}>{t('admin2.qrm_col_cabinet')}</th>
-                                    <th style={{ padding: '6px 8px' }}>{t('admin2.qrm_col_status')}</th>
-                                    <th style={{ padding: '6px 8px' }}>{t('admin2.qrm_col_actions')}</th>
+                                <tr>
+                                    <th className="admin-qrm-th">{t('admin2.qrm_col_code')}</th>
+                                    <th className="admin-qrm-th">{t('admin2.qrm_col_tag')}</th>
+                                    <th className="admin-qrm-th">{t('admin2.qrm_col_display_name')}</th>
+                                    <th className="admin-qrm-th">{t('admin2.qrm_col_numbers')}</th>
+                                    <th className="admin-qrm-th">{t('admin2.qrm_col_cabinet')}</th>
+                                    <th className="admin-qrm-th">{t('admin2.qrm_col_status')}</th>
+                                    <th className="admin-qrm-th">{t('admin2.qrm_col_actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {resources.map((resource) => (
-                                    <tr key={resource.id} data-testid={`qr-resource-row-${resource.id}`} style={{ borderTop: '1px solid var(--mac-border, rgba(0,0,0,0.08))' }}>
-                                        <td style={{ padding: '6px 8px' }}>
-                                            <code>{resource.code}</code>
+                                    <tr key={resource.id} className="admin-qrm-tr" data-testid={`qr-resource-row-${resource.id}`}>
+                                        <td className="admin-qrm-td">
+                                            <code className="admin-sdx-code">{resource.code}</code>
                                         </td>
-                                        <td style={{ padding: '6px 8px' }}>
-                                            <code>{resource.queue_tag}</code>
+                                        <td className="admin-qrm-td">
+                                            <code className="admin-sdx-code">{resource.queue_tag}</code>
                                         </td>
-                                        <td style={{ padding: '6px 8px' }}>{resource.display_name}</td>
-                                        <td style={{ padding: '6px 8px' }}>
+                                        <td className="admin-qrm-td">{resource.display_name}</td>
+                                        <td className="admin-qrm-td">
                                             {resource.start_number_online} / {resource.max_online_per_day}
                                         </td>
-                                        <td style={{ padding: '6px 8px' }}>{resource.default_cabinet || '—'}</td>
-                                        <td style={{ padding: '6px 8px' }}>
+                                        <td className="admin-qrm-td">{resource.default_cabinet || '—'}</td>
+                                        <td className="admin-qrm-td">
                                             {resource.active ? (
                                                 <Badge data-testid="qr-resource-badge-active">{t('admin2.qrm_status_active')}</Badge>
                                             ) : (
                                                 <Badge variant="secondary" data-testid="qr-resource-badge-draft">{t('admin2.qrm_status_draft')}</Badge>
                                             )}
                                         </td>
-                                        <td style={{ padding: '6px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                        <td className="admin-qrm-td-right">
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
