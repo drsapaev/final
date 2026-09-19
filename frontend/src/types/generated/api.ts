@@ -22135,6 +22135,42 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/admin/queue-resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Список QueueResource (реестр ресурсных владельцев тегов) */
+        get: operations["list_queue_resources_api_v1_queue_admin_queue_resources_get"];
+        put?: never;
+        /** Создать QueueResource (draft по умолчанию; active=true — через gate §3.1) */
+        post: operations["create_queue_resource_api_v1_queue_admin_queue_resources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/admin/queue-resources/{resource_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** QueueResource по id */
+        get: operations["get_queue_resource_api_v1_queue_admin_queue_resources__resource_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** PATCH QueueResource (ordinary-поля; code/queue_tag immutable; active — lifecycle §3.2) */
+        patch: operations["update_queue_resource_api_v1_queue_admin_queue_resources__resource_id__patch"];
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -39748,6 +39784,78 @@ export type components = {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /**
+         * QueueResourceCreate
+         * @description Draft-by-default (S-14: услуги/профиль → draft-ресурс → активация
+         *     через gate §3.1); `active=true` сразу — только при пройденном gate.
+         */
+        QueueResourceCreate: {
+            /** Code */
+            code: string;
+            /** Queue Tag */
+            queue_tag: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Start Number Online
+             * @default 1
+             */
+            start_number_online: number;
+            /**
+             * Max Online Per Day
+             * @default 15
+             */
+            max_online_per_day: number;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /**
+             * Active
+             * @default false
+             */
+            active: boolean;
+        };
+        /** QueueResourceOut */
+        QueueResourceOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Queue Tag */
+            queue_tag: string;
+            /** Display Name */
+            display_name: string;
+            /** Active */
+            active: boolean;
+            /** Start Number Online */
+            start_number_online: number;
+            /** Max Online Per Day */
+            max_online_per_day: number;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * QueueResourceUpdate
+         * @description §3.2: ordinary PATCH — `display_name`/`start_number_online`/
+         *     `max_online_per_day`/`default_cabinet`; `active` — lifecycle-переход
+         *     под serialization-scope §3.1(б). `code`/`queue_tag` immutable
+         *     (extra="forbid" -> 422 на попытку).
+         */
+        QueueResourceUpdate: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Start Number Online */
+            start_number_online?: number | null;
+            /** Max Online Per Day */
+            max_online_per_day?: number | null;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /** Active */
+            active?: boolean | null;
         };
     };
     responses: never;
@@ -78131,6 +78239,223 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+        };
+    };
+    list_queue_resources_api_v1_queue_admin_queue_resources_get: {
+        parameters: {
+            query?: {
+                active_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"][];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_queue_resource_api_v1_queue_admin_queue_resources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueResourceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Невалидный payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Дубликат code/queue_tag или отказ инварианта §3.1 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Неизвестные поля payload */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_queue_resource_api_v1_queue_admin_queue_resources__resource_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description QueueResource не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_queue_resource_api_v1_queue_admin_queue_resources__resource_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueResourceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description QueueResource не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Отказ инварианта §3.1 при активации */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Попытка изменить immutable code/queue_tag или невалидный payload */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
