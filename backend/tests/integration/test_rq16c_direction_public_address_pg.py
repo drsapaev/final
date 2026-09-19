@@ -447,13 +447,18 @@ def test_non_lowercase_code_rejected(pg_session):
 def test_downgrade_reupgrade_leaves_no_partial_registry(pg_env):
     sa_url, psycopg_dsn = pg_env
 
-    r_down = _run_alembic(sa_url, "downgrade", "-1")
+    # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the head moved to 0072
+    # (nurse workplace assignments 0071 + service executions 0072), so the
+    # first step is an ABSOLUTE downgrade to the retirement 0069 — this
+    # exercises the 0072/0071/0070 downgrades on the way and keeps the
+    # original assertion shape: the retirement state must retain the
+    # registry with NO partial rows.
+    r_down = _run_alembic(sa_url, "downgrade", "0069_sentinel_pair_retirement")
     assert r_down.returncode == 0, r_down.stderr[-1500:]
     with psycopg.connect(psycopg_dsn) as conn:
         version = conn.execute("select version_num from alembic_version").fetchone()[0]
-        # -1 from the head (0070 lineage) lands on the retirement 0069:
-        # the lineage downgrade drops only its own columns/indexes and
-        # must leave NO partial registry rows either.
+        # landing on the retirement 0069: the lineage downgrade drops only
+        # its own columns/indexes and must leave NO partial registry rows.
         assert version == "0069_sentinel_pair_retirement"
         present = conn.execute(
             "select to_regclass('public.queue_direction_public_addresses')"

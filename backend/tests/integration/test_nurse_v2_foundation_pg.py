@@ -145,24 +145,29 @@ def _insert_resource(conn, code: str, active: bool = True) -> int:
 
 
 def _insert_visit_service(conn, name: str = "Процедура") -> int:
+    # baseline NOT NULLs without server defaults are provided explicitly
+    # (patients.created_at/is_deleted, visits.created_at,
+    # visit_services.created_at)
     patient_id = conn.execute(
         text(
-            "INSERT INTO patients (first_name, last_name, birth_date) "
-            "VALUES ('Пациент', 'Н2', '1990-01-01') RETURNING id"
+            "INSERT INTO patients (last_name, first_name, birth_date, "
+            "created_at, is_deleted) "
+            "VALUES ('Н2', 'Пациент', '1990-01-01', now(), false) RETURNING id"
         )
     ).scalar_one()
     visit_id = conn.execute(
         text(
             "INSERT INTO visits (patient_id, status, discount_mode, "
-            "approval_status, source, reminder_generation) "
-            f"VALUES ({patient_id}, 'open', 'none', 'none', 'desk', 0) "
+            "approval_status, source, reminder_generation, created_at) "
+            f"VALUES ({patient_id}, 'open', 'none', 'none', 'desk', 0, now()) "
             "RETURNING id"
         )
     ).scalar_one()
     return conn.execute(
         text(
-            "INSERT INTO visit_services (visit_id, name, qty) "
-            f"VALUES ({visit_id}, '{name}', 1) RETURNING id"
+            "INSERT INTO visit_services (visit_id, service_id, name, qty, "
+            "created_at) "
+            f"VALUES ({visit_id}, 101, '{name}', 1, now()) RETURNING id"
         )
     ).scalar_one()
 
@@ -260,16 +265,25 @@ def test_fresh_install_schema_shape(head_url):
                 "nurse_workplace_assignments",
                 "uq_nurse_workplace_assignments_active_pair",
             )
+            assert "UNIQUE" in pair_index
+            # PostgreSQL may render partial predicates with ::text casts
+            # (e.g. ``((is_active)::text = ...``) — normalize before the
+            # exact-shape assertions.
+            normalized_pair = pair_index.replace("::text", "")
+            normalized_pair = normalized_pair.replace("(", "").replace(")", "")
+            assert "user_id, queue_resource_id" in normalized_pair
             assert (
-                "UNIQUE" in pair_index and "is_active" in pair_index
+                "is_active" in normalized_pair
             ), f"unexpected partial predicate: {pair_index!r}"
 
             active_execution_index = indexdef(
                 "service_executions", "uq_service_executions_one_active"
             )
             assert "UNIQUE" in active_execution_index
+            normalized_active = active_execution_index.replace("::text", "")
+            normalized_active = normalized_active.replace("(", "").replace(")", "")
             assert (
-                "status = 'in_progress'" in active_execution_index
+                "status = 'in_progress'" in normalized_active
             ), f"unexpected partial predicate: {active_execution_index!r}"
 
             # plain attempt-unique constraint
