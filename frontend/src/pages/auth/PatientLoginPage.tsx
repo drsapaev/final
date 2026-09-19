@@ -20,7 +20,7 @@ import { LogIn, Phone, ShieldCheck } from 'lucide-react';
 import { Alert, Button, Card, CardContent, CardHeader, CardTitle, Input } from '../../components/ui/macos';
 import { ensureCSRFToken } from '../../api/client';
 import { patientLogin, requestPatientOtp, verifyPatientOtp } from '../../api/patientAccess';
-import { setProfile, setToken } from '../../stores/auth';
+import { replaceAccessOnlySession } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
 import { isValidUzbekPhone, normalizeUzbekPhoneForApi } from '../../utils/phoneUtils';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -144,8 +144,12 @@ const PatientLoginPage = () => {
       const session = await patientLogin({ phone, verification_grant: grantResponse.verification_grant });
 
       const accessToken = session.access_token.trim();
-      setToken(accessToken);
-      setProfile(session.user as unknown as Record<string, unknown>);
+      // Phase 0 PR-B review P1: patient sessions are access-only (no refresh
+      // token). REPLACE any previous staff principal in this tab — never merge
+      // with it. A leftover staff refresh_token would be replayed on
+      // /authentication/refresh once the patient JWT nears expiry, silently
+      // minting a fresh staff access token (hidden principal swap).
+      replaceAccessOnlySession(accessToken, session.user as unknown as Record<string, unknown>);
       ensureCSRFToken().catch(() => {
         // Non-fatal — the request interceptor fetches CSRF on demand.
       });

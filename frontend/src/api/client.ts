@@ -97,6 +97,21 @@ async function performTokenRefresh(): Promise<string | null> {
     });
 
     if (response.data && response.data.access_token) {
+      // Session-replacement guard (Phase 0 PR-B review P1): if the stored
+      // refresh token changed while this refresh was in flight — e.g.
+      // replaceAccessOnlySession() cleared it during a patient login or
+      // activation — the rotated tokens below belong to the REPLACED
+      // principal. Persisting them would resurrect the old staff session
+      // on top of the freshly installed patient one. Drop them and let the
+      // pending request continue under the current (replacement) session;
+      // the 401-recovery path already refuses to clear a replaced session
+      // (failedToken !== currentToken guard), so null is safe there too.
+      if (tokenManager.getRefreshToken() !== refreshToken) {
+        logger.warn('🔄 Refresh token changed mid-flight — dropping rotated tokens of the replaced session');
+        pendingRequestsQueue.forEach(resolve => resolve(null));
+        pendingRequestsQueue = [];
+        return null;
+      }
       const newToken = response.data.access_token;
       tokenManager.setAccessToken(newToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;

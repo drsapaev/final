@@ -375,6 +375,38 @@ export function setProfile(profile: UserProfile | null): void {
   notify();
 }
 
+/**
+ * Replace the current session with an access-only session (no refresh token).
+ *
+ * Phase 0 PR-B review P1 (cross-session principal swap): patient login and
+ * activation return a canonical access-only session. When a staff session
+ * (Admin/Registrar/...) already lives in the same tab (public routes are
+ * reachable while authenticated), a plain setToken/setProfile pair leaves
+ * the OLD staff refresh_token behind. The request interceptor then calls
+ * refreshTokenIfNeeded() before nearly every non-/auth/ request; once the
+ * patient access token nears expiry, the client POSTs /authentication/refresh
+ * with the stale staff refresh token — the backend resolves it to the former
+ * staff user and mints a fresh STAFF access token, while the UI keeps
+ * showing the patient profile (hidden principal swap back to Admin/Staff).
+ *
+ * The order below is the atomic-replacement contract:
+ *   1. refresh_token FIRST — the previous principal can no longer be
+ *      refreshed, not even in the window before the new token lands;
+ *   2. access token — replaces the previous principal's JWT;
+ *   3. profile — replaces the previous principal's UI identity
+ *      (also overwrites tokenManager's `user` payload).
+ *
+ * Used by PatientLoginPage and PatientActivatePage. Regression:
+ * stores/__tests__/auth.test.ts (replaceAccessOnlySession) and
+ * api/__tests__/client.patientSession.test.ts (no /authentication/refresh
+ * replay with the stale staff token).
+ */
+export function replaceAccessOnlySession(accessToken: string, profile: UserProfile): void {
+  tokenManager.setRefreshToken(null);
+  setToken(accessToken);
+  setProfile(profile);
+}
+
 // Backwards-compatible names (aliases)
 export const setAuthToken = setToken;
 export const getAuthToken = getToken;
@@ -392,6 +424,7 @@ const auth = {
   getProfile,
   validateSession,
   setProfile,
+  replaceAccessOnlySession,
 };
 
 export default auth;

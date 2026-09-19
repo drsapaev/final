@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '../../../contexts/ThemeContext';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,6 +24,7 @@ vi.mock('../../../stores/auth', () => ({
   setToken: vi.fn(),
   setProfile: vi.fn(),
   clearToken: vi.fn(),
+  replaceAccessOnlySession: vi.fn(),
 }));
 
 vi.mock('../../../i18n/useTranslation', () => ({
@@ -40,7 +41,7 @@ import {
   confirmActivation,
   requestActivationOtp,
 } from '../../../api/patientAccess';
-import { setProfile, setToken } from '../../../stores/auth';
+import { replaceAccessOnlySession, setProfile, setToken } from '../../../stores/auth';
 
 const mockedRequestOtp = vi.mocked(requestActivationOtp);
 const mockedConfirm = vi.mocked(confirmActivation);
@@ -92,6 +93,55 @@ describe('PatientActivatePage (Phase 0 PR-B)', () => {
     expect(mockedRequestOtp).not.toHaveBeenCalled();
   });
 
+  it('strips the deep-link token from the URL after prefill (P2)', async () => {
+    const locations: string[] = [];
+    const LocationProbe = () => {
+      const { search } = useLocation();
+      if (locations[locations.length - 1] !== search) {
+        locations.push(search);
+      }
+      return null;
+    };
+
+    render(
+      <MemoryRouter initialEntries={[`/patient/activate?token=${TOKEN}&keep=1`]}>
+        <ThemeProvider>
+          <PatientActivatePage />
+          <LocationProbe />
+        </ThemeProvider>
+      </MemoryRouter>
+    );
+
+    // Prefill still works (token copied into state before the strip).
+    const tokenInput = screen.getByLabelText('patientPortal.pa_token_label') as HTMLInputElement;
+    expect(tokenInput.value).toBe(TOKEN);
+
+    // ...and the credential is gone from the URL (history replaced), while
+    // unrelated query params survive.
+    await waitFor(() => {
+      expect(locations[locations.length - 1]).toBe('?keep=1');
+    });
+    // Never re-introduced by a later navigation snapshot either.
+    expect(locations.every((search) => !search.includes(TOKEN) || search === `?token=${TOKEN}&keep=1`)).toBe(true);
+    // Still never auto-submitted.
+    expect(mockedRequestOtp).not.toHaveBeenCalled();
+  });
+
+  it('accepts tokens up to the backend contract boundary (maxLength 256)', async () => {
+    renderPage();
+
+    // 200 chars — beyond the stale 128 limit, within the backend max 256.
+    const longToken = 'b'.repeat(200);
+    fireEvent.change(screen.getByLabelText('patientPortal.pa_token_label'), {
+      target: { value: longToken },
+    });
+    fireEvent.submit(screen.getByLabelText('patientPortal.pa_continue').closest('form')!);
+
+    await waitFor(() => {
+      expect(mockedRequestOtp).toHaveBeenCalledWith({ activation_token: longToken, locale: 'ru' });
+    });
+  });
+
   it('rejects a too-short token client-side', async () => {
     renderPage();
 
@@ -136,8 +186,11 @@ describe('PatientActivatePage (Phase 0 PR-B)', () => {
 
     await waitFor(() => {
       expect(mockedConfirm).toHaveBeenCalledWith({ activation_token: TOKEN, code: '654321' });
-      expect(setToken).toHaveBeenCalledWith('activated-jwt');
-      expect(setProfile).toHaveBeenCalledWith(PATIENT_SESSION.user);
+      // P1: access-only session replacement (also clears any stale staff
+      // refresh token) — never the raw setToken/setProfile pair.
+      expect(replaceAccessOnlySession).toHaveBeenCalledWith('activated-jwt', PATIENT_SESSION.user);
+      expect(setToken).not.toHaveBeenCalled();
+      expect(setProfile).not.toHaveBeenCalled();
     });
   });
 });

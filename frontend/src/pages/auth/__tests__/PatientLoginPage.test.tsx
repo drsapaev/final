@@ -24,6 +24,7 @@ vi.mock('../../../stores/auth', () => ({
   setToken: vi.fn(),
   setProfile: vi.fn(),
   clearToken: vi.fn(),
+  replaceAccessOnlySession: vi.fn(),
 }));
 
 vi.mock('../../../i18n/useTranslation', () => ({
@@ -42,7 +43,7 @@ import {
   verifyPatientOtp,
 } from '../../../api/patientAccess';
 import { ensureCSRFToken } from '../../../api/client';
-import { setProfile, setToken } from '../../../stores/auth';
+import { replaceAccessOnlySession, setProfile, setToken } from '../../../stores/auth';
 
 const mockedRequestOtp = vi.mocked(requestPatientOtp);
 const mockedVerifyOtp = vi.mocked(verifyPatientOtp);
@@ -143,9 +144,13 @@ describe('PatientLoginPage (Phase 0 PR-B)', () => {
     });
 
     await waitFor(() => {
-      expect(setToken).toHaveBeenCalledWith('patient-jwt');
-      expect(setProfile).toHaveBeenCalledWith(PATIENT_SESSION.user);
+      // P1: the canonical session is installed via the access-only
+      // replacement helper (which also clears any stale staff refresh
+      // token) — never via the raw setToken/setProfile pair.
+      expect(replaceAccessOnlySession).toHaveBeenCalledWith('patient-jwt', PATIENT_SESSION.user);
       expect(ensureCSRFToken).toHaveBeenCalled();
+      expect(setToken).not.toHaveBeenCalled();
+      expect(setProfile).not.toHaveBeenCalled();
     });
   });
 

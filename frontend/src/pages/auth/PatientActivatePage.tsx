@@ -13,7 +13,9 @@
  *
  * Deep-link: /patient/activate?token=... prefills the token field. The token
  * is NEVER auto-submitted — the user explicitly continues (stale/revoked
- * tokens surface as a uniform 400 on submit, not on page load).
+ * tokens surface as a uniform 400 on submit, not on page load). The token is
+ * copied into state and immediately stripped from the URL (history replace),
+ * so the credential never lingers in the address bar or browser history.
  *
  * Session: same canonical session storage as /patient/login.
  */
@@ -24,7 +26,7 @@ import { KeyRound, ShieldCheck } from 'lucide-react';
 import { Alert, Button, Card, CardContent, CardHeader, CardTitle, Input } from '../../components/ui/macos';
 import { ensureCSRFToken } from '../../api/client';
 import { confirmActivation, requestActivationOtp } from '../../api/patientAccess';
-import { setProfile, setToken } from '../../stores/auth';
+import { replaceAccessOnlySession } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
 import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
@@ -53,7 +55,7 @@ const PatientActivatePage = () => {
   const { t: rawT, language } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [step, setStep] = useState<PatientActivateStep>('token');
   const [activationToken, setActivationToken] = useState('');
@@ -63,12 +65,21 @@ const PatientActivatePage = () => {
   const [error, setError] = useState('');
 
   // Deep-link prefill (?token=...) — prefill only, never auto-submit.
+  // Phase 0 PR-B review P2: the activation token is a live 72h credential,
+  // so after copying it into state it is immediately stripped from the URL
+  // (address bar, browser history, copy-paste) with replace:true — the
+  // history entry no longer carries the secret. Unrelated query params are
+  // preserved; the re-run of this effect after the strip is a no-op
+  // (prefill resolves to ''), so this cannot loop.
   useEffect(() => {
     const prefill = (searchParams.get('token') || '').trim();
     if (prefill) {
       setActivationToken(prefill);
+      const next = new URLSearchParams(searchParams);
+      next.delete('token');
+      setSearchParams(next, { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, setSearchParams]);
 
   const normalizeError = useCallback(
     (err: unknown) => {
@@ -94,9 +105,11 @@ const PatientActivatePage = () => {
     setError('');
 
     const token = activationToken.trim();
-    if (token.length < 16 || token.length > 128) {
-      // Backend: token is a 128-char hex sha256; only the length sanity check
-      // is mirrored client-side — real validity is uniform-400 server-side.
+    if (token.length < 16 || token.length > 256) {
+      // Backend contract (openapi PatientActivationOtpRequest/ConfirmRequest):
+      // minLength 16, maxLength 256; the issued token is
+      // secrets.token_urlsafe(32) (~43 chars). Only the length sanity check
+      // is mirrored client-side — real validity is a uniform 400 server-side.
       setError(t('patientPortal.pa_token_invalid'));
       return;
     }
@@ -134,8 +147,10 @@ const PatientActivatePage = () => {
       });
 
       const accessToken = session.access_token.trim();
-      setToken(accessToken);
-      setProfile(session.user as unknown as Record<string, unknown>);
+      // Phase 0 PR-B review P1: access-only session replacement — see
+      // PatientLoginPage / stores/auth.replaceAccessOnlySession. A leftover
+      // staff refresh_token must never survive into the patient session.
+      replaceAccessOnlySession(accessToken, session.user as unknown as Record<string, unknown>);
       ensureCSRFToken().catch(() => {
         // Non-fatal — the request interceptor fetches CSRF on demand.
       });
