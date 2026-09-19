@@ -137,6 +137,162 @@
         }
       }
     },
+    "/api/v1/patients/cabinet/summary": {
+      "get": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Get Patient Cabinet Summary",
+        "description": "Home-screen summary for the JWT patient portal (own scope only).",
+        "operationId": "get_patient_cabinet_summary_api_v1_patients_cabinet_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Patient Cabinet Summary Api V1 Patients Cabinet Summary Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/patients/booking/preview": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Preview Patient Portal Booking",
+        "description": "Non-mutating booking preview for the JWT patient portal.",
+        "operationId": "preview_patient_portal_booking_api_v1_patients_booking_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientPortalBookingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Preview Patient Portal Booking Api V1 Patients Booking Preview Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/patients/booking": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Create Patient Portal Booking",
+        "description": "Create one trusted patient-portal appointment (own scope only).\n\nMirrors the Mini App creation contract: same draft validation, same\nper-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same\n409 on occupied slots, same lifecycle eligibility for the doctor.",
+        "operationId": "create_patient_portal_booking_api_v1_patients_booking_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientPortalBookingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Patient Portal Booking Api V1 Patients Booking Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/patients/forms": {
+      "get": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Get Patient Portal Forms",
+        "description": "Read-only protected forms metadata + saved answers for the JWT portal.\n\nSubmissions remain Telegram-only in this PR (see module docstring).",
+        "operationId": "get_patient_portal_forms_api_v1_patients_forms_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Patient Portal Forms Api V1 Patients Forms Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/patients/appointments": {
       "get": {
         "tags": [
@@ -91340,6 +91496,79 @@
           "code"
         ],
         "title": "PatientOtpVerifyRequest"
+      },
+      "PatientPortalBookingRequest": {
+        "properties": {
+          "appointmentDate": {
+            "type": "string",
+            "format": "date",
+            "title": "Appointmentdate"
+          },
+          "appointmentTime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointmenttime"
+          },
+          "doctorId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctorid"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "services": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Services"
+          }
+        },
+        "type": "object",
+        "required": [
+          "appointmentDate"
+        ],
+        "title": "PatientPortalBookingRequest",
+        "description": "Same validation contract as the Mini App booking preview request."
       },
       "PatientProfileOut": {
         "properties": {

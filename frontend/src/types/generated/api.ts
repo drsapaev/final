@@ -111,6 +111,92 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/patients/cabinet/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Patient Cabinet Summary
+         * @description Home-screen summary for the JWT patient portal (own scope only).
+         */
+        get: operations["get_patient_cabinet_summary_api_v1_patients_cabinet_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/booking/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Patient Portal Booking
+         * @description Non-mutating booking preview for the JWT patient portal.
+         */
+        post: operations["preview_patient_portal_booking_api_v1_patients_booking_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/booking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Patient Portal Booking
+         * @description Create one trusted patient-portal appointment (own scope only).
+         *
+         *     Mirrors the Mini App creation contract: same draft validation, same
+         *     per-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same
+         *     409 on occupied slots, same lifecycle eligibility for the doctor.
+         */
+        post: operations["create_patient_portal_booking_api_v1_patients_booking_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Patient Portal Forms
+         * @description Read-only protected forms metadata + saved answers for the JWT portal.
+         *
+         *     Submissions remain Telegram-only in this PR (see module docstring).
+         */
+        get: operations["get_patient_portal_forms_api_v1_patients_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/patients/appointments": {
         parameters: {
             query?: never;
@@ -31873,6 +31959,27 @@ export type components = {
             code: string;
         };
         /**
+         * PatientPortalBookingRequest
+         * @description Same validation contract as the Mini App booking preview request.
+         */
+        PatientPortalBookingRequest: {
+            /**
+             * Appointmentdate
+             * Format: date
+             */
+            appointmentDate: string;
+            /** Appointmenttime */
+            appointmentTime?: string | null;
+            /** Doctorid */
+            doctorId?: number | null;
+            /** Department */
+            department?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Services */
+            services?: string[] | null;
+        };
+        /**
          * PatientProfileOut
          * @description Профиль пациента для API
          */
@@ -39860,6 +39967,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_patient_cabinet_summary_api_v1_patients_cabinet_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    preview_patient_portal_booking_api_v1_patients_booking_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientPortalBookingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_patient_portal_booking_api_v1_patients_booking_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientPortalBookingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_patient_portal_forms_api_v1_patients_forms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

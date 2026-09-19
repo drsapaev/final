@@ -118,3 +118,42 @@ Notes:
 - Unit tests: `frontend/src/pages/auth/__tests__/`,
   `frontend/src/api/__tests__/patientAccess.test.ts`,
   `frontend/src/components/admin/__tests__/PatientActivationTokenDialog.test.tsx`.
+
+## Phase 1 (PR-C1): JWT patient portal self-service
+
+Phase 0 OTP patients land on `/patient` with a canonical `User(role="Patient")`
+JWT. PR-C1 adds the web counterpart of the Mini App self-service surface so
+the portal no longer depends on Telegram identity:
+
+| Capability | Endpoint (JWT, `Patient` role, own scope) | Mini App counterpart (unchanged) |
+|------------|-------------------------------------------|----------------------------------|
+| Cabinet summary | `GET /api/v1/patients/cabinet/summary` | `POST /api/v1/telegram/mini-app/cabinet/summary` |
+| Booking preview | `POST /api/v1/patients/booking/preview` | `POST /api/v1/telegram/mini-app/appointments/preview` |
+| Booking create | `POST /api/v1/patients/booking` (201) | `POST /api/v1/telegram/mini-app/appointments` |
+| Forms (read-only) | `GET /api/v1/patients/forms` | `POST /api/v1/telegram/mini-app/forms/preview` |
+
+Contract notes:
+
+- Single source of truth: all four endpoints reuse the Mini App service layer
+  (`build_telegram_mini_app_appointment_booking_preview`,
+  `build_telegram_mini_app_patient_forms_preview`, the cabinet summary payload
+  assembly). Identity differs only at the scope boundary — the JWT endpoints
+  build a `TelegramMiniAppSessionScope` from `current_user.patient.id` with
+  `telegram_user_id`/`telegram_chat_id` set to `None` (the dataclass fields are
+  optional since PR-C1; Telegram-sourced scopes keep real ids).
+- Booking creation mirrors the Mini App contract exactly: per-doctor
+  `FOR UPDATE` slot reservation taken BEFORE eligibility, same 409
+  `appointment_time_slot_occupied`, same doctor lifecycle eligibility.
+- Error mapping: request-shaped booking problems are `400`
+  (`appointment_date_in_past`, `doctor_id_invalid`, ...), identity/scope
+  problems are `403`; a `User` without a linked patient card gets `404
+  patient_profile_required`; unauthenticated is `401`.
+- Deliberately out of scope: web form SUBMISSIONS. The
+  `telegram_patient_form_submissions.telegram_chat_id` column is `NOT NULL`,
+  so a web submission path requires its own schema decision first. The web
+  forms endpoint is read-only (`POST /patients/forms` is 405).
+- Router mount order matters: `patient_portal` is included BEFORE
+  `patients.router` so static `/patients/forms` and `/patients/booking` win
+  over `GET /patients/{patient_id}`.
+- Audit: every endpoint writes a `patient_access_audit` row (actor = JWT user,
+  scope = patient portal scope).
