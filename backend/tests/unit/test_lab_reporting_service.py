@@ -270,20 +270,24 @@ class TestLabReportingService:
             f"Backfill должен создать 2 LabResult, got {after}"
         )
 
-    def test_revise_and_additional_blank_refresh_legacy_projection(
+    def test_revise_and_additional_blank_do_not_overwrite_legacy_projection(
         self, db_session, test_patient, test_visit
     ):
-        """PR2: legacy lab_results должна отражать последнюю финализированную
-        версию каждого показателя и не блокироваться наличием любых строк
-        того же order_id.
+        """C-track guard (решение владельца, см.
+        .ai-factory/plans/lab-results-lineage-decision.md): проекция не
+        перезаписывает существующие legacy-строки, принадлежность которых
+        цепочке бланка недоказуема (lineage-полей на схеме пока нет).
 
-        Сценарий плана PR2:
-          - финализировать бланк A (hgb, wbc);
-          - revise → изменить один показатель → финализировать: legacy
-            consumer видит новое значение;
-          - дополнительный бланк B (ige_total, другой test_code) того же
-            visit (тот же order): показатели A сохраняются, показатель B
-            появляется.
+        Контракт этапа C:
+          - финализировать бланк A (hgb=100, wbc=5.2): строки создаются
+            (заказ без проекций);
+          - revise → hgb=140 → финализировать: существующие строки НЕ
+            перезаписываются (hgb остаётся "100") — open limitation до A+;
+          - дополнительный бланк B (total_ige) того же visit/order: строки A
+            не затронуты, total_ige не появляется (skip), дубликатов нет.
+
+        Перезаписывающий upsert #3235 был P1: коллизия field_key (glucose
+        крови и мочи) затирала утверждённый результат чужим исследованием.
         """
         test_patient.sex = "M"
         test_patient.birth_date = date(1990, 1, 1)
@@ -327,7 +331,10 @@ class TestLabReportingService:
         assert _legacy_rows()["hgb"].value == "100"
         assert _legacy_rows()["wbc"].value == "5.2"
 
-        # Revise → изменить один синтетический показатель → финализировать
+        # Revise → изменить один синтетический показатель → финализировать:
+        # строки заказа уже есть, проекция пропускается — ревизия НЕ
+        # перезаписывает утверждённый результат (до A+ legacy остаётся со
+        # значением исходной версии).
         revision = service.revise(finalized_a.id)
         service.bulk_upsert_values(
             revision.id,
@@ -336,12 +343,14 @@ class TestLabReportingService:
         service.finalize(revision.id)
 
         rows = _legacy_rows()
-        assert rows["hgb"].value == "140", (
-            "legacy projection must show the revised value after re-finalize"
+        assert len(rows) == 2, (
+            "revision finalize must not create duplicate rows"
         )
-        assert rows["wbc"].value == "5.2", (
-            "unrelated indicator of the same order must be preserved"
+        assert rows["hgb"].value == "100", (
+            "C-track guard: revision must NOT overwrite the projected result "
+            "while lineage is unprovable"
         )
+        assert rows["wbc"].value == "5.2"
 
         # Дополнительный бланк B (другой шаблон/test_code) того же visit:
         # _resolve_or_create_order переиспользует order визита
@@ -363,13 +372,21 @@ class TestLabReportingService:
         service.finalize(instance_b.id)
 
         rows = _legacy_rows()
-        assert rows["hgb"].value == "140", (
-            "blank B finalize must not drop blank A indicators"
+        assert rows["hgb"].value == "100", (
+            "blank B finalize must not overwrite blank A indicators"
         )
         assert rows["wbc"].value == "5.2"
-        assert rows["total_ige"].value == "150", (
-            "additional blank must reach the legacy projection"
+        assert "total_ige" not in rows, (
+            "C-track guard: without lineage the sibling blank's projection "
+            "must be skipped, not merged into the same order rows"
         )
+        # Каноническое значение ревизии сохраняется в новой модели —
+        # legacy-неполнота не теряет данные, а лишь временно не проецирует их.
+        refreshed_revision = service.get_instance(revision.id)
+        revision_hgb = next(
+            v for v in refreshed_revision.values if v.field_key == "hgb"
+        )
+        assert revision_hgb.value_text == "140"
 
     def test_create_instance_prefills_signer_snapshot_from_actor_name(
         self, db_session, test_patient
