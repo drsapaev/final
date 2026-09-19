@@ -1,6 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import auth, { getExpiredPrincipalWasPatient } from '../stores/auth';
+import auth, { getExpiredPrincipalWasPatient, resetExpiredPrincipalHint } from '../stores/auth';
 import type { AuthState } from '../types/domain/auth';
 import logger from '../utils/logger';
 import {
@@ -97,6 +97,30 @@ export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProp
   const [isChecking, setIsChecking] = useState<boolean>(() => Boolean(auth.getToken()) && route?.auth !== 'public');
   const location = useLocation();
 
+  const missingTokenRedirect = route !== null && route.auth !== 'public' && !state.token;
+  const expiredPatientRedirect = missingTokenRedirect && getExpiredPrincipalWasPatient();
+
+  // Codex P2 (round 4): the hint is consumed ONCE per missing-token episode
+  // and the selected target is FROZEN for that episode (ref) — duplicate
+  // clears on the same 401 trigger extra re-renders, and a re-computed
+  // target after the hint was consumed must never flip the redirect back
+  // to the staff login.
+  const redirectTargetRef = useRef<string | null>(null);
+  if (missingTokenRedirect && redirectTargetRef.current === null) {
+    redirectTargetRef.current = expiredPatientRedirect ? '/patient/login' : '/login';
+  }
+
+  useEffect(() => {
+    if (missingTokenRedirect) {
+      // Consume the hint once the target is selected — it must not keep
+      // redirecting LATER anonymous visits in this tab to the patient login.
+      resetExpiredPrincipalHint();
+    } else {
+      // Session (re-)established — arm the ref for a future expiry episode.
+      redirectTargetRef.current = null;
+    }
+  }, [missingTokenRedirect]);
+
   useEffect(() => {
     let isMounted = true;
     const unsubscribe = auth.subscribe((nextState: AuthState) => {
@@ -160,15 +184,21 @@ export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProp
     );
   }
 
-  if (route.auth !== 'public' && !state.token) {
-    // Phase 0 follow-up (Codex P1, rounds 2-3): the redirect target follows
+  if (missingTokenRedirect) {
+    // Phase 0 follow-up (Codex P1, rounds 2-4): the redirect target follows
     // the EXPIRED PRINCIPAL, not the route — patient-home is shared with
     // support staff (Admin/Registrar/Doctor), so route metadata cannot
     // identify whose session died. The auth store remembers the cleared
     // session's kind: an expired PATIENT lands on the phone/OTP entry point
     // (/patient/login); expired staff and anonymous visitors keep /login.
-    const target = getExpiredPrincipalWasPatient() ? '/patient/login' : '/login';
-    return <Navigate to={target} replace state={{ from: location }} />;
+    // The target is frozen per episode and the hint consumed (ref above).
+    return (
+      <Navigate
+        to={redirectTargetRef.current ?? '/login'}
+        replace
+        state={{ from: location }}
+      />
+    );
   }
 
   if (!canAccessRoute(route, state.profile as RouteProfile | null)) {

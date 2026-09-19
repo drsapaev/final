@@ -95,6 +95,9 @@ describe('RouteAccessBoundary redirect target for missing tokens (Phase 0 follow
       expect(seen[seen.length - 1]).toBe('/patient/login');
     });
     expect(screen.queryByTestId('panel-content')).not.toBeInTheDocument();
+    // Codex P2 (round 4): the hint is consumed once the target is selected —
+    // later anonymous visits in this tab go to /login, not the patient form.
+    expect(getExpiredPrincipalWasPatient()).toBe(false);
   });
 
   it('keeps /login for an expired STAFF session on the SHARED patient panel', async () => {

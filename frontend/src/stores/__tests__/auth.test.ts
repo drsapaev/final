@@ -215,5 +215,24 @@ describe('auth store', () => {
       auth.clearToken();
       expect(auth.getExpiredPrincipalWasPatient()).toBe(false);
     });
+
+    it('preserves the patient hint across duplicate clears on the same 401', async () => {
+      // Codex P1 (round 4): the response interceptor clears first (hint set
+      // from the live profile), then getProfile() catches the SAME 401 and
+      // clears again — the second call sees NO profile and must not flip
+      // the hint back to false.
+      primeSessionStorage({
+        auth_token: 'jwt',
+        auth_profile: JSON.stringify({ id: 9, username: 'patient-9', role: 'Patient' }),
+      });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(true);
+
+      primeSessionStorage({});
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(true);
+    });
   });
 });

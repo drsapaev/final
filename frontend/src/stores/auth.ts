@@ -53,16 +53,33 @@ let expiredPrincipalWasPatient = false;
 
 function rememberExpiredPrincipalKind(): void {
   const profile = getProfileFromStorage() as Record<string, unknown> | null;
-  expiredPrincipalWasPatient =
-    String(profile?.role ?? '').toLowerCase() === 'patient';
+  const isPatient = String(profile?.role ?? '').toLowerCase() === 'patient';
+  // Codex P1 (round 4): duplicate clears happen on the same 401 (the
+  // response interceptor clears first, then getProfile() catches the same
+  // failure and clears again — the second call sees NO profile anymore).
+  // Only positive patient evidence may set the hint; a later profile-less
+  // clear must never overwrite it with false.
+  if (isPatient) {
+    expiredPrincipalWasPatient = true;
+  }
 }
 
 /**
  * True when the most recently CLEARED session in this tab belonged to a
- * Patient principal. Reset by any subsequent setToken() with a real token.
+ * Patient principal. Reset by any subsequent setToken() with a real token,
+ * and consumed by RouteAccessBoundary once the redirect target is selected.
  */
 export function getExpiredPrincipalWasPatient(): boolean {
   return expiredPrincipalWasPatient;
+}
+
+/**
+ * Consume the hint (Codex P2, round 4): after the boundary has selected the
+ * redirect target, the hint must not keep sending LATER anonymous visits in
+ * this tab to the patient login.
+ */
+export function resetExpiredPrincipalHint(): void {
+  expiredPrincipalWasPatient = false;
 }
 
 function notify(): void {
