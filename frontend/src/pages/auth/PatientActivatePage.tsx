@@ -11,17 +11,23 @@
  *   2. activate/confirm {activation_token, code} → atomic User+UserProfile+
  *      Patient.user_id linking → canonical User(role="Patient") JWT.
  *
- * Deep-link: /patient/activate?token=... prefills the token field. The token
- * is NEVER auto-submitted — the user explicitly continues (stale/revoked
- * tokens surface as a uniform 400 on submit, not on page load). The token is
- * copied into state and immediately stripped from the URL (history replace),
- * so the credential never lingers in the address bar or browser history.
+ * Deep-link: /patient/activate#token=... prefills the token field. The
+ * FRAGMENT form is the canonical handout format (Phase 0 follow-up, owner
+ * P2): the browser never transmits the fragment to the server, so the
+ * 72h activation credential is invisible to Vercel rewrites, access logs
+ * and any infrastructure in front of the SPA. The legacy query form
+ * (?token=...) keeps working for links already handed out within the TTL.
+ * The token is NEVER auto-submitted — the user explicitly continues
+ * (stale/revoked tokens surface as a uniform 400 on submit, not on page
+ * load). The token is copied into state and immediately stripped from the
+ * URL (history replace), so the credential never lingers in the address
+ * bar or browser history.
  *
  * Session: same canonical session storage as /patient/login.
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { KeyRound, ShieldCheck } from 'lucide-react';
 import { Alert, Button, Card, CardContent, CardHeader, CardTitle, Input } from '../../components/ui/macos';
 import { ensureCSRFToken } from '../../api/client';
@@ -55,7 +61,8 @@ const PatientActivatePage = () => {
   const { t: rawT, language } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   const [step, setStep] = useState<PatientActivateStep>('token');
   const [activationToken, setActivationToken] = useState('');
@@ -64,22 +71,32 @@ const PatientActivatePage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Deep-link prefill (?token=...) — prefill only, never auto-submit.
-  // Phase 0 PR-B review P2: the activation token is a live 72h credential,
-  // so after copying it into state it is immediately stripped from the URL
-  // (address bar, browser history, copy-paste) with replace:true — the
-  // history entry no longer carries the secret. Unrelated query params are
-  // preserved; the re-run of this effect after the strip is a no-op
-  // (prefill resolves to ''), so this cannot loop.
+  // Deep-link prefill (#token=... fragment, legacy ?token=... query) —
+  // prefill only, never auto-submit. Phase 0 PR-B review P2 + follow-up
+  // (owner P2): after copying the credential into state it is immediately
+  // stripped from the URL (address bar, browser history, copy-paste) with
+  // replace:true — the history entry no longer carries the secret. The
+  // fragment form is read via router location (works identically under
+  // BrowserRouter and MemoryRouter in tests); the query form is kept for
+  // links already handed out (72h TTL). Unrelated query params are
+  // preserved; the re-run of this effect after the strip resolves to an
+  // empty prefill, so this cannot loop.
   useEffect(() => {
-    const prefill = (searchParams.get('token') || '').trim();
-    if (prefill) {
-      setActivationToken(prefill);
-      const next = new URLSearchParams(searchParams);
-      next.delete('token');
-      setSearchParams(next, { replace: true });
+    const hashParams = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+    const fromHash = (hashParams.get('token') || '').trim();
+    const fromQuery = (searchParams.get('token') || '').trim();
+    const prefill = fromHash || fromQuery;
+    if (!prefill) {
+      return;
     }
-  }, [searchParams, setSearchParams]);
+    setActivationToken(prefill);
+    const next = new URLSearchParams(searchParams);
+    next.delete('token');
+    navigate(
+      { pathname: location.pathname, search: next.toString(), hash: '' },
+      { replace: true }
+    );
+  }, [location.hash, location.pathname, navigate, searchParams]);
 
   const normalizeError = useCallback(
     (err: unknown) => {

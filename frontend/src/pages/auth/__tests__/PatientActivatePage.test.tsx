@@ -127,6 +127,49 @@ describe('PatientActivatePage (Phase 0 PR-B)', () => {
     expect(mockedRequestOtp).not.toHaveBeenCalled();
   });
 
+  it('prefills from the #token= fragment deep link (server-invisible form) and strips it', async () => {
+    // Phase 0 follow-up (owner P2): the canonical handout link carries the
+    // 72h credential in the FRAGMENT — the browser never transmits it to
+    // the server, so rewrites/access logs in front of the SPA never see it.
+    const snapshots: string[] = [];
+    const LocationProbe = () => {
+      const { search, hash } = useLocation();
+      const snapshot = `${search}|${hash}`;
+      if (snapshots[snapshots.length - 1] !== snapshot) {
+        snapshots.push(snapshot);
+      }
+      return null;
+    };
+
+    render(
+      <MemoryRouter initialEntries={[`/patient/activate#token=${TOKEN}`]}>
+        <ThemeProvider>
+          <PatientActivatePage />
+          <LocationProbe />
+        </ThemeProvider>
+      </MemoryRouter>
+    );
+
+    const tokenInput = screen.getByLabelText('patientPortal.pa_token_label') as HTMLInputElement;
+    expect(tokenInput.value).toBe(TOKEN);
+
+    // The fragment is stripped after prefill — no token left in the URL.
+    await waitFor(() => {
+      expect(snapshots[snapshots.length - 1]).toBe('|');
+    });
+    // Only the very first snapshot (before the strip) carried the secret.
+    expect(snapshots.slice(1).every((entry) => !entry.includes(TOKEN))).toBe(true);
+    expect(mockedRequestOtp).not.toHaveBeenCalled();
+  });
+
+  it('prefers the fragment token when fragment and query both carry one', () => {
+    renderPage([`/patient/activate?token=${'q'.repeat(64)}#token=${TOKEN}`]);
+
+    const tokenInput = screen.getByLabelText('patientPortal.pa_token_label') as HTMLInputElement;
+    expect(tokenInput.value).toBe(TOKEN);
+    expect(mockedRequestOtp).not.toHaveBeenCalled();
+  });
+
   it('accepts tokens up to the backend contract boundary (maxLength 256)', async () => {
     renderPage();
 

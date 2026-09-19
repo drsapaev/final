@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../api/client', () => ({
   me: vi.fn(),
   setToken: vi.fn(),
+  // Phase 0 follow-up: the store registers its session-termination listener
+  // in the client at module scope — stub it so registration is a no-op.
+  setSessionInvalidationListener: vi.fn(),
 }));
 
 import { me, setToken as setClientToken } from '../../api/client';

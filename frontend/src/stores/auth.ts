@@ -17,7 +17,7 @@
 //
 // Keep changes minimal and additive — don't remove existing exported names.
 
-import { me, setToken as setClientToken } from '../api/client';
+import { me, setToken as setClientToken, setSessionInvalidationListener } from '../api/client';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 import type { AuthState, UserProfile } from '../types/domain/auth';
@@ -413,6 +413,20 @@ export const getAuthToken = getToken;
 export const clearAuthToken = clearToken;
 export const setAuthProfile = setProfile;
 export const subscribeAuth = subscribe;
+
+// Phase 0 follow-up (owner P2, access-only session lifecycle): the api client
+// 401-recovery path terminates dead access-only sessions (the Patient portal
+// installs sessions with no refresh token, so a dead 30-minute JWT used to
+// leave the UI showing a logged-in patient until the next navigation). The
+// clear must run through THIS store — clearing auth_token/auth_profile plus
+// tokenManager and PHI caches and notifying subscribers — so
+// RouteAccessBoundary reacts immediately. The store registers itself here
+// (instead of client.ts importing this store) to keep the import direction
+// acyclic; the client falls back to its own credential cleanup when no
+// listener is registered.
+setSessionInvalidationListener(() => {
+  clearToken();
+});
 
 // Default export for consumers using default import
 const auth = {
