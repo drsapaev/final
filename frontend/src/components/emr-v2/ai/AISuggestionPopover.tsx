@@ -78,6 +78,7 @@ export function AISuggestionPopover({
     onClose,
     anchorRef,
 }: AISuggestionPopoverProps) {
+    const { t: rawT } = useTranslation(); const t = rawT;
     const popoverRef = useRef<HTMLDivElement | null>(null);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
@@ -198,7 +199,7 @@ export function AISuggestionPopover({
                 <span className="ai-popover__icon">✨</span>
                 <span className="ai-popover__label">AI предлагает</span>
                 <span className="ai-popover__count">{suggestions.length} вариант{suggestions.length > 1 ? 'а' : ''}</span>
-                <button className="ai-popover__close" onClick={onClose}>×</button>
+                <button className="ai-popover__close" onClick={onClose} aria-label={t('close')}>×</button>
             </div>
 
             {/* Suggestions */}
