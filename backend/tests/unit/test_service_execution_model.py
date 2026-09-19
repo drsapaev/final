@@ -9,7 +9,11 @@ Owner's required list (design-GO 2026-09-19):
   NEW attempt row, the old row keeps its terminal state;
 - creating/completing a ServiceExecution does NOT close the Visit
   ("выполнить услугу" != "закрыть визит");
-- defaults: attempt_no = 1, status = 'in_progress'.
+- defaults: attempt_no = 1, status = 'in_progress';
+- review P2-2: the D1 FINAL status vocabulary and the 1-based attempt
+  ordinal are enforced by portable CHECK constraints in the ORM —
+  invalid statuses / non-positive attempt numbers are rejected at
+  flush time on SQLite too (mirrored in migration 0072).
 """
 
 from __future__ import annotations
@@ -17,7 +21,7 @@ from __future__ import annotations
 from datetime import datetime, UTC
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import CheckConstraint, create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
@@ -96,6 +100,46 @@ def test_status_vocabulary_first_stage() -> None:
     }
     # 'no_show' stays a queue-level state — deliberately absent here
     assert "no_show" not in SERVICE_EXECUTION_STATUSES
+
+
+# ---------------- review P2-2: DB-level vocabulary / ordinal CHECKs ----------------
+
+
+@pytest.mark.parametrize(
+    "bad_status",
+    ["foo", "started", "in-progress", "IN_PROGRESS", "no_show", ""],
+)
+def test_status_outside_d1_vocabulary_rejected_by_check(session, bad_status) -> None:
+    """A typo'd or unknown status must not be insertable — the CHECK
+    constraint is what stops it from bypassing the one-active-execution
+    model (the partial unique index guards only the literal
+    'in_progress')."""
+    visit, visit_service = _visit_with_service(session)
+    with pytest.raises(IntegrityError):
+        _execution(session, visit_service, status=bad_status)
+    session.rollback()
+
+
+@pytest.mark.parametrize("bad_attempt_no", [0, -1, -5])
+def test_non_positive_attempt_no_rejected_by_check(session, bad_attempt_no) -> None:
+    """Attempts are 1-based ordinals (D1 FINAL: a retry after 'incomplete'
+    creates attempt_no = previous + 1); zero and negatives are invalid."""
+    visit, visit_service = _visit_with_service(session)
+    with pytest.raises(IntegrityError):
+        _execution(session, visit_service, attempt_no=bad_attempt_no)
+    session.rollback()
+
+
+def test_check_constraints_declared_in_table_args() -> None:
+    """The vocabulary/ordinal CHECKs are portable table-level constraints
+    (mirrored in migration 0072 — the 0068 CHECK precedent)."""
+    checks = {
+        c.name: c.sqltext.text if hasattr(c.sqltext, "text") else str(c.sqltext)
+        for c in ServiceExecution.__table__.constraints
+        if isinstance(c, CheckConstraint)
+    }
+    assert "ck_service_executions_status" in checks
+    assert "ck_service_executions_attempt_no" in checks
 
 
 def test_defaults_attempt_and_status(session) -> None:

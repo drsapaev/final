@@ -8,7 +8,10 @@ Owner's required list (design-GO 2026-09-19):
   partial unique is proven on PostgreSQL by the migration test; here the
   boundary check gives the API its deterministic 409);
 - an inactive assignment can be replaced by a new active one;
-- invalid/inactive QueueResource is rejected at the assignment boundary.
+- invalid/inactive QueueResource is rejected at the assignment boundary;
+- review P2-1: deactivation is an atomic guarded UPDATE — under an
+  interleaved concurrent flip exactly ONE request wins, the loser gets
+  409 (not a second 200).
 """
 
 from __future__ import annotations
@@ -257,6 +260,66 @@ def test_deactivate_twice_returns_409(session) -> None:
     with pytest.raises(NurseWorkplaceApiDomainError) as exc:
         svc.deactivate_assignment(data["id"])
     assert exc.value.status_code == 409
+
+
+def test_deactivate_atomic_under_interleaved_concurrent_flip(session) -> None:
+    """Review P2-1: exactly ONE deactivate may win; the loser gets 409.
+
+    Race simulation — the interleave where the previous read-check-write
+    version answered a second 200: a second writer flips the row in the
+    window between this request's observation and its write. The hook
+    fires right before the service's UPDATE reaches the DB and flips
+    the row through a SEPARATE raw connection (the "concurrent winner").
+    The guarded atomic UPDATE must then match 0 rows and answer 409.
+    """
+    import sqlite3
+
+    from sqlalchemy import event
+
+    nurse = _user(session, "nurse_race")
+    resource = _resource(session, "procedures")
+    svc = _svc(session)
+    data = svc.create_assignment(
+        user_id=nurse.id, queue_resource_id=resource.id, cabinet_override="5"
+    )
+    assignment_id = data["id"]
+
+    engine = session.get_bind()
+    db_path = engine.url.database
+    flipped: list[bool] = []
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def concurrent_winner(conn, cursor, statement, parameters, context, executemany):
+        if (
+            statement.upper().startswith("UPDATE")
+            and "nurse_workplace_assignments" in statement
+            and not flipped
+        ):
+            flipped.append(True)
+            raw = sqlite3.connect(db_path)
+            try:
+                raw.execute(
+                    "UPDATE nurse_workplace_assignments SET is_active = 0 "
+                    "WHERE id = ?",
+                    (assignment_id,),
+                )
+                raw.commit()
+            finally:
+                raw.close()
+
+    try:
+        with pytest.raises(NurseWorkplaceApiDomainError) as exc:
+            svc.deactivate_assignment(assignment_id)
+    finally:
+        event.remove(engine, "before_cursor_execute", concurrent_winner)
+
+    assert flipped, "race hook never fired — interleave not exercised"
+    assert (
+        exc.value.status_code == 409
+    ), "the loser of a concurrent deactivate must observe 409, not 200"
+    row = session.get(NurseWorkplaceAssignment, assignment_id)
+    assert row is not None and row.is_active is False
+    assert session.query(NurseWorkplaceAssignment).count() == 1
 
 
 def test_list_filters_and_total(session) -> None:

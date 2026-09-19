@@ -9,6 +9,8 @@ by ``alembic upgrade`` (SQLite is never a substitute):
    - the D2 partial unique index (active pair) and the D1 partial unique
      index (one in_progress execution per VisitService) exist with the
      exact predicates; the plain attempt-unique constraint exists;
+   - the D1 status vocabulary and the 1-based attempt ordinal are
+     DB-enforced (review P2-2: CHECK constraints on service_executions);
    - FKs reference users / queue_resources / visit_services /
      queue_entries;
    - RLS is ENABLED on both new public tables (0051 convention);
@@ -20,7 +22,9 @@ by ``alembic upgrade`` (SQLite is never a substitute):
 3. D1 invariants on data: a second in_progress execution for the same
    VisitService is rejected; a completed attempt + a new in_progress
    attempt coexist (retry semantics); duplicate (visit_service_id,
-   attempt_no) is rejected; the performer FK enforces real users.
+   attempt_no) is rejected; the performer FK enforces real users;
+   statuses outside the D1 vocabulary and non-positive attempt numbers
+   are rejected by the CHECK constraints (review P2-2).
 4. Downgrade reverses cleanly (head -> 0070 -> head).
 """
 
@@ -300,6 +304,25 @@ def test_fresh_install_schema_shape(head_url):
             )
             assert "uq_service_executions_visit_service_attempt" in attempt_unique
 
+            # review P2-2: the D1 FINAL status vocabulary and the 1-based
+            # attempt ordinal are enforced at the DB level (portable
+            # CHECKs, mirrored in the ORM __table_args__)
+            check_constraints = set(
+                conn.execute(
+                    text(
+                        "SELECT conname FROM pg_constraint "
+                        "WHERE conrelid = 'service_executions'::regclass "
+                        "AND contype = 'c'"
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert {
+                "ck_service_executions_status",
+                "ck_service_executions_attempt_no",
+            } <= check_constraints, check_constraints
+
             # FKs
             assignment_fks = set(
                 conn.execute(
@@ -456,6 +479,30 @@ def test_d1_execution_invariants(head_url):
         with pytest.raises(IntegrityError):
             with engine.begin() as conn:
                 _insert_execution(conn, visit_service_id, 999999, attempt_no=3)
+
+        # review P2-2: statuses outside the D1 FINAL vocabulary are
+        # rejected by the DB CHECK — a typo'd or unknown status cannot
+        # bypass the one-active-execution model (the partial unique
+        # guards only the literal 'in_progress')
+        for bad_status in ("foo", "started", "in-progress", "IN_PROGRESS"):
+            with pytest.raises(IntegrityError):
+                with engine.begin() as conn:
+                    _insert_execution(
+                        conn, visit_service_id, nurse, attempt_no=3, status=bad_status
+                    )
+
+        # review P2-2: attempts are 1-based ordinals — zero/negative
+        # attempt numbers are rejected by the DB CHECK
+        for bad_attempt_no in (0, -1):
+            with pytest.raises(IntegrityError):
+                with engine.begin() as conn:
+                    _insert_execution(
+                        conn,
+                        visit_service_id,
+                        nurse,
+                        attempt_no=bad_attempt_no,
+                        status="completed",
+                    )
 
         with engine.connect() as conn:
             rows = conn.execute(

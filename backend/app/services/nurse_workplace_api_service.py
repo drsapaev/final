@@ -14,7 +14,12 @@ Boundary validations (the assignment boundary of the track):
 Deactivation keeps the row (inactive assignments are historical
 records, not drift); a NEW active row for the same pair may be created
 afterwards — exactly what the partial (WHERE is_active) uniqueness
-permits.
+permits. The active->inactive transition is a single guarded
+``UPDATE ... WHERE is_active`` (review P2-1): two concurrent deactivate
+calls cannot both observe ``is_active=True`` and both return 200 —
+exactly one request flips the row; the loser gets rowcount=0 and
+re-reads to decide 404 (row gone) vs 409 (row exists, already
+inactive).
 
 Error mapping: 404 = referenced entity not found; 400 = entity fails the
 boundary validation (not a Nurse / deactivated user / inactive resource);
@@ -26,6 +31,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.core.roles import normalize_role_value
@@ -199,6 +205,20 @@ class NurseWorkplaceApiService:
         )
         return self._enrich(rows), total
 
+    def _refetch(self, assignment_id: int) -> NurseWorkplaceAssignment | None:
+        """Deterministic re-read that bypasses identity-map staleness.
+
+        ``populate_existing()`` forces a fresh SELECT even when an
+        instance for the row is already loaded in this session (and
+        possibly stale after a concurrent writer committed first).
+        """
+        return (
+            self.db.query(NurseWorkplaceAssignment)
+            .filter(NurseWorkplaceAssignment.id == assignment_id)
+            .populate_existing()
+            .first()
+        )
+
     def get_assignment(self, assignment_id: int) -> dict[str, Any]:
         row = self.db.get(NurseWorkplaceAssignment, assignment_id)
         if row is None:
@@ -208,16 +228,37 @@ class NurseWorkplaceApiService:
         return self._enrich([row])[0]
 
     def deactivate_assignment(self, assignment_id: int) -> dict[str, Any]:
-        row = self.db.get(NurseWorkplaceAssignment, assignment_id)
-        if row is None:
-            raise NurseWorkplaceApiDomainError(
-                404, f"Назначение id={assignment_id} не найдено"
+        # Atomic guarded transition (review P2-1): read-check-write here
+        # would let two concurrent requests both observe is_active=True
+        # and both return 200, violating the endpoint's 409 contract. A
+        # single UPDATE with the is_active guard in the WHERE clause makes
+        # the flip atomic at the row level; the loser sees rowcount=0 and
+        # re-reads to distinguish 404 (row does not exist) from 409 (row
+        # exists, already inactive).
+        result = self.db.execute(
+            update(NurseWorkplaceAssignment)
+            .where(
+                NurseWorkplaceAssignment.id == assignment_id,
+                NurseWorkplaceAssignment.is_active.is_(True),
             )
-        if not row.is_active:
+            .values(is_active=False)
+        )
+        if result.rowcount == 0:
+            # Nothing was flipped by THIS request: either the row is gone
+            # (404) or a concurrent writer already deactivated it (409).
+            self.db.rollback()
+            row = self._refetch(assignment_id)
+            if row is None:
+                raise NurseWorkplaceApiDomainError(
+                    404, f"Назначение id={assignment_id} не найдено"
+                )
             raise NurseWorkplaceApiDomainError(
                 409, f"Назначение id={assignment_id} уже неактивно"
             )
-        row.is_active = False
         self.db.commit()
-        self.db.refresh(row)
+        row = self._refetch(assignment_id)
+        if row is None:  # pragma: no cover - just flipped by this request
+            raise NurseWorkplaceApiDomainError(
+                404, f"Назначение id={assignment_id} не найдено"
+            )
         return self._enrich([row])[0]

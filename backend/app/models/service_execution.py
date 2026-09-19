@@ -28,6 +28,11 @@ Semantics:
 DB invariants (migration 0072):
 - ``UNIQUE(visit_service_id, attempt_no)`` — declared here AND in the
   migration (plain constraint, works on both SQLite and PostgreSQL).
+- ``CHECK (status IN ('in_progress','completed','incomplete',
+  'cancelled'))`` and ``CHECK (attempt_no >= 1)`` — the D1 FINAL status
+  vocabulary and the 1-based attempt ordinal are enforced at the DB
+  level, not just by ORM defaults (review P2-2; portable constraints —
+  declared here AND in the migration, the 0068 CHECK precedent).
 - partial unique index ``uq_service_executions_one_active`` on
   (visit_service_id) WHERE status = 'in_progress' — at most ONE
   simultaneously active execution per VisitService. PG-only DDL
@@ -46,6 +51,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
@@ -151,5 +157,21 @@ class ServiceExecution(Base):
             "visit_service_id",
             "attempt_no",
             name="uq_service_executions_visit_service_attempt",
+        ),
+        # D1 FINAL status vocabulary, enforced at the DB level (review
+        # P2-2): a typo'd or yet-unknown status must not be able to
+        # bypass the one-active-execution model (the partial unique
+        # index guards only the literal 'in_progress'). Portable CHECK —
+        # mirrored in migration 0072 (0068 precedent: portable
+        # constraints live in BOTH the ORM and the migration).
+        CheckConstraint(
+            "status IN ('in_progress', 'completed', 'incomplete', 'cancelled')",
+            name="ck_service_executions_status",
+        ),
+        # Attempts are 1-based ordinals (D1 FINAL contract: a retry after
+        # 'incomplete' creates attempt_no = previous + 1).
+        CheckConstraint(
+            "attempt_no >= 1",
+            name="ck_service_executions_attempt_no",
         ),
     )

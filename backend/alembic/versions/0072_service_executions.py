@@ -13,6 +13,15 @@ Statuses (first stage): in_progress | completed | incomplete | cancelled.
 Invariants (this migration):
 - UNIQUE(visit_service_id, attempt_no) — one ordinal per attempt
   (mirrored in the ORM __table_args__; works on SQLite too);
+- CHECK (status IN ('in_progress','completed','incomplete',
+  'cancelled')) — the D1 FINAL status vocabulary is enforced at the DB
+  level: a typo'd or unknown status must not be able to bypass the
+  one-active-execution model (the partial unique index below guards
+  only the literal 'in_progress');
+- CHECK (attempt_no >= 1) — attempts are 1-based ordinals (D1 FINAL
+  contract: a retry after 'incomplete' creates attempt_no + 1);
+  both CHECKs are portable constraints mirrored in the ORM
+  __table_args__ (the 0068 CHECK precedent);
 - partial unique index uq_service_executions_one_active on
   (visit_service_id) WHERE status = 'in_progress' — at most ONE
   simultaneously active execution per VisitService (PG-only DDL,
@@ -83,6 +92,17 @@ def upgrade() -> None:
             "visit_service_id",
             "attempt_no",
             name="uq_service_executions_visit_service_attempt",
+        ),
+        # D1 FINAL status vocabulary + 1-based attempt ordinal, enforced
+        # at the DB level (review P2-2; portable CHECKs — mirrored in the
+        # ORM __table_args__, the 0068 CHECK precedent).
+        sa.CheckConstraint(
+            "status IN ('in_progress', 'completed', 'incomplete', 'cancelled')",
+            name="ck_service_executions_status",
+        ),
+        sa.CheckConstraint(
+            "attempt_no >= 1",
+            name="ck_service_executions_attempt_no",
         ),
     )
     op.create_foreign_key(
