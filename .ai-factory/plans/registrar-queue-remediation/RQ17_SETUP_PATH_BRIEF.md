@@ -42,7 +42,7 @@ Baseline: **doctor-owned — 2 admin-раздела из разных секци
 - **Проверка (готовность)**: проверяемые связи шага — (а) исполнитель по оси D-01: для doctor-owned — активная Doctor-запись, принадлежащая specialty; для resource-owned — **ACTIVE QueueResource с exact `queue_tag`** (именно наличие такой строки определяет resource routing: `resolve_tag_resource` — `queue_tag == tag AND active`); (б) ≥1 активная услуга с этим `queue_tag`; (в) активный QueueProfile владеет тегом; (г) профиль visible (`show_on_qr_page`); (д) provision-статус постоянного адреса (D-03: provision идемпотентен, переименование не меняет адрес). Read-side: `/services`, `/queues/profiles?active_only=false`, `/services/admin/doctors` — существующие; read-side постоянного адреса — `GET /api/v1/queue/directions/{profile_key}/entry-methods` (поле `permanent_address.supported` в перечислении entry-methods; отдельного GET provision-эндпоинта НЕ существует), write-side — `POST /api/v1/queue/admin/directions/{profile_key}/public-address/provision`. Для doctor-owned оси все API существуют; готовность (а) resource-owned оси читается через новый минимальный контракт QueueResource (list-read включён в него) — следующий runtime-PR поэтому **backend+frontend, не frontend-only**.
 - **QR**: выдача/показ/скачивание постоянного `/q/<public_code>` — **RQ-18** (готовый бэкенд RQ-16.d: provision + анонимный start-session). RQ-17 останавливается на provision-статусе и явном указании «QR появится здесь после RQ-18» — не дублируем и не опережаем.
 
-## 3.1. Системный инвариант владельца тега: resource-tag ⇔ doctorless-service (обязательная часть admin-контракта; owner-ревью round 2, P1)
+## 3.1. Системный инвариант владельца тега: resource-tag ⇔ doctorless-service (обязательная часть admin-контракта; owner-ревью round 2, P1; round 3, P1 — эффективная routing-поверхность + serialization-scope)
 
 QueueResource — не безобидная справочная строка. Runtime выбирает ось маршрутизации по единственному предикату `resolve_tag_resource` = `queue_tag == tag AND active` (`backend/app/crud/queue_resource_routing.py:46-64`), и `MorningAssignmentService` при наличии такой строки пре-создаёт очередь на РЕСУРСНОЙ оси (`specialist_id=NULL + queue_resource_id`), не доходя до doctor-owner fallback (`backend/app/services/morning_assignment.py:151-176` — ветка `continue` мимо `single_active_service_doctor`). Поэтому один admin-POST активной строки по тегу, фактически принадлежащему врачу, делает тег registry-backed и меняет owner-семантику doctor-owned направления — хотя ни одна другая таблица не менялась. Это нарушение D-01/RQ-05 самой архитектурой write-пути, а не неточность чек-листа.
 
@@ -52,22 +52,51 @@ QueueResource — не безобидная справочная строка. R
       ≥ 1 активная doctorless-услуга (requires_doctor=false)
       0 активных услуг с requires_doctor=true
 
+Round 3 (owner-ревью head `bafb8938a`, trace `1a0b7ff9c192641d`): симметричных pre-checks всё же недостаточно — registry-форма выше лишь ОДНА нога полного инварианта. Обязательны два уточнения.
+
+**(а) Инвариант определяется через эффективную routing-поверхность, а не только реестр.** Поверхность маршрутизации дня деактивационно-устойчива: `tag_routes_to_resource` возвращает существующую активную resource-owned очередь (day, tag) независимо от флага реестра (`backend/app/crud/queue_resource_routing.py:285-303`), и `get_or_create_daily_queue` разрешает её первым же вызовом — до всякого doctor-fallback (`backend/app/crud/online_queue.py:906-908`), даже при вызове с реальным Doctor в `specialist_id` (пин `test_deactivated_registry_keeps_resource_queue_routable`, `backend/tests/integration/test_queue_resource_runtime_switch.py:1252`). Следствие: `active=false` у строки реестра НЕ означает, что ресурсная ось исчезла — она остаётся маршрутизируемой до закрытия очереди дня. Service-side gate, смотрящий только на ACTIVE QueueResource, в этой ситуации пропускает уже неверную маршрутизацию: утром тег ресурсный → resource-owned DailyQueue создана → admin деактивирует строку → `Service(T).requires_doctor=true` формально проходит gate → новый doctor-required пациент по T возвращается в resource-owned очередь, владение врачом молча игнорируется runtime'ом. Полная форма инварианта — через эффективное состояние:
+
+    RESOURCE_SURFACE(tag, day) :=
+          ACTIVE QueueResource(tag)
+       ИЛИ ACTIVE DailyQueue(queue_tag = tag,
+                             queue_resource_id IS NOT NULL)
+
+    RESOURCE_SURFACE(tag) существует  ⇒  doctor-required семантика для тега запрещена
+
+Service create/update/активация `requires_doctor=true` отклоняется при ЛЮБОЙ из двух ног; деактивация QueueResource сама по себе НЕ разрешает смену owner-оси в Service, пока жива resource-owned очередь дня.
+
+**(б) Одна общая serialization-область обеих write-surfaces (анти-TOCTOU).** Два независимых check-before-write гонку не переживают: T1 (PATCH ресурса `active=true`) читает услуги — gate PASS; параллельно T2 (PUT услуги `requires_doctor=true`) читает реестр — ACTIVE строк 0, gate PASS; после обоих коммитов возникает ровно запрещённое состояние. Контракт: QueueResource-активация/деактивация и Service create/update/активация работают в ОДНОЙ критической секции канонического `queue_tag`:
+
+    lock owner-config(tag) — transaction-scoped advisory lock
+    (прецедент паттерна: lock_queue_tag_claim_scope,
+     backend/app/crud/queue_resource_routing.py:153-176;
+     конфиг-ключ тега — НЕ дневной daily_queue:tag:{tag}:{day})
+    → re-read под локом: QueueResource(tag) + активные Services(tag)
+      + живая DailyQueue(tag, сегодня)
+    → validate эффективного ПОСТ-состояния (после мутации)
+    → mutate → commit
+
+Мульти-теговые операции (будущий retag, S-26) берут скоупы в каноническом (sorted) порядке тегов — правило упорядочивания уже закреплено QD-2E P1 для дневных скоупов (docstring `lock_queue_tag_claim_scope`).
+
 Проверки обязаны стоять:
 
 - при создании/активации QueueResource (POST `active=true` и последующий PATCH `active: true`);
 - при изменении `queue_tag` (по §3.2 исключено из обычного PATCH; gate сохраняется в контракте любой будущей retag-операции);
-- при create/update/активации Service, если тег уже resource-backed: сегодня `ServicesApiService.create_service`/`update_service` НЕ проверяют наличие ACTIVE QueueResource (`backend/app/services/services_api_service.py:303,350`) — без гейта mixed-семантика собирается в два шага: безопасный ресурс на doctorless-теге → позже Service(`requires_doctor=true`) на том же теге, и система внутренне противоречива.
+- при create/update/активации Service, если тег уже resource-backed — resource-backed здесь в полной форме §3.1(а): ACTIVE registry-строка ИЛИ живая resource-owned DailyQueue; сегодня `ServicesApiService.create_service`/`update_service` НЕ проверяют ни то, ни другое (`backend/app/services/services_api_service.py:303,350`) — без гейта mixed-семантика собирается в два шага: безопасный ресурс на doctorless-теге → позже Service(`requires_doctor=true`) на том же теге, и система внутренне противоречива.
 
 Негативные тест-пины минимума (обязательны в runtime-PR):
 
 1. POST ресурса на тег с активной `requires_doctor=true`-услугой → reject;
 2. POST ресурса на mixed-тег (одновременно doctorless и requires_doctor) → reject;
 3. Service(`requires_doctor=true`) на тег с ACTIVE ресурсом → reject;
-4. перевод doctorless-услуги в `requires_doctor=true` при существующем ACTIVE ресурсе → reject.
+4. перевод doctorless-услуги в `requires_doctor=true` при существующем ACTIVE ресурсе → reject;
+5. конкурентные writer-ы «активация ресурса ↔ перевод услуги в `requires_doctor=true`» из легального стартового состояния (draft-ресурс + doctorless-услуга): ровно один writer отклоняется — второй после входа в serialization-scope §3.1(б) перечитывает состояние и видит запрещённое пост-состояние; финальное состояние удовлетворяет инварианту при любом чередовании (mixed state невозможен);
+6. деактивация строки среди дня при живой resource-owned DailyQueue(tag, сегодня) → перевод услуги тега в `requires_doctor=true` отклоняется (gate обязан проверять DailyQueue-ногу RESOURCE_SURFACE, а не только registry);
+7. активация ресурса при уже существующей doctor-owned DailyQueue(tag, сегодня) → тихая смена owner-семантики текущего дня запрещена: поверхность дня фиксируется первой очередью (day, tag), ресурсная ось вступает в силу со следующего дня (next-day-only; runtime-механика `existing_by_tag` `backend/app/crud/online_queue.py:916-926` — контракт закрепляется явно, вторая очередь (day, tag) не форкается).
 
-Из gate следует и коррекция последовательности S-14: ACTIVE-ресурс нельзя безопасно создать до доказательства doctorless-услуги, поэтому целевой путь ресурсной оси — «service/profile → QueueResource activation»: услуги/профиль готовятся первыми, ресурс создаётся draft (`active=false`) и активируется после прохождения gate; допустимый эквивалент — create сразу `active=true`, когда gate уже пройден. Без этого правила формально красивый CRUD следующего runtime-PR меняет маршрутизацию пациентов неверно.
+Из gate следует и коррекция последовательности S-14: ACTIVE-ресурс нельзя безопасно создать до доказательства doctorless-услуги, поэтому целевой путь ресурсной оси — «service/profile → QueueResource activation»: услуги/профиль готовятся первыми, ресурс создаётся draft (`active=false`) и активируется после прохождения gate; допустимый эквивалент — create сразу `active=true`, когда gate уже пройден. Сама активация и встречные Service-записи проходят под общим serialization-scope §3.1(б) — безопасный порядок S-14 остаётся конвенцией поверх принудительной критической секции, а не надеждой на аккуратность оператора. Без этих правил формально красивый CRUD следующего runtime-PR меняет маршрутизацию пациентов неверно.
 
-## 3.2. Mutability contract QueueResource (обязательная часть admin-контракта; owner-ревью round 2, P2)
+## 3.2. Mutability contract QueueResource (обязательная часть admin-контракта; owner-ревью round 2, P2; round 3 — lifecycle `active` дополнен эффективной поверхностью)
 
 Модель несёт поля разной семантики (`backend/app/models/online_queue.py:107-120`); brief «QueueResourceCreate/Update DTO» без mutability-контракта недоопределён. Контракт минимального admin-контракта:
 
@@ -86,8 +115,10 @@ QueueResource — не безобидная справочная строка. R
 
 Lifecycle-семантика `active` записывается в API-контракт и тесты явно (не как случайное следствие существующего кода):
 
-- `active=true` — тег маршрутизируется на ресурсную ось (`resolve_tag_resource`), утренний пайплайн пре-создаёт ресурсную DailyQueue;
-- `active=false` — НОВЫЕ ресурсные очереди тега не создаются (утренний пайплайн уходит в doctor-owner/fail-closed ветку), при этом существующая resource-owned DailyQueue остаётся маршрутизируемой для завершения обслуживания (деактивация не осиротяет открытую очередь; новая очередь требует ACTIVE registry-строки).
+- `active=true` — тег маршрутизируется на ресурсную ось (`resolve_tag_resource`), утренний пайплайн пре-создаёт ресурсную DailyQueue; при уже существующей doctor-owned DailyQueue(tag, сегодня) owner-ось текущего дня молча НЕ меняется — поверхность дня фиксируется первой очередью (day, tag), ресурсная ось вступает в силу со следующего дня (next-day-only; runtime-механика `existing_by_tag` `backend/app/crud/online_queue.py:916-926`, контракт — пин 7 §3.1);
+- `active=false` — НОВЫЕ ресурсные очереди тега не создаются (утренний пайплайн уходит в doctor-owner/fail-closed ветку), при этом существующая resource-owned DailyQueue остаётся маршрутизируемой для завершения обслуживания (деактивация не осиротяет открытую очередь; новая очередь требует ACTIVE registry-строки); смена owner-оси в Service разрешена только когда не остаётся ни одной ноги RESOURCE_SURFACE (§3.1(а)) — ни ACTIVE строки, ни живой resource-owned очереди дня: деактивация сама по себе ось не возвращает (пин 6 §3.1).
+
+Оба перехода `active` обязаны проходить под общим serialization-scope §3.1(б) — наравне с create/активацией.
 
 ## 4. Экран-вход (shape, реализация — следующий срез)
 
@@ -102,11 +133,11 @@ Lifecycle-семантика `active` записывается в API-контр
 
 ## 5. Проверка среза (из плана §RQ-17)
 
-- **S-14** (`ACCEPTANCE.md:34`): новая specialty или существующая; новый врач/ресурс; синтетическая услуга → пройти предлагаемую настройку с пустой формы до статуса готовности; видны обязательные связи и ошибки; нет второго onboarding; профиль-обзор отличается от отдельной очереди; нет необходимости редактировать код. Admin browser + REAL_API. «Новый врач/ресурс» читается буквально — e2e покрывает ОБЕ оси D-01: новый врач (doctor-owned — атомарный canonical onboarding в `/admin/users`) и новый ресурс (resource-owned — через минимальный QueueResource admin-контракт); осевая готовность (а) проверяется на обоих вариантах. Resource-owned вариант проходит gate §3.1 (услуги/профиль → draft-ресурс → активация); негативные комбинации инварианта §3.1 покрываются интеграционными пинами контракта (§6), не e2e-сценарием. (Department-atomicity RQ-04 — отдельная обязательная проверка вне S-14, `ACCEPTANCE.md:52-59`.)
+- **S-14** (`ACCEPTANCE.md:34`): новая specialty или существующая; новый врач/ресурс; синтетическая услуга → пройти предлагаемую настройку с пустой формы до статуса готовности; видны обязательные связи и ошибки; нет второго onboarding; профиль-обзор отличается от отдельной очереди; нет необходимости редактировать код. Admin browser + REAL_API. «Новый врач/ресурс» читается буквально — e2e покрывает ОБЕ оси D-01: новый врач (doctor-owned — атомарный canonical onboarding в `/admin/users`) и новый ресурс (resource-owned — через минимальный QueueResource admin-контракт); осевая готовность (а) проверяется на обоих вариантах. Resource-owned вариант проходит gate §3.1 (услуги/профиль → draft-ресурс → активация; обе write-surfaces и оба lifecycle-перехода `active` — под общим serialization-scope §3.1(б)); негативные комбинации инварианта §3.1 (7 пинов) покрываются интеграционными пинами контракта (§6), не e2e-сценарием. (Department-atomicity RQ-04 — отдельная обязательная проверка вне S-14, `ACCEPTANCE.md:52-59`.)
 - **Число переходов до/после**: baseline §2 (doctor-owned: 2 раздела, 3+ экрана, цикл тег↔профиль, 0 индикаторов; resource-owned: 0 путей) → после: 1 вход + переходы только на существующие экраны и новую минимальную поверхность QueueResource; каждый шаг показывает, что осталось.
 - **Состояния шага**: сохранение / возврат / ошибка шага / повтор — каждое не теряет прогресс checklist (статус всегда пересчитывается из API, не хранится локально).
 - **Ноль технических ключей** как обязательного знания пользователя — фиксируется тестом-пином на тексты форм пути.
 
 ## 6. Следующий шаг после этого brief
 
-Реализация экрана-входа §4 отдельным runtime-PR: **backend + frontend, не frontend-only** (owner-ревью #3327, P1): (1) минимальный QueueResource admin-контракт — `QueueResourceCreate`/Update DTO, list/detail `GET`, `POST`/`PATCH /api/v1/queue/admin/queue-resources`, интеграционные тесты (Admin-only; без изменения существующих контрактов и routing-семантики `resolve_tag_resource`) + системный инвариант §3.1 на ОБЕИХ write-surfaces — QueueResource create/активация И Service create/update/активация (`ServicesApiService`) — с негативными пинами §3.1 (минимум 4) и mutability contract §3.2: immutable `code`/`queue_tag` (пин: PATCH `queue_tag` → reject), lifecycle-семантика `active` (пин деактивации: новая ресурсная очередь тега не создаётся, существующая завершается); (2) новый route + checklist-компонент + минимальный менеджер QueueResource + e2e-проверка S-14 на REAL_API (обе оси D-01), body по канону, owner review. Этот brief — docs-PR, merge по команде владельца (стоячая политика), автоматического merge/deploy нет.
+Реализация экрана-входа §4 отдельным runtime-PR: **backend + frontend, не frontend-only** (owner-ревью #3327, P1): (1) минимальный QueueResource admin-контракт — `QueueResourceCreate`/Update DTO, list/detail `GET`, `POST`/`PATCH /api/v1/queue/admin/queue-resources`, интеграционные тесты (Admin-only; без изменения существующих контрактов и routing-семантики `resolve_tag_resource`) + системный инвариант §3.1 через эффективную routing-поверхность RESOURCE_SURFACE (ACTIVE registry-строка ИЛИ живая resource-owned DailyQueue) на ОБЕИХ write-surfaces — QueueResource create/активация/деактивация И Service create/update/активация (`ServicesApiService`) — под ОДНИМ serialization-scope канонического тега (transaction-scoped advisory config-lock, §3.1(б)), с негативными пинами §3.1 (минимум 7: матрица инварианта + конкурентный writer-пин + два lifecycle-пина) и mutability contract §3.2: immutable `code`/`queue_tag` (пин: PATCH `queue_tag` → reject), lifecycle-семантика `active` (пины: деактивация — новая ресурсная очередь тега не создаётся, существующая завершается, перевод услуг тега на `requires_doctor` запрещён до закрытия живой resource-очереди; активация при существующей doctor-owned очереди дня — next-day-only, без тихой смены оси); (2) новый route + checklist-компонент + минимальный менеджер QueueResource + e2e-проверка S-14 на REAL_API (обе оси D-01), body по канону, owner review. Этот brief — docs-PR, merge по команде владельца (стоячая политика), автоматического merge/deploy нет.
