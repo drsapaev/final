@@ -170,16 +170,20 @@ class ServicesApiService:
         new_service: Service,
         user_id: int | None = None,
         comment: str | None = None,
+        commit: bool = True,
     ) -> None:
         # Codex round-15 P2: user_id -- attribution of the service audit to
         # the authenticated actor (GraphQL updateServicePrice); None keeps
         # the legacy behaviour for callers without an actor.
+        # RQ-17 round-3 P2: commit=False -- transaction ownership remains
+        # with the batch writer (one commit for changes + audit rows).
         self.repository.log_service_update(
             service_id=service_id,
             old_service=old_service,
             new_service=new_service,
             user_id=user_id,
             comment=comment,
+            commit=commit,
         )
 
     def list_service_categories(self, *, active: bool | None):
@@ -613,6 +617,24 @@ class ServicesApiService:
                 db.flush()
                 for tag in affected_tags:
                     validate_tag_owner_invariant(db, tag, today)
+
+            # RQ-17 round-3 (P2): audit-строки суть ЧАСТЬ batch-транзакции:
+            # add/flush без внутреннего commit, ОДИН commit ниже применяет
+            # изменения и audit атомарно. Прежний порядок (audit-хелпер с
+            # внутренним commit ДО repository.commit()) коммитил весь batch
+            # первым же audit-вызовом: заявленная single-commit граница
+            # нарушалась, row/advisory-локи освобождались до конца
+            # критической секции, конкурентный writer мог изменить строку
+            # до формирования следующего audit snapshot.
+            for service in services:
+                self._log_service_update(
+                    service_id=service.id,
+                    old_service=old_snapshots[service.id],
+                    new_service=service,
+                    user_id=user_id,
+                    comment=f"Batch update: {comment}" if comment else "Batch update",
+                    commit=False,
+                )
         except OwnerInvariantViolation:
             db.rollback()
             raise
@@ -620,14 +642,7 @@ class ServicesApiService:
             db.rollback()
             raise ValueError(f"Batch update failed: {exc}") from exc
 
-        for service in services:
-            self._log_service_update(
-                service_id=service.id,
-                old_service=old_snapshots[service.id],
-                new_service=service,
-                user_id=user_id,
-                comment=f"Batch update: {comment}" if comment else "Batch update",
-            )
+        # single commit: изменения Service и весь audit одной транзакцией
         self.repository.commit()
         for service in services:
             self.repository.refresh(service)

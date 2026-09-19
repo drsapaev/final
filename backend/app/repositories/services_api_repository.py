@@ -170,6 +170,7 @@ class ServicesApiRepository:
         new_service: Service,
         user_id: int | None = None,
         comment: str | None = None,
+        commit: bool = True,
     ) -> None:
         try:
             ServiceAuditService(self.db).log_service_update(
@@ -178,8 +179,15 @@ class ServicesApiRepository:
                 new_service=new_service,
                 user_id=user_id,
                 comment=comment,
+                commit=commit,
             )
         except Exception as exc:
+            if not commit:
+                # RQ-17 round-3 P2: в batch-режиме audit-строка — часть
+                # атомарной транзакции batch'а; молча проглоченный сбой
+                # здесь оставил бы batch без audit-следа при успешном
+                # коммите. Владелец транзакции обязан увидеть сбой.
+                raise
             logger.warning(
                 "Service audit update failed after service commit: service_id=%s error=%s",
                 service_id,

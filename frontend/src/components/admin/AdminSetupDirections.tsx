@@ -13,6 +13,10 @@ import { useTranslation } from '../../i18n/useTranslation';
  *     проверка → QR), каждый шаг = переход в существующий экран с
  *     возвратом на checklist; для resource-owned — минимальная
  *     поверхность менеджера QueueResource (единственное новое UI);
+ *     resource-flow можно начать БЕЗ существующего тега (round-3
+ *     owner-ревью P1): у совершенно новой specialty тега ещё нет —
+ *     он появится после создания профиля/услуги на шагах мастера,
+ *     после возврата его можно выбрать в селекторе этого же шага;
  *  3. не требует технических ключей: queue_tag/profile_key не вводятся
  *     руками — выбор из существующих значений;
  *  4. QR-колонка — точка расширения зашита, но не реализуется (RQ-18).
@@ -51,6 +55,7 @@ import { type QueueResourceDto, listQueueResources } from '../../api/queueResour
 import QueueResourceManager from './QueueResourceManager';
 import {
     type Checklist,
+    type ChecklistDoctorDto,
     type ChecklistProfileDto,
     type ChecklistServiceDto,
     type EntryMethodsDto,
@@ -88,6 +93,7 @@ const AdminSetupDirections = () => {
     const [services, setServices] = useState<ChecklistServiceDto[]>([]);
     const [profiles, setProfiles] = useState<ChecklistProfileDto[]>([]);
     const [resources, setResources] = useState<QueueResourceDto[]>([]);
+    const [doctors, setDoctors] = useState<ChecklistDoctorDto[]>([]);
     const [entryMethodsByProfileKey, setEntryMethodsByProfileKey] = useState<
         Record<string, EntryMethodsDto | null>
     >({});
@@ -99,20 +105,29 @@ const AdminSetupDirections = () => {
         try {
             setLoading(true);
             setError(null);
-            const [servicesRes, profilesRes, resourcesRows] = await Promise.all([
+            const [servicesRes, profilesRes, resourcesRows, doctorsRes] = await Promise.all([
                 api.get('/services?limit=1000') as Promise<{ data: unknown }>,
                 api.get('/queues/profiles?active_only=false') as Promise<{
                     data: { profiles?: ChecklistProfileDto[] };
                 }>,
                 listQueueResources(),
+                // (а) doctor-owned leg: read-side активных Doctor-записей
+                // (brief §3(а)); endpoint отдаёт только active=true
+                api.get('/services/admin/doctors?limit=500') as Promise<{
+                    data: ChecklistDoctorDto[];
+                }>,
             ]);
             const serviceRows = (Array.isArray(servicesRes.data)
                 ? servicesRes.data
                 : []) as ChecklistServiceDto[];
             const profileRows = (profilesRes.data?.profiles || []) as ChecklistProfileDto[];
+            const doctorRows = (
+                Array.isArray(doctorsRes.data) ? doctorsRes.data : []
+            ) as ChecklistDoctorDto[];
             setServices(serviceRows);
             setProfiles(profileRows);
             setResources(resourcesRows);
+            setDoctors(doctorRows);
 
             // (д) provision-статус — только для QR-visible профилей (иначе
             // read-side честно отказывает); ошибка чтения → статус неизвестен.
@@ -149,8 +164,15 @@ const AdminSetupDirections = () => {
     }, [loadCore]);
 
     const checklist: Checklist = useMemo(
-        () => buildChecklist(services, profiles, resources, entryMethodsByProfileKey),
-        [services, profiles, resources, entryMethodsByProfileKey],
+        () =>
+            buildChecklist(
+                services,
+                profiles,
+                resources,
+                entryMethodsByProfileKey,
+                doctors,
+            ),
+        [services, profiles, resources, entryMethodsByProfileKey, doctors],
     );
 
     const wizardTagOptions = useMemo(
@@ -323,10 +345,16 @@ const AdminSetupDirections = () => {
                                                         data-testid="setup-wizard-tag-select"
                                                     />
                                                 </div>
+                                                <p className="admin-sdx-step-hint admin-sdx-muted">
+                                                    {t('admin2.sdx_wizard_tag_optional_hint')}
+                                                </p>
+                                                {/* Round-3 (P1): кнопка НЕ заблокирована пустым тегом —
+                                                    новое направление начинается «с пустой формы»: тег
+                                                    появится после создания профиля/услуги (шаги ниже)
+                                                    и выбирается в селекторе после возврата. */}
                                                 <Button
                                                     variant="secondary"
                                                     size="sm"
-                                                    disabled={!wizard.tag}
                                                     onClick={() => setWizard((w) => ({ ...w, axis: 'resource', step: 1 }))}
                                                     data-testid="setup-wizard-axis-resource"
                                                 >

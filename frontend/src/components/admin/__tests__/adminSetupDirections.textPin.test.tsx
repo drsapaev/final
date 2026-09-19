@@ -49,6 +49,11 @@ const profileRow = {
 
 function mockReadSide() {
   mockedGet.mockImplementation(async (url: string) => {
+    // более специфичная ветка ДО общего префикса /services:
+    // read-side активных Doctor-записей (brief §3(а), round-3 P1)
+    if (url.startsWith('/services/admin/doctors')) {
+      return { data: [{ id: 7, specialty: 'lab', cabinet: '101', active: true }] };
+    }
     if (url.startsWith('/services')) {
       return { data: [serviceRow] };
     }
@@ -101,6 +106,25 @@ describe('AdminSetupDirections — checklist render (statuses recomputed from AP
     expect(screen.getByTestId('setup-row-profile')).toBeVisible();
     // (д) честный статус из entry-methods: provision не сделан → «не готово»
     expect(screen.getByTestId('setup-row-permanent-address')).toBeVisible();
+  });
+});
+
+describe('AdminSetupDirections — wizard «с пустой формы» (round-3 P1)', () => {
+  it('resource axis can START without an existing tag (deferred tag choice)', async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('setup-checklist-row-lab')).toBeVisible(),
+    );
+
+    await user.click(screen.getByTestId('setup-wizard-open'));
+    // кнопка resource-оси НЕ заблокирована пустым выбором тега —
+    // совершенно новое направление стартует с пустой формы
+    const axisButton = screen.getByTestId('setup-wizard-axis-resource');
+    expect(axisButton).not.toBeDisabled();
+    await user.click(axisButton);
+    expect(screen.getByTestId('setup-wizard-step-services')).toBeVisible();
   });
 });
 

@@ -4,7 +4,11 @@
  * Read-side contract: statuses are ALWAYS recomputed from API payloads;
  * these tests pin the exact readiness semantics used by the checklist:
  *  - resource axis = ACTIVE QueueResource (draft never counts — gate §3.1);
- *  - doctor axis = active requires_doctor service with assigned doctor;
+ *  - doctor axis = eligible ACTIVE Doctor record of the matching specialty
+ *    (brief §3(а) literally; round-3 owner-ревью P1) — NOT the
+ *    `Service.doctor_id` FK: a deactivated doctor with a stale FK must
+ *    never read «готово», and a fresh canonical Doctor with no service
+ *    binding yet must not read «исполнителя нет»;
  *  - (б) active services of the tag;
  *  - (в)/(г) active owning profile / QR visibility;
  *  - (д) permanent_address.supported from the entry-methods enumeration
@@ -15,7 +19,9 @@ import {
     buildChecklist,
     candidateTags,
     collectKnownTags,
+    eligibleDoctorsForTag,
     readPermanentAddressSupported,
+    specialtyTagKey,
 } from '../setupDirectionsReadiness';
 
 const svc = (over: Record<string, unknown>) => ({
@@ -46,6 +52,14 @@ const resource = (over: Record<string, unknown>) => ({
     start_number_online: 1,
     max_online_per_day: 15,
     default_cabinet: null,
+    ...over,
+});
+
+const doctor = (over: Record<string, unknown>) => ({
+    id: 42,
+    specialty: 'lab',
+    cabinet: '101',
+    active: true,
     ...over,
 });
 
@@ -80,21 +94,73 @@ describe('buildChecklist — axis (а)', () => {
         expect(active['lab'].executorReady).toBe(true);
     });
 
-    it('doctor axis = active requires_doctor service with an assigned doctor', () => {
-        const withoutDoctor = buildChecklist(
+    it('doctor axis = eligible active Doctor record of the matching specialty (brief §3(а), round-3 P1)', () => {
+        // новый канонический Doctor существует, но doctor_id ещё не
+        // проставлен услуге — исполнитель УЖЕ есть (ложного «нет
+        // исполнителя» больше нет)
+        const newDoctor = buildChecklist(
             [svc({ requires_doctor: true, doctor_id: null })],
-            [profile({})],
+            [profile({ queue_tags: ['cardiology'] })],
             [],
+            {},
+            [doctor({ id: 7, specialty: 'cardiology' })],
         );
-        expect(withoutDoctor['lab'].axis).toBeNull();
+        expect(newDoctor['cardiology'].axis).toBe('doctor');
+        expect(newDoctor['cardiology'].eligibleDoctors).toHaveLength(1);
+        expect(newDoctor['cardiology'].executorReady).toBe(true);
+        // сервис-привязка — отдельное инфо-поле, НЕ критерий (а)
+        expect(newDoctor['cardiology'].doctorBoundService).toBeNull();
 
-        const withDoctor = buildChecklist(
+        // без элигибельного врача FK услуги ось НЕ строит
+        const withoutDoctor = buildChecklist(
             [svc({ requires_doctor: true, doctor_id: 42 })],
             [profile({})],
             [],
         );
-        expect(withDoctor['lab'].axis).toBe('doctor');
-        expect(withDoctor['lab'].doctorService?.doctor_id).toBe(42);
+        expect(withoutDoctor['lab'].axis).toBeNull();
+        expect(withoutDoctor['lab'].executorReady).toBe(false);
+    });
+
+    it('deactivated doctor with a stale Service.doctor_id never yields a false-ready', () => {
+        // /services/admin/doctors отдаёт только активных: деактивированный
+        // врач в списке отсутствует; FK услуги на это не влияет
+        const checklist = buildChecklist(
+            [svc({ requires_doctor: true, doctor_id: 42 })],
+            [profile({})],
+            [],
+            {},
+            [],
+        );
+        expect(checklist['lab'].axis).toBeNull();
+        expect(checklist['lab'].executorReady).toBe(false);
+
+        // явно переданный неактивный/несовпадающий врач тоже не считается
+        const explicitInactive = buildChecklist(
+            [svc({ requires_doctor: true, doctor_id: 42 })],
+            [profile({})],
+            [],
+            {},
+            [doctor({ id: 42, active: false })],
+        );
+        expect(explicitInactive['lab'].executorReady).toBe(false);
+    });
+
+    it('specialty/tag mapping: blank and general sentinels and mismatches are not owners', () => {
+        expect(specialtyTagKey('  Lab ')).toBe('lab');
+
+        const owners = eligibleDoctorsForTag(
+            [
+                doctor({ id: 1, specialty: 'lab' }),
+                doctor({ id: 2, specialty: '  LAB  ' }), // нормализация — совпадает
+                doctor({ id: 3, specialty: 'cardiology' }), // mismatch
+                doctor({ id: 4, specialty: 'general' }), // incomplete sentinel
+                doctor({ id: 5, specialty: '   ' }), // пустая specialty
+                doctor({ id: 6, specialty: null }), // нет specialty
+                doctor({ id: 7, active: false }), // неактивный
+            ],
+            'lab',
+        );
+        expect(owners.map((d) => d.id)).toEqual([1, 2]);
     });
 
     it('inactive services never carry the axis or (б)', () => {

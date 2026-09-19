@@ -7,9 +7,12 @@
  * Ось doctor-owned: мастер S-14 ведёт врача в /admin/users (canonical
  * onboarding, атомарное User+Doctor) — «нет второго onboarding» фиксируется
  * тем, что внутри мастера НЕТ формы создания врача, только переход.
- * Ось resource-owned: полный путь до статуса готовности — профиль с новым
- * тегом → doctorless-услуга тега → draft QueueResource → активация через
- * gate §3.1 → checklist пересчитывает статусы из API.
+ * Ось resource-owned: полный путь НАЧИНАЕТСЯ С ЧИСТОГО SETUP SCREEN (S-14
+ * «from empty form», round-3 owner-ревью P1): мастер ведёт в профиль с
+ * новым тегом и doctorless-услугу через ссылки существующих экранов, тег
+ * выбирается в селекторе оси после создания/возврата, затем draft
+ * QueueResource и активация через gate §3.1; checklist пересчитывает
+ * статусы из API.
  *
  * Негативные комбинации инварианта §3.1 (12 пинов) покрываются
  * интеграционными пинами контракта
@@ -117,13 +120,28 @@ test('S-14 doctor-owned: мастер ведёт в существующие э�
   });
 });
 
-test('S-14 resource-owned: профиль → doctorless-услуга → draft-ресурс → активация через gate', async ({ page }) => {
+test('S-14 resource-owned: с чистого setup screen — wizard ведёт профиль/услугу, тег выбирается после создания, draft → активация через gate', async ({ page }) => {
   test.setTimeout(180_000);
 
-  // 1) профиль с НОВЫМ тегом (QueueProfilesManager: queue_tags вводится
-  //    как список; это существующий экран, не поверхность пути RQ-17)
-  await page.goto('/admin/services?servicesTab=queue-profiles');
+  // 0) старт СТРОГО с экрана-входа: новое направление начинается «с пустой
+  //    формы» — resource-ось доступна БЕЗ существующего тега (round-3 P1:
+  //    прежняя версия скрывала это, создавая профиль/услугу вне мастера)
+  await page.goto('/admin/setup-directions');
   await page.waitForLoadState('networkidle');
+  await expect(page.getByTestId('setup-directions-heading')).toBeVisible();
+  await page.getByTestId('setup-wizard-open').click();
+  await expect(page.getByTestId('setup-wizard')).toBeVisible();
+  // deferred start: кнопка resource-оси активна и без выбранного тега
+  await expect(page.getByTestId('setup-wizard-axis-resource')).not.toBeDisabled();
+  await page.getByTestId('setup-wizard-axis-resource').click();
+  await expect(page.getByTestId('setup-wizard-step-services')).toBeVisible();
+
+  // 1) шаг «отображение» (через мастер) → QueueProfilesManager: профиль
+  //    с НОВЫМ тегом (queue_tags вводится списком; это существующий экран,
+  //    не поверхность пути RQ-17)
+  await page.getByTestId('setup-wizard-services-next').click();
+  await page.getByRole('link', { name: /профил|profiles/i }).first().click();
+  await expect(page).toHaveURL(/\/admin\/services/);
   await page.getByRole('button', { name: /Добавить|Создать/i }).first().click();
   const modal = page.locator('.admin-qp-modal');
   await expect(modal).toBeVisible();
@@ -134,10 +152,19 @@ test('S-14 resource-owned: профиль → doctorless-услуга → draft-
   await modal.getByRole('button', { name: /Сохранить|Создать/i }).first().click();
   await expect(page.getByText(profileTitle).first()).toBeVisible({ timeout: 15000 });
 
-  // 2) doctorless-услуга нового тега (ServiceCatalog; ADM-06-прецедент)
-  await page.goto('/admin/services?servicesTab=catalog');
+  // 2) возврат в путь: тег создан — выбирается в селекторе resource-оси
+  //    («выбор созданного тега после возврата»), шаг «услуги» → ServiceCatalog
+  await page.goto('/admin/setup-directions');
   await page.waitForLoadState('networkidle');
-  await expect(page.getByRole('heading', { name: 'Справочник услуг' })).toBeVisible();
+  await page.getByTestId('setup-wizard-open').click();
+  await page.getByTestId('setup-wizard-tag-select').click();
+  await page.getByRole('option', { name: resourceTag }).first().click();
+  await page.getByTestId('setup-wizard-axis-resource').click();
+  await page.getByRole('link', { name: /Услуги|Services/i }).first().click();
+  await expect(page).toHaveURL(/\/admin\/services/);
+
+  // 3) doctorless-услуга нового тега (ServiceCatalog; ADM-06-прецедент)
+  await page.getByRole('heading', { name: 'Справочник услуг' }).waitFor();
   await page.getByRole('button', { name: 'Добавить услугу' }).click();
   const form = page.locator('form').last();
   await form.locator('input[type="text"]').first().fill(serviceName);
@@ -151,15 +178,21 @@ test('S-14 resource-owned: профиль → doctorless-услуга → draft-
   await form.getByRole('button', { name: 'Сохранить' }).click();
   await expect(page.getByText('Услуга создана')).toBeVisible({ timeout: 15000 });
 
-  // 3) экран-вход: тег появился в чек-листе (статусы пересчитаны из API)
+  // 4) экран-вход: мастер ведёт на проверку — тег в чек-листе, статусы
+  //    пересчитаны из API ((б) готово, оси ещё нет — ресурс не создан)
   await page.goto('/admin/setup-directions');
   await page.waitForLoadState('networkidle');
+  await page.getByTestId('setup-wizard-open').click();
+  await page.getByTestId('setup-wizard-tag-select').click();
+  await page.getByRole('option', { name: resourceTag }).first().click();
+  await page.getByTestId('setup-wizard-axis-resource').click();
+  await page.getByTestId('setup-wizard-services-next').click();
+  await page.getByTestId('setup-wizard-display-next').click();
+  await page.getByTestId('setup-wizard-verify-open').click();
   const row = page.getByTestId(`setup-checklist-row-${resourceTag}`);
   await expect(row).toBeVisible({ timeout: 15000 });
-  // оси ещё нет; услуги тега уже есть ((б) готово)
-  await expect(row.getByTestId('setup-row-services')).toBeVisible();
 
-  // 4) QueueResource-менеджер: draft-ресурс (draft-by-default)
+  // 5) QueueResource-менеджер: draft-ресурс (draft-by-default)
   await page.getByTestId('setup-view-resources').click();
   await page.getByTestId('qr-resource-create-toggle').click();
   // «ноль технических ключей»: тег — выбор из существующих значений
@@ -175,12 +208,12 @@ test('S-14 resource-owned: профиль → doctorless-услуга → draft-
   await expect(page.locator('[data-testid^="qr-resource-row-"]').first()).toBeVisible({ timeout: 15000 });
   await expect(page.getByTestId('qr-resource-badge-draft').first()).toBeVisible();
 
-  // 5) активация через gate §3.1 (doctorless-услуга тега существует)
+  // 6) активация через gate §3.1 (doctorless-услуга тега существует)
   const draftRow = page.locator('[data-testid^="qr-resource-row-"]').first();
   await draftRow.locator('[data-testid^="qr-resource-toggle-"]').click();
   await expect(page.getByTestId('qr-resource-badge-active').first()).toBeVisible({ timeout: 15000 });
 
-  // 6) чек-лист: ось resource, (а) готово
+  // 7) чек-лист: ось resource, (а) готово
   await page.getByTestId('setup-view-checklist').click();
   await expect(row.getByTestId('setup-row-axis-resource')).toBeVisible({ timeout: 15000 });
 

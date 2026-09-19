@@ -2450,6 +2450,7 @@ const en = {
     sdx_axis_resource_desc: 'Day + QueueResource.id. Services/profile are prepared first; the resource is created as a draft and activated through the gate.',
     sdx_choose: 'Choose',
     sdx_wizard_tag_placeholder: 'Direction tag (from existing)',
+    sdx_wizard_tag_optional_hint: 'Tag not in the list yet? Continue without choosing — it appears after you create the profile/service, then pick it here after you return.',
     sdx_wizard_services_hint: 'Create a service and bind it to the direction tag (choose from existing tags).',
     sdx_wizard_services_link: 'Open "Services" (catalog)',
     sdx_next: 'Next',
