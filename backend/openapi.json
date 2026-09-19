@@ -151,9 +151,37 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Get Patient Cabinet Summary Api V1 Patients Cabinet Summary Get"
+                  "$ref": "#/components/schemas/PatientPortalCabinetSummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "JWT user has no linked Patient profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
                 }
               }
             }
@@ -190,9 +218,37 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Preview Patient Portal Booking Api V1 Patients Booking Preview Post"
+                  "$ref": "#/components/schemas/PatientPortalBookingPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request-shaped validation failure (see detail.reason)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
                 }
               }
             }
@@ -221,17 +277,36 @@
           "patients"
         ],
         "summary": "Create Patient Portal Booking",
-        "description": "Create one trusted patient-portal appointment (own scope only).\n\nMirrors the Mini App creation contract: same draft validation, same\nper-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same\n409 on occupied slots, same lifecycle eligibility for the doctor.",
+        "description": "Create one trusted patient-portal appointment (own scope only).\n\nMirrors the Mini App creation contract: same draft validation, same\nper-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same\n409 on occupied slots, same lifecycle eligibility for the doctor.\n\nP2 (round 2): the `Idempotency-Key` header is REQUIRED. The global\nidempotency middleware only protects requests that carry a key —\nwithout a mandated key a lost response + automatic browser retry of a\ndate-only/department-only request (no doctor slot lock applies) would\ncreate duplicate appointments. Same key + same payload replays the\ncommitted 201; same key + changed payload is a 409.",
         "operationId": "create_patient_portal_booking_api_v1_patients_booking_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Required. Retries of the SAME booking attempt must reuse the same key — the middleware replays the committed response instead of creating a second appointment.",
+              "title": "Idempotency-Key"
+            },
+            "description": "Required. Retries of the SAME booking attempt must reuse the same key — the middleware replays the committed response instead of creating a second appointment."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PatientPortalBookingRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -239,9 +314,47 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Create Patient Portal Booking Api V1 Patients Booking Post"
+                  "$ref": "#/components/schemas/PatientPortalBookingCreatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request-shaped validation failure (see detail.reason)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Doctor time slot already occupied (or idempotency payload mismatch)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
                 }
               }
             }
@@ -256,12 +369,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/patients/forms": {
@@ -278,9 +386,37 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Get Patient Portal Forms Api V1 Patients Forms Get"
+                  "$ref": "#/components/schemas/PatientPortalFormsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request-shaped validation failure (see detail.reason)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT or revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
                 }
               }
             }
@@ -67798,6 +67934,17 @@
             ],
             "title": "Department"
           },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
           "appointment_date": {
             "type": "string",
             "format": "date",
@@ -68039,6 +68186,17 @@
               }
             ],
             "title": "Department"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
           },
           "appointment_date": {
             "type": "string",
@@ -91497,6 +91655,236 @@
         ],
         "title": "PatientOtpVerifyRequest"
       },
+      "PatientPortalBookingAppointment": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "appointment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Appointment Date"
+          },
+          "appointment_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Time"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "visit_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Type"
+          },
+          "payment_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Type"
+          },
+          "services": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Services",
+            "default": []
+          },
+          "payment_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Amount"
+          },
+          "payment_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Currency"
+          },
+          "payment_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Provider"
+          },
+          "payment_transaction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Transaction Id"
+          },
+          "payment_webhook_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Webhook Id"
+          },
+          "payment_processed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Processed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "appointment_date",
+          "status"
+        ],
+        "title": "PatientPortalBookingAppointment",
+        "description": "Draft appointment echo (Mini App payload + resolved department_id)."
+      },
+      "PatientPortalBookingCreatedResponse": {
+        "properties": {
+          "created": {
+            "type": "boolean",
+            "title": "Created"
+          },
+          "appointment_id": {
+            "type": "integer",
+            "title": "Appointment Id"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/PatientPortalBookingPreviewResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "appointment_id",
+          "preview"
+        ],
+        "title": "PatientPortalBookingCreatedResponse"
+      },
+      "PatientPortalBookingPreviewResponse": {
+        "properties": {
+          "preview_only": {
+            "type": "boolean",
+            "title": "Preview Only"
+          },
+          "mutation_allowed": {
+            "type": "boolean",
+            "title": "Mutation Allowed"
+          },
+          "message_key": {
+            "type": "string",
+            "title": "Message Key"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/PatientPortalScope"
+          },
+          "appointment": {
+            "$ref": "#/components/schemas/PatientPortalBookingAppointment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "preview_only",
+          "mutation_allowed",
+          "message_key",
+          "scope",
+          "appointment"
+        ],
+        "title": "PatientPortalBookingPreviewResponse"
+      },
       "PatientPortalBookingRequest": {
         "properties": {
           "appointmentDate": {
@@ -91569,6 +91957,534 @@
         ],
         "title": "PatientPortalBookingRequest",
         "description": "Same validation contract as the Mini App booking preview request."
+      },
+      "PatientPortalCabinetAppointmentsItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "PatientPortalCabinetAppointmentsItem"
+      },
+      "PatientPortalCabinetPayments": {
+        "properties": {
+          "billed": {
+            "type": "string",
+            "title": "Billed"
+          },
+          "paid": {
+            "type": "string",
+            "title": "Paid"
+          },
+          "pending": {
+            "type": "string",
+            "title": "Pending"
+          },
+          "debt": {
+            "type": "string",
+            "title": "Debt"
+          },
+          "linked_visit_count": {
+            "type": "integer",
+            "title": "Linked Visit Count"
+          },
+          "active_queue_count": {
+            "type": "integer",
+            "title": "Active Queue Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "billed",
+          "paid",
+          "pending",
+          "debt",
+          "linked_visit_count",
+          "active_queue_count"
+        ],
+        "title": "PatientPortalCabinetPayments"
+      },
+      "PatientPortalCabinetPolicy": {
+        "properties": {
+          "plain_telegram_chat_allowed": {
+            "type": "boolean",
+            "title": "Plain Telegram Chat Allowed"
+          },
+          "pdf_included": {
+            "type": "boolean",
+            "title": "Pdf Included"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plain_telegram_chat_allowed",
+          "pdf_included"
+        ],
+        "title": "PatientPortalCabinetPolicy"
+      },
+      "PatientPortalCabinetQueueItem": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "status"
+        ],
+        "title": "PatientPortalCabinetQueueItem"
+      },
+      "PatientPortalCabinetReportsItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "ready_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "status"
+        ],
+        "title": "PatientPortalCabinetReportsItem"
+      },
+      "PatientPortalCabinetSummaryResponse": {
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/PatientPortalScope"
+          },
+          "patient": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Patient"
+          },
+          "appointments": {
+            "items": {
+              "$ref": "#/components/schemas/PatientPortalCabinetAppointmentsItem"
+            },
+            "type": "array",
+            "title": "Appointments"
+          },
+          "visits": {
+            "items": {
+              "$ref": "#/components/schemas/PatientPortalCabinetVisitsItem"
+            },
+            "type": "array",
+            "title": "Visits"
+          },
+          "queue": {
+            "items": {
+              "$ref": "#/components/schemas/PatientPortalCabinetQueueItem"
+            },
+            "type": "array",
+            "title": "Queue"
+          },
+          "payments": {
+            "$ref": "#/components/schemas/PatientPortalCabinetPayments"
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/PatientPortalCabinetReportsItem"
+            },
+            "type": "array",
+            "title": "Reports"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/PatientPortalCabinetPolicy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scope",
+          "patient",
+          "appointments",
+          "visits",
+          "queue",
+          "payments",
+          "reports",
+          "policy"
+        ],
+        "title": "PatientPortalCabinetSummaryResponse"
+      },
+      "PatientPortalCabinetVisitsItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "PatientPortalCabinetVisitsItem"
+      },
+      "PatientPortalErrorDetail": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "PatientPortalErrorDetail",
+        "description": "Structured portal error body (scope / request-shaped failures)."
+      },
+      "PatientPortalErrorResponse": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatientPortalErrorDetail"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "PatientPortalErrorResponse"
+      },
+      "PatientPortalFormField": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required"
+          },
+          "max_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Length"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Options",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "type",
+          "required"
+        ],
+        "title": "PatientPortalFormField"
+      },
+      "PatientPortalFormItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/PatientPortalFormField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "submission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatientPortalFormSubmission"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "fields"
+        ],
+        "title": "PatientPortalFormItem"
+      },
+      "PatientPortalFormSubmission": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "form_id": {
+            "type": "string",
+            "title": "Form Id"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "answers": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Answers"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "form_id",
+          "schema_version",
+          "status",
+          "answers"
+        ],
+        "title": "PatientPortalFormSubmission"
+      },
+      "PatientPortalFormsPolicy": {
+        "properties": {
+          "plain_telegram_chat_allowed": {
+            "type": "boolean",
+            "title": "Plain Telegram Chat Allowed"
+          },
+          "medical_details_in_chat": {
+            "type": "boolean",
+            "title": "Medical Details In Chat"
+          },
+          "storage_enabled": {
+            "type": "boolean",
+            "title": "Storage Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plain_telegram_chat_allowed",
+          "medical_details_in_chat",
+          "storage_enabled"
+        ],
+        "title": "PatientPortalFormsPolicy"
+      },
+      "PatientPortalFormsResponse": {
+        "properties": {
+          "preview_only": {
+            "type": "boolean",
+            "title": "Preview Only"
+          },
+          "mutation_allowed": {
+            "type": "boolean",
+            "title": "Mutation Allowed"
+          },
+          "message_key": {
+            "type": "string",
+            "title": "Message Key"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/PatientPortalScope"
+          },
+          "forms": {
+            "items": {
+              "$ref": "#/components/schemas/PatientPortalFormItem"
+            },
+            "type": "array",
+            "title": "Forms"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/PatientPortalFormsPolicy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "preview_only",
+          "mutation_allowed",
+          "message_key",
+          "scope",
+          "forms",
+          "policy"
+        ],
+        "title": "PatientPortalFormsResponse"
+      },
+      "PatientPortalScope": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "patient_id"
+        ],
+        "title": "PatientPortalScope"
       },
       "PatientProfileOut": {
         "properties": {

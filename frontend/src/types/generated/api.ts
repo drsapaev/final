@@ -167,6 +167,13 @@ export type paths = {
          *     Mirrors the Mini App creation contract: same draft validation, same
          *     per-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same
          *     409 on occupied slots, same lifecycle eligibility for the doctor.
+         *
+         *     P2 (round 2): the `Idempotency-Key` header is REQUIRED. The global
+         *     idempotency middleware only protects requests that carry a key —
+         *     without a mandated key a lost response + automatic browser retry of a
+         *     date-only/department-only request (no doctor slot lock applies) would
+         *     create duplicate appointments. Same key + same payload replays the
+         *     committed 201; same key + changed payload is a 409.
          */
         post: operations["create_patient_portal_booking_api_v1_patients_booking_post"];
         delete?: never;
@@ -23306,6 +23313,8 @@ export type components = {
             doctor_id?: number | null;
             /** Department */
             department?: string | null;
+            /** Department Id */
+            department_id?: number | null;
             /**
              * Appointment Date
              * Format: date
@@ -23377,6 +23386,8 @@ export type components = {
             doctor_id?: number | null;
             /** Department */
             department?: string | null;
+            /** Department Id */
+            department_id?: number | null;
             /**
              * Appointment Date
              * Format: date
@@ -31959,6 +31970,71 @@ export type components = {
             code: string;
         };
         /**
+         * PatientPortalBookingAppointment
+         * @description Draft appointment echo (Mini App payload + resolved department_id).
+         */
+        PatientPortalBookingAppointment: {
+            /** Patient Id */
+            patient_id: number;
+            /** Doctor Id */
+            doctor_id?: number | null;
+            /** Department */
+            department?: string | null;
+            /** Department Id */
+            department_id?: number | null;
+            /**
+             * Appointment Date
+             * Format: date
+             */
+            appointment_date: string;
+            /** Appointment Time */
+            appointment_time?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Status */
+            status: string;
+            /** Visit Type */
+            visit_type?: string | null;
+            /** Payment Type */
+            payment_type?: string | null;
+            /**
+             * Services
+             * @default []
+             */
+            services: string[];
+            /** Payment Amount */
+            payment_amount?: number | null;
+            /** Payment Currency */
+            payment_currency?: string | null;
+            /** Payment Provider */
+            payment_provider?: string | null;
+            /** Payment Transaction Id */
+            payment_transaction_id?: string | null;
+            /** Payment Webhook Id */
+            payment_webhook_id?: number | null;
+            /** Payment Processed At */
+            payment_processed_at?: string | null;
+        };
+        /** PatientPortalBookingCreatedResponse */
+        PatientPortalBookingCreatedResponse: {
+            /** Created */
+            created: boolean;
+            /** Appointment Id */
+            appointment_id: number;
+            preview: components["schemas"]["PatientPortalBookingPreviewResponse"];
+        };
+        /** PatientPortalBookingPreviewResponse */
+        PatientPortalBookingPreviewResponse: {
+            /** Preview Only */
+            preview_only: boolean;
+            /** Mutation Allowed */
+            mutation_allowed: boolean;
+            /** Message Key */
+            message_key: string;
+            scope: components["schemas"]["PatientPortalScope"];
+            appointment: components["schemas"]["PatientPortalBookingAppointment"];
+        };
+        /**
          * PatientPortalBookingRequest
          * @description Same validation contract as the Mini App booking preview request.
          */
@@ -31978,6 +32054,181 @@ export type components = {
             notes?: string | null;
             /** Services */
             services?: string[] | null;
+        };
+        /** PatientPortalCabinetAppointmentsItem */
+        PatientPortalCabinetAppointmentsItem: {
+            /** Id */
+            id: number;
+            /** Date */
+            date?: string | null;
+            /** Time */
+            time?: string | null;
+            /** Status */
+            status: string;
+            /** Department */
+            department?: string | null;
+        };
+        /** PatientPortalCabinetPayments */
+        PatientPortalCabinetPayments: {
+            /** Billed */
+            billed: string;
+            /** Paid */
+            paid: string;
+            /** Pending */
+            pending: string;
+            /** Debt */
+            debt: string;
+            /** Linked Visit Count */
+            linked_visit_count: number;
+            /** Active Queue Count */
+            active_queue_count: number;
+        };
+        /** PatientPortalCabinetPolicy */
+        PatientPortalCabinetPolicy: {
+            /** Plain Telegram Chat Allowed */
+            plain_telegram_chat_allowed: boolean;
+            /** Pdf Included */
+            pdf_included: boolean;
+        };
+        /** PatientPortalCabinetQueueItem */
+        PatientPortalCabinetQueueItem: {
+            /** Number */
+            number: number;
+            /** Status */
+            status: string;
+            /** Cabinet */
+            cabinet?: string | null;
+        };
+        /** PatientPortalCabinetReportsItem */
+        PatientPortalCabinetReportsItem: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Ready At */
+            ready_at?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** PatientPortalCabinetSummaryResponse */
+        PatientPortalCabinetSummaryResponse: {
+            scope: components["schemas"]["PatientPortalScope"];
+            /** Patient */
+            patient: {
+                [key: string]: string;
+            };
+            /** Appointments */
+            appointments: components["schemas"]["PatientPortalCabinetAppointmentsItem"][];
+            /** Visits */
+            visits: components["schemas"]["PatientPortalCabinetVisitsItem"][];
+            /** Queue */
+            queue: components["schemas"]["PatientPortalCabinetQueueItem"][];
+            payments: components["schemas"]["PatientPortalCabinetPayments"];
+            /** Reports */
+            reports: components["schemas"]["PatientPortalCabinetReportsItem"][];
+            policy: components["schemas"]["PatientPortalCabinetPolicy"];
+        };
+        /** PatientPortalCabinetVisitsItem */
+        PatientPortalCabinetVisitsItem: {
+            /** Id */
+            id: number;
+            /** Date */
+            date?: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
+         * PatientPortalErrorDetail
+         * @description Structured portal error body (scope / request-shaped failures).
+         */
+        PatientPortalErrorDetail: {
+            /** Reason */
+            reason: string;
+            /** Message */
+            message?: string | null;
+        };
+        /** PatientPortalErrorResponse */
+        PatientPortalErrorResponse: {
+            /** Detail */
+            detail: components["schemas"]["PatientPortalErrorDetail"] | string;
+        };
+        /** PatientPortalFormField */
+        PatientPortalFormField: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Type */
+            type: string;
+            /** Required */
+            required: boolean;
+            /** Max Length */
+            max_length?: number | null;
+            /**
+             * Options
+             * @default []
+             */
+            options: string[];
+        };
+        /** PatientPortalFormItem */
+        PatientPortalFormItem: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            /** Fields */
+            fields: components["schemas"]["PatientPortalFormField"][];
+            submission?: components["schemas"]["PatientPortalFormSubmission"] | null;
+        };
+        /** PatientPortalFormSubmission */
+        PatientPortalFormSubmission: {
+            /** Id */
+            id: number;
+            /** Form Id */
+            form_id: string;
+            /** Schema Version */
+            schema_version: number;
+            /** Status */
+            status: string;
+            /** Answers */
+            answers: {
+                [key: string]: unknown;
+            };
+            /** Submitted At */
+            submitted_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** PatientPortalFormsPolicy */
+        PatientPortalFormsPolicy: {
+            /** Plain Telegram Chat Allowed */
+            plain_telegram_chat_allowed: boolean;
+            /** Medical Details In Chat */
+            medical_details_in_chat: boolean;
+            /** Storage Enabled */
+            storage_enabled: boolean;
+        };
+        /** PatientPortalFormsResponse */
+        PatientPortalFormsResponse: {
+            /** Preview Only */
+            preview_only: boolean;
+            /** Mutation Allowed */
+            mutation_allowed: boolean;
+            /** Message Key */
+            message_key: string;
+            scope: components["schemas"]["PatientPortalScope"];
+            /** Forms */
+            forms: components["schemas"]["PatientPortalFormItem"][];
+            policy: components["schemas"]["PatientPortalFormsPolicy"];
+        };
+        /** PatientPortalScope */
+        PatientPortalScope: {
+            /** Type */
+            type: string;
+            /** Patient Id */
+            patient_id: number;
         };
         /**
          * PatientProfileOut
@@ -39986,9 +40237,34 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PatientPortalCabinetSummaryResponse"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description JWT user has no linked Patient profile */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
         };
@@ -40012,9 +40288,34 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PatientPortalBookingPreviewResponse"];
+                };
+            };
+            /** @description Request-shaped validation failure (see detail.reason) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -40031,7 +40332,10 @@ export interface operations {
     create_patient_portal_booking_api_v1_patients_booking_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description Required. Retries of the SAME booking attempt must reuse the same key — the middleware replays the committed response instead of creating a second appointment. */
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -40047,9 +40351,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PatientPortalBookingCreatedResponse"];
+                };
+            };
+            /** @description Request-shaped validation failure (see detail.reason) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Doctor time slot already occupied (or idempotency payload mismatch) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -40078,9 +40416,34 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PatientPortalFormsResponse"];
+                };
+            };
+            /** @description Request-shaped validation failure (see detail.reason) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
         };

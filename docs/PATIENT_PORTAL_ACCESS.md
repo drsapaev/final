@@ -157,3 +157,35 @@ Contract notes:
   over `GET /patients/{patient_id}`.
 - Audit: every endpoint writes a `patient_access_audit` row (actor = JWT user,
   scope = patient portal scope).
+
+Round-2 hardening (review of PR #3340, applies to all four endpoints):
+
+- Principal validity: the shared portal dependency composes
+  `get_current_active_user` + `require_roles("Patient")`. An
+  admin-deactivated `User` gets `403` on every portal endpoint even with an
+  unexpired JWT (`require_roles` alone never checks `is_active`).
+- Soft-deleted card: `Patient.is_deleted = true` yields `403
+  patient_link_invalid` — the same SSOT check the Mini App scope resolver
+  applies (soft deletion only flips the flag; `User.patient` keeps
+  resolving, so the check must be explicit).
+- Department resolution: booking `department` is the canonical
+  `Department.key` (`cardio`, `echokg`, `derma`, `dental`, `lab`,
+  `procedures`). Unknown keys → `400 department_unknown`; deactivated
+  departments → `400 department_inactive`. The created `Appointment` gets
+  the resolved `department_id` (the routing context the schedule and
+  department-schedule reads join on); the raw string is display metadata.
+- Booking idempotency: `POST /patients/booking` REQUIRES an
+  `Idempotency-Key` header (missing header → `422`). PR-C2 must generate
+  one key per booking attempt and REUSE it on retry: same key + same
+  payload replays the committed `201` (no duplicate appointment), same key
+  + changed payload is a `409`. Date-only/department-only requests have no
+  doctor slot lock, so the mandated key is the only duplicate protection
+  for those shapes.
+- Typed contract: all four endpoints publish explicit Pydantic response
+  DTOs (`PatientPortalCabinetSummaryResponse`,
+  `PatientPortalBookingPreviewResponse`, `PatientPortalBookingCreatedResponse`,
+  `PatientPortalFormsResponse`) and document their 4xx surface
+  (`PatientPortalErrorResponse`, `detail` = `{reason, message?}` from
+  portal guards or a plain string from the auth/RBAC layer). The generated
+  TypeScript (`src/types/generated/api.ts`) is part of the PR-C2 contract
+  and is freshness-gated in CI.
