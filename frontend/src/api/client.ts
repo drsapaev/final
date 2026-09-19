@@ -184,7 +184,17 @@ const AUTH_BOOTSTRAP_SUFFIXES = [
   '/password-reset',
   '/password-reset/confirm',
   '/auth/logout',
-  '/authentication/logout'
+  '/authentication/logout',
+  // Patient portal (Phase 0 PR-A1/A2): pre-session endpoints whose uniform
+  // anti-enum 400/401/429 must surface as form errors — they must never
+  // trigger the reactive refresh/retry path (a patient session has no
+  // refresh_token, and a 401 here means "wrong code / not activated",
+  // not "token expired").
+  '/patient-access/request-otp',
+  '/patient-access/verify-otp',
+  '/patient-access/login',
+  '/patient-access/activate/request-otp',
+  '/patient-access/activate/confirm'
 ];
 
 function isAuthBootstrapEndpoint(url: string | undefined): boolean {
@@ -302,7 +312,7 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
       if (!isAuthEndpoint) {
         return Promise.reject(new Error(
           `[FIX:CSRF] Strict mode: refusing ${method.toUpperCase()} ${url} without CSRF token. `
-          + `Set VITE_CSRF_STRICT=0 to revert to fail-open behaviour.`
+          + 'Set VITE_CSRF_STRICT=0 to revert to fail-open behaviour.'
         ));
       }
     }

@@ -35,3 +35,4 @@ export * from './doctor';
 export * from './billing';
 export * from './queue';
 export * from './chat';
+export * from './patientAccess';
