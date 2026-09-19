@@ -480,12 +480,19 @@ def test_morning_precreate_registry_tags_go_resource_axis(
     assert ecg_queue.queue_resource_id is not None
 
 
-def test_morning_precreate_general_tag_keeps_synthetic_path(
+def test_morning_precreate_unowned_tag_skips_fail_closed(
     db_session: Session,
     monkeypatch,
+    caplog,
 ) -> None:
-    """Non-registry tags keep the legacy path: the general queue is
-    pre-created on the general_resource synthetic doctor."""
+    """QD-2E (RQ-15.b) deliberate-state pin FLIP: a non-registry tag
+    WITHOUT an explicit owner is NOT pre-created. The pre-2E pin held
+    the general_resource synthetic as the default owner; stage E
+    retired it (D-08) — zero owners means a loud error log and no
+    queue; the booking surfaces raise the explicit configuration
+    error when a patient actually arrives."""
+    import logging
+
     from app.services.morning_assignment import MorningAssignmentService
 
     # QD-2C (round-18 CI root-cause): see _neutralize_begin_nested.
@@ -493,16 +500,52 @@ def test_morning_precreate_general_tag_keeps_synthetic_path(
 
     _scope_morning_world(db_session, "general")
     gen_user = _make_user(db_session, username="general_resource", role="Resource")
-    gen_doctor = _make_doctor(db_session, user_id=gen_user.id, specialty="general")
+    _make_doctor(db_session, user_id=gen_user.id, specialty="general")
     _make_service(db_session, queue_tag="general", name="Приём")
+
+    with caplog.at_level(logging.ERROR, logger="app.services.morning_assignment"):
+        created = MorningAssignmentService(
+            db_session
+        ).ensure_daily_queues_for_all_tags(_DAY)
+    assert created == 0
+    queue = queue_resource_routing.find_active_tag_queue(db_session, _DAY, "general")
+    assert queue is None
+    # fail-closed is LOUD: the operator sees exactly what to decide
+    assert any(
+        "QD-2E fail-closed" in record.getMessage()
+        and "no explicit owner" in record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.ERROR
+    )
+
+
+def test_morning_precreate_single_doctor_tag_gets_doctor_queue(
+    db_session: Session,
+    monkeypatch,
+) -> None:
+    """QD-2E: a non-registry tag whose active services carry ONE
+    distinct doctor is pre-created on that doctor (K01/K11 → the
+    cardiologist after the operator map application)."""
+    from app.services.morning_assignment import MorningAssignmentService
+
+    _neutralize_begin_nested(monkeypatch, db_session)
+
+    _scope_morning_world(db_session, "cardio")
+    doc_user = _make_user(db_session, username="dr_cardio", role="doctor")
+    doc = _make_doctor(db_session, user_id=doc_user.id, specialty="cardio")
+    service = _make_service(
+        db_session, queue_tag="cardio", name="Консультация кардиолога"
+    )
+    service.doctor_id = doc.id
+    db_session.commit()
 
     created = MorningAssignmentService(db_session).ensure_daily_queues_for_all_tags(
         _DAY
     )
     assert created == 1
-    queue = queue_resource_routing.find_active_tag_queue(db_session, _DAY, "general")
+    queue = queue_resource_routing.find_active_tag_queue(db_session, _DAY, "cardio")
     assert queue is not None
-    assert queue.specialist_id == gen_doctor.id
+    assert queue.specialist_id == doc.id
     assert queue.queue_resource_id is None
 
 
@@ -556,8 +599,9 @@ def test_batch_resolve_returns_none_for_registry_tag(db_session: Session) -> Non
 def test_batch_resolve_keeps_legacy_chain_without_registry(
     db_session: Session,
 ) -> None:
-    """No registry row → the old chain: unique service doctor wins; the
-    synthetic map is still consulted for the synthetic-owned tags."""
+    """No registry row → the explicit chain: the unique service doctor
+    wins. QD-2E: the synthetic map (general_resource fallback) is GONE
+    — the chain now ends in the fail-closed configuration error."""
     from app.services.batch_patient_service import BatchPatientService, EntryAction
 
     doc_user = _make_user(db_session, username="dr_svc", role="doctor")
@@ -3588,6 +3632,11 @@ def test_full_update_independent_entry_uses_resource_floor(
         queue_tag="lab",
         queue_resource_id=resource.id,
     )
+    # RQ-13.b (D-06): 0067 backfill parity — a day row that predates the
+    # snapshot carries its owner's registry floor; the independent-entry
+    # number must keep flooring at the registry value THROUGH the frozen
+    # snapshot (get_next_queue_number reads start_number first).
+    target_queue.start_number = 40
     assert target_queue.id != source_queue.id
 
     from datetime import datetime as _dt
@@ -4132,6 +4181,7 @@ def test_clinic_wide_profile_join_routes_registry_tag(db_session: Session) -> No
             patient_name="Пациент Профиля",
             phone="+998901234599",
             specialist_id_override=profile.id,
+            specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
             source="online",
         )
         queue = result["daily_queue"]
@@ -4216,6 +4266,7 @@ def test_clinic_wide_profile_join_prefers_deactivated_resource_surface(
             patient_name="Пациент ЭКГ",
             phone="+998901234598",
             specialist_id_override=profile.id,
+            specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
             source="online",
         )
         # the existing surface is reused — no fork, no «Нет активных врачей»
@@ -4286,6 +4337,7 @@ def test_clinic_wide_profile_join_doctor_path_without_registry(
             patient_name="Пациент Врача",
             phone="+998901234597",
             specialist_id_override=profile.id,
+            specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
             source="online",
         )
         queue = result["daily_queue"]
@@ -7471,3 +7523,142 @@ def test_cabinet_specialist_filter_includes_resource_queues(
         day=None, specialist_id=lab_synthetic.id, cabinet_number=None
     )
     assert resource_queue.id in [item["id"] for item in payload_all]
+
+
+# ===================== XXI. R19 pins — force-majeure transfer
+#                        numbering follows the day snapshot =====================
+
+
+def test_force_majeure_transfer_numbers_from_day_snapshot_doctor_queue(
+    db_session: Session,
+) -> None:
+    """R19 P2 (snapshot integration, #3279): a force-majeure transfer
+    into a NEW doctor queue must number tickets from the queue's
+    frozen day snapshot (DailyQueue.start_number, RQ-13.b D-06), not
+    from its own private MAX+1 counter. #3279 added the snapshot to
+    the queue CREATION while the transfer kept its own counter — the
+    first transferred patient got №1 in a queue whose day starts at
+    41, and the next ordinary registration got №41."""
+    from app.services.force_majeure_service import ForceMajeureService
+
+    doctor_user = _make_user(db_session, username="fm_snap_dr1", role="doctor")
+    doctor = _make_doctor(
+        db_session, user_id=doctor_user.id, specialty="stom_r19a"
+    )
+    doctor.start_number_online = 41
+    db_session.commit()
+    db_session.refresh(doctor)
+
+    source_queue = _make_queue(
+        db_session,
+        day=_dt_now_tashkent_day(),
+        specialist_id=doctor.id,
+        queue_tag="stom_r19a",
+    )
+    entry = _make_waiting_entry(db_session, source_queue)
+
+    try:
+        result = ForceMajeureService(db_session).transfer_entries_to_tomorrow(
+            entries=[entry],
+            specialist_id=doctor.id,
+            reason="r19 pin",
+            performed_by_id=doctor_user.id,
+            send_notifications=False,
+        )
+        assert result["success"] is True, result
+
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        tomorrow = _dt_now_tashkent_day() + timedelta(days=1)
+        target_queue = (
+            db_session.query(DailyQueue)
+            .filter(DailyQueue.specialist_id == doctor.id, DailyQueue.day == tomorrow)
+            .one()
+        )
+        # the day was frozen at 41 by the creator — the transfer must
+        # read the SAME snapshot ordinary registration reads
+        assert target_queue.start_number == 41
+        assert moved.queue_id == target_queue.id
+        assert moved.number == 41, (
+            "transfer must number from the day snapshot (41), not from "
+            "the private MAX+1 counter (1) — E-039 violated"
+        )
+    finally:
+        _durable_cleanup(db_session, "fm_snap_dr1")
+
+
+def test_force_majeure_transfer_numbers_from_day_snapshot_resource_queue(
+    db_session: Session,
+) -> None:
+    """R19 P2 (live-setting drift, #3279): the transfer into an
+    EXISTING resource-owned queue must number from the day snapshot —
+    the old path floored at the LIVE
+    QueueResource.start_number_online, so an admin bump after the day
+    was frozen (41 -> 501) made transferred tickets jump outside the
+    frozen sequence while ordinary registration kept the snapshot."""
+    from app.services.force_majeure_service import ForceMajeureService
+
+    res_user = _make_user(db_session, username="fm_snap_res1", role="Resource")
+    synthetic = _make_doctor(db_session, user_id=res_user.id, specialty="lab_r19b")
+    resource = _make_resource(
+        db_session, code="lab_r19b", queue_tag="lab_r19b", start_number_online=41
+    )
+
+    tomorrow = _dt_now_tashkent_day() + timedelta(days=1)
+    tomorrow_queue = _make_queue(
+        db_session,
+        day=tomorrow,
+        specialist_id=None,
+        queue_tag="lab_r19b",
+        queue_resource_id=resource.id,
+    )
+    # frozen at day creation (0067 shape)
+    tomorrow_queue.start_number = 41
+    db_session.commit()
+    db_session.refresh(tomorrow_queue)
+
+    # the admin bump AFTER the day was frozen
+    resource.start_number_online = 501
+    db_session.commit()
+
+    # control: ordinary registration keeps the SNAPSHOT
+    assert (
+        queue_service.get_next_queue_number(
+            db_session, daily_queue=tomorrow_queue, queue_tag="lab_r19b"
+        )
+        == 41
+    )
+
+    source_queue = _make_queue(
+        db_session,
+        day=_dt_now_tashkent_day(),
+        specialist_id=synthetic.id,
+        queue_tag="lab_r19b",
+    )
+    entry = _make_waiting_entry(db_session, source_queue)
+
+    try:
+        result = ForceMajeureService(db_session).transfer_entries_to_tomorrow(
+            entries=[entry],
+            specialist_id=synthetic.id,
+            reason="r19 pin",
+            performed_by_id=res_user.id,
+            send_notifications=False,
+        )
+        assert result["success"] is True, result
+
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        assert moved.queue_id == tomorrow_queue.id
+        assert moved.number == 41, (
+            "transfer must number from the day snapshot (41), not from "
+            "the LIVE registry value (501) — E-039 violated"
+        )
+    finally:
+        _durable_cleanup(db_session, "fm_snap_res1")

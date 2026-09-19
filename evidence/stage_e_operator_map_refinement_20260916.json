@@ -1,0 +1,37 @@
+{
+  "report_version": 2,
+  "supersedes": null,
+  "refines": "evidence/stage_e_operator_map_refinement_20260915.json",
+  "refined_date": "2026-09-16",
+  "note": "D-08 final owner confirmation (2026-09-16): the last two null decisions are decided — S01 -> Doctor 16 (User 27 Stomatolog), D01 -> Doctor 15 (User 26 Dermatolog), both on the doctor axis (requires_doctor stays true). The effective operator map is now COMPLETE: 21/21 null decisions decided across the two dated refinements (19 on 2026-09-15 + 2 here), effective undecided = 0. The original 2026-09-12 snapshot and the 2026-09-15 refinement file are kept verbatim. The confirmation binds the exact snapshot identities (S01 id=3, D01 id=1) and the exact (doctor, user) linkage; a mismatched object or pre-state must never be auto-substituted. Procedures stay on the resource axis (the procedures-cabinet nurses) — they are never assigned to the dermatologist; the QueueResource('procedures') seed defaults remain operator-editable without a migration.",
+  "items": [
+    {
+      "surface": "service",
+      "id": 3,
+      "code": "S01",
+      "name": "Консультация стоматолога",
+      "queue_tag": "stomatology",
+      "requires_doctor": true,
+      "doctor_id": null,
+      "decision": "assign_doctor",
+      "target_doctor_id": 16,
+      "expected_user_id": 27,
+      "set_requires_doctor": null,
+      "refined_by": "owner 2026-09-16: консультацию ведёт стоматолог (Doctor 16, User 27 Stomatolog), врачебная ось, requires_doctor=true"
+    },
+    {
+      "surface": "service",
+      "id": 1,
+      "code": "D01",
+      "name": "Консультация дерматолога-косметолога",
+      "queue_tag": "dermatology",
+      "requires_doctor": true,
+      "doctor_id": null,
+      "decision": "assign_doctor",
+      "target_doctor_id": 15,
+      "expected_user_id": 26,
+      "set_requires_doctor": null,
+      "refined_by": "owner 2026-09-16: консультацию ведёт дерматолог-косметолог (Doctor 15, User 26 Dermatolog), врачебная ось, requires_doctor=true; процедуры остаются на ресурсной оси (медсёстры)"
+    }
+  ]
+}

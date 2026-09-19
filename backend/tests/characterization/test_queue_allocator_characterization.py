@@ -301,7 +301,14 @@ def test_force_majeure_transfer_characterization_preserves_current_allocator_beh
         )
         .one()
     )
-    assert transferred_entry.number == 5
+    # R19 P2 (#3279 snapshot integration): the transfer numbers through
+    # the SSOT live-writer counter — the SAME counter ordinary
+    # registration uses on this queue. The counter never reuses a
+    # number: the cancelled №99 keeps raising the max (ordinary
+    # registration already handed out №100 here before this change —
+    # the old private transfer counter that skipped cancelled rows was
+    # the diverging path). Snapshot default (1) does not bind.
+    assert transferred_entry.number == 100
     assert transferred_entry.status == "waiting"
     assert transferred_entry.priority == ForceMajeureService.TRANSFER_PRIORITY
     assert transferred_entry.queue_time is not None

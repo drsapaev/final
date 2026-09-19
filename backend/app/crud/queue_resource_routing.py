@@ -137,8 +137,21 @@ def resource_queue_defaults(resource: QueueResource) -> dict:
     }
 
 
-def lock_registry_tag_creation(db: Session, queue_tag: str, day: date) -> None:
-    """Serialize the first creation of a registry-tag queue (QD-2C).
+def _bound_dialect_name(db: Session) -> str | None:
+    """Dialect name of the session bind, robust to test doubles.
+
+    Real sessions expose ``bind`` (an Engine) with a ``dialect``; unit
+    fakes may be bare objects or Mocks without a bind. Those are never
+    PostgreSQL, so they resolve to ``None`` and the advisory lock below
+    stays a no-op — the same parity the helper gives SQLite sessions.
+    """
+    bind = getattr(db, "bind", None)
+    dialect = getattr(bind, "dialect", None)
+    return getattr(dialect, "name", None)
+
+
+def lock_queue_tag_claim_scope(db: Session, queue_tag: str, day: date) -> None:
+    """Serialize claim resolution and creation for one queue tag and day.
 
     query-then-insert with no unique constraint until QD-2D: two
     concurrent first-arrival writers (batch create, visit
@@ -149,12 +162,28 @@ def lock_registry_tag_creation(db: Session, queue_tag: str, day: date) -> None:
     takes: ``daily_queue:tag:{tag}:{day}``) serializes the
     check-then-insert window; SQLite (tests) has no advisory locks
     and skips — the sequential no-duplicate pins cover that path.
+
+    QD-2E P1: multi-tag callers MUST acquire their scopes through this
+    helper in sorted ``(day, queue_tag)`` order — the lock is
+    transaction-scoped and idempotent while held, so pre-acquiring a
+    scope and re-taking it through the claim coordinator inside the
+    same transaction is free, while inverting the order of two scopes
+    across concurrent transactions can deadlock PostgreSQL.
     """
-    if db.bind is not None and db.bind.dialect.name == "postgresql":
+    if _bound_dialect_name(db) == "postgresql":
         db.execute(
             sa.text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
             {"k": f"daily_queue:tag:{queue_tag}:{day.isoformat()}"},
         )
+
+
+def lock_registry_tag_creation(db: Session, queue_tag: str, day: date) -> None:
+    """Compatibility wrapper for the original registry creation lock name.
+
+    The neutral helper keeps the PostgreSQL ``pg_advisory_xact_lock`` key
+    ``daily_queue:tag:{queue_tag}:{day.isoformat()}`` used by existing callers.
+    """
+    lock_queue_tag_claim_scope(db, queue_tag, day)
 
 
 def resource_start_number(db: Session, daily_queue: DailyQueue) -> int | None:
@@ -171,6 +200,53 @@ def resource_start_number(db: Session, daily_queue: DailyQueue) -> int | None:
     if resource is None or not resource.start_number_online:
         return None
     return int(resource.start_number_online)
+
+
+def effective_day_start_number(
+    db: Session,
+    *,
+    resource: QueueResource | None = None,
+    doctor=None,
+    queue_tag: str | None = None,
+) -> int:
+    """RQ-13.b / D-06 SSOT: effective start number to freeze into a NEW day.
+
+    D-06 chain «клиника → отделение → владелец» (department level —
+    RQ-23): the owner value applies when explicitly configured (>1 —
+    the column default reads as "unconfigured"), otherwise the clinic
+    level: ``settings.start_numbers[tag]`` →
+    ``SPECIALTY_START_NUMBERS[tag]`` → 1. Resource axis (QD-2C): the
+    registry value is the SSOT, unconditionally.
+
+    The result is frozen into ``DailyQueue.start_number`` at day
+    creation (Alembic 0067) and does NOT follow live settings: «Новые
+    настройки не меняют выданные номера и историю текущего дня» (E-039).
+
+    CRUD layer home (next to ``resource_start_number``): repositories of
+    ANY context (emr/queue) may import crud directly; the services impl
+    modules are queue-context-gated (architecture gate).
+    """
+    if resource is not None:
+        return int(resource.start_number_online or 1)
+    if doctor is not None:
+        owner_start = int(doctor.start_number_online or 0)
+        if owner_start > 1:
+            return owner_start
+    from app.crud.clinic import get_queue_settings
+    from app.services.queue_svc._base import QueueBusinessServiceMixinBase
+
+    settings = get_queue_settings(db) or {}
+    start_numbers = settings.get("start_numbers", {}) or {}
+    tag_key = queue_tag or "default"
+    raw = start_numbers.get(tag_key)
+    if raw is None:
+        raw = QueueBusinessServiceMixinBase.SPECIALTY_START_NUMBERS.get(tag_key)
+    if raw is None:
+        raw = QueueBusinessServiceMixinBase.SPECIALTY_START_NUMBERS.get("default", 1)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return QueueBusinessServiceMixinBase.SPECIALTY_START_NUMBERS.get("default", 1)
 
 
 def resolve_registry_tag_queue_for_specialist(

@@ -47,8 +47,8 @@ import subprocess
 import sys
 import uuid
 from datetime import UTC, date, datetime, time
-
 from pathlib import Path
+from types import SimpleNamespace
 
 import psycopg
 import pytest
@@ -147,7 +147,11 @@ def _assert_pg_head(engine) -> None:
     assert engine.dialect.name == "postgresql"
     with engine.connect() as conn:
         version = conn.execute(text("select version_num from alembic_version")).scalar()
-    assert version == "0065_queue_numbering_unique", version
+    # QD-2E chain reconciliation + RQ-13.b + RQ-15.d: the populated head
+    # assert advances with the chain (0065 -> 0066 cutover -> 0067
+    # snapshot -> 0068 direction public-address registry, RQ-16.c /
+    # E-055 -> 0069 sentinel pair retirement).
+    assert version == "0069_sentinel_pair_retirement", version
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:
@@ -172,7 +176,9 @@ def _both_unique_objects(engine) -> dict[str, bool]:
 
 @pytest.fixture(scope="module")
 def pg_engine():
-    """A run-unique scratch database upgraded to head (0065)."""
+    """A run-unique scratch database upgraded to head (0068 — the QD-2E
+    cutover is data-only; the RQ-15.d sentinel retirement cleanly removes
+    the 0055 pairs the same chain seeded on the empty scratch)."""
     admin_url, _host = _verified_admin_url()
     db_name, sa_url = _scratch_pair(admin_url, "main")
     _create_scratch(admin_url, db_name)
@@ -229,13 +235,25 @@ def _make_doctor(session, suffix: str):
 
 
 def _seed_queue(session, doctor_id: int, day: date, tag, active=True):
-    from app.models.online_queue import DailyQueue
-
-    q = DailyQueue(day=day, specialist_id=doctor_id, queue_tag=tag, active=active)
-    session.add(q)
+    """RQ-13.b: Core INSERT with the 0064-era column list so the
+    populated-upgrade proof can seed rows at the OLD schema revision
+    while later tests seed the same helper at head (start_number is
+    server-defaulted, never referenced)."""
+    # RAW SQL with the 0064-era column list: any SQLAlchemy insert
+    # (entity or Core) auto-includes python-defaulted columns such as the
+    # 0067 start_number, which does not exist on the pre-0067 schema this
+    # proof seeds at. A full ORM re-select would also reference the new
+    # column — callers only ever use .id, so return a lightweight stand-in.
+    row = session.execute(
+        text(
+            "INSERT INTO daily_queues (day, specialist_id, queue_tag, active, "
+            "online_start_time, online_end_time, max_online_entries) "
+            "VALUES (:d, :s, :t, :a, '07:00', '09:00', 15) RETURNING id"
+        ),
+        {"d": day, "s": doctor_id, "t": tag, "a": active},
+    ).one()
     session.commit()
-    session.refresh(q)
-    return q
+    return SimpleNamespace(id=row[0])
 
 
 def _seed_entry(session, queue_id: int, number: int, status="waiting", source="desk"):

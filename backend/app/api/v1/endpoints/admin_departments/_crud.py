@@ -6,7 +6,10 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.endpoints.admin_departments._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.admin_departments._helpers import (
+    _department_linked_profiles,
     _ensure_department_integrations,
+    _sync_department_active_to_profiles,
+    _sync_department_rename_to_own_profile,
     router,
 )  # noqa: F401
 from app.api.v1.endpoints.admin_doctors import _reject_sentinel_linked_doctor  # QD-1.1
@@ -228,15 +231,55 @@ def bulk_delete_departments(
     """
     ids = payload.ids
 
-    deleted = 0
+    # RQ-13 UI-slice (S-11/D-06): guard parity with the single delete —
+    # a department whose linked profiles still own queue history cannot be
+    # hard-deleted. All-or-nothing: nothing is deleted when ANY requested
+    # department is blocked (no partial bulk delete), and the 409 report
+    # names every offending department with its live impact. Deletable
+    # departments go through the SAME cascade as the single endpoint
+    # (the old raw db.delete() loop orphaned the 1:1 profile).
+    departments = []
     not_found = 0
-
     for dept_id in ids:
         department = db.query(Department).filter(Department.id == dept_id).first()
         if not department:
             not_found += 1
             continue
-        db.delete(department)
+        departments.append(department)
+
+    blocked_report: list[dict] = []
+    for department in departments:
+        dept_links = _department_delete_block_report(db, department)
+        if dept_links:
+            blocked_report.append(
+                {
+                    "department_id": department.id,
+                    "name": department.name_ru,
+                    "waiting_patients": sum(
+                        link["entries_waiting"] for link in dept_links
+                    ),
+                    "profiles": dept_links,
+                }
+            )
+    if blocked_report:
+        total_waiting = sum(r["waiting_patients"] for r in blocked_report)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "department_has_queue_history",
+                "message": (
+                    "Массовое удаление отменено: связанные вкладки очередей "
+                    "все ещё содержат записи/ожидающих пациентов. "
+                    "Деактивируйте отделения вместо удаления."
+                ),
+                "waiting_patients": total_waiting,
+                "blocked": blocked_report,
+            },
+        )
+
+    deleted = 0
+    for department in departments:
+        _delete_department_cascade(db, department)
         deleted += 1
 
     db.commit()
@@ -270,6 +313,8 @@ def bulk_activate_departments(
 
     updated = 0
     not_found = 0
+    profiles_hidden_total = 0
+    profiles_restored_total = 0
 
     for dept_id in ids:
         department = db.query(Department).filter(Department.id == dept_id).first()
@@ -277,6 +322,11 @@ def bulk_activate_departments(
             not_found += 1
             continue
         department.active = bool(active)
+        # RQ-13.a (D-06): bulk activation follows the SAME lifecycle
+        # contract as the single-department toggle.
+        sync = _sync_department_active_to_profiles(db, department, active=active)
+        profiles_hidden_total += sync["profiles_hidden"]
+        profiles_restored_total += sync["profiles_restored"]
         updated += 1
 
     db.commit()
@@ -286,6 +336,8 @@ def bulk_activate_departments(
         "success": True,
         "updated": updated,
         "not_found": not_found,
+        "profiles_hidden": profiles_hidden_total,
+        "profiles_restored": profiles_restored_total,
         "message": f"{action.capitalize()} {updated} отделений",
     }
 
@@ -313,10 +365,24 @@ def update_department(
             detail=f"Department with id {department_id} not found",
         )
 
+    # RQ-13.a (F-12/D-06): capture the pre-update state so the profile
+    # sync can detect what actually changed.
+    old_name_ru = department.name_ru
+    old_active = department.active
+
     # Обновляем только переданные поля
     update_data = department_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(department, field, value)
+
+    # RQ-13.a: propagate the changed lifecycle axes to the linked
+    # QueueProfiles (titles on rename, visibility on active flip).
+    renamed = _sync_department_rename_to_own_profile(db, department, old_name_ru)
+    active_sync = (
+        _sync_department_active_to_profiles(db, department, active=department.active)
+        if "active" in update_data and update_data["active"] != old_active
+        else {"profiles_hidden": 0, "profiles_restored": 0}
+    )
 
     db.commit()
     db.refresh(department)
@@ -324,6 +390,10 @@ def update_department(
     return {
         "success": True,
         "data": DepartmentResponse.from_orm(department).dict(),
+        "profile_sync": {
+            "titles_synced": renamed,
+            **active_sync,
+        },
         "message": "Department updated successfully",
     }
 
@@ -360,6 +430,84 @@ def initialize_department(
     }
 
 
+def _department_delete_block_report(db: Session, department) -> list[dict]:
+    """RQ-13.a (D-06/S-11/D-02): per-profile impact rows for a department
+    whose linked profiles still own queue history (any day) or waiting
+    patients. Same significant-link bar as the profile hard-delete guard
+    (RQ-12.b), computed live from the same SSOT at execution time
+    (stale-data protection by construction). Shared by the single delete
+    and the bulk delete (one contract, not two behaviors)."""
+    from app.api.v1.endpoints.registrar_integration._queue_profiles import (
+        _profile_link_counts,
+    )
+    blocked_links: list[dict] = []
+    for profile in _department_linked_profiles(db, department):
+        counts = _profile_link_counts(db, profile)
+        if counts["entries_total"] > 0:
+            blocked_links.append(
+                {
+                    "profile_key": profile.key,
+                    "daily_queues": counts["daily_queues"],
+                    "entries_waiting": counts["entries_waiting"],
+                    "entries_total": counts["entries_total"],
+                }
+            )
+    return blocked_links
+
+
+def _delete_department_cascade(db: Session, department) -> dict:
+    """Shared cascade cleanup for a department whose deletion is allowed:
+    unlinks services, removes DepartmentService/QueueSettings/RegSettings
+    and the 1:1 QueueProfile, then deletes the department row. No commit —
+    the caller owns the transaction (single delete commits once; bulk
+    delete commits once after the whole loop)."""
+    cleaned = {"services": 0, "department_services": 0, "queue_settings": 0,
+               "registration_settings": 0, "queue_profile": False}
+
+    # Clear department_key from services
+    from app.models.service import Service
+    services = db.query(Service).filter(Service.department_key == department.key).all()
+    for svc in services:
+        svc.department_key = None
+        cleaned["services"] += 1
+
+    # Delete DepartmentService links
+    dept_services = db.query(DepartmentService).filter(
+        DepartmentService.department_id == department.id
+    ).all()
+    for ds in dept_services:
+        db.delete(ds)
+        cleaned["department_services"] += 1
+
+    # Delete DepartmentQueueSettings
+    queue_settings = db.query(DepartmentQueueSettings).filter(
+        DepartmentQueueSettings.department_id == department.id
+    ).first()
+    if queue_settings:
+        db.delete(queue_settings)
+        cleaned["queue_settings"] = 1
+
+    # Delete DepartmentRegistrationSettings
+    reg_settings = db.query(DepartmentRegistrationSettings).filter(
+        DepartmentRegistrationSettings.department_id == department.id
+    ).first()
+    if reg_settings:
+        db.delete(reg_settings)
+        cleaned["registration_settings"] = 1
+
+    # Delete associated QueueProfile
+    from app.models.queue_profile import QueueProfile
+    queue_profile = db.query(QueueProfile).filter(
+        QueueProfile.key == department.key
+    ).first()
+    if queue_profile:
+        db.delete(queue_profile)
+        cleaned["queue_profile"] = True
+
+    db.delete(department)
+    return cleaned
+
+
 @router.delete("/{department_id}", response_model=dict)
 def delete_department(
     department_id: int,
@@ -382,51 +530,30 @@ def delete_department(
             detail=f"Department with id {department_id} not found",
         )
 
-    # PR-22: cascade cleanup
-    cleaned = {"services": 0, "department_services": 0, "queue_settings": 0,
-               "registration_settings": 0, "queue_profile": False}
+    # RQ-13.a (D-06/S-11/D-02): a department whose linked profiles still
+    # own queue history (any day) or waiting patients cannot be hard-
+    # deleted — the profile deletion below would remove the tab surfaces
+    # those patients are reachable through. Same significant-link bar as
+    # the profile hard-delete guard (RQ-12.b), computed live from the
+    # same SSOT at execution time (stale-data protection by construction).
+    blocked_links = _department_delete_block_report(db, department)
+    if blocked_links:
+        total_waiting = sum(b["entries_waiting"] for b in blocked_links)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "department_has_queue_history",
+                "message": (
+                    "Нельзя удалить отделение: связанные вкладки очередей "
+                    "все ещё содержат записи/ожидающих пациентов. "
+                    "Деактивируйте отделение вместо удаления."
+                ),
+                "waiting_patients": total_waiting,
+                "profiles": blocked_links,
+            },
+        )
 
-    # Clear department_key from services
-    from app.models.service import Service
-    services = db.query(Service).filter(Service.department_key == department.key).all()
-    for svc in services:
-        svc.department_key = None
-        cleaned["services"] += 1
-
-    # Delete DepartmentService links
-    dept_services = db.query(DepartmentService).filter(
-        DepartmentService.department_id == department_id
-    ).all()
-    for ds in dept_services:
-        db.delete(ds)
-        cleaned["department_services"] += 1
-
-    # Delete DepartmentQueueSettings
-    queue_settings = db.query(DepartmentQueueSettings).filter(
-        DepartmentQueueSettings.department_id == department_id
-    ).first()
-    if queue_settings:
-        db.delete(queue_settings)
-        cleaned["queue_settings"] = 1
-
-    # Delete DepartmentRegistrationSettings
-    reg_settings = db.query(DepartmentRegistrationSettings).filter(
-        DepartmentRegistrationSettings.department_id == department_id
-    ).first()
-    if reg_settings:
-        db.delete(reg_settings)
-        cleaned["registration_settings"] = 1
-
-    # Delete associated QueueProfile
-    from app.models.queue_profile import QueueProfile
-    queue_profile = db.query(QueueProfile).filter(
-        QueueProfile.key == department.key
-    ).first()
-    if queue_profile:
-        db.delete(queue_profile)
-        cleaned["queue_profile"] = True
-
-    db.delete(department)
+    cleaned = _delete_department_cascade(db, department)
     db.commit()
 
     logger.info(
@@ -461,6 +588,12 @@ def toggle_department(
 
     # Переключаем active
     department.active = not department.active
+    # RQ-13.a (D-06): the toggle is a lifecycle transition — propagate
+    # visibility to the linked QueueProfiles (hide all linked on
+    # deactivation, restore the department-owned profile on activation).
+    profile_sync = _sync_department_active_to_profiles(
+        db, department, active=department.active
+    )
     db.commit()
     db.refresh(department)
 
@@ -469,6 +602,7 @@ def toggle_department(
     return {
         "success": True,
         "data": DepartmentResponse.from_orm(department).dict(),
+        "profile_sync": profile_sync,
         "message": f"Department '{department.name_ru}' {status_text}",
     }
 

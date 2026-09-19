@@ -6113,6 +6113,168 @@
         }
       }
     },
+    "/api/v1/queue/directions/{profile_key}/entry-methods": {
+      "get": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Поддерживаемые способы QR-входа направления (RQ-16.b/RQ-16.d)",
+        "description": "Read-only contract surface: explicitly enumerate the QR-entry\nmethods the server supports for the direction addressed by its\nQR-visible profile key. ``permanent_address`` is dynamic per\ndirection since RQ-16.d (E-055 §8).",
+        "operationId": "get_direction_entry_methods_api_v1_queue_directions__profile_key__entry_methods_get",
+        "parameters": [
+          {
+            "name": "profile_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectionEntryMethodsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queue/admin/directions/{profile_key}/public-address/provision": {
+      "post": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Provision постоянного публичного адреса направления (RQ-16.d)",
+        "description": "Admin provision/enable of the permanent public address (E-055 §3):\nthe server generates the opaque code ONCE and persists it forever.\nIdempotent — a re-provision returns the SAME address (created=False);\narchive/reactivate cycles never regenerate (E-055 §7). Manual address\nediting and rotation are out of scope (E-055 §6).",
+        "operationId": "provision_public_address_api_v1_queue_admin_directions__profile_key__public_address_provision_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicAddressProvisionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Зарезервированный ключ направления или исчерпаны попытки генерации"
+          },
+          "401": {
+            "description": "Требуется аутентификация"
+          },
+          "403": {
+            "description": "Только роль Admin"
+          },
+          "404": {
+            "description": "Направление не найдено"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queue/public/{public_code}/start-session": {
+      "post": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Начало короткоживущей сессии по постоянному адресу направления (RQ-16.d, анонимный путь)",
+        "description": "ONE canonical anonymous resolve/start operation (E-055 §9):\n\npublic_code -> registry -> QueueProfile -> visibility/eligibility ->\nanonymous rate limit -> short-lived session -> the existing\nQueueJoin session flow. No second join mechanism: every rule stays\nin the canonical resolver, and the minted direction-scoped token is\nbound to THIS direction for the session's whole short life.",
+        "operationId": "start_public_direction_session_api_v1_queue_public__public_code__start_session_post",
+        "parameters": [
+          {
+            "name": "public_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Public Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicDirectionStartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Честный отказ существующего сессионного контракта (окно записи и т.п.)"
+          },
+          "404": {
+            "description": "Анонимный отказ (S-15): направление недоступно — unknown/archived/hidden/deleted/retired неразличимы",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Направление недоступно"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit превышен (анонимный путь)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queue/admin/qr-tokens/generate": {
       "post": {
         "tags": [
@@ -15287,6 +15449,56 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Get Queue Profiles Public Api V1 Queues Profiles Public Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queues/profiles/{profile_key}/impact-preview": {
+      "get": {
+        "tags": [
+          "registrar"
+        ],
+        "summary": "Get Queue Profile Impact Preview",
+        "description": "RQ-12.b (D-02): server-side impact preview of what a lifecycle\naction on this profile would touch.\n\nRead-only: this endpoint never mutates anything and its report is\ninformational only — the delete endpoint re-verifies the same links\nat execution time, so a stale preview cannot authorize destruction\n(ACCEPTANCE S-10: \"повторить со stale preview\").",
+        "operationId": "get_queue_profile_impact_preview_api_v1_queues_profiles__profile_key__impact_preview_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Queue Profile Impact Preview Api V1 Queues Profiles  Profile Key  Impact Preview Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -25109,6 +25321,79 @@
             "OAuth2PasswordBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/admin/queue/settings/effective": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Effective Queue Settings",
+        "description": "RQ-23.a (D-06 APPROVED, S-20): отчёт эффективных настроек очереди.\n\nRead-only вычисление над существующими строками: каждый управляемый\nпараметр получает источник (клиника → отделение → владелец → снимок\nдня), флаг «живое/не применяется» и время применения. Фронтенд\nотображает результат и источник уровня (D-06); поведение очередей\nотчёт не меняет.",
+        "operationId": "get_effective_queue_settings_api_v1_admin_queue_settings_effective_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "department_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Id"
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tag"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Effective Queue Settings Api V1 Admin Queue Settings Effective Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/admin/queue/test": {
@@ -42228,6 +42513,270 @@
         ]
       }
     },
+    "/api/v1/patient-access/request-otp": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Request Patient Otp",
+        "description": "Отправить OTP для входа пациента. Ответ номер-нейтрален (anti-enum).",
+        "operationId": "request_patient_otp_api_v1_patient_access_request_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Request Patient Otp Api V1 Patient Access Request Otp Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patient-access/verify-otp": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Verify Patient Otp",
+        "description": "Проверить OTP -> одноразовый verification_grant (единый ответ при любой неудаче).",
+        "operationId": "verify_patient_otp_api_v1_patient_access_verify_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientOtpVerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Verify Patient Otp Api V1 Patient Access Verify Otp Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patient-access/login": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Patient Login",
+        "description": "phone + verification_grant -> JWT канонического User(role=Patient).\n\nFail-closed: 0 или >1 активных verified Patient-пользователей на номер ->\nединый generic 401 (endpoint не становится каталогом пациентов).",
+        "operationId": "patient_login_api_v1_patient_access_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Patient Login Api V1 Patient Access Login Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patient-access/activate/request-otp": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Request Activation Otp",
+        "description": "Отправить OTP для активации доступа.\n\nOTP уходит ТОЛЬКО на номер карты, привязанный к токену при выпуске.\nОтвет маскирует номер и не содержит PHI.",
+        "operationId": "request_activation_otp_api_v1_patient_access_activate_request_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientActivationOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientActivationOtpResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patient-access/activate/confirm": {
+      "post": {
+        "tags": [
+          "patient-access"
+        ],
+        "summary": "Confirm Activation",
+        "description": "Токен + OTP -> каноническая сессия User(role=Patient).\n\nАтомарно: User + UserProfile(phone, verified) + Patient.user_id в одной\nтранзакции (SELECT FOR UPDATE + один commit). Все отказы — единый\ngeneric текст (anti-enum).",
+        "operationId": "confirm_activation_api_v1_patient_access_activate_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientActivationConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientActivationConfirmResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/{patient_id}/activation-token": {
+      "post": {
+        "tags": [
+          "patients"
+        ],
+        "summary": "Issue Activation Token",
+        "description": "Выдать одноразовый токен активации портала для карты пациента.\n\nТокен привязывается к (Patient.id, нормализованный phone) на момент\nвыдачи; действует 72 часа; перевыпуск отзывает предыдущий токен.\nОткрытый текст токена возвращается ОДИН раз и не попадает в аудит.",
+        "operationId": "issue_activation_token_api_v1_patients__patient_id__activation_token_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientActivationTokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queue/reorder/reorder": {
       "put": {
         "tags": [
@@ -54534,6 +55083,16 @@
               }
             }
           },
+          "409": {
+            "description": "Номер телефона уже используется другим активным аккаунтом пациента портала (инвариант phone-scope Phase 0)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPhoneScopeConflictDetail"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -54731,6 +55290,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/app__schemas__user_management__UserProfileResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Номер телефона уже используется другим активным аккаунтом пациента портала (инвариант phone-scope Phase 0)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPhoneScopeConflictDetail"
                 }
               }
             }
@@ -74914,6 +75483,70 @@
         "title": "DifferentialDiagnosisRequest",
         "description": "Request body for POST /ai/differential-diagnosis."
       },
+      "DirectionEntryMethod": {
+        "type": "string",
+        "enum": [
+          "session_qr",
+          "permanent_address",
+          "view_only"
+        ],
+        "title": "DirectionEntryMethod",
+        "description": "The contract methods space (DIRECTION_CONTRACT.md §6.2)."
+      },
+      "DirectionEntryMethodSupport": {
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/DirectionEntryMethod"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "supported"
+        ],
+        "title": "DirectionEntryMethodSupport",
+        "description": "One method with its honest support flag for this direction."
+      },
+      "DirectionEntryMethodsResponse": {
+        "properties": {
+          "direction_key": {
+            "type": "string",
+            "title": "Direction Key",
+            "description": "Canonical QR-visible profile key (normalized)"
+          },
+          "profile_id": {
+            "type": "integer",
+            "title": "Profile Id",
+            "description": "QueueProfile.id — a separate id space (D-01)"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Public display title (title_ru preferred)"
+          },
+          "entry_methods": {
+            "items": {
+              "$ref": "#/components/schemas/DirectionEntryMethodSupport"
+            },
+            "type": "array",
+            "title": "Entry Methods",
+            "description": "The WHOLE methods space, always fully present: every contract method carries an honest supported flag; clients must not infer methods absent from this enumeration"
+          }
+        },
+        "type": "object",
+        "required": [
+          "direction_key",
+          "profile_id",
+          "title",
+          "entry_methods"
+        ],
+        "title": "DirectionEntryMethodsResponse",
+        "description": "Explicit entry-methods enumeration for one QR-visible direction."
+      },
       "DiscountCalculationRequest": {
         "properties": {
           "patient_id": {
@@ -83082,6 +83715,21 @@
             ],
             "title": "Specialist Ids",
             "description": "Список ID специалистов (для общего QR)"
+          },
+          "specialist_entity_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Entity Types",
+            "description": "Типы сущностей specialist_ids, выровненные по индексам ('doctor' | 'profile'); тип выбора передаётся явно (D-01), тип сущности не определяется по совпадению числового ID"
           }
         },
         "type": "object",
@@ -89812,6 +90460,191 @@
         ],
         "title": "Patient"
       },
+      "PatientActivationConfirmRequest": {
+        "properties": {
+          "activation_token": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 16,
+            "title": "Activation Token"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 6,
+            "minLength": 6,
+            "pattern": "^\\d{6}$",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activation_token",
+          "code"
+        ],
+        "title": "PatientActivationConfirmRequest"
+      },
+      "PatientActivationConfirmResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type"
+          },
+          "user": {
+            "$ref": "#/components/schemas/PatientActivationSessionUser"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type",
+          "user",
+          "patient_id"
+        ],
+        "title": "PatientActivationConfirmResponse"
+      },
+      "PatientActivationOtpRequest": {
+        "properties": {
+          "activation_token": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 16,
+            "title": "Activation Token"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activation_token"
+        ],
+        "title": "PatientActivationOtpRequest",
+        "description": "Токен активации — БЕЗ поля phone: OTP отправляется только на номер,\nзафиксированный в карте при выпуске токена (identity contract v3)."
+      },
+      "PatientActivationOtpResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "phone_masked": {
+            "type": "string",
+            "title": "Phone Masked"
+          },
+          "expires_in_minutes": {
+            "type": "integer",
+            "title": "Expires In Minutes"
+          },
+          "resend_after_seconds": {
+            "type": "integer",
+            "title": "Resend After Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "phone_masked",
+          "expires_in_minutes",
+          "resend_after_seconds"
+        ],
+        "title": "PatientActivationOtpResponse"
+      },
+      "PatientActivationSessionUser": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "is_superuser": {
+            "type": "boolean",
+            "title": "Is Superuser"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "email",
+          "full_name",
+          "role",
+          "is_active",
+          "is_superuser"
+        ],
+        "title": "PatientActivationSessionUser"
+      },
+      "PatientActivationTokenResponse": {
+        "properties": {
+          "activation_token": {
+            "type": "string",
+            "title": "Activation Token"
+          },
+          "expires_in_hours": {
+            "type": "integer",
+            "title": "Expires In Hours"
+          },
+          "phone_masked": {
+            "type": "string",
+            "title": "Phone Masked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activation_token",
+          "expires_in_hours",
+          "phone_masked"
+        ],
+        "title": "PatientActivationTokenResponse"
+      },
       "PatientBenefitCreate": {
         "properties": {
           "patient_id": {
@@ -90036,6 +90869,24 @@
         ],
         "title": "PatientEntriesResponse",
         "description": "Ответ с записями пациента за день"
+      },
+      "PatientLoginRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "verification_grant": {
+            "type": "string",
+            "title": "Verification Grant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "verification_grant"
+        ],
+        "title": "PatientLoginRequest"
       },
       "PatientOnboardingAuthRequest": {
         "properties": {
@@ -90447,6 +91298,48 @@
           "safeNextAction"
         ],
         "title": "PatientOnboardingSubmitResponse"
+      },
+      "PatientOtpRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone"
+        ],
+        "title": "PatientOtpRequest"
+      },
+      "PatientOtpVerifyRequest": {
+        "properties": {
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phone",
+          "code"
+        ],
+        "title": "PatientOtpVerifyRequest"
       },
       "PatientProfileOut": {
         "properties": {
@@ -94251,6 +95144,126 @@
         ],
         "title": "ProvidersResponse",
         "description": "Список доступных провайдеров"
+      },
+      "PublicAddressProvisionResponse": {
+        "properties": {
+          "profile_id": {
+            "type": "integer",
+            "title": "Profile Id",
+            "description": "QueueProfile.id — a separate id space (D-01)"
+          },
+          "direction_key": {
+            "type": "string",
+            "title": "Direction Key",
+            "description": "Canonical profile key the address is bound to"
+          },
+          "public_code": {
+            "type": "string",
+            "title": "Public Code",
+            "description": "Opaque random 12-char lowercase public code (E-055 §2) — a PUBLIC identifier, never a secret and never derived from the direction title or key"
+          },
+          "url_path": {
+            "type": "string",
+            "title": "Url Path",
+            "description": "The permanent frontend route: /q/<public_code>"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created",
+            "description": "True when a NEW code was generated now; False when the direction already had its one active address (E-055 §3: generated ONCE, re-provision returns the SAME address)"
+          },
+          "provisioned_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provisioned At",
+            "description": "Address creation timestamp (ISO-8601)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "direction_key",
+          "public_code",
+          "url_path",
+          "created"
+        ],
+        "title": "PublicAddressProvisionResponse",
+        "description": "Result of the Admin provision/enable of a permanent address."
+      },
+      "PublicDirectionAddressInfo": {
+        "properties": {
+          "profile_id": {
+            "type": "integer",
+            "title": "Profile Id",
+            "description": "QueueProfile.id — a separate id space (D-01)"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Canonical direction key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Public display title (title_ru preferred)"
+          },
+          "public_code": {
+            "type": "string",
+            "title": "Public Code",
+            "description": "The canonical lowercase public code of the address"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "key",
+          "title",
+          "public_code"
+        ],
+        "title": "PublicDirectionAddressInfo",
+        "description": "The direction a permanent-address session is scoped to."
+      },
+      "PublicDirectionStartResponse": {
+        "properties": {
+          "session_token": {
+            "type": "string",
+            "title": "Session Token"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "permanent_address": {
+            "type": "boolean",
+            "title": "Permanent Address",
+            "description": "Always True on this surface (the address is permanent)"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/PublicDirectionAddressInfo"
+          },
+          "queue_info": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Queue Info",
+            "description": "The same token-info shape the session-QR flow consumes, with selectable_specialists narrowed to this direction's eligible owners (RQ-09.b eligibility contract)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_token",
+          "expires_at",
+          "permanent_address",
+          "direction",
+          "queue_info"
+        ],
+        "title": "PublicDirectionStartResponse",
+        "description": "Short-lived session opened through the permanent public address.\n\nThe ``session_token`` drives the EXISTING QueueJoin flow\n(``/queue/join/:token`` semantics preserved); the internal\ndirection-scoped QR token is deliberately NOT returned."
       },
       "PushDeviceErrorDetail": {
         "properties": {
@@ -105344,6 +106357,20 @@
           "groups"
         ],
         "title": "UserPermissionsResponse"
+      },
+      "UserPhoneScopeConflictDetail": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "UserPhoneScopeConflictDetail",
+        "description": "Body of the HTTP 409 phone-scope conflict on the user-management\nsurfaces (Phase 0, PR #3320 round 2): ``{\"detail\": ...}``.\n\nRaised when a mutation would create a SECOND active verified\nPatient-user on a phone that already backs another active patient\nportal account (the login resolver is fail-closed at >1 candidates)."
       },
       "UserPreferencesRequest": {
         "properties": {},

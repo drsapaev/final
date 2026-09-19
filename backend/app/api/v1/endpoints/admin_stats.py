@@ -205,9 +205,22 @@ def get_recent_activities(
             .all()
         )
 
+        # PERF: имена пациентов загружаем ОДНИМ batch-запросом. N+1 по
+        # удалённому (us-east-1) пулеру стоил ~200мс на запись и разгонял
+        # эндпоинт до 15.6с p95 (Sentry SLA breach 2026-09-14).
+        appointment_patient_ids = sorted(
+            {apt.patient_id for apt in recent_appointments if apt.patient_id is not None}
+        )
+        patients_by_id: dict[int, Patient] = {}
+        if appointment_patient_ids:
+            for patient in (
+                db.query(Patient).filter(Patient.id.in_(appointment_patient_ids)).all()
+            ):
+                patients_by_id[patient.id] = patient
+
         for apt in recent_appointments:
-            # Получаем имя пациента
-            patient = db.query(Patient).filter(Patient.id == apt.patient_id).first()
+            # Получаем имя пациента (из батча, без N+1)
+            patient = patients_by_id.get(apt.patient_id) if apt.patient_id is not None else None
             patient_name = (
                 patient.short_name() if patient else f"Пациент #{apt.patient_id}"
             )

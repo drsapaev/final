@@ -317,4 +317,127 @@ export const resolveRegistrarWorklistEmptyScopeKind = ({
   return scopeHasEntries ? 'filtered-empty' : 'queue-empty';
 };
 
+/**
+ * RQ-21.b (D-07 APPROVED): signed-counter facts for the worklist counters.
+ *
+ * The worklist has TWO row kinds that must never share one counter label:
+ * - a specific tab lists individual queue ENTRIES → unit «записей» (records);
+ * - the "all departments" tab lists AGGREGATED PATIENTS → unit «пациентов».
+ *   Calling patients «записи» was the D-07 unit-mixing defect (the old
+ *   `${length} tabs_appointments` label served both surfaces).
+ *
+ * The descriptor is derived from the SAME data the list under the counter
+ * uses (SSOT helpers above — one source, no drift when the date/filter
+ * changes): `count` is the displayed rows; `scopeCount` is the loaded
+ * day+tab scope BEFORE status/search narrowing; `narrowed` (count <
+ * scopeCount) makes the UI say «показано N из M» instead of presenting a
+ * narrowed sample as the whole queue (same family of honesty as RQ-21.a);
+ * `loadedPage` mirrors paginationInfo.hasMore so a PAGE of rows is never
+ * presented as the total (the registrar/queues/today contract returns the
+ * full day today — the flag is structural honesty for future paging).
+ */
+export type RegistrarWorklistCounterUnit = 'records' | 'patients';
+
+export interface RegistrarWorklistCounterDescriptor {
+  unit: RegistrarWorklistCounterUnit;
+  /** Rows the list under the counter shows (after status/search narrowing). */
+  count: number;
+  /** Loaded day+tab scope rows BEFORE narrowing (honest «из M» denominator). */
+  scopeCount: number;
+  /** True when narrowing reduced the scope (status filter / search query). */
+  narrowed: boolean;
+  /** True when the loaded sample is a page (hasMore), not the full scope. */
+  loadedPage: boolean;
+}
+
+export const describeRegistrarWorklistCounter = ({
+  appointments,
+  activeTab,
+  queueProfiles,
+  rows,
+  hasMore,
+}: {
+  appointments: Appointment[];
+  activeTab: string | null;
+  queueProfiles: QueueProfileItem[];
+  rows: Record<string, unknown>[];
+  hasMore: boolean;
+}): RegistrarWorklistCounterDescriptor => {
+  if (!activeTab) {
+    // All-departments: the scope is the AGGREGATED PATIENT count of the
+    // loaded day (aggregation cannot lose patients — RQ-21.a note), taken
+    // BEFORE the status/search narrowing the rows already embody.
+    const scopeCount = aggregateRegistrarPatients(
+      appointments as Record<string, unknown>[],
+    ).length;
+    return {
+      unit: 'patients',
+      count: rows.length,
+      scopeCount,
+      narrowed: rows.length < scopeCount,
+      loadedPage: hasMore,
+    };
+  }
+
+  // Specific tab: same SSOT tag resolution as rows/emptyScopeKind — the
+  // scope is every entry matching the tab's queue_tags, before narrowing.
+  const possibleTags = getQueueTagsForTabKey(activeTab, queueProfiles);
+  const scopeCount = appointments.filter((entry) =>
+    possibleTags.some((tag: string) => tag.toLowerCase() === appointmentQueueTagValue(entry)),
+  ).length;
+  return {
+    unit: 'records',
+    count: rows.length,
+    scopeCount,
+    narrowed: rows.length < scopeCount,
+    loadedPage: hasMore,
+  };
+};
+
+/**
+ * RQ-21.b (D-07): compose the signed counter string for BOTH worklist
+ * counter surfaces (header meta line + status badge) — one formatter, no
+ * drift. The unit word is pluralized by i18next from the count it agrees
+ * with: the displayed count on the plain form, the SCOPE count on the
+ * narrowed form («показано 3 из 50 записей» — the unit belongs to 50).
+ */
+export const formatRegistrarWorklistCounter = (
+  t: (key: string, options?: Record<string, unknown>) => string,
+  d: RegistrarWorklistCounterDescriptor,
+): string => {
+  const unitWord = d.unit === 'records'
+    ? t('registrarPanel.rp_counter_records', { count: d.narrowed ? d.scopeCount : d.count })
+    : t('registrarPanel.rp_counter_patients', { count: d.narrowed ? d.scopeCount : d.count });
+  const head = d.narrowed
+    ? t('registrarPanel.rp_counter_shown_of', { shown: d.count, scope: d.scopeCount, unit: unitWord })
+    : `${d.count} ${unitWord}`;
+  return d.loadedPage ? `${t('registrarPanel.rp_counter_loaded')} ${head}` : head;
+};
+
+/**
+ * RQ-21.b (D-07): one SSOT call for BOTH worklist presentation facts — the
+ * empty-scope kind (RQ-21.a) and the signed counter (above) — so the panel
+ * computes them from the SAME data in ONE place (no drift, no extra panel
+ * LOC beyond the plan §PR-UI-13 size pin).
+ */
+export const resolveRegistrarWorklistPresentationFacts = ({
+  appointments,
+  activeTab,
+  queueProfiles,
+  rows,
+  hasMore,
+}: {
+  appointments: Appointment[];
+  activeTab: string | null;
+  queueProfiles: QueueProfileItem[];
+  rows: Record<string, unknown>[];
+  hasMore: boolean;
+}): {
+  emptyScopeKind: RegistrarWorklistEmptyScopeKind;
+  counter: RegistrarWorklistCounterDescriptor;
+} => ({
+  emptyScopeKind: resolveRegistrarWorklistEmptyScopeKind({ appointments, activeTab, queueProfiles }),
+  counter: describeRegistrarWorklistCounter({ appointments, activeTab, queueProfiles, rows, hasMore }),
+});
+
 export default computeRegistrarWorklistRows;

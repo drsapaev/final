@@ -19,12 +19,18 @@ from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.crud.queue_resource_routing import resolve_tag_resource
+from app.crud.queue_owner_policy import (
+    eligible_real_doctor,
+    owner_configuration_error,
+)
+from app.crud.queue_resource_routing import (
+    resolve_tag_resource,
+    tag_routes_to_resource,
+)
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
-from app.models.user import User
 from app.models.visit import Visit
 from app.services.queue_domain_service import QueueDomainService
 from app.services.queue_service import get_queue_service
@@ -38,17 +44,6 @@ from app.services.service_mapping import (
 logger = logging.getLogger(__name__)
 
 EntryActionType = Literal["online_queue", "visit"]
-
-_BATCH_CREATE_RESOURCE_MAPPING = {
-    "ecg": "ecg_resource",
-    "echokg": "ecg_resource",
-    "lab": "lab_resource",
-    "laboratory": "lab_resource",
-    "general": "general_resource",
-    "cardiology_common": "general_resource",
-    "dermatology": "general_resource",
-    "procedures": "general_resource",
-}
 
 
 # ============================================================================
@@ -660,8 +655,48 @@ class BatchPatientService:
     ) -> DailyQueue:
         queue_service = get_queue_service()
 
+        # Review round 4 (P2): the RESOURCE path is decided FIRST. The
+        # canonical get_or_create_daily_queue ignores specialist_id
+        # entirely when the tag routes on the resource axis (an existing
+        # resource-owned (day, tag) surface, or an ACTIVE registry row) —
+        # so a stale service.doctor_id (a deactivated/synthetic doctor
+        # left on a lab service) or an unnecessary action.doctor_id must
+        # NOT fail the operation on a doctor that never owns the queue.
+        # The doctor eligibility contract below applies only when the
+        # resulting queue is actually DOCTOR-owned.
+        routes_to_resource = queue_tag and (
+            tag_routes_to_resource(self.db, queue_tag, target_date) is not None
+            or resolve_tag_resource(self.db, queue_tag) is not None
+        )
+        if routes_to_resource:
+            return queue_service.get_or_create_daily_queue(
+                self.db,
+                day=target_date,
+                specialist_id=None,
+                queue_tag=queue_tag,
+            )
+
         explicit_specialist_id = action.doctor_id or getattr(service, "doctor_id", None)
         if explicit_specialist_id:
+            # QD-2E (PR review thread 3995711803, P2): явный источник
+            # назначения (action.doctor_id / service.doctor_id) проходит
+            # тот же ОБЩИЙ контракт пригодности ДО создания очереди —
+            # непригодный явный врач (неактивный Doctor, отсутствующий/
+            # неактивный User, внутренний Resource) не строит
+            # doctor-owned очередь, которой некому управлять; отказ
+            # происходит до любых записей (без сирот queue-entry/визита).
+            if not eligible_real_doctor(self.db, int(explicit_specialist_id)):
+                raise owner_configuration_error(
+                    queue_tag=queue_tag,
+                    detail=(
+                        f"explicit doctor id={int(explicit_specialist_id)} is "
+                        "not an eligible real owner (inactive doctor, "
+                        "missing/inactive user link, an internal resource "
+                        "account or an incomplete profile) — the batch "
+                        "create-action fails closed before any queue row "
+                        "is written"
+                    ),
+                )
             return queue_service.get_or_create_daily_queue(
                 self.db,
                 day=target_date,
@@ -669,24 +704,17 @@ class BatchPatientService:
                 queue_tag=queue_tag,
             )
 
-        active_queues = (
-            self.db.query(DailyQueue)
-            .filter(
-                DailyQueue.day == target_date,
-                DailyQueue.queue_tag == queue_tag,
-                DailyQueue.active == True,
-            )
-            .order_by(DailyQueue.id.asc())
-            .all()
-        )
-        if len(active_queues) == 1:
-            return active_queues[0]
-        if len(active_queues) > 1:
-            raise ValueError(
-                "Неоднозначная очередь для create-action "
-                f"(queue_tag={queue_tag}, date={target_date})"
-            )
-
+        # QD-2E surface-reuse ruling (PR review thread 3995689410, P1 —
+        # the FINAL business decision): the owner of a NEW record is
+        # NEVER derived from the existence of queues with the same
+        # queue_tag/day. The former block returned the single existing
+        # (day, tag) queue as this patient's queue — adopting a foreign
+        # doctor's surface — and raised on multiple doctor queues of one
+        # tag (which is NOT an error per se: PR-26 keeps them separate).
+        # The owner comes from the action/service contract above or from
+        # the resolver's shared contracts (registry resource axis / the
+        # tag's single service doctor / the specialty fallback); anything
+        # else is the D-08 configuration error.
         resolved_specialist_id = self._resolve_create_action_specialist_id(
             action=action,
             queue_tag=queue_tag,
@@ -711,9 +739,14 @@ class BatchPatientService:
         QD-2C runtime switch: тег со строкой в queue_resources (сиды
         0059 — lab/ecg) — докторлесс: возвращаем None, очередь создаёт
         get_or_create_daily_queue на ресурсной оси (см.
-        queue_svc/_operations.py). Порядок прежний для остальных
-        тегов: единственный врач услуг → синтетик по маппингу →
-        специальность → ошибка."""
+        queue_svc/_operations.py).
+
+        QD-2E (RQ-15.b): для остальных тегов порядок — единственный
+        врач услуг → специальность → конфигурационная ошибка.
+        Маппинг ``_BATCH_CREATE_RESOURCE_MAPPING`` (fallback на
+        general_resource для general/cardiology_common/dermatology/
+        procedures) УДАЛЁН: неизвестный владелец = явная ошибка
+        конфигурации (D-08), а не тихий маршрут на синтетика."""
         # QD-2C: тег реестра — ресурсная ось, врач не нужен
         if resolve_tag_resource(self.db, queue_tag) is not None:
             return None
@@ -732,27 +765,30 @@ class BatchPatientService:
             if doctor_id is not None
         ]
         if len(service_doctor_ids) == 1:
-            return int(service_doctor_ids[0])
+            # QD-2E (PR review thread 3995711803, P2): единый врач услуг
+            # обязан быть пригодным реальным владельцем — ОБЩИЙ контракт
+            # eligible_real_doctor (активный Doctor + связанный активный
+            # User + не внутренний Resource), как во всех прочих путях
+            # owner-resolution. Стухшая привязка услуги к врачу не строит
+            # тихую очередь, которой никто не может управлять (D-08).
+            candidate_id = int(service_doctor_ids[0])
+            if not eligible_real_doctor(self.db, candidate_id):
+                raise owner_configuration_error(
+                    queue_tag=queue_tag,
+                    detail=(
+                        f"the tag's single service doctor id={candidate_id} "
+                        "is not an eligible real owner (inactive doctor, "
+                        "missing/inactive user link or an internal "
+                        "resource account) — a stale catalog assignment "
+                        "fails closed"
+                    ),
+                )
+            return candidate_id
         if len(service_doctor_ids) > 1:
             raise ValueError(
                 "Неоднозначный владелец очереди по услугам "
                 f"(queue_tag={queue_tag})"
             )
-
-        resource_username = _BATCH_CREATE_RESOURCE_MAPPING.get(queue_tag)
-        if resource_username:
-            resource_doctor = (
-                self.db.query(Doctor)
-                .join(User, Doctor.user_id == User.id)
-                .filter(
-                    Doctor.active == True,
-                    User.username == resource_username,
-                    User.is_active == True,
-                )
-                .first()
-            )
-            if resource_doctor:
-                return int(resource_doctor.id)
 
         specialty_candidates = {
             candidate.lower()
@@ -767,8 +803,20 @@ class BatchPatientService:
         matching_doctors = [
             doctor
             for doctor in self.db.query(Doctor).filter(Doctor.active == True).all()
-            if (doctor.specialty or "").strip().lower() in specialty_candidates
-            or normalize_specialty((doctor.specialty or "").strip()) in specialty_candidates
+            # QD-2E (PR review thread 3995711803, P2): specialty-fallback
+            # применяет ПОЛНЫЙ общий контракт пригодности, а не его часть:
+            # раньше is_internal_resource_doctor отсеивал только
+            # внутренние аккаунты и возвращал False при отсутствии User —
+            # активный Doctor с неактивным/отсутствующим User молча
+            # становился владельцем очереди, которой некому управлять.
+            # eligible_real_doctor — тот же shared-предикат, что и во всех
+            # новых owner-resolution путях (D-08: синтетики недостижимы
+            # и через specialty-матчинг, каким бы путём он ни шёл).
+            if eligible_real_doctor(self.db, doctor.id)
+            and (
+                (doctor.specialty or "").strip().lower() in specialty_candidates
+                or normalize_specialty((doctor.specialty or "").strip()) in specialty_candidates
+            )
         ]
 
         if len(matching_doctors) == 1:
@@ -779,10 +827,12 @@ class BatchPatientService:
                 f"(queue_tag={queue_tag}, specialty={action.specialty})"
             )
 
-        raise ValueError(
-            "Не удалось определить владельца очереди для create-action "
-            f"(queue_tag={queue_tag})"
-        )
+        # QD-2E (RQ-15.b): fail-closed — нет реестра, нет врача услуг,
+        # нет врача специальности. Раньше здесь молча вставал
+        # general_resource-синтетик; теперь это явная конфигурационная
+        # ошибка (D-08): оператор решает (assign_doctor / retag_resource
+        # / disable_service по operator map).
+        raise owner_configuration_error(queue_tag=queue_tag)
 
     def _build_create_action_service_codes(
         self,

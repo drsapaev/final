@@ -167,10 +167,17 @@ class TokensMixin(QRQueueServiceMixinBase):
             # SQLite сохраняет datetime без timezone в локальном времени
             # expires_at сохранен как naive datetime в локальном времени (Asia/Tashkent)
             if qr_token.expires_at:
-                # expires_at - это naive datetime в локальном времени
-                # now - это timezone-aware datetime в локальном времени
-                # Конвертируем expires_at в timezone-aware для сравнения
-                expires_aware = qr_token.expires_at.replace(tzinfo=timezone)
+                # RQ-16.d defect fix (exposed on UTC-session PostgreSQL):
+                # a tz-AWARE read (timestamptz) must be compared as-is —
+                # blind replace(tzinfo=...) kept the wall clock and shifted
+                # live tokens by the offset, marking them expired. Naive
+                # reads (SQLite test world) keep attaching the clinic
+                # timezone. Mirror of validate_queue_token's check.
+                expires_aware = (
+                    qr_token.expires_at
+                    if qr_token.expires_at.tzinfo is not None
+                    else qr_token.expires_at.replace(tzinfo=timezone)
+                )
 
                 if expires_aware <= now:
                     logger.debug(

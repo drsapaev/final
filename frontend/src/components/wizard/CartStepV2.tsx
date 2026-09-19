@@ -53,6 +53,13 @@ export interface CartService {
   service_code?: string;
   code?: string;
   is_consultation?: boolean;
+  // RQ-05.b: поля из DTO каталога (GET /registrar/services), по которым
+  // рисуется селектор врача: флаг обязательности и профиль отделения.
+  requires_doctor?: boolean;
+  department_key?: string;
+  // RQ-08.a: серверные допустимые специальности врача (null — не применимо);
+  // приоритетный путь фильтра врача, UI не зависит от alias-таблицы.
+  accepted_specialties?: string[] | null;
   price?: number;
   duration?: number;
   [key: string]: unknown;
@@ -497,11 +504,12 @@ const CartStepV2 = ({
             const service = servicesData?.find((s) => s.id === item.service_id);
             const requiresDoctor = Boolean(service?.requires_doctor || service?.is_consultation);
 
-            // PR-23 P0 #1 / W2-PR2: фильтр врачей по specialty/department_key —
-            // SSOT-хелпер без fallback «показать всех» (пустой список — валидный
-            // ответ: ADR-001, владелец очереди = выбранный врач).
-            const serviceDepartmentKey = String(service?.department_key || '').toLowerCase().trim();
-            const filteredDoctors = filterDoctorsForService(normalizedDoctorsData, serviceDepartmentKey);
+            // PR-23 P0 #1 / W2-PR2 / RQ-08.a: фильтр врачей по серверной
+            // eligibility — запись каталога несёт accepted_specialties (тот же
+            // код, что серверный гейт RQ-05.a); fallback на alias-таблицу —
+            // только при отсутствии серверных данных. Пустой список — валидный
+            // ответ: ADR-001, владелец очереди = выбранный врач.
+            const filteredDoctors = filterDoctorsForService(normalizedDoctorsData, service);
             const doctorOptions = filteredDoctors;
 
             return (

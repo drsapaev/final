@@ -175,6 +175,17 @@ class DailyQueue(Base):
         Integer, default=15, nullable=False
     )  # Максимум записей онлайн
 
+    # RQ-13.b (D-06 APPROVED, E-039): снимок применённых параметров дня —
+    # стартовый номер. Замораживается ПРИ СОЗДАНИИ дня из эффективного
+    # значения (владелец: QueueResource/Doctor.start_number_online, иначе
+    # клиника-уровень — см. effective_day_start_number) и НЕ следует за
+    # живыми настройками: «Новые настройки не меняют выданные номера и
+    # историю текущего дня». 0067: NOT NULL DEFAULT 1, бэкфилл из
+    # start_number_online владельца для существующих строк.
+    start_number: Mapped[int] = mapped_column(
+        Integer, default=1, nullable=False, server_default=text("1")
+    )
+
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

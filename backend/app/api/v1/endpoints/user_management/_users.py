@@ -4,13 +4,18 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.user_management._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.user_management._helpers import (
+    _USER_MANAGEMENT_ROLE_PATTERN,
     _find_user_export_file,
     _safe_user_export_filename,
     _user_export_mime_type,
-    _USER_MANAGEMENT_ROLE_PATTERN,
     router,
 )  # noqa: F401
 from app.schemas.clinic import ServiceUnavailableDetail
+from app.schemas.user_management import UserPhoneScopeConflictDetail
+from app.services.patient_phone_scope import (
+    PatientPhoneScopeConflict,
+    lock_user_candidate_state,
+)
 
 
 @router.post(
@@ -173,7 +178,23 @@ async def get_users(
         )
 
 
-@router.put("/users/{user_id}", response_model=UserResponse)
+@router.put(
+    "/users/{user_id}",
+    response_model=UserResponse,
+    # Phase 0 (PR #3320 round 2, P1): the systemic phone-scope invariant —
+    # reactivating a Patient-user, changing role -> Patient, or pointing a
+    # Patient-user at a phone that already backs another active patient
+    # portal account is rejected BEFORE any state changes.
+    responses={
+        409: {
+            "model": UserPhoneScopeConflictDetail,
+            "description": (
+                "Номер телефона уже используется другим активным аккаунтом "
+                "пациента портала (инвариант phone-scope Phase 0)"
+            ),
+        }
+    },
+)
 async def update_user(
     user_id: int,
     user_data: UserUpdateRequest,
@@ -198,6 +219,11 @@ async def update_user(
 
         return UserResponse(**profile_data)
 
+    except PatientPhoneScopeConflict as exc:
+        # Phase 0 phone-scope invariant (round-2 P1): controlled 409 — the
+        # service rolled back, nothing changed, the other account keeps the
+        # phone and the resolver predicate stays single-candidate.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception:
@@ -313,7 +339,23 @@ async def get_user_profile(
         )
 
 
-@router.put("/users/{user_id}/profile", response_model=UserProfileResponse)
+@router.put(
+    "/users/{user_id}/profile",
+    response_model=UserProfileResponse,
+    # Phase 0 (PR #3320 round 2, P1): same systemic phone-scope invariant
+    # for the staff-side profile surface — a phone change may not aim a
+    # Patient-user at a phone that already backs another active patient
+    # portal account.
+    responses={
+        409: {
+            "model": UserPhoneScopeConflictDetail,
+            "description": (
+                "Номер телефона уже используется другим активным аккаунтом "
+                "пациента портала (инвариант phone-scope Phase 0)"
+            ),
+        }
+    },
+)
 async def update_user_profile(
     user_id: int,
     profile_data: UserProfileUpdate,
@@ -331,7 +373,15 @@ async def update_user_profile(
                 detail="Недостаточно прав для обновления профиля",
             )
 
-        profile = user_profile.get_by_user_id(db, user_id)
+        # Round-4 P1 (review, concurrency): same serialization contract as
+        # update_user / bulk — the candidate-defining state (users.role,
+        # user_profiles.phone, user_profiles.phone_verified) is read under
+        # FOR UPDATE before any guard decision is computed from it. The
+        # locked instances double as the records mutated below (identity
+        # map), so no unlocked re-read can re-enter between guard and
+        # mutation. Global lock order: users row -> user_profiles row ->
+        # phone advisory lock.
+        target_user, profile = lock_user_candidate_state(db, user_id)
         if not profile:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -340,6 +390,35 @@ async def update_user_profile(
 
         # Обновляем профиль
         update_data = profile_data.dict(exclude_unset=True)
+
+        # Phase 0 phone-scope invariant (round-2 P1): the staff-side profile
+        # surface is another path that can re-aim a verified phone. A
+        # Patient-user may not be pointed at a phone that already backs
+        # another ACTIVE patient portal account (409), and ANY changed phone
+        # loses its verified flag — possession is not proven for an entered
+        # number (same convention as the self-service phone change).
+        if "phone" in update_data:
+            from app.core.roles import Roles
+            from app.services.patient_otp_service import normalize_phone
+            from app.services.patient_phone_scope import ensure_phone_scope_free
+
+            old_normalized = normalize_phone(profile.phone or "")
+            new_normalized = normalize_phone(update_data.get("phone") or "")
+            if new_normalized:
+                # Round-3 P2: persist the CANONICAL normalized value, not
+                # the admin-entered representation — the login resolver and
+                # the phone-scope count compare SQL equality against the
+                # normalized phone, so a reformatted duplicate would keep
+                # phone_verified=True while silently dropping the record
+                # out of the resolver predicate (generic login 401).
+                update_data["phone"] = new_normalized
+            if new_normalized != old_normalized:
+                if target_user is not None and target_user.role == Roles.PATIENT:
+                    ensure_phone_scope_free(
+                        db, new_normalized, exclude_user_id=user_id
+                    )
+                profile.phone_verified = False
+
         profile = UserManagementApiService(db).apply_profile_update(
             profile=profile,
             update_data=update_data,
@@ -386,6 +465,9 @@ async def update_user_profile(
             updated_at=profile.updated_at,
         )
 
+    except PatientPhoneScopeConflict as exc:
+        db.rollback()  # release the phone-scope advisory lock; nothing changed
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.detail) from exc
     except HTTPException:
         raise
     except Exception:

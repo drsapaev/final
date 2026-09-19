@@ -236,6 +236,111 @@ def _get_emoji_for_key(key: str) -> str:
     return emoji_map.get(key, "👨‍⚕️")
 
 
+def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
+    """RQ-12.b (D-02, owner decision 2026-09-15): significant-link counts
+    for a QueueProfile, computed from live tables at call time.
+
+    This function is the single SSOT for BOTH the impact preview and the
+    hard-delete guard: the delete endpoint re-computes these numbers in
+    the same transaction that would commit the delete, so a previously
+    rendered preview can never authorize a destructive action (stale
+    preview protection, ACCEPTANCE S-10). Significant links are:
+
+    - services whose queue_tag is owned by this profile (a delete would
+      orphan or silently untag them);
+    - daily queues (ANY day — historical rows included) whose queue_tag
+      is owned by this profile: their entries are the profile's real
+      usage history and possibly still-waiting patients;
+    - waiting entries under those queues (must remain serviceable by
+      staff regardless of the profile's active state).
+    """
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.service import Service
+
+    tags = [t for t in (profile.queue_tags or []) if t]
+    services = 0
+    daily_queues = 0
+    entries_waiting = 0
+    entries_total = 0
+    if tags:
+        services = (
+            db.query(Service).filter(Service.queue_tag.in_(tags)).count()
+        )
+        daily_queues = (
+            db.query(DailyQueue).filter(DailyQueue.queue_tag.in_(tags)).count()
+        )
+        if daily_queues:
+            queue_ids = [
+                row.id
+                for row in db.query(DailyQueue.id)
+                .filter(DailyQueue.queue_tag.in_(tags))
+                .all()
+            ]
+            entries_q = db.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.queue_id.in_(queue_ids)
+            )
+            entries_total = entries_q.count()
+            entries_waiting = entries_q.filter(
+                OnlineQueueEntry.status == "waiting"
+            ).count()
+    return {
+        "services": services,
+        "daily_queues": daily_queues,
+        "entries_waiting": entries_waiting,
+        "entries_total": entries_total,
+    }
+
+
+@router.get("/queues/profiles/{profile_key}/impact-preview", response_model=dict[str, Any])
+def get_queue_profile_impact_preview(
+    profile_key: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin")),
+):
+    """RQ-12.b (D-02): server-side impact preview of what a lifecycle
+    action on this profile would touch.
+
+    Read-only: this endpoint never mutates anything and its report is
+    informational only — the delete endpoint re-verifies the same links
+    at execution time, so a stale preview cannot authorize destruction
+    (ACCEPTANCE S-10: "повторить со stale preview").
+    """
+    try:
+        from app.models.queue_profile import QueueProfile
+
+        profile = (
+            db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
+        )
+        if not profile:
+            raise HTTPException(
+                status_code=404, detail=f"Profile '{profile_key}' not found"
+            )
+
+        counts = _profile_link_counts(db, profile)
+        can_hard_delete = all(v == 0 for v in counts.values())
+
+        return {
+            "success": True,
+            "profile": {
+                "key": profile.key,
+                "title": profile.title,
+                "is_active": profile.is_active,
+            },
+            "links": counts,
+            "can_hard_delete": can_hard_delete,
+            # D-02: a used tab is archived (is_active=False), never
+            # silently destroyed; deletion is only for linkless profiles.
+            "recommendation": "delete" if can_hard_delete else "archive",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error building impact preview for {profile_key}: {e}")
+        db.rollback()
+        _raise_registrar_internal_error("queue profile impact preview", e)
+
+
 # ===================== QUEUE PROFILE CRUD (ADMIN) =====================
 
 
@@ -414,6 +519,31 @@ def delete_queue_profile(
         profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
         if not profile:
             raise HTTPException(status_code=404, detail=f"Profile '{profile_key}' not found")
+
+        # RQ-12.b (D-02 owner decision 2026-09-15): hard delete is allowed
+        # ONLY with proven absence of significant links — services on the
+        # profile's tags, daily queues (historical rows included) and any
+        # entries under them (waiting patients must stay serviceable via
+        # archive, not be orphaned by deletion). The counts are computed
+        # HERE, at execution time, from the same SSOT as the impact
+        # preview — a previously rendered preview report is informational
+        # and NEVER authorizes the delete (stale-preview protection, S-10).
+        counts = _profile_link_counts(db, profile)
+        if any(counts.values()):
+            logger.warning(
+                f"Delete of QueueProfile '{profile_key}' blocked: {counts}"
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "reason": "profile_has_significant_links",
+                    "links": counts,
+                    "message": (
+                        "Профиль используется: архивируйте его "
+                        "(is_active=false) вместо удаления."
+                    ),
+                },
+            )
 
         # PR-22: cascade cleanup — clear queue_tag from services that
         # matched this profile's tags. Without this, services keep
