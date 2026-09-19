@@ -78,6 +78,15 @@ function renderAt(path: string, route: BoundaryRoute): string[] {
   return seen;
 }
 
+function createJwt(expSecondsFromNow: number): string {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payload = btoa(JSON.stringify({
+    sub: '42',
+    exp: Math.floor(Date.now() / 1000) + expSecondsFromNow,
+  }));
+  return `${header}.${payload}.signature`;
+}
+
 describe('RouteAccessBoundary redirect target for missing tokens (Phase 0 follow-up)', () => {
   beforeEach(() => {
     sessionStorage.clear();
@@ -203,6 +212,32 @@ describe('RouteAccessBoundary redirect target for missing tokens (Phase 0 follow
     // The auth-state-driven re-render must consume the hint.
     await waitFor(() => {
       expect(getExpiredPrincipalWasPatient()).toBe(false);
+    });
+  });
+
+  it('sends a patient session cleared while mounted to /patient/login via the snapshot', async () => {
+    // Codex P2 (round 8): the boundary observes the clear through its
+    // auth subscription — the redirect target must come from the notified
+    // snapshot (flag carried atomically with the token-clear).
+    replaceAccessOnlySession(createJwt(3600), {
+      id: 42,
+      username: 'patient-42',
+      role: 'Patient',
+    } as never);
+
+    const seen = renderAt('/patient', PATIENT_HOME_ROUTE);
+    // Live patient session: after the async session validation the panel
+    // renders.
+    await waitFor(() => {
+      expect(screen.getByTestId('panel-content')).toBeInTheDocument();
+    });
+
+    // JWT dies mid-session: the interceptor-driven clearToken notifies
+    // subscribers and the mounted boundary re-renders.
+    clearToken();
+
+    await waitFor(() => {
+      expect(seen[seen.length - 1]).toBe('/patient/login');
     });
   });
 });

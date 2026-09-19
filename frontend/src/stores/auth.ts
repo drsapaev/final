@@ -137,9 +137,15 @@ export function getProfileFromStorage(): UserProfile | null {
 }
 
 export function getState(): AuthState {
+  // Codex P2 (round 8): the expired-principal kind travels INSIDE the
+  // notified snapshot — a boundary that re-renders from a subscription
+  // reads the flag atomically with the token-clear, immune to stale
+  // passive-effect ordering (an already-scheduled effect could otherwise
+  // wipe the global hint before the observing render ran).
   return {
     token: getToken(),
     profile: getProfileFromStorage(),
+    expiredPrincipalWasPatient: expiredPrincipalWasPatient,
   };
 }
 

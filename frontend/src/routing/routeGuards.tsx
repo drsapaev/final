@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import auth, { getExpiredPrincipalWasPatient, resetExpiredPrincipalHint } from '../stores/auth';
+import auth, { resetExpiredPrincipalHint } from '../stores/auth';
 import type { AuthState } from '../types/domain/auth';
 import logger from '../utils/logger';
 import {
@@ -98,7 +98,11 @@ export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProp
   const location = useLocation();
 
   const missingTokenRedirect = route !== null && route.auth !== 'public' && !state.token;
-  const expiredPatientRedirect = missingTokenRedirect && getExpiredPrincipalWasPatient();
+  // Codex P2 (round 8): read the expired-principal kind from the NOTIFIED
+  // SNAPSHOT (carried atomically with the token-clear by stores/auth) — not
+  // from the mutable global, which a stale already-scheduled passive effect
+  // could wipe before this render observes it.
+  const expiredPatientRedirect = missingTokenRedirect && state.expiredPrincipalWasPatient === true;
 
   // Codex P2 (round 4): the hint is consumed ONCE per missing-token episode
   // and the selected target is FROZEN for that episode (ref) — duplicate

@@ -77,7 +77,9 @@ describe('auth store', () => {
     const state = await auth.validateSession(true);
 
     expect(meMock).not.toHaveBeenCalled();
-    expect(state).toEqual({ token: null, profile: null });
+    // Round 8: the snapshot carries the expired-principal kind (false here —
+    // the cleared profile was a staff/registrar one).
+    expect(state).toEqual({ token: null, profile: null, expiredPrincipalWasPatient: false });
     expect(storage.auth_token).toBeUndefined();
     expect(storage.auth_profile).toBeUndefined();
   });
@@ -233,6 +235,28 @@ describe('auth store', () => {
       primeSessionStorage({});
       auth.clearToken();
       expect(auth.getExpiredPrincipalWasPatient()).toBe(true);
+    });
+
+    it('carries the expired-principal kind in the notified snapshot (round 8)', async () => {
+      // Codex P2 (round 8): the kind travels INSIDE the notified AuthState
+      // so a boundary re-render reads it atomically with the token-clear,
+      // immune to stale passive-effect ordering.
+      primeSessionStorage({
+        auth_token: 'jwt',
+        auth_profile: JSON.stringify({ id: 9, username: 'patient-9', role: 'Patient' }),
+      });
+
+      const auth = await import('../auth');
+      const seen: Array<Record<string, unknown>> = [];
+      const unsubscribe = auth.subscribe((s: unknown) => {
+        seen.push(s as Record<string, unknown>);
+      });
+      auth.clearToken();
+      unsubscribe();
+
+      const last = seen[seen.length - 1];
+      expect(last.token).toBeNull();
+      expect(last.expiredPrincipalWasPatient).toBe(true);
     });
   });
 });
