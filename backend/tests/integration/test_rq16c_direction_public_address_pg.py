@@ -62,7 +62,7 @@ SCRATCH_DB = "rq16c_check"
 # The head pin advances with the chain (established pattern: #3306
 # advanced the 0067-era pins; the RQ-15.d repair chains 0069 above the
 # 0068 registry revision — owner directive trace 1a0aef280204950d).
-EXPECTED_HEAD = "0069_sentinel_pair_retirement"
+EXPECTED_HEAD = "0070_lab_results_lineage"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -449,8 +449,25 @@ def test_downgrade_reupgrade_leaves_no_partial_registry(pg_env):
     assert r_down.returncode == 0, r_down.stderr[-1500:]
     with psycopg.connect(psycopg_dsn) as conn:
         version = conn.execute("select version_num from alembic_version").fetchone()[0]
-        # -1 from the 0069 chain head lands on the registry revision 0068:
-        # the retirement downgrade must leave NO partial registry rows.
+        # -1 from the head (0070 lineage) lands on the retirement 0069:
+        # the lineage downgrade drops only its own columns/indexes and
+        # must leave NO partial registry rows either.
+        assert version == "0069_sentinel_pair_retirement"
+        present = conn.execute(
+            "select to_regclass('public.queue_direction_public_addresses')"
+        ).fetchone()[0]
+        assert present is not None, "0069 keeps the registry table"
+        leftover = conn.execute(
+            "select count(*) from queue_direction_public_addresses"
+        ).fetchone()[0]
+        assert leftover == 0, "0070 downgrade leaves no partial registry"
+
+    # next step: the retirement downgrade (0069 -> 0068) leaves
+    # NO partial registry rows; 0068 keeps the registry table.
+    r_down_mid = _run_alembic(sa_url, "downgrade", "-1")
+    assert r_down_mid.returncode == 0, r_down_mid.stderr[-1500:]
+    with psycopg.connect(psycopg_dsn) as conn:
+        version = conn.execute("select version_num from alembic_version").fetchone()[0]
         assert version == "0068_direction_public_address"
         present = conn.execute(
             "select to_regclass('public.queue_direction_public_addresses')"
@@ -462,7 +479,7 @@ def test_downgrade_reupgrade_leaves_no_partial_registry(pg_env):
         assert leftover == 0, "0069 downgrade leaves no partial registry"
 
     # one more step: 0068's own downgrade drops the registry table
-    # (the original pre-repair assertion, now one level below the head)
+    # (the original pre-repair assertion, now two levels below the head)
     r_down2 = _run_alembic(sa_url, "downgrade", "-1")
     assert r_down2.returncode == 0, r_down2.stderr[-1500:]
     with psycopg.connect(psycopg_dsn) as conn:
