@@ -12,6 +12,9 @@ vi.mock('../../api/client', () => ({
   },
   buildApiUrl: vi.fn((path) => path),
   setToken: vi.fn(),
+  // stores/auth registers its session-termination listener in the client at
+  // module scope — stub it so registration is a no-op.
+  setSessionInvalidationListener: vi.fn(),
 }));
 
 vi.mock('../../hooks/useSetupStatus.ts', () => ({

@@ -318,4 +318,47 @@ describe('access-only patient session replacement (P1)', () => {
     expect(tokenState.cleared).toBe(1);
     expect(tokenState.access).toBeNull();
   });
+
+  it('terminates a dead access-only session through the auth store on 401 (Phase 0 follow-up)', async () => {
+    // Patient portal lifecycle: the session is access-only (no refresh
+    // token), so the reactive refresh branch never runs. The 401 cleanup
+    // must go through stores/auth.clearToken — clearing auth_token /
+    // auth_profile plus tokenManager and notifying subscribers — so
+    // RouteAccessBoundary redirects immediately instead of showing a
+    // zombie logged-in patient until the next navigation.
+    const patientJwt = createJwt(3600);
+    replaceAccessOnlySession(patientJwt, PATIENT_PROFILE);
+    expect(tokenState.refresh).toBeNull();
+    expect(sessionStorage.getItem('auth_token')).toBe(patientJwt);
+
+    api.defaults.adapter = async (config) => {
+      throw make401FromRealConfig(config);
+    };
+
+    const authEvents: Array<Record<string, unknown>> = [];
+    const onAuthChanged = (event: Event): void => {
+      authEvents.push((event as CustomEvent).detail as Record<string, unknown>);
+    };
+    window.addEventListener('authStateChanged', onAuthChanged);
+    try {
+      await expect(api.get('/api/v1/patients/summary')).rejects.toMatchObject({
+        response: { status: 401 }
+      });
+
+      // Store-level termination: both session keys are gone...
+      expect(sessionStorage.getItem('auth_token')).toBeNull();
+      expect(sessionStorage.getItem('auth_profile')).toBeNull();
+      // ...tokenManager credentials dropped...
+      expect(tokenState.access).toBeNull();
+      expect(tokenState.user).toBeNull();
+      expect(tokenState.cleared).toBeGreaterThanOrEqual(1);
+      // ...and subscribers were notified with the emptied auth state.
+      expect(authEvents.length).toBeGreaterThan(0);
+      const lastState = authEvents[authEvents.length - 1];
+      expect(lastState.token).toBeNull();
+      expect(lastState.profile).toBeNull();
+    } finally {
+      window.removeEventListener('authStateChanged', onAuthChanged);
+    }
+  });
 });

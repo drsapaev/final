@@ -38,7 +38,7 @@ import {
 import { useQueueApi } from '../../hooks/useQueueApi';
 import { usePatientsApi } from '../../hooks/usePatientsApi';
 import { api } from '../../api/client';
-import { fetchRegistrarServices } from '../../api/registrar';
+import { fetchRegistrarDoctors, fetchRegistrarServices } from '../../api/registrar';
 // UX Audit Stage 3 (Wizard issue 5.1):
 // Все 13 raw fetch() к /patients/* и /registrar/cart заменены на
 // централизованный patients API client. Это убирает дублирование
@@ -1055,8 +1055,8 @@ const AppointmentWizardV2 = ({
 
   const loadDoctors = useCallback(async () => {
     try {
-      const { data } = await api.get('/registrar/doctors');
-      setDoctorsData(data);
+      const { doctors } = await fetchRegistrarDoctors();
+      setDoctorsData(doctors.map((doctor): DoctorData => ({ ...doctor })));
     } catch (error: unknown) {
       logger.error('Ошибка загрузки врачей:', error);
     }
@@ -1901,6 +1901,7 @@ const AppointmentWizardV2 = ({
       let visits: unknown[] = groupCartItemsByVisit(
         wizardData.cart.items as Parameters<typeof groupCartItemsByVisit>[0],
         getDepartmentByService,
+        getResourceQueueTagByService,
       );
       if (!visits || visits.length === 0) {
         toast.error(t('misc.aw_cart_empty_or_invalid'));
@@ -2602,40 +2603,20 @@ const AppointmentWizardV2 = ({
             if (editMode) {
               logger.log('📝 Режим редактирования: создаем визиты только из новых услуг');
 
-              // Группируем только новые услуги по визитам
-              const newServiceVisits: Record<string, {
-                doctor_id: string | number | null;
-                services: Array<{ service_id?: string | number; quantity?: number }>;
-                visit_date: string;
-                visit_time: string | null;
-                department: string;
-                notes: string | null;
-              }> = {};
-              newServicesWithoutDoctor.forEach((item) => {
-                const department = getDepartmentByService((item as { service_id?: string | number }).service_id as string | number);
-                const key = `${department}_no_doctor_${new Date().toISOString().split('T')[0]}_no_time`;
-
-                if (!newServiceVisits[key]) {
-                  newServiceVisits[key] = {
-                    doctor_id: null,
-                    services: [],
-                    visit_date: new Date().toISOString().split('T')[0],
-                    visit_time: null,
-                    department: department,
-                    notes: null
-                  };
-                }
-
-                newServiceVisits[key].services.push({
-                  service_id: (item as { service_id?: string | number }).service_id,
-                  quantity: item.quantity
-                });
-              });
-
               // ✅ ИСПРАВЛЕНО: Сохраняем существующие визиты и добавляем только новые
               // По сценарию 5: новые услуги создают новые визиты, существующие не изменяются
               // Но для cart endpoint нужно отправить только новые визиты (существующие уже в БД)
-              const newVisitsOnly = Object.values(newServiceVisits);
+              const visitDate = new Date().toISOString().split('T')[0];
+              const newVisitsOnly = groupCartItemsByVisit(
+                newServicesWithoutDoctor.map((item) => ({
+                  ...item,
+                  doctor_id: null,
+                  visit_date: visitDate,
+                  visit_time: null,
+                })),
+                getDepartmentByService,
+                getResourceQueueTagByService,
+              );
               visits = newVisitsOnly;
               logger.log('📋 Созданы визиты только из новых услуг:', visits.length);
               logger.log('ℹ️ Существующие визиты не изменяются (остаются в БД)');
@@ -2878,6 +2859,13 @@ const AppointmentWizardV2 = ({
   // обёртка сохраняет существующие вызовы.
   const getDepartmentByService = (serviceId: string | number) => {
     return getWizardDepartmentForService(serviceId, servicesData);
+  };
+
+  const getResourceQueueTagByService = (serviceId: string | number): string | null => {
+    const service = servicesData.find((candidate) => candidate.id === serviceId);
+    if (!service || service.requires_doctor) return null;
+    const queueTag = String(service.queue_tag || '').trim();
+    return queueTag || null;
   };
 
   // ===================== ДЕЙСТВИЯ ДИАЛОГА =====================

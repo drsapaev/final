@@ -339,6 +339,39 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 // ✅ SECURITY: Handle 401 responses - log but don't auto-clear tokens
 // (prevents race condition where 401 during login transition clears new token)
 
+// Phase 0 follow-up (owner P2, access-only session lifecycle): the 401
+// recovery path must be able to TERMINATE a dead access-only session
+// (Patient portal login/activation install sessions with no refresh
+// token) through the same machinery as an explicit logout - clearing
+// auth_token/auth_profile + tokenManager + PHI caches and notifying
+// subscribers so RouteAccessBoundary redirects immediately instead of
+// showing a zombie session. The auth store registers the hook below
+// (stores/auth.ts imports this module, so the listener keeps the import
+// direction acyclic); when no store is loaded (standalone client tests)
+// the fallback still drops the client-level credentials.
+export type SessionInvalidationListener = () => void;
+let sessionInvalidationListener: SessionInvalidationListener | null = null;
+
+export function setSessionInvalidationListener(listener: SessionInvalidationListener | null): void {
+  sessionInvalidationListener = listener;
+}
+
+function invalidateDeadSession(): void {
+  const listener = sessionInvalidationListener;
+  if (listener) {
+    try {
+      listener();
+    } catch (e) {
+      logger.warn('[api] session invalidation listener failed:', e);
+    }
+  }
+  // Belt-and-suspenders: even without the store hook, drop client-level
+  // credentials so guards and the request interceptor see an anonymous
+  // state (idempotent with the listener path).
+  tokenManager.clearAll();
+  delete api.defaults.headers.common['Authorization'];
+}
+
 // #05 Tier 1: Detect CSRF rejection from the backend.
 // The backend sets `X-CSRF-Status: rejected` header and returns
 // { "detail": "CSRF validation failed", "reason": "missing_cookie|missing_header|mismatch" }
@@ -411,6 +444,23 @@ api.interceptors.response.use(
           logger.warn('🔒 Token refresh failed — clearing session');
           tokenManager.clearAll();
           delete api.defaults.headers.common['Authorization'];
+        }
+      } else if (hadAuthHeader && !refreshToken) {
+        // Access-only session (Patient portal): no refresh token exists, so
+        // the reactive refresh branch above never runs. Phase 0 follow-up
+        // (owner P2): without this branch a dead 30-minute JWT used to leave
+        // the session installed — every request kept 401ing while the UI
+        // still showed the patient as logged in. Clear the session, keeping
+        // the SAME race guard as the refresh path: the decision is made on
+        // the LIVE access token re-read at rejection time. If a newer login
+        // replaced the principal mid-flight, liveToken differs from
+        // failedToken and the replacement survives untouched.
+        const liveToken = tokenManager.getAccessToken();
+        if (liveToken && failedToken === liveToken) {
+          logger.warn('🔒 401 on access-only session (no refresh token) — clearing dead session', {
+            url: config.url
+          });
+          invalidateDeadSession();
         }
       }
     }
