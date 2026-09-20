@@ -7,15 +7,21 @@ import { canUseGlobalSearch } from '../globalSearchAccess';
 import { api } from '../../../api/client';
 
 /**
- * NURSE-V2 N2-2 (review P2 round 3 — PR #3333): the global search bar
- * self-gates on the frontend mirror of the backend GLOBAL_SEARCH_ROLES
- * allowlist. Before the gate, the bar rendered unconditionally inside
- * HeaderNew — on the nurse home (/clinical/profile, the N2-2 login
- * landing) every typed query fired GET /global-search, hit the backend
- * role gate (Nurse is not in the allowlist) and the 403 was swallowed
- * into an empty "nothing found" list: a clinical control that is
- * guaranteed dead on that surface. The backend boundary stays the source
- * of truth for PHI; this gate only stops shipping the dead control.
+ * NURSE-V2 N2-2 (review P2 round 3 — PR 3333 + codex round): the global
+ * search bar self-gates on the frontend mirror of the backend
+ * GLOBAL_SEARCH_ROLES allowlist. Before the gate, the bar rendered
+ * unconditionally inside HeaderNew — on the nurse home (/clinical/profile,
+ * the N2-2 login landing) every typed query fired GET /global-search, hit
+ * the backend role gate (Nurse is not in the allowlist) and the 403 was
+ * swallowed into an empty "nothing found" list: a clinical control that is
+ * guaranteed dead on that surface.
+ *
+ * The grant computation mirrors require_roles EXACTLY (codex finding):
+ * is_superuser bypasses, otherwise the SINGLE primary role is compared
+ * case-insensitively — profile.roles / role_name are never consulted,
+ * because the backend never consults them either. The backend boundary
+ * stays the source of truth for PHI; this gate only stops shipping the
+ * dead control.
  */
 
 const authState = {
@@ -61,7 +67,8 @@ beforeEach(() => {
 });
 
 describe('canUseGlobalSearch (backend GLOBAL_SEARCH_ROLES mirror)', () => {
-  // Every spelling the backend tuple carries must pass, case-insensitively.
+  // Every spelling the backend tuple carries must pass, case-insensitively
+  // (the backend lowercases both sides before comparing).
   const backendAllowlist = [
     'Admin', 'Registrar', 'Doctor', 'Cashier', 'Lab', 'Laboratory',
     'cardio', 'cardiology', 'Cardiologist', 'derma', 'Dermatologist',
@@ -83,19 +90,26 @@ describe('canUseGlobalSearch (backend GLOBAL_SEARCH_ROLES mirror)', () => {
     expect(canUseGlobalSearch(null)).toBe(false);
     expect(canUseGlobalSearch(undefined)).toBe(false);
     expect(canUseGlobalSearch({})).toBe(false);
-    expect(canUseGlobalSearch({ role: null, role_name: undefined })).toBe(false);
+    expect(canUseGlobalSearch({ role: null })).toBe(false);
   });
 
-  it('honors a roles array: any granted role is enough', () => {
-    expect(canUseGlobalSearch({ roles: ['nurse', 'doctor'] })).toBe(true);
-    expect(canUseGlobalSearch({ roles: ['nurse'] })).toBe(false);
-    expect(canUseGlobalSearch({ roles: [] })).toBe(false);
-    expect(canUseGlobalSearch({ roles: ['nurse', 42, null] })).toBe(false);
+  it('mirrors the require_roles superuser bypass (codex: under-inclusive)', () => {
+    // A superuser is admitted by the backend regardless of the stored
+    // role — the gate must not hide a working control from them.
+    expect(canUseGlobalSearch({ role: 'Patient', is_superuser: true })).toBe(true);
+    expect(canUseGlobalSearch({ role: 'Nurse', is_superuser: true })).toBe(true);
+    expect(canUseGlobalSearch({ role: 'Admin', is_superuser: false })).toBe(true);
+    expect(canUseGlobalSearch({ role: 'nurse', is_superuser: false })).toBe(false);
   });
 
-  it('falls back to role_name when role is absent', () => {
-    expect(canUseGlobalSearch({ role_name: 'Registrar' })).toBe(true);
-    expect(canUseGlobalSearch({ role_name: 'nurse' })).toBe(false);
+  it('consults ONLY the single primary role — never roles/role_name (codex: over-inclusive)', () => {
+    // require_roles reads current_user.role alone; GET /auth/me exposes
+    // exactly role + is_superuser. A roles array must not resurrect the
+    // bar for a primary role the backend would 403.
+    expect(canUseGlobalSearch({ role: 'Nurse', roles: ['Registrar'] })).toBe(false);
+    expect(canUseGlobalSearch({ role: 'nurse', roles: ['nurse', 'doctor'] })).toBe(false);
+    expect(canUseGlobalSearch({ role_name: 'Registrar' })).toBe(false);
+    expect(canUseGlobalSearch({ role: 'Registrar', role_name: 'nurse' })).toBe(true);
   });
 });
 
@@ -122,8 +136,16 @@ describe('GlobalSearchBar role gate (NURSE-V2 N2-2)', () => {
     expect(screen.getByRole('combobox')).toBeTruthy();
   });
 
-  it('renders for a mixed multi-role profile that includes a granted role', () => {
+  it('renders nothing when only a roles array claims a granted role (codex pin)', () => {
+    // {role:'Nurse', roles:['Registrar']} — the backend checks the single
+    // role column and would answer 403; the bar must not ship here.
     renderSearchBar({ id: 9, username: 'multi', role: 'nurse', roles: ['nurse', 'registrar'] });
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(apiGet).not.toHaveBeenCalled();
+  });
+
+  it('renders for a superuser regardless of the stored role (codex pin)', () => {
+    renderSearchBar({ id: 11, username: 'root', role: 'Patient', is_superuser: true });
     expect(screen.getByRole('combobox')).toBeTruthy();
   });
 });
