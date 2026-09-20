@@ -6037,7 +6037,7 @@
           "nurse-workplace-assignments"
         ],
         "summary": "Create Nurse Workplace Assignment",
-        "description": "Assign a Nurse User to a QueueResource workplace (D2 FINAL).\n\n404 — referenced user/resource not found; 400 — the user is not an\nactive Nurse or the resource is inactive; 409 — an active\nassignment for the same (user, resource) pair already exists;\n401/403 — the control-plane auth contract (see\n_AUTH_ERROR_RESPONSES).",
+        "description": "Assign a Nurse User to a QueueResource workplace (D2 FINAL).\n\n404 — referenced user/resource not found; 400 — the user is not an\nactive Nurse or the resource is inactive; 409 — an active\nassignment for the same (user, resource) pair already exists;\n401/403 — the control-plane auth contract (see\n_AUTH_ERROR_RESPONSES).\n\nThe mutation is committed with an actor-attributed UserAuditLog row\nin the same transaction (codex round-2 P2): the acting Admin and the\n(user_id, queue_resource_id) grant are reconstructable from the\nledger alone.",
         "operationId": "create_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments_post",
         "security": [
           {
@@ -6350,7 +6350,7 @@
           "nurse-workplace-assignments"
         ],
         "summary": "Deactivate Nurse Workplace Assignment",
-        "description": "Deactivate an assignment (the row stays as history; D2 FINAL).\n\n404 — assignment not found; 409 — already inactive. A new active row\nfor the same (user, resource) pair may be created afterwards;\n401/403 — the control-plane auth contract (see\n_AUTH_ERROR_RESPONSES).",
+        "description": "Deactivate an assignment (the row stays as history; D2 FINAL).\n\n404 — assignment not found; 409 — already inactive. A new active row\nfor the same (user, resource) pair may be created afterwards;\n401/403 — the control-plane auth contract (see\n_AUTH_ERROR_RESPONSES).\n\nThe transition is committed with an actor-attributed UserAuditLog\nrow in the same transaction (codex round-2 P2).",
         "operationId": "deactivate_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__deactivate_post",
         "security": [
           {

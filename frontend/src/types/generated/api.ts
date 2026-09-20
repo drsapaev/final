@@ -2250,6 +2250,11 @@ export type paths = {
          *     assignment for the same (user, resource) pair already exists;
          *     401/403 — the control-plane auth contract (see
          *     _AUTH_ERROR_RESPONSES).
+         *
+         *     The mutation is committed with an actor-attributed UserAuditLog row
+         *     in the same transaction (codex round-2 P2): the acting Admin and the
+         *     (user_id, queue_resource_id) grant are reconstructable from the
+         *     ledger alone.
          */
         post: operations["create_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments_post"];
         delete?: never;
@@ -2295,6 +2300,9 @@ export type paths = {
          *     for the same (user, resource) pair may be created afterwards;
          *     401/403 — the control-plane auth contract (see
          *     _AUTH_ERROR_RESPONSES).
+         *
+         *     The transition is committed with an actor-attributed UserAuditLog
+         *     row in the same transaction (codex round-2 P2).
          */
         post: operations["deactivate_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__deactivate_post"];
         delete?: never;
