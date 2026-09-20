@@ -455,3 +455,87 @@ def test_openapi_nurse_workplace_assignments_publish_domain_errors(
     detail_contract = schema["components"]["schemas"]["NurseWorkplaceErrorDetail"]
     assert set(detail_contract["required"]) == {"detail"}
     assert detail_contract["properties"]["detail"]["type"] == "string"
+
+
+def test_openapi_nurse_serving_publishes_domain_and_auth_errors(
+    client: TestClient,
+) -> None:
+    """NURSE-V2 N2-3: the serving plane's error contract is published.
+
+    The runtime proves every code (test_nurse_serving_endpoints.py:
+    401 anonymous / 403 wrong role + deactivated Nurse + no assignment /
+    400 boundary / 404 entity / 409 claim conflicts); the published
+    OpenAPI must describe them so generated consumers model the real
+    surface — the N2-2 review-round-2/3 discipline.
+    """
+    schema = _get_openapi_schema(client)
+    base = "/api/v1/nurse/serving"
+
+    workplaces = schema["paths"][f"{base}/workplaces"]["get"]
+    assert {"200", "401", "403"} <= set(workplaces["responses"])
+
+    entries = schema["paths"][f"{base}/queue-resources/{{queue_resource_id}}/entries"][
+        "get"
+    ]
+    assert {"200", "401", "403", "404"} <= set(entries["responses"])
+
+    call_next = schema["paths"][f"{base}/queue-resources/{{queue_resource_id}}/call-next"][
+        "post"
+    ]
+    assert {"200", "401", "403", "404"} <= set(call_next["responses"])
+
+    start = schema["paths"][
+        f"{base}/queue-resources/{{queue_resource_id}}/entries/{{entry_id}}/start"
+    ]["post"]
+    assert {"200", "400", "401", "403", "404"} <= set(start["responses"])
+
+    create_execution = schema["paths"][
+        f"{base}/queue-resources/{{queue_resource_id}}/executions"
+    ]["post"]
+    assert {"200", "201", "400", "401", "403", "404", "409"} <= set(
+        create_execution["responses"]
+    )
+
+    complete = schema["paths"][f"{base}/executions/{{execution_id}}/complete"]["post"]
+    assert {"200", "400", "401", "403", "404", "409"} <= set(complete["responses"])
+
+    incomplete = schema["paths"][f"{base}/executions/{{execution_id}}/incomplete"]["post"]
+    assert {"200", "400", "401", "403", "404", "409"} <= set(incomplete["responses"])
+
+    no_show = schema["paths"][
+        f"{base}/queue-resources/{{queue_resource_id}}/entries/{{entry_id}}/no-show"
+    ]["post"]
+    assert {"200", "400", "401", "403", "404", "409"} <= set(no_show["responses"])
+
+    entry_incomplete = schema["paths"][
+        f"{base}/queue-resources/{{queue_resource_id}}/entries/{{entry_id}}/incomplete"
+    ]["post"]
+    assert {"200", "400", "401", "403", "404", "409"} <= set(
+        entry_incomplete["responses"]
+    )
+
+    # Every published error on every operation carries the typed
+    # {"detail": ...} body (NurseServingErrorDetail).
+    operations = (
+        workplaces,
+        entries,
+        call_next,
+        start,
+        create_execution,
+        complete,
+        incomplete,
+        no_show,
+        entry_incomplete,
+    )
+    for operation in operations:
+        for code in ("400", "401", "403", "404", "409"):
+            if code not in operation["responses"]:
+                continue
+            error_schema = operation["responses"][code]["content"]["application/json"][
+                "schema"
+            ]
+            assert error_schema["$ref"].rsplit("/", 1)[-1] == "NurseServingErrorDetail"
+
+    detail_contract = schema["components"]["schemas"]["NurseServingErrorDetail"]
+    assert set(detail_contract["required"]) == {"detail"}
+    assert detail_contract["properties"]["detail"]["type"] == "string"
