@@ -4731,6 +4731,7 @@ const kk = {
     umdl_role_registrar: 'Регистратор',
     umdl_role_cashier: 'Кассир',
     umdl_role_lab: 'Лаборант',
+    umdl_role_nurse: 'Медсестра',
     umdl_role_patient: 'Пациент',
     umdl_doctor_profile_section: 'Профиль врача',
     umdl_doctor_specialty: 'Специальность',

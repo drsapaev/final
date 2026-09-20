@@ -550,11 +550,17 @@ class UserAuditLogResponse(UserAuditLogBase):
 # the spelling by construction; the freeze is the mechanism, exactly as
 # for Manager.
 _USER_MANAGEMENT_ROLE_PATTERN = (
-    "^(Admin|Registrar|Doctor|Cashier|Lab|Patient|"
+    "^(Admin|Registrar|Nurse|Doctor|Cashier|Lab|Patient|"
     "SuperAdmin|"
     + "|".join(sorted(DOCTOR_ROLE_SPELLINGS))
     + ")$"
 )
+# NURSE-V2 (owner design-GO 2026-09-19): 'Nurse' added to the write
+# vocabulary " + EM + " the canonical product role is re-opened (N2-2):
+# a Nurse User can be created/updated through user management WITHOUT a
+# doctor_profile (the NonDoctorRoleLiteral variant below), exactly like
+# Registrar. Privileges are NOT granted here " + EM + " Nurse stays
+# privilege-zero until N2-3 serving permissions.
 
 # Roles accepted by POST /users WITHOUT a doctor_profile. Exact complement
 # of the canonical "Doctor" variant below — DOCTOR_ROLE_SPELLINGS carries
@@ -574,6 +580,11 @@ _USER_MANAGEMENT_ROLE_PATTERN = (
 _NON_DOCTOR_ROLE_VALUES: tuple[str, ...] = (
     "Admin",
     "Registrar",
+    # NURSE-V2 (owner design-GO 2026-09-19): 'Nurse' accepted by
+    # POST /users WITHOUT a doctor_profile " + EM + " the role is a
+    # non-doctor clinical-serving role (workplace assignments are
+    # administered separately, N2-2 admin contract).
+    "Nurse",
     "Cashier",
     "Lab",
     "Patient",

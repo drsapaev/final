@@ -30,6 +30,14 @@ export const ROLE_HOME_PRIORITY = [
   'cashier',
   'doctor',
   'patient',
+  // NURSE-V2 N2-2 (review P2, PR #3333): 'nurse' re-opened as a login-
+  // capable role — it MUST have a home route that actually admits it.
+  // Without an entry getRoleHomeRoute() fell through to the shared
+  // '/clinical/search' fallback, which is role-scoped WITHOUT Nurse —
+  // a successful login landed on /forbidden. Last position: a Nurse
+  // profile carries exactly one role, so priority collisions cannot
+  // arise; the entry exists purely to resolve the home lookup.
+  'nurse',
 ];
 
 // PR-UI-19 (C-6, Codex round 1): the AI safety disclaimer is user-visible in
@@ -1350,6 +1358,12 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'authenticated',
     roles: [],
+    // NURSE-V2 N2-2 (review P2, PR #3333): the Nurse login landing until
+    // the N2-5 tablet workspace ships. auth:'authenticated' means the page
+    // grants NOTHING role-scoped — privilege-zero is preserved (no clinical
+    // search/patients/EMR); the Nurse simply sees their own profile instead
+    // of an automatic /forbidden bounce after a successful login.
+    homeForRoles: ['nurse'],
     entry: 'contextual',
     nav: false,
     title: 'User Profile',
