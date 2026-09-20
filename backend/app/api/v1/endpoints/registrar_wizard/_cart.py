@@ -14,6 +14,9 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
 )  # noqa: F401
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.online_queue import DailyQueue
+from app.services.registrar_wizard_queue_assignment_service import (
+    DuplicateCartResourceQueueVisitsError,
+)
 
 
 @router.post("/registrar/cart", response_model=CartResponse)
@@ -90,10 +93,6 @@ def create_cart_appointments(
         # (SSOT: DOCTOR_QUEUE_SPECIALTY_VARIANTS).
         _assert_cart_doctor_eligibility(db, cart_data.visits)
 
-        created_visits = []
-        created_visit_amounts: dict[int, Decimal] = {}
-        total_invoice_amount = Decimal('0')
-
         # QD-2E review P1 (cart/GQL lock ordering): every (day, tag) claim
         # scope of the cart is taken BEFORE the first cart write. The
         # visit INSERTs below fire the doctors FK check — a FOR KEY SHARE
@@ -106,11 +105,20 @@ def create_cart_appointments(
         # ``today`` is computed once and reused for the assignment call so
         # the pre-locked scope set cannot drift across a midnight rollover.
         today = date.today()
+        RegistrarWizardQueueAssignmentService.assert_unique_same_day_resource_queue_visits(
+            db,
+            cart_data.visits,
+            target_day=today,
+        )
         RegistrarWizardQueueAssignmentService.prelock_cart_tag_claim_scopes(
             db,
             cart_data.visits,
             target_day=today,
         )
+
+        created_visits = []
+        created_visit_amounts: dict[int, Decimal] = {}
+        total_invoice_amount = Decimal('0')
 
         # Создаём визиты
         from time import sleep
@@ -402,6 +410,12 @@ def create_cart_appointments(
         # путь ошибки обязан откатить частичные данные корзины.
         db.rollback()
         raise
+    except DuplicateCartResourceQueueVisitsError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     except QueueOwnerConfigurationError as exc:
         # QD-2E (RQ-15.b): fail-closed владелец очереди — это
         # КОНФИГУРАЦИОННАЯ ошибка каталога (D-08), а не сбой сервера:
@@ -1579,4 +1593,3 @@ class BenefitSettingsResponse(BaseModel):
     benefit_consultation_free: bool
     all_free_auto_approve: bool
     updated_at: datetime
-

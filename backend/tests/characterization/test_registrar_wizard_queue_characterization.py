@@ -6,7 +6,8 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
+from app.models.payment_invoice import PaymentInvoice
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit
@@ -49,6 +50,7 @@ def _create_service(
     code: str,
     name: str,
     queue_tag: str,
+    requires_doctor: bool = True,
 ) -> Service:
     service = Service(
         code=code,
@@ -56,9 +58,9 @@ def _create_service(
         price=100000.00,
         duration_minutes=30,
         active=True,
-        requires_doctor=True,
+        requires_doctor=requires_doctor,
         queue_tag=queue_tag,
-        is_consultation=True,
+        is_consultation=requires_doctor,
     )
     db_session.add(service)
     db_session.commit()
@@ -378,6 +380,185 @@ def test_registrar_wizard_characterization_different_specialists_create_separate
 
     assert {entry.visit_id for entry in patient_entries} == set(payload["visit_ids"])
     assert len({entry.queue_id for entry in patient_entries}) == 2
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_registrar_wizard_rejects_duplicate_same_day_resource_queue_visits_before_writes(
+    client,
+    db_session,
+    monkeypatch,
+    registrar_auth_headers,
+    test_patient,
+):
+    queue_tag = "wizard_shared_procedures"
+    resource = QueueResource(
+        code="wizard-shared-procedures",
+        queue_tag=queue_tag,
+        display_name="Процедуры",
+        active=True,
+    )
+    first_service = _create_service(
+        db_session,
+        code="WIZ-PROC-01",
+        name="Процедура из отделения A",
+        queue_tag=queue_tag,
+        requires_doctor=False,
+    )
+    second_service = _create_service(
+        db_session,
+        code="WIZ-PROC-02",
+        name="Процедура из отделения B",
+        queue_tag=queue_tag,
+        requires_doctor=False,
+    )
+    db_session.add(resource)
+    db_session.commit()
+
+    from app.crud import visit as visit_crud
+
+    create_visit_calls: list[int] = []
+    real_create_visit = visit_crud.create_visit
+
+    def track_create_visit(*args, **kwargs):
+        create_visit_calls.append(1)
+        return real_create_visit(*args, **kwargs)
+
+    monkeypatch.setattr(visit_crud, "create_visit", track_create_visit)
+
+    before = {
+        "visits": db_session.query(Visit)
+        .filter(Visit.patient_id == test_patient.id)
+        .count(),
+        "invoices": db_session.query(PaymentInvoice)
+        .filter(PaymentInvoice.patient_id == test_patient.id)
+        .count(),
+        "queues": db_session.query(DailyQueue)
+        .filter(DailyQueue.queue_tag == queue_tag)
+        .count(),
+        "entries": db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == test_patient.id)
+        .count(),
+    }
+
+    response = client.post(
+        "/api/v1/registrar/cart",
+        headers=registrar_auth_headers,
+        json=_cart_payload(
+            patient_id=test_patient.id,
+            visits=[
+                {
+                    "doctor_id": None,
+                    "visit_date": date.today().isoformat(),
+                    "department": "dermatology",
+                    "services": [{"service_id": first_service.id, "quantity": 1}],
+                },
+                {
+                    "doctor_id": None,
+                    "visit_date": date.today().isoformat(),
+                    "department": "procedures",
+                    "services": [
+                        {"service_id": second_service.id, "quantity": 1}
+                    ],
+                },
+            ],
+        ),
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"] == (
+        "Услуги очереди «Процедуры» распределены по нескольким визитам. "
+        "Объедините их в один визит и повторите сохранение."
+    )
+    assert create_visit_calls == []
+    db_session.expire_all()
+    assert (
+        db_session.query(Visit).filter(Visit.patient_id == test_patient.id).count()
+        == before["visits"]
+    )
+    assert (
+        db_session.query(PaymentInvoice)
+        .filter(PaymentInvoice.patient_id == test_patient.id)
+        .count()
+        == before["invoices"]
+    )
+    assert (
+        db_session.query(DailyQueue)
+        .filter(DailyQueue.queue_tag == queue_tag)
+        .count()
+        == before["queues"]
+    )
+    assert (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == test_patient.id)
+        .count()
+        == before["entries"]
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_registrar_wizard_accepts_same_resource_queue_services_in_one_visit(
+    client,
+    db_session,
+    registrar_auth_headers,
+    test_patient,
+):
+    queue_tag = "wizard_grouped_procedures"
+    db_session.add(
+        QueueResource(
+            code="wizard-grouped-procedures",
+            queue_tag=queue_tag,
+            display_name="Процедуры",
+            active=True,
+        )
+    )
+    first_service = _create_service(
+        db_session,
+        code="WIZ-GROUP-01",
+        name="Сгруппированная процедура A",
+        queue_tag=queue_tag,
+        requires_doctor=False,
+    )
+    second_service = _create_service(
+        db_session,
+        code="WIZ-GROUP-02",
+        name="Сгруппированная процедура B",
+        queue_tag=queue_tag,
+        requires_doctor=False,
+    )
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/registrar/cart",
+        headers=registrar_auth_headers,
+        json=_cart_payload(
+            patient_id=test_patient.id,
+            visits=[
+                {
+                    "doctor_id": None,
+                    "visit_date": date.today().isoformat(),
+                    "department": "procedures",
+                    "services": [
+                        {"service_id": first_service.id, "quantity": 1},
+                        {"service_id": second_service.id, "quantity": 1},
+                    ],
+                }
+            ],
+        ),
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert len(payload["visit_ids"]) == 1
+    visit_id = payload["visit_ids"][0]
+    entries = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.visit_id == visit_id)
+        .all()
+    )
+    assert len(entries) == 1
+    assert payload["queue_numbers"][str(visit_id)][0]["number"] == entries[0].number
 
 
 @pytest.mark.integration
