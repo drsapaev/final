@@ -57,6 +57,9 @@ export default function VirtualizedQueueList({
 }: VirtualizedQueueListProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // PR7: локальный in-flight guard — синхронный burst scroll-событий не
+  // должен запускать onLoadMore повторно до обновления loadingMore state.
+  const loadMoreInFlightRef = useRef(false);
 
   const rowVirtualizer = useVirtualizer({
     count: appointments.length,
@@ -76,6 +79,10 @@ export default function VirtualizedQueueList({
       const { scrollTop, scrollHeight, clientHeight } = scrollEl;
       // Trigger load when user is within 3 card heights of the bottom
       if (scrollHeight - scrollTop - clientHeight < CARD_ESTIMATE_HEIGHT * 3) {
+        // PR7: in-flight guard — burst scroll-событий до обновления
+        // loadingMore не должен запускать повторные одновременные load-more.
+        if (loadMoreInFlightRef.current) return;
+        loadMoreInFlightRef.current = true;
         onLoadMore();
       }
     };
@@ -83,6 +90,19 @@ export default function VirtualizedQueueList({
     scrollEl.addEventListener('scroll', handleScroll, { passive: true });
     return () => scrollEl.removeEventListener('scroll', handleScroll);
   }, [hasMore, loadingMore, onLoadMore]);
+
+  // PR7: сброс in-flight guard, когда родитель завершил (или не начал)
+  // загрузку: следующий подход к низу снова разрешён.
+  useEffect(() => {
+    if (!loadingMore) {
+      loadMoreInFlightRef.current = false;
+    }
+  }, [loadingMore]);
+
+  // PR7: динамическое измерение высоты карточек (measureElement) —
+  // фикс-оценка 180px перекрывала/раздвигала соседние карточки, когда
+  // реальная высота отличается (длинные услуги, много бейджей).
+  const measureElement = rowVirtualizer.measureElement;
 
   const virtualItems = rowVirtualizer.getVirtualItems();
 
@@ -112,6 +132,7 @@ export default function VirtualizedQueueList({
             <div
               key={appointment.id}
               data-index={virtualItem.index}
+              ref={measureElement}
               style={{
                 position: 'absolute',
                 top: 0,
@@ -143,7 +164,7 @@ export default function VirtualizedQueueList({
             {loadingMore  ? <RotateCw size={14} aria-hidden="true" /> : <ArrowDown size={14} aria-hidden="true" />}
             {loadingMore
               ? t('queue.loading')
-              : `${t('queue.show_more')} (${queueTotal - appointments.length} ${t('queue.remaining')})`}
+              : `${t('queue.show_more')} (${Math.max(0, queueTotal - appointments.length)} ${t('queue.remaining')})`}
           </Button>
         </div>
       )}

@@ -1,6 +1,6 @@
 import {
   AlertTriangle, BarChart3, Bell, Brain, Building2, Calendar, Camera,
-  CircleDollarSign, CreditCard, FileText, Heart, KeyRound, List, ListOrdered,
+  CircleDollarSign, Compass, CreditCard, FileText, Heart, KeyRound, List, ListOrdered,
   Lock, Monitor, Percent, Phone, Puzzle, Search, Send, Settings, Smile,
   SquareStack, Stethoscope, TestTube2, UserPlus, Users, Wand2,
 } from 'lucide-react';
@@ -811,6 +811,27 @@ export const ROUTE_REGISTRY = [
     component: 'UnifiedSettings',
     legacyRedirectFrom: [],
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-queue-settings', pageTitle: 'Admin Queue Settings' }),
+  },
+  {
+    // RQ-17 (E-065): собранный путь настройки направления — экран-вход
+    // checklist + мастер S-14 (brief RQ17_SETUP_PATH_BRIEF.md §4).
+    // Единственная новая запись сайдбара среза: минимальный QueueResource
+    // CRUD живёт своей поверхностью внутри экрана-входа, не отдельным route.
+    id: 'admin-setup-directions',
+    path: '/admin/setup-directions',
+    group: 'admin',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'app-shell',
+    auth: 'role-scoped',
+    roles: ['Admin'],
+    entry: 'menu',
+    nav: nav({ labelKey: 'nav.setup_directions', icon: Compass, sectionKey: 'nav.section_clinic_queue', order: 35, sidebar: true }),
+    title: 'Admin Setup Directions',
+    owner: 'admin.queue',
+    component: 'AdminSetupDirections',
+    legacyRedirectFrom: [],
+    layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-setup-directions', pageTitle: 'Admin Setup Directions' }),
   },
   {
     id: 'admin-ai-settings',

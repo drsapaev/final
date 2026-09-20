@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, timezone
+from types import SimpleNamespace
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -14,8 +15,7 @@ from app.models.lab import LabOrder, LabReportInstance, LabResult
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
-from app.models.visit import Visit
-from app.models.visit import VisitService
+from app.models.visit import Visit, VisitService
 
 
 def _suffix() -> str:
@@ -1133,65 +1133,75 @@ def test_bulk_values_optimistic_locking_bumps_token_and_rejects_stale(
     test_patient,
     test_visit,
 ):
-    """PR3: каждое успешное bulk-сохранение должно продвигать version token
-    (updated_at), иначе два лаборанта с одним устаревшим токеном молча
-    перезаписывают друг друга после первого сохранения. Stale token обязан
-    получать 409 и не перезаписывать изменения другого пользователя.
-    """
+    """The server version is exact down to microseconds and advances on save."""
     instance = _create_lab_report_instance(
         client,
         auth_headers=auth_headers,
         patient_id=test_patient.id,
         visit_id=test_visit.id,
     )
-    token_before = instance["updated_at"]
-    assert token_before
+    row = (
+        db_session.query(LabReportInstance)
+        .filter(LabReportInstance.id == instance["id"])
+        .one()
+    )
+    baseline = datetime(2026, 9, 20, 8, 15, 30, 123456, tzinfo=UTC)
+    row.updated_at = baseline
+    db_session.commit()
 
-    def _frontend_iso(token: str) -> str:
-        # Фронтенд отправляет toISOString() — всегда с offset. SQLite-харнес
-        # сериализует токены без offset; с offset-less токеном guard в
-        # _assert_not_concurrently_modified получает aware-vs-naive вычитание
-        # и graceful-degradation пропускает проверку блокировки.
-        return datetime.fromisoformat(token).replace(tzinfo=UTC).isoformat()
+    def _parse_token(token: str) -> datetime:
+        parsed = datetime.fromisoformat(token.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
 
     def _bulk_save(expected_token: str, value: str):
         return client.post(
             f"/api/v1/lab/report-instances/{instance['id']}/bulk-values"
-            f"?expected_updated_at={quote(_frontend_iso(expected_token), safe='')}",
+            f"?expected_updated_at={quote(expected_token, safe='')}",
             headers=auth_headers,
             json=[{"field_key": "wbc", "value_text": value}],
         )
 
-    # In-sync сохранение №1 (DRAFT -> IN_PROGRESS)
-    first = _bulk_save(token_before, "5.2")
+    # The same instant in a non-UTC offset, including all six microsecond
+    # digits, must compare equal after timezone normalization.
+    equivalent_offset_token = baseline.astimezone(
+        timezone(timedelta(hours=5))
+    ).isoformat()
+    first = _bulk_save(equivalent_offset_token, "5.2")
     assert first.status_code == 200, first.text
     token_first = first.json()["instance"]["updated_at"]
-    assert token_first != token_before, (
-        "успешное bulk-сохранение должно продвигать version token"
-    )
+    first_dt = _parse_token(token_first)
+    assert first_dt > baseline
 
-    # In-sync сохранение №2: статус уже IN_PROGRESS, колонки instance не
-    # меняются — token всё равно обязан продвинуться (дефект PR3 на base).
+    # A token only 500 microseconds behind is still stale. The previous
+    # one-second tolerance silently allowed exactly this lost-update window.
+    stale_token = (first_dt - timedelta(microseconds=500)).isoformat()
+    stale = _bulk_save(stale_token, "9.9")
+    assert stale.status_code == 409, stale.text
+
+    malformed = _bulk_save("not-a-version", "9.8")
+    assert malformed.status_code == 400, malformed.text
+
+    unchanged = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}",
+        headers=auth_headers,
+    )
+    assert unchanged.status_code == 200, unchanged.text
+    unchanged_wbc = next(
+        field
+        for section in unchanged.json()["sections"]
+        for field in section["fields"]
+        if field["field_key"] == "wbc"
+    )
+    assert unchanged_wbc["value_text"] == "5.2"
+
+    # A fresh exact token remains accepted and must advance monotonically
+    # even though the instance is already IN_PROGRESS.
     second = _bulk_save(token_first, "5.4")
     assert second.status_code == 200, second.text
     token_second = second.json()["instance"]["updated_at"]
-    assert token_second != token_first, (
-        "повторное bulk-сохранение обязано продвинуть version token, "
-        "иначе optimistic locking не защищает второй и последующие saves"
-    )
-
-    # Stale token: симулируем, что другой лаборант сохранил блок 10 минут
-    # назад; вызывающий с token_second обязан получить 409.
-    row = (
-        db_session.query(LabReportInstance)
-        .filter(LabReportInstance.id == instance["id"])
-        .first()
-    )
-    row.updated_at = datetime.now(UTC) - timedelta(minutes=10)
-    db_session.commit()
-
-    stale = _bulk_save(token_second, "9.9")
-    assert stale.status_code == 409, stale.text
+    assert _parse_token(token_second) > first_dt
 
     fresh = client.get(
         f"/api/v1/lab/report-instances/{instance['id']}",
@@ -1205,5 +1215,267 @@ def test_bulk_values_optimistic_locking_bumps_token_and_rejects_stale(
         if field["field_key"] == "wbc"
     )
     assert wbc_field["value_text"] == "5.4", (
-        "stale save не должен перезаписывать значения актуальной версии"
+        "stale or malformed saves must not overwrite the accepted value"
     )
+
+
+@pytest.mark.integration
+def test_instance_update_advances_token_monotonically(
+    client,
+    auth_headers,
+    test_patient,
+    test_visit,
+):
+    """Signer/branding edits use the same exact server-version contract."""
+    instance = _create_lab_report_instance(
+        client,
+        auth_headers=auth_headers,
+        patient_id=test_patient.id,
+        visit_id=test_visit.id,
+    )
+
+    first = client.put(
+        f"/api/v1/lab/report-instances/{instance['id']}"
+        f"?expected_updated_at={quote(instance['updated_at'], safe='')}",
+        headers=auth_headers,
+        json={"signer_snapshot": {"lab_technician_name": "SYNTHETIC A"}},
+    )
+    assert first.status_code == 200, first.text
+    first_body = first.json()
+    assert first_body["signer_snapshot"]["lab_technician_name"] == "SYNTHETIC A"
+
+    second = client.put(
+        f"/api/v1/lab/report-instances/{instance['id']}"
+        f"?expected_updated_at={quote(first_body['updated_at'], safe='')}",
+        headers=auth_headers,
+        json={"branding_snapshot": {"clinic_name": "SYNTHETIC Clinic"}},
+    )
+    assert second.status_code == 200, second.text
+
+    def _as_utc(value: str) -> datetime:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return (parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)).astimezone(UTC)
+
+    assert _as_utc(first_body["updated_at"]) > _as_utc(instance["updated_at"])
+    assert _as_utc(second.json()["updated_at"]) > _as_utc(first_body["updated_at"])
+
+
+@pytest.mark.integration
+def test_lab_queue_today_paginates_honestly(client, auth_headers, monkeypatch):
+    """PR7: total — весь день (до слайса), entries — только запрошенный
+    slice; порядок registrar не меняется. Фасад принимает limit/offset
+    и обязан их применять (раньше параметры игнорировались, а total
+    был длиной возвращённого slice)."""
+    from app.api.v1.endpoints import registrar_integration as ri
+
+    entries = [
+        {"id": i, "patient_name": f"Синтетический пациент {i}", "status": "waiting"}
+        for i in range(1, 121)
+    ]
+    fake_payload = {
+        "queues": [{"specialty": "lab", "entries": entries}],
+        "date": "2026-09-19",
+        "timezone": "Asia/Tashkent",
+    }
+    delegated_windows = []
+
+    def fake_get_today_queues_page(**kwargs):
+        delegated_windows.append((kwargs["limit"], kwargs["offset"]))
+        start = kwargs["offset"]
+        stop = start + kwargs["limit"]
+        return {
+            **fake_payload,
+            "queues": [
+                {
+                    **fake_payload["queues"][0],
+                    "entries": entries[start:stop],
+                }
+            ],
+            "total_entries": len(entries),
+        }
+
+    monkeypatch.setattr(ri, "get_today_queues_page", fake_get_today_queues_page)
+
+    page2 = client.get(
+        "/api/v1/lab/queue/today?limit=50&offset=50", headers=auth_headers
+    )
+    assert page2.status_code == 200, page2.text
+    body = page2.json()
+    assert body["total"] == 120, "total must be the whole day, not the slice"
+    assert len(body["entries"]) == 50
+    assert body["entries"][0]["id"] == 51
+    assert body["entries"][-1]["id"] == 100
+
+    page3 = client.get(
+        "/api/v1/lab/queue/today?limit=50&offset=100", headers=auth_headers
+    )
+    assert page3.status_code == 200, page3.text
+    body3 = page3.json()
+    assert body3["total"] == 120
+    assert len(body3["entries"]) == 20
+    assert body3["entries"][0]["id"] == 101
+
+    # Порядок внутри slice — канонический порядок registrar (без пересорт).
+    page1 = client.get(
+        "/api/v1/lab/queue/today?limit=50&offset=0", headers=auth_headers
+    )
+    body1 = page1.json()
+    assert [e["id"] for e in body1["entries"]] == list(range(1, 51))
+    assert delegated_windows == [(50, 50), (50, 100), (50, 0)]
+
+
+def test_registrar_lab_queue_page_bounds_enrichment_after_global_dedup(monkeypatch):
+    """The lab window is selected after canonical ordering/global dedup but
+    before report, patient, service, metadata, and payment enrichment."""
+    from app.api.v1.endpoints.registrar_integration import _today_queues as today_queues
+
+    def _entry(entry_id: int, minute: int) -> dict:
+        return {
+            "type": "online_queue",
+            "data": SimpleNamespace(id=entry_id, payment_processed_at=None),
+            "created_at": datetime(2026, 9, 20, 8, minute),
+            "queue_time": datetime(2026, 9, 20, 8, minute),
+        }
+
+    ecg_by_legacy_name_only = SimpleNamespace(
+        queue_tag=None,
+        name="Synthetic ECG compatibility label",
+        code="ecg",
+    )
+    page_ecg_services_count, page_non_ecg_services_count = (
+        today_queues._count_serializer_visible_visit_services(
+            [ecg_by_legacy_name_only]
+        )
+    )
+    assert (page_ecg_services_count, page_non_ecg_services_count) == (0, 1)
+    current_cardiology_branch_is_serializable = (
+        today_queues._serializer_will_emit_visit(
+            filter_services=True,
+            ecg_only=False,
+            ecg_count=page_ecg_services_count,
+            non_ecg_count=page_non_ecg_services_count,
+        )
+    )
+    assert current_cardiology_branch_is_serializable is False
+    skipped_visit = {
+        "type": "visit",
+        "data": SimpleNamespace(id=99),
+        "created_at": datetime(2026, 9, 20, 8, 0),
+        "queue_time": datetime(2026, 9, 20, 8, 0),
+        "_page_serializable": current_cardiology_branch_is_serializable,
+    }
+
+    queues_by_specialty = {
+        "lab": {
+            "entries": [skipped_visit, _entry(3, 3), _entry(1, 1), _entry(2, 2)],
+            "doctor": None,
+            "doctor_id": None,
+            "doctors": {},
+        },
+        "laboratory": {
+            "entries": [_entry(2, 0), _entry(4, 4), _entry(5, 5)],
+            "doctor": None,
+            "doctor_id": None,
+            "doctors": {},
+        },
+    }
+    summarized_ids = []
+    enriched_ids = []
+    metadata_indexes = []
+
+    def fake_collect_summaries(*, db, queues_by_specialty, department_filter):
+        del db, department_filter
+        summarized_ids.extend(
+            entry["data"].id
+            for queue in queues_by_specialty.values()
+            for entry in queue["entries"]
+        )
+        return {}, True
+
+    def fake_process_online_queue_entry(*, entry_data, **kwargs):
+        del kwargs
+        enriched_ids.append(entry_data.id)
+        return {
+            "record_id": entry_data.id,
+            "patient_id": entry_data.id,
+            "patient_name": f"P{entry_data.id}",
+            "phone": "",
+            "patient_birth_year": None,
+            "address": None,
+            "entry_status": "waiting",
+            "source": "desk",
+            "discount_mode": "none",
+            "visit_time": None,
+            "services": [],
+            "service_codes": [],
+            "service_details": [],
+            "total_cost": 0,
+        }
+
+    monkeypatch.setattr(
+        today_queues, "_collect_lab_report_summaries", fake_collect_summaries
+    )
+    monkeypatch.setattr(
+        today_queues, "_process_online_queue_entry", fake_process_online_queue_entry
+    )
+    monkeypatch.setattr(
+        today_queues,
+        "_process_visit_entry",
+        lambda **kwargs: pytest.fail("non-serializable visit reached enrichment"),
+    )
+
+    def fake_resolve_queue_entry_metadata(**kwargs):
+        metadata_indexes.append(kwargs["idx"])
+        return kwargs["entry_data"].id, None, None
+
+    monkeypatch.setattr(
+        today_queues,
+        "_resolve_queue_entry_metadata",
+        fake_resolve_queue_entry_metadata,
+    )
+    monkeypatch.setattr(
+        today_queues, "_resolve_entry_department", lambda **kwargs: (None, None)
+    )
+    monkeypatch.setattr(
+        today_queues, "_resolve_payment_truth", lambda *args, **kwargs: ("unpaid", None)
+    )
+    monkeypatch.setattr(
+        today_queues, "_registrar_available_actions", lambda **kwargs: []
+    )
+    monkeypatch.setattr(
+        today_queues,
+        "_serialize_queue_entry",
+        lambda **kwargs: {"id": kwargs["record_id"]},
+    )
+    monkeypatch.setattr(
+        today_queues,
+        "_build_queue_payload",
+        lambda *, queue_data, specialty, queue_number, entries: {
+            "specialty": specialty,
+            "queue_number": queue_number,
+            "entries": entries,
+        },
+    )
+
+    result, total = today_queues._build_queue_result_page(
+        db=object(),
+        current_user=SimpleNamespace(role="Lab", roles=[]),
+        queues_by_specialty=queues_by_specialty,
+        department_filter={"lab", "laboratory"},
+        today=date(2026, 9, 20),
+        limit=2,
+        offset=2,
+    )
+
+    assert total == 5
+    assert summarized_ids == [3, 4]
+    assert enriched_ids == [3, 4]
+    assert metadata_indexes == [3, 1]
+    assert result == [
+        {"specialty": "lab", "queue_number": 1, "entries": [{"id": 3}]},
+        {
+            "specialty": "laboratory",
+            "queue_number": 2,
+            "entries": [{"id": 4}],
+        },
+    ]

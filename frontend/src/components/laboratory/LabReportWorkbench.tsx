@@ -18,7 +18,7 @@ import {
 // WF-08 fix: confirmation dialog для irreversible actions (Finalize, Revise).
 import { useConfirm } from '../common/ConfirmDialog';
 
-// P-04 fix: декомпозиция монолитного компонента (969 → ~530 строк).
+                  // P-04 fix: декомпозиция монолитного компонента (969 → ~530 строк).
 // Helper-функции и подкомпоненты вынесены в отдельные модули:
 import {
   extractFieldValue,
@@ -94,6 +94,14 @@ export default function LabReportWorkbench({
 
   // STRAT#2: единый канал нотификаций.
   const labToast = useLabToast(notify as (type: string, message: string) => void);
+  // PR6: серверно разрешённое действие «Добавить бланк». Единственный
+  // источник разрешения — backend факт templateResolution.allowed_templates
+  // (resolve_template_options); React не изобретает список и не прячет
+  // шаблоны сам. При несохранённых изменениях действие заблокировано,
+  // чтобы переключение на новый бланк не потеряло черновик.
+  const [addBlankTemplateId, setAddBlankTemplateId] = useState<string>('');
+  const allowedTemplates = ((templateResolution?.allowed_templates ?? []) as Array<Record<string, unknown>>);
+  const addBlankTemplateIdValue = addBlankTemplateId || String(allowedTemplates[0]?.id ?? '');
 
   // STRAT#1: state declarations + derived memos + init effects
   // теперь в useLabReportState hook (hooks/useLabReportState.js).
@@ -277,7 +285,7 @@ export default function LabReportWorkbench({
     // Если backend обнаружит, что бланк был изменён другим пользователем
     // после этого timestamp — вернёт 409, persistDraft выбросит exception.
     let expectedUpdatedAt = activeInstance.updated_at
-      ? new Date(activeInstance.updated_at as string).toISOString()
+      ? activeInstance.updated_at as string
       : null;
 
     const payload: Array<Record<string, unknown>> = [];
@@ -307,7 +315,7 @@ export default function LabReportWorkbench({
       // 409 от собственного сохранения.
       const signerUpdatedAt = latestInstance?.updated_at as string | undefined;
       if (signerUpdatedAt) {
-        expectedUpdatedAt = new Date(signerUpdatedAt).toISOString();
+        expectedUpdatedAt = signerUpdatedAt;
       }
     }
     if (payload.length > 0) {
@@ -760,6 +768,40 @@ export default function LabReportWorkbench({
                   <LabStatusStepper status={activeInstance.status as string} />
                 </div>
 
+{/* PR6: «Добавить бланк» — только серверно разрешённые шаблоны
+                      (templateResolution.allowed_templates). Заблокировано при
+                      isDirty: несохранённый черновик не теряется. Существующие
+                      отчёты остаются в истории (reportHistory / недавние). */}
+                  {selectedAppointment && !templateResolutionLoading && allowedTemplates.length > 0 && (
+                    <Alert severity="info">
+                      <span>Добавить ещё бланк:</span>
+                      <select
+                        className="macos-input"
+                        aria-label="Шаблон дополнительного бланка"
+                        value={addBlankTemplateIdValue}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAddBlankTemplateId(event.target.value)}
+                      >
+                        {allowedTemplates.map((template) => (
+                          <option key={String(template.id)} value={String(template.id)}>
+                            {String(template.name ?? '')} ({String(template.family ?? '')})
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        variant="outline"
+                        size="small"
+                        disabled={saving || isDirty || busyAction === 'create' || !addBlankTemplateIdValue}
+                        title={isDirty ? 'Сначала сохраните несохранённые изменения черновика' : undefined}
+                        onClick={() => handleCreateInstance(addBlankTemplateIdValue)}
+                      >
+                        <FolderPlus size={14} aria-hidden="true" />
+                        Добавить бланк
+                      </Button>
+                      {isDirty && (
+                        <span> — сначала сохраните несохранённые изменения черновика</span>
+                      )}
+                    </Alert>
+                  )}
                 {/* P-04 fix: панель действий вынесена в LabReportActionsBar */}
                 <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap', alignItems: 'center' }}>
                   <LabReportActionsBar

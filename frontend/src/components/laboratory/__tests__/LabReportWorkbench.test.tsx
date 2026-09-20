@@ -421,7 +421,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     status: 'DRAFT',
     template_id: 3,
     patient_id: 444,
-    updated_at: '2026-09-13T08:00:00.000000+00:00',
+    updated_at: '2026-09-13T08:00:00.123456+00:00',
     signer_snapshot: {},
     available_actions: ['edit', 'save_draft', 'finalize'],
     critical_findings: [],
@@ -496,8 +496,8 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(wbcItem?.comment).toBe('утренний забор');
   });
 
-  it('uses the version token from the signer response for the subsequent values save', async () => {
-    const signerResponseUpdated = '2026-09-13T08:00:05.500000+00:00';
+  it('keeps microsecond version tokens opaque across signer and values saves', async () => {
+    const signerResponseUpdated = '2026-09-13T08:00:05.654321+00:00';
     mockedApi.updateInstance.mockResolvedValue({
       ...reopenedDraftInstance,
       updated_at: signerResponseUpdated,
@@ -525,9 +525,9 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(mockedApi.updateInstance).toHaveBeenCalledWith(
       77,
       { signer_snapshot: expect.objectContaining({ lab_technician_name: 'Иванов И.И.' }) },
-      new Date('2026-09-13T08:00:00.000000+00:00').toISOString()
+      '2026-09-13T08:00:00.123456+00:00'
     );
-    expect(ownBulkCall[2]).toBe(new Date(signerResponseUpdated).toISOString());
+    expect(ownBulkCall[2]).toBe(signerResponseUpdated);
   });
 
   it('does not surface an autosave confirmation for a failed autosave', async () => {
@@ -583,5 +583,119 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       vi.useRealTimers();
       vi.clearAllMocks();
     }
+  });
+});
+
+describe('LabReportWorkbench add-blank action (PR6)', () => {
+  const mockedApi = labReportingApi as unknown as {
+    createInstance: ReturnType<typeof vi.fn>;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+
+  const openInstance = {
+    id: 91,
+    status: 'DRAFT',
+    template_id: 3,
+    patient_id: 444,
+    visit_id: 728,
+    updated_at: '2026-09-13T08:00:00.000000+00:00',
+    signer_snapshot: {},
+    available_actions: ['edit', 'save_draft', 'finalize'],
+    critical_findings: [],
+    sections: [
+      {
+        key: 'cbc',
+        title: 'CBC',
+        fields: [
+          { field_key: 'wbc', label: 'Лейкоциты', value_type: 'text', value_text: '', comment: null },
+        ],
+      },
+    ],
+  };
+  const resolution = {
+    visit_id: 728,
+    service_codes: ['CBC'],
+    allowed_templates: [
+      { id: 3, name: 'CBC template', family: 'hematology' },
+      { id: 8, name: 'Urine panel', family: 'urinalysis' },
+    ],
+    unmapped_service_codes: [],
+  };
+
+  function renderAddBlank(props: Record<string, unknown> = {}) {
+    return render(
+      <ThemeProvider>
+        <LabReportWorkbench
+          selectedAppointment={{
+            id: 17,
+            patient_id: 444,
+            visit_id: 728,
+            patient_fio: 'Test Patient',
+            service_codes: ['CBC'],
+          }}
+          templates={[]}
+          templateResolution={resolution}
+          templateResolutionLoading={false}
+          reportHistory={[]}
+          recentReports={[]}
+          activeInstance={openInstance}
+          onInstanceChange={vi.fn()}
+          onOpenInstance={vi.fn()}
+          onRefreshHistory={vi.fn(async () => {})}
+          onRefreshRecentReports={vi.fn(async () => {})}
+          onQueueChanged={vi.fn(async () => {})}
+          notify={vi.fn()}
+          {...props}
+        />
+      </ThemeProvider>
+    );
+  }
+
+  it('renders the add-blank action from server-resolved templates and creates the chosen blank', async () => {
+    const onInstanceChange = vi.fn();
+    mockedApi.createInstance.mockResolvedValue({
+      ...openInstance,
+      id: 92,
+      template_id: 8,
+    });
+
+    renderAddBlank({ onInstanceChange });
+
+    // Только серверно разрешённые шаблоны, оба в списке.
+    const select = screen.getByLabelText('Шаблон дополнительного бланка');
+    expect(select).toBeInTheDocument();
+    expect(select).toHaveValue('3');
+    fireEvent.change(select, { target: { value: '8' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Добавить бланк/ }));
+
+    await waitFor(() => expect(mockedApi.createInstance).toHaveBeenCalled());
+    const payload = mockedApi.createInstance.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.template_id).toBe(8);
+    expect(payload.patient_id).toBe(444);
+    expect(payload.visit_id).toBe(728);
+    await waitFor(() => expect(onInstanceChange).toHaveBeenCalled());
+    expect((onInstanceChange.mock.calls[0][0] as Record<string, unknown>).id).toBe(92);
+  });
+
+  it('disables the add-blank action while the open draft is dirty', async () => {
+    renderAddBlank();
+    fireEvent.change(screen.getByLabelText('Результат: Лейкоциты'), {
+      target: { value: '7' },
+    });
+    const button = screen.getByRole('button', { name: /Добавить бланк/ });
+    expect(button).toBeDisabled();
+    // Создание не выполняется.
+    expect(mockedApi.createInstance).not.toHaveBeenCalled();
+  });
+
+  it('renders no add-blank action without server-resolved templates', () => {
+    renderAddBlank({ templateResolution: null });
+    expect(screen.queryByLabelText('Шаблон дополнительного бланка')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Добавить бланк/ })).toBeNull();
   });
 });
