@@ -163,6 +163,60 @@ describe('buildChecklist — axis (а)', () => {
         expect(owners.map((d) => d.id)).toEqual([1, 2]);
     });
 
+    it('REGRESSION (round-4 P2): dentistry Doctor owns the stomatology tag (alias family, NOT exact equality)', () => {
+        // Здоровая конфигурация из owner-ревью: канонический Doctor.specialty
+        // = 'dentistry' (SSOT core/specialties.py D-1), а queue-механика
+        // живёт на теге 'stomatology' (ключ профилей). До фикса exact
+        // string equality давал ложное «нет исполнителя».
+        const healthy = buildChecklist(
+            [svc({ queue_tag: 'stomatology', requires_doctor: true, doctor_id: null })],
+            [profile({ key: 'stom-key', queue_tags: ['stomatology'] })],
+            [],
+            {},
+            [doctor({ id: 42, specialty: 'dentistry' })],
+        );
+        expect(healthy['stomatology'].axis).toBe('doctor');
+        expect(healthy['stomatology'].executorReady).toBe(true);
+        expect(healthy['stomatology'].eligibleDoctors.map((d) => d.id)).toEqual([42]);
+
+        // Обратная симметрия: легаси-врач 'stomatology' владеет каноническим
+        // тегом 'dentistry'
+        const reverse = eligibleDoctorsForTag(
+            [doctor({ id: 9, specialty: 'stomatology' })],
+            'dentistry',
+        );
+        expect(reverse.map((d) => d.id)).toEqual([9]);
+    });
+
+    it('dental-family aliases (dentistry/dental/stomatology/dentist) match each other; cross-family and sentinels stay out', () => {
+        // Зеркало backend specialty_variants: любой вариант семейства
+        // находится фильтром по любому другому (D-1)
+        const family = eligibleDoctorsForTag(
+            [
+                doctor({ id: 1, specialty: 'dentistry' }),
+                doctor({ id: 2, specialty: 'dental' }),
+                doctor({ id: 3, specialty: 'stomatology' }),
+                doctor({ id: 4, specialty: 'dentist' }),
+                doctor({ id: 5, specialty: '  Dentistry ' }), // нормализация + семейство
+            ],
+            'stomatology',
+        );
+        expect(family.map((d) => d.id)).toEqual([1, 2, 3, 4, 5]);
+
+        // Чужие семейства по-прежнему не владельцы
+        const foreign = eligibleDoctorsForTag(
+            [
+                doctor({ id: 6, specialty: 'cardiology' }),
+                doctor({ id: 7, specialty: 'lab' }),
+                doctor({ id: 8, specialty: 'general' }), // sentinel не входит в семейства
+                doctor({ id: 9, specialty: 'dentistic' }), // неизвестное — только exact
+                doctor({ id: 10, active: false, specialty: 'dentist' }), // неактивный
+            ],
+            'dentistry',
+        );
+        expect(foreign).toHaveLength(0);
+    });
+
     it('inactive services never carry the axis or (б)', () => {
         const checklist = buildChecklist(
             [

@@ -12,7 +12,9 @@
  *      (brief §3(а) буквально; round-3 owner-ревью P1): read-side
  *      `/services/admin/doctors` отдаёт только активных врачей, а
  *      specialty сопоставляется тегу направления (specialty/tag
- *      mapping). FK `Service.doctor_id` НЕ является критерием (а):
+ *      mapping; alias-семейства SSOT core/specialties.py —
+ *      round-4 owner-ревью P2: dentistry-врач владеет тегом
+ *      stomatology). FK `Service.doctor_id` НЕ является критерием (а):
  *      деактивированный врач с оставшимся FK давал ложное «готово», а
  *      новый канонический Doctor без проставленного FK — ложное «нет
  *      исполнителя»;
@@ -136,11 +138,42 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * Нормализация для specialty/tag mapping: теги направлений в этой системе
  * каноничны по naming'у specialty (QUEUE_GROUPS: cardiology, dermatology,
- * stomatology, laboratory, …), поэтому принадлежность врача направлению —
- * нормализованное равенство specialty и queue_tag.
+ * stomatology, laboratory, …). Принадлежность врача направлению —
+ * нормализованное равенство specialty и queue_tag С УЧЁТОМ alias-семейств
+ * (см. specialtyFamilyKey): `Doctor.specialty` — свободная строка с
+ * историческими написаниями, а `Service.queue_tag` — точный routing-ключ.
  */
 export function specialtyTagKey(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+/**
+ * Alias-семейство specialty (read-side matching) — зеркало SSOT
+ * `backend/app/core/specialties.py` (NEEDS DECISION D-1): dentist-семейство
+ * исторически живёт в четырёх написаниях — `dentistry` (каноническое
+ * хранимое значение), `dental` (админская DoctorModal), `stomatology`
+ * (ключ queue-механики/профилей), `dentist` (legacy). Read-side
+ * `specialty_variants` считает их одним семейством: любой вариант
+ * находится при фильтре по любому другому (здоровая конфигурация
+ * `Doctor.specialty = dentistry` + `Service.queue_tag = stomatology` —
+ * ВРАЧ ЕСТЬ, round-4 owner-ревью P2). Non-dental specialties проходят
+ * без переименования; `general` — sentinel незаполненного профиля,
+ * в семейства не входит и элигибельности не даёт.
+ */
+const DENTAL_FAMILY_SPELLINGS: ReadonlySet<string> = new Set([
+  'dentistry',
+  'dental',
+  'stomatology',
+  'dentist',
+]);
+const DENTAL_CANONICAL_SPECIALTY = 'dentistry';
+
+/** Ключ alias-семейства для уже нормализованного specialty-ключа или null. */
+function specialtyFamilyKey(specialtyKey: string): string | null {
+  if (DENTAL_FAMILY_SPELLINGS.has(specialtyKey)) {
+    return DENTAL_CANONICAL_SPECIALTY;
+  }
+  return null;
 }
 
 /** Sentinel незаполненного профиля врача (core/specialties.py; incomplete
@@ -153,7 +186,14 @@ const INCOMPLETE_SPECIALTY_SENTINEL = 'general';
  * соответствует тегу направления. Read-side `/services/admin/doctors`
  * возвращает только активных записей; элигибельность дополнительно требует
  * реальной (не-sentinel/непустой) specialty — строка с пустой/`general`
- * specialty не может быть владельцем направления.
+ * specialty не может быть владельцем направления. Соответствие —
+ * alias-family matching (зеркало read-side SSOT
+ * `core/specialties.py::specialty_variants`): точное нормализованное
+ * равенство ИЛИ одно семейство написаний (dentistry/dental/stomatology/
+ * dentist). Exact string equality здесь НЕдостаточен: канонический
+ * `Doctor.specialty = dentistry` при queue-теге `stomatology`
+ * (ключ механики профилей) — здоровая конфигурация, а не «нет
+ * исполнителя» (round-4 owner-ревью P2).
  */
 export function eligibleDoctorsForTag(
   doctors: ChecklistDoctorDto[],
@@ -163,6 +203,7 @@ export function eligibleDoctorsForTag(
   if (!tagKey) {
     return [];
   }
+  const tagFamily = specialtyFamilyKey(tagKey);
   return doctors.filter((doctor) => {
     if (doctor.active === false) {
       return false;
@@ -170,12 +211,17 @@ export function eligibleDoctorsForTag(
     const specialtyKey = specialtyTagKey(doctor.specialty);
     if (
       !specialtyKey ||
-      specialtyKey === INCOMPLETE_SPECIALTY_SENTINEL ||
-      specialtyKey !== tagKey
+      specialtyKey === INCOMPLETE_SPECIALTY_SENTINEL
     ) {
       return false;
     }
-    return true;
+    if (specialtyKey === tagKey) {
+      return true;
+    }
+    // Alias-семейство (backend specialty_variants): врач dentistry —
+    // владелец тега stomatology и наоборот; dental/dentist — то же
+    // семейство. Незнакомые specialty совпадают только точно.
+    return tagFamily !== null && specialtyFamilyKey(specialtyKey) === tagFamily;
   });
 }
 
