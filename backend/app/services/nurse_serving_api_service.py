@@ -109,6 +109,7 @@ from app.core.audit import log_audit_event
 from app.crud import visit as crud_visit
 from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import find_active_tag_queue
+from app.models.appointment import Appointment
 from app.models.nurse_workplace import NurseWorkplaceAssignment
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.service import Service
@@ -764,20 +765,95 @@ class NurseServingApiService:
     ) -> Visit:
         """visit_id-first; else station-branch resolution + immediate link.
 
-        Mirrors the doctor-surface resource branch (patient + queue day +
-        department == queue_tag) with one deliberate widening: the search
-        accepts ``open`` OR ``in_progress`` visits — the canonical
-        procedures flow (doctor orders -> patient walks to the station)
-        has the visit already in_progress, and an open-only search would
-        create a duplicate visit. A missing visit is created
-        (doctor_id=None) and immediately linked to the entry (the
-        qr_queue/_online_entries precedent: start and completion mutate
-        ONE station event, not two visits).
+        Codex round-1 P1: the linked visit is REVALIDATED against the
+        entry's queue day before it is trusted — a force-majeure
+        transfer (``ForceMajeureService.transfer_to_tomorrow``) copies
+        ``visit_id`` onto the new day's entry, and serving must not run
+        on yesterday's visit. The mirror of the doctor-surface contract
+        (``doctor_integration/_queue_ops.py::_resolve_entry_visit``,
+        codex rounds 40/41/43):
+
+        - same-day visit -> served as-is;
+        - visit of ANOTHER day, not anchored by live same-day tickets ->
+          re-stamped to the queue day, its paired appointment follows
+          (the round-43 lesson: without the appointment re-pairing the
+          canonical visit pairing can later spawn a duplicate);
+        - visit still shared by live tickets of its own day -> a FRESH
+          visit is resolved for the queue day below and the entry is
+          relinked (the peers keep the old visit).
+
+        The station branch (patient + queue day + department ==
+        queue_tag) keeps one deliberate widening over the doctor
+        surface: the search accepts ``open`` OR ``in_progress`` visits —
+        the canonical procedures flow (doctor orders -> patient walks to
+        the station) has the visit already in_progress, and an
+        open-only search would create a duplicate visit. A missing visit
+        is created (doctor_id=None) and immediately linked to the entry
+        (the qr_queue/_online_entries precedent: start and completion
+        mutate ONE station event, not two visits).
         """
         if entry.visit_id:
             visit = self.db.get(Visit, entry.visit_id)
             if visit is not None:
-                return visit
+                queue_day = getattr(entry.queue, "day", None)
+                if queue_day is None or visit.visit_date == queue_day:
+                    return visit
+                # A transferred (or hand-relinked) entry pointing at a
+                # visit of another day: validate the anchor before
+                # trusting the link.
+                shared = (
+                    self.db.query(OnlineQueueEntry.id)
+                    .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+                    .filter(
+                        OnlineQueueEntry.visit_id == visit.id,
+                        OnlineQueueEntry.id != entry.id,
+                        # Retired tickets no longer anchor the visit.
+                        OnlineQueueEntry.status.not_in(["cancelled", "no_show"]),
+                        # Only SAME-day peers anchor; entries already
+                        # moved to a new day follow their own resolution.
+                        DailyQueue.day == visit.visit_date,
+                    )
+                    .first()
+                    is not None
+                )
+                if not shared:
+                    # The solo visit follows the transferred ticket
+                    # (re-stamped to the day of actual serving) — and its
+                    # paired appointment follows too, the round-43
+                    # doctor-surface contract: the canonical visit
+                    # pairing (patient/date/time/doctor) would otherwise
+                    # keep the appointment on the old day and could spawn
+                    # a second visit for it later.
+                    appointment_filters = [
+                        Appointment.patient_id == visit.patient_id,
+                        Appointment.appointment_date == visit.visit_date,
+                        Appointment.status.not_in(
+                            ["cancelled", "completed", "no_show"]
+                        ),
+                    ]
+                    if visit.doctor_id is None:
+                        appointment_filters.append(Appointment.doctor_id.is_(None))
+                    else:
+                        appointment_filters.append(
+                            Appointment.doctor_id == visit.doctor_id
+                        )
+                    if visit.visit_time:
+                        _hhmm = visit.visit_time[:5]
+                        appointment_filters.append(
+                            Appointment.appointment_time.in_((_hhmm, f"{_hhmm}:00"))
+                        )
+                    else:
+                        appointment_filters.append(
+                            Appointment.appointment_time.is_(None)
+                        )
+                    self.db.query(Appointment).filter(*appointment_filters).update(
+                        {"appointment_date": queue_day}, synchronize_session=False
+                    )
+                    visit.visit_date = queue_day
+                    return visit
+                # Shared by live same-day tickets: fall through to the
+                # branch resolution below (a fresh visit for THIS queue
+                # day + relink — the peers keep the old one).
 
         queue_day = getattr(entry.queue, "day", None) or clinic_today(self.db)
         visit = (
@@ -996,40 +1072,93 @@ class NurseServingApiService:
                         return resource, entry
         return None, entry
 
-    def _authorize_execution_terminal(
-        self, execution: ServiceExecution, user_id: int
-    ) -> tuple[QueueResource | None, OnlineQueueEntry | None]:
-        """ACTIVE assignment on the execution's station, or the drain rule.
+    def _execution_station_or_error(
+        self, execution: ServiceExecution
+    ) -> tuple[QueueResource, OnlineQueueEntry]:
+        """The execution's station, with the FULL chain validated (codex P1).
 
-        The drain (the brief's mid-flight deactivation decision): the
-        STARTER of an in_progress attempt may always END it — without
-        this, a deactivation mid-flight would strand the row
-        in_progress forever (the 0072 partial unique one-active index
-        would block every retry). The drain cannot claim anything new.
+        The graceful-drain bypass must never authorize a mutation whose
+        station identity is not reconstructable AND consistent:
+        - the entry must exist (``queue_entry_id`` is nullable — an entry
+          purge SET NULLs it; an orphaned execution has no servable
+          station context, only the ledger keeps its history);
+        - the resource must resolve from the entry's queue (owner axis or
+          the bridged tag axis);
+        - the CHAIN must be consistent: the execution's VisitService
+          belongs to the entry's visit AND routes to that resource (D3:
+          queue_tag match + requires_doctor=false). Without this a
+          hand-applied cross-station row (station-A entry, station-B
+          service) let an A-assigned starter complete B-routed work and
+          the last-completer check — seeing NO station-A services — flip
+          the entry to served on the empty-station predicate.
         """
         resource, entry = self._execution_station_resource(execution)
-        if resource is not None:
-            assignment = (
-                self.db.query(NurseWorkplaceAssignment)
-                .filter(
-                    NurseWorkplaceAssignment.user_id == user_id,
-                    NurseWorkplaceAssignment.queue_resource_id == resource.id,
-                    NurseWorkplaceAssignment.is_active.is_(True),
-                )
-                .first()
+        if resource is None or entry is None:
+            raise NurseServingApiDomainError(
+                403,
+                "Исполнение id="
+                f"{execution.id} не связано с записью очереди рабочего "
+                "места (контекст станции невосстановим) — операция "
+                "недоступна с обслуживающей поверхности",
             )
-            if assignment is not None:
-                return resource, entry
-        if execution.started_by_user_id == user_id:
-            # Graceful drain: the starter ends the attempt she holds.
-            return resource, entry
-        target = (
-            f"queue_resource_id={resource.id}" if resource is not None else "станции"
+        visit_service = self.db.get(VisitService, execution.visit_service_id)
+        service = (
+            self.db.get(Service, visit_service.service_id)
+            if visit_service is not None
+            else None
         )
+        if (
+            visit_service is None
+            or entry.visit_id is None
+            or visit_service.visit_id != entry.visit_id
+            or service is None
+            or not _service_routed_to_station(service, resource)
+        ):
+            raise NurseServingApiDomainError(
+                403,
+                "Исполнение id="
+                f"{execution.id} не согласовано со станцией "
+                f"(queue_resource_id={resource.id}): услуга не принадлежит "
+                "визиту записи или не маршрутизирована на эту станцию "
+                "(D3) — операция недоступна",
+            )
+        return resource, entry
+
+    def _authorize_execution_terminal(
+        self, execution: ServiceExecution, user_id: int
+    ) -> tuple[QueueResource, OnlineQueueEntry]:
+        """Validated station + ACTIVE assignment, or the bounded drain rule.
+
+        Codex round-1 P1: the station chain is validated FIRST — the
+        starter bypass (below) never applies to an orphaned or
+        cross-station execution. The drain (the brief's mid-flight
+        deactivation decision): the STARTER of an in_progress attempt
+        may always END it — without this, a deactivation mid-flight
+        would strand the row in_progress forever (the 0072 partial
+        unique one-active index would block every retry). The drain
+        cannot claim anything new.
+        """
+        resource, entry = self._execution_station_or_error(execution)
+        assignment = (
+            self.db.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == user_id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+                NurseWorkplaceAssignment.is_active.is_(True),
+            )
+            .first()
+        )
+        if assignment is not None:
+            return resource, entry
+        if execution.started_by_user_id == user_id:
+            # Graceful drain: the starter ends the attempt she holds —
+            # on a VALIDATED station chain only (see above).
+            return resource, entry
         raise NurseServingApiDomainError(
             403,
             "Нет активного назначения на рабочее место "
-            f"({target}) для завершения исполнения id={execution.id}",
+            f"(queue_resource_id={resource.id}) для завершения исполнения "
+            f"id={execution.id}",
         )
 
     def complete_execution(
@@ -1048,11 +1177,19 @@ class NurseServingApiService:
         ``served_by_user_id`` is the flipping nurse (§6).
         """
         execution = self._execution_or_error(execution_id)
-        resource, _entry = self._authorize_execution_terminal(execution, user_id)
 
+        # Codex round-1 P2: the same-PERFORMER terminal replay is checked
+        # BEFORE the assignment authorization — a nurse who completed the
+        # attempt and lost the response must still get her 200 no-op after
+        # a mid-flight assignment deactivation (the replay discloses only
+        # her own already-committed attribution, never new state).
         if execution.status == "completed":
             if execution.performed_by_user_id == user_id:
                 return self._execution_payload(execution)
+
+        resource, _entry = self._authorize_execution_terminal(execution, user_id)
+
+        if execution.status == "completed":
             raise NurseServingApiDomainError(
                 409,
                 f"Исполнение id={execution_id} уже завершено "
@@ -1168,11 +1305,16 @@ class NurseServingApiService:
         either retries or terminates the entry explicitly.
         """
         execution = self._execution_or_error(execution_id)
-        _resource, _entry = self._authorize_execution_terminal(execution, user_id)
 
+        # Codex round-1 P2: the same-PERFORMER terminal replay precedes
+        # the assignment authorization (see complete_execution).
         if execution.status == "incomplete":
             if execution.performed_by_user_id == user_id:
                 return self._execution_payload(execution)
+
+        _resource, _entry = self._authorize_execution_terminal(execution, user_id)
+
+        if execution.status == "incomplete":
             raise NurseServingApiDomainError(
                 409,
                 f"Исполнение id={execution_id} уже отмечено незавершённым "

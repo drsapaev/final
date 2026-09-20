@@ -1072,3 +1072,289 @@ class TestReadPlane:
         with pytest.raises(NurseServingApiDomainError) as exc:
             NurseServingApiService(db_session).get_station_state(nurse.id, resource.id)
         _expect(exc, 403)
+
+
+# ----------------------------------------------------------------------------
+# I. codex round-1 regressions (station chain / visit-day transfer / replay)
+# ----------------------------------------------------------------------------
+
+
+class TestCodexRound1StationChain:
+    """P1 (L1025): the drain bypass requires a validated station chain."""
+
+    def _world(self, db: Session):
+        nurse = _nurse(db, "n23_chain_nurse")
+        resource = _resource(db)
+        _assignment(db, nurse, resource, cabinet="c2")
+        queue = _station_queue(db, resource)
+        service = NurseServingApiService(db)
+        return nurse, resource, queue, service
+
+    def _inflight_execution(self, db: Session):
+        nurse, resource, queue, service = self._world(db)
+        patient = _patient(db, "Chain")
+        entry = _entry(db, queue, 1, patient=patient)
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry.id)
+        visit = db.get(Visit, entry.visit_id)
+        svc = _service(db, "CHN1", queue_tag=resource.queue_tag)
+        vs = _visit_service(db, visit, svc)
+        execution = service.create_execution(
+            nurse.id, resource.id, queue_entry_id=entry.id, visit_service_id=vs.id
+        )
+        return nurse, resource, queue, service, entry, visit, vs, execution
+
+    def test_orphaned_execution_is_refused_even_for_the_starter(
+        self, db_session: Session
+    ):
+        # queue_entry_id is nullable (ON DELETE SET NULL): an orphaned
+        # execution has NO reconstructable station — neither assignment
+        # nor drain may authorize its mutation from the serving plane.
+        (
+            nurse,
+            _resource,
+            _queue,
+            service,
+            _entry,
+            _visit,
+            _vs,
+            execution,
+        ) = self._inflight_execution(db_session)
+        db_session.query(ServiceExecution).filter(
+            ServiceExecution.id == execution["id"]
+        ).update({"queue_entry_id": None})
+        db_session.commit()
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            service.complete_execution(nurse.id, execution["id"])
+        _expect(exc, 403)
+
+    def test_cross_station_hand_applied_row_is_refused(self, db_session: Session):
+        # Station-A entry + station-B-routed VisitService: the A-assigned
+        # STARTER must not complete B-routed work through the drain, and
+        # the empty-station last-completer predicate must never flip.
+        (
+            nurse,
+            resource,
+            _queue,
+            service,
+            entry,
+            visit,
+            _vs,
+            execution,
+        ) = self._inflight_execution(db_session)
+        resource_b = _resource(db_session, "station_b")
+        b_service = _service(db_session, "CHNB", queue_tag=resource_b.queue_tag)
+        # Hand-apply: repoint the execution's VisitService to a B-routed
+        # service of the SAME visit (violates the D3 chain for station A).
+        b_vs = _visit_service(db_session, visit, b_service)
+        db_session.query(ServiceExecution).filter(
+            ServiceExecution.id == execution["id"]
+        ).update({"visit_service_id": b_vs.id})
+        db_session.commit()
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            service.complete_execution(nurse.id, execution["id"])
+        _expect(exc, 403)
+        db_session.refresh(entry)
+        assert entry.status == "in_progress"  # no empty-station flip
+
+    def test_foreign_visit_execution_is_refused(self, db_session: Session):
+        (
+            nurse,
+            _resource,
+            _queue,
+            service,
+            entry,
+            entry_visit,
+            vs,
+            execution,
+        ) = self._inflight_execution(db_session)
+        other_patient = _patient(db_session, "ChainOther")
+        other_visit = _visit(
+            db_session, other_patient, department="other", status="open"
+        )
+        # Hand-applied drift: the VisitService row is repointed at
+        # another visit — the execution's chain is inconsistent.
+        db_session.query(VisitService).filter(VisitService.id == vs.id).update(
+            {"visit_id": other_visit.id}
+        )
+        db_session.commit()
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            service.complete_execution(nurse.id, execution["id"])
+        _expect(exc, 403)
+        db_session.refresh(entry)
+        assert entry.status == "in_progress"
+        assert entry_visit is not None
+
+
+class TestCodexRound1VisitDayTransfer:
+    """P1 (L780): the linked visit is revalidated against the queue day."""
+
+    def _world(self, db: Session, *, visit_day):
+
+        nurse = _nurse(db, "n23_transfer_nurse")
+        resource = _resource(db)
+        _assignment(db, nurse, resource)
+        queue = _station_queue(db, resource)
+        patient = _patient(db, "Transfer")
+        visit = _visit(db, patient, department=resource.queue_tag, day=visit_day)
+        entry = _entry(db, queue, 1, patient=patient, visit=visit)
+        service = NurseServingApiService(db)
+        service.call_next(nurse.id, resource.id)
+        return nurse, resource, queue, patient, visit, entry, service
+
+    def test_solo_yesterday_visit_is_restamped_with_its_appointment(
+        self, db_session: Session
+    ):
+        from datetime import timedelta
+
+        from app.models.appointment import Appointment
+
+        today = clinic_today(db_session)
+        nurse, resource, _queue, patient, visit, entry, service = self._world(
+            db_session, visit_day=today - timedelta(days=1)
+        )
+        appointment = Appointment(
+            patient_id=patient.id,
+            appointment_date=visit.visit_date,
+            appointment_time=None,
+            doctor_id=None,
+            status="confirmed",
+        )
+        db_session.add(appointment)
+        db_session.commit()
+        db_session.refresh(appointment)
+
+        result = service.start_entry(nurse.id, resource.id, entry.id)
+        assert result["visit_id"] == visit.id
+        db_session.refresh(visit)
+        assert visit.visit_date == today  # the solo visit followed the ticket
+        db_session.refresh(appointment)
+        assert appointment.appointment_date == today  # round-43 mirror
+        assert (
+            db_session.query(Visit).filter(Visit.patient_id == patient.id).count() == 1
+        )
+
+    def test_shared_yesterday_visit_yields_a_fresh_same_day_visit(
+        self, db_session: Session
+    ):
+        from datetime import timedelta
+
+        today = clinic_today(db_session)
+        nurse, resource, queue, patient, visit, entry, service = self._world(
+            db_session, visit_day=today - timedelta(days=1)
+        )
+        # A live yesterday peer ticket of ANOTHER station still anchors
+        # the old visit: the nurse resolution must NOT re-stamp it.
+        other_resource = _resource(db_session, "transfer_anchor")
+        peer_queue = _station_queue(
+            db_session, other_resource, day=today - timedelta(days=1)
+        )
+        peer = OnlineQueueEntry(
+            queue_id=peer_queue.id,
+            number=9,
+            patient_id=patient.id,
+            patient_name=patient.first_name,
+            status="waiting",
+            source="desk",
+            visit_id=visit.id,
+        )
+        db_session.add(peer)
+        db_session.commit()
+
+        result = service.start_entry(nurse.id, resource.id, entry.id)
+        assert result["visit_id"] is not None
+        assert result["visit_id"] != visit.id  # a FRESH visit was resolved
+        db_session.refresh(visit)
+        assert visit.visit_date == today - timedelta(days=1)  # untouched
+        fresh = db_session.get(Visit, result["visit_id"])
+        assert fresh.visit_date == today
+        assert fresh.department == resource.queue_tag
+        db_session.refresh(entry)
+        assert entry.visit_id == fresh.id  # relinked
+
+    def test_same_day_visit_is_served_as_is(self, db_session: Session):
+        nurse, resource, _queue, patient, visit, entry, service = self._world(
+            db_session, visit_day=clinic_today(db_session)
+        )
+        result = service.start_entry(nurse.id, resource.id, entry.id)
+        assert result["visit_id"] == visit.id
+        assert (
+            db_session.query(Visit).filter(Visit.patient_id == patient.id).count() == 1
+        )
+
+
+class TestCodexRound1TerminalReplayBeforeAuth:
+    """P2 (L1051): the same-performer replay precedes authorization."""
+
+    def _completed_then_deactivated(self, db: Session):
+        nurse = _nurse(db, "n23_replay_nurse")
+        resource = _resource(db)
+        assignment = _assignment(db, nurse, resource, cabinet="c2")
+        queue = _station_queue(db, resource)
+        patient = _patient(db, "Replay")
+        entry = _entry(db, queue, 1, patient=patient)
+        service = NurseServingApiService(db)
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry.id)
+        visit = db.get(Visit, entry.visit_id)
+        svc = _service(db, "RPL1", queue_tag=resource.queue_tag)
+        vs = _visit_service(db, visit, svc)
+        execution = service.create_execution(
+            nurse.id, resource.id, queue_entry_id=entry.id, visit_service_id=vs.id
+        )
+        service.complete_execution(nurse.id, execution["id"])
+        # Mid-flight: the assignment is deactivated AFTER the completion.
+        assignment.is_active = False
+        db.commit()
+        return nurse, resource, entry, execution, service
+
+    def test_completed_replay_survives_assignment_deactivation(
+        self, db_session: Session
+    ):
+        nurse, _resource, entry, execution, service = self._completed_then_deactivated(
+            db_session
+        )
+        result = service.complete_execution(nurse.id, execution["id"])
+        assert result["status"] == "completed"
+        assert result["performed_by_user_id"] == nurse.id
+        db_session.refresh(entry)
+        assert entry.status == "served"  # the flip is not re-triggered
+
+    def test_incomplete_replay_survives_assignment_deactivation(
+        self, db_session: Session
+    ):
+        nurse = _nurse(db_session, "n23_replay_incomplete")
+        resource = _resource(db_session)
+        assignment = _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "ReplayInc")
+        entry = _entry(db_session, queue, 1, patient=patient)
+        service = NurseServingApiService(db_session)
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry.id)
+        visit = db_session.get(Visit, entry.visit_id)
+        svc = _service(db_session, "RPL2", queue_tag=resource.queue_tag)
+        vs = _visit_service(db_session, visit, svc)
+        execution = service.create_execution(
+            nurse.id, resource.id, queue_entry_id=entry.id, visit_service_id=vs.id
+        )
+        service.incomplete_execution(nurse.id, execution["id"], "delayed")
+        assignment.is_active = False
+        db_session.commit()
+        result = service.incomplete_execution(nurse.id, execution["id"], "delayed")
+        assert result["status"] == "incomplete"
+        assert result["performed_by_user_id"] == nurse.id
+
+    def test_other_user_terminal_conflict_still_requires_authorization(
+        self, db_session: Session
+    ):
+        # The PRE-auth replay covers only the SAME performer; another
+        # user on a terminal attempt still passes through authorization
+        # and gets the 403 (no assignment) — not a state disclosure.
+        nurse, _resource, _entry, execution, service = self._completed_then_deactivated(
+            db_session
+        )
+        outsider = _nurse(db_session, "n23_replay_outsider")
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            service.complete_execution(outsider.id, execution["id"])
+        _expect(exc, 403)
