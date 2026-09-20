@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app.models.nurse_workplace import NurseWorkplaceAssignment
 from app.models.online_queue import QueueResource
 from app.models.user import User
+from app.models.user_profile import UserAuditLog
 
 _BASE_PATH = "/api/v1/admin/nurse-workplace-assignments"
 
@@ -88,6 +89,15 @@ def _resource(db_session: Session, code: str) -> QueueResource:
 
 def _assignment_count(db_session: Session) -> int:
     return db_session.query(NurseWorkplaceAssignment).count()
+
+
+def _assignment_audit_rows(db_session: Session) -> list[UserAuditLog]:
+    """Codex round-2 P2: ledger rows for THIS control plane."""
+    return (
+        db_session.query(UserAuditLog)
+        .filter(UserAuditLog.resource_type == "nurse_workplace_assignments")
+        .all()
+    )
 
 
 @pytest.mark.integration
@@ -157,6 +167,28 @@ def test_active_admin_operates_the_control_plane(
     response = client.post(f"{_BASE_PATH}/{assignment_id}/deactivate", headers=headers)
     assert response.status_code == 200
     assert response.json()["is_active"] is False
+
+    # Codex round-2 P2: both mutations are actor-attributed in the ledger —
+    # the acting Admin's id and the (user_id, queue_resource_id) grant are
+    # reconstructable from UserAuditLog alone (the AuditMiddleware's
+    # anonymous collection-path POST cannot provide either).
+    audit_rows = _assignment_audit_rows(db_session)
+    assert len(audit_rows) == 2
+    by_action = {row.action: row for row in audit_rows}
+    assert set(by_action) == {"CREATE", "UPDATE"}
+    for row in audit_rows:
+        assert row.user_id == admin.id
+    grant = {
+        "user_id": nurse.id,
+        "queue_resource_id": resource.id,
+        "cabinet_override": None,
+        "is_active": True,
+    }
+    assert by_action["CREATE"].resource_id == assignment_id
+    assert by_action["CREATE"].new_values == grant
+    assert by_action["UPDATE"].resource_id == assignment_id
+    assert by_action["UPDATE"].old_values == grant
+    assert by_action["UPDATE"].new_values == {**grant, "is_active": False}
 
 
 @pytest.mark.integration

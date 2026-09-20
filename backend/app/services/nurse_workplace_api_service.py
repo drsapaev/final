@@ -40,6 +40,18 @@ exactly one request flips the row; the loser gets rowcount=0 and
 re-reads to decide 404 (row gone) vs 409 (row exists, already
 inactive).
 
+Mutation audit (codex round-2 P2): every create/deactivate commits an
+actor-attributed ``UserAuditLog`` row IN THE SAME TRANSACTION as the
+mutation. The generic AuditMiddleware runs before dependency
+authentication and omits request bodies, so a collection-path POST is
+logged anonymously — an authorization grant must be reconstructable
+(actor + the (user_id, queue_resource_id) pair) from the ledger alone.
+The audit row is written unconditionally (an unattributed row still
+records WHAT changed); production attribution is guaranteed by the
+endpoint, which always passes the authenticated ``current_user`` plus
+the request context (request_id / ip / user_agent) collected by
+``audit_log_dependency``.
+
 Error mapping: 404 = referenced entity not found; 400 = entity fails the
 boundary validation (not a Nurse / deactivated user / inactive resource);
 409 = conflict with the current state (duplicate active pair, assignment
@@ -53,6 +65,7 @@ from typing import Any
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
+from app.core.audit import log_audit_event
 from app.core.roles import normalize_role_value
 from app.models.nurse_workplace import NurseWorkplaceAssignment
 from app.models.online_queue import QueueResource
@@ -193,6 +206,9 @@ class NurseWorkplaceApiService:
         user_id: int,
         queue_resource_id: int,
         cabinet_override: str | None,
+        acting_admin_id: int | None = None,
+        acting_admin_username: str | None = None,
+        audit_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         # Review P2 (round 2 — TOCTOU): every eligibility read below runs
         # UNDER the target row locks (users row, then queue_resources row)
@@ -243,6 +259,34 @@ class NurseWorkplaceApiService:
             is_active=True,
         )
         self.db.add(assignment)
+        # Materialize the PK inside THIS transaction so the audit row can
+        # reference the exact row it attributes (codex round-2 P2): the
+        # INSERT itself still commits atomically with the audit row below.
+        self.db.flush()
+        log_audit_event(
+            db=self.db,
+            user_id=acting_admin_id,
+            action="CREATE",
+            table_name="nurse_workplace_assignments",
+            row_id=assignment.id,
+            old_values=None,
+            new_values={
+                "user_id": user_id,
+                "queue_resource_id": queue_resource_id,
+                "cabinet_override": cabinet_override,
+                "is_active": True,
+            },
+            request_id=(audit_context or {}).get("request_id"),
+            ip_address=(audit_context or {}).get("ip_address"),
+            user_agent=(audit_context or {}).get("user_agent"),
+            description=(
+                "NURSE-V2 N2-2: admin "
+                f"{acting_admin_username or acting_admin_id or 'unknown'} "
+                f"granted user_id={user_id} -> "
+                f"queue_resource_id={queue_resource_id} "
+                f"(cabinet_override={cabinet_override!r})"
+            ),
+        )
         self.db.commit()
         self.db.refresh(assignment)
         return self._enrich([assignment])[0]
@@ -299,7 +343,14 @@ class NurseWorkplaceApiService:
             )
         return self._enrich([row])[0]
 
-    def deactivate_assignment(self, assignment_id: int) -> dict[str, Any]:
+    def deactivate_assignment(
+        self,
+        assignment_id: int,
+        *,
+        acting_admin_id: int | None = None,
+        acting_admin_username: str | None = None,
+        audit_context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         # Atomic guarded transition (review P2-1): read-check-write here
         # would let two concurrent requests both observe is_active=True
         # and both return 200, violating the endpoint's 409 contract. A
@@ -307,6 +358,22 @@ class NurseWorkplaceApiService:
         # the flip atomic at the row level; the loser sees rowcount=0 and
         # re-reads to distinguish 404 (row does not exist) from 409 (row
         # exists, already inactive).
+        #
+        # The pre-UPDATE snapshot below is a plain fresh read taken ONLY
+        # for the audit record (codex round-2 P2); the guarded UPDATE — not
+        # this read — remains the decision-maker, so a concurrent writer
+        # between the two still yields exactly-one-winner semantics.
+        prior = self._refetch(assignment_id)
+        prior_values = (
+            {
+                "user_id": prior.user_id,
+                "queue_resource_id": prior.queue_resource_id,
+                "cabinet_override": prior.cabinet_override,
+                "is_active": True,
+            }
+            if prior is not None
+            else None
+        )
         result = self.db.execute(
             update(NurseWorkplaceAssignment)
             .where(
@@ -318,6 +385,7 @@ class NurseWorkplaceApiService:
         if result.rowcount == 0:
             # Nothing was flipped by THIS request: either the row is gone
             # (404) or a concurrent writer already deactivated it (409).
+            # No mutation happened -> NO audit row is written.
             self.db.rollback()
             row = self._refetch(assignment_id)
             if row is None:
@@ -327,6 +395,29 @@ class NurseWorkplaceApiService:
             raise NurseWorkplaceApiDomainError(
                 409, f"Назначение id={assignment_id} уже неактивно"
             )
+        log_audit_event(
+            db=self.db,
+            user_id=acting_admin_id,
+            action="UPDATE",
+            table_name="nurse_workplace_assignments",
+            row_id=assignment_id,
+            old_values=prior_values,
+            new_values=({**prior_values, "is_active": False} if prior_values else None),
+            request_id=(audit_context or {}).get("request_id"),
+            ip_address=(audit_context or {}).get("ip_address"),
+            user_agent=(audit_context or {}).get("user_agent"),
+            description=(
+                "NURSE-V2 N2-2: admin "
+                f"{acting_admin_username or acting_admin_id or 'unknown'} "
+                f"revoked assignment id={assignment_id}"
+                + (
+                    f" (user_id={prior.user_id} -> "
+                    f"queue_resource_id={prior.queue_resource_id})"
+                    if prior is not None
+                    else ""
+                )
+            ),
+        )
         self.db.commit()
         row = self._refetch(assignment_id)
         if row is None:  # pragma: no cover - just flipped by this request

@@ -26,10 +26,13 @@ the shape FastAPI's HTTPException returns for the auth failures.
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_active_roles
+from app.core.audit import audit_log_dependency
 from app.models.user import User
 from app.schemas.nurse_workplace import (
     NurseWorkplaceAssignmentCreateRequest,
@@ -101,6 +104,7 @@ def create_nurse_workplace_assignment(
     payload: NurseWorkplaceAssignmentCreateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_active_roles("Admin")),
+    audit_context: dict[str, Any] = Depends(audit_log_dependency),
 ):
     """Assign a Nurse User to a QueueResource workplace (D2 FINAL).
 
@@ -109,12 +113,20 @@ def create_nurse_workplace_assignment(
     assignment for the same (user, resource) pair already exists;
     401/403 — the control-plane auth contract (see
     _AUTH_ERROR_RESPONSES).
+
+    The mutation is committed with an actor-attributed UserAuditLog row
+    in the same transaction (codex round-2 P2): the acting Admin and the
+    (user_id, queue_resource_id) grant are reconstructable from the
+    ledger alone.
     """
     try:
         data = NurseWorkplaceApiService(db).create_assignment(
             user_id=payload.user_id,
             queue_resource_id=payload.queue_resource_id,
             cabinet_override=payload.cabinet_override,
+            acting_admin_id=current_user.id,
+            acting_admin_username=current_user.username,
+            audit_context=audit_context,
         )
     except NurseWorkplaceApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
@@ -191,6 +203,7 @@ def deactivate_nurse_workplace_assignment(
     assignment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_active_roles("Admin")),
+    audit_context: dict[str, Any] = Depends(audit_log_dependency),
 ):
     """Deactivate an assignment (the row stays as history; D2 FINAL).
 
@@ -198,9 +211,17 @@ def deactivate_nurse_workplace_assignment(
     for the same (user, resource) pair may be created afterwards;
     401/403 — the control-plane auth contract (see
     _AUTH_ERROR_RESPONSES).
+
+    The transition is committed with an actor-attributed UserAuditLog
+    row in the same transaction (codex round-2 P2).
     """
     try:
-        data = NurseWorkplaceApiService(db).deactivate_assignment(assignment_id)
+        data = NurseWorkplaceApiService(db).deactivate_assignment(
+            assignment_id,
+            acting_admin_id=current_user.id,
+            acting_admin_username=current_user.username,
+            audit_context=audit_context,
+        )
     except NurseWorkplaceApiDomainError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return _to_response(data)

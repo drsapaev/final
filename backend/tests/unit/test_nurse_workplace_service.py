@@ -35,6 +35,7 @@ from app.db.base_class import Base
 from app.models.nurse_workplace import NurseWorkplaceAssignment
 from app.models.online_queue import QueueResource
 from app.models.user import User
+from app.models.user_profile import UserAuditLog
 from app.schemas.nurse_workplace import NurseWorkplaceAssignmentCreateRequest
 from app.services.nurse_workplace_api_service import (
     NurseWorkplaceApiDomainError,
@@ -174,6 +175,151 @@ def test_effective_cabinet_is_null_coalesced_not_truthiness(session) -> None:
     assert items[0]["cabinet_override"] == ""
     assert items[0]["effective_cabinet"] == ""
     assert items[0]["effective_cabinet"] != resource.default_cabinet
+
+
+def _audit_rows(session) -> list[UserAuditLog]:
+    return (
+        session.query(UserAuditLog)
+        .filter(UserAuditLog.resource_type == "nurse_workplace_assignments")
+        .all()
+    )
+
+
+def test_create_assignment_writes_actor_attributed_audit_row(session) -> None:
+    """Codex round-2 P2: the grant is reconstructable from the ledger.
+
+    The generic AuditMiddleware logs a collection-path POST anonymously
+    (it runs before dependency authentication and omits bodies), so the
+    service itself commits an actor-attributed UserAuditLog row IN THE
+    SAME transaction: acting admin + the (user_id, queue_resource_id)
+    grant + the request context.
+    """
+    admin = _user(session, "admin_audit", role="Admin")
+    nurse = _user(session, "nurse_audit")
+    resource = _resource(session, "procedures")
+    data = _svc(session).create_assignment(
+        user_id=nurse.id,
+        queue_resource_id=resource.id,
+        cabinet_override="7",
+        acting_admin_id=admin.id,
+        acting_admin_username=admin.username,
+        audit_context={
+            "request_id": "req-audit-1",
+            "ip_address": "10.0.0.9",
+            "user_agent": "audit-ua",
+        },
+    )
+    rows = _audit_rows(session)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.user_id == admin.id
+    assert row.action == "CREATE"
+    assert row.resource_id == data["id"]
+    assert row.new_values == {
+        "user_id": nurse.id,
+        "queue_resource_id": resource.id,
+        "cabinet_override": "7",
+        "is_active": True,
+    }
+    assert row.old_values is None
+    assert row.request_id == "req-audit-1"
+    assert row.ip_address == "10.0.0.9"
+    assert row.user_agent == "audit-ua"
+    assert admin.username in (row.description or "")
+    assert f"user_id={nurse.id}" in (row.description or "")
+    assert f"queue_resource_id={resource.id}" in (row.description or "")
+
+
+def test_deactivate_assignment_writes_actor_attributed_audit_row(session) -> None:
+    """Codex round-2 P2: the revocation is reconstructable too."""
+    admin = _user(session, "admin_audit2", role="Admin")
+    nurse = _user(session, "nurse_audit2")
+    resource = _resource(session, "ecg")
+    svc = _svc(session)
+    data = svc.create_assignment(
+        user_id=nurse.id, queue_resource_id=resource.id, cabinet_override=None
+    )
+    session.query(UserAuditLog).filter(
+        UserAuditLog.resource_type == "nurse_workplace_assignments"
+    ).delete()
+    session.commit()
+
+    svc.deactivate_assignment(
+        data["id"],
+        acting_admin_id=admin.id,
+        acting_admin_username=admin.username,
+    )
+    rows = _audit_rows(session)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.user_id == admin.id
+    assert row.action == "UPDATE"
+    assert row.resource_id == data["id"]
+    assert row.old_values == {
+        "user_id": nurse.id,
+        "queue_resource_id": resource.id,
+        "cabinet_override": None,
+        "is_active": True,
+    }
+    assert row.new_values == {
+        "user_id": nurse.id,
+        "queue_resource_id": resource.id,
+        "cabinet_override": None,
+        "is_active": False,
+    }
+    assert admin.username in (row.description or "")
+
+
+def test_failed_mutations_write_no_audit_rows(session) -> None:
+    """No mutation -> no audit row: 404 unknown target, 409 duplicate
+    active pair, 409 double-deactivate, 404 unknown assignment id."""
+    nurse = _user(session, "nurse_audit3")
+    resource = _resource(session, "lab")
+    svc = _svc(session)
+    with pytest.raises(NurseWorkplaceApiDomainError):
+        svc.create_assignment(
+            user_id=999999,
+            queue_resource_id=resource.id,
+            cabinet_override=None,
+            acting_admin_id=1,
+        )
+    assert _audit_rows(session) == []
+
+    svc.create_assignment(
+        user_id=nurse.id,
+        queue_resource_id=resource.id,
+        cabinet_override=None,
+        acting_admin_id=1,
+    )
+    session.query(UserAuditLog).filter(
+        UserAuditLog.resource_type == "nurse_workplace_assignments"
+    ).delete()
+    session.commit()
+
+    assignment_id = (
+        session.query(NurseWorkplaceAssignment)
+        .filter(NurseWorkplaceAssignment.user_id == nurse.id)
+        .one()
+        .id
+    )
+    with pytest.raises(NurseWorkplaceApiDomainError) as exc:
+        svc.create_assignment(
+            user_id=nurse.id,
+            queue_resource_id=resource.id,
+            cabinet_override=None,
+            acting_admin_id=1,
+        )
+    assert exc.value.status_code == 409
+    with pytest.raises(NurseWorkplaceApiDomainError):
+        svc.deactivate_assignment(424242, acting_admin_id=1)
+    assert _audit_rows(session) == []
+
+    svc.deactivate_assignment(assignment_id, acting_admin_id=1)
+    with pytest.raises(NurseWorkplaceApiDomainError) as exc:
+        svc.deactivate_assignment(assignment_id, acting_admin_id=1)
+    assert exc.value.status_code == 409
+    # exactly ONE audit row: the successful deactivation only
+    assert len(_audit_rows(session)) == 1
 
 
 def test_create_rejects_unknown_user_with_404(session) -> None:
