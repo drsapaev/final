@@ -73,7 +73,7 @@ function instanceIdsMatch(
   return String(left) === String(right);
 }
 
-// PR #3351: фактический instance param из ТЕКУЩЕГО адреса браузера.
+// PR 3351: фактический instance param из ТЕКУЩЕГО адреса браузера.
 // instanceParamRef обновляется только на рендере и может отставать от
 // последнего navigate (например, быстрый второй клик пациента до
 // popstate/render URL-записи первого перехода): тогда pendingSync получал
@@ -335,7 +335,7 @@ export default function LabPanel() {
     }
   }, [activeTab, searchParams]);
 
-  // PR #3351: URL-запись строится от АКТУАЛЬНОГО поискового запроса
+  // PR 3351: URL-запись строится от АКТУАЛЬНОГО поискового запроса
   // браузера, а не от замыкания location.search конкретного рендера:
   // пассивные эффекты прошлого рендера доливаются ПОСЛЕ нового navigate
   // (replaceState синхронен), и «сохранение» patient/instance из старой
@@ -588,7 +588,7 @@ export default function LabPanel() {
     (pending: boolean) => setOperationSourcePending('template', pending),
     [setOperationSourcePending],
   );
-  // Контракт блокирующих операций (PR #3351):
+  // Контракт блокирующих операций (PR 3351):
   // - report/template SAVE (draft, finalize, revise, print, autosave)
   //   блокирует КОНТЕКСТНЫЕ переходы затрагиваемого источника — переход
   //   посреди записи мог бы создать повторную запись или разрушительный
@@ -874,7 +874,7 @@ export default function LabPanel() {
     const requestId = beginInstanceTransition(instanceId, {
       forcePending: options.clearCurrent,
     });
-    // PR #3351: instance param, с которого стартовал этот переход. Если за
+    // PR 3351: instance param, с которого стартовал этот переход. Если за
     // время запроса адресная строка сменилась ВНЕШНЕЙ навигацией на другой
     // instance (не источник и не цель), откат в catch не должен затирать
     // новое намерение — restore effect сделает supersede и откроет его.
@@ -928,7 +928,7 @@ export default function LabPanel() {
     } catch (error) {
       if (requestId !== instanceRequestSequenceRef.current) return;
       setInstanceTransitionPending(false);
-      // PR #3351: если адресная строка уже принадлежит более новому внешнему
+      // PR 3351: если адресная строка уже принадлежит более новому внешнему
       // намерению (instance param не равен ни цели, ни источнику этого
       // перехода), откат и pending-контракт не нужны: restore effect вот-вот
       // сделает supersede и откроет новый intent. Откат здесь затирал бы
@@ -1000,7 +1000,7 @@ export default function LabPanel() {
           // Keep a rollback contract while React Router is still exposing the
           // cancelled external URL. Otherwise the restore effect observes it
           // once more and immediately opens a second dirty-state dialog.
-          // PR #3351: если адресная строка уже занята более новым внешним
+          // PR 3351: если адресная строка уже занята более новым внешним
           // намерением (другой instance), откат не должен его затирать —
           // restore effect сделает supersede и обработает новый intent.
           const cancelledUrlInstanceId = getCurrentUrlInstanceId(instanceParamRef.current);
@@ -1041,7 +1041,7 @@ export default function LabPanel() {
     // с location текущего рендера. Синхронизация state→URL не должна писать
     // поверх ещё не обработанного намерения (иначе instance=89 из внешнего
     // URL затирался обратно на instance=88 до того, как restore effect
-    // успевал его открыть — PR #3351). Собственные navigate тоже опережают
+    // успевал его открыть — PR 3351). Собственные navigate тоже опережают
     // замыкание эффекта, но тогда window совпадает с lastAppWrittenSearch —
     // это наш URL, и писать из него как из базы безопасно.
     if (
@@ -1052,7 +1052,7 @@ export default function LabPanel() {
       return;
     }
     const pendingSync = pendingInstanceUrlSyncRef.current;
-    // PR #3351: сравниваем с фактическим instance param текущего адреса —
+    // PR 3351: сравниваем с фактическим instance param текущего адреса —
     // замыкание instanceParamId может отставать от последней URL-записи.
     const currentUrlInstanceId = getCurrentUrlInstanceId(
       instanceParamId != null ? String(instanceParamId) : null,
@@ -1114,7 +1114,7 @@ export default function LabPanel() {
   // the URL can briefly retain the old instance id; do not let that stale id
   // overwrite the report already selected by the user.
   useEffect(() => {
-    // PR #3351: фактический instance param из ТЕКУЩЕГО адреса, а не из
+    // PR 3351: фактический instance param из ТЕКУЩЕГО адреса, а не из
     // замыкания рендера: URL-запись предыдущего перехода могла ещё не
     // отрендериться (быстрый второй клик пациента), и замыкание со
     // старым/null значением разрывало pendingSync-контракт ложным

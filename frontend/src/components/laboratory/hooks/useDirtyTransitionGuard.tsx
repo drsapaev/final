@@ -207,7 +207,7 @@ export function useDirtyTransitionGuard(options?: {
   // атомарно вместе с коммитом.
   cancelRef.current = cancel;
 
-  // Детерминированное владение Escape (PR #3351):
+  // Детерминированное владение Escape (PR 3351):
   // - listener на document в CAPTURE-фазе: закрывает диалог при Escape при
   //   любой позиции фокуса (в т.ч. body до requestAnimationFrame-автофокуса
   //   Modal), раньше пассивных bubble-listener-ов;

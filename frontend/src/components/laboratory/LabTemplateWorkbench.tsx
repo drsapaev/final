@@ -669,7 +669,7 @@ export default function LabTemplateWorkbench({
       id: 'template',
       isDirty: () => isTemplateDirtyRef.current,
       save: () => attemptSaveTemplateRef.current(),
-      // PR #3351: Discard сбрасывает черновик шаблона к hydrate(activeVersion).
+      // PR 3351: Discard сбрасывает черновик шаблона к hydrate(activeVersion).
       // Если переход (загрузка другого шаблона) упадёт и вернёт прежний
       // selectedTemplate, сброшенный draft не останется dirty и не будет
       // перезаписан поздним сохранением.
@@ -703,7 +703,7 @@ export default function LabTemplateWorkbench({
     <fieldset
       disabled={interactionPending}
       aria-busy={interactionPending}
-      style={{ border: 0, padding: 0, margin: 0, minWidth: 0, width: '100%' }}
+      className="ltw-fieldset-reset"
     >
       <div className="ltw-root">
       <Card variant="filled" padding="none">

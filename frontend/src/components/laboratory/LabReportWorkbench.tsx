@@ -231,7 +231,7 @@ export default function LabReportWorkbench({
     && !saving
     && !autoSaving;
 
-  // PR #3351 pending-контракт: create — latest-wins и НЕ блокирует
+  // PR 3351 pending-контракт: create — latest-wins и НЕ блокирует
   // контекстные переходы (поздний ответ отбрасывается по operation-context
   // в handleInstanceChange). Все остальные операции (save draft, autosave,
   // finalize, revise, print, notify) блокируют переходы report-области.
@@ -649,7 +649,7 @@ export default function LabReportWorkbench({
           throw error;
         }
       },
-      // PR #3351: Discard сбрасывает черновик к baseline активного
+      // PR 3351: Discard сбрасывает черновик к baseline активного
       // instance. Выбор необратим: если переход упадёт (загрузка новой
       // цели завершилась ошибкой), сброшенный draft не останется dirty и
       // не будет закоммичен autosave от старого контекста.
