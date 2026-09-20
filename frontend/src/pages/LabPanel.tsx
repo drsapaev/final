@@ -8,6 +8,7 @@ import LabReportWorkbench, {
 } from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
 import { useDirtyTransitionGuard } from '../components/laboratory/hooks/useDirtyTransitionGuard';
+import type { DirtyGuardTransitionOptions } from '../components/laboratory/hooks/useDirtyTransitionGuard';
 import { formatLabStatus } from '../components/laboratory/labUiLabels';
 import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -70,6 +71,19 @@ function instanceIdsMatch(
     return left == null && right == null;
   }
   return String(left) === String(right);
+}
+
+// PR #3351: фактический instance param из ТЕКУЩЕГО адреса браузера.
+// instanceParamRef обновляется только на рендере и может отставать от
+// последнего navigate (например, быстрый второй клик пациента до
+// popstate/render URL-записи первого перехода): тогда pendingSync получал
+// sourceUrlId=null вместо реального id, restore effect считал свежий URL
+// «чужим» и делал supersede НАЗАД к предыдущему отчёту. Для контрактов,
+// описывающих адресную строку, нужен именно текущий URL, а не последний
+// отрендеренный.
+function getCurrentUrlInstanceId(fallback: string | null | undefined) {
+  if (typeof window === 'undefined') return fallback ?? null;
+  return new URLSearchParams(window.location.search).get('instance');
 }
 
 function getInstancePatientId(instance: Record<string, unknown> | null) {
@@ -321,18 +335,40 @@ export default function LabPanel() {
     }
   }, [activeTab, searchParams]);
 
-  const switchTab = useCallback((tabId: string) => {
-    setActiveTab(tabId);
-    // WF-15 fix: сохраняем patient/instance в URL при переключении таба.
-    const params = new URLSearchParams(locationSearchRef.current);
-    params.set('tab', tabId);
-    const query = params.toString();
+  // PR #3351: URL-запись строится от АКТУАЛЬНОГО поискового запроса
+  // браузера, а не от замыкания location.search конкретного рендера:
+  // пассивные эффекты прошлого рендера доливаются ПОСЛЕ нового navigate
+  // (replaceState синхронен), и «сохранение» patient/instance из старой
+  // базы затирало свежий tab=reports обратно на tab=queue, после чего
+  // tab-sync effect возвращал пользователя на вкладку очереди.
+  const currentSearchParams = useCallback(() => (
+    typeof window === 'undefined'
+      ? new URLSearchParams(locationSearchRef.current)
+      : new URLSearchParams(window.location.search)
+  ), []);
+  // Последний query, написанный САМИМ приложением (navigate replace).
+  // Различает «наш navigate ещё не отрендерен» (window опережает замыкание,
+  // но совпадает с lastAppWrittenSearch — писать можно) и «внешний
+  // pushState+popstate ещё не обработан роутером» (window не совпадает ни
+  // с нашим последним запросом, ни с location рендера — писать нельзя,
+  // restore effect обработает намерение после popstate-рендера).
+  const lastAppWrittenSearchRef = useRef<string | null>(null);
+  const navigateReplace = useCallback((query: string) => {
+    lastAppWrittenSearchRef.current = query ? `?${query}` : '';
     locationSearchRef.current = query ? `?${query}` : '';
     navigate(`/lab${query ? `?${query}` : ''}`, { replace: true });
   }, [navigate]);
 
+  const switchTab = useCallback((tabId: string) => {
+    setActiveTab(tabId);
+    // WF-15 fix: сохраняем patient/instance в URL при переключении таба.
+    const params = currentSearchParams();
+    params.set('tab', tabId);
+    navigateReplace(params.toString());
+  }, [currentSearchParams, navigateReplace]);
+
   const syncUrlToCurrentContext = useCallback(() => {
-    const params = new URLSearchParams(locationSearchRef.current);
+    const params = currentSearchParams();
     const currentAppointment = selectedAppointmentRef.current;
     const currentInstanceId = activeInstanceIdRef.current;
     if (currentAppointment?.patient_id != null) {
@@ -345,9 +381,8 @@ export default function LabPanel() {
     } else {
       params.delete('instance');
     }
-    const query = params.toString();
-    navigate(`/lab${query ? `?${query}` : ''}`, { replace: true });
-  }, [navigate]);
+    navigateReplace(params.toString());
+  }, [currentSearchParams, navigateReplace]);
 
   const handleTabKeyDown = useCallback((event: React.KeyboardEvent, tabId: string) => {
     const currentIndex = tabs.findIndex((tab) => tab.id === tabId);
@@ -553,11 +588,24 @@ export default function LabPanel() {
     (pending: boolean) => setOperationSourcePending('template', pending),
     [setOperationSourcePending],
   );
+  // Контракт блокирующих операций (PR #3351):
+  // - report/template SAVE (draft, finalize, revise, print, autosave)
+  //   блокирует КОНТЕКСТНЫЕ переходы затрагиваемого источника — переход
+  //   посреди записи мог бы создать повторную запись или разрушительный
+  //   откат состояния;
+  // - report CREATE — latest-wins: переходы не блокируются, поздний
+  //   ответ отбрасывается по operation-context (epoch/selectionKey/
+  //   patientId) в handleInstanceChange;
+  // - внешняя URL-навигация (без sourceIds — все источники) блокируется
+  //   при ЛЮБОМ pending-источнике.
   const guardTransition = useCallback((
     transition: () => void | Promise<void>,
-    options?: { onCancel?: () => void | Promise<void> },
+    options?: DirtyGuardTransitionOptions,
   ) => {
-    if (pendingOperationSourcesRef.current.size > 0) {
+    const blockedBy = options?.sourceIds
+      ? [...pendingOperationSourcesRef.current].filter((source) => options.sourceIds?.includes(source))
+      : [...pendingOperationSourcesRef.current];
+    if (blockedBy.length > 0) {
       notify('info', t('workbench.saving'));
       void options?.onCancel?.();
       return false;
@@ -579,7 +627,7 @@ export default function LabPanel() {
       setSelectedAppointment(null);
       clearActiveInstance();
       switchTab('queue');
-    }),
+    }, { sourceIds: ['report'] }),
     disabled: isDialogOpen,
   });
 
@@ -625,7 +673,7 @@ export default function LabPanel() {
           retryAction: () => guardTransition(async () => {
             dismissMessage();
             await loadTemplates(preferredTemplateId);
-          }),
+          }, { sourceIds: ['template'] }),
           retryLabel: t('misc.lp_zagruzit_snova'),
         }
       );
@@ -741,14 +789,15 @@ export default function LabPanel() {
     // Invalidate any history response that belongs to the previous patient.
     reportHistoryRequestRef.current += 1;
     loadedHistoryForPatientRef.current = null;
+    const currentUrlInstanceId = getCurrentUrlInstanceId(instanceParamRef.current);
     const stateAndUrlAlreadyMatch = instanceIdsMatch(activeInstanceIdRef.current, targetId)
-      && instanceIdsMatch(instanceParamRef.current, targetId);
+      && instanceIdsMatch(currentUrlInstanceId, targetId);
     pendingInstanceUrlSyncRef.current = !options.forcePending && stateAndUrlAlreadyMatch
       ? null
       : {
         targetId,
         requestId,
-        sourceUrlId: instanceParamRef.current,
+        sourceUrlId: currentUrlInstanceId,
       };
     return requestId;
   }, []);
@@ -825,6 +874,11 @@ export default function LabPanel() {
     const requestId = beginInstanceTransition(instanceId, {
       forcePending: options.clearCurrent,
     });
+    // PR #3351: instance param, с которого стартовал этот переход. Если за
+    // время запроса адресная строка сменилась ВНЕШНЕЙ навигацией на другой
+    // instance (не источник и не цель), откат в catch не должен затирать
+    // новое намерение — restore effect сделает supersede и откроет его.
+    const transitionSourceUrlId = getCurrentUrlInstanceId(instanceParamRef.current);
     if (options.clearCurrent) {
       activeInstanceRef.current = null;
       activeInstanceEpochRef.current = labOperationEpochRef.current;
@@ -834,7 +888,9 @@ export default function LabPanel() {
     }
     try {
       const instance = (await labReportingApi.getInstance(instanceId)) as { patient_snapshot?: { patient_id?: string | number; [k: string]: unknown }; [k: string]: unknown };
-      if (requestId !== instanceRequestSequenceRef.current) return;
+      if (requestId !== instanceRequestSequenceRef.current) {
+        return;
+      }
       const resultPatientId = getInstancePatientId(instance);
       const currentAppointment = selectedAppointmentRef.current;
       if (!currentAppointment || !appointmentMatchesInstance(currentAppointment, instance)) {
@@ -864,14 +920,28 @@ export default function LabPanel() {
         loadedHistoryForPatientRef.current = patientId;
         await loadReportHistory(patientId);
       }
-      if (requestId !== instanceRequestSequenceRef.current) return;
+      if (requestId !== instanceRequestSequenceRef.current) {
+        return;
+      }
       setInstanceTransitionPending(false);
       switchTab('reports');
     } catch (error) {
       if (requestId !== instanceRequestSequenceRef.current) return;
       setInstanceTransitionPending(false);
-      pendingInstanceUrlSyncRef.current = options.clearCurrent && instanceParamRef.current != null
-        ? { targetId: null, requestId, sourceUrlId: instanceParamRef.current }
+      // PR #3351: если адресная строка уже принадлежит более новому внешнему
+      // намерению (instance param не равен ни цели, ни источнику этого
+      // перехода), откат и pending-контракт не нужны: restore effect вот-вот
+      // сделает supersede и откроет новый intent. Откат здесь затирал бы
+      // новый ?instance=N обратно на старый отчёт.
+      const currentUrlInstanceId = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('instance')
+        : null;
+      const urlBelongsToThisTransition = instanceIdsMatch(currentUrlInstanceId, instanceId)
+        || instanceIdsMatch(currentUrlInstanceId, transitionSourceUrlId);
+      if (!urlBelongsToThisTransition) return;
+      const rollbackSourceUrlId = getCurrentUrlInstanceId(instanceParamRef.current);
+      pendingInstanceUrlSyncRef.current = options.clearCurrent && rollbackSourceUrlId != null
+        ? { targetId: null, requestId, sourceUrlId: rollbackSourceUrlId }
         : null;
       syncUrlToCurrentContext();
       const historyPatientId = (
@@ -904,6 +974,9 @@ export default function LabPanel() {
     // PR5: публичный переход через dirty-guard (недавние отчёты,
     // восстановление ?instance=N из URL). Внутри подтверждённого перехода
     // используется applyInstanceTransition — подтверждение один раз.
+    // Внешняя URL-навигация (urlIntent) меняет весь контекст панели и
+    // спрашивает все dirty-источники; внутренние переходы — только
+    // report-draft.
     guardTransition(
       () => {
         if (options.urlIntent) {
@@ -922,15 +995,24 @@ export default function LabPanel() {
         void applyInstanceTransition(instanceId, { urlIntent: options.urlIntent });
       },
       {
+        sourceIds: options.urlIntent ? undefined : ['report'],
         onCancel: options.urlIntent ? () => {
           // Keep a rollback contract while React Router is still exposing the
           // cancelled external URL. Otherwise the restore effect observes it
           // once more and immediately opens a second dirty-state dialog.
+          // PR #3351: если адресная строка уже занята более новым внешним
+          // намерением (другой instance), откат не должен его затирать —
+          // restore effect сделает supersede и обработает новый intent.
+          const cancelledUrlInstanceId = getCurrentUrlInstanceId(instanceParamRef.current);
+          if (!instanceIdsMatch(cancelledUrlInstanceId, instanceId)) {
+            pendingUrlIntentRef.current = null;
+            return;
+          }
           const requestId = ++instanceRequestSequenceRef.current;
           pendingInstanceUrlSyncRef.current = {
             targetId: activeInstanceIdRef.current,
             requestId,
-            sourceUrlId: instanceParamRef.current,
+            sourceUrlId: cancelledUrlInstanceId,
           };
           pendingUrlIntentRef.current = null;
           syncUrlToCurrentContext();
@@ -953,21 +1035,42 @@ export default function LabPanel() {
     // until the user decides. A late report mutation may update local state,
     // but must not erase that newer navigation request or dismiss its dialog.
     if (pendingUrlIntentRef.current) return;
+    // Внешняя URL-навигация (pushState + popstate), которую React Router ещё
+    // не отрендерил, владеет адресной строкой: window.location.search в этом
+    // окне не совпадает НИ с последним запросом, написанным приложением, НИ
+    // с location текущего рендера. Синхронизация state→URL не должна писать
+    // поверх ещё не обработанного намерения (иначе instance=89 из внешнего
+    // URL затирался обратно на instance=88 до того, как restore effect
+    // успевал его открыть — PR #3351). Собственные navigate тоже опережают
+    // замыкание эффекта, но тогда window совпадает с lastAppWrittenSearch —
+    // это наш URL, и писать из него как из базы безопасно.
+    if (
+      typeof window !== 'undefined'
+      && window.location.search !== location.search
+      && window.location.search !== lastAppWrittenSearchRef.current
+    ) {
+      return;
+    }
     const pendingSync = pendingInstanceUrlSyncRef.current;
+    // PR #3351: сравниваем с фактическим instance param текущего адреса —
+    // замыкание instanceParamId может отставать от последней URL-записи.
+    const currentUrlInstanceId = getCurrentUrlInstanceId(
+      instanceParamId != null ? String(instanceParamId) : null,
+    );
     if (
       pendingSync
-      && !instanceIdsMatch(instanceParamId, pendingSync.sourceUrlId)
-      && !instanceIdsMatch(instanceParamId, pendingSync.targetId)
+      && !instanceIdsMatch(currentUrlInstanceId, pendingSync.sourceUrlId)
+      && !instanceIdsMatch(currentUrlInstanceId, pendingSync.targetId)
     ) return;
     if (pendingSync && !instanceIdsMatch(activeInstanceId, pendingSync.targetId)) return;
     // A differing explicit URL id is navigation intent. Let the restore effect
     // guard and load it before state-to-URL synchronization writes anything.
     if (
       pendingSync == null
-      && !instanceIdsMatch(activeInstanceId, instanceParamId)
+      && !instanceIdsMatch(activeInstanceId, currentUrlInstanceId)
     ) return;
 
-    const params = new URLSearchParams(location.search);
+    const params = currentSearchParams();
     if (selectedAppointment?.patient_id) {
       params.set('patient', String(selectedAppointment.patient_id));
     } else {
@@ -979,11 +1082,11 @@ export default function LabPanel() {
       params.delete('instance');
     }
     // Только если params реально изменились —避免 лишних navigate
-    const current = new URLSearchParams(location.search);
+    const current = currentSearchParams();
     if (params.toString() !== current.toString()) {
-      navigate(`/lab?${params.toString()}`, { replace: true });
+      navigateReplace(params.toString());
     }
-  }, [activeInstanceId, instanceParamId, selectedAppointment, location.search, navigate]);
+  }, [activeInstanceId, currentSearchParams, instanceParamId, selectedAppointment, location.search, navigateReplace]);
 
   // Initial data loaders are independent of URL changes. Keeping them in the
   // URL-restore effect re-fetched templates on every tab/query update and
@@ -1011,7 +1114,12 @@ export default function LabPanel() {
   // the URL can briefly retain the old instance id; do not let that stale id
   // overwrite the report already selected by the user.
   useEffect(() => {
-    const instanceId = instanceParamId;
+    // PR #3351: фактический instance param из ТЕКУЩЕГО адреса, а не из
+    // замыкания рендера: URL-запись предыдущего перехода могла ещё не
+    // отрендериться (быстрый второй клик пациента), и замыкание со
+    // старым/null значением разрывало pendingSync-контракт ложным
+    // supersede (например, обратно на null и удалением instance из URL).
+    const instanceId = getCurrentUrlInstanceId(instanceParamId != null ? String(instanceParamId) : null);
     const pendingSync = pendingInstanceUrlSyncRef.current;
 
     if (pendingSync) {
@@ -1232,7 +1340,9 @@ export default function LabPanel() {
           loadingMore={loadingMore}
           queueTotal={queueTotal}
           onOpenAppointment={(appointment) => {
-            // PR5: смена пациента — переход через dirty-guard.
+            // PR5: смена пациента — переход через dirty-guard. Затрагивает
+            // только report-draft: шаблонный редактор живёт в отдельном
+            // табе и не уничтожается сменой пациента.
             guardTransition(() => {
               const nextAppointment = appointment as Record<string, unknown>;
               selectedAppointmentRef.current = nextAppointment;
@@ -1255,7 +1365,7 @@ export default function LabPanel() {
                 clearActiveInstance();
                 switchTab('reports');
               }
-            });
+            }, { sourceIds: ['report'] });
           }}
           selectedAppointment={selectedAppointment as Record<string, unknown> & { id?: string | number; patient_fio?: string; patient_phone?: string; patient_id?: string | number; visit_id?: string | number; appointment_time?: string; status?: string }}
           reportHistory={reportHistory as unknown as Array<Record<string, unknown> & { id: string | number; created_at: string; status: string; flagged_findings_count: number; critical_findings_count: number; max_flag_severity?: number }>}
@@ -1277,7 +1387,9 @@ export default function LabPanel() {
           templateTransitionPending={templateTransitionPending}
           onOperationPendingChange={handleTemplateOperationPendingChange}
           onSelectTemplate={async (template) => {
-            // PR5: смена шаблона — переход через dirty-guard.
+            // PR5: смена шаблона — переход через dirty-guard. Затрагивает
+            // только template-draft: report-редактор привязан к
+            // activeInstance и не уничтожается сменой шаблона.
             guardTransition(async () => {
               const templateId = (template as { id?: string | number })?.id;
               if (templateId == null) return;
@@ -1307,7 +1419,7 @@ export default function LabPanel() {
                   setTemplateTransitionPending(false);
                 }
               }
-            });
+            }, { sourceIds: ['template'] });
           }}
           onTemplatesChanged={async (preferredTemplateId = null) => {
             await loadTemplates(preferredTemplateId);

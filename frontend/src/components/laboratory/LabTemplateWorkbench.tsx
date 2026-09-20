@@ -45,8 +45,16 @@ export default function LabTemplateWorkbench({
   selectedTemplate?: Record<string, unknown> | null;
   onSelectTemplate?: (template: Record<string, unknown>) => void;
   onTemplatesChanged?: (preferredTemplateId?: string | number | null) => Promise<void>;
-  registerDirtySource?: (source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => void;
-  guardTransition?: (transition: () => void | Promise<void>) => void;
+  registerDirtySource?: (source: {
+    id: string;
+    isDirty: () => boolean;
+    save: () => Promise<void>;
+    discard?: () => void;
+  }) => () => void;
+  guardTransition?: (
+    transition: () => void | Promise<void>,
+    options?: { onCancel?: () => void | Promise<void>; sourceIds?: string[] },
+  ) => boolean;
   templateTransitionPending?: boolean;
   onOperationPendingChange?: (pending: boolean) => void;
   notify?: (type: string, message: string) => void;
@@ -220,7 +228,7 @@ export default function LabTemplateWorkbench({
     // callback не выполняется, поэтому старый draft и заполненная форма
     // создания остаются на месте.
     if (guardTransition) {
-      guardTransition(createAndSelect);
+      guardTransition(createAndSelect, { sourceIds: ['template'] });
       return;
     }
     await createAndSelect();
@@ -642,6 +650,10 @@ export default function LabTemplateWorkbench({
   useEffect(() => {
     isTemplateDirtyRef.current = templateDirty;
   });
+  const activeVersionRef = useRef(activeVersion);
+  useEffect(() => {
+    activeVersionRef.current = activeVersion;
+  });
   const registerDirtySourceRef = useRef(registerDirtySource);
   // PR5-review: saveTemplateWithFeedback захватывает state конкретного рендера —
   // регистрация монтируется один раз, но вызывает АКТУАЛЬНУЮ функцию через
@@ -657,6 +669,13 @@ export default function LabTemplateWorkbench({
       id: 'template',
       isDirty: () => isTemplateDirtyRef.current,
       save: () => attemptSaveTemplateRef.current(),
+      // PR #3351: Discard сбрасывает черновик шаблона к hydrate(activeVersion).
+      // Если переход (загрузка другого шаблона) упадёт и вернёт прежний
+      // selectedTemplate, сброшенный draft не останется dirty и не будет
+      // перезаписан поздним сохранением.
+      discard: () => {
+        setDraftVersion(hydrateVersion(activeVersionRef.current));
+      },
     });
   }, []);
 

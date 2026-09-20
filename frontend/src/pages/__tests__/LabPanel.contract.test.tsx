@@ -256,3 +256,65 @@ describe('LabPanel queue/report status contract', () => {
     expect(templateWorkbenchBlock).toContain('templateTransitionPending={templateTransitionPending}');
   });
 });
+
+// PR #3351: pending-контракт и URL single-writer контракты.
+describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () => {
+  it('scopes the pending-block to the sources the transition affects', () => {
+    const source = readLabPanelSource();
+    const guardBlock = extractBlock(
+      source,
+      'const guardTransition = useCallback((',
+      '}, [guardDirtyTransition, notify]);',
+    );
+
+    // Блокировка учитывает только затрагиваемые источники: pending report
+    // не должен запрещать смену шаблона и наоборот.
+    expect(guardBlock).toContain('options?.sourceIds');
+    expect(guardBlock).toContain('options.sourceIds?.includes(source)');
+    // Полная область (внешняя URL-навигация) блокируется при любом pending.
+    expect(guardBlock).toContain(': [...pendingOperationSourcesRef.current]');
+  });
+
+  it('marks each transition with its affected source scope', () => {
+    const source = readLabPanelSource();
+    // Смена пациента / Escape / внутренние открытия отчёта — report-область.
+    expect(source).toContain("{ sourceIds: ['report'] }");
+    // Смена шаблона / retry списка шаблонов — template-область.
+    expect(source).toContain("{ sourceIds: ['template'] }");
+    // Внешняя URL-навигация спрашивает все источники.
+    expect(source).toContain('sourceIds: options.urlIntent ? undefined : [\'report\']');
+  });
+
+  it('keeps report CREATE latest-wins: create does not block transitions', () => {
+    const workbenchSource = fs.readFileSync(
+      path.resolve(__dirname, '../../components/laboratory/LabReportWorkbench.tsx'),
+      'utf8',
+    );
+    // PR #3351: create — latest-wins (поздний ответ отбрасывается по
+    // operation-context), все остальные операции блокируют переходы.
+    expect(workbenchSource).toContain("const reportOperationBlocksTransition = (saving && busyAction !== 'create') || autoSaving;");
+  });
+
+  it('writes the URL from the live browser search, not a stale render closure', () => {
+    const source = readLabPanelSource();
+    // Все URL-писатели строят query от window.location.search: замыкание
+    // location.search прошлого рендера отставало от последнего navigate и
+    // затирало свежий tab=reports обратно на tab=queue.
+    expect(source).toContain('new URLSearchParams(window.location.search)');
+    // URL-sync не пишет поверх ещё не обработанного внешнего popstate.
+    expect(source).toContain('window.location.search !== lastAppWrittenSearchRef.current');
+    // pendingSync-контракты описывают фактический адрес, а не последний рендер.
+    expect(source).toContain('function getCurrentUrlInstanceId(');
+    expect(source).toContain('const currentUrlInstanceId = getCurrentUrlInstanceId(instanceParamRef.current);');
+  });
+
+  it('does not roll a failed intent back over a newer external URL intent', () => {
+    const source = readLabPanelSource();
+    const catchBlock = extractBlock(
+      source,
+      'const urlBelongsToThisTransition = instanceIdsMatch(currentUrlInstanceId, instanceId)',
+      'if (!urlBelongsToThisTransition) return;',
+    );
+    expect(catchBlock).toContain('instanceIdsMatch(currentUrlInstanceId, transitionSourceUrlId)');
+  });
+});

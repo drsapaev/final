@@ -123,7 +123,12 @@ export default function LabReportWorkbench({
   onRefreshRecentReports?: () => Promise<void>;
   onQueueChanged?: () => Promise<void>;
   notify?: (type: string, message: string) => void;
-  registerDirtySource?: (source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => void;
+  registerDirtySource?: (source: {
+    id: string;
+    isDirty: () => boolean;
+    save: () => Promise<void>;
+    discard?: () => void;
+  }) => () => void;
   onOperationPendingChange?: (pending: boolean) => void;
   [k: string]: unknown;
 }) {
@@ -226,12 +231,17 @@ export default function LabReportWorkbench({
     && !saving
     && !autoSaving;
 
+  // PR #3351 pending-контракт: create — latest-wins и НЕ блокирует
+  // контекстные переходы (поздний ответ отбрасывается по operation-context
+  // в handleInstanceChange). Все остальные операции (save draft, autosave,
+  // finalize, revise, print, notify) блокируют переходы report-области.
+  const reportOperationBlocksTransition = (saving && busyAction !== 'create') || autoSaving;
   useLayoutEffect(() => {
-    onOperationPendingChange?.(saving || autoSaving);
+    onOperationPendingChange?.(reportOperationBlocksTransition);
     return () => {
-      if (saving || autoSaving) onOperationPendingChange?.(false);
+      if (reportOperationBlocksTransition) onOperationPendingChange?.(false);
     };
-  }, [autoSaving, onOperationPendingChange, saving]);
+  }, [onOperationPendingChange, reportOperationBlocksTransition]);
 
   useEffect(() => {
     const partial = partialDraftCommitRef.current;
@@ -638,6 +648,15 @@ export default function LabReportWorkbench({
           }
           throw error;
         }
+      },
+      // PR #3351: Discard сбрасывает черновик к baseline активного
+      // instance. Выбор необратим: если переход упадёт (загрузка новой
+      // цели завершилась ошибкой), сброшенный draft не останется dirty и
+      // не будет закоммичен autosave от старого контекста.
+      discard: () => {
+        const baseline = initialValuesRef.current;
+        setDraftValues({ ...baseline.values });
+        setSignerSnapshot({ ...baseline.signer });
       },
     });
   }, []);

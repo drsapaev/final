@@ -334,6 +334,7 @@ describe('LabTemplateWorkbench create template flow (PR5)', () => {
     const onTemplatesChanged = vi.fn(async (_preferredTemplateId?: string | number | null) => {});
     const guardTransition = vi.fn((transition: () => void | Promise<void>) => {
       void transition();
+      return true;
     });
     mockedApi.createTemplate.mockResolvedValue({
       id: 9,
@@ -370,6 +371,7 @@ describe('LabTemplateWorkbench create template flow (PR5)', () => {
   it('Cancel keeps both the dirty template draft and new-template form without sending POST', async () => {
     const guardTransition = vi.fn((_transition: () => void | Promise<void>) => {
       // Models the guard dialog Cancel action: the transition is not run.
+      return false;
     });
 
     render(
@@ -406,6 +408,7 @@ describe('LabTemplateWorkbench create template flow (PR5)', () => {
   it('routes clone and archive refreshes through the dirty transition guard', async () => {
     const guardTransition = vi.fn((_transition: () => void | Promise<void>) => {
       // Models Cancel: neither command may run before the guard resolves.
+      return false;
     });
 
     render(
@@ -578,5 +581,118 @@ describe('LabTemplateWorkbench guard save freshness (PR5 review fix)', () => {
     const event = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
+  });
+
+  // PR #3351 (P1 — Discard): registered discard сбрасывает черновик шаблона
+  // к hydrate(activeVersion): не dirty, поле возвращает серверное значение,
+  // beforeunload больше не блокируется.
+  it('registered discard resets the template draft to the hydrated version', async () => {
+    const registerDirtySource = vi.fn(
+      (_source: { id: string; isDirty: () => boolean; save: () => Promise<void>; discard?: () => void }) => () => {},
+    );
+    render(
+      <ThemeProvider>
+        <LabTemplateWorkbenchRaw
+          templates={[ruleTemplateFixture]}
+          selectedTemplate={ruleTemplateFixture}
+          onSelectTemplate={vi.fn()}
+          onTemplatesChanged={vi.fn(async () => {})}
+          registerDirtySource={registerDirtySource}
+          notify={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => expect(mockedApi.listCatalogUnits).toHaveBeenCalled());
+    await screen.findByRole('button', { name: /Поле: Гемоглобин/ });
+    expandFirstFieldEditor();
+    fireEvent.change(screen.getByLabelText('Название поля'), {
+      target: { value: 'Гемоглобин, изменённый' },
+    });
+
+    const source = registerDirtySource.mock.calls[0][0] as {
+      isDirty: () => boolean;
+      discard?: () => void;
+    };
+    expect(source.isDirty()).toBe(true);
+
+    act(() => {
+      source.discard?.();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByLabelText('Название поля')).toHaveValue('Гемоглобин');
+    expect(source.isDirty()).toBe(false);
+
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  // PR #3351 (P1 — гидратация и идентичность черновика): смена
+  // selectedTemplate ре-гидратирует редактор из новой версии — правки
+  // предыдущего шаблона не протекают и не считаются dirty.
+  it('re-hydrates the draft when the selected template changes', async () => {
+    const otherTemplate = {
+      ...ruleTemplateFixture,
+      id: 6,
+      code: 'rule_demo_b',
+      name: 'Rule Demo B',
+      published_version_id: 61,
+      versions: [
+        {
+          ...ruleTemplateFixture.versions[0],
+          id: 61,
+          template_id: 6,
+          sections: [
+            {
+              ...ruleTemplateFixture.versions[0].sections[0],
+              fields: [
+                {
+                  ...ruleTemplateFixture.versions[0].sections[0].fields[0],
+                  field_key: 'wbc',
+                  label: 'Лейкоциты',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const registerDirtySource = vi.fn(
+      (_source: { id: string; isDirty: () => boolean; save: () => Promise<void>; discard?: () => void }) => () => {},
+    );
+    const workbench = (template: Record<string, unknown>) => (
+      <ThemeProvider>
+        <LabTemplateWorkbenchRaw
+          templates={[ruleTemplateFixture, otherTemplate]}
+          selectedTemplate={template}
+          onSelectTemplate={vi.fn()}
+          onTemplatesChanged={vi.fn(async () => {})}
+          registerDirtySource={registerDirtySource}
+          notify={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    const { rerender } = render(workbench(ruleTemplateFixture));
+    await screen.findByRole('button', { name: /Поле: Гемоглобин/ });
+    expandFirstFieldEditor();
+    fireEvent.change(screen.getByLabelText('Название поля'), {
+      target: { value: 'Гемоглобин, изменённый' },
+    });
+    const dirtySource = registerDirtySource.mock.calls[0][0] as { isDirty: () => boolean };
+    expect(dirtySource.isDirty()).toBe(true);
+
+    rerender(workbench(otherTemplate));
+    await screen.findByRole('button', { name: /Поле: Лейкоциты/ });
+
+    // Редактор показывает поля нового шаблона; правки старого не протекли.
+    expect(screen.queryByRole('button', { name: /Поле: Гемоглобин/ })).toBeNull();
+    // Раскрытие поля (ключ 0-0) сохраняется — редактор поля уже открыт.
+    expect(screen.getByLabelText('Название поля')).toHaveValue('Лейкоциты');
+    expect(dirtySource.isDirty()).toBe(false);
   });
 });

@@ -121,6 +121,8 @@ let bulkSavePostCount = 0;
 let instance88GetCount = 0;
 let instance89GetCount = 0;
 let instance88DelayMs = 0;
+let instance88ResponseGate: Promise<void> | null = null;
+let releaseInstance88Response: (() => void) | null = null;
 let instance89ResponseGate: Promise<void> | null = null;
 let releaseInstance89Response: (() => void) | null = null;
 let instance89ShouldFail = false;
@@ -137,6 +139,10 @@ let reportInstanceCreateResponseGate: Promise<void> | null = null;
 let releaseReportInstanceCreateResponse: (() => void) | null = null;
 let lastReportInstanceCreatePayload: Record<string, unknown> | null = null;
 let templateResolutionDelayByPatient = new Map<string, number>();
+let bulkSaveResponseGate: Promise<void> | null = null;
+let releaseBulkSaveResponse: (() => void) | null = null;
+let templateDraftSaveResponseGate: Promise<void> | null = null;
+let releaseTemplateDraftSaveResponse: (() => void) | null = null;
 let templateResolution101ResponseGate: Promise<void> | null = null;
 let releaseTemplateResolution101Response: (() => void) | null = null;
 let templateResolutionPatientRequests: string[] = [];
@@ -145,6 +151,16 @@ let history101ResponseGate: Promise<void> | null = null;
 let releaseHistory101Response: (() => void) | null = null;
 let history102ResponseGate: Promise<void> | null = null;
 let releaseHistory102Response: (() => void) | null = null;
+
+// Скрытый locator карточки пациента очереди: tabpanel очереди смонтирован
+// всегда (hidden-секции), а getByRole исключает скрытые элементы из a11y
+// дерева — как только отчёт открывается и вкладка очереди скрывается,
+// getByRole(...).dispatchEvent перестаёт находить кнопку и тест флапает
+// (PR #3351: «использовать стабильный скрытый locator»). dispatchEvent
+// не требует видимости. Карточка пациента — div[role="button"], не <button>.
+function queuePatientButton(page: Page, name: string) {
+  return page.locator('#lab-panel-tabpanel-queue [role="button"]', { hasText: name }).first();
+}
 
 async function installSession(page: Page) {
   await page.addInitScript(({ token, profile }) => {
@@ -206,9 +222,10 @@ async function installApiMocks(page: Page) {
     return json(route, TEMPLATE_DETAIL_B);
   });
   await page.route('**/api/v1/lab/templates/5/versions', (route) => json(route, { id: 52 }));
-  await page.route('**/api/v1/lab/template-versions/52', (route) => {
+  await page.route('**/api/v1/lab/template-versions/52', async (route) => {
     if (route.request().method() === 'PUT') {
       templateDraftUpdateCount += 1;
+      if (templateDraftSaveResponseGate) await templateDraftSaveResponseGate;
       const payload = route.request().postDataJSON() as Record<string, unknown>;
       template5FooterNotes = String(payload.footer_notes ?? '');
       return json(route, { id: 52, ...payload });
@@ -281,6 +298,7 @@ async function installApiMocks(page: Page) {
   });
   await page.route('**/api/v1/lab/report-instances/88', async (route) => {
     instance88GetCount += 1;
+    if (instance88ResponseGate) await instance88ResponseGate;
     if (instance88DelayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, instance88DelayMs));
     }
@@ -295,11 +313,23 @@ async function installApiMocks(page: Page) {
     return json(route, INSTANCE_B);
   });
   await page.route('**/api/v1/lab/report-instances/90', (route) => json(route, INSTANCE_CREATED));
-  await page.route('**/api/v1/lab/report-instances/88/bulk-values**', (route) => {
+  await page.route('**/api/v1/lab/report-instances/88/bulk-values**', async (route) => {
     bulkSavePostCount += 1;
+    if (bulkSaveResponseGate) await bulkSaveResponseGate;
+    // Реальный backend возвращает instance с СОХРАНЁННЫМИ значениями —
+    // иначе честный ре-гидрат ответом затирал бы только что записанный draft.
+    const items = (route.request().postDataJSON() as Array<{ field_key?: string; value_text?: string | null }>) || [];
+    const savedSections = INSTANCE_A.sections.map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => {
+        const item = items.find((entry) => entry.field_key === field.field_key);
+        return item ? { ...field, value_text: item.value_text ?? '' } : field;
+      }),
+    }));
     return json(route, {
       instance: {
         ...INSTANCE_A,
+        sections: savedSections,
         updated_at: '2026-09-13T08:00:01.000000+00:00',
       },
     });
@@ -318,6 +348,8 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     instance88GetCount = 0;
     instance89GetCount = 0;
     instance88DelayMs = 0;
+    instance88ResponseGate = null;
+    releaseInstance88Response = null;
     instance89ResponseGate = null;
     releaseInstance89Response = null;
     instance89ShouldFail = false;
@@ -334,6 +366,10 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     releaseReportInstanceCreateResponse = null;
     lastReportInstanceCreatePayload = null;
     templateResolutionDelayByPatient = new Map();
+    bulkSaveResponseGate = null;
+    releaseBulkSaveResponse = null;
+    templateDraftSaveResponseGate = null;
+    releaseTemplateDraftSaveResponse = null;
     templateResolution101ResponseGate = null;
     releaseTemplateResolution101Response = null;
     templateResolutionPatientRequests = [];
@@ -406,14 +442,22 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
   });
 
   test('rapid report selection is latest-wins when the first response arrives last', async ({ page }) => {
-    instance88DelayMs = 600;
+    // PR #3351: детерминированный gate вместо задержки: доказываем, что GET
+    // первого отчёта уже начался, и только тогда кликаем второго пациента.
+    instance88ResponseGate = new Promise<void>((resolve) => {
+      releaseInstance88Response = resolve;
+    });
     await page.goto('/lab');
 
-    await page.getByRole('button', { name: /Пациент Один/ }).first().dispatchEvent('click');
-    await page.getByRole('button', { name: /Пациент Два/ }).first().dispatchEvent('click');
+    await queuePatientButton(page, 'Пациент Один').dispatchEvent('click');
+    await expect.poll(() => instance88GetCount).toBe(1);
+    await queuePatientButton(page, 'Пациент Два').dispatchEvent('click');
 
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
-    await page.waitForTimeout(instance88DelayMs + 200);
+    const staleResponse = page.waitForResponse((response) => response.url().includes('/report-instances/88'));
+    releaseInstance88Response?.();
+    await staleResponse;
+    await waitForReactToSettle(page);
     await expect(page.getByText('Отчёт #88')).toHaveCount(0);
     expect(instance88GetCount).toBe(1);
     expect(instance89GetCount).toBe(1);
@@ -426,9 +470,9 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     });
     await page.goto('/lab');
 
-    await page.getByRole('button', { name: /Пациент Один/ }).first().dispatchEvent('click');
+    await queuePatientButton(page, 'Пациент Один').dispatchEvent('click');
     await expect.poll(() => reportHistoryPatientRequests.includes('101')).toBe(true);
-    await page.getByRole('button', { name: /Пациент Два/ }).first().dispatchEvent('click');
+    await queuePatientButton(page, 'Пациент Два').dispatchEvent('click');
 
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     const reportsPanel = page.locator('#lab-panel-tabpanel-reports');
@@ -526,17 +570,19 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
       window.history.pushState({}, '', '/lab?instance=90');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
-    await expect(dialog).toBeVisible();
+    // PR #3351 discard contract: the report draft was reset by the first
+    // Discard, so the newer 90 intent runs immediately — there is no second
+    // confirmation dialog for the already-discarded draft, and no autosave
+    // can resurrect it.
     const staleResponse = page.waitForResponse((response) => response.url().includes('/report-instances/89'));
     releaseInstance89Response?.();
     await staleResponse;
     await waitForReactToSettle(page);
 
-    await expect(dialog).toBeVisible();
-    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('90');
-    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    await expect(page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' })).toHaveCount(0);
+    await expect(page.getByText(/несохранённые изменения/).first()).toHaveCount(0);
     await expect(page.getByText('Отчёт #90').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('90');
   });
 
   test('a failed external report load restores the current report URL', async ({ page }) => {
@@ -855,9 +901,9 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     });
     await page.goto('/lab');
 
-    await page.getByRole('button', { name: /Пациент Один/ }).first().dispatchEvent('click');
+    await queuePatientButton(page, 'Пациент Один').dispatchEvent('click');
     await expect.poll(() => templateResolutionPatientRequests.includes('101')).toBe(true);
-    await page.getByRole('button', { name: /Пациент Два/ }).first().dispatchEvent('click');
+    await queuePatientButton(page, 'Пациент Два').dispatchEvent('click');
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     await expect.poll(() => templateResolutionPatientRequests.includes('102')).toBe(true);
     const staleResolutionResponse = page.waitForResponse((response) => {
@@ -1027,5 +1073,46 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect(codeInput).toHaveValue('new_rule_t');
     await expect(nameInput).toHaveValue('Новый шаблон правил');
     expect(templateCreatePostCount).toBe(0);
+  });
+
+  // PR #3351 (P1 — pending-контракт): report SAVE блокирует контекстный
+  // переход затрагиваемого источника — нет ни разрушительного перехода,
+  // ни повторной записи; после завершения сохранения пользователь
+  // остаётся на прежнем отчёте. Template SAVE аналогично блокирует смену
+  // шаблона на уровне панели (UI списка шаблонов к тому же полностью
+  // блокируется на время записи — контракт проверяется в unit-тестах
+  // LabPanel.contract.test.tsx).
+  test('a patient transition is blocked while a report save is in flight', async ({ page }) => {
+    bulkSaveResponseGate = new Promise<void>((resolve) => {
+      releaseBulkSaveResponse = resolve;
+    });
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.6');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Сохранить черновик' }).click();
+    await expect.poll(() => bulkSavePostCount).toBe(1);
+
+    // Переход к другому пациенту во время записи — заблокирован.
+    await page.getByRole('tab').first().click();
+    await queuePatientButton(page, 'Пациент Два').dispatchEvent('click');
+    await page.waitForTimeout(300);
+    expect(instance89GetCount).toBe(0);
+    expect(bulkSavePostCount).toBe(1);
+    await expect(page.getByText(/сохраняется…/).first()).toBeVisible();
+
+    // Сохранение завершается — переход НЕ выполняется автоматически:
+    // пользователь остаётся на отчёте #88 с сохранённым значением.
+    releaseBulkSaveResponse?.();
+    await page.waitForTimeout(300);
+    expect(instance89GetCount).toBe(0);
+    await page.getByRole('tab').nth(2).click();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await expect(fieldInput).toHaveValue('6.6');
+    await expect(page.getByText(/несохранённые изменения/)).toHaveCount(0);
   });
 });

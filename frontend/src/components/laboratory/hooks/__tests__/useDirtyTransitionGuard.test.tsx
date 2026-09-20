@@ -259,4 +259,182 @@ describe('useDirtyTransitionGuard (PR5)', () => {
     expect(screen.getByRole('heading', { name: 'Unsaved changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
+
+  // PR #3351: sourceIds — область перехода ограничена затрагиваемыми
+  // источниками: dirty-отчёт не должен спрашивать подтверждение при смене
+  // шаблона и наоборот.
+  it('a dirty report does not guard a template-scoped transition', () => {
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    act(() => {
+      result.current.registerDirtySource({
+        id: 'report',
+        isDirty: () => true,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+      result.current.registerDirtySource({
+        id: 'template',
+        isDirty: () => false,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+    });
+
+    const templateTransition = vi.fn();
+    let started = false;
+    act(() => {
+      started = result.current.guardTransition(templateTransition, { sourceIds: ['template'] });
+    });
+
+    expect(started).toBe(true);
+    expect(templateTransition).toHaveBeenCalledTimes(1);
+    expect(result.current.isDialogOpen).toBe(false);
+  });
+
+  it('a dirty template guards a template-scoped transition but not a report-scoped one', () => {
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    act(() => {
+      result.current.registerDirtySource({
+        id: 'report',
+        isDirty: () => false,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+      result.current.registerDirtySource({
+        id: 'template',
+        isDirty: () => true,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+    });
+
+    const reportTransition = vi.fn();
+    let reportStarted = false;
+    act(() => {
+      reportStarted = result.current.guardTransition(reportTransition, { sourceIds: ['report'] });
+    });
+    expect(reportStarted).toBe(true);
+    expect(reportTransition).toHaveBeenCalledTimes(1);
+
+    const templateTransition = vi.fn();
+    let templateStarted = true;
+    act(() => {
+      templateStarted = result.current.guardTransition(templateTransition, { sourceIds: ['template'] });
+    });
+    expect(templateStarted).toBe(false);
+    expect(templateTransition).not.toHaveBeenCalled();
+    expect(result.current.isDialogOpen).toBe(true);
+  });
+
+  it('Discard resets the affected dirty sources before running the transition', async () => {
+    const discardReport = vi.fn();
+    const discardTemplate = vi.fn();
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    let reportDirty = true;
+    act(() => {
+      result.current.registerDirtySource({
+        id: 'report',
+        isDirty: () => reportDirty,
+        save: vi.fn().mockResolvedValue(undefined),
+        discard: () => {
+          reportDirty = false;
+          discardReport();
+        },
+      });
+      result.current.registerDirtySource({
+        id: 'template',
+        isDirty: () => true,
+        save: vi.fn().mockResolvedValue(undefined),
+        discard: discardTemplate,
+      });
+    });
+
+    const transition = vi.fn(() => {
+      // К моменту запуска перехода сброшенный источник уже не dirty.
+      expect(reportDirty).toBe(false);
+    });
+    act(() => {
+      result.current.guardTransition(transition, { sourceIds: ['report'] });
+    });
+
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Выйти без сохранения' }));
+    await flush();
+
+    // Сброшен только затронутый источник; template-draft не тронут.
+    expect(discardReport).toHaveBeenCalledTimes(1);
+    expect(discardTemplate).not.toHaveBeenCalled();
+    expect(transition).toHaveBeenCalledTimes(1);
+  });
+
+  it('Discard without a scope resets every dirty source', async () => {
+    const discardA = vi.fn();
+    const discardB = vi.fn();
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    act(() => {
+      result.current.registerDirtySource({
+        id: 'report',
+        isDirty: () => true,
+        save: vi.fn().mockResolvedValue(undefined),
+        discard: discardA,
+      });
+      result.current.registerDirtySource({
+        id: 'template',
+        isDirty: () => true,
+        save: vi.fn().mockResolvedValue(undefined),
+        discard: discardB,
+      });
+      result.current.guardTransition(vi.fn());
+    });
+
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Выйти без сохранения' }));
+    await flush();
+
+    expect(discardA).toHaveBeenCalledTimes(1);
+    expect(discardB).toHaveBeenCalledTimes(1);
+  });
+
+  it('Escape on the document cancels the pending transition', async () => {
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    act(() => {
+      result.current.registerDirtySource({
+        id: 'report',
+        isDirty: () => true,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+    });
+    const transition = vi.fn();
+    const onCancel = vi.fn();
+    act(() => {
+      result.current.guardTransition(transition, { onCancel });
+    });
+
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+    expect(result.current.isDialogOpen).toBe(true);
+
+    // PR #3351: Escape ловится capture-listener-ом на document при любой
+    // позиции фокуса (здесь — body, как в E2E до автофокуса Modal).
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+    });
+
+    expect(result.current.isDialogOpen).toBe(false);
+    expect(transition).not.toHaveBeenCalled();
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('save-with-scope persists only the scoped dirty sources', async () => {
+    const saveReport = vi.fn().mockResolvedValue(undefined);
+    const saveTemplate = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    act(() => {
+      result.current.registerDirtySource({ id: 'report', isDirty: () => true, save: saveReport });
+      result.current.registerDirtySource({ id: 'template', isDirty: () => true, save: saveTemplate });
+      result.current.guardTransition(vi.fn(), { sourceIds: ['report'] });
+    });
+
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить и перейти' }));
+    await flush();
+
+    expect(saveReport).toHaveBeenCalledTimes(1);
+    expect(saveTemplate).not.toHaveBeenCalled();
+  });
 });

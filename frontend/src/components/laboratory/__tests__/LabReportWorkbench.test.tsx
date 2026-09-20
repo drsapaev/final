@@ -721,8 +721,11 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     });
     await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1));
     operation = { ...operation, epoch: 2 };
-    resolveFirstBulk?.({
-      instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:08.000000+00:00' },
+    await act(async () => {
+      resolveFirstBulk?.({
+        instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:08.000000+00:00' },
+      });
+      await Promise.resolve();
     });
     await firstSave;
     expect(firstError).toBeInstanceOf(Error);
@@ -743,7 +746,10 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Результат: Лейкоциты')).toBeDisabled();
     expect(screen.getByLabelText('ФИО лаборанта')).toBeDisabled();
-    resolveBulk?.({ instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:10.000000+00:00' } });
+    await act(async () => {
+      resolveBulk?.({ instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:10.000000+00:00' } });
+      await Promise.resolve();
+    });
     await waitFor(() => expect(screen.getByLabelText('Результат: Лейкоциты')).toBeEnabled());
   });
 
@@ -1045,6 +1051,129 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     });
     expect(saveError).toEqual(new Error('Сохранение отклонено сервером'));
     expect(notify).toHaveBeenCalledWith('error', 'Сохранение отклонено сервером');
+  });
+
+  // PR #3351 (P1 — гидратация и идентичность черновика): смена instance
+  // без сохранения не протекает в редактор нового отчёта — черновик
+  // ре-гидратируется из baseline новой цели, isDirty false, и повторное
+  // сохранение пишет значения НОВОГО instance, а не правки старого.
+  it('re-hydrates the draft for a new instance without leaking the previous edits', async () => {
+    const onInstanceChange = vi.fn();
+    mockedApi.bulkSaveValues.mockReset().mockResolvedValue({
+      instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:07.000000+00:00' },
+    });
+
+    const utils = renderWithActiveInstance({ onInstanceChange });
+    // Правим поле отчёта #77 без сохранения.
+    fireEvent.change(screen.getByLabelText('Результат: Лейкоциты'), {
+      target: { value: '9.9' },
+    });
+    await waitFor(() => expect(screen.getByText(/несохранённые изменения/i)).toBeInTheDocument());
+
+    const otherInstance = {
+      ...reopenedDraftInstance,
+      id: 78,
+      updated_at: '2026-09-13T09:00:00.000000+00:00',
+      sections: [
+        {
+          key: 'cbc',
+          title: 'CBC',
+          fields: [
+            { field_key: 'wbc', label: 'Лейкоциты', value_type: 'text', value_text: '4.1', comment: null },
+          ],
+        },
+      ],
+    };
+    utils.rerender(
+      <ThemeProvider>
+        <LabReportWorkbench
+          selectedAppointment={null}
+          templates={[]}
+          templateResolution={null}
+          templateResolutionLoading={false}
+          reportHistory={[]}
+          recentReports={[]}
+          activeInstance={otherInstance}
+          onInstanceChange={onInstanceChange}
+          onOpenInstance={vi.fn()}
+          onRefreshHistory={vi.fn()}
+          onRefreshRecentReports={vi.fn()}
+          onQueueChanged={vi.fn()}
+          notify={vi.fn()}
+        />
+      </ThemeProvider>,
+    );
+
+    // Гидратация из нового instance: значение из #78, не правка из #77.
+    await waitFor(() => expect(screen.getByLabelText('Результат: Лейкоциты')).toHaveValue('4.1'));
+    expect(screen.queryByText(/несохранённые изменения/i)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) {
+        await Promise.resolve();
+      }
+    });
+
+    const [instanceId, payload] = mockedApi.bulkSaveValues.mock.calls[0] as [
+      string | number,
+      Array<Record<string, unknown>>,
+    ];
+    expect(instanceId).toBe(78);
+    const wbcItem = payload.find((item) => item.field_key === 'wbc');
+    expect(wbcItem?.value_text).toBe('4.1');
+    expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1);
+  });
+
+  // PR #3351 (P1 — Discard): после сброса черновика через registered
+  // discard черновик не dirty, и запланированный autosave не выполняется —
+  // «Выйти без сохранения» не может быть отменён поздним автосохранением.
+  it('does not autosave a draft that was reset by the registered discard callback', async () => {
+    vi.useFakeTimers();
+    try {
+      const registerDirtySource = vi.fn(
+        (_source: { id: string; isDirty: () => boolean; save: () => Promise<void>; discard?: () => void }) => vi.fn(),
+      );
+      renderWithActiveInstance({ registerDirtySource });
+      fireEvent.change(screen.getByLabelText('Результат: Лейкоциты'), {
+        target: { value: '7.3' },
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(registerDirtySource).toHaveBeenCalledTimes(1);
+      const source = registerDirtySource.mock.calls[0][0] as {
+        isDirty: () => boolean;
+        discard?: () => void;
+      };
+      expect(source.isDirty()).toBe(true);
+
+      act(() => {
+        source.discard?.();
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // Draft сброшен к baseline: не dirty, поле вернуло серверное значение.
+      expect(screen.getByLabelText('Результат: Лейкоциты')).toHaveValue('5.2');
+      expect(source.isDirty()).toBe(false);
+
+      // 30-секундный autosave debounce истекает — сохранения нет.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(35000);
+      });
+      expect(mockedApi.bulkSaveValues).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
