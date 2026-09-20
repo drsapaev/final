@@ -33,6 +33,7 @@ FRONTEND_SRC = REPO_ROOT / "frontend" / "src"
 
 # ===================== enum / hierarchy closure =====================
 
+
 def test_roles_enum_reopens_nurse_v2() -> None:
     from app.core.roles import Roles
 
@@ -57,9 +58,11 @@ def test_roles_catalog_retired_set_drops_nurse_only() -> None:
     """Codex review P2 (#3054) history + NURSE-V2: the DB-backed role
     catalog boundary (RoleCreate + /roles/options) keeps Manager/
     Receptionist retired; the re-opened canonical 'Nurse' is no longer
-    blocked — a catalog row for it is legal product vocabulary now (the
-    dropdown mirror surfaces it only if the catalog row exists; creating
-    one is NOT an N2-2 requirement)."""
+    blocked. Codex round-3 P2 (PR #3333) then closed the workflow gap:
+    /roles/options MERGES the canonical user-creation vocabulary into the
+    catalog-derived list, so 'Nurse' is offered even without a catalog
+    row (creating one is still NOT an N2-2 requirement — see
+    test_roles_options_core_vocabulary.py for the merge pins)."""
     from app.core.roles import (
         is_retired_role_spelling,
         normalize_role_value,
@@ -94,6 +97,7 @@ def test_staff_roles_and_hierarchy_keep_nurse_least_privilege() -> None:
 
 # ===================== write vocabulary closure =====================
 
+
 def test_user_management_pattern_accepts_canonical_nurse() -> None:
     from app.schemas.user_management import _USER_MANAGEMENT_ROLE_PATTERN
 
@@ -108,8 +112,15 @@ def test_user_management_pattern_accepts_canonical_nurse() -> None:
     assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "Manager")
     assert not re.match(_USER_MANAGEMENT_ROLE_PATTERN, "Receptionist")
     for canonical in (
-        "Admin", "Doctor", "Registrar", "Cashier", "Lab",
-        "Patient", "SuperAdmin", "cardio", "doctor",
+        "Admin",
+        "Doctor",
+        "Registrar",
+        "Cashier",
+        "Lab",
+        "Patient",
+        "SuperAdmin",
+        "cardio",
+        "doctor",
     ):
         assert re.match(_USER_MANAGEMENT_ROLE_PATTERN, canonical), canonical
 
@@ -143,6 +154,7 @@ def test_authentication_create_update_reject_nurse() -> None:
 
 
 # ===================== AI RBAC matrix closure =====================
+
 
 def test_ai_rbac_matrix_has_no_nurse_grants() -> None:
     from app.core.rbac import ROLE_PERMISSIONS, UserRole
@@ -212,6 +224,7 @@ def test_migration_forces_nurse_tombstone() -> None:
 
 # ===================== grant-list closure (imports) =====================
 
+
 def test_analytics_role_lists_drop_nurse() -> None:
     from app.api.v1.endpoints.advanced_analytics import (
         CLINICAL_ADVANCED_ANALYTICS_ROLES,
@@ -239,6 +252,7 @@ def test_visit_read_roles_drop_nurse() -> None:
 
 
 # ===================== source contracts (frontend mirrors) =====================
+
 
 def _src(rel: str) -> str:
     return (FRONTEND_SRC / rel).read_text(encoding="utf-8")

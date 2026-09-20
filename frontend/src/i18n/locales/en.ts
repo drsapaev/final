@@ -4632,6 +4632,7 @@ const en = {
     umdl_role_registrar: 'Registrar',
     umdl_role_cashier: 'Кассир',
     umdl_role_lab: 'Лаборант',
+    umdl_role_nurse: 'Медсестра',
     umdl_role_patient: 'Пациент',
     umdl_doctor_profile_section: 'Doctor profile',
     umdl_doctor_specialty: 'Specialty',

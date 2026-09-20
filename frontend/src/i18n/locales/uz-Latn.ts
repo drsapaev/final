@@ -4633,6 +4633,7 @@ const uzLatn = {
     umdl_role_registrar: 'Registrator',
     umdl_role_cashier: 'Kassir',
     umdl_role_lab: 'Laborant',
+    umdl_role_nurse: 'Hamshira',
     umdl_role_patient: 'Bemor',
     umdl_doctor_profile_section: 'Shifokor profili',
     umdl_doctor_specialty: 'Mutaxassislik',
