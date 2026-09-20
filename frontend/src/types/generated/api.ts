@@ -909,6 +909,12 @@ export type paths = {
          *
          *     Позволяет изменить одинаковые поля у группы услуг.
          *     Например: изменить цену, активность, категорию и т.д.
+         *
+         *     RQ-17 round-2 (P1-1): batch — равноправный writer serialization-scope
+         *     §3.1 (не прямой setattr-обход): row-locks sorted по id,
+         *     owner-config-локи всех affected-тегов (sorted) и пост-валидация
+         *     инварианта каждого тега до single commit. Атомарно: нарушение
+         *     инварианта -> 409, при котором ни одна услуга batch не изменена.
          */
         post: operations["batch_update_services_api_v1_services_admin_batch_update_post"];
         delete?: never;
@@ -2321,6 +2327,89 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/nurse-workplace-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Nurse Workplace Assignments
+         * @description Paged list of workplace assignments (active first, newest first).
+         */
+        get: operations["list_nurse_workplace_assignments_api_v1_admin_nurse_workplace_assignments_get"];
+        put?: never;
+        /**
+         * Create Nurse Workplace Assignment
+         * @description Assign a Nurse User to a QueueResource workplace (D2 FINAL).
+         *
+         *     404 — referenced user/resource not found; 400 — the user is not an
+         *     active Nurse or the resource is inactive; 409 — an active
+         *     assignment for the same (user, resource) pair already exists;
+         *     401/403 — the control-plane auth contract (see
+         *     _AUTH_ERROR_RESPONSES).
+         *
+         *     The mutation is committed with an actor-attributed UserAuditLog row
+         *     in the same transaction (codex round-2 P2): the acting Admin and the
+         *     (user_id, queue_resource_id) grant are reconstructable from the
+         *     ledger alone.
+         */
+        post: operations["create_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/nurse-workplace-assignments/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Nurse Workplace Assignment
+         * @description Read a single workplace assignment by id (404 when missing).
+         */
+        get: operations["get_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/nurse-workplace-assignments/{assignment_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate Nurse Workplace Assignment
+         * @description Deactivate an assignment (the row stays as history; D2 FINAL).
+         *
+         *     404 — assignment not found; 409 — already inactive. A new active row
+         *     for the same (user, resource) pair may be created afterwards;
+         *     401/403 — the control-plane auth contract (see
+         *     _AUTH_ERROR_RESPONSES).
+         *
+         *     The transition is committed with an actor-attributed UserAuditLog
+         *     row in the same transaction (codex round-2 P2).
+         */
+        post: operations["deactivate_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/admin/queue-analytics/{specialist_id}": {
         parameters: {
             query?: never;
@@ -2756,6 +2845,42 @@ export type paths = {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/admin/queue-resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Список QueueResource (реестр ресурсных владельцев тегов) */
+        get: operations["list_queue_resources_api_v1_queue_admin_queue_resources_get"];
+        put?: never;
+        /** Создать QueueResource (draft по умолчанию; active=true — через gate §3.1) */
+        post: operations["create_queue_resource_api_v1_queue_admin_queue_resources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/admin/queue-resources/{resource_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** QueueResource по id */
+        get: operations["get_queue_resource_api_v1_queue_admin_queue_resources__resource_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** PATCH QueueResource (ordinary-поля; code/queue_tag immutable; active — lifecycle §3.2) */
+        patch: operations["update_queue_resource_api_v1_queue_admin_queue_resources__resource_id__patch"];
         trace?: never;
     };
     "/api/v1/queue/available-specialists": {
@@ -31018,7 +31143,7 @@ export type components = {
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            role: "Admin" | "Registrar" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
+            role: "Admin" | "Registrar" | "Nurse" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
             /** Doctor Profile */
             doctor_profile?: null;
         };
@@ -31407,6 +31532,95 @@ export type components = {
             by_severity: {
                 [key: string]: number;
             };
+        };
+        /**
+         * NurseWorkplaceAssignmentCreateRequest
+         * @description Admin request to assign a Nurse User to a QueueResource workplace.
+         */
+        NurseWorkplaceAssignmentCreateRequest: {
+            /**
+             * User Id
+             * @description Target User id (role must be Nurse)
+             */
+            user_id: number;
+            /**
+             * Queue Resource Id
+             * @description QueueResource registry id
+             */
+            queue_resource_id: number;
+            /**
+             * Cabinet Override
+             * @description Station/cabinet for this assignment; NULL falls back to QueueResource.default_cabinet (D2 FINAL)
+             */
+            cabinet_override?: string | null;
+        };
+        /**
+         * NurseWorkplaceAssignmentListResponse
+         * @description Paged list of assignments with the total count for the filter.
+         */
+        NurseWorkplaceAssignmentListResponse: {
+            /** Items */
+            items: components["schemas"]["NurseWorkplaceAssignmentResponse"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * NurseWorkplaceAssignmentResponse
+         * @description Admin read model for a NurseWorkplaceAssignment row.
+         *
+         *     Enriched with the referenced user/resource mirror fields so the admin
+         *     surface does not need follow-up requests; ``effective_cabinet`` is the
+         *     resolved cabinet (override ?? QueueResource.default_cabinet).
+         */
+        NurseWorkplaceAssignmentResponse: {
+            /** Id */
+            id: number;
+            /** User Id */
+            user_id: number;
+            /** Queue Resource Id */
+            queue_resource_id: number;
+            /** Cabinet Override */
+            cabinet_override?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** User Username */
+            user_username?: string | null;
+            /** User Full Name */
+            user_full_name?: string | null;
+            /** Resource Code */
+            resource_code?: string | null;
+            /** Resource Display Name */
+            resource_display_name?: string | null;
+            /** Resource Queue Tag */
+            resource_queue_tag?: string | null;
+            /** Resource Default Cabinet */
+            resource_default_cabinet?: string | null;
+            /** Effective Cabinet */
+            effective_cabinet?: string | null;
+        };
+        /**
+         * NurseWorkplaceErrorDetail
+         * @description Body of the documented errors on the assignment control plane:
+         *     the domain errors (400/404/409) AND the auth errors (401/403, review
+         *     P2 round 2 — PR #3333).
+         *
+         *     Review P2 (PR #3333): the PR body declares 400/404/409 part of the
+         *     canonical admin contract; this model gives the generated clients the
+         *     typed ``{"detail": ...}`` shape FastAPI's HTTPException actually
+         *     returns — the same pattern as ServiceUnavailableDetail (admin-doctors
+         *     503) and UserPhoneScopeConflictDetail (user-management 409). The
+         *     401/403 publications reuse the same model because the auth failures
+         *     (get_current_user / require_active_roles) also surface as
+         *     HTTPException ``{"detail": ...}`` bodies — proven at runtime by
+         *     test_nurse_workplace_endpoints.py.
+         */
+        NurseWorkplaceErrorDetail: {
+            /** Detail */
+            detail: string;
         };
         /** OnboardingAnalyticsDashboard */
         OnboardingAnalyticsDashboard: {
@@ -34469,6 +34683,86 @@ export type components = {
             } | null;
             /** Doctor Id */
             doctor_id?: number | null;
+        };
+        /**
+         * QueueResourceCreate
+         * @description Draft-by-default (S-14: услуги/профиль → draft-ресурс → активация
+         *     через gate §3.1); `active=true` сразу — только при пройденном gate.
+         */
+        QueueResourceCreate: {
+            /** Code */
+            code: string;
+            /** Queue Tag */
+            queue_tag: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Start Number Online
+             * @default 1
+             */
+            start_number_online: number;
+            /**
+             * Max Online Per Day
+             * @default 15
+             */
+            max_online_per_day: number;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /**
+             * Active
+             * @default false
+             */
+            active: boolean;
+        };
+        /** QueueResourceOut */
+        QueueResourceOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Queue Tag */
+            queue_tag: string;
+            /** Display Name */
+            display_name: string;
+            /** Active */
+            active: boolean;
+            /** Start Number Online */
+            start_number_online: number;
+            /** Max Online Per Day */
+            max_online_per_day: number;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * QueueResourceUpdate
+         * @description §3.2: ordinary PATCH — `display_name`/`start_number_online`/
+         *     `max_online_per_day`/`default_cabinet`; `active` — lifecycle-переход
+         *     под serialization-scope §3.1(б). `code`/`queue_tag` immutable
+         *     (extra="forbid" -> 422 на попытку).
+         *
+         *     Nullable здесь только `default_cabinet` (единственная nullable-колонка
+         *     в таблице). Explicit `null` для остальных полей — 422 (round-3
+         *     owner-ревью P2): DB-колонки NOT NULL, и без этого пина explicit null
+         *     проходил Pydantic (`exclude_unset` сохранял его) и падал на
+         *     constraint violation уже в БД -> 500 вместо 422. Отличать explicit
+         *     null от unset позволяет `model_fields_set` — absent-поле в него не
+         *     попадает и остаётся «нет изменения».
+         */
+        QueueResourceUpdate: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Start Number Online */
+            start_number_online?: number | null;
+            /** Max Online Per Day */
+            max_online_per_day?: number | null;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /** Active */
+            active?: boolean | null;
         };
         /**
          * QueueSettingsUpdate
@@ -43939,6 +44233,267 @@ export interface operations {
             };
         };
     };
+    list_nurse_workplace_assignments_api_v1_admin_nurse_workplace_assignments_get: {
+        parameters: {
+            query?: {
+                /** @description Filter by target Nurse user */
+                user_id?: number | null;
+                /** @description Filter by QueueResource */
+                queue_resource_id?: number | null;
+                /** @description Filter by is_active (default: all) */
+                active?: boolean | null;
+                /** @description Page size */
+                limit?: number;
+                /** @description Page offset */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentListResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NurseWorkplaceAssignmentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
+                };
+            };
+            /** @description Целевой пользователь не Nurse / деактивирован, либо QueueResource неактивен */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Пользователь или QueueResource не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Активное назначение для пары (user, queue_resource) уже существует */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Назначение не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Назначение не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Назначение уже деактивировано */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_queue_analytics_api_v1_queue_admin_queue_analytics__specialist_id__get: {
         parameters: {
             query?: {
@@ -44669,6 +45224,223 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    list_queue_resources_api_v1_queue_admin_queue_resources_get: {
+        parameters: {
+            query?: {
+                active_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"][];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_queue_resource_api_v1_queue_admin_queue_resources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueResourceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Невалидный payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Дубликат code/queue_tag или отказ инварианта §3.1 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Неизвестные поля payload */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_queue_resource_api_v1_queue_admin_queue_resources__resource_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description QueueResource не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_queue_resource_api_v1_queue_admin_queue_resources__resource_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueResourceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description QueueResource не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Отказ инварианта §3.1 при активации */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Попытка изменить immutable code/queue_tag или невалидный payload */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -5,6 +5,7 @@ import { ROUTE_REGISTRY, SIDEBAR_PRESETS } from '../routeRegistry';
 import {
   getCompatibilityRedirects,
   getAdminNavSections,
+  getEffectiveRouteByPath,
   getInternalDemoRoutes,
   getLegacyRedirectTarget,
   getProtectedPatientFormsEntryPath,
@@ -16,6 +17,7 @@ import {
   isInternalDemoEnabled,
   isRouteAccessibleToProfile,
 } from '../routeSelectors';
+import { getRouteForProfile, hasRouteAccess } from '../../constants/routes';
 
 interface RouteHeadingContractEntry {
   path: string;
@@ -186,5 +188,43 @@ describe('docs snapshot', () => {
     expect(markdown).toContain('Compatibility Redirects');
     expect(markdown).toContain('/registrar');
     expect(markdown).toContain('/admin/settings');
+  });
+});
+
+// NURSE-V2 N2-2 (review P2, PR #3333): Nurse is login-capable, so a
+// successful login must land on a route that actually admits the role.
+// Before the fix the home lookup missed Nurse, fell through to the shared
+// '/clinical/search' fallback (role-scoped WITHOUT Nurse) and the
+// RouteAccessBoundary bounced the freshly authenticated user to
+// /forbidden.
+describe('NURSE-V2 N2-2 nurse login landing', () => {
+  it('routes a Nurse profile to the authenticated profile screen — not /clinical/search, not /forbidden', () => {
+    const nurse = { role: 'Nurse' };
+
+    const target = getRoleHomeRoute(nurse);
+    expect(target).toBe('/clinical/profile');
+    expect(target).not.toBe('/clinical/search');
+    expect(target).not.toBe('/forbidden');
+
+    // The landing route must actually admit the Nurse profile...
+    const route = getEffectiveRouteByPath(target);
+    expect(route).toBeTruthy();
+    expect(isRouteAccessibleToProfile(route, nurse)).toBe(true);
+
+    // ...and the login surface computes the exact same destination.
+    expect(getRouteForProfile(nurse)).toBe('/clinical/profile');
+  });
+
+  it('keeps the Nurse privilege-zero on role-scoped surfaces (N2-2)', () => {
+    const nurse = { role: 'Nurse' };
+
+    // The old accidental landing must stay a deny.
+    expect(hasRouteAccess(nurse, '/clinical/search')).toBe(false);
+    // No clinical/admin/registrar surface is granted by the login fix.
+    expect(hasRouteAccess(nurse, '/admin')).toBe(false);
+    expect(hasRouteAccess(nurse, '/registrar')).toBe(false);
+    expect(hasRouteAccess(nurse, '/doctor')).toBe(false);
+    expect(hasRouteAccess(nurse, '/cashier')).toBe(false);
+    expect(hasRouteAccess(nurse, '/lab')).toBe(false);
   });
 });

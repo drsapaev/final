@@ -1,6 +1,7 @@
 """
 API endpoints for Role management
 """
+
 import logging
 from typing import NoReturn
 
@@ -24,6 +25,30 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 ROLES_PUBLIC_ERROR = "Internal server error"
+
+# NURSE-V2 N2-2 (codex round-3 P2, PR 3333): the roles catalog is a
+# deployment artifact — this slice neither seeds nor requires a 'Nurse'
+# row — but the admin UI sources its user-creation options from this
+# endpoint, so without a catalog row the newly admitted role was NOT
+# selectable in the normal workflow. The canonical user-creation
+# vocabulary is therefore MERGED into the catalog-derived list: every
+# role the user-management write schema admits as a normal selectable
+# is always offered, in every supported deployment (empty catalog
+# included). Catalog rows keep their deployment display names and win
+# over the merged defaults (no duplicates); retired (Manager /
+# Receptionist), internal-only (Resource) and provisioned-only
+# (SuperAdmin) spellings are deliberately NOT part of the guaranteed
+# core — they surface only when the catalog itself carries them (and
+# the retired/internal filters above still apply to those rows).
+_CORE_USER_ROLE_OPTIONS: tuple[tuple[str, str], ...] = (
+    ("Admin", "Администратор"),
+    ("Doctor", "Врач"),
+    ("Registrar", "Регистратор"),
+    ("Cashier", "Кассир"),
+    ("Lab", "Лаборант"),
+    ("Nurse", "Медсестра"),
+    ("Patient", "Пациент"),
+)
 
 
 def _raise_roles_internal_error(operation: str, exc: Exception) -> NoReturn:
@@ -58,7 +83,7 @@ async def get_roles(
 
         return RoleListResponse(
             roles=[RoleResponse.model_validate(role) for role in roles],
-            total=len(roles)
+            total=len(roles),
         )
     except Exception as e:
         _raise_roles_internal_error("get_roles", e)
@@ -66,7 +91,9 @@ async def get_roles(
 
 @router.get("/options", response_model=RoleOptionsListResponse)
 async def get_role_options(
-    include_all: bool = Query(False, description="Include 'All roles' option for filters"),
+    include_all: bool = Query(
+        False, description="Include 'All roles' option for filters"
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -85,6 +112,20 @@ async def get_role_options(
         if include_all:
             options.append(RoleOptionResponse(value="", label="Все роли"))
 
+        # Codex settle-pass P2: a catalog row whose name is a CASE VARIANT of
+        # a core spelling (e.g. 'nurse' — RoleCreate permits it, a compatible
+        # deployment may already contain it) must not leak its verbatim value:
+        # NonDoctorRoleLiteral admits only the exact canonical spelling, so a
+        # lowercase option would 422 on submit — the same dead-option trap the
+        # M-2b retired-spelling filter closes. Recognized core spellings are
+        # therefore CANONICALIZED (value -> the core spelling; the deployment
+        # display_name is kept), and exact duplicates (a catalog carrying both
+        # 'Nurse' and 'nurse') collapse to the first canonicalized row.
+        core_by_lower = {
+            value.lower(): value for value, _label in _CORE_USER_ROLE_OPTIONS
+        }
+        emitted: set[str] = set()
+
         # Add each role
         # M-2b (Codex review P2 follow-up on #3049): retired RBAC spellings
         # never surface as selectable options — a legacy/compatible-deployment
@@ -101,10 +142,23 @@ async def get_role_options(
             # non-logins, not user-management vocabulary.
             if is_internal_only_role_spelling(role.name):
                 continue
-            options.append(RoleOptionResponse(
-                value=role.name,
-                label=role.display_name
-            ))
+            canonical = core_by_lower.get(role.name.lower())
+            value = canonical if canonical is not None else role.name
+            if value in emitted:
+                continue
+            emitted.add(value)
+            options.append(RoleOptionResponse(value=value, label=role.display_name))
+
+        # NURSE-V2 N2-2 (codex round-3 P2): guarantee the canonical
+        # user-creation vocabulary even when the catalog is missing rows
+        # (a supported deployment — this slice does not seed public.roles).
+        # A catalog row for a core spelling keeps its deployment
+        # display_name (canonicalized value); only missing spellings are
+        # appended with the canonical label.
+        for value, label in _CORE_USER_ROLE_OPTIONS:
+            if value not in emitted:
+                emitted.add(value)
+                options.append(RoleOptionResponse(value=value, label=label))
 
         return RoleOptionsListResponse(options=options)
     except Exception as e:
@@ -140,7 +194,7 @@ async def create_role(
     if current_user.role != "Admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Только администраторы могут создавать роли"
+            detail="Только администраторы могут создавать роли",
         )
 
     try:
@@ -169,7 +223,7 @@ async def update_role(
     if current_user.role != "Admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Только администраторы могут изменять роли"
+            detail="Только администраторы могут изменять роли",
         )
 
     try:
@@ -184,7 +238,9 @@ async def update_role(
         _raise_roles_internal_error("update_role", e)
 
 
-@router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete(
+    "/{role_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None
+)
 async def delete_role(
     role_id: int,
     db: Session = Depends(get_db),
@@ -200,7 +256,7 @@ async def delete_role(
     if current_user.role != "Admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Только администраторы могут удалять роли"
+            detail="Только администраторы могут удалять роли",
         )
 
     try:
