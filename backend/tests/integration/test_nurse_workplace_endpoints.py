@@ -160,6 +160,48 @@ def test_active_admin_operates_the_control_plane(
 
 
 @pytest.mark.integration
+def test_create_normalizes_blank_cabinet_override_to_null(
+    client: TestClient, db_session: Session
+) -> None:
+    """Review P2 round 3 (PR #3333): D2's cabinet axis is NULL-coalesced.
+
+    An empty admin form field serializes to cabinet_override="". The API
+    normalizes it to NULL at the write boundary, so the stored row and the
+    response report a consistent pair — override NULL, effective = the
+    resource default — instead of the contradictory ""-override with
+    default-effective that a D2-literal N2-3 consumer would read as a
+    real cabinet.
+    """
+    from tests.conftest import mint_access_token
+
+    admin = _admin(db_session, "n2v2_admin_blank")
+    nurse = _nurse(db_session, "n2v2_nurse_blank")
+    resource = _resource(db_session, "n2v2_procedures")  # default_cabinet "c1"
+    headers = {"Authorization": f"Bearer {mint_access_token(admin)}"}
+
+    response = client.post(
+        _BASE_PATH,
+        json={
+            "user_id": nurse.id,
+            "queue_resource_id": resource.id,
+            "cabinet_override": "   ",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["cabinet_override"] is None
+    assert body["effective_cabinet"] == "c1"
+
+    row = (
+        db_session.query(NurseWorkplaceAssignment)
+        .filter(NurseWorkplaceAssignment.user_id == nurse.id)
+        .one()
+    )
+    assert row.cabinet_override is None
+
+
+@pytest.mark.integration
 def test_nurse_role_is_403_on_the_control_plane(
     client: TestClient, db_session: Session
 ) -> None:

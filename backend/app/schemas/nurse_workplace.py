@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class NurseWorkplaceAssignmentCreateRequest(BaseModel):
@@ -28,6 +28,22 @@ class NurseWorkplaceAssignmentCreateRequest(BaseModel):
             "QueueResource.default_cabinet (D2 FINAL)"
         ),
     )
+
+    @field_validator("cabinet_override")
+    @classmethod
+    def _blank_override_is_no_override(cls, v: str | None) -> str | None:
+        # Review P2 round 3 (PR #3333): D2 FINAL defines the cabinet axis as
+        # NULL-coalesced (NULL -> QueueResource.default_cabinet). An empty
+        # or whitespace-only string carries the same "no override" intent
+        # as an omitted field (an empty admin form input serializes to ""),
+        # so it is normalized to NULL at the write boundary. Without this
+        # the API could store cabinet_override="" — a non-NULL override the
+        # enrichment would contradict ("" override, default effective) and
+        # an N2-3 implementation that is D2-literal (override ?? default)
+        # would read as a real cabinet, diverging from this admin surface.
+        if v is None or not v.strip():
+            return None
+        return v
 
 
 class NurseWorkplaceAssignmentResponse(BaseModel):

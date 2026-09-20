@@ -12,6 +12,11 @@ Owner's required list (design-GO 2026-09-19):
 - review P2-1: deactivation is an atomic guarded UPDATE — under an
   interleaved concurrent flip exactly ONE request wins, the loser gets
   409 (not a second 200);
+- review P2 round 3 (D2 cabinet axis): blank overrides ("" / spaces)
+  are normalized to NULL at the create schema, and the enrichment
+  resolves effective_cabinet with D2-literal NULL-coalescing — a
+  hand-applied "" row reports "" (the same answer a D2-literal N2-3
+  would give), never a silent truthiness fallback to the default;
 - review P2 round 2 (TOCTOU): the create eligibility reads are
   deterministic FRESH reads — a lifecycle change committed by a
   concurrent session is observed (400) even when this session already
@@ -30,6 +35,7 @@ from app.db.base_class import Base
 from app.models.nurse_workplace import NurseWorkplaceAssignment
 from app.models.online_queue import QueueResource
 from app.models.user import User
+from app.schemas.nurse_workplace import NurseWorkplaceAssignmentCreateRequest
 from app.services.nurse_workplace_api_service import (
     NurseWorkplaceApiDomainError,
     NurseWorkplaceApiService,
@@ -118,6 +124,56 @@ def test_cabinet_override_null_falls_back_to_resource_default(session) -> None:
         user_id=nurse.id, queue_resource_id=resource.id, cabinet_override=None
     )
     assert data["effective_cabinet"] == resource.default_cabinet
+
+
+def test_cabinet_override_blank_string_normalized_to_null_at_schema(
+    session,
+) -> None:
+    """Review P2 round 3 (PR #3333): D2's cabinet axis is NULL-coalesced.
+
+    An empty admin form field serializes to "" — the create schema
+    normalizes blank (empty / whitespace-only) overrides to NULL so the
+    API can never store an override that contradicts its own
+    effective_cabinet resolution. Real values are kept verbatim.
+    """
+    for blank in ("", "   "):
+        payload = NurseWorkplaceAssignmentCreateRequest(
+            user_id=1, queue_resource_id=1, cabinet_override=blank
+        )
+        assert payload.cabinet_override is None, repr(blank)
+    verbatim = NurseWorkplaceAssignmentCreateRequest(
+        user_id=1, queue_resource_id=1, cabinet_override=" 5 "
+    )
+    assert verbatim.cabinet_override == " 5 "
+    omitted = NurseWorkplaceAssignmentCreateRequest(user_id=1, queue_resource_id=1)
+    assert omitted.cabinet_override is None
+
+
+def test_effective_cabinet_is_null_coalesced_not_truthiness(session) -> None:
+    """Review P2 round 3 (PR #3333): override ?? default, D2-literal.
+
+    A hand-applied "" row (raw INSERT, outside the API write boundary)
+    reports effective_cabinet="" — the exact answer a D2-literal N2-3
+    implementation would give — instead of the old truthiness fallback
+    that silently swapped the row's own non-NULL override for the
+    resource default.
+    """
+    nurse = _user(session, "nurse_c")
+    resource = _resource(session, "lab")
+    session.add(
+        NurseWorkplaceAssignment(
+            user_id=nurse.id,
+            queue_resource_id=resource.id,
+            cabinet_override="",
+            is_active=True,
+        )
+    )
+    session.commit()
+    items, _total = _svc(session).list_assignments(user_id=nurse.id)
+    assert len(items) == 1
+    assert items[0]["cabinet_override"] == ""
+    assert items[0]["effective_cabinet"] == ""
+    assert items[0]["effective_cabinet"] != resource.default_cabinet
 
 
 def test_create_rejects_unknown_user_with_404(session) -> None:

@@ -169,7 +169,18 @@ class NurseWorkplaceApiService:
                     ),
                     "resource_queue_tag": (resource.queue_tag if resource else None),
                     "resource_default_cabinet": default_cabinet,
-                    "effective_cabinet": row.cabinet_override or default_cabinet,
+                    # D2 FINAL (review P2 round 3 — PR #3333): the resolved
+                    # cabinet is NULL-coalesced (override ?? default), NOT
+                    # truthiness-coalesced. The create schema normalizes ""
+                    # to NULL at the write boundary; this explicit
+                    # is-not-None check keeps the same D2 semantics for
+                    # any hand-applied row so an N2-3 implementation that
+                    # is D2-literal can never diverge from this surface.
+                    "effective_cabinet": (
+                        row.cabinet_override
+                        if row.cabinet_override is not None
+                        else default_cabinet
+                    ),
                 }
             )
         return items
