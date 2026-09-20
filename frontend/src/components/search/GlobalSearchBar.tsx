@@ -602,7 +602,7 @@ function GlobalSearchBarInner({ className = '' }: GlobalSearchBarProps) {
 }
 
 
-// NURSE-V2 N2-2 (review P2 round 3 — PR #3333): self-gate on the backend
+// NURSE-V2 N2-2 (review P2 round 3 — PR 3333): self-gate on the backend
 // GLOBAL_SEARCH_ROLES mirror (./globalSearchAccess). GET /global-search
 // answers 403 for every role outside that allowlist; without the gate any
 // app-shell surface open to such a role (the nurse home /clinical/profile
