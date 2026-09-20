@@ -1,21 +1,28 @@
 /**
- * Activation deep-link credential handling (Phase 0 follow-up, Codex P1).
+ * Activation deep-link credential handling (Phase 0 follow-up, Codex P1 +
+ * owner review round 12).
  *
  * The canonical handout link carries the 72h activation credential in the
  * URL fragment (/patient/activate#token=...) so it is never transmitted to
- * the server. But the fragment still lives in window.location until the
- * PatientActivatePage effect strips it — and telemetry (Sentry) initializes
- * in main.tsx BEFORE React mounts. The Sentry scrubber redacts object keys
- * containing "token"; URL-valued telemetry fields (request.url, breadcrumb
- * from/to) are NOT scrubbed, so a pageload trace or a startup error could
- * otherwise carry the credential to Sentry.
+ * the server. Legacy links already handed out within the TTL still use the
+ * query form (/patient/activate?token=...) — the query component reaches
+ * the server on the first HTTP navigation and stays in window.location
+ * until the PatientActivatePage effect strips it. Telemetry (Sentry)
+ * initializes in main.tsx BEFORE React mounts, and the Sentry scrubber
+ * redacts object keys containing "token"; URL-valued telemetry fields
+ * (request.url, breadcrumb from/to, pageload transaction URLs) carry the
+ * credential as a plain string, so a pageload trace or a startup error
+ * could otherwise leak EITHER handout form to Sentry.
  *
- * extractPatientActivationFragment() must therefore run BEFORE initSentry():
- * it copies the token into an in-memory one-shot slot (never storage) and
- * rewrites the address bar without the fragment. PatientActivatePage consumes
- * the slot on mount and falls back to the router location (fragment/query)
- * for environments where the bootstrap extraction did not run (tests,
- * MemoryRouter).
+ * extractPatientActivationCredential() must therefore run BEFORE
+ * initSentry(): it copies the token into an in-memory one-shot slot (never
+ * storage) and rewrites the address bar without the credential — for BOTH
+ * forms (the canonical fragment wins when a URL carries both). The query
+ * strip preserves unrelated query params. PatientActivatePage consumes the
+ * slot on mount and falls back to the router location (fragment/query) for
+ * environments where the bootstrap extraction did not run (tests,
+ * MemoryRouter). Defense-in-depth: services/sentry.ts additionally redacts
+ * credential query params inside URL-valued telemetry strings.
  */
 
 let pendingActivationFragmentToken: string | null = null;
@@ -68,9 +75,69 @@ export function extractPatientActivationFragment(): void {
     // Never break bootstrap over deep-link hygiene.
     if (import.meta.env.MODE === 'development') {
       // eslint-disable-next-line no-console
-      console.warn('[patientActivateDeepLink] extraction failed:', e);
+      console.warn('[patientActivateDeepLink] fragment extraction failed:', e);
     }
   }
+}
+
+/**
+ * Legacy backward-compatibility path (owner round-12 P1): links already
+ * handed out within the 72h TTL use /patient/activate?token=... The query
+ * component is present in window.location from the very first HTTP request
+ * and survives until the PatientActivatePage effect — i.e. past Sentry
+ * init. Strip it BEFORE initSentry(): stash the token (the canonical
+ * fragment form wins when both are present) and rewrite the address bar
+ * with unrelated query params preserved (a legacy URL may carry lang/utm
+ * companions that are not credentials).
+ */
+function extractPatientActivationQueryToken(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    const { pathname, search, hash } = window.location;
+    if (!search || !isActivateRoutePathname(pathname)) {
+      return;
+    }
+    const params = new URLSearchParams(search);
+    // URLSearchParams percent-decodes names, so this also catches a
+    // hand-obfuscated %74oken= key that the page fallback would still
+    // resolve to the credential.
+    const token = (params.get('token') || '').trim();
+    if (!token) {
+      return;
+    }
+    if (pendingActivationFragmentToken === null) {
+      pendingActivationFragmentToken = token;
+    }
+    // Drop every token param (all occurrences), keep the rest verbatim,
+    // preserve an unrelated hash. replace: the history entry must not keep
+    // the secret either.
+    params.delete('token');
+    const nextSearch = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      '',
+      pathname + (nextSearch ? `?${nextSearch}` : '') + hash
+    );
+  } catch (e) {
+    // Never break bootstrap over deep-link hygiene.
+    if (import.meta.env.MODE === 'development') {
+      // eslint-disable-next-line no-console
+      console.warn('[patientActivateDeepLink] legacy query extraction failed:', e);
+    }
+  }
+}
+
+/**
+ * Bootstrap entry point (main.tsx, BEFORE initSentry()): extract the
+ * activation credential from BOTH handout forms — the canonical #token=
+ * fragment and the legacy ?token= query — and strip both from the address
+ * bar/history. See the module docs for the telemetry rationale.
+ */
+export function extractPatientActivationCredential(): void {
+  extractPatientActivationFragment();
+  extractPatientActivationQueryToken();
 }
 
 /**

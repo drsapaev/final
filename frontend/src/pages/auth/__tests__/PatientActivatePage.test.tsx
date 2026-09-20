@@ -42,7 +42,7 @@ import {
   requestActivationOtp,
 } from '../../../api/patientAccess';
 import { replaceAccessOnlySession, setProfile, setToken } from '../../../stores/auth';
-import { extractPatientActivationFragment, takePatientActivationFragmentToken } from '../../../utils/patientActivateDeepLink';
+import { extractPatientActivationCredential, takePatientActivationFragmentToken } from '../../../utils/patientActivateDeepLink';
 
 const mockedRequestOtp = vi.mocked(requestActivationOtp);
 const mockedConfirm = vi.mocked(confirmActivation);
@@ -172,11 +172,11 @@ describe('PatientActivatePage (Phase 0 PR-B)', () => {
   });
 
   it('prefills from the bootstrap-extracted fragment stash (telemetry-safe path)', () => {
-    // Phase 0 follow-up (Codex P1): main.tsx extracts the fragment BEFORE
+    // Phase 0 follow-up (Codex P1): main.tsx extracts the credential BEFORE
     // telemetry init, so by the time the page mounts the router location is
     // already clean — the token arrives via the one-shot stash instead.
     window.history.replaceState(null, '', `/patient/activate#token=${TOKEN}`);
-    extractPatientActivationFragment();
+    extractPatientActivationCredential();
     expect(window.location.hash).toBe('');
 
     renderPage(); // MemoryRouter at /patient/activate — no fragment anywhere

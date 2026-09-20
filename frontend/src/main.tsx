@@ -16,18 +16,21 @@ import { bootstrapStoredColorScheme } from './theme/colorScheme';
 // Инициализация API interceptors
 import { setupInterceptors, initializeAuth } from './api/interceptors';
 
-// Phase 0 follow-up (Codex P1): pull the activation credential out of the
-// URL fragment BEFORE telemetry initializes — the Sentry scrubber redacts
-// keys containing "token" but not URL-valued fields (request.url, breadcrumb
-// from/to), so a pageload trace or startup error would otherwise carry the
-// #token=... credential to Sentry. PatientActivatePage reads the stashed
-// value (see utils/patientActivateDeepLink.ts).
-import { extractPatientActivationFragment } from './utils/patientActivateDeepLink';
+// Phase 0 follow-up (Codex P1 + owner round-12 P1): pull the activation
+// credential out of the URL BEFORE telemetry initializes — for BOTH handout
+// forms: the canonical #token= fragment and the legacy ?token= query kept
+// for links handed out within the 72h TTL. The Sentry scrubber redacts
+// token-keyed fields but not URL-valued telemetry fields (request.url,
+// breadcrumb from/to, pageload transaction request.url), so a pageload
+// trace or startup error would otherwise carry the credential to Sentry
+// before React strips the URL. PatientActivatePage reads the stashed value
+// (see utils/patientActivateDeepLink.ts).
+import { extractPatientActivationCredential } from './utils/patientActivateDeepLink';
 
 // Sentry — no-op if VITE_SENTRY_DSN is unset
 import { initSentry } from './services/sentry';
 
-extractPatientActivationFragment();
+extractPatientActivationCredential();
 initSentry();
 bootstrapStoredColorScheme();
 
