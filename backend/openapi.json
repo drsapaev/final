@@ -253,6 +253,16 @@
               }
             }
           },
+          "404": {
+            "description": "JWT user has no linked Patient profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -277,7 +287,7 @@
           "patients"
         ],
         "summary": "Create Patient Portal Booking",
-        "description": "Create one trusted patient-portal appointment (own scope only).\n\nMirrors the Mini App creation contract: same draft validation, same\nper-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same\n409 on occupied slots, same lifecycle eligibility for the doctor.\n\nP2 (round 2): the `Idempotency-Key` header is REQUIRED. The global\nidempotency middleware only protects requests that carry a key —\nwithout a mandated key a lost response + automatic browser retry of a\ndate-only/department-only request (no doctor slot lock applies) would\ncreate duplicate appointments. Same key + same payload replays the\ncommitted 201; same key + changed payload is a 409.",
+        "description": "Create one trusted patient-portal appointment (own scope only).\n\nMirrors the Mini App creation contract: same draft validation, same\nper-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same\n409 on occupied slots, same lifecycle eligibility for the doctor.\n\nP2 (round 2): the `Idempotency-Key` header is REQUIRED. The global\nidempotency middleware only protects requests that carry a key —\nwithout a mandated key a lost response + automatic browser retry of a\ndate-only/department-only request (no doctor slot lock applies) would\ncreate duplicate appointments. Same key + same payload replays the\ncommitted 201; same key + changed payload is a 409.\n\nP2 (round 3): creation goes through the portal-INTERNAL\n`PatientPortalAppointmentCreate` — the persisted `department_id` is the\nserver-resolved FK from `_resolve_portal_department`, never a\nclient-owned field (the shared `AppointmentCreate` no longer accepts\none, closing the legacy-endpoint bypass).",
         "operationId": "create_patient_portal_booking_api_v1_patients_booking_post",
         "security": [
           {
@@ -341,6 +351,16 @@
           },
           "403": {
             "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "JWT user has no linked Patient profile, or the requested doctor is not eligible for new appointments (doctor_not_eligible)",
             "content": {
               "application/json": {
                 "schema": {
@@ -413,6 +433,16 @@
           },
           "403": {
             "description": "Role/scope denied (staff role, deactivated user, invalid link)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "JWT user has no linked Patient profile",
             "content": {
               "application/json": {
                 "schema": {
@@ -68559,17 +68589,6 @@
             ],
             "title": "Department"
           },
-          "department_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department Id"
-          },
           "appointment_date": {
             "type": "string",
             "format": "date",
@@ -68747,6 +68766,17 @@
               }
             ],
             "title": "Patient Name"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
           }
         },
         "type": "object",
@@ -68811,17 +68841,6 @@
               }
             ],
             "title": "Department"
-          },
-          "department_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Department Id"
           },
           "appointment_date": {
             "type": "string",
@@ -92892,6 +92911,10 @@
             "type": "boolean",
             "title": "Plain Telegram Chat Allowed"
           },
+          "medical_details_in_chat": {
+            "type": "boolean",
+            "title": "Medical Details In Chat"
+          },
           "pdf_included": {
             "type": "boolean",
             "title": "Pdf Included"
@@ -92900,6 +92923,7 @@
         "type": "object",
         "required": [
           "plain_telegram_chat_allowed",
+          "medical_details_in_chat",
           "pdf_included"
         ],
         "title": "PatientPortalCabinetPolicy"

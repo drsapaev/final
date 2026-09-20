@@ -230,3 +230,45 @@ Round-2 hardening (review of PR #3340, applies to all four endpoints):
   portal guards or a plain string from the auth/RBAC layer). The generated
   TypeScript (`src/types/generated/api.ts`) is part of the PR-C2 contract
   and is freshness-gated in CI.
+
+Round-3 hardening (review of PR #3340 @ `42465f8`, applies to the portal +
+the idempotency middleware):
+
+- Patient-aware replay policy: the idempotency namespace now binds the
+  CURRENT active Patient card (`patient:{id}`) on top of the canonical
+  user id. A snapshot committed under card A can never be replayed after
+  the account is re-linked to card B (different namespace → fresh
+  execution). A MISSING or soft-deleted card bypasses the idempotency
+  machinery entirely: the retry reaches the endpoint's own guards and is
+  answered `404 patient_profile_required` / `403 patient_link_invalid`
+  exactly like a first request — a committed booking can no longer be
+  replayed to a revoked card within the 24h key TTL.
+- Operation-scoped keys: the namespace also binds `METHOD + normalized
+  path`, so one `Idempotency-Key` can never alias two operations that
+  share a request DTO (`POST /patients/booking/preview` vs
+  `POST /patients/booking`): a replay only ever satisfies the same
+  operation it was produced by. The Redis claim keys and execution-intent
+  markers inherit the same scoping. Existing stored snapshots expire
+  naturally (24h TTL); a deploy re-executes each key at most once.
+- Cabinet policy SSOT parity: `PatientPortalCabinetPolicy` carries the
+  full Mini App policy payload (`plain_telegram_chat_allowed`,
+  `medical_details_in_chat`, `pdf_included`) — response filtering no
+  longer drops `medical_details_in_chat`.
+- Typed 404 surface: `404 patient_profile_required` is now DECLARED for
+  preview, booking and forms (only cabinet declared it before); booking
+  additionally documents the doctor-eligibility 404. The generated
+  TypeScript is regenerated from the spec (CI freshness gate).
+- Internal creation schema: `department_id` was removed from the shared
+  `AppointmentCreate` and lives only on the portal-internal
+  `PatientPortalAppointmentCreate`. `POST /patients/booking` persists the
+  server-resolved `departments.id`; the legacy `POST /appointments/`
+  contract is back to its pre-#3340 shape (no client-owned routing FK —
+  the read model `Appointment` still exposes `department_id`).
+- Denied audit rows: portal refusals write `outcome="denied"`
+  `patient_access_audit` rows with `extra_data.reason`
+  (`patient_link_invalid` 403, `department_unknown`/`department_inactive`
+  400, `doctor_not_eligible` 404, `appointment_time_slot_occupied` 409)
+  and `extra_data.surface = "jwt_portal"`. The soft-deleted-card 403
+  carries the revoked card id as the audit subject. A refusal with no
+  subject at all (no linked card) writes no row — the same SSOT boundary
+  the Mini App applies to auth failures without a patient context.

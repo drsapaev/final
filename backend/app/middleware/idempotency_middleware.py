@@ -49,6 +49,7 @@ import base64
 import hashlib
 import json
 import logging
+import re
 import time
 import uuid
 from collections import OrderedDict
@@ -340,6 +341,66 @@ def _principal_refusal_response() -> Response:
         content='{"detail": "Пользователь деактивирован или сессия недействительна"}',
         media_type="application/json",
     )
+
+
+def _normalize_idem_path(path: str) -> str:
+    """Round-3 (owner P2): path normalization for the operation scope.
+
+    Trailing slashes are collapsed ("/cart/" == "/cart"), everything else
+    stays byte-exact — paths are routing-identity and must not alias.
+    """
+    return re.sub(r"/+$", "", path) or "/"
+
+
+def _patient_replay_policy_sync(
+    request: Any, canonical_user_id: int
+) -> tuple[str, bool]:
+    """Round-3 (owner P1): patient-aware replay policy, one DB roundtrip.
+
+    Returns ``(patient_scope, fall_through)``:
+
+    - non-Patient principal (or user row gone — later exec-auth refuses
+      fail-closed): ``("", False)`` — namespace carries NO patient scope;
+    - Patient with an ACTIVE card: ``("patient:{id}", False)`` — the
+      namespace (local cache, Redis claim, execution intents) is bound to
+      the CURRENT card id, so a snapshot made under card A can never be
+      served after the account is re-linked to card B;
+    - Patient with a MISSING or SOFT-DELETED card: ``("", True)`` — the
+      caller falls through to the endpoint WITHOUT any idempotency
+      machinery: no cached snapshot, no claim, no intent. The endpoint's
+      own guards answer 404 patient_profile_required / 403
+      patient_link_invalid (and write the denied audit row) exactly as
+      they would for a first request. Replaying a committed booking to a
+      revoked card is precisely the leak this policy closes.
+    """
+    generator = _resolve_request_db(request)
+    try:
+        db = next(generator)
+        from sqlalchemy import select
+
+        from app.models.patient import Patient
+        from app.models.user import User
+
+        row = db.execute(
+            select(User.role, Patient.id, Patient.is_deleted)
+            .outerjoin(Patient, Patient.user_id == User.id)
+            .where(User.id == int(canonical_user_id))
+        ).first()
+        if row is None:
+            return "", False
+        role, patient_id, is_deleted = row
+        if str(role or "").strip().casefold() != "patient":
+            return "", False
+        if patient_id is None or bool(is_deleted):
+            return "", True
+        return f"patient:{int(patient_id)}", False
+    finally:
+        try:
+            next(generator)
+        except StopIteration:
+            pass
+        except Exception:  # pragma: no cover - generator teardown
+            pass
 
 
 def _resolve_request_db(request: Any):
@@ -1031,7 +1092,40 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 request.url.path,
             )
             return _principal_refusal_response()
-        user_id = self._namespace(canonical_id)
+
+        # Round-3 (owner P2): the idempotency identity is the OPERATION, not
+        # just the principal — method + normalized path join the namespace,
+        # so one key can never alias two different operations that share a
+        # request DTO (POST /patients/booking/preview vs POST
+        # /patients/booking) or two resources of a parameterized route.
+        op_scope = (
+            f"{request.method.upper()}:{_normalize_idem_path(request.url.path)}"
+        )
+        # Round-3 (owner P1): patient-aware replay policy. The live card
+        # state decides whether idempotency machinery may run AT ALL for a
+        # Patient principal: an active card scopes the namespace to the card
+        # id; a missing/soft-deleted card bypasses replay entirely so the
+        # endpoint's own guards (404/403 + denied audit) answer the retry.
+        try:
+            patient_scope, patient_fall_through = await asyncio.to_thread(
+                _patient_replay_policy_sync, request, canonical_id
+            )
+        except Exception:
+            logger.warning(
+                "Idempotency patient replay-policy check failed; refusing keyed write: path=%s",
+                request.url.path,
+                exc_info=True,
+            )
+            return _principal_refusal_response()
+        if patient_fall_through:
+            logger.warning(
+                "Idempotency replay policy: no ACTIVE Patient card; bypassing replay, "
+                "endpoint guards decide: user=%s key=%s path=%s",
+                canonical_id, idempotency_key, request.url.path,
+            )
+            return await call_next(request)
+
+        user_id = self._namespace(canonical_id, op_scope, patient_scope)
 
         # Codex R4 #3092 (P1): resolve the distributed claim BEFORE the local
         # cache check — the role-mismatch fall-through needs it to drop a
@@ -1842,7 +1936,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             return None
 
     @staticmethod
-    def _namespace(canonical_user_id: int) -> str:
+    def _namespace(
+        canonical_user_id: int,
+        operation_scope: str = "",
+        patient_scope: str = "",
+    ) -> str:
         """Stable per-principal cache namespace from the CANONICAL user id.
 
         Codex R11 #3092 (P1): the raw ``sub`` differs between token shapes
@@ -1851,8 +1949,20 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         namespace after refresh. The namespace is derived from the DB-
         resolved user id, so every token shape of the same account maps to
         ONE namespace. Hashed: no usernames/ids in Redis keys.
+
+        Round-3 (owner P1/P2): the namespace additionally binds the
+        OPERATION (method + normalized path) and, for Patient principals,
+        the CURRENT active card id. One key therefore cannot alias two
+        operations sharing a request DTO, and a snapshot committed under
+        card A can never be replayed after the account is re-linked to
+        card B (the re-linked account resolves a different patient scope,
+        i.e. a different namespace, and executes fresh).
         """
         subject = f"user:{int(canonical_user_id)}"
+        if operation_scope:
+            subject = f"{subject}|op:{operation_scope}"
+        if patient_scope:
+            subject = f"{subject}|{patient_scope}"
         return hashlib.sha256(subject.encode("utf-8")).hexdigest()[:32]
 
     async def _principal_authorized(

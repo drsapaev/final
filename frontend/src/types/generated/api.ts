@@ -174,6 +174,12 @@ export type paths = {
          *     date-only/department-only request (no doctor slot lock applies) would
          *     create duplicate appointments. Same key + same payload replays the
          *     committed 201; same key + changed payload is a 409.
+         *
+         *     P2 (round 3): creation goes through the portal-INTERNAL
+         *     `PatientPortalAppointmentCreate` — the persisted `department_id` is the
+         *     server-resolved FK from `_resolve_portal_department`, never a
+         *     client-owned field (the shared `AppointmentCreate` no longer accepts
+         *     one, closing the legacy-endpoint bypass).
          */
         post: operations["create_patient_portal_booking_api_v1_patients_booking_post"];
         delete?: never;
@@ -23438,8 +23444,6 @@ export type components = {
             doctor_id?: number | null;
             /** Department */
             department?: string | null;
-            /** Department Id */
-            department_id?: number | null;
             /**
              * Appointment Date
              * Format: date
@@ -23492,6 +23496,8 @@ export type components = {
             updated_at?: string | null;
             /** Patient Name */
             patient_name?: string | null;
+            /** Department Id */
+            department_id?: number | null;
         };
         /**
          * AppointmentCancelRequest
@@ -23511,8 +23517,6 @@ export type components = {
             doctor_id?: number | null;
             /** Department */
             department?: string | null;
-            /** Department Id */
-            department_id?: number | null;
             /**
              * Appointment Date
              * Format: date
@@ -32301,6 +32305,8 @@ export type components = {
         PatientPortalCabinetPolicy: {
             /** Plain Telegram Chat Allowed */
             plain_telegram_chat_allowed: boolean;
+            /** Medical Details In Chat */
+            medical_details_in_chat: boolean;
             /** Pdf Included */
             pdf_included: boolean;
         };
@@ -40612,6 +40618,15 @@ export interface operations {
                     "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
+            /** @description JWT user has no linked Patient profile */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -40668,6 +40683,15 @@ export interface operations {
             };
             /** @description Role/scope denied (staff role, deactivated user, invalid link) */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description JWT user has no linked Patient profile, or the requested doctor is not eligible for new appointments (doctor_not_eligible) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -40733,6 +40757,15 @@ export interface operations {
             };
             /** @description Role/scope denied (staff role, deactivated user, invalid link) */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description JWT user has no linked Patient profile */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

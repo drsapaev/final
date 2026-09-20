@@ -140,10 +140,12 @@ def auth_headers(sub: str = "1") -> dict[str, str]:
     return {"Authorization": f"Bearer {create_access_token(sub)}"}
 
 
-def nkey(sub: str, key: str, kind: str) -> str:
+def nkey(sub: str, key: str, kind: str, path: str = "/echo") -> str:
     """Redis key under the hashed CANONICAL namespace of the given principal
-    (Codex R11 #3092: the harness stubs resolve sub "1"/"2" to user 1/2)."""
-    ns = IdempotencyMiddleware._namespace(int(sub))
+    (Codex R11 #3092: the harness stubs resolve sub "1"/"2" to user 1/2).
+    Round-3 (owner P2): the namespace binds the OPERATION — method + path —
+    so harness keys are computed with the same scope the dispatch uses."""
+    ns = IdempotencyMiddleware._namespace(int(sub), f"POST:{path}")
     return f"idem:{ns}:{key}:{kind}"
 
 
@@ -227,6 +229,8 @@ def two_workers(fake_redis: FakeRedis):
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
     idem_module._distributed_claim = _make_claim(fake_redis)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
     # Codex R11 #3092: the canonical resolution is stubbed — numeric subs are
@@ -249,6 +253,7 @@ def two_workers(fake_redis: FakeRedis):
 
     idem_module._distributed_claim = saved
     idem_module._check_principal_authorized_sync = saved_auth
+    idem_module._patient_replay_policy_sync = saved_patient_policy
     idem_module._resolve_principal_id_sync = saved_resolve
 
 
@@ -318,10 +323,10 @@ def test_handler_crash_keeps_intent_retry_reconciles_instead_of_rerunning(two_wo
 
     first = client1.post("/boom", headers={**auth_headers("1"), "Idempotency-Key": "crash-key"})
     assert first.status_code == 500
-    assert nkey("1", "crash-key", "claim") not in fake_redis.store, (
+    assert nkey("1", "crash-key", "claim", path="/boom") not in fake_redis.store, (
         "crashed handler must release the in-flight claim"
     )
-    assert nkey("1", "crash-key", "intent") in fake_redis.store, (
+    assert nkey("1", "crash-key", "intent", path="/boom") in fake_redis.store, (
         "the pre-execution intent marker survives the crash (unknown outcome)"
     )
 
@@ -341,7 +346,7 @@ def test_returned_non_2xx_clears_intent_so_retry_reruns(two_workers):
 
     first = client1.post("/bad", headers={**auth_headers("1"), "Idempotency-Key": "bad-key"})
     assert first.status_code == 400
-    assert nkey("1", "bad-key", "intent") not in fake_redis.store, (
+    assert nkey("1", "bad-key", "intent", path="/bad") not in fake_redis.store, (
         "a returned error clears the intent marker (outcome known: nothing applied)"
     )
 
@@ -364,7 +369,7 @@ def test_lost_outcome_retry_refused_then_replays_once_response_lands(two_workers
     # the marker (no stored response) — simulated directly:
     claim = idem_module._distributed_claim
     claim.mark_execution_intent(
-        idem_module.IdempotencyMiddleware._namespace(1), "lost-key"
+        idem_module.IdempotencyMiddleware._namespace(1, "POST:/echo"), "lost-key"
     )
 
     retry = client2.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": "lost-key"})
@@ -375,7 +380,7 @@ def test_lost_outcome_retry_refused_then_replays_once_response_lands(two_workers
     from fastapi import Response as FastAPIResponse
 
     claim.store_response(
-        idem_module.IdempotencyMiddleware._namespace(1),
+        idem_module.IdempotencyMiddleware._namespace(1, "POST:/echo"),
         "lost-key",
         FastAPIResponse(content=b'{"ok": true, "recovered": true}', status_code=200),
         payload_hash=idem_module.payload_hash(b""),
@@ -392,6 +397,8 @@ def test_redis_unavailable_falls_back_to_in_memory(monkeypatch):
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
     claim = object.__new__(DistributedIdempotencyClaim)
     claim._ttl = 24 * 60 * 60
     claim._client = None
@@ -416,6 +423,7 @@ def test_redis_unavailable_falls_back_to_in_memory(monkeypatch):
     finally:
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._patient_replay_policy_sync = saved_patient_policy
         idem_module._resolve_principal_id_sync = saved_resolve
 
 
@@ -816,6 +824,9 @@ def test_unresolvable_principal_is_refused_non_executing(two_workers, monkeypatc
     (nothing commits), nothing is stored or replayed under any namespace."""
     client1, client2, counters, fake_redis = two_workers
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    monkeypatch.setattr(idem_module, "_patient_replay_policy_sync", lambda request, canonical_id: ("", False))
     monkeypatch.setattr(idem_module, "_resolve_principal_id_sync", lambda *a, **k: None)
 
     response = client1.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": "ghost-key"})
@@ -824,6 +835,7 @@ def test_unresolvable_principal_is_refused_non_executing(two_workers, monkeypatc
 
     # Nothing was stored under ANY namespace: after the resolution recovers,
     # the same key executes fresh (no stale replay surface exists).
+    monkeypatch.setattr(idem_module, "_patient_replay_policy_sync", saved_patient_policy)
     monkeypatch.setattr(idem_module, "_resolve_principal_id_sync", saved_resolve)
     response2 = client1.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": "ghost-key"})
     assert response2.status_code == 200
@@ -1357,6 +1369,8 @@ def test_required_redis_down_refuses_keyed_write_then_recovers(monkeypatch):
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
     claim = _down_claim(required=True)
     idem_module._distributed_claim = claim
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
@@ -1383,6 +1397,7 @@ def test_required_redis_down_refuses_keyed_write_then_recovers(monkeypatch):
     finally:
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._patient_replay_policy_sync = saved_patient_policy
         idem_module._resolve_principal_id_sync = saved_resolve
 
 
@@ -1393,6 +1408,8 @@ def test_optional_redis_down_keeps_in_memory_degrade(monkeypatch):
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
     claim = _down_claim(required=False)
     idem_module._distributed_claim = claim
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
@@ -1411,6 +1428,7 @@ def test_optional_redis_down_keeps_in_memory_degrade(monkeypatch):
     finally:
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._patient_replay_policy_sync = saved_patient_policy
         idem_module._resolve_principal_id_sync = saved_resolve
 
 
@@ -1472,6 +1490,8 @@ def test_required_intent_write_must_be_confirmed_before_execution(monkeypatch):
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
     claim = object.__new__(DistributedIdempotencyClaim)
     claim._ttl = 24 * 60 * 60
     claim._prefix = "idem"
@@ -1498,6 +1518,7 @@ def test_required_intent_write_must_be_confirmed_before_execution(monkeypatch):
     finally:
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._patient_replay_policy_sync = saved_patient_policy
         idem_module._resolve_principal_id_sync = saved_resolve
 
 
@@ -1509,6 +1530,8 @@ def test_replay_rechecks_resource_authorization_for_same_role(monkeypatch):
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
 
     calls: list[bool] = []
 
@@ -1544,6 +1567,7 @@ def test_replay_rechecks_resource_authorization_for_same_role(monkeypatch):
     finally:
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._patient_replay_policy_sync = saved_patient_policy
         idem_module._resolve_principal_id_sync = saved_resolve
 
 
@@ -1929,7 +1953,7 @@ def test_post_acquire_replay_when_response_lands_between_read_and_acquire(two_wo
     и хендлер исполнял запись второй раз (дубликаты визитов/счетов)."""
     client1, client2, counters, fake_redis = two_workers
     claim = idem_module._distributed_claim
-    ns = idem_module.IdempotencyMiddleware._namespace(1)
+    ns = idem_module.IdempotencyMiddleware._namespace(1, "POST:/echo")
     key = "r18-postacquire-replay"
 
     # Хук на уровне Redis (техника _plant_lapse): ПЕРВОЕ чтение воркера A
@@ -1976,7 +2000,7 @@ def test_post_acquire_payload_mismatch_returns_409_not_second_execution(two_work
     исполнение с чужим (или своим повторным) ответом."""
     client1, client2, counters, fake_redis = two_workers
     claim = idem_module._distributed_claim
-    ns = idem_module.IdempotencyMiddleware._namespace(1)
+    ns = idem_module.IdempotencyMiddleware._namespace(1, "POST:/echo")
     key = "r18-postacquire-mismatch"
 
     original_load = claim.load_response
@@ -2037,6 +2061,8 @@ def test_failed_intent_write_recovery_does_not_block_same_key_retry(monkeypatch)
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
     claim = object.__new__(DistributedIdempotencyClaim)
     claim._ttl = 24 * 60 * 60
     claim._prefix = "idem"
@@ -2085,6 +2111,7 @@ def test_failed_intent_write_recovery_does_not_block_same_key_retry(monkeypatch)
     finally:
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._patient_replay_policy_sync = saved_patient_policy
         idem_module._resolve_principal_id_sync = saved_resolve
         idem_module._local_execution_intents.clear()
 
@@ -2263,6 +2290,8 @@ def test_recovered_tokenless_attempt_refuses_over_foreign_intent(monkeypatch):
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
     idem_module._distributed_claim = _wire_outage_claim(fake)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
     idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
@@ -2308,6 +2337,7 @@ def test_recovered_tokenless_attempt_refuses_over_foreign_intent(monkeypatch):
     finally:
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._patient_replay_policy_sync = saved_patient_policy
         idem_module._resolve_principal_id_sync = saved_resolve
         idem_module._local_execution_intents.clear()
         monkeypatch.undo()
@@ -2325,6 +2355,8 @@ def test_recovered_tokenless_attempt_executes_once_without_foreign_intent(monkey
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
     idem_module._distributed_claim = _wire_outage_claim(fake)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
     idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
@@ -2360,6 +2392,7 @@ def test_recovered_tokenless_attempt_executes_once_without_foreign_intent(monkey
     finally:
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._patient_replay_policy_sync = saved_patient_policy
         idem_module._resolve_principal_id_sync = saved_resolve
         idem_module._local_execution_intents.clear()
         monkeypatch.undo()
@@ -2435,6 +2468,8 @@ def test_tokenless_lost_set_response_cleans_own_marker(monkeypatch):
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
     idem_module._distributed_claim = _wire_outage_claim(fake)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
     idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
@@ -2471,6 +2506,7 @@ def test_tokenless_lost_set_response_cleans_own_marker(monkeypatch):
     finally:
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._patient_replay_policy_sync = saved_patient_policy
         idem_module._resolve_principal_id_sync = saved_resolve
         idem_module._local_execution_intents.clear()
         monkeypatch.undo()
@@ -2616,6 +2652,8 @@ def test_failed_owned_cleanup_keeps_fast_retries_fail_closed(monkeypatch):
     saved = idem_module._distributed_claim
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
     idem_module._distributed_claim = _wire_outage_claim(fake)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
     idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
@@ -2688,6 +2726,7 @@ def test_failed_owned_cleanup_keeps_fast_retries_fail_closed(monkeypatch):
     finally:
         idem_module._distributed_claim = saved
         idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._patient_replay_policy_sync = saved_patient_policy
         idem_module._resolve_principal_id_sync = saved_resolve
         idem_module._local_execution_intents.clear()
         monkeypatch.undo()
