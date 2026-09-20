@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Badge, Button, Card, CardContent, CardHeader } from '../components/ui/macos';
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
-import LabReportWorkbench from '../components/laboratory/LabReportWorkbench';
+import LabReportWorkbench, { type LabInstanceChangeContext } from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
 import { useDirtyTransitionGuard } from '../components/laboratory/hooks/useDirtyTransitionGuard';
 import { formatLabStatus } from '../components/laboratory/labUiLabels';
@@ -59,6 +59,16 @@ function isAbortLikeError(error: unknown) {
   return name === 'aborterror' || message.includes('aborted');
 }
 
+function instanceIdsMatch(
+  left: string | number | null | undefined,
+  right: string | number | null | undefined,
+) {
+  if (left == null || right == null) {
+    return left == null && right == null;
+  }
+  return String(left) === String(right);
+}
+
 function buildTemplateResolutionPayload(appointment: Record<string, unknown> | null) {
   if (!appointment) {
     return null;
@@ -88,6 +98,7 @@ export default function LabPanel() {
   const location = useLocation();
   const navigate = useNavigate();
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const instanceParam = searchParams.get('instance');
 
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'queue');
   const [appointments, setAppointments] = useState<Record<string, unknown>[]>([]);
@@ -107,12 +118,32 @@ export default function LabPanel() {
   const loadMoreAbortControllerRef = useRef<AbortController | null>(null);
   const [templates, setTemplates] = useState<Record<string, unknown>[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Record<string, unknown> | null>(null);
+  const selectedTemplateIdRef = useRef<string | number | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Record<string, unknown> | null>(null);
   const [reportHistory, setReportHistory] = useState<Record<string, unknown>[]>([]);
   const [recentReports, setRecentReports] = useState<Record<string, unknown>[]>([]);
   const [activeInstance, setActiveInstance] = useState<Record<string, unknown> | null>(null);
+  const activeInstanceId = (activeInstance?.id as string | number | null | undefined) ?? null;
+  const activeInstanceIdRef = useRef<string | number | null>(activeInstanceId);
+  const selectedAppointmentPatientIdRef = useRef<string | number | null>(
+    (selectedAppointment?.patient_id as string | number | null | undefined) ?? null,
+  );
+  const instanceParamRef = useRef<string | null>(instanceParam);
+  activeInstanceIdRef.current = activeInstanceId;
+  selectedAppointmentPatientIdRef.current =
+    (selectedAppointment?.patient_id as string | number | null | undefined) ?? null;
+  instanceParamRef.current = instanceParam;
+  // Internal state changes and URL restoration are two directions of the same
+  // contract. The pending object deliberately represents `targetId: null` too:
+  // clearing a report must suppress restoration from the previous URL value.
+  const instanceRequestSequenceRef = useRef(0);
+  const pendingInstanceUrlSyncRef = useRef<{
+    targetId: string | number | null;
+    requestId: number;
+  } | null>(null);
   const [templateResolution, setTemplateResolution] = useState<Record<string, unknown> | null>(null);
   const [templateResolutionLoading, setTemplateResolutionLoading] = useState(false);
+  const templateResolutionRequestRef = useRef(0);
   // QW-4 fix: message теперь содержит опциональный retryAction — функцию,
   // которая вызывается при клике «Повторить» в Alert. Раньше ошибки
   // показывались на 5 секунд без возможности восстановиться — пользователь
@@ -148,6 +179,7 @@ export default function LabPanel() {
   // patient_id для которого история уже загружена, и useEffect пропускает
   // повторный вызов если patient_id совпадает.
   const loadedHistoryForPatientRef = useRef<string | number | null>(null);
+  const reportHistoryRequestRef = useRef(0);
   useSessionTimeoutWarning({
     onWarning: () => setSessionWarning({ active: true }),
     onExpired: () => {
@@ -334,6 +366,10 @@ export default function LabPanel() {
   // (смена пациента/отчёта/шаблона, Escape, восстановление из URL).
   const { registerDirtySource, guardTransition, guardDialog } = useDirtyTransitionGuard();
 
+  useEffect(() => {
+    selectedTemplateIdRef.current = (selectedTemplate?.id as string | number | null | undefined) ?? null;
+  }, [selectedTemplate]);
+
   useLabHotkeys({
     switchTab,
     refreshData: loadLabAppointments,
@@ -345,11 +381,16 @@ export default function LabPanel() {
       const summary = await labReportingApi.listTemplates() as Record<string, unknown>;
       const templateSummary = normalizeListPayload(summary);
       setTemplates(templateSummary);
-      const templateId = preferredTemplateId || (selectedTemplate?.id as string | number | undefined) || (templateSummary[0]?.id as string | number | undefined) || null;
-      if (templateId) {
+      const templateId = preferredTemplateId
+        ?? selectedTemplateIdRef.current
+        ?? (templateSummary[0]?.id as string | number | undefined)
+        ?? null;
+      if (templateId != null) {
         const detail = (await labReportingApi.getTemplate(templateId)) as Record<string, unknown>;
+        selectedTemplateIdRef.current = (detail?.id as string | number | null | undefined) ?? templateId;
         setSelectedTemplate(detail);
       } else {
+        selectedTemplateIdRef.current = null;
         setSelectedTemplate(null);
       }
     } catch (error) {
@@ -372,14 +413,17 @@ export default function LabPanel() {
   }, [notify]);
 
   const loadReportHistory = useCallback(async (patientId: string | number) => {
+    const requestId = ++reportHistoryRequestRef.current;
     if (!patientId) {
       setReportHistory([]);
       return;
     }
     try {
       const history = (await labReportingApi.listInstances({ patient_id: patientId, limit: 50 })) as Record<string, unknown>;
+      if (requestId !== reportHistoryRequestRef.current) return;
       setReportHistory(normalizeListPayload(history));
     } catch (error) {
+      if (requestId !== reportHistoryRequestRef.current) return;
       logger.error('[LabPanel] loadReportHistory failed', error);
       notify(
         'error',
@@ -406,6 +450,7 @@ export default function LabPanel() {
   }, [notify]);
 
   const loadTemplateResolution = useCallback(async (appointment: Record<string, unknown> | null) => {
+    const requestId = ++templateResolutionRequestRef.current;
     if (!appointment) {
       setTemplateResolution(null);
       setTemplateResolutionLoading(false);
@@ -422,6 +467,7 @@ export default function LabPanel() {
     setTemplateResolutionLoading(true);
     try {
       const resolution = (await labReportingApi.resolveTemplateOptions(payload)) as Record<string, unknown>;
+      if (requestId !== templateResolutionRequestRef.current) return;
       setTemplateResolution(resolution);
       const apptId = appointment?.appointment_id as string | number | undefined;
       const visitId = resolution?.visit_id as string | number | undefined;
@@ -429,6 +475,7 @@ export default function LabPanel() {
         mergeResolvedVisitIntoState(apptId, visitId);
       }
     } catch (error) {
+      if (requestId !== templateResolutionRequestRef.current) return;
       logger.error('[LabPanel] loadTemplateResolution failed', error);
       setTemplateResolution(null);
       notify(
@@ -439,34 +486,110 @@ export default function LabPanel() {
         )
       );
     } finally {
-      setTemplateResolutionLoading(false);
+      if (requestId === templateResolutionRequestRef.current) {
+        setTemplateResolutionLoading(false);
+      }
     }
   }, [mergeResolvedVisitIntoState, notify]);
+
+  const beginInstanceTransition = useCallback((
+    targetId: string | number | null,
+    options: { forcePending?: boolean } = {},
+  ) => {
+    const requestId = ++instanceRequestSequenceRef.current;
+    // Invalidate any history response that belongs to the previous patient.
+    reportHistoryRequestRef.current += 1;
+    loadedHistoryForPatientRef.current = null;
+    const stateAndUrlAlreadyMatch = instanceIdsMatch(activeInstanceIdRef.current, targetId)
+      && instanceIdsMatch(instanceParamRef.current, targetId);
+    pendingInstanceUrlSyncRef.current = !options.forcePending && stateAndUrlAlreadyMatch
+      ? null
+      : { targetId, requestId };
+    return requestId;
+  }, []);
+
+  const handleInstanceChange = useCallback((
+    instance: Record<string, unknown>,
+    change: LabInstanceChangeContext,
+  ) => {
+    const targetId = (instance?.id as string | number | null | undefined) ?? null;
+    const resultPatientId = (
+      instance?.patient_id
+      ?? (instance?.patient_snapshot as Record<string, unknown> | undefined)?.patient_id
+    ) as string | number | null | undefined;
+    const pendingSync = pendingInstanceUrlSyncRef.current;
+
+    // A response belongs to the instance/patient that started the operation.
+    // Late save/finalize/create responses must never supersede a newer patient
+    // or report transition.
+    if (!instanceIdsMatch(activeInstanceIdRef.current, change.expectedInstanceId)) return;
+    if (pendingSync && !instanceIdsMatch(pendingSync.targetId, targetId)) return;
+    if (
+      selectedAppointmentPatientIdRef.current != null
+      && resultPatientId != null
+      && !instanceIdsMatch(selectedAppointmentPatientIdRef.current, resultPatientId)
+    ) return;
+
+    if (change.kind === 'update') {
+      if (!instanceIdsMatch(targetId, change.expectedInstanceId)) return;
+      activeInstanceIdRef.current = targetId;
+      setActiveInstance(instance);
+      return;
+    }
+
+    beginInstanceTransition(targetId);
+    activeInstanceIdRef.current = targetId;
+    setActiveInstance(instance);
+  }, [beginInstanceTransition]);
+
+  const clearActiveInstance = useCallback(() => {
+    beginInstanceTransition(null);
+    activeInstanceIdRef.current = null;
+    setActiveInstance(null);
+  }, [beginInstanceTransition]);
 
   // PR5-review: «сырое» открытие отчёта без guard — вызывается ВНУТРИ уже
   // подтверждённого перехода (смена пациента), чтобы не запускать вложенный
   // guard и не оставлять частично изменённый контекст при отмене.
-  const applyInstanceTransition = useCallback(async (instanceId: string | number) => {
+  const applyInstanceTransition = useCallback(async (
+    instanceId: string | number,
+    options: { clearCurrent?: boolean } = {},
+  ) => {
+    const requestId = beginInstanceTransition(instanceId, {
+      forcePending: options.clearCurrent,
+    });
+    if (options.clearCurrent) {
+      activeInstanceIdRef.current = null;
+      setActiveInstance(null);
+    }
     try {
       const instance = (await labReportingApi.getInstance(instanceId)) as { patient_snapshot?: { patient_id?: string | number; [k: string]: unknown }; [k: string]: unknown };
+      if (requestId !== instanceRequestSequenceRef.current) return;
+      activeInstanceIdRef.current = (instance?.id as string | number | null | undefined) ?? instanceId;
       setActiveInstance(instance);
-      if (instance.patient_snapshot?.patient_id) {
+      const patientId = instance.patient_snapshot?.patient_id;
+      if (patientId && loadedHistoryForPatientRef.current !== patientId) {
         // L-M-2 fix: дедупликация loadReportHistory.
         // Сначала помечаем patient_id в loadedHistoryForPatientRef — это
         // предотвращает повторный вызов из useEffect [selectedAppointment]
         // ниже, который сработает когда setSelectedAppointment обновит состояние.
-        loadedHistoryForPatientRef.current = instance.patient_snapshot.patient_id;
-        await loadReportHistory(instance.patient_snapshot.patient_id);
+        loadedHistoryForPatientRef.current = patientId;
+        await loadReportHistory(patientId);
       }
+      if (requestId !== instanceRequestSequenceRef.current) return;
       switchTab('reports');
     } catch (error) {
+      if (requestId !== instanceRequestSequenceRef.current) return;
+      pendingInstanceUrlSyncRef.current = options.clearCurrent && instanceParamRef.current != null
+        ? { targetId: null, requestId }
+        : null;
       logger.error('[LabPanel] loadInstance failed', error);
       notify(
         'error',
         getErrorMessage(error, t('misc.lp_ne_udalos_otkryt_laboratorny'))
       );
     }
-  }, [loadReportHistory, notify, switchTab]);
+  }, [beginInstanceTransition, loadReportHistory, notify, switchTab]);
 
   const loadInstance = useCallback(async (instanceId: string | number) => {
     if (!instanceId) {
@@ -483,14 +606,22 @@ export default function LabPanel() {
   // WF-15 fix: URL sync для patient/instance — shareable + back-button friendly.
   // При смене selectedAppointment или activeInstance обновляем URL params.
   useEffect(() => {
+    // A differing explicit URL id is navigation intent. Let the restore effect
+    // guard and load it before state-to-URL synchronization writes anything.
+    if (
+      pendingInstanceUrlSyncRef.current == null
+      && instanceParam != null
+      && !instanceIdsMatch(activeInstanceId, instanceParam)
+    ) return;
+
     const params = new URLSearchParams(location.search);
     if (selectedAppointment?.patient_id) {
       params.set('patient', String(selectedAppointment.patient_id));
     } else {
       params.delete('patient');
     }
-    if (activeInstance?.id) {
-      params.set('instance', String(activeInstance.id));
+    if (activeInstanceId != null) {
+      params.set('instance', String(activeInstanceId));
     } else {
       params.delete('instance');
     }
@@ -499,36 +630,55 @@ export default function LabPanel() {
     if (params.toString() !== current.toString()) {
       navigate(`/lab?${params.toString()}`, { replace: true });
     }
-  }, [selectedAppointment, activeInstance, location.search, navigate]);
+  }, [activeInstanceId, instanceParam, selectedAppointment, location.search, navigate]);
 
-  // PR5-review: актуальный id активного отчёта для URL-restore effect —
-  // эффект зависит от searchParams, но не от activeInstance (stale closure).
-  const activeInstanceIdRef = useRef<string | number | null>(null);
-  useEffect(() => {
-    activeInstanceIdRef.current = (activeInstance?.id as string | number | null) ?? null;
-  });
-
+  // Initial data loaders are independent of URL changes. Keeping them in the
+  // URL-restore effect re-fetched templates on every tab/query update and
+  // re-hydrated over an unsaved template draft.
   useEffect(() => {
     loadLabAppointments();
     loadTemplates();
     loadRecentReports();
-    // WF-15 fix: восстановление контекста из URL при загрузке.
-    // Если URL содержит ?instance=N — открываем этот отчёт.
-    // PR5-review: скип, если этот отчёт уже активен — иначе URL-sync
-    // (промежуточный instance старого отчёта) перезапускал guarded
-    // loadInstance внутри уже подтверждённого перехода и оставлял
-    // второй, вечный guard-диалог.
-    const instanceParam = searchParams.get('instance');
-    if (instanceParam) {
-      const instanceId = parseInt(instanceParam, 10);
-      if (
-        !Number.isNaN(instanceId)
-        && String(activeInstanceIdRef.current) !== String(instanceId)
-      ) {
-        loadInstance(instanceId);
-      }
+  }, [loadLabAppointments, loadRecentReports, loadTemplates]);
+
+  // The virtualized queue is hidden while another tab is active. Refresh its
+  // page when the user returns so it receives a new item array and measures
+  // visible rows again. This preserves the prior queue-tab behavior without
+  // reloading templates (which would overwrite a dirty template draft).
+  const previousActiveTabRef = useRef(activeTab);
+  useEffect(() => {
+    const previousTab = previousActiveTabRef.current;
+    previousActiveTabRef.current = activeTab;
+    if (activeTab === 'queue' && previousTab !== 'queue') {
+      loadLabAppointments();
     }
-  }, [loadLabAppointments, loadRecentReports, loadTemplates, searchParams, loadInstance]);
+  }, [activeTab, loadLabAppointments]);
+
+  // Restore only the instance URL contract. During an internal report switch,
+  // the URL can briefly retain the old instance id; do not let that stale id
+  // overwrite the report already selected by the user.
+  useEffect(() => {
+    const instanceId = instanceParam ? parseInt(instanceParam, 10) : null;
+    const pendingSync = pendingInstanceUrlSyncRef.current;
+
+    if (pendingSync) {
+      if (
+        instanceIdsMatch(instanceId, pendingSync.targetId)
+        && instanceIdsMatch(activeInstanceId, pendingSync.targetId)
+      ) {
+        pendingInstanceUrlSyncRef.current = null;
+      }
+      return;
+    }
+
+    if (
+      instanceId != null
+      && !Number.isNaN(instanceId)
+      && !instanceIdsMatch(activeInstanceId, instanceId)
+    ) {
+      loadInstance(instanceId);
+    }
+  }, [activeInstanceId, instanceParam, loadInstance]);
 
   // STRAT#16: cleanup — отменяем все pending запросы при unmount компонента.
   // Предотвращает setState-after-unmark warnings и network waste.
@@ -724,11 +874,14 @@ export default function LabPanel() {
               // создания.
               const instanceId = appointment.report_instance_id as string | number | undefined;
               if (instanceId) {
-                void applyInstanceTransition(instanceId);
+                // Clear the previous patient's report before the async load.
+                // Otherwise URL sync can combine the new patient with the old
+                // instance id and restore that stale report over the result.
+                void applyInstanceTransition(instanceId, { clearCurrent: true });
               } else {
-                setActiveInstance(null);
+                clearActiveInstance();
+                switchTab('reports');
               }
-              switchTab('reports');
             });
           }}
           selectedAppointment={selectedAppointment as Record<string, unknown> & { id?: string | number; patient_fio?: string; patient_phone?: string; patient_id?: string | number; visit_id?: string | number; appointment_time?: string; status?: string }}
@@ -747,6 +900,7 @@ export default function LabPanel() {
           templates={templates}
           selectedTemplate={selectedTemplate}
           registerDirtySource={registerDirtySource}
+          guardTransition={guardTransition}
           onSelectTemplate={async (template) => {
             // PR5: смена шаблона — переход через dirty-guard.
             guardTransition(async () => {
@@ -813,8 +967,8 @@ export default function LabPanel() {
           recentReports={recentReports as unknown as never[]}
           registerDirtySource={registerDirtySource}
           activeInstance={activeInstance as unknown as null}
-          onInstanceChange={setActiveInstance}
-          onOpenInstance={loadInstance as unknown as (instance: Record<string, unknown>) => void}
+          onInstanceChange={handleInstanceChange}
+          onOpenInstance={loadInstance}
           onRefreshHistory={loadReportHistory as unknown as (patientId: string | number) => Promise<void>}
           onRefreshRecentReports={loadRecentReports as unknown as undefined}
           onQueueChanged={loadLabAppointments as unknown as undefined}

@@ -21,6 +21,7 @@ const workbenchPath = path.resolve(__dirname, '../LabReportWorkbench.tsx');
 
 vi.mock('../../../api/labReporting', () => ({
   labReportingApi: {
+    getInstance: vi.fn(),
     createInstance: vi.fn(),
     updateInstance: vi.fn(),
     bulkSaveValues: vi.fn(),
@@ -412,6 +413,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
   // vi.mock подменяет методы на vi.fn(), но статический тип остаётся от
   // реального labReportingApi — приводим к vi.fn для setup и инспекции.
   const mockedApi = labReportingApi as unknown as {
+    getInstance: ReturnType<typeof vi.fn>;
     updateInstance: ReturnType<typeof vi.fn>;
     bulkSaveValues: ReturnType<typeof vi.fn>;
   };
@@ -473,11 +475,12 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
   }
 
   it('sends the hydrated per-field comment when saving a reopened draft', async () => {
+    const onInstanceChange = vi.fn();
     mockedApi.bulkSaveValues.mockResolvedValue({
       instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:05.000000+00:00' },
     });
 
-    renderWithActiveInstance();
+    renderWithActiveInstance({ onInstanceChange });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
 
     await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalled());
@@ -494,6 +497,10 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     >;
     const wbcItem = payload.find((item) => item.field_key === 'wbc');
     expect(wbcItem?.comment).toBe('утренний забор');
+    expect(onInstanceChange).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 77 }),
+      { kind: 'update', expectedInstanceId: 77 },
+    );
   });
 
   it('keeps microsecond version tokens opaque across signer and values saves', async () => {
@@ -583,6 +590,59 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       vi.useRealTimers();
       vi.clearAllMocks();
     }
+  });
+
+  it('routes superseded-report navigation through the guarded open callback', () => {
+    const onOpenInstance = vi.fn();
+    const onInstanceChange = vi.fn();
+
+    renderWithActiveInstance({
+      activeInstance: { ...reopenedDraftInstance, supersedes_instance_id: 76 },
+      onOpenInstance,
+      onInstanceChange,
+    });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /исправленная версия отчёта #76/i })
+    );
+
+    expect(onOpenInstance).toHaveBeenCalledWith(76);
+    expect(mockedApi.getInstance).not.toHaveBeenCalled();
+    expect(onInstanceChange).not.toHaveBeenCalled();
+  });
+
+  it('notifies and rethrows when the registered report save fails', async () => {
+    const notify = vi.fn();
+    const unregister = vi.fn();
+    const registerDirtySource = vi.fn(
+      (_source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => unregister
+    );
+    mockedApi.bulkSaveValues.mockRejectedValueOnce(new Error('Сохранение отклонено сервером'));
+
+    renderWithActiveInstance({ notify, registerDirtySource });
+    fireEvent.change(screen.getByLabelText('Результат: Лейкоциты'), {
+      target: { value: '6.7' },
+    });
+
+    await waitFor(() => expect(registerDirtySource).toHaveBeenCalledTimes(1));
+    const source = registerDirtySource.mock.calls[0][0] as {
+      id: string;
+      isDirty: () => boolean;
+      save: () => Promise<void>;
+    };
+
+    expect(source.id).toBe('report');
+    expect(source.isDirty()).toBe(true);
+    let saveError: unknown;
+    await act(async () => {
+      try {
+        await source.save();
+      } catch (error) {
+        saveError = error;
+      }
+    });
+    expect(saveError).toEqual(new Error('Сохранение отклонено сервером'));
+    expect(notify).toHaveBeenCalledWith('error', 'Сохранение отклонено сервером');
   });
 });
 
@@ -680,6 +740,10 @@ describe('LabReportWorkbench add-blank action (PR6)', () => {
     expect(payload.visit_id).toBe(728);
     await waitFor(() => expect(onInstanceChange).toHaveBeenCalled());
     expect((onInstanceChange.mock.calls[0][0] as Record<string, unknown>).id).toBe(92);
+    expect(onInstanceChange.mock.calls[0][1]).toEqual({
+      kind: 'transition',
+      expectedInstanceId: 91,
+    });
   });
 
   it('disables the add-blank action while the open draft is dirty', async () => {

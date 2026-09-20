@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { Button, Modal } from '../../ui/macos';
 import { ModalContent, ModalFooter, ModalHeader, ModalTitle } from '../../ui/macos/Modal';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * PR5: useDirtyTransitionGuard — единый guard для переходов панели
@@ -40,14 +41,11 @@ export interface DirtyTransitionGuard {
   isDialogOpen: boolean;
 }
 
-const SAVE_AND_CONTINUE = 'Сохранить и перейти';
-const DISCARD_AND_CONTINUE = 'Выйти без сохранения';
-const CANCEL = 'Отмена';
-
 export function useDirtyTransitionGuard(options?: {
   title?: string;
   message?: string;
 }): DirtyTransitionGuard {
+  const { t } = useTranslation();
   const sourcesRef = useRef<Map<string, DirtyDraftSource>>(new Map());
   const [pendingTransition, setPendingTransition] = useState<(() => void | Promise<void>) | null>(null);
   const [busy, setBusy] = useState(false);
@@ -108,20 +106,20 @@ export function useDirtyTransitionGuard(options?: {
   const guardDialog = pendingTransition ? (
     <Modal isOpen onClose={cancel}>
       <ModalHeader>
-        <ModalTitle>{options?.title ?? 'Несохранённые изменения'}</ModalTitle>
+        <ModalTitle>{options?.title ?? t('confirm.unsaved_title')}</ModalTitle>
       </ModalHeader>
       <ModalContent>
-        {options?.message ?? 'В бланке есть несохранённые изменения. Сохранить их перед переходом?'}
+        {options?.message ?? t('confirm.unsaved_message')}
       </ModalContent>
       <ModalFooter>
         <Button variant="outline" size="default" onClick={cancel} disabled={busy}>
-          {CANCEL}
+          {t('confirm.cancel')}
         </Button>
         <Button variant="ghost" size="default" onClick={() => { void discardAndContinue(); }} disabled={busy}>
-          {DISCARD_AND_CONTINUE}
+          {t('confirm.unsaved_discard_and_continue')}
         </Button>
         <Button variant="primary" size="default" onClick={() => { void finishWithSave(); }} disabled={busy}>
-          {SAVE_AND_CONTINUE}
+          {t('confirm.unsaved_save_and_continue')}
         </Button>
       </ModalFooter>
     </Modal>

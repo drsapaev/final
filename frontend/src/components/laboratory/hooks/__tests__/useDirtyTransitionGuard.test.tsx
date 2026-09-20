@@ -1,10 +1,11 @@
 import React from 'react';
 import '@testing-library/jest-dom';
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDirtyTransitionGuard } from '../useDirtyTransitionGuard';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import i18n from '@/i18n';
 
 const flush = async () => {
   await act(async () => {
@@ -15,6 +16,18 @@ const flush = async () => {
 };
 
 describe('useDirtyTransitionGuard (PR5)', () => {
+  beforeEach(async () => {
+    await act(async () => {
+      await i18n.changeLanguage('ru');
+    });
+  });
+
+  afterEach(async () => {
+    await act(async () => {
+      await i18n.changeLanguage('ru');
+    });
+  });
+
   it('runs the transition immediately when nothing is dirty', () => {
     const { result } = renderHook(() => useDirtyTransitionGuard());
     const transition = vi.fn();
@@ -124,5 +137,48 @@ describe('useDirtyTransitionGuard (PR5)', () => {
       result.current.guardTransition(transition);
     });
     expect(result.current.isDialogOpen).toBe(true);
+  });
+
+  it('renders the dialog in the active locale', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('uz-Latn');
+    });
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    act(() => {
+      result.current.registerDirtySource({
+        id: 'report',
+        isDirty: () => true,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+      result.current.guardTransition(vi.fn());
+    });
+
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+
+    expect(screen.getByRole('heading', { name: 'Saqlanmagan o\'zgarishlar' })).toBeInTheDocument();
+    expect(screen.getByText('Blankada saqlanmagan o\'zgarishlar bor. O\'tishdan oldin ularni saqlaysizmi?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bekor qilish' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Saqlamasdan davom etish' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Saqlash va davom etish' })).toBeInTheDocument();
+  });
+
+  it('uses the localized cancel label in English', async () => {
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    act(() => {
+      result.current.registerDirtySource({
+        id: 'template',
+        isDirty: () => true,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+      result.current.guardTransition(vi.fn());
+    });
+
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+
+    expect(screen.getByRole('heading', { name: 'Unsaved changes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 });

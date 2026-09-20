@@ -50,6 +50,11 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { getErrorMessage } from '../../utils/type-guards';
 import { FileText, FolderPlus } from 'lucide-react';
 
+export interface LabInstanceChangeContext {
+  kind: 'update' | 'transition';
+  expectedInstanceId: string | number | null;
+}
+
 export default function LabReportWorkbench({
   selectedAppointment = null,
   templates,
@@ -73,8 +78,11 @@ export default function LabReportWorkbench({
   reportHistory?: Array<Record<string, unknown>>;
   recentReports?: Array<Record<string, unknown>>;
   activeInstance?: Record<string, unknown> | null;
-  onInstanceChange?: (instance: Record<string, unknown>) => void;
-  onOpenInstance?: (instance: Record<string, unknown>) => void;
+  onInstanceChange?: (
+    instance: Record<string, unknown>,
+    change: LabInstanceChangeContext,
+  ) => void;
+  onOpenInstance?: (instanceId: string | number) => void;
   onRefreshHistory?: (patientId: string | number) => Promise<void>;
   onRefreshRecentReports?: () => Promise<void>;
   onQueueChanged?: () => Promise<void>;
@@ -218,6 +226,7 @@ export default function LabReportWorkbench({
   }, [isDirty, canSaveDraft, saving, draftValues]);
 
   const handleCreateInstance = useCallback(async (templateIdOverride: string | number | null = null, options: Record<string, unknown> = {}) => {
+    const expectedInstanceId = (activeInstance?.id as string | number | null | undefined) ?? null;
     const templateId = templateIdOverride || selectedTemplateId;
     if (!selectedAppointment?.patient_id || !templateId) {
       notify?.('error', t('errors.select_patient_template'));
@@ -244,7 +253,10 @@ export default function LabReportWorkbench({
           name: item.name || null
         }))
       });
-      onInstanceChange?.(instance as Record<string, unknown>);
+      onInstanceChange?.(instance as Record<string, unknown>, {
+        kind: 'transition',
+        expectedInstanceId,
+      });
       await onRefreshHistory?.(selectedAppointment.patient_id as string | number);
       await onRefreshRecentReports?.();
       await onQueueChanged?.();
@@ -256,6 +268,7 @@ export default function LabReportWorkbench({
       setBusyAction(null);
     }
   }, [
+    activeInstance,
     notify,
     onInstanceChange,
     onRefreshHistory,
@@ -281,6 +294,7 @@ export default function LabReportWorkbench({
     if (!activeInstance) {
       return null;
     }
+    const expectedInstanceId = activeInstance.id as string | number;
     // WF-06 fix: передаём updated_at для optimistic locking.
     // Если backend обнаружит, что бланк был изменён другим пользователем
     // после этого timestamp — вернёт 409, persistDraft выбросит exception.
@@ -322,7 +336,10 @@ export default function LabReportWorkbench({
       const response = (await labReportingApi.bulkSaveValues(activeInstance.id as string | number, payload, expectedUpdatedAt)) as Record<string, unknown>;
       latestInstance = response.instance as Record<string, unknown>;
     }
-    onInstanceChange?.(latestInstance as Record<string, unknown>);
+    onInstanceChange?.(latestInstance as Record<string, unknown>, {
+      kind: 'update',
+      expectedInstanceId,
+    });
     return latestInstance;
   }
 
@@ -374,7 +391,10 @@ export default function LabReportWorkbench({
           onClick: () => {
             void (async () => {
               const fresh = await labReportingApi.getInstance(activeInstance.id as string | number);
-              onInstanceChange?.(fresh as Record<string, unknown>);
+              onInstanceChange?.(fresh as Record<string, unknown>, {
+                kind: 'update',
+                expectedInstanceId: activeInstance.id as string | number,
+              });
             })();
           },
         }
@@ -383,6 +403,10 @@ export default function LabReportWorkbench({
     }
     notify?.('error', message);
   }
+  const notifySaveErrorRef = useRef(notifySaveError);
+  useEffect(() => {
+    notifySaveErrorRef.current = notifySaveError;
+  });
 
   async function handleSaveDraft() {
     try {
@@ -413,7 +437,16 @@ export default function LabReportWorkbench({
     return registerDirtySourceRef.current({
       id: 'report',
       isDirty: () => isDirtyRef.current,
-      save: () => Promise.resolve(handleSaveDraftRef.current?.()).then(() => undefined),
+      save: async () => {
+        try {
+          await handleSaveDraftRef.current?.();
+        } catch (error) {
+          // Dirty-transition guard intentionally swallows save failures so the
+          // source must surface the error before rethrowing to block navigation.
+          notifySaveErrorRef.current(error);
+          throw error;
+        }
+      },
     });
   }, []);
 
@@ -422,6 +455,7 @@ export default function LabReportWorkbench({
 
   async function handleFinalize() {
     if (!activeInstance) return;
+    const expectedInstanceId = activeInstance.id as string | number;
     // WF-08 fix: Finalize — необратимое действие. Бланк становится immutable,
     // единственный путь правки — revise (создание нового instance).
     // Показываем confirmation dialog с объяснением последствий.
@@ -440,7 +474,7 @@ export default function LabReportWorkbench({
     try {
       const latest = await persistDraft();
       const finalized = await labReportingApi.finalize(((latest || activeInstance) as Record<string, unknown>).id as string | number) as Record<string, unknown>;
-      onInstanceChange?.(finalized);
+      onInstanceChange?.(finalized, { kind: 'update', expectedInstanceId });
       await onRefreshHistory?.(finalized.patient_id as string | number);
       await onRefreshRecentReports?.();
       await onQueueChanged?.();
@@ -457,6 +491,7 @@ export default function LabReportWorkbench({
 
   async function handleRevise() {
     if (!activeInstance) return;
+    const expectedInstanceId = activeInstance.id as string | number;
     // M-1 fix: Revise creates a new instance (old one preserved as FINALIZED),
     // but it changes which instance is "active" and creates audit-trail entries.
     // The comment at L52-55 promised a guard — now delivered.
@@ -474,7 +509,7 @@ export default function LabReportWorkbench({
     setBusyAction('revise');
     try {
       const revised = (await labReportingApi.revise(activeInstance.id as string | number)) as Record<string, unknown>;
-      onInstanceChange?.(revised);
+      onInstanceChange?.(revised, { kind: 'transition', expectedInstanceId });
       await onRefreshHistory?.(revised.patient_id as string | number);
       await onRefreshRecentReports?.();
       notify?.('success', t('success.revised'));
@@ -490,6 +525,7 @@ export default function LabReportWorkbench({
 
   async function handlePrint() {
     if (!activeInstance) return;
+    const expectedInstanceId = activeInstance.id as string | number;
     setSaving(true);
     setBusyAction('print');
     // L-5 fix: use setPrintFeedback (inline Alert) as the single feedback
@@ -506,7 +542,7 @@ export default function LabReportWorkbench({
 
       if (printResult.success) {
         const printed = (await labReportingApi.markPrinted(activeInstance.id as string | number)) as Record<string, unknown>;
-        onInstanceChange?.(printed);
+        onInstanceChange?.(printed, { kind: 'update', expectedInstanceId });
         await onRefreshHistory?.(printed.patient_id as string | number);
         await onRefreshRecentReports?.();
         await onQueueChanged?.();
@@ -552,7 +588,7 @@ export default function LabReportWorkbench({
       // WF-05 fix: не помечаем как PRINTED при неудаче popup.
       if (popup) {
         const printed = (await labReportingApi.markPrinted(activeInstance.id as string | number)) as Record<string, unknown>;
-        onInstanceChange?.(printed);
+        onInstanceChange?.(printed, { kind: 'update', expectedInstanceId });
         await onRefreshHistory?.(printed.patient_id as string | number);
         await onRefreshRecentReports?.();
         await onQueueChanged?.();
@@ -741,11 +777,14 @@ export default function LabReportWorkbench({
                       <button
                         type="button"
                         onClick={() => {
-                          // PR-60 / Low-31: navigate to the superseded instance
-                          if (onInstanceChange && activeInstance.supersedes_instance_id) {
-                            labReportingApi.getInstance(activeInstance.supersedes_instance_id as string | number)
-                              .then((instance: unknown) => onInstanceChange?.(instance as Record<string, unknown>))
-                              .catch((e: unknown) => logger.warn('Failed to load superseded instance:', e));
+                          // PR5: every report switch must pass through the panel's
+                          // dirty-transition guard exposed by onOpenInstance.
+                          const instanceId = activeInstance.supersedes_instance_id;
+                          if (
+                            onOpenInstance
+                            && (typeof instanceId === 'string' || typeof instanceId === 'number')
+                          ) {
+                            onOpenInstance(instanceId);
                           }
                         }}
                         style={{
@@ -987,7 +1026,7 @@ export default function LabReportWorkbench({
         reportHistory={reportHistory as never}
         historySeverityFilter={historySeverityFilter}
         onSeverityFilterChange={setHistorySeverityFilter}
-        onOpenInstance={onOpenInstance as unknown as (instanceId: string | number) => void}
+        onOpenInstance={onOpenInstance}
       />
       {/* WF-08 fix: portal-mounted ConfirmDialog для irreversible actions */}
       {confirmDialog}

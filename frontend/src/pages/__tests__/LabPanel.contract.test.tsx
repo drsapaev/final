@@ -162,4 +162,74 @@ describe('LabPanel queue/report status contract', () => {
     expect(source).not.toContain('from \'../api/runtime\'');
     expect(source).not.toContain('const API_V1_BASE');
   });
+
+  it('keeps the current template selected across refreshes without a stale closure fallback', () => {
+    const source = readLabPanelSource();
+    const loadTemplatesBlock = extractBlock(
+      source,
+      'const loadTemplates = useCallback(async (preferredTemplateId: string | number | null = null) => {',
+      'const loadReportHistory = useCallback(async (patientId: string | number) => {',
+    );
+
+    expect(source).toContain('selectedTemplateIdRef');
+    expect(loadTemplatesBlock).toMatch(/preferredTemplateId\s*\?\?\s*selectedTemplateIdRef\.current/);
+    expect(source).toContain('selectedTemplateIdRef.current = (selectedTemplate?.id');
+    expect(loadTemplatesBlock).toContain('selectedTemplateIdRef.current = (detail?.id');
+  });
+
+  it('separates initial data loading from URL instance restoration', () => {
+    const source = readLabPanelSource();
+    expect(source).toContain('pendingInstanceUrlSyncRef');
+    expect(source).toContain('instanceRequestSequenceRef');
+    expect(source).toContain('instanceParamRef.current = instanceParam');
+    expect(source).toContain('const instanceParam = searchParams.get(\'instance\')');
+    expect(source).toContain('}, [loadLabAppointments, loadRecentReports, loadTemplates]);');
+    expect(source).toContain('}, [activeInstanceId, instanceParam, loadInstance]);');
+  });
+
+  it('makes report transitions latest-wins and marks every state-driven URL change', () => {
+    const source = readLabPanelSource();
+    const transitionBlock = extractBlock(
+      source,
+      'const applyInstanceTransition = useCallback(async (',
+      'const loadInstance = useCallback(async (instanceId: string | number) => {',
+    );
+
+    expect(transitionBlock).toContain('const requestId = beginInstanceTransition(instanceId, {');
+    expect(transitionBlock).toContain('forcePending: options.clearCurrent');
+    expect(transitionBlock).toContain('requestId !== instanceRequestSequenceRef.current');
+    expect(transitionBlock).toContain('if (options.clearCurrent)');
+    expect(source).toContain('beginInstanceTransition(null)');
+    expect(source).toContain('onInstanceChange={handleInstanceChange}');
+    expect(source).toContain('void applyInstanceTransition(instanceId, { clearCurrent: true })');
+    expect(source).toContain('instanceIdsMatch(instanceId, pendingSync.targetId)');
+    expect(source).toContain('instanceIdsMatch(activeInstanceId, pendingSync.targetId)');
+    expect(source).toContain("change.kind === 'update'");
+    expect(source).toContain('change.expectedInstanceId');
+  });
+
+  it('keeps template resolution latest-wins across rapid patient changes', () => {
+    const source = readLabPanelSource();
+    const resolutionBlock = extractBlock(
+      source,
+      'const loadTemplateResolution = useCallback(async (appointment: Record<string, unknown> | null) => {',
+      'const beginInstanceTransition = useCallback((',
+    );
+
+    expect(source).toContain('templateResolutionRequestRef = useRef(0)');
+    expect(resolutionBlock).toContain('const requestId = ++templateResolutionRequestRef.current');
+    expect(resolutionBlock).toContain('requestId !== templateResolutionRequestRef.current');
+    expect(resolutionBlock).toContain('requestId === templateResolutionRequestRef.current');
+  });
+
+  it('routes template creation through the same dirty transition guard', () => {
+    const source = readLabPanelSource();
+    const templateWorkbenchBlock = extractBlock(
+      source,
+      '<LabTemplateWorkbench',
+      '</section>',
+    );
+
+    expect(templateWorkbenchBlock).toContain('guardTransition={guardTransition}');
+  });
 });

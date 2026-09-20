@@ -36,6 +36,7 @@ export default function LabTemplateWorkbench({
   onSelectTemplate,
   onTemplatesChanged,
   registerDirtySource,
+  guardTransition,
   notify
 }: {
   templates?: unknown[];
@@ -43,6 +44,7 @@ export default function LabTemplateWorkbench({
   onSelectTemplate?: (template: Record<string, unknown>) => void;
   onTemplatesChanged?: (preferredTemplateId?: string | number | null) => Promise<void>;
   registerDirtySource?: (source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => void;
+  guardTransition?: (transition: () => void | Promise<void>) => void;
   notify?: (type: string, message: string) => void;
   [k: string]: unknown;
 }) {
@@ -155,26 +157,36 @@ export default function LabTemplateWorkbench({
       notify?.('error', t('errors.template_code_name_required'));
       return;
     }
-    setSaving(true);
-    try {
-      const created = await labReportingApi.createTemplate({
-        ...formData,
-        initial_version: blankVersion
-      }) as Record<string, unknown> | undefined;
-      notify?.('success', t('success.template_created'));
-      setShowNewTemplateDialog(false);
-      // PR5: используем возвращённый id — обновляем список с выбором
-      // созданного шаблона и сразу открываем его в редакторе.
-      const createdId = (created as { id?: string | number })?.id ?? null;
-      await onTemplatesChanged?.(createdId);
-      if (createdId != null && created) {
-        onSelectTemplate?.(created);
+
+    const createAndSelect = async () => {
+      setSaving(true);
+      try {
+        const created = await labReportingApi.createTemplate({
+          ...formData,
+          initial_version: blankVersion
+        }) as Record<string, unknown> | undefined;
+        notify?.('success', t('success.template_created'));
+        setShowNewTemplateDialog(false);
+        // PR5: единственный post-create переход. Родитель обновляет список и
+        // выбирает ровно id из ответа; повторный onSelectTemplate запустил бы
+        // второй dirty-guard уже после успешного POST.
+        const createdId = (created as { id?: string | number })?.id ?? null;
+        await onTemplatesChanged?.(createdId);
+      } catch (error) {
+        notify?.('error', getErrorMessage(error));
+      } finally {
+        setSaving(false);
       }
-    } catch (error) {
-      notify?.('error', getErrorMessage(error));
-    } finally {
-      setSaving(false);
+    };
+
+    // PR5: подтверждение охватывает весь переход, включая POST. При Cancel
+    // callback не выполняется, поэтому старый draft и заполненная форма
+    // создания остаются на месте.
+    if (guardTransition) {
+      guardTransition(createAndSelect);
+      return;
     }
+    await createAndSelect();
   }
 
   async function ensureDraftVersion(): Promise<string | number> {
@@ -270,7 +282,6 @@ export default function LabTemplateWorkbench({
   async function attemptSaveTemplate() {
     if (!selectedTemplate) {
       const message = t('errors.select_template_first');
-      notify?.('error', message);
       throw new Error(message);
     }
     const rangeErrors = validateReferenceRanges();
@@ -279,7 +290,6 @@ export default function LabTemplateWorkbench({
     if (rangeErrors.length > 0 || jsonErrors.length > 0 || keyErrors.length > 0) {
       const allErrors = [...rangeErrors, ...jsonErrors, ...keyErrors];
       const message = `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`;
-      notify?.('error', message);
       throw new Error(message);
     }
     setSaving(true);
@@ -294,12 +304,22 @@ export default function LabTemplateWorkbench({
     }
   }
 
-  async function handleSaveTemplate() {
+  // Единая оболочка для кнопки Save и dirty-guard: любая ошибка видима
+  // пользователю и пробрасывается дальше, чтобы guard не выполнил переход.
+  async function saveTemplateWithFeedback() {
     try {
       await attemptSaveTemplate();
+    } catch (error) {
+      notify?.('error', getErrorMessage(error, t('errors.save_failed')));
+      throw error;
+    }
+  }
+
+  async function handleSaveTemplate() {
+    try {
+      await saveTemplateWithFeedback();
     } catch {
-      // attemptSaveTemplate обязан сам показать ошибку пользователю
-      // (включая ранний выход при отсутствии выбранного шаблона).
+      // saveTemplateWithFeedback уже показал ошибку; кнопка остаётся на месте.
     }
   }
 
@@ -338,25 +358,37 @@ export default function LabTemplateWorkbench({
       notify?.('error', t('errors.select_version_for_archive'));
       return;
     }
-    const ok = await confirm({
-      title: t('confirm.archive_title'),
-      message: t('confirm.archive_message'),
-      description: t('confirm.archive_description'),
-      confirmLabel: t('confirm.archive_confirm'),
-      cancelLabel: t('confirm.cancel'),
-      intent: 'warning',
-    });
-    if (!ok) return;
-    setSaving(true);
-    try {
-      await labReportingApi.archiveTemplateVersion((activeVersion as Record<string, unknown>)?.id as string | number);
-      notify?.('success', t('success.template_archived'));
-      await onTemplatesChanged?.();
-    } catch (error) {
-      notify?.('error', getErrorMessage(error));
-    } finally {
-      setSaving(false);
+    // Archive exactly the version the operator selected when pressing the
+    // button. Save-and-continue may create/refresh a different draft version;
+    // letting the deferred callback read activeVersion again would make the
+    // destructive target depend on response timing.
+    const archiveVersionId = (activeVersion as Record<string, unknown>)?.id as string | number;
+    const archiveAndRefresh = async () => {
+      const ok = await confirm({
+        title: t('confirm.archive_title'),
+        message: t('confirm.archive_message'),
+        description: t('confirm.archive_description'),
+        confirmLabel: t('confirm.archive_confirm'),
+        cancelLabel: t('confirm.cancel'),
+        intent: 'warning',
+      });
+      if (!ok) return;
+      setSaving(true);
+      try {
+        await labReportingApi.archiveTemplateVersion(archiveVersionId);
+        notify?.('success', t('success.template_archived'));
+        await onTemplatesChanged?.();
+      } catch (error) {
+        notify?.('error', getErrorMessage(error));
+      } finally {
+        setSaving(false);
+      }
+    };
+    if (guardTransition) {
+      guardTransition(archiveAndRefresh);
+      return;
     }
+    await archiveAndRefresh();
   }
 
   async function handleCloneTemplate() {
@@ -364,17 +396,24 @@ export default function LabTemplateWorkbench({
       notify?.('error', t('errors.select_template_for_copy'));
       return;
     }
-    setSaving(true);
-    try {
-      const cloned = (await labReportingApi.cloneTemplate((selectedTemplate as { id?: string | number })?.id as string | number)) as Record<string, unknown>;
-      notify?.('success', t('success.template_cloned'));
-      await onTemplatesChanged?.();
-    } catch (error) {
-      const err = error as { message?: string };
-      notify?.('error', err?.message || '');
-    } finally {
-      setSaving(false);
+    const cloneAndRefresh = async () => {
+      setSaving(true);
+      try {
+        await labReportingApi.cloneTemplate((selectedTemplate as { id?: string | number })?.id as string | number);
+        notify?.('success', t('success.template_cloned'));
+        await onTemplatesChanged?.();
+      } catch (error) {
+        const err = error as { message?: string };
+        notify?.('error', err?.message || '');
+      } finally {
+        setSaving(false);
+      }
+    };
+    if (guardTransition) {
+      guardTransition(cloneAndRefresh);
+      return;
     }
+    await cloneAndRefresh();
   }
 
   // ─── Field/Section mutation helpers (used by ContentTab) ───
@@ -546,7 +585,7 @@ export default function LabTemplateWorkbench({
 
   // PR5: dirty-state draft шаблона — черновик отличается от hydrate(activeVersion).
   const templateDirty = useMemo(() => {
-    if (!selectedTemplate || !activeVersion) return false;
+    if (!selectedTemplate) return false;
     return JSON.stringify(draftVersion) !== JSON.stringify(hydrateVersion(activeVersion));
   }, [draftVersion, selectedTemplate, activeVersion]);
 
@@ -555,13 +594,13 @@ export default function LabTemplateWorkbench({
     isTemplateDirtyRef.current = templateDirty;
   });
   const registerDirtySourceRef = useRef(registerDirtySource);
-  // PR5-review: attemptSaveTemplate захватывает state конкретного рендера —
+  // PR5-review: saveTemplateWithFeedback захватывает state конкретного рендера —
   // регистрация монтируется один раз, но вызывает АКТУАЛЬНУЮ функцию через
   // обновляемый ref (паттерн handleSaveDraftRef в LabReportWorkbench),
   // иначе после загрузки шаблона save продолжает видеть первый рендер.
   const attemptSaveTemplateRef = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
-    attemptSaveTemplateRef.current = attemptSaveTemplate;
+    attemptSaveTemplateRef.current = saveTemplateWithFeedback;
   });
   useEffect(() => {
     if (!registerDirtySourceRef.current) return;
@@ -571,6 +610,18 @@ export default function LabTemplateWorkbench({
       save: () => attemptSaveTemplateRef.current(),
     });
   }, []);
+
+  // Защищаем закрытие/перезагрузку вкладки тем же признаком dirty, который
+  // использует внутренний transition guard.
+  useEffect(() => {
+    if (!templateDirty) return undefined;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [templateDirty]);
 
   // PR4: единый список ошибок валидации текущего draft для inline-блока;
   // хендлеры Save/Publish используют те же проверки перед любым запросом.

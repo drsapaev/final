@@ -29,6 +29,18 @@ function blockFromFile(fileContent: string, startMarker: string, endMarker: stri
 }
 
 describe('LabTemplateWorkbench template version command contract', () => {
+  it('pins the archive target before a deferred save-and-continue guard', () => {
+    const archiveBlock = blockFromFile(
+      source,
+      'async function handleArchiveTemplate() {',
+      'async function handleCloneTemplate() {',
+    );
+
+    expect(archiveBlock).toContain('const archiveVersionId =');
+    expect(archiveBlock).toContain('archiveTemplateVersion(archiveVersionId)');
+    expect(archiveBlock).not.toContain('archiveTemplateVersion((activeVersion');
+  });
+
   it('uses backend-owned template version actions instead of status for draft creation', () => {
     // helper теперь в utils.js
     const helperBlock = blockFromFile(
@@ -163,7 +175,7 @@ describe('LabTemplateWorkbench template version command contract', () => {
 
 // ─── PR4: behavioral tests — валидация текущего draft до любых запросов ───
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach as rtlBeforeEach } from 'vitest';
 import LabTemplateWorkbenchRaw from '../LabTemplateWorkbench';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -311,9 +323,18 @@ describe('LabTemplateWorkbench draft rule validation (PR4)', () => {
 });
 
 describe('LabTemplateWorkbench create template flow (PR5)', () => {
-  it('selects the created template using the returned id and refreshes the list', async () => {
+  rtlBeforeEach(() => {
+    vi.clearAllMocks();
+    mockedApi.listCatalogUnits.mockResolvedValue([]);
+    mockedApi.listCatalogAnalytes.mockResolvedValue([]);
+  });
+
+  it('guards creation before POST and refreshes exactly the returned id without a second guarded selection', async () => {
     const onSelectTemplate = vi.fn();
     const onTemplatesChanged = vi.fn(async (_preferredTemplateId?: string | number | null) => {});
+    const guardTransition = vi.fn((transition: () => void | Promise<void>) => {
+      void transition();
+    });
     mockedApi.createTemplate.mockResolvedValue({
       id: 9,
       code: 'new_rule_t',
@@ -328,6 +349,7 @@ describe('LabTemplateWorkbench create template flow (PR5)', () => {
           selectedTemplate={null}
           onSelectTemplate={onSelectTemplate}
           onTemplatesChanged={onTemplatesChanged}
+          guardTransition={guardTransition}
           notify={vi.fn()}
         />
       </ThemeProvider>
@@ -339,14 +361,86 @@ describe('LabTemplateWorkbench create template flow (PR5)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
 
     await waitFor(() => expect(mockedApi.createTemplate).toHaveBeenCalled());
-    await waitFor(() => expect(onSelectTemplate).toHaveBeenCalled());
 
+    expect(guardTransition).toHaveBeenCalledTimes(1);
     expect(onTemplatesChanged).toHaveBeenCalledWith(9);
-    expect(onSelectTemplate.mock.calls[0][0]).toMatchObject({ id: 9, code: 'new_rule_t' });
+    expect(onSelectTemplate).not.toHaveBeenCalled();
+  });
+
+  it('Cancel keeps both the dirty template draft and new-template form without sending POST', async () => {
+    const guardTransition = vi.fn((_transition: () => void | Promise<void>) => {
+      // Models the guard dialog Cancel action: the transition is not run.
+    });
+
+    render(
+      <ThemeProvider>
+        <LabTemplateWorkbenchRaw
+          templates={[ruleTemplateFixture]}
+          selectedTemplate={ruleTemplateFixture}
+          onSelectTemplate={vi.fn()}
+          onTemplatesChanged={vi.fn(async () => {})}
+          guardTransition={guardTransition}
+          notify={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    expandFirstFieldEditor();
+    const draftInput = screen.getByLabelText('Название поля');
+    fireEvent.change(draftInput, { target: { value: 'Гемоглобин, изменённый' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Новый' }));
+    const codeInput = screen.getByLabelText('Код шаблона');
+    const nameInput = screen.getByLabelText('Название шаблона');
+    fireEvent.change(codeInput, { target: { value: 'new_rule_t' } });
+    fireEvent.change(nameInput, { target: { value: 'Новый шаблон правил' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+
+    await waitFor(() => expect(guardTransition).toHaveBeenCalledTimes(1));
+    expect(mockedApi.createTemplate).not.toHaveBeenCalled();
+    expect(draftInput).toHaveValue('Гемоглобин, изменённый');
+    expect(codeInput).toHaveValue('new_rule_t');
+    expect(nameInput).toHaveValue('Новый шаблон правил');
+  });
+
+  it('routes clone and archive refreshes through the dirty transition guard', async () => {
+    const guardTransition = vi.fn((_transition: () => void | Promise<void>) => {
+      // Models Cancel: neither command may run before the guard resolves.
+    });
+
+    render(
+      <ThemeProvider>
+        <LabTemplateWorkbenchRaw
+          templates={[ruleTemplateFixture]}
+          selectedTemplate={ruleTemplateFixture}
+          onSelectTemplate={vi.fn()}
+          onTemplatesChanged={vi.fn(async () => {})}
+          guardTransition={guardTransition}
+          notify={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => expect(mockedApi.listCatalogUnits).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Клонировать' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Архивировать' }));
+
+    expect(guardTransition).toHaveBeenCalledTimes(2);
+    expect(mockedApi.cloneTemplate).not.toHaveBeenCalled();
+    expect(mockedApi.archiveTemplateVersion).not.toHaveBeenCalled();
   });
 });
 
 describe('LabTemplateWorkbench guard save freshness (PR5 review fix)', () => {
+  rtlBeforeEach(() => {
+    vi.clearAllMocks();
+    mockedApi.listCatalogUnits.mockResolvedValue([]);
+    mockedApi.listCatalogAnalytes.mockResolvedValue([]);
+    mockedApi.createTemplateVersion.mockResolvedValue({ id: 52 });
+    mockedApi.updateTemplateVersion.mockResolvedValue({ id: 52 });
+  });
+
   it('registered save uses the current render state after the template loads later', async () => {
     const registerDirtySource = vi.fn(
       (_source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => {}
@@ -388,7 +482,9 @@ describe('LabTemplateWorkbench guard save freshness (PR5 review fix)', () => {
     };
     expect(source.id).toBe('template');
     expect(source.isDirty()).toBe(true);
-    await source.save();
+    await act(async () => {
+      await source.save();
+    });
 
     // Актуальный version id (51 -> новый draft 52) и актуальные изменения.
     expect(mockedApi.createTemplateVersion).toHaveBeenCalledWith(5, 51);
@@ -400,5 +496,73 @@ describe('LabTemplateWorkbench guard save freshness (PR5 review fix)', () => {
     expect(rule.cases[0].low).toBe(2);
     // Сохранение прошло успешно — переход может продолжиться.
     expect(onTemplatesChanged).toHaveBeenCalled();
+  });
+
+  it('registered save visibly reports an API failure and rethrows so the guard stays put', async () => {
+    const registerDirtySource = vi.fn(
+      (_source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => {}
+    );
+    const notify = vi.fn();
+    mockedApi.updateTemplateVersion.mockRejectedValueOnce(new Error('save exploded'));
+
+    render(
+      <ThemeProvider>
+        <LabTemplateWorkbenchRaw
+          templates={[ruleTemplateFixture]}
+          selectedTemplate={ruleTemplateFixture}
+          onSelectTemplate={vi.fn()}
+          onTemplatesChanged={vi.fn(async () => {})}
+          registerDirtySource={registerDirtySource}
+          notify={notify}
+        />
+      </ThemeProvider>
+    );
+
+    expandFirstFieldEditor();
+    fireEvent.change(screen.getByLabelText('Название поля'), {
+      target: { value: 'Гемоглобин, изменённый' },
+    });
+
+    const source = registerDirtySource.mock.calls[0][0] as {
+      isDirty: () => boolean;
+      save: () => Promise<void>;
+    };
+    expect(source.isDirty()).toBe(true);
+
+    let saveError: unknown;
+    await act(async () => {
+      try {
+        await source.save();
+      } catch (error) {
+        saveError = error;
+      }
+    });
+    expect(saveError).toEqual(new Error('save exploded'));
+    expect(notify).toHaveBeenCalledWith('error', 'save exploded');
+  });
+
+  it('blocks beforeunload while the template draft is dirty', async () => {
+    render(
+      <ThemeProvider>
+        <LabTemplateWorkbenchRaw
+          templates={[ruleTemplateFixture]}
+          selectedTemplate={ruleTemplateFixture}
+          onSelectTemplate={vi.fn()}
+          onTemplatesChanged={vi.fn(async () => {})}
+          notify={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => expect(mockedApi.listCatalogUnits).toHaveBeenCalled());
+
+    expandFirstFieldEditor();
+    fireEvent.change(screen.getByLabelText('Название поля'), {
+      target: { value: 'Гемоглобин, изменённый' },
+    });
+
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
   });
 });
