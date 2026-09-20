@@ -264,8 +264,8 @@ def list_lab_orders(
 # Façade решает все 3 проблемы: собственный контракт, собственная RBAC,
 # нормализация в lab-специфичный формат на backend.
 #
-# Внутренне делегирует к существующей функции get_today_queues из
-# registrar_integration, чтобы не дублировать ~1700 строк логики.
+# Внутренне делегирует к bounded-варианту registrar today-queues,
+# чтобы не дублировать каноническую логику сборки очереди.
 # Возвращает плоский массив записей (а не nested queues[]) — это
 # упрощает frontend и убирает промежуточную нормализацию.
 @router.get("/queue/today", response_model=dict[str, Any])
@@ -286,13 +286,15 @@ target_date: str | None = Query(default=None, description="Дата (YYYY-MM-DD)
     """
     # Импортируем внутри функции, чтобы избежать circular import
     # (registrar_integration импортирует много зависимостей).
-    from app.api.v1.endpoints.registrar_integration import get_today_queues
+    from app.api.v1.endpoints.registrar_integration import get_today_queues_page
 
     # Делегируем к существующей функции с явным department=lab.
     # current_user передаём как есть — RBAC уже проверена этим endpoint'ом.
-    raw_payload = get_today_queues(
+    raw_payload = get_today_queues_page(
         target_date=target_date,
         department="lab",
+        limit=limit,
+        offset=offset,
         db=db,
         current_user=user,
     )
@@ -349,16 +351,9 @@ target_date: str | None = Query(default=None, description="Дата (YYYY-MM-DD)
                 "max_flag_severity": latest_lab_report.get("max_flag_severity") if latest_lab_report else None,
             })
 
-    # PR7: честная серверная пагинация lab-facade. Registrar canonical
-    # ordering не меняется (get_today_queues отдаёт весь день); lab-facade
-    # применяет запрошенный slice к своему плоскому представлению:
-    # total = весь день, entries = только запрошенный slice.
-    total = len(flat_entries)
-    flat_entries = flat_entries[offset : offset + limit]
-
     return {
         "entries": flat_entries,
-        "total": total,
+        "total": raw_payload["total_entries"],
         "date": raw_payload.get("date"),
         "timezone": raw_payload.get("timezone", "Asia/Tashkent"),
     }

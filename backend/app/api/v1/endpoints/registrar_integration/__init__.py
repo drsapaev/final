@@ -24,11 +24,13 @@ from app.api.v1.endpoints.registrar_integration._queue_ops import (
 )
 from app.api.v1.endpoints.registrar_integration._today_queues import (
     get_today_queues,  # noqa: F401
+    get_today_queues_page,  # noqa: F401
 )
 
 __all__ = [
     "router",
     "get_today_queues",
+    "get_today_queues_page",
     "start_queue_visit",
     "_serialize_registrar_datetime",
     "_registrar_available_actions",
