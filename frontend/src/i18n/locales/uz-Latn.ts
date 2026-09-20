@@ -10566,6 +10566,7 @@ const uzLatn = {
     pi_cancel: 'Bekor qilish',
     pi_done: 'Tayyor',
     pi_error_already_linked: 'Karta allaqachon bemor hisobiga bog\'langan',
+    pi_error_phone_bound: 'Telefon raqami boshqa karta portaliga bog\'langan. Bir raqamga ikkinchi hisob ochish mumkin emas',
     pi_error_not_found: 'Bemor topilmadi yoki o\'chirilgan',
     pi_error_generic: 'Token berilmadi. Qayta urinib ko\'ring',
     pi_action_aria: 'Faollashtirish tokenini berish: {name}',
