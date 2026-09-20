@@ -38,7 +38,7 @@ import {
 import { useQueueApi } from '../../hooks/useQueueApi';
 import { usePatientsApi } from '../../hooks/usePatientsApi';
 import { api } from '../../api/client';
-import { fetchRegistrarServices } from '../../api/registrar';
+import { fetchRegistrarDoctors, fetchRegistrarServices } from '../../api/registrar';
 // UX Audit Stage 3 (Wizard issue 5.1):
 // Все 13 raw fetch() к /patients/* и /registrar/cart заменены на
 // централизованный patients API client. Это убирает дублирование
@@ -1055,8 +1055,8 @@ const AppointmentWizardV2 = ({
 
   const loadDoctors = useCallback(async () => {
     try {
-      const { data } = await api.get('/registrar/doctors');
-      setDoctorsData(data);
+      const { doctors } = await fetchRegistrarDoctors();
+      setDoctorsData(doctors.map((doctor): DoctorData => ({ ...doctor })));
     } catch (error: unknown) {
       logger.error('Ошибка загрузки врачей:', error);
     }
