@@ -369,6 +369,28 @@ class NurseServingApiService:
             payload["services"] = self._station_services_payload(entry, resource)
         return payload
 
+    def _replay_payload(self, execution: ServiceExecution) -> dict[str, Any]:
+        """Codex round-2 P2: the terminal replay reports the DURABLE entry
+        state, not a defaulted false.
+
+        A lost-response retry of a completion that flipped the entry must
+        not answer ``entry_served=false`` — the consumer would believe
+        the station event is still open. The authoritative flip record
+        lives on the entry row itself (status/served_by/served_at); the
+        replay reflects the CURRENT state truthfully.
+        """
+        entry = (
+            self.db.get(OnlineQueueEntry, execution.queue_entry_id)
+            if execution.queue_entry_id is not None
+            else None
+        )
+        served = entry is not None and entry.status == "served"
+        return self._execution_payload(
+            execution,
+            entry_served=served,
+            entry_served_by_user_id=entry.served_by_user_id if served else None,
+        )
+
     def _execution_payload(
         self,
         execution: ServiceExecution,
@@ -440,7 +462,14 @@ class NurseServingApiService:
         return items, total
 
     def get_station_state(self, user_id: int, queue_resource_id: int) -> dict[str, Any]:
-        """The station board: queue meta + waiting + active entries + my claim."""
+        """The station board: waiting + active + my claim + late_pending.
+
+        ``late_pending`` (codex round-2 P1): terminal entries whose visit
+        still has PENDING station-routed services (a procedure prescribed
+        after the last-completer flip) — surfaced so nothing prescribed
+        is silently stranded; the servable path is the existing rejoin
+        flow (a new ticket for the same visit).
+        """
         resource = self._resource_or_error(queue_resource_id)
         assignment = self._active_assignment_or_error(user_id, queue_resource_id)
         queue = self._station_queue_or_error(resource)
@@ -478,6 +507,40 @@ class NurseServingApiService:
             for e in active_rows
         ]
         my_entry = next((item for item in active if item["is_my_claim"]), None)
+
+        # Codex round-2 P1 (late services are never SILENTLY stranded):
+        # terminal entries of today's station queue whose visit still has
+        # PENDING station-routed services — e.g. a procedure the doctor
+        # prescribed AFTER the last-completer flip (the add-service paths
+        # append VisitServices without touching queue entries). The
+        # serving plane deliberately does NOT reopen terminal entries
+        # (the patient is no longer at the station); the servable path is
+        # the EXISTING rejoin flow — a new ticket for the same visit (the
+        # next entry's serving sees ALL pending station services of the
+        # visit, including the late one). The board surfaces the state so
+        # the desk can re-ticket: nothing prescribed is invisible.
+        terminal_rows = (
+            self.db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.queue_id == queue.id,
+                OnlineQueueEntry.status.in_(_ENTRY_TERMINAL_STATES),
+                OnlineQueueEntry.visit_id.isnot(None),
+            )
+            .order_by(OnlineQueueEntry.id.asc())
+            .all()
+        )
+        late_pending = []
+        for terminal_entry in terminal_rows:
+            services = self._station_services_payload(terminal_entry, resource)
+            if any(item["pending"] for item in services):
+                late_pending.append(
+                    self._entry_payload(
+                        terminal_entry,
+                        my_user_id=user_id,
+                        resource=resource,
+                        with_services=True,
+                    )
+                )
         return {
             "queue_resource_id": queue_resource_id,
             "resource_queue_tag": resource.queue_tag,
@@ -488,10 +551,12 @@ class NurseServingApiService:
             "waiting": waiting,
             "active": active,
             "my_entry": my_entry,
+            "late_pending": late_pending,
             "counts": {
                 "waiting": len(waiting),
                 "called": sum(1 for e in active_rows if e.status == "called"),
                 "in_progress": sum(1 for e in active_rows if e.status == "in_progress"),
+                "late_pending": len(late_pending),
             },
         }
 
@@ -1185,7 +1250,7 @@ class NurseServingApiService:
         # her own already-committed attribution, never new state).
         if execution.status == "completed":
             if execution.performed_by_user_id == user_id:
-                return self._execution_payload(execution)
+                return self._replay_payload(execution)
 
         resource, _entry = self._authorize_execution_terminal(execution, user_id)
 
@@ -1310,7 +1375,7 @@ class NurseServingApiService:
         # the assignment authorization (see complete_execution).
         if execution.status == "incomplete":
             if execution.performed_by_user_id == user_id:
-                return self._execution_payload(execution)
+                return self._replay_payload(execution)
 
         _resource, _entry = self._authorize_execution_terminal(execution, user_id)
 

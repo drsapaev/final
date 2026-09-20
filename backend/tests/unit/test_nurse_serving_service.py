@@ -1358,3 +1358,131 @@ class TestCodexRound1TerminalReplayBeforeAuth:
         with pytest.raises(NurseServingApiDomainError) as exc:
             service.complete_execution(outsider.id, execution["id"])
         _expect(exc, 403)
+
+
+# ----------------------------------------------------------------------------
+# J. codex round-2 regressions (late services / replay flip outcome)
+# ----------------------------------------------------------------------------
+
+
+class TestCodexRound2LatePending:
+    """P1 (L1226): late station services are never SILENTLY stranded."""
+
+    def test_served_entry_with_late_service_is_surfaced_on_the_board(
+        self, db_session: Session
+    ):
+        # The full flow: claim -> start -> execute -> complete (flip),
+        # THEN the doctor prescribes another station-routed procedure
+        # (the add-service paths append VisitServices without touching
+        # queue entries).
+        nurse = _nurse(db_session, "n23_late_nurse")
+        resource = _resource(db_session)
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Late")
+        entry = _entry(db_session, queue, 1, patient=patient)
+        service = NurseServingApiService(db_session)
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry.id)
+        visit = db_session.get(Visit, entry.visit_id)
+        svc = _service(db_session, "LATE1", queue_tag=resource.queue_tag)
+        vs = _visit_service(db_session, visit, svc)
+        execution = service.create_execution(
+            nurse.id, resource.id, queue_entry_id=entry.id, visit_service_id=vs.id
+        )
+        result = service.complete_execution(nurse.id, execution["id"])
+        assert result["entry_served"] is True
+
+        late_svc = _service(db_session, "LATE2", queue_tag=resource.queue_tag)
+        late_vs = _visit_service(db_session, visit, late_svc)
+
+        state = service.get_station_state(nurse.id, resource.id)
+        # The served entry with the pending late service is VISIBLE.
+        assert state["counts"]["late_pending"] == 1
+        assert [item["id"] for item in state["late_pending"]] == [entry.id]
+        late_services = state["late_pending"][0]["services"]
+        assert {s["visit_service_id"] for s in late_services} == {vs.id, late_vs.id}
+        pending = {s["visit_service_id"] for s in late_services if s["pending"]}
+        assert pending == {late_vs.id}  # the completed one is done
+
+        # The serving plane still refuses to execute on a terminal entry
+        # (the patient is not at the station — rejoin first).
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            service.create_execution(
+                nurse.id,
+                resource.id,
+                queue_entry_id=entry.id,
+                visit_service_id=vs.id,
+            )
+        _expect(exc, 400)
+
+    def test_rejoin_flow_serves_the_late_service(self, db_session: Session):
+        # The EXISTING rejoin path: a new ticket for the same visit —
+        # the next entry's serving sees ALL pending station services of
+        # the visit, including the late one.
+        nurse = _nurse(db_session, "n23_rejoin_nurse")
+        resource = _resource(db_session)
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Rejoin")
+        entry = _entry(db_session, queue, 1, patient=patient)
+        service = NurseServingApiService(db_session)
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry.id)
+        visit = db_session.get(Visit, entry.visit_id)
+        svc = _service(db_session, "RJN1", queue_tag=resource.queue_tag)
+        vs = _visit_service(db_session, visit, svc)
+        execution = service.create_execution(
+            nurse.id, resource.id, queue_entry_id=entry.id, visit_service_id=vs.id
+        )
+        service.complete_execution(nurse.id, execution["id"])
+
+        late_svc = _service(db_session, "RJN2", queue_tag=resource.queue_tag)
+        late_vs = _visit_service(db_session, visit, late_svc)
+
+        # The desk re-tickets the patient for the same visit.
+        entry2 = _entry(db_session, queue, 2, patient=patient, visit=visit)
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry2.id)
+        late_execution = service.create_execution(
+            nurse.id, resource.id, queue_entry_id=entry2.id, visit_service_id=late_vs.id
+        )
+        result = service.complete_execution(nurse.id, late_execution["id"])
+        assert result["entry_served"] is True  # entry2 flips
+        db_session.refresh(entry2)
+        assert entry2.status == "served"
+        # The board no longer reports late-pending anything.
+        state = service.get_station_state(nurse.id, resource.id)
+        assert state["counts"]["late_pending"] == 0
+
+
+class TestCodexRound2ReplayFlipOutcome:
+    """P2 (L1188): the terminal replay preserves the flip outcome."""
+
+    def test_completed_replay_reports_the_served_entry(self, db_session: Session):
+        nurse = _nurse(db_session, "n23_flip_replay")
+        resource = _resource(db_session)
+        assignment = _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "FlipReplay")
+        entry = _entry(db_session, queue, 1, patient=patient)
+        service = NurseServingApiService(db_session)
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry.id)
+        visit = db_session.get(Visit, entry.visit_id)
+        svc = _service(db_session, "FLP1", queue_tag=resource.queue_tag)
+        vs = _visit_service(db_session, visit, svc)
+        execution = service.create_execution(
+            nurse.id, resource.id, queue_entry_id=entry.id, visit_service_id=vs.id
+        )
+        first = service.complete_execution(nurse.id, execution["id"])
+        assert first["entry_served"] is True
+
+        # Assignment deactivated AFTER the flip: the lost-response retry
+        # must still report the DURABLE served state, not a default false.
+        assignment.is_active = False
+        db_session.commit()
+        replay = service.complete_execution(nurse.id, execution["id"])
+        assert replay["status"] == "completed"
+        assert replay["entry_served"] is True
+        assert replay["entry_served_by_user_id"] == nurse.id

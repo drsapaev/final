@@ -2358,7 +2358,12 @@ export type paths = {
          *     their station-routed services and execution state (the tablet's
          *     "what is left to perform" list); ``my_entry`` is the caller's own
          *     held claim — the §6 reconnect/reload contract (the active serving
-         *     is re-fetchable, never lost).
+         *     is re-fetchable, never lost). ``late_pending`` surfaces TERMINAL
+         *     entries whose visit still has pending station-routed services (a
+         *     procedure prescribed after the last-completer flip): the serving
+         *     plane never reopens terminal entries — the servable path is the
+         *     existing rejoin flow (a new ticket for the same visit); the board
+         *     makes the state visible so nothing prescribed is silently stranded.
          */
         get: operations["get_station_entries_api_v1_nurse_serving_queue_resources__queue_resource_id__entries_get"];
         put?: never;
@@ -31844,6 +31849,15 @@ export type components = {
         /**
          * NurseServingStationResponse
          * @description The station state: queue metadata + waiting + active entries.
+         *
+         *     ``late_pending`` (codex round-2 P1): TERMINAL entries of today's
+         *     station queue whose visit still has PENDING station-routed services
+         *     — e.g. a procedure prescribed after the last-completer flip. The
+         *     serving plane deliberately does not reopen terminal entries; the
+         *     servable path is the existing rejoin flow (a new ticket for the same
+         *     visit — the next entry's serving sees ALL pending station services).
+         *     The board surfaces the state so nothing prescribed is silently
+         *     stranded and the desk can re-ticket.
          */
         NurseServingStationResponse: {
             /** Queue Resource Id */
@@ -31863,6 +31877,8 @@ export type components = {
             /** Active */
             active: components["schemas"]["NurseServingEntryResponse"][];
             my_entry?: components["schemas"]["NurseServingEntryResponse"] | null;
+            /** Late Pending */
+            late_pending?: components["schemas"]["NurseServingEntryResponse"][];
             /** Counts */
             counts?: {
                 [key: string]: number;

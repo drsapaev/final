@@ -98,7 +98,17 @@ class NurseServingEntryResponse(BaseModel):
 
 
 class NurseServingStationResponse(BaseModel):
-    """The station state: queue metadata + waiting + active entries."""
+    """The station state: queue metadata + waiting + active entries.
+
+    ``late_pending`` (codex round-2 P1): TERMINAL entries of today's
+    station queue whose visit still has PENDING station-routed services
+    — e.g. a procedure prescribed after the last-completer flip. The
+    serving plane deliberately does not reopen terminal entries; the
+    servable path is the existing rejoin flow (a new ticket for the same
+    visit — the next entry's serving sees ALL pending station services).
+    The board surfaces the state so nothing prescribed is silently
+    stranded and the desk can re-ticket.
+    """
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -111,6 +121,7 @@ class NurseServingStationResponse(BaseModel):
     waiting: list[NurseServingEntryResponse]
     active: list[NurseServingEntryResponse]
     my_entry: NurseServingEntryResponse | None = None
+    late_pending: list[NurseServingEntryResponse] = Field(default_factory=list)
     counts: dict[str, int] = Field(default_factory=dict)
 
 
@@ -168,7 +179,10 @@ class NurseServingExecutionResponse(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     # Set on terminal transitions: whether THIS completion flipped the
-    # queue entry to served (the last-completer contract).
+    # queue entry to served (the last-completer contract). On an
+    # idempotent replay the field reflects the entry's CURRENT served
+    # state (the durable attribution lives on the entry row:
+    # status/served_by/served_at).
     entry_served: bool = False
     entry_served_by_user_id: int | None = None
 

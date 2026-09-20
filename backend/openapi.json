@@ -6485,7 +6485,7 @@
           "nurse-serving"
         ],
         "summary": "Get Station Entries",
-        "description": "The station board: waiting + active entries + the caller's claim.\n\n``waiting`` is the canonical call order (priority DESC, arrival\nASC, id ASC); ``active`` are the called/in_progress entries with\ntheir station-routed services and execution state (the tablet's\n\"what is left to perform\" list); ``my_entry`` is the caller's own\nheld claim — the §6 reconnect/reload contract (the active serving\nis re-fetchable, never lost).",
+        "description": "The station board: waiting + active entries + the caller's claim.\n\n``waiting`` is the canonical call order (priority DESC, arrival\nASC, id ASC); ``active`` are the called/in_progress entries with\ntheir station-routed services and execution state (the tablet's\n\"what is left to perform\" list); ``my_entry`` is the caller's own\nheld claim — the §6 reconnect/reload contract (the active serving\nis re-fetchable, never lost). ``late_pending`` surfaces TERMINAL\nentries whose visit still has pending station-routed services (a\nprocedure prescribed after the last-completer flip): the serving\nplane never reopens terminal entries — the servable path is the\nexisting rejoin flow (a new ticket for the same visit); the board\nmakes the state visible so nothing prescribed is silently stranded.",
         "operationId": "get_station_entries_api_v1_nurse_serving_queue_resources__queue_resource_id__entries_get",
         "security": [
           {
@@ -91636,6 +91636,13 @@
               }
             ]
           },
+          "late_pending": {
+            "items": {
+              "$ref": "#/components/schemas/NurseServingEntryResponse"
+            },
+            "type": "array",
+            "title": "Late Pending"
+          },
           "counts": {
             "additionalProperties": {
               "type": "integer"
@@ -91652,7 +91659,7 @@
           "active"
         ],
         "title": "NurseServingStationResponse",
-        "description": "The station state: queue metadata + waiting + active entries."
+        "description": "The station state: queue metadata + waiting + active entries.\n\n``late_pending`` (codex round-2 P1): TERMINAL entries of today's\nstation queue whose visit still has PENDING station-routed services\n— e.g. a procedure prescribed after the last-completer flip. The\nserving plane deliberately does not reopen terminal entries; the\nservable path is the existing rejoin flow (a new ticket for the same\nvisit — the next entry's serving sees ALL pending station services).\nThe board surfaces the state so nothing prescribed is silently\nstranded and the desk can re-ticket."
       },
       "NurseServingStationServiceState": {
         "properties": {
