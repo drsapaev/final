@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
+from types import SimpleNamespace
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -14,8 +15,7 @@ from app.models.lab import LabOrder, LabReportInstance, LabResult
 from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
-from app.models.visit import Visit
-from app.models.visit import VisitService
+from app.models.visit import Visit, VisitService
 
 
 def _suffix() -> str:
@@ -1226,7 +1226,24 @@ def test_lab_queue_today_paginates_honestly(client, auth_headers, monkeypatch):
         "date": "2026-09-19",
         "timezone": "Asia/Tashkent",
     }
-    monkeypatch.setattr(ri, "get_today_queues", lambda **kwargs: fake_payload)
+    delegated_windows = []
+
+    def fake_get_today_queues_page(**kwargs):
+        delegated_windows.append((kwargs["limit"], kwargs["offset"]))
+        start = kwargs["offset"]
+        stop = start + kwargs["limit"]
+        return {
+            **fake_payload,
+            "queues": [
+                {
+                    **fake_payload["queues"][0],
+                    "entries": entries[start:stop],
+                }
+            ],
+            "total_entries": len(entries),
+        }
+
+    monkeypatch.setattr(ri, "get_today_queues_page", fake_get_today_queues_page)
 
     page2 = client.get(
         "/api/v1/lab/queue/today?limit=50&offset=50", headers=auth_headers
@@ -1252,4 +1269,162 @@ def test_lab_queue_today_paginates_honestly(client, auth_headers, monkeypatch):
         "/api/v1/lab/queue/today?limit=50&offset=0", headers=auth_headers
     )
     body1 = page1.json()
-    assert [e["id"] for e in body1["entries"]] == [i for i in range(1, 51)]
+    assert [e["id"] for e in body1["entries"]] == list(range(1, 51))
+    assert delegated_windows == [(50, 50), (50, 100), (50, 0)]
+
+
+def test_registrar_lab_queue_page_bounds_enrichment_after_global_dedup(monkeypatch):
+    """The lab window is selected after canonical ordering/global dedup but
+    before report, patient, service, metadata, and payment enrichment."""
+    from app.api.v1.endpoints.registrar_integration import _today_queues as today_queues
+
+    def _entry(entry_id: int, minute: int) -> dict:
+        return {
+            "type": "online_queue",
+            "data": SimpleNamespace(id=entry_id, payment_processed_at=None),
+            "created_at": datetime(2026, 9, 20, 8, minute),
+            "queue_time": datetime(2026, 9, 20, 8, minute),
+        }
+
+    ecg_by_legacy_name_only = SimpleNamespace(
+        queue_tag=None,
+        name="Synthetic ECG compatibility label",
+        code="ecg",
+    )
+    page_ecg_services_count, page_non_ecg_services_count = (
+        today_queues._count_serializer_visible_visit_services(
+            [ecg_by_legacy_name_only]
+        )
+    )
+    assert (page_ecg_services_count, page_non_ecg_services_count) == (0, 1)
+    current_cardiology_branch_is_serializable = (
+        today_queues._serializer_will_emit_visit(
+            filter_services=True,
+            ecg_only=False,
+            ecg_count=page_ecg_services_count,
+            non_ecg_count=page_non_ecg_services_count,
+        )
+    )
+    assert current_cardiology_branch_is_serializable is False
+    skipped_visit = {
+        "type": "visit",
+        "data": SimpleNamespace(id=99),
+        "created_at": datetime(2026, 9, 20, 8, 0),
+        "queue_time": datetime(2026, 9, 20, 8, 0),
+        "_page_serializable": current_cardiology_branch_is_serializable,
+    }
+
+    queues_by_specialty = {
+        "lab": {
+            "entries": [skipped_visit, _entry(3, 3), _entry(1, 1), _entry(2, 2)],
+            "doctor": None,
+            "doctor_id": None,
+            "doctors": {},
+        },
+        "laboratory": {
+            "entries": [_entry(2, 0), _entry(4, 4), _entry(5, 5)],
+            "doctor": None,
+            "doctor_id": None,
+            "doctors": {},
+        },
+    }
+    summarized_ids = []
+    enriched_ids = []
+    metadata_indexes = []
+
+    def fake_collect_summaries(*, db, queues_by_specialty, department_filter):
+        del db, department_filter
+        summarized_ids.extend(
+            entry["data"].id
+            for queue in queues_by_specialty.values()
+            for entry in queue["entries"]
+        )
+        return {}, True
+
+    def fake_process_online_queue_entry(*, entry_data, **kwargs):
+        del kwargs
+        enriched_ids.append(entry_data.id)
+        return {
+            "record_id": entry_data.id,
+            "patient_id": entry_data.id,
+            "patient_name": f"P{entry_data.id}",
+            "phone": "",
+            "patient_birth_year": None,
+            "address": None,
+            "entry_status": "waiting",
+            "source": "desk",
+            "discount_mode": "none",
+            "visit_time": None,
+            "services": [],
+            "service_codes": [],
+            "service_details": [],
+            "total_cost": 0,
+        }
+
+    monkeypatch.setattr(
+        today_queues, "_collect_lab_report_summaries", fake_collect_summaries
+    )
+    monkeypatch.setattr(
+        today_queues, "_process_online_queue_entry", fake_process_online_queue_entry
+    )
+    monkeypatch.setattr(
+        today_queues,
+        "_process_visit_entry",
+        lambda **kwargs: pytest.fail("non-serializable visit reached enrichment"),
+    )
+
+    def fake_resolve_queue_entry_metadata(**kwargs):
+        metadata_indexes.append(kwargs["idx"])
+        return kwargs["entry_data"].id, None, None
+
+    monkeypatch.setattr(
+        today_queues,
+        "_resolve_queue_entry_metadata",
+        fake_resolve_queue_entry_metadata,
+    )
+    monkeypatch.setattr(
+        today_queues, "_resolve_entry_department", lambda **kwargs: (None, None)
+    )
+    monkeypatch.setattr(
+        today_queues, "_resolve_payment_truth", lambda *args, **kwargs: ("unpaid", None)
+    )
+    monkeypatch.setattr(
+        today_queues, "_registrar_available_actions", lambda **kwargs: []
+    )
+    monkeypatch.setattr(
+        today_queues,
+        "_serialize_queue_entry",
+        lambda **kwargs: {"id": kwargs["record_id"]},
+    )
+    monkeypatch.setattr(
+        today_queues,
+        "_build_queue_payload",
+        lambda *, queue_data, specialty, queue_number, entries: {
+            "specialty": specialty,
+            "queue_number": queue_number,
+            "entries": entries,
+        },
+    )
+
+    result, total = today_queues._build_queue_result_page(
+        db=object(),
+        current_user=SimpleNamespace(role="Lab", roles=[]),
+        queues_by_specialty=queues_by_specialty,
+        department_filter={"lab", "laboratory"},
+        today=date(2026, 9, 20),
+        limit=2,
+        offset=2,
+    )
+
+    assert total == 5
+    assert summarized_ids == [3, 4]
+    assert enriched_ids == [3, 4]
+    assert metadata_indexes == [3, 1]
+    assert result == [
+        {"specialty": "lab", "queue_number": 1, "entries": [{"id": 3}]},
+        {
+            "specialty": "laboratory",
+            "queue_number": 2,
+            "entries": [{"id": 4}],
+        },
+    ]
