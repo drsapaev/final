@@ -38,9 +38,33 @@ carry no nav entry, and are registered in `src/routing/routeRegistry.ts`
 The route smoke suite (`frontend/e2e/frontend-10-route-smoke.spec.ts`)
 covers both routes as public surfaces.
 
-`/patient/activate?token=...` prefills the token field from a deep link.
+`/patient/activate#token=...` prefills the token field from a deep link.
 The token is never auto-submitted: stale or revoked tokens surface as a
 uniform error only after an explicit submit.
+
+**Deep-link form (Phase 0 follow-up):** the canonical handout link carries
+the token in the URL **fragment** (`#token=...`). The browser never
+transmits the fragment to the server, so Vercel rewrites, access logs and
+any infrastructure in front of the SPA never observe the 72-hour
+credential on the first HTTP navigation (the legacy `?token=...` query
+form was visible to that infrastructure before the SPA booted and could
+only be stripped after JS load). The legacy query form keeps working for
+links already handed out within the TTL; both forms are copied into state
+and immediately stripped from the URL/history after prefill. BOTH handout
+forms are additionally extracted and stripped during app bootstrap BEFORE
+telemetry (Sentry) initialization (`utils/patientActivateDeepLink.ts`,
+called from `main.tsx` before `initSentry()`): the query component of a
+legacy link survives in `window.location` until the page effect, and the
+Sentry scrubber redacts token-keyed object fields but not URL-valued
+telemetry fields — so the bootstrap strip covers the fragment AND the
+legacy query (unrelated query params and an unrelated hash are preserved;
+the canonical fragment wins when a URL carries both). Defense-in-depth:
+`services/sentry.ts` additionally redacts credential query/fragment params
+(token + `*_token`, api keys, secret, password, sig/signature,
+authorization) inside URL-valued telemetry strings (`request.url`,
+breadcrumb from/to, Referer) and in transactions via
+`beforeSendTransaction` (pageload traces bypass `beforeSend`), so a
+pageload trace or startup error must never observe the credential at all.
 
 ## Staff issuance (PR-A2)
 
@@ -110,6 +134,23 @@ Notes:
   not activated", not "expired").
 - Session storage uses the standard `tokenManager` keys
   (`auth_token`/`user`), not the legacy webauthn `patient_jwt_token` keys.
+- Access-only session lifecycle (Phase 0 follow-up): a patient session has
+  no refresh token, so a 401 on a business endpoint after the 30-minute
+  JWT expiry terminates the session through `stores/auth.clearToken()`
+  (registered into `api/client.ts` via `setSessionInvalidationListener`),
+  clearing `auth_token`/`auth_profile` + tokenManager + PHI caches and
+  notifying subscribers — `RouteAccessBoundary` redirects to the login
+  page immediately. The clear keeps the same race guard as the reactive
+  refresh path: it fires only when the failed token is still the live
+  access token, so a mid-flight re-login is never wiped.
+- Issuance 409 semantics (Phase 0 follow-up): the backend returns two
+  distinct safe 409 details on `POST /patients/{id}/activation-token` —
+  `ERR_PATIENT_ALREADY_LINKED` (this card already linked) and
+  `ERR_ISSUANCE_PHONE_BOUND` (card not linked, but the phone is already
+  bound to another portal card — family/shared phone). The issuance dialog
+  maps them to separate localized messages (`pi_error_already_linked` vs
+  `pi_error_phone_bound`); the phone-bound detail string is mirrored as a
+  pinned literal in the dialog and pinned by backend unit tests.
 
 ## Related
 

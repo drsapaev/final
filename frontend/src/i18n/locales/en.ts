@@ -10571,6 +10571,7 @@ const en = {
     pi_cancel: 'Cancel',
     pi_done: 'Done',
     pi_error_already_linked: 'The card is already linked to a patient account',
+    pi_error_phone_bound: 'The phone number is already bound to another card portal account. A second account on the same number is not available',
     pi_error_not_found: 'Patient not found or deleted',
     pi_error_generic: 'Could not issue the token. Please try again',
     pi_action_aria: 'Issue activation token: {name}',
