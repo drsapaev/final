@@ -294,25 +294,110 @@ def require_active_roles(*roles: Any):
     ``require_roles`` gate; the active check applies to superusers too
     (a deactivated superuser must not operate the control plane either).
 
+    Codex settle-2 P2 (PR #3333): the inactive-account denial is audited
+    HERE, actor-attributed, before the 403 is raised. The previous
+    composition resolved ``get_current_active_user`` as the first
+    parameter, so a deactivated (super)admin's 403 fired BEFORE the role
+    gate — the structured denial path never ran and the AuditMiddleware
+    only left a pre-auth anonymous request line: the stale
+    privileged-token attempt stayed unattributed. Now the plain
+    ``get_current_user`` resolves the account, the audited role gate runs
+    first (a wrong-role caller gets the role-gate denial WITH its own
+    logging), and the active check below writes an unconditional
+    ``UserAuditLog`` ACCESS_DENIED row (``log_audit_event`` — the ledger
+    row must land for non-critical control-plane resources too, where
+    ``log_critical_change`` table-gating would silently drop it) naming
+    the actor, the required roles and the denial reason.
+
     NOTE: making ``require_roles()`` itself active-aware (834 endpoint call
     sites) is deliberately NOT done here — that is a separate owner-gated
     task; this factory is the in-scope closure for the NURSE-V2 control-plane
     endpoints (and the pattern for N2-3 serving endpoints).
     """
-    from fastapi import Depends
+    from fastapi import Depends, HTTPException, status
 
-    from app.api.deps import get_current_active_user
+    from app.api.deps import get_current_user, get_db
     from app.models.user import User
 
     role_gate = require_roles(*roles)
 
     def _dep(
-        current_user: User = Depends(get_current_active_user),
+        current_user: User = Depends(get_current_user),
+        db=Depends(get_db),
         _role_gated: User = Depends(role_gate),
     ) -> User:
-        # get_current_active_user already raised 403 for deactivated
-        # accounts (before the role gate runs); the audit-logged role check
-        # has passed for every active account that reaches this line.
+        # The role gate above has already run (and audited its own denials);
+        # every account that reaches this line carries one of the required
+        # roles. The active check closes the deactivated-(super)admin hole.
+        if not bool(getattr(current_user, "is_active", False)):
+            from app.core.audit import log_audit_event
+            from app.middleware.audit_middleware import get_current_request
+
+            request = get_current_request()
+            resource_type = None
+            resource_id = None
+            path_str = "unknown"
+            method_str = "UNKNOWN"
+            if request:
+                path_parts = [p for p in request.url.path.split("/") if p]
+                path_str = request.url.path
+                method_str = request.method
+                if (
+                    len(path_parts) >= 3
+                    and path_parts[0] == "api"
+                    and path_parts[1] == "v1"
+                ):
+                    resource_type = path_parts[2]
+                if len(path_parts) >= 4 and path_parts[3].isdigit():
+                    resource_id = int(path_parts[3])
+
+            normalized_roles = getattr(role_gate, "required_roles", ()) or ()
+
+            audit_logger = logging.getLogger(__name__)
+            audit_logger.error(
+                "ACTIVE ACCOUNT DENIED",
+                extra={
+                    "required_roles": list(normalized_roles),
+                    "user_role": getattr(current_user, "role", None),
+                    "resource_type": resource_type or "unknown",
+                    "resource_id_present": resource_id is not None,
+                    "request_available": request is not None,
+                },
+            )
+            # Unconditional ledger row: log_critical_change would drop it for
+            # control-plane resources (table-gated to CRITICAL_TABLES).
+            try:
+                log_audit_event(
+                    db=db,
+                    user_id=current_user.id,
+                    action="ACCESS_DENIED",
+                    table_name=resource_type or "unknown",
+                    row_id=resource_id,
+                    old_values=None,
+                    new_values={
+                        "required_roles": list(normalized_roles),
+                        "user_role": getattr(current_user, "role", None),
+                        "denial_reason": "user_deactivated",
+                        "request_available": request is not None,
+                    },
+                    description=(
+                        f"403 Forbidden: {method_str} {path_str} - учетная "
+                        "запись деактивирована (требуются роли: "
+                        f"{', '.join(normalized_roles)})"
+                    ),
+                )
+                db.commit()
+            except Exception as e:  # noqa: BLE001
+                audit_logger.error(
+                    "Failed to log ACCESS_DENIED audit",
+                    extra={"exception_type": type(e).__name__},
+                    exc_info=True,
+                )
+
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Пользователь деактивирован",
+            )
         return current_user
 
     # Codex R6 #3092 contract: publish the normalized roles exactly the way

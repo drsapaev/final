@@ -129,6 +129,29 @@ def test_deactivated_admin_token_gets_403_and_writes_no_assignments(
     assert response.status_code == 403, response.text
     assert _assignment_count(db_session) == 0
 
+    # Codex settle-2 P2 (PR #3333): every stale-privileged-token denial is
+    # ACTOR-ATTRIBUTED in the audit ledger. The previous composition raised
+    # the inactive 403 inside get_current_active_user BEFORE the role gate,
+    # so the structured denial path never ran and the AuditMiddleware only
+    # left a pre-auth anonymous request line. require_active_roles now
+    # writes an unconditional UserAuditLog ACCESS_DENIED row (the actor, the
+    # required roles and the denial reason) before raising.
+    denial_rows = (
+        db_session.query(UserAuditLog)
+        .filter(
+            UserAuditLog.user_id == admin.id,
+            UserAuditLog.action == "ACCESS_DENIED",
+        )
+        .all()
+    )
+    assert len(denial_rows) == 2  # one per mutating request above
+    for row in denial_rows:
+        values = row.new_values or {}
+        assert values.get("denial_reason") == "user_deactivated"
+        assert values.get("required_roles") == ["Admin"]
+        assert values.get("user_role") == "Admin"
+        assert "деактивирована" in (row.description or "")
+
     # The read side of the control plane is closed for the same token too.
     response = client.get(f"{_BASE_PATH}/1", headers=stale_token)
     assert response.status_code == 403, response.text
