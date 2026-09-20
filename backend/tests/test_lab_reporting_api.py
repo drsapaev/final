@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from urllib.parse import quote
 from uuid import uuid4
@@ -1133,65 +1133,75 @@ def test_bulk_values_optimistic_locking_bumps_token_and_rejects_stale(
     test_patient,
     test_visit,
 ):
-    """PR3: каждое успешное bulk-сохранение должно продвигать version token
-    (updated_at), иначе два лаборанта с одним устаревшим токеном молча
-    перезаписывают друг друга после первого сохранения. Stale token обязан
-    получать 409 и не перезаписывать изменения другого пользователя.
-    """
+    """The server version is exact down to microseconds and advances on save."""
     instance = _create_lab_report_instance(
         client,
         auth_headers=auth_headers,
         patient_id=test_patient.id,
         visit_id=test_visit.id,
     )
-    token_before = instance["updated_at"]
-    assert token_before
+    row = (
+        db_session.query(LabReportInstance)
+        .filter(LabReportInstance.id == instance["id"])
+        .one()
+    )
+    baseline = datetime(2026, 9, 20, 8, 15, 30, 123456, tzinfo=UTC)
+    row.updated_at = baseline
+    db_session.commit()
 
-    def _frontend_iso(token: str) -> str:
-        # Фронтенд отправляет toISOString() — всегда с offset. SQLite-харнес
-        # сериализует токены без offset; с offset-less токеном guard в
-        # _assert_not_concurrently_modified получает aware-vs-naive вычитание
-        # и graceful-degradation пропускает проверку блокировки.
-        return datetime.fromisoformat(token).replace(tzinfo=UTC).isoformat()
+    def _parse_token(token: str) -> datetime:
+        parsed = datetime.fromisoformat(token.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
 
     def _bulk_save(expected_token: str, value: str):
         return client.post(
             f"/api/v1/lab/report-instances/{instance['id']}/bulk-values"
-            f"?expected_updated_at={quote(_frontend_iso(expected_token), safe='')}",
+            f"?expected_updated_at={quote(expected_token, safe='')}",
             headers=auth_headers,
             json=[{"field_key": "wbc", "value_text": value}],
         )
 
-    # In-sync сохранение №1 (DRAFT -> IN_PROGRESS)
-    first = _bulk_save(token_before, "5.2")
+    # The same instant in a non-UTC offset, including all six microsecond
+    # digits, must compare equal after timezone normalization.
+    equivalent_offset_token = baseline.astimezone(
+        timezone(timedelta(hours=5))
+    ).isoformat()
+    first = _bulk_save(equivalent_offset_token, "5.2")
     assert first.status_code == 200, first.text
     token_first = first.json()["instance"]["updated_at"]
-    assert token_first != token_before, (
-        "успешное bulk-сохранение должно продвигать version token"
-    )
+    first_dt = _parse_token(token_first)
+    assert first_dt > baseline
 
-    # In-sync сохранение №2: статус уже IN_PROGRESS, колонки instance не
-    # меняются — token всё равно обязан продвинуться (дефект PR3 на base).
+    # A token only 500 microseconds behind is still stale. The previous
+    # one-second tolerance silently allowed exactly this lost-update window.
+    stale_token = (first_dt - timedelta(microseconds=500)).isoformat()
+    stale = _bulk_save(stale_token, "9.9")
+    assert stale.status_code == 409, stale.text
+
+    malformed = _bulk_save("not-a-version", "9.8")
+    assert malformed.status_code == 400, malformed.text
+
+    unchanged = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}",
+        headers=auth_headers,
+    )
+    assert unchanged.status_code == 200, unchanged.text
+    unchanged_wbc = next(
+        field
+        for section in unchanged.json()["sections"]
+        for field in section["fields"]
+        if field["field_key"] == "wbc"
+    )
+    assert unchanged_wbc["value_text"] == "5.2"
+
+    # A fresh exact token remains accepted and must advance monotonically
+    # even though the instance is already IN_PROGRESS.
     second = _bulk_save(token_first, "5.4")
     assert second.status_code == 200, second.text
     token_second = second.json()["instance"]["updated_at"]
-    assert token_second != token_first, (
-        "повторное bulk-сохранение обязано продвинуть version token, "
-        "иначе optimistic locking не защищает второй и последующие saves"
-    )
-
-    # Stale token: симулируем, что другой лаборант сохранил блок 10 минут
-    # назад; вызывающий с token_second обязан получить 409.
-    row = (
-        db_session.query(LabReportInstance)
-        .filter(LabReportInstance.id == instance["id"])
-        .first()
-    )
-    row.updated_at = datetime.now(UTC) - timedelta(minutes=10)
-    db_session.commit()
-
-    stale = _bulk_save(token_second, "9.9")
-    assert stale.status_code == 409, stale.text
+    assert _parse_token(token_second) > first_dt
 
     fresh = client.get(
         f"/api/v1/lab/report-instances/{instance['id']}",
@@ -1205,8 +1215,49 @@ def test_bulk_values_optimistic_locking_bumps_token_and_rejects_stale(
         if field["field_key"] == "wbc"
     )
     assert wbc_field["value_text"] == "5.4", (
-        "stale save не должен перезаписывать значения актуальной версии"
+        "stale or malformed saves must not overwrite the accepted value"
     )
+
+
+@pytest.mark.integration
+def test_instance_update_advances_token_monotonically(
+    client,
+    auth_headers,
+    test_patient,
+    test_visit,
+):
+    """Signer/branding edits use the same exact server-version contract."""
+    instance = _create_lab_report_instance(
+        client,
+        auth_headers=auth_headers,
+        patient_id=test_patient.id,
+        visit_id=test_visit.id,
+    )
+
+    first = client.put(
+        f"/api/v1/lab/report-instances/{instance['id']}"
+        f"?expected_updated_at={quote(instance['updated_at'], safe='')}",
+        headers=auth_headers,
+        json={"signer_snapshot": {"lab_technician_name": "SYNTHETIC A"}},
+    )
+    assert first.status_code == 200, first.text
+    first_body = first.json()
+    assert first_body["signer_snapshot"]["lab_technician_name"] == "SYNTHETIC A"
+
+    second = client.put(
+        f"/api/v1/lab/report-instances/{instance['id']}"
+        f"?expected_updated_at={quote(first_body['updated_at'], safe='')}",
+        headers=auth_headers,
+        json={"branding_snapshot": {"clinic_name": "SYNTHETIC Clinic"}},
+    )
+    assert second.status_code == 200, second.text
+
+    def _as_utc(value: str) -> datetime:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return (parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)).astimezone(UTC)
+
+    assert _as_utc(first_body["updated_at"]) > _as_utc(instance["updated_at"])
+    assert _as_utc(second.json()["updated_at"]) > _as_utc(first_body["updated_at"])
 
 
 @pytest.mark.integration
