@@ -846,6 +846,7 @@ export interface GroupedVisitLike {
 export const groupCartItemsByVisit = (
   items: WizardCartItemLike[],
   getDepartmentByService: (serviceId: string | number) => string,
+  getResourceQueueTagByService: (serviceId: string | number) => string | null,
 ): GroupedVisitLike[] => {
   const visits: Record<string, GroupedVisitLike> = {};
 
@@ -874,8 +875,22 @@ export const groupCartItemsByVisit = (
       finalDepartment = 'procedures'; // Все процедуры в одном отделе
     }
 
-    // Группируем по finalDepartment + doctor_id + visit_date + visit_time
-    const key = `${finalDepartment}_${item.doctor_id || 'no_doctor'}_${item.visit_date}_${item.visit_time || 'no_time'}`;
+    // Безврачебная ресурсная очередь — единая точка обслуживания, даже если
+    // услуги каталога относятся к разным отделениям. Для неё queue_tag
+    // определяет владельца группировки, а department остаётся метаданными
+    // созданного визита. Врачебные и неклассифицированные услуги сохраняют
+    // прежний контракт department + doctor_id.
+    const resourceQueueTag = item.doctor_id == null
+      ? getResourceQueueTagByService(item.service_id as string | number)
+      : null;
+    const ownerIdentity = resourceQueueTag
+      ? ['resource', resourceQueueTag]
+      : ['doctor', finalDepartment, item.doctor_id || null];
+    const key = JSON.stringify([
+      ...ownerIdentity,
+      item.visit_date || null,
+      item.visit_time || null,
+    ]);
 
     if (!visits[key]) {
       visits[key] = {
