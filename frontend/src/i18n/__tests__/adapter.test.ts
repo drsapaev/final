@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { t as rawT, tInterpolate as rawTInterpolate, i18n } from '../useTranslation';
+import { SUPPORTED_LANGUAGES } from '../index';
 
 // react-i18next's t() has a typed-keys signature that requires options
 // or a defaultValue. The adapter re-exports it directly, so we cast to
@@ -56,6 +57,25 @@ describe('i18n adapter (STRAT#29 + STRAT#49)', () => {
     it('changeLanguage is available (react-i18next)', () => {
       expect(typeof i18n.changeLanguage).toBe('function');
     });
+
+    it.each(SUPPORTED_LANGUAGES)(
+      'contains registrar wizard recovery copy for %s',
+      (language) => {
+        for (const key of [
+          'misc.aw_doctor_cabinet',
+          'misc.aw_search_failed',
+          'misc.aw_search_retry',
+          'misc.aw_discard_changes_title',
+          'misc.aw_discard_changes_message',
+          'misc.aw_discard_changes_confirm',
+        ]) {
+          const value = i18n.getResource(language, 'translation', key);
+          expect(value, `${language}:${key}`).toEqual(expect.any(String));
+          expect(String(value).trim(), `${language}:${key}`).not.toBe('');
+          expect(value, `${language}:${key}`).not.toBe(key);
+        }
+      },
+    );
   });
 
   describe('react-i18next integration', () => {

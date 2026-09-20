@@ -129,7 +129,9 @@ export async function fetchRegistrarDoctors(): Promise<RegistrarDoctorsResponse>
   // Backend returns { doctors: [...] }. Map each row to domain Doctor.
   const list: unknown = Array.isArray(data) ? data : (data as { doctors?: unknown })?.doctors ?? [];
   const doctors = mapDoctorDtos(list);
-  return { doctors, ...(data as Record<string, unknown> ?? {}) };
+  // Keep backend metadata, but the normalized Doctor[] is authoritative.
+  // Spreading the transport envelope last would overwrite it with raw DTOs.
+  return { ...(data as Record<string, unknown> ?? {}), doctors };
 }
 
 /**
