@@ -421,7 +421,7 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     status: 'DRAFT',
     template_id: 3,
     patient_id: 444,
-    updated_at: '2026-09-13T08:00:00.000000+00:00',
+    updated_at: '2026-09-13T08:00:00.123456+00:00',
     signer_snapshot: {},
     available_actions: ['edit', 'save_draft', 'finalize'],
     critical_findings: [],
@@ -496,8 +496,8 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(wbcItem?.comment).toBe('утренний забор');
   });
 
-  it('uses the version token from the signer response for the subsequent values save', async () => {
-    const signerResponseUpdated = '2026-09-13T08:00:05.500000+00:00';
+  it('keeps microsecond version tokens opaque across signer and values saves', async () => {
+    const signerResponseUpdated = '2026-09-13T08:00:05.654321+00:00';
     mockedApi.updateInstance.mockResolvedValue({
       ...reopenedDraftInstance,
       updated_at: signerResponseUpdated,
@@ -525,9 +525,9 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(mockedApi.updateInstance).toHaveBeenCalledWith(
       77,
       { signer_snapshot: expect.objectContaining({ lab_technician_name: 'Иванов И.И.' }) },
-      new Date('2026-09-13T08:00:00.000000+00:00').toISOString()
+      '2026-09-13T08:00:00.123456+00:00'
     );
-    expect(ownBulkCall[2]).toBe(new Date(signerResponseUpdated).toISOString());
+    expect(ownBulkCall[2]).toBe(signerResponseUpdated);
   });
 
   it('does not surface an autosave confirmation for a failed autosave', async () => {
