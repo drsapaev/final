@@ -112,6 +112,20 @@ async def get_role_options(
         if include_all:
             options.append(RoleOptionResponse(value="", label="Все роли"))
 
+        # Codex settle-pass P2: a catalog row whose name is a CASE VARIANT of
+        # a core spelling (e.g. 'nurse' — RoleCreate permits it, a compatible
+        # deployment may already contain it) must not leak its verbatim value:
+        # NonDoctorRoleLiteral admits only the exact canonical spelling, so a
+        # lowercase option would 422 on submit — the same dead-option trap the
+        # M-2b retired-spelling filter closes. Recognized core spellings are
+        # therefore CANONICALIZED (value -> the core spelling; the deployment
+        # display_name is kept), and exact duplicates (a catalog carrying both
+        # 'Nurse' and 'nurse') collapse to the first canonicalized row.
+        core_by_lower = {
+            value.lower(): value for value, _label in _CORE_USER_ROLE_OPTIONS
+        }
+        emitted: set[str] = set()
+
         # Add each role
         # M-2b (Codex review P2 follow-up on #3049): retired RBAC spellings
         # never surface as selectable options — a legacy/compatible-deployment
@@ -128,16 +142,22 @@ async def get_role_options(
             # non-logins, not user-management vocabulary.
             if is_internal_only_role_spelling(role.name):
                 continue
-            options.append(RoleOptionResponse(value=role.name, label=role.display_name))
+            canonical = core_by_lower.get(role.name.lower())
+            value = canonical if canonical is not None else role.name
+            if value in emitted:
+                continue
+            emitted.add(value)
+            options.append(RoleOptionResponse(value=value, label=role.display_name))
 
         # NURSE-V2 N2-2 (codex round-3 P2): guarantee the canonical
         # user-creation vocabulary even when the catalog is missing rows
         # (a supported deployment — this slice does not seed public.roles).
-        # Case-insensitive de-dup: a catalog row for a core spelling keeps
-        # its deployment display_name; only missing spellings are appended.
-        present = {str(option.value).lower() for option in options}
+        # A catalog row for a core spelling keeps its deployment
+        # display_name (canonicalized value); only missing spellings are
+        # appended with the canonical label.
         for value, label in _CORE_USER_ROLE_OPTIONS:
-            if value.lower() not in present:
+            if value not in emitted:
+                emitted.add(value)
                 options.append(RoleOptionResponse(value=value, label=label))
 
         return RoleOptionsListResponse(options=options)

@@ -179,3 +179,53 @@ def test_include_all_keeps_leading_filter_option(
     assert options[0]["label"] == "Все роли"
     values = {str(o["value"]).lower() for o in options[1:]}
     assert _CORE_VALUES <= values
+
+
+@pytest.mark.integration
+def test_case_variant_catalog_rows_emit_canonical_values(
+    client: TestClient, db_session: Session
+) -> None:
+    """Codex settle-pass P2: a catalog row named 'nurse' (lowercase —
+    RoleCreate permits it, a compatible deployment may already contain it)
+    must not suppress the canonical 'Nurse' entry or leak its verbatim
+    value: NonDoctorRoleLiteral admits only the exact canonical spelling,
+    so a lowercase option would 422 on submit. The option value is
+    CANONICALIZED to the core spelling while the deployment display_name
+    is kept; a catalog carrying both 'Nurse' and 'nurse' collapses to one
+    option (the first catalog row wins for the label).
+    """
+    from tests.conftest import mint_access_token
+
+    _clear_catalog(db_session)
+    _seed_role(db_session, "nurse", "Медсестра (совместимость)", level=4)
+    _seed_role(db_session, "CASHIER", "Старшая касса", level=6)
+    headers = {
+        "Authorization": f"Bearer {mint_access_token(_admin(db_session, 'n2v2_roles_case_admin'))}"
+    }
+
+    response = client.get(_OPTIONS_PATH, headers=headers)
+    assert response.status_code == 200, response.text
+    options = response.json()["options"]
+    values = [str(o["value"]) for o in options]
+
+    # canonical values only — the verbatim case variants never leak
+    assert "nurse" not in values
+    assert "CASHIER" not in values
+    assert "Nurse" in values
+    assert "Cashier" in values
+
+    # the catalog display names survive the canonicalization
+    by_value = {str(o["value"]): o for o in options}
+    assert by_value["Nurse"]["label"] == "Медсестра (совместимость)"
+    assert by_value["Cashier"]["label"] == "Старшая касса"
+
+    # exactly one option per canonical spelling
+    assert values.count("Nurse") == 1
+    assert values.count("Cashier") == 1
+
+    # and a catalog carrying BOTH spellings collapses to a single option
+    _seed_role(db_session, "Nurse", "Дублирующая медсестра", level=3)
+    response = client.get(_OPTIONS_PATH, headers=headers)
+    assert response.status_code == 200
+    values = [str(o["value"]) for o in response.json()["options"]]
+    assert values.count("Nurse") == 1
