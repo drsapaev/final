@@ -153,6 +153,7 @@ const uzLatn = {
     print_pdf_invalid: 'PDF noto\'g\'ri shakllantirilgan. Administratorga murojaat qiling.',
     print_pdf_opened: 'PDF yangi varaqda ochildi. Chop etish holati yangilandi.',
     print_pdf_blocked: 'PDF shakllantirildi, lekin yangi varaq bloklandi. Bu sayt uchun pop-up\'larga ruxsat bering va hisobot holatini yangilash uchun «Chop etish»ni qayta bosing.',
+    print_status_failed: 'Hujjat chop etildi yoki ochildi, ammo chop etish holati saqlanmadi. Qayta urinishdan oldin hisobotni yangilang.',
     critical_findings: 'Kritik ko\'rsatkichlar',
     critical_findings_hint: 'Kiritish to\'g\'riligini tekshiring. Kritik qiymatlar shifokor e\'tiborini talab qiladi.',
     norm_label: 'Me\'yori',

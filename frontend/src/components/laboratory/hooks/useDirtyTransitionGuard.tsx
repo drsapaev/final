@@ -36,9 +36,18 @@ export interface DirtyDraftSource {
 
 export interface DirtyTransitionGuard {
   registerDirtySource: (source: DirtyDraftSource) => () => void;
-  guardTransition: (transition: () => void | Promise<void>) => void;
+  guardTransition: (
+    transition: () => void | Promise<void>,
+    options?: { onCancel?: () => void | Promise<void> },
+  ) => boolean;
+  dismissPendingTransition: () => void;
   guardDialog: React.ReactNode;
   isDialogOpen: boolean;
+}
+
+interface PendingDirtyTransition {
+  run: () => void | Promise<void>;
+  onCancel?: () => void | Promise<void>;
 }
 
 export function useDirtyTransitionGuard(options?: {
@@ -47,7 +56,8 @@ export function useDirtyTransitionGuard(options?: {
 }): DirtyTransitionGuard {
   const { t } = useTranslation();
   const sourcesRef = useRef<Map<string, DirtyDraftSource>>(new Map());
-  const [pendingTransition, setPendingTransition] = useState<(() => void | Promise<void>) | null>(null);
+  const pendingTransitionRef = useRef<PendingDirtyTransition | null>(null);
+  const [pendingTransition, setPendingTransition] = useState<PendingDirtyTransition | null>(null);
   const [busy, setBusy] = useState(false);
 
   const registerDirtySource = useCallback((source: DirtyDraftSource) => {
@@ -57,27 +67,38 @@ export function useDirtyTransitionGuard(options?: {
     };
   }, []);
 
-  const guardTransition = useCallback((transition: () => void | Promise<void>) => {
+  const guardTransition = useCallback((
+    transition: () => void | Promise<void>,
+    transitionOptions?: { onCancel?: () => void | Promise<void> },
+  ) => {
     const hasDirty = [...sourcesRef.current.values()].some((source) => source.isDirty());
     if (!hasDirty) {
+      pendingTransitionRef.current = null;
+      setPendingTransition(null);
       void transition();
-      return;
+      return true;
     }
-    setPendingTransition(() => transition);
+    const pending = { run: transition, onCancel: transitionOptions?.onCancel };
+    pendingTransitionRef.current = pending;
+    setPendingTransition(pending);
+    return false;
   }, []);
 
   const finishWithSave = async () => {
-    const transition = pendingTransition;
+    const transition = pendingTransitionRef.current;
     if (!transition) return;
     setBusy(true);
     try {
       for (const source of sourcesRef.current.values()) {
         if (source.isDirty()) {
           await source.save();
+          if (pendingTransitionRef.current !== transition) return;
         }
       }
+      if (pendingTransitionRef.current !== transition) return;
+      pendingTransitionRef.current = null;
       setPendingTransition(null);
-      await transition();
+      await transition.run();
     } catch {
       // Ошибку сохранения уже показал источник (notify/inline).
       // Пользователь остаётся на месте с введённым draft.
@@ -87,12 +108,13 @@ export function useDirtyTransitionGuard(options?: {
   };
 
   const discardAndContinue = async () => {
-    const transition = pendingTransition;
+    const transition = pendingTransitionRef.current;
     if (!transition) return;
+    pendingTransitionRef.current = null;
     setPendingTransition(null);
     setBusy(true);
     try {
-      await transition();
+      await transition.run();
     } finally {
       setBusy(false);
     }
@@ -100,8 +122,16 @@ export function useDirtyTransitionGuard(options?: {
 
   const cancel = () => {
     if (busy) return;
+    const onCancel = pendingTransitionRef.current?.onCancel;
+    pendingTransitionRef.current = null;
     setPendingTransition(null);
+    void onCancel?.();
   };
+
+  const dismissPendingTransition = useCallback(() => {
+    pendingTransitionRef.current = null;
+    setPendingTransition(null);
+  }, []);
 
   const guardDialog = pendingTransition ? (
     <Modal isOpen onClose={cancel}>
@@ -126,7 +156,13 @@ export function useDirtyTransitionGuard(options?: {
   ) : null;
 
 
-  return { registerDirtySource, guardTransition, guardDialog, isDialogOpen: pendingTransition !== null };
+  return {
+    registerDirtySource,
+    guardTransition,
+    dismissPendingTransition,
+    guardDialog,
+    isDialogOpen: pendingTransition !== null,
+  };
 }
 
 export default useDirtyTransitionGuard;

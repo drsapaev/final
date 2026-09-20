@@ -503,15 +503,18 @@ describe('LabTemplateWorkbench guard save freshness (PR5 review fix)', () => {
       (_source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => {}
     );
     const notify = vi.fn();
-    mockedApi.updateTemplateVersion.mockRejectedValueOnce(new Error('save exploded'));
+    mockedApi.updateTemplateVersion
+      .mockRejectedValueOnce(new Error('save exploded'))
+      .mockResolvedValueOnce({ id: 52 });
 
+    const onTemplatesChanged = vi.fn(async () => {});
     render(
       <ThemeProvider>
         <LabTemplateWorkbenchRaw
           templates={[ruleTemplateFixture]}
           selectedTemplate={ruleTemplateFixture}
           onSelectTemplate={vi.fn()}
-          onTemplatesChanged={vi.fn(async () => {})}
+          onTemplatesChanged={onTemplatesChanged}
           registerDirtySource={registerDirtySource}
           notify={notify}
         />
@@ -539,6 +542,17 @@ describe('LabTemplateWorkbench guard save freshness (PR5 review fix)', () => {
     });
     expect(saveError).toEqual(new Error('save exploded'));
     expect(notify).toHaveBeenCalledWith('error', 'save exploded');
+    expect(onTemplatesChanged).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Название поля')).toHaveValue('Гемоглобин, изменённый');
+
+    await act(async () => {
+      await source.save();
+    });
+    expect(mockedApi.createTemplateVersion).toHaveBeenCalledTimes(1);
+    expect(mockedApi.updateTemplateVersion).toHaveBeenCalledTimes(2);
+    expect(mockedApi.updateTemplateVersion.mock.calls[0][0]).toBe(52);
+    expect(mockedApi.updateTemplateVersion.mock.calls[1][0]).toBe(52);
+    expect(onTemplatesChanged).toHaveBeenCalledTimes(1);
   });
 
   it('blocks beforeunload while the template draft is dirty', async () => {

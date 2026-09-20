@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useId, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState, useId, useRef } from 'react';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle } from '../ui/macos';
 import { useConfirm } from '../common/ConfirmDialog';
 // ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
@@ -37,6 +37,8 @@ export default function LabTemplateWorkbench({
   onTemplatesChanged,
   registerDirtySource,
   guardTransition,
+  templateTransitionPending = false,
+  onOperationPendingChange = undefined,
   notify
 }: {
   templates?: unknown[];
@@ -45,6 +47,8 @@ export default function LabTemplateWorkbench({
   onTemplatesChanged?: (preferredTemplateId?: string | number | null) => Promise<void>;
   registerDirtySource?: (source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => void;
   guardTransition?: (transition: () => void | Promise<void>) => void;
+  templateTransitionPending?: boolean;
+  onOperationPendingChange?: (pending: boolean) => void;
   notify?: (type: string, message: string) => void;
   [k: string]: unknown;
 }) {
@@ -76,6 +80,12 @@ export default function LabTemplateWorkbench({
   const [templateSearch, setTemplateSearch] = useState('');
   const [draftVersion, setDraftVersion] = useState(hydrateVersion(null));
   const [saving, setSaving] = useState(false);
+  const [draftSourceVersion, setDraftSourceVersion] = useState<Record<string, unknown> | null>(null);
+  const pendingCreatedDraftRef = useRef<{
+    templateId: string | number;
+    sourceVersionId: string | number | null;
+    draftVersionId: string | number;
+  } | null>(null);
   const [catalogUnits, setCatalogUnits] = useState<Array<Record<string, unknown>>>([]);
   const [catalogAnalytes, setCatalogAnalytes] = useState<Array<Record<string, unknown>>>([]);
 
@@ -120,9 +130,36 @@ export default function LabTemplateWorkbench({
       || versions[versions.length - 1]
       || null;
   }, [selectedTemplate]);
+  const draftHydrated = draftSourceVersion === activeVersion;
+  const interactionPending = saving || templateTransitionPending || !draftHydrated;
+
+  useLayoutEffect(() => {
+    onOperationPendingChange?.(saving);
+    return () => {
+      if (saving) onOperationPendingChange?.(false);
+    };
+  }, [onOperationPendingChange, saving]);
 
   useEffect(() => {
+    const pendingDraft = pendingCreatedDraftRef.current;
+    if (!pendingDraft) return;
+    const templateId = (selectedTemplate as { id?: string | number } | null)?.id;
+    const activeVersionId = (activeVersion as Record<string, unknown> | null)?.id as string | number | undefined;
+    if (
+      String(templateId ?? '') !== String(pendingDraft.templateId)
+      || (
+        String(activeVersionId ?? '') !== String(pendingDraft.sourceVersionId ?? '')
+        && String(activeVersionId ?? '') !== String(pendingDraft.draftVersionId)
+      )
+      || String(activeVersionId ?? '') === String(pendingDraft.draftVersionId)
+    ) {
+      pendingCreatedDraftRef.current = null;
+    }
+  }, [activeVersion, selectedTemplate]);
+
+  useLayoutEffect(() => {
     setDraftVersion(hydrateVersion(activeVersion));
+    setDraftSourceVersion(activeVersion);
   }, [activeVersion]);
 
   useEffect(() => {
@@ -193,15 +230,26 @@ export default function LabTemplateWorkbench({
     if (!selectedTemplate) {
       throw new Error(t('misc.ltw_snachala_vyberite_shablon'));
     }
+    const templateId = (selectedTemplate as { id?: string | number })?.id as string | number;
+    const sourceVersionId = ((activeVersion as Record<string, unknown>)?.id as string | number) ?? null;
+    const pendingDraft = pendingCreatedDraftRef.current;
+    if (
+      pendingDraft
+      && String(pendingDraft.templateId) === String(templateId)
+      && String(pendingDraft.sourceVersionId ?? '') === String(sourceVersionId ?? '')
+    ) {
+      return pendingDraft.draftVersionId;
+    }
     if (hasTemplateVersionAction(activeVersion, 'update')) {
       return (activeVersion as Record<string, unknown>)?.id as string | number;
     }
     if (!hasTemplateVersionAction(activeVersion, 'create_draft')) {
       throw new Error(t('misc.ltw_server_ne_razreshil_sozdat_c'));
     }
-    const version = (await labReportingApi.createTemplateVersion((selectedTemplate as { id?: string | number })?.id as string | number, ((activeVersion as Record<string, unknown>)?.id as string | number) ?? null)) as Record<string, unknown>;
-    await onTemplatesChanged?.();
-    return (version as Record<string, unknown>)?.id as string | number;
+    const version = (await labReportingApi.createTemplateVersion(templateId, sourceVersionId)) as Record<string, unknown>;
+    const draftVersionId = (version as Record<string, unknown>)?.id as string | number;
+    pendingCreatedDraftRef.current = { templateId, sourceVersionId, draftVersionId };
+    return draftVersionId;
   }
 
   // PR-57: validate reference ranges (low < high) before save/publish
@@ -341,6 +389,7 @@ export default function LabTemplateWorkbench({
       const versionId = await ensureDraftVersion();
       await labReportingApi.updateTemplateVersion(versionId, buildVersionPayload(draftVersion));
       await labReportingApi.publishTemplateVersion(versionId);
+      pendingCreatedDraftRef.current = null;
       notify?.('success', t('success.template_published'));
       await onTemplatesChanged?.();
     } catch (error) {
@@ -585,9 +634,9 @@ export default function LabTemplateWorkbench({
 
   // PR5: dirty-state draft шаблона — черновик отличается от hydrate(activeVersion).
   const templateDirty = useMemo(() => {
-    if (!selectedTemplate) return false;
+    if (!selectedTemplate || !draftHydrated) return false;
     return JSON.stringify(draftVersion) !== JSON.stringify(hydrateVersion(activeVersion));
-  }, [draftVersion, selectedTemplate, activeVersion]);
+  }, [draftHydrated, draftVersion, selectedTemplate, activeVersion]);
 
   const isTemplateDirtyRef = useRef(templateDirty);
   useEffect(() => {
@@ -632,7 +681,12 @@ export default function LabTemplateWorkbench({
   ];
 
   return (
-    <div className="ltw-root">
+    <fieldset
+      disabled={interactionPending}
+      aria-busy={interactionPending}
+      style={{ border: 0, padding: 0, margin: 0, minWidth: 0, width: '100%' }}
+    >
+      <div className="ltw-root">
       <Card variant="filled" padding="none">
         <CardHeader className="ltw-card-header">
           <CardTitle className="ltw-card-title">
@@ -640,7 +694,7 @@ export default function LabTemplateWorkbench({
               <SquareStack size={20} aria-hidden="true" />
               {t('template.title')}
             </span>
-            <Button variant="primary" size="small" onClick={() => setShowNewTemplateDialog(true)} disabled={saving}>
+            <Button variant="primary" size="small" onClick={() => setShowNewTemplateDialog(true)} disabled={interactionPending}>
               <Plus size={14} aria-hidden="true" />
               {t('template.new_template')}
             </Button>
@@ -680,7 +734,10 @@ export default function LabTemplateWorkbench({
               <button
                 key={String(template.id ?? "")}
                 type="button"
-                onClick={() => onSelectTemplate?.(template as Record<string, unknown>)}
+                onClick={() => {
+                  if (!interactionPending) onSelectTemplate?.(template as Record<string, unknown>);
+                }}
+                disabled={interactionPending}
                 className={`ltw-template-btn ${String(selectedTemplate?.id ?? "") === String(template.id ?? "") ? 'ltw-template-btn-selected' : ''}`}
               >
                 <div className="ltw-fw-600">{String(template.name ?? "")}</div>
@@ -869,7 +926,7 @@ export default function LabTemplateWorkbench({
         open={showNewTemplateDialog}
         onClose={() => setShowNewTemplateDialog(false)}
         onCreate={handleCreateTemplate}
-        saving={saving}
+        saving={interactionPending}
         existingTemplates={templates as unknown as Parameters<typeof NewTemplateDialog>[0]['existingTemplates']}
       />
 
@@ -891,7 +948,8 @@ export default function LabTemplateWorkbench({
 
       {/* L-H-1 fix: portal-mounted ConfirmDialog для destructive actions */}
       {confirmDialog}
-    </div>
+      </div>
+    </fieldset>
   );
 }
 

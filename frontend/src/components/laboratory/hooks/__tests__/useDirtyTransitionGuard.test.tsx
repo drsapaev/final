@@ -31,11 +31,13 @@ describe('useDirtyTransitionGuard (PR5)', () => {
   it('runs the transition immediately when nothing is dirty', () => {
     const { result } = renderHook(() => useDirtyTransitionGuard());
     const transition = vi.fn();
+    let started = false;
 
     act(() => {
-      result.current.guardTransition(transition);
+      started = result.current.guardTransition(transition);
     });
 
+    expect(started).toBe(true);
     expect(transition).toHaveBeenCalledTimes(1);
     expect(result.current.isDialogOpen).toBe(false);
   });
@@ -47,9 +49,11 @@ describe('useDirtyTransitionGuard (PR5)', () => {
       result.current.registerDirtySource({ id: 'report', isDirty: () => true, save });
     });
     const transition = vi.fn();
+    let started = true;
     act(() => {
-      result.current.guardTransition(transition);
+      started = result.current.guardTransition(transition);
     });
+    expect(started).toBe(false);
     expect(result.current.isDialogOpen).toBe(true);
 
     render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
@@ -57,6 +61,46 @@ describe('useDirtyTransitionGuard (PR5)', () => {
 
     expect(save).not.toHaveBeenCalled();
     expect(transition).not.toHaveBeenCalled();
+    expect(result.current.isDialogOpen).toBe(false);
+  });
+
+  it('runs transition-specific cancel recovery without running the transition', () => {
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    act(() => {
+      result.current.registerDirtySource({
+        id: 'report',
+        isDirty: () => true,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+    });
+    const transition = vi.fn();
+    const onCancel = vi.fn();
+    act(() => {
+      result.current.guardTransition(transition, { onCancel });
+    });
+
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(transition).not.toHaveBeenCalled();
+  });
+
+  it('can dismiss an obsolete pending transition without running cancel recovery', () => {
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    act(() => {
+      result.current.registerDirtySource({
+        id: 'report',
+        isDirty: () => true,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+      result.current.guardTransition(vi.fn(), { onCancel: vi.fn() });
+    });
+
+    act(() => {
+      result.current.dismissPendingTransition();
+    });
+
     expect(result.current.isDialogOpen).toBe(false);
   });
 
@@ -96,6 +140,40 @@ describe('useDirtyTransitionGuard (PR5)', () => {
 
     expect(save).toHaveBeenCalledTimes(1);
     expect(transition).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not run an obsolete transition when a newer intent arrives during save', async () => {
+    let resolveSave: (() => void) | undefined;
+    const save = vi.fn(() => new Promise<void>((resolve) => {
+      resolveSave = resolve;
+    }));
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    act(() => {
+      result.current.registerDirtySource({ id: 'report', isDirty: () => true, save });
+      result.current.guardTransition(vi.fn());
+    });
+    const obsoleteTransition = vi.fn();
+    act(() => {
+      result.current.guardTransition(obsoleteTransition);
+    });
+    render(<ThemeProvider>{result.current.guardDialog}</ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить и перейти' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const latestTransition = vi.fn();
+    act(() => {
+      result.current.guardTransition(latestTransition);
+    });
+    await act(async () => {
+      resolveSave?.();
+      await Promise.resolve();
+    });
+
+    expect(obsoleteTransition).not.toHaveBeenCalled();
+    expect(latestTransition).not.toHaveBeenCalled();
+    expect(result.current.isDialogOpen).toBe(true);
   });
 
   it('a failed save keeps the user in place and does not continue the transition', async () => {

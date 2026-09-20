@@ -184,7 +184,8 @@ describe('LabPanel queue/report status contract', () => {
     expect(source).toContain('instanceParamRef.current = instanceParam');
     expect(source).toContain('const instanceParam = searchParams.get(\'instance\')');
     expect(source).toContain('}, [loadLabAppointments, loadRecentReports, loadTemplates]);');
-    expect(source).toContain('}, [activeInstanceId, instanceParam, loadInstance]);');
+    expect(source).toContain('instanceParamId');
+    expect(source).toContain('}, [activeInstanceId, dismissPendingTransition, instanceParamId, loadInstance]);');
   });
 
   it('makes report transitions latest-wins and marks every state-driven URL change', () => {
@@ -192,7 +193,7 @@ describe('LabPanel queue/report status contract', () => {
     const transitionBlock = extractBlock(
       source,
       'const applyInstanceTransition = useCallback(async (',
-      'const loadInstance = useCallback(async (instanceId: string | number) => {',
+      'const loadInstance = useCallback((',
     );
 
     expect(transitionBlock).toContain('const requestId = beginInstanceTransition(instanceId, {');
@@ -206,6 +207,8 @@ describe('LabPanel queue/report status contract', () => {
     expect(source).toContain('instanceIdsMatch(activeInstanceId, pendingSync.targetId)');
     expect(source).toContain("change.kind === 'update'");
     expect(source).toContain('change.expectedInstanceId');
+    expect(source).toContain('change.operation.epoch');
+    expect(source).toContain('getOperationContext={getReportOperationContext}');
   });
 
   it('keeps template resolution latest-wins across rapid patient changes', () => {
@@ -231,5 +234,25 @@ describe('LabPanel queue/report status contract', () => {
     );
 
     expect(templateWorkbenchBlock).toContain('guardTransition={guardTransition}');
+  });
+
+  it('guards template retries and rolls back a failed detail selection', () => {
+    const source = readLabPanelSource();
+    const loadTemplatesBlock = extractBlock(
+      source,
+      'const loadTemplates = useCallback(async (preferredTemplateId: string | number | null = null) => {',
+      'const loadReportHistory = useCallback(async (patientId: string | number) => {',
+    );
+    const templateWorkbenchBlock = extractBlock(
+      source,
+      '<LabTemplateWorkbench',
+      '</section>',
+    );
+
+    expect(loadTemplatesBlock).toContain('retryAction: () => guardTransition(async () => {');
+    expect(loadTemplatesBlock).toContain('await loadTemplates(preferredTemplateId)');
+    expect(templateWorkbenchBlock).toContain('const previousTemplate = selectedTemplateRef.current');
+    expect(templateWorkbenchBlock).toContain('setSelectedTemplate(previousTemplate)');
+    expect(templateWorkbenchBlock).toContain('templateTransitionPending={templateTransitionPending}');
   });
 });

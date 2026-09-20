@@ -33,6 +33,7 @@ const FAKE_TOKEN = [
 
 const TEMPLATES_SUMMARY = [
   { id: 5, code: 'rule_demo', name: 'Rule Demo', family: 'chemistry', is_active: true, published_version_id: 51, draft_version_id: null, latest_version_id: 51 },
+  { id: 6, code: 'rule_demo_b', name: 'Rule Demo B', family: 'chemistry', is_active: true, published_version_id: 61, draft_version_id: null, latest_version_id: 61 },
 ];
 
 const TEMPLATE_DETAIL = {
@@ -43,6 +44,7 @@ const TEMPLATE_DETAIL = {
       template_id: 5,
       version_no: 1,
       status: 'PUBLISHED',
+      available_actions: ['create_draft'],
       layout_preset: 'lab_table_classic_v1',
       page_settings: {},
       branding_overrides: {},
@@ -90,6 +92,16 @@ const INSTANCE_B = {
   patient_snapshot: { patient_id: 102, full_name: 'Пациент Два' },
 };
 
+const TEMPLATE_DETAIL_B = {
+  ...TEMPLATE_DETAIL,
+  ...TEMPLATES_SUMMARY[1],
+  versions: TEMPLATE_DETAIL.versions.map((version) => ({
+    ...version,
+    id: 61,
+    template_id: 6,
+  })),
+};
+
 const INSTANCE_CREATED = {
   ...INSTANCE_A,
   id: 90,
@@ -100,16 +112,39 @@ const QUEUE_ENTRIES = [
   { id: 1, appointment_id: 'a-1', patient_id: 101, patient_fio: 'Пациент Один', patient_phone: '', status: 'waiting', report_instance_id: 88, services: [], service_codes: [], service_details: [] },
   { id: 2, appointment_id: 'a-2', patient_id: 102, patient_fio: 'Пациент Два', patient_phone: '', status: 'waiting', report_instance_id: 89, services: [], service_codes: [], service_details: [] },
   { id: 3, appointment_id: 'a-3', patient_id: 103, patient_fio: 'Пациент Без Бланка', patient_phone: '', status: 'waiting', report_instance_id: null, services: [], service_codes: [], service_details: [] },
+  { id: 4, appointment_id: 'a-4', patient_id: 103, patient_fio: 'Пациент Без Бланка Повтор', patient_phone: '', status: 'waiting', report_instance_id: null, services: [], service_codes: [], service_details: [] },
 ];
 
 let templateCreatePostCount = 0;
 let reportInstanceCreatePostCount = 0;
+let bulkSavePostCount = 0;
 let instance88GetCount = 0;
 let instance89GetCount = 0;
 let instance88DelayMs = 0;
-let reportInstanceCreateDelayMs = 0;
+let instance89ResponseGate: Promise<void> | null = null;
+let releaseInstance89Response: (() => void) | null = null;
+let instance89ShouldFail = false;
+let template5GetCount = 0;
+let template5FirstResponseGate: Promise<void> | null = null;
+let releaseTemplate5FirstResponse: (() => void) | null = null;
+let template5ResponseGate: Promise<void> | null = null;
+let releaseTemplate5Response: (() => void) | null = null;
+let template5ShouldFail = false;
+let template6ShouldFail = false;
+let template5FooterNotes = '';
+let templateDraftUpdateCount = 0;
+let reportInstanceCreateResponseGate: Promise<void> | null = null;
+let releaseReportInstanceCreateResponse: (() => void) | null = null;
 let lastReportInstanceCreatePayload: Record<string, unknown> | null = null;
 let templateResolutionDelayByPatient = new Map<string, number>();
+let templateResolution101ResponseGate: Promise<void> | null = null;
+let releaseTemplateResolution101Response: (() => void) | null = null;
+let templateResolutionPatientRequests: string[] = [];
+let reportHistoryPatientRequests: string[] = [];
+let history101ResponseGate: Promise<void> | null = null;
+let releaseHistory101Response: (() => void) | null = null;
+let history102ResponseGate: Promise<void> | null = null;
+let releaseHistory102Response: (() => void) | null = null;
 
 async function installSession(page: Page) {
   await page.addInitScript(({ token, profile }) => {
@@ -118,6 +153,12 @@ async function installSession(page: Page) {
     window.sessionStorage.setItem('auth_profile', JSON.stringify(profile));
     window.sessionStorage.setItem('user', JSON.stringify(profile));
   }, { token: FAKE_TOKEN, profile: LAB_PROFILE });
+}
+
+async function waitForReactToSettle(page: Page) {
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+  }));
 }
 
 async function installApiMocks(page: Page) {
@@ -141,7 +182,39 @@ async function installApiMocks(page: Page) {
     date: '2026-09-13',
     timezone: 'Asia/Tashkent',
   }));
-  await page.route('**/api/v1/lab/templates/5', (route) => json(route, TEMPLATE_DETAIL));
+  await page.route('**/api/v1/lab/templates/5', async (route) => {
+    template5GetCount += 1;
+    if (template5GetCount === 1 && template5FirstResponseGate) {
+      await template5FirstResponseGate;
+    }
+    if (template5ResponseGate) await template5ResponseGate;
+    if (template5ShouldFail) {
+      return route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"failed"}' });
+    }
+    return json(route, {
+      ...TEMPLATE_DETAIL,
+      versions: TEMPLATE_DETAIL.versions.map((version) => ({
+        ...version,
+        footer_notes: template5FooterNotes,
+      })),
+    });
+  });
+  await page.route('**/api/v1/lab/templates/6', (route) => {
+    if (template6ShouldFail) {
+      return route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"failed"}' });
+    }
+    return json(route, TEMPLATE_DETAIL_B);
+  });
+  await page.route('**/api/v1/lab/templates/5/versions', (route) => json(route, { id: 52 }));
+  await page.route('**/api/v1/lab/template-versions/52', (route) => {
+    if (route.request().method() === 'PUT') {
+      templateDraftUpdateCount += 1;
+      const payload = route.request().postDataJSON() as Record<string, unknown>;
+      template5FooterNotes = String(payload.footer_notes ?? '');
+      return json(route, { id: 52, ...payload });
+    }
+    return json(route, { id: 52 });
+  });
   await page.route('**/api/v1/lab/templates/9', (route) => json(route, {
     ...TEMPLATES_SUMMARY[0],
     id: 9,
@@ -161,6 +234,10 @@ async function installApiMocks(page: Page) {
   await page.route('**/api/v1/lab/template-resolutions/resolve', async (route) => {
     const payload = route.request().postDataJSON() as Record<string, unknown>;
     const patientId = String(payload.patient_id ?? '');
+    templateResolutionPatientRequests.push(patientId);
+    if (patientId === '101' && templateResolution101ResponseGate) {
+      await templateResolution101ResponseGate;
+    }
     const delayMs = templateResolutionDelayByPatient.get(patientId) ?? 0;
     if (delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -174,14 +251,20 @@ async function installApiMocks(page: Page) {
       resolution_mode: 'mapped',
     });
   });
-  await page.route('**/api/v1/lab/report-instances?**', (route) => json(route, []));
+  await page.route('**/api/v1/lab/report-instances?**', async (route) => {
+    const patientId = new URL(route.request().url()).searchParams.get('patient_id');
+    if (patientId) reportHistoryPatientRequests.push(patientId);
+    if (patientId === '101' && history101ResponseGate) await history101ResponseGate;
+    if (patientId === '102' && history102ResponseGate) await history102ResponseGate;
+    return json(route, patientId ? [{ id: `history-${patientId}`, patient_id: Number(patientId) }] : []);
+  });
   await page.route('**/api/v1/lab/report-instances', async (route) => {
     if (route.request().method() === 'POST') {
       reportInstanceCreatePostCount += 1;
       const payload = route.request().postDataJSON() as Record<string, unknown>;
       lastReportInstanceCreatePayload = payload;
-      if (reportInstanceCreateDelayMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, reportInstanceCreateDelayMs));
+      if (reportInstanceCreateResponseGate) {
+        await reportInstanceCreateResponseGate;
       }
       const patientId = Number(payload.patient_id);
       return json(route, {
@@ -203,11 +286,24 @@ async function installApiMocks(page: Page) {
     }
     return json(route, INSTANCE_A);
   });
-  await page.route('**/api/v1/lab/report-instances/89', (route) => {
+  await page.route('**/api/v1/lab/report-instances/89', async (route) => {
     instance89GetCount += 1;
+    if (instance89ResponseGate) await instance89ResponseGate;
+    if (instance89ShouldFail) {
+      return route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"failed"}' });
+    }
     return json(route, INSTANCE_B);
   });
   await page.route('**/api/v1/lab/report-instances/90', (route) => json(route, INSTANCE_CREATED));
+  await page.route('**/api/v1/lab/report-instances/88/bulk-values**', (route) => {
+    bulkSavePostCount += 1;
+    return json(route, {
+      instance: {
+        ...INSTANCE_A,
+        updated_at: '2026-09-13T08:00:01.000000+00:00',
+      },
+    });
+  });
   await page.route('**/api/v1/lab/catalog/**', (route) => json(route, []));
   await page.route('**/api/v1/lab/recent-reports**', (route) => json(route, []));
 }
@@ -218,12 +314,34 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
   test.beforeEach(async ({ page }) => {
     templateCreatePostCount = 0;
     reportInstanceCreatePostCount = 0;
+    bulkSavePostCount = 0;
     instance88GetCount = 0;
     instance89GetCount = 0;
     instance88DelayMs = 0;
-    reportInstanceCreateDelayMs = 0;
+    instance89ResponseGate = null;
+    releaseInstance89Response = null;
+    instance89ShouldFail = false;
+    template5GetCount = 0;
+    template5FirstResponseGate = null;
+    releaseTemplate5FirstResponse = null;
+    template5ResponseGate = null;
+    releaseTemplate5Response = null;
+    template5ShouldFail = false;
+    template6ShouldFail = false;
+    template5FooterNotes = '';
+    templateDraftUpdateCount = 0;
+    reportInstanceCreateResponseGate = null;
+    releaseReportInstanceCreateResponse = null;
     lastReportInstanceCreatePayload = null;
     templateResolutionDelayByPatient = new Map();
+    templateResolution101ResponseGate = null;
+    releaseTemplateResolution101Response = null;
+    templateResolutionPatientRequests = [];
+    reportHistoryPatientRequests = [];
+    history101ResponseGate = null;
+    releaseHistory101Response = null;
+    history102ResponseGate = null;
+    releaseHistory102Response = null;
     await installSession(page);
     await installApiMocks(page);
   });
@@ -302,6 +420,172 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
   });
 
+  test('a late history response cannot replace the newly selected patient history', async ({ page }) => {
+    history101ResponseGate = new Promise<void>((resolve) => {
+      releaseHistory101Response = resolve;
+    });
+    await page.goto('/lab');
+
+    await page.getByRole('button', { name: /Пациент Один/ }).first().dispatchEvent('click');
+    await expect.poll(() => reportHistoryPatientRequests.includes('101')).toBe(true);
+    await page.getByRole('button', { name: /Пациент Два/ }).first().dispatchEvent('click');
+
+    await expect(page.getByText('Отчёт #89').first()).toBeVisible();
+    const reportsPanel = page.locator('#lab-panel-tabpanel-reports');
+    await expect(reportsPanel.getByText('Отчёт #history-102').first()).toBeVisible();
+    const staleHistoryResponse = page.waitForResponse((response) => (
+      response.url().includes('/report-instances?')
+      && new URL(response.url()).searchParams.get('patient_id') === '101'
+    ));
+    releaseHistory101Response?.();
+    await staleHistoryResponse;
+    await waitForReactToSettle(page);
+
+    await expect(reportsPanel.getByText('Отчёт #history-101')).toHaveCount(0);
+    await expect(reportsPanel.getByText('Отчёт #history-102').first()).toBeVisible();
+  });
+
+  test('finishing target history cannot restore the previous report URL', async ({ page }) => {
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    const initialInstance88Requests = instance88GetCount;
+
+    history102ResponseGate = new Promise<void>((resolve) => {
+      releaseHistory102Response = resolve;
+    });
+    await page.getByRole('tab').first().click();
+    await page.getByRole('button', { name: /Пациент Два/ }).first().click();
+    await expect.poll(() => instance89GetCount).toBe(1);
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
+    await waitForReactToSettle(page);
+
+    const targetHistoryResponse = page.waitForResponse((response) => (
+      response.url().includes('/report-instances?')
+      && new URL(response.url()).searchParams.get('patient_id') === '102'
+    ));
+    releaseHistory102Response?.();
+    await targetHistoryResponse;
+    await waitForReactToSettle(page);
+
+    await expect(page.getByText('Отчёт #89').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
+    expect(instance88GetCount).toBe(initialInstance88Requests);
+  });
+
+  test('a newer external URL intent supersedes an in-flight report load', async ({ page }) => {
+    instance89ResponseGate = new Promise<void>((resolve) => {
+      releaseInstance89Response = resolve;
+    });
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=89');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await expect.poll(() => instance89GetCount).toBe(1);
+    await expect(fieldInput).toBeDisabled();
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=90');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    await expect(page.getByText('Отчёт #90').first()).toBeVisible();
+    const staleResponse = page.waitForResponse((response) => response.url().includes('/report-instances/89'));
+    releaseInstance89Response?.();
+    await staleResponse;
+    await waitForReactToSettle(page);
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('90');
+    await expect(page.getByText('Отчёт #89')).toHaveCount(0);
+  });
+
+  test('a stale failed load cannot dismiss a newer guarded URL intent', async ({ page }) => {
+    instance89ResponseGate = new Promise<void>((resolve) => {
+      releaseInstance89Response = resolve;
+    });
+    instance89ShouldFail = true;
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await fieldInput.fill('7.2');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=89');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    let dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    await expect.poll(() => instance89GetCount).toBe(1);
+
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=90');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+    const staleResponse = page.waitForResponse((response) => response.url().includes('/report-instances/89'));
+    releaseInstance89Response?.();
+    await staleResponse;
+    await waitForReactToSettle(page);
+
+    await expect(dialog).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('90');
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    await expect(page.getByText('Отчёт #90').first()).toBeVisible();
+  });
+
+  test('a failed external report load restores the current report URL', async ({ page }) => {
+    instance89ShouldFail = true;
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    const reportsPanel = page.locator('#lab-panel-tabpanel-reports');
+    await expect(reportsPanel.getByText('Отчёт #history-101').first()).toBeVisible();
+    const historyRequestsBeforeFailure = reportHistoryPatientRequests.filter((id) => id === '101').length;
+
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=89');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    await expect.poll(() => instance89GetCount).toBe(1);
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await expect.poll(
+      () => reportHistoryPatientRequests.filter((id) => id === '101').length,
+    ).toBeGreaterThan(historyRequestsBeforeFailure);
+    await expect(reportsPanel.getByText('Отчёт #history-101').first()).toBeVisible();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await fieldInput.fill('7.1');
+    await page.getByRole('button', { name: 'Сохранить черновик' }).click();
+    await expect.poll(() => bulkSavePostCount).toBe(1);
+  });
+
+  test('a failed queue report load keeps the selected patient and clears the stale report URL', async ({ page }) => {
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    instance89ShouldFail = true;
+
+    await page.getByRole('tab').first().click();
+    const failedResponse = page.waitForResponse((response) => (
+      response.url().includes('/report-instances/89') && response.status() === 500
+    ));
+    await page.getByRole('button', { name: /Пациент Два/ }).first().click();
+    await expect.poll(() => instance89GetCount).toBe(1);
+    await failedResponse;
+    await waitForReactToSettle(page);
+    await expect.poll(() => new URL(page.url()).searchParams.get('patient')).toBe('102');
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBeNull();
+    await expect(page.getByText('Отчёт #88')).toHaveCount(0);
+    await expect.poll(() => reportHistoryPatientRequests.at(-1)).toBe('102');
+  });
+
   test('dirty URL transition keeps the requested report after Discard', async ({ page }) => {
     await page.goto('/lab');
     await page.getByRole('button', { name: /Пациент Один/ }).first().click();
@@ -319,10 +603,121 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
 
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
+    const breadcrumb = page.getByRole('navigation', { name: 'Навигация' });
+    await expect(breadcrumb).toContainText('Пациент Два');
+    await expect(breadcrumb).not.toContainText('Пациент Один');
     await page.waitForTimeout(300);
     await expect(page.getByText('Отчёт #88')).toHaveCount(0);
     expect(instance88GetCount).toBe(1);
     await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
+  });
+
+  test('Cancel on an external URL transition restores the active report URL', async ({ page }) => {
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await fieldInput.fill('6.8');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=89');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Отмена' }).click();
+
+    await expect(fieldInput).toHaveValue('6.8');
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
+    await expect.poll(() => new URL(page.url()).searchParams.get('patient')).toBe('101');
+    expect(instance89GetCount).toBe(0);
+  });
+
+  test('Escape cancellation keeps the dirty report and current tab intact', async ({ page }) => {
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await fieldInput.fill('6.9');
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+    await page.keyboard.press('Escape');
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'Панель лаборатории' }).getByRole('tab').nth(2)).toHaveAttribute('aria-selected', 'true');
+    await dialog.getByRole('button', { name: 'Отмена' }).click();
+
+    await expect(fieldInput).toHaveValue('6.9');
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
+  });
+
+  test('Escape closes an external URL guard once and rolls the URL back', async ({ page }) => {
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await fieldInput.fill('7.1');
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=89');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
+    await expect(fieldInput).toHaveValue('7.1');
+    await waitForReactToSettle(page);
+    await expect(page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' })).toHaveCount(0);
+  });
+
+  test('removing the report from the URL is guarded and Discard clears the active report', async ({ page }) => {
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await fieldInput.fill('6.9');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+    const historyRequestsBeforeClear = reportHistoryPatientRequests.length;
+
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+
+    await expect(page.getByText('Отчёт #88')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Создать отчёт' })).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBeNull();
+    await expect.poll(() => reportHistoryPatientRequests.length).toBeGreaterThan(historyRequestsBeforeClear);
+    expect(reportHistoryPatientRequests.at(-1)).toBe('101');
+  });
+
+  test('returning the URL to the active report dismisses the stale pending transition', async ({ page }) => {
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await fieldInput.fill('7.0');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=89');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?patient=101&instance=88');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    await expect(dialog).toHaveCount(0);
+    await expect(fieldInput).toHaveValue('7.0');
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    expect(instance89GetCount).toBe(0);
   });
 
   test('selecting a patient without a report clears the old instance without restoring it', async ({ page }) => {
@@ -358,7 +753,9 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
   });
 
   test('late create response cannot replace a newer patient report', async ({ page }) => {
-    reportInstanceCreateDelayMs = 700;
+    reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
+      releaseReportInstanceCreateResponse = resolve;
+    });
     await page.goto('/lab');
     await page.getByRole('button', { name: /Пациент Один/ }).first().click();
     await expect(page.getByText('Отчёт #88').first()).toBeVisible();
@@ -369,21 +766,107 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await page.getByRole('button', { name: /Пациент Два/ }).first().click();
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
 
-    await page.waitForTimeout(reportInstanceCreateDelayMs + 250);
+    const createResponse = page.waitForResponse((response) => (
+      response.request().method() === 'POST'
+      && response.url().endsWith('/api/v1/lab/report-instances')
+    ));
+    releaseReportInstanceCreateResponse?.();
+    await createResponse;
+    await waitForReactToSettle(page);
+    await expect.poll(() => reportHistoryPatientRequests.at(-1)).toBe('102');
     await expect(page.getByText('Отчёт #90')).toHaveCount(0);
+    await expect(page.getByText('Отчёт #89').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
+    expect(reportHistoryPatientRequests.at(-1)).toBe('102');
+  });
+
+  test('a late report create cannot erase a URL intent guarded by a dirty template', async ({ page }) => {
+    reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
+      releaseReportInstanceCreateResponse = resolve;
+    });
+    await page.goto('/lab');
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Добавить бланк' }).click();
+    await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
+
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await panelTabs.getByRole('tab').nth(1).click();
+    await page.getByRole('tab', { name: 'Оформление' }).click();
+    const footerInput = page.getByLabel('Подвал шаблона');
+    await footerInput.fill('Несохранённый подвал');
+
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=89');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+
+    const createResponse = page.waitForResponse((response) => (
+      response.request().method() === 'POST'
+      && response.url().endsWith('/api/v1/lab/report-instances')
+    ));
+    releaseReportInstanceCreateResponse?.();
+    await createResponse;
+    await waitForReactToSettle(page);
+
+    await expect(dialog).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
   });
 
+  test('late create from another appointment of the same patient is rejected', async ({ page }) => {
+    reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
+      releaseReportInstanceCreateResponse = resolve;
+    });
+    await page.goto('/lab');
+
+    await page.getByRole('button', { name: /Пациент Без Бланка/ }).first().click();
+    await expect(page.getByRole('button', { name: 'Создать отчёт' })).toBeVisible();
+    await page.getByRole('button', { name: 'Создать отчёт' }).click();
+    await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
+
+    await page.getByRole('tab').first().click();
+    await page.getByRole('button', { name: /Пациент Без Бланка Повтор/ }).click();
+    // The workbench keeps the in-flight create disabled until its response
+    // settles, even after the appointment context changes.
+    await expect(page.getByRole('button', { name: 'Создаю...' })).toBeDisabled();
+    const createResponse = page.waitForResponse((response) => (
+      response.request().method() === 'POST'
+      && response.url().endsWith('/api/v1/lab/report-instances')
+    ));
+    releaseReportInstanceCreateResponse?.();
+    await createResponse;
+    await waitForReactToSettle(page);
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBeNull();
+
+    await expect(page.getByText('Отчёт #90')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Создать отчёт' })).toBeVisible();
+    expect(lastReportInstanceCreatePayload).toMatchObject({ appointment_id: 'a-3' });
+  });
+
   test('late template resolution cannot contaminate the next patient create payload', async ({ page }) => {
-    templateResolutionDelayByPatient.set('101', 700);
-    instance88DelayMs = 500;
+    templateResolution101ResponseGate = new Promise<void>((resolve) => {
+      releaseTemplateResolution101Response = resolve;
+    });
     await page.goto('/lab');
 
     await page.getByRole('button', { name: /Пациент Один/ }).first().dispatchEvent('click');
+    await expect.poll(() => templateResolutionPatientRequests.includes('101')).toBe(true);
     await page.getByRole('button', { name: /Пациент Два/ }).first().dispatchEvent('click');
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
-    await page.waitForTimeout(800);
+    await expect.poll(() => templateResolutionPatientRequests.includes('102')).toBe(true);
+    const staleResolutionResponse = page.waitForResponse((response) => {
+      if (!response.url().endsWith('/api/v1/lab/template-resolutions/resolve')) return false;
+      return String(response.request().postDataJSON()?.patient_id ?? '') === '101';
+    });
+    releaseTemplateResolution101Response?.();
+    await staleResolutionResponse;
+    await waitForReactToSettle(page);
 
     await page.getByRole('button', { name: 'Добавить бланк' }).click();
     await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
@@ -421,6 +904,89 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // Возвращённый шаблон (id=9) выбран: в редакторе виден его код.
     await expect(page.getByText('new_rule_t').first()).toBeVisible();
     expect(templateCreatePostCount).toBe(1);
+  });
+
+  test('late template detail cannot replace the newly created template', async ({ page }) => {
+    template5FirstResponseGate = new Promise<void>((resolve) => {
+      releaseTemplate5FirstResponse = resolve;
+    });
+    await page.goto('/lab?tab=templates');
+    await expect.poll(() => template5GetCount).toBe(1);
+
+    await page.getByRole('button', { name: 'Новый' }).click();
+    await page.getByLabel('Код шаблона').fill('new_rule_t');
+    await page.getByLabel('Название шаблона').fill('Новый шаблон правил');
+    await page.getByRole('button', { name: 'Создать' }).click();
+
+    await expect(page.getByText('new_rule_t').first()).toBeVisible();
+    const staleTemplateResponse = page.waitForResponse((response) => response.url().endsWith('/api/v1/lab/templates/5'));
+    releaseTemplate5FirstResponse?.();
+    await staleTemplateResponse;
+    await waitForReactToSettle(page);
+    await expect(page.getByText('new_rule_t').first()).toBeVisible();
+    expect(templateCreatePostCount).toBe(1);
+  });
+
+  test('template editor stays locked until a selected template detail finishes loading', async ({ page }) => {
+    await page.goto('/lab?tab=templates');
+    await page.getByRole('tab', { name: 'Оформление' }).click();
+    const footerInput = page.getByLabel('Подвал шаблона');
+    await expect(footerInput).toBeEnabled();
+
+    template5ResponseGate = new Promise<void>((resolve) => {
+      releaseTemplate5Response = resolve;
+    });
+    const detailResponse = page.waitForResponse((response) => (
+      response.url().endsWith('/api/v1/lab/templates/5') && response.status() === 200
+    ));
+    await page.getByRole('button', { name: /Rule Demo/ }).first().click();
+    await expect.poll(() => template5GetCount).toBe(2);
+    await expect(footerInput).toBeDisabled();
+
+    releaseTemplate5Response?.();
+    await detailResponse;
+    await waitForReactToSettle(page);
+    await expect(footerInput).toBeEnabled();
+  });
+
+  test('failed template detail restores the previous editable template', async ({ page }) => {
+    await page.goto('/lab?tab=templates');
+    const fieldButton = page.getByRole('button', { name: /Поле: Лейкоциты/ });
+    await expect(fieldButton).toBeVisible();
+    template5ShouldFail = true;
+    const failedDetail = page.waitForResponse((response) => (
+      response.url().endsWith('/api/v1/lab/templates/5') && response.status() === 500
+    ));
+
+    await page.getByRole('button', { name: /Rule Demo/ }).first().click();
+    await failedDetail;
+    await waitForReactToSettle(page);
+
+    await expect(fieldButton).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Новый' })).toBeEnabled();
+  });
+
+  test('failed target template keeps the freshly saved source draft', async ({ page }) => {
+    await page.goto('/lab?tab=templates');
+    await page.getByRole('tab', { name: 'Оформление' }).click();
+    const footerInput = page.getByLabel('Подвал шаблона');
+    await footerInput.fill('Сохранённый подвал A');
+    template6ShouldFail = true;
+
+    await page.getByRole('button', { name: /Rule Demo B/ }).first().click();
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+    const failedTarget = page.waitForResponse((response) => (
+      response.url().endsWith('/api/v1/lab/templates/6') && response.status() === 500
+    ));
+    await dialog.getByRole('button', { name: 'Сохранить и перейти' }).click();
+    await failedTarget;
+    await waitForReactToSettle(page);
+
+    expect(templateDraftUpdateCount).toBe(1);
+    expect(template5FooterNotes).toBe('Сохранённый подвал A');
+    await expect(footerInput).toHaveValue('Сохранённый подвал A');
+    await expect(page.getByRole('button', { name: 'Новый' })).toBeEnabled();
   });
 
   test('dirty template -> Create -> Cancel preserves both drafts and sends no POST', async ({ page }) => {

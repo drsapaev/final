@@ -16,8 +16,9 @@
  * @param {Function} handlers.switchTab - switches tab (updates URL)
  * @param {Function} handlers.refreshData - reloads queue
  * @param {Function} handlers.clearSelection - clears selectedAppointment
+ * @param {boolean} handlers.disabled - suspends panel shortcuts while a modal owns keyboard input
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import logger from '../utils/logger';
 
 const LAB_TAB_MAP = {
@@ -30,13 +31,32 @@ export const useLabHotkeys = ({
   switchTab,
   refreshData,
   clearSelection,
+  disabled = false,
 }: {
   switchTab?: (tab: string) => void;
   refreshData?: () => void;
   clearSelection?: () => void;
+  disabled?: boolean;
 }) => {
+  // Keep one document listener and read the current render synchronously.
+  // A modal can become visible before an effect cleanup/rebind runs; a stale
+  // listener must not handle the same Escape that the modal owns.
+  const handlersRef = useRef({ switchTab, refreshData, clearSelection, disabled });
+  handlersRef.current = { switchTab, refreshData, clearSelection, disabled };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      const {
+        switchTab: currentSwitchTab,
+        refreshData: currentRefreshData,
+        clearSelection: currentClearSelection,
+        disabled: currentDisabled,
+      } = handlersRef.current;
+      // Dialogs own Escape and every other shortcut while they are open.
+      // Checking the DOM also covers nested confirm dialogs whose state is
+      // local to report/template workbenches and not exposed to LabPanel.
+      if (currentDisabled || document.querySelector('[role="dialog"]')) return;
       // Ignore shortcuts when user is typing in an input/textarea
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
@@ -49,8 +69,8 @@ export const useLabHotkeys = ({
       if (isCtrl && ['1', '2', '3'].includes(e.key)) {
         e.preventDefault();
         const tab = LAB_TAB_MAP[e.key as keyof typeof LAB_TAB_MAP];
-        if (tab && switchTab) {
-          switchTab(tab);
+        if (tab && currentSwitchTab) {
+          currentSwitchTab(tab);
           logger.info(`[LabHotkeys] Switched to tab: ${tab}`);
         }
         return;
@@ -59,29 +79,28 @@ export const useLabHotkeys = ({
       // F5: refresh data
       if (e.key === 'F5') {
         e.preventDefault();
-        if (refreshData) {
-          refreshData();
+        if (currentRefreshData) {
+          currentRefreshData();
           logger.info('[LabHotkeys] Data refreshed');
         }
         return;
       }
 
-      // Escape: clear selection AND switch to queue tab
-      // PR-60 / High-11: was only clearing selection, leaving user on Reports tab with empty state
+      // Escape is one caller-owned transition. The caller decides which
+      // context and tab are cleared so a dirty guard can keep it atomic.
       if (e.key === 'Escape') {
-        if (clearSelection) {
-          clearSelection();
-        }
-        if (switchTab) {
-          switchTab('queue');
+        if (currentClearSelection) {
+          currentClearSelection();
         }
         return;
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    // Capture runs before Modal's document-level bubble listener can close and
+    // unmount the dialog during the same native Escape event.
+    document.addEventListener('keydown', handleKeyDown, true);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [switchTab, refreshData, clearSelection]);
+  }, []);
 };

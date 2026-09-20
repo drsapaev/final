@@ -3,11 +3,12 @@ import '@testing-library/jest-dom';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbenchRaw from '../LabReportWorkbench';
 import { labReportingApi } from '@/api/labReporting';
+import { printService } from '@/services/print';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
 // The component under test still relies on TS prop types,
@@ -30,6 +31,12 @@ vi.mock('../../../api/labReporting', () => ({
     revise: vi.fn(),
     downloadPdf: vi.fn(),
     markPrinted: vi.fn(),
+  },
+}));
+
+vi.mock('../../../services/print', () => ({
+  printService: {
+    printLabResults: vi.fn(),
   },
 }));
 
@@ -404,6 +411,10 @@ describe('LabReportWorkbench', () => {
 });
 
 describe('LabReportWorkbench draft save integrity (PR3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   // custom/no-fake-timers-without-cleanup: fake timers из autosave-теста
   // обязаны возвращаться к real timers в hook, а не только в finally.
   afterEach(() => {
@@ -416,6 +427,12 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     getInstance: ReturnType<typeof vi.fn>;
     updateInstance: ReturnType<typeof vi.fn>;
     bulkSaveValues: ReturnType<typeof vi.fn>;
+    finalize: ReturnType<typeof vi.fn>;
+    downloadPdf: ReturnType<typeof vi.fn>;
+    markPrinted: ReturnType<typeof vi.fn>;
+  };
+  const mockedPrintService = printService as unknown as {
+    printLabResults: ReturnType<typeof vi.fn>;
   };
 
   const reopenedDraftInstance = {
@@ -474,6 +491,14 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     );
   }
 
+  it('locks report values and signer inputs while another report is loading', () => {
+    renderWithActiveInstance({ instanceTransitionPending: true });
+
+    expect(screen.getByLabelText('Результат: Лейкоциты')).toBeDisabled();
+    expect(screen.getByLabelText('ФИО лаборанта')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Сохранить черновик' })).toBeDisabled();
+  });
+
   it('sends the hydrated per-field comment when saving a reopened draft', async () => {
     const onInstanceChange = vi.fn();
     mockedApi.bulkSaveValues.mockResolvedValue({
@@ -499,7 +524,11 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
     expect(wbcItem?.comment).toBe('утренний забор');
     expect(onInstanceChange).toHaveBeenCalledWith(
       expect.objectContaining({ id: 77 }),
-      { kind: 'update', expectedInstanceId: 77 },
+      {
+        kind: 'update',
+        expectedInstanceId: 77,
+        operation: { epoch: 0, selectionKey: null, patientId: null },
+      },
     );
   });
 
@@ -535,6 +564,293 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       '2026-09-13T08:00:00.123456+00:00'
     );
     expect(ownBulkCall[2]).toBe(signerResponseUpdated);
+  });
+
+  it('reuses the committed signer token when bulk save fails and is retried', async () => {
+    const signerUpdatedAt = '2026-09-13T08:00:05.654321+00:00';
+    const acceptedUpdatedAt = '2026-09-13T08:00:06.654321+00:00';
+    const onInstanceChange = vi.fn();
+    const registerDirtySource = vi.fn(
+      (_source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => vi.fn(),
+    );
+    mockedApi.updateInstance.mockReset().mockResolvedValue({
+      ...reopenedDraftInstance,
+      updated_at: signerUpdatedAt,
+      signer_snapshot: { lab_technician_name: 'Иванов И.И.' },
+    });
+    mockedApi.bulkSaveValues
+      .mockReset()
+      .mockRejectedValueOnce(new Error('bulk failed'))
+      .mockResolvedValueOnce({
+        instance: {
+          ...reopenedDraftInstance,
+          updated_at: acceptedUpdatedAt,
+          signer_snapshot: { lab_technician_name: 'Иванов И.И.' },
+        },
+      });
+
+    renderWithActiveInstance({ onInstanceChange, registerDirtySource });
+    fireEvent.change(screen.getByLabelText('Результат: Лейкоциты'), {
+      target: { value: '6.8' },
+    });
+    fireEvent.click(screen.getByText('Подписи'));
+    fireEvent.change(screen.getByLabelText('ФИО лаборанта'), {
+      target: { value: 'Иванов И.И.' },
+    });
+    await waitFor(() => expect(registerDirtySource).toHaveBeenCalledTimes(1));
+    const source = registerDirtySource.mock.calls[0][0] as { save: () => Promise<void> };
+
+    let firstError: unknown;
+    await act(async () => {
+      try {
+        await source.save();
+      } catch (error) {
+        firstError = error;
+      }
+    });
+    expect(firstError).toEqual(new Error('bulk failed'));
+
+    await act(async () => {
+      await source.save();
+    });
+
+    expect(mockedApi.updateInstance).toHaveBeenCalledTimes(1);
+    expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(2);
+    expect(mockedApi.bulkSaveValues.mock.calls[0][2]).toBe(signerUpdatedAt);
+    expect(mockedApi.bulkSaveValues.mock.calls[1][2]).toBe(signerUpdatedAt);
+    expect(
+      (mockedApi.bulkSaveValues.mock.calls[1][1] as Array<Record<string, unknown>>)
+        .find((item) => item.field_key === 'wbc')?.value_text,
+    ).toBe('6.8');
+    expect(onInstanceChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ updated_at: acceptedUpdatedAt }),
+      expect.objectContaining({ kind: 'update', expectedInstanceId: 77 }),
+    );
+  });
+
+  it('clears a partial signer commit after the active instance changes', async () => {
+    const registerDirtySource = vi.fn(
+      (_source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => vi.fn(),
+    );
+    mockedApi.updateInstance.mockReset().mockImplementation(async (id: number) => ({
+      ...reopenedDraftInstance,
+      id,
+      updated_at: `2026-09-13T08:00:0${id === 77 ? '5' : '6'}.000000+00:00`,
+      signer_snapshot: { lab_technician_name: 'Иванов И.И.' },
+    }));
+    mockedApi.bulkSaveValues
+      .mockReset()
+      .mockRejectedValueOnce(new Error('bulk failed'))
+      .mockResolvedValueOnce({
+        instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:07.000000+00:00' },
+      });
+    const baseProps = {
+      selectedAppointment: null,
+      templates: [],
+      templateResolution: null,
+      templateResolutionLoading: false,
+      reportHistory: [],
+      recentReports: [],
+      onInstanceChange: vi.fn(),
+      onOpenInstance: vi.fn(),
+      onRefreshHistory: vi.fn(),
+      onRefreshRecentReports: vi.fn(),
+      onQueueChanged: vi.fn(),
+      notify: vi.fn(),
+      registerDirtySource,
+    };
+    const utils = render(
+      <ThemeProvider>
+        <LabReportWorkbench {...baseProps} activeInstance={reopenedDraftInstance} />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByText('Подписи'));
+    fireEvent.change(screen.getByLabelText('ФИО лаборанта'), {
+      target: { value: 'Иванов И.И.' },
+    });
+    await waitFor(() => expect(registerDirtySource).toHaveBeenCalledTimes(1));
+    const source = registerDirtySource.mock.calls[0][0] as { save: () => Promise<void> };
+    await act(async () => {
+      try { await source.save(); } catch { /* expected */ }
+    });
+
+    utils.rerender(
+      <ThemeProvider>
+        <LabReportWorkbench {...baseProps} activeInstance={{ ...reopenedDraftInstance, id: 78 }} />
+      </ThemeProvider>,
+    );
+    utils.rerender(
+      <ThemeProvider>
+        <LabReportWorkbench {...baseProps} activeInstance={reopenedDraftInstance} />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByText('Подписи'));
+    fireEvent.change(screen.getByLabelText('ФИО лаборанта'), {
+      target: { value: 'Иванов И.И.' },
+    });
+    await act(async () => {
+      await source.save();
+    });
+
+    expect(mockedApi.updateInstance).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries from the bulk token committed before a stale context result', async () => {
+    let resolveFirstBulk: ((value: unknown) => void) | null = null;
+    const firstBulk = new Promise((resolve) => { resolveFirstBulk = resolve; });
+    let operation = { epoch: 1, selectionKey: 'instance:77', patientId: 444 };
+    const registerDirtySource = vi.fn(
+      (_source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => vi.fn(),
+    );
+    mockedApi.updateInstance.mockReset();
+    mockedApi.bulkSaveValues
+      .mockReset()
+      .mockImplementationOnce(() => firstBulk)
+      .mockResolvedValueOnce({
+        instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:09.000000+00:00' },
+      });
+    renderWithActiveInstance({ registerDirtySource, getOperationContext: () => operation });
+    fireEvent.change(screen.getByLabelText('Результат: Лейкоциты'), {
+      target: { value: '7.2' },
+    });
+    await waitFor(() => expect(registerDirtySource).toHaveBeenCalledTimes(1));
+    const source = registerDirtySource.mock.calls[0][0] as { save: () => Promise<void> };
+    let firstError: unknown;
+    const firstSave = act(async () => {
+      try { await source.save(); } catch (error) { firstError = error; }
+    });
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1));
+    operation = { ...operation, epoch: 2 };
+    resolveFirstBulk?.({
+      instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:08.000000+00:00' },
+    });
+    await firstSave;
+    expect(firstError).toBeInstanceOf(Error);
+
+    await act(async () => {
+      await source.save();
+    });
+    expect(mockedApi.bulkSaveValues.mock.calls[1][2]).toBe('2026-09-13T08:00:08.000000+00:00');
+  });
+
+  it('locks values and signer inputs until an in-flight manual save settles', async () => {
+    let resolveBulk: ((value: unknown) => void) | null = null;
+    mockedApi.bulkSaveValues.mockReset().mockImplementationOnce(() => new Promise((resolve) => {
+      resolveBulk = resolve;
+    }));
+    renderWithActiveInstance();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить черновик' }));
+    await waitFor(() => expect(mockedApi.bulkSaveValues).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText('Результат: Лейкоциты')).toBeDisabled();
+    expect(screen.getByLabelText('ФИО лаборанта')).toBeDisabled();
+    resolveBulk?.({ instance: { ...reopenedDraftInstance, updated_at: '2026-09-13T08:00:10.000000+00:00' } });
+    await waitFor(() => expect(screen.getByLabelText('Результат: Лейкоциты')).toBeEnabled());
+  });
+
+  it('does not open a stale PDF fallback after the report context changes', async () => {
+    let resolvePrint: ((value: unknown) => void) | null = null;
+    let operation = { epoch: 1, selectionKey: 'instance:77', patientId: 444 };
+    mockedPrintService.printLabResults.mockReset().mockImplementationOnce(() => new Promise((resolve) => {
+      resolvePrint = resolve;
+    }));
+    mockedApi.downloadPdf.mockReset();
+    mockedApi.markPrinted.mockReset();
+    renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+      getOperationContext: () => operation,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedPrintService.printLabResults).toHaveBeenCalledTimes(1));
+    operation = { ...operation, epoch: 2 };
+    await act(async () => {
+      resolvePrint?.({ success: false, error: 'printer offline' });
+      await Promise.resolve();
+    });
+
+    expect(mockedApi.downloadPdf).not.toHaveBeenCalled();
+    expect(mockedApi.markPrinted).not.toHaveBeenCalled();
+    expect(screen.queryByText('Отправляю лабораторный отчёт на печать...')).toBeNull();
+  });
+
+  it('reports a failed print-status audit even after navigation changed context', async () => {
+    let rejectMarkPrinted: ((reason?: unknown) => void) | null = null;
+    let operation = { epoch: 1, selectionKey: 'instance:77', patientId: 444 };
+    const notify = vi.fn();
+    mockedPrintService.printLabResults.mockReset().mockResolvedValueOnce({ success: true });
+    mockedApi.markPrinted.mockReset().mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      rejectMarkPrinted = reject;
+    }));
+    renderWithActiveInstance({
+      activeInstance: {
+        ...reopenedDraftInstance,
+        status: 'FINALIZED',
+        available_actions: ['print'],
+      },
+      getOperationContext: () => operation,
+      notify,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+    await waitFor(() => expect(mockedApi.markPrinted).toHaveBeenCalledWith(77));
+    operation = { ...operation, epoch: 2 };
+    await act(async () => {
+      rejectMarkPrinted?.(new Error('audit unavailable'));
+      await Promise.resolve();
+    });
+
+    expect(notify).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('статус печати не сохранился'),
+    );
+  });
+
+  it('does not let the first print timer clear feedback from a second print', async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveSecondPrint: ((value: unknown) => void) | null = null;
+      mockedPrintService.printLabResults
+        .mockReset()
+        .mockResolvedValueOnce({ success: true })
+        .mockImplementationOnce(() => new Promise((resolve) => {
+          resolveSecondPrint = resolve;
+        }));
+      mockedApi.markPrinted.mockReset().mockResolvedValue({
+        ...reopenedDraftInstance,
+        status: 'PRINTED',
+        available_actions: ['print'],
+      });
+      renderWithActiveInstance({
+        activeInstance: {
+          ...reopenedDraftInstance,
+          status: 'FINALIZED',
+          available_actions: ['print'],
+        },
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+      await act(async () => {
+        for (let i = 0; i < 8; i += 1) await Promise.resolve();
+      });
+      expect(screen.getByText(/Лабораторный отчёт отправлен на печать/)).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Печать результата' }));
+      expect(screen.getByText('Отправляю лабораторный отчёт на печать...')).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+      expect(screen.getByText('Отправляю лабораторный отчёт на печать...')).toBeInTheDocument();
+
+      await act(async () => {
+        resolveSecondPrint?.({ success: true });
+        for (let i = 0; i < 8; i += 1) await Promise.resolve();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not surface an autosave confirmation for a failed autosave', async () => {
@@ -590,6 +906,92 @@ describe('LabReportWorkbench draft save integrity (PR3)', () => {
       vi.useRealTimers();
       vi.clearAllMocks();
     }
+  });
+
+  it('does not run a scheduled autosave after the report context changes', async () => {
+    vi.useFakeTimers();
+    try {
+      let operation = { epoch: 1, selectionKey: 'appointment:a-1', patientId: 101 };
+      renderWithActiveInstance({ getOperationContext: () => operation });
+      fireEvent.change(screen.getByLabelText('Результат: Лейкоциты'), {
+        target: { value: '6.6' },
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      operation = { epoch: 2, selectionKey: 'appointment:a-1', patientId: 101 };
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30000);
+      });
+
+      expect(mockedApi.bulkSaveValues).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      vi.clearAllMocks();
+    }
+  });
+
+  it('cancels the autosave timer while the unsaved-transition dialog is open', async () => {
+    vi.useFakeTimers();
+    try {
+      const baseProps = {
+        selectedAppointment: null,
+        templates: [],
+        templateResolution: null,
+        templateResolutionLoading: false,
+        reportHistory: [],
+        recentReports: [],
+        activeInstance: reopenedDraftInstance,
+        onInstanceChange: vi.fn(),
+        onOpenInstance: vi.fn(),
+        onRefreshHistory: vi.fn(),
+        onRefreshRecentReports: vi.fn(),
+        onQueueChanged: vi.fn(),
+        notify: vi.fn(),
+      };
+      const utils = render(
+        <ThemeProvider>
+          <LabReportWorkbench {...baseProps} pauseAutoSave={false} />
+        </ThemeProvider>
+      );
+      fireEvent.change(screen.getByLabelText('Результат: Лейкоциты'), {
+        target: { value: '6.4' },
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      utils.rerender(
+        <ThemeProvider>
+          <LabReportWorkbench {...baseProps} pauseAutoSave />
+        </ThemeProvider>
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30000);
+      });
+
+      expect(mockedApi.bulkSaveValues).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      vi.clearAllMocks();
+    }
+  });
+
+  it('does not finalize the old report when context changes while confirmation is open', async () => {
+    let operation = { epoch: 1, selectionKey: 'appointment:a-1', patientId: 101 };
+    renderWithActiveInstance({ getOperationContext: () => operation });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Утвердить' }));
+    const dialog = await screen.findByRole('dialog');
+    operation = { epoch: 2, selectionKey: 'appointment:a-2', patientId: 102 };
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Утвердить' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockedApi.bulkSaveValues).not.toHaveBeenCalled();
+    expect(mockedApi.finalize).not.toHaveBeenCalled();
   });
 
   it('routes superseded-report navigation through the guarded open callback', () => {
@@ -743,7 +1145,39 @@ describe('LabReportWorkbench add-blank action (PR6)', () => {
     expect(onInstanceChange.mock.calls[0][1]).toEqual({
       kind: 'transition',
       expectedInstanceId: 91,
+      operation: { epoch: 0, selectionKey: null, patientId: null },
     });
+  });
+
+  it('stops refreshes and success feedback when the parent rejects a late create result', async () => {
+    const onInstanceChange = vi.fn(() => false);
+    const onRefreshHistory = vi.fn(async () => {});
+    const onRefreshRecentReports = vi.fn(async () => {});
+    const onQueueChanged = vi.fn(async () => {});
+    const notify = vi.fn();
+    mockedApi.createInstance.mockResolvedValue({
+      ...openInstance,
+      id: 93,
+      template_id: 8,
+    });
+
+    renderAddBlank({
+      onInstanceChange,
+      onRefreshHistory,
+      onRefreshRecentReports,
+      onQueueChanged,
+      notify,
+    });
+    fireEvent.change(screen.getByLabelText('Шаблон дополнительного бланка'), {
+      target: { value: '8' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Добавить бланк/ }));
+
+    await waitFor(() => expect(onInstanceChange).toHaveBeenCalledTimes(1));
+    expect(onRefreshHistory).not.toHaveBeenCalled();
+    expect(onRefreshRecentReports).not.toHaveBeenCalled();
+    expect(onQueueChanged).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalledWith('success', expect.any(String));
   });
 
   it('disables the add-blank action while the open draft is dirty', async () => {

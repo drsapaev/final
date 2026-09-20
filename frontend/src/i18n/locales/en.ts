@@ -153,6 +153,7 @@ const en = {
     print_pdf_invalid: 'PDF сформирован некорректно. Обратитесь к администратору.',
     print_pdf_opened: 'PDF открыт в новой вкладке. Статус печати обновлён.',
     print_pdf_blocked: 'PDF сформирован, но новая вкладка заблокирована. Разрешите pop-up для этого сайта и нажмите «Печать» снова, чтобы обновить статус отчёта.',
+    print_status_failed: 'The document was printed or opened, but its print status was not saved. Refresh the report before retrying.',
     critical_findings: 'Критические показатели',
     critical_findings_hint: 'Проверьте правильность ввода. Критические значения требуют внимания врача.',
     norm_label: 'Норма',
