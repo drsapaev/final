@@ -620,8 +620,19 @@ def test_alembic_chain_single_head_0062() -> None:
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
     # single head: RQ-15.d retires the synthetic pairs after the
-    # public-address registry (RQ-16.c chained after the 0067 snapshot)
-    assert heads == ["0070_lab_results_lineage"]
+    # public-address registry (RQ-16.c chained after the 0067 snapshot),
+    # the lab-results lineage (A+ stage 1) claims 0070, and NURSE-V2 N2-2
+    # (owner design-GO 2026-09-19) extends the chain with the workplace
+    # assignments (0071) and service executions (0072).
+    assert graph["0071_nurse_workplace_assignments"] == (
+        "0070_lab_results_lineage",
+    )
+    assert graph["0072_service_executions"] == (
+        "0071_nurse_workplace_assignments",
+    )
+    assert len("0071_nurse_workplace_assignments") <= 32
+    assert len("0072_service_executions") <= 32
+    assert heads == ["0072_service_executions"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

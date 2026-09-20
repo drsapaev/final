@@ -13,7 +13,9 @@ class FinalizeMixin(LabReportingServiceMixinBase):
 
     def finalize(self, instance_id: int) -> LabReportInstance:
         logger.info("[LAB] finalize instance_id=%s", instance_id)
-        instance = self.get_instance(instance_id)
+        # Serialize the whole aggregate before reading status or child values.
+        # Draft saves and finalization share this parent-first lock order.
+        instance = self._get_locked_instance(instance_id)
         self._assert_instance_editable(instance)
         current_values = {
             value.field_key: self._extract_effective_value(value)
@@ -60,6 +62,7 @@ class FinalizeMixin(LabReportingServiceMixinBase):
         self.repository.flush()
         instance.status = "FINALIZED"
         instance.finalized_at = datetime.now(UTC)
+        self._advance_instance_version(instance)
         # P-01 bridge: sync в legacy lab_results таблицу для read-only
         # потребителей (mobile app, EMR, statistics, notifications).
         # Создаёт LabResult записи как projection из LabReportValue.

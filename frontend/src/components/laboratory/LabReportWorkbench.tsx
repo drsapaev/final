@@ -285,7 +285,7 @@ export default function LabReportWorkbench({
     // Если backend обнаружит, что бланк был изменён другим пользователем
     // после этого timestamp — вернёт 409, persistDraft выбросит exception.
     let expectedUpdatedAt = activeInstance.updated_at
-      ? new Date(activeInstance.updated_at as string).toISOString()
+      ? activeInstance.updated_at as string
       : null;
 
     const payload: Array<Record<string, unknown>> = [];
@@ -315,7 +315,7 @@ export default function LabReportWorkbench({
       // 409 от собственного сохранения.
       const signerUpdatedAt = latestInstance?.updated_at as string | undefined;
       if (signerUpdatedAt) {
-        expectedUpdatedAt = new Date(signerUpdatedAt).toISOString();
+        expectedUpdatedAt = signerUpdatedAt;
       }
     }
     if (payload.length > 0) {

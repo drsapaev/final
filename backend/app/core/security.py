@@ -270,6 +270,222 @@ def require_roles(*roles: Any):
     return _dep
 
 
+def _audit_resource_identity(request: Any) -> tuple[str | None, int | None]:
+    """
+    Codex post-settle P2 (PR #3333): audit resource identity for denial
+    rows, derived from the MATCHED ROUTE TEMPLATE instead of positional
+    path guessing.
+
+    The settle-2 parser took ``path_parts[2]`` / ``path_parts[3]`` — the
+    ``/api/v1/{resource}/{id}`` shape. Control-plane routes live one scope
+    deeper (``/api/v1/admin/nurse-workplace-assignments/{assignment_id}/
+    deactivate``), so a denial was labeled ``resource_type="admin"`` with
+    ``resource_id=NULL``: the row never surfaced in
+    ``CRUDUserAuditLog.get_by_resource()`` history of the assignment the
+    stale token tried to reach — the id survived only inside the free-form
+    description.
+
+    Anchoring on ``request.scope["route"]`` (the router sets it BEFORE
+    dependency solving; the audit middleware's ContextVar request shares
+    the same mutable scope dict) makes the extraction scope-agnostic:
+
+    * item operations — the static segment immediately preceding the
+      FIRST templated ``{param}`` is the resource, the param value (digits
+      only) is the row id:
+      ``admin/nurse-workplace-assignments/{assignment_id}/deactivate``
+      -> ("nurse_workplace_assignments", 123). Trailing action segments
+      (``deactivate``) and scope segments (``admin``) can never be mistaken
+      for the resource.
+    * collection operations — the last static segment is the resource
+      (``admin/nurse-workplace-assignments`` -> "nurse_workplace_assignments",
+      no row id: a denial on create/list has no row to point at yet).
+    * URL hyphens normalize to underscores — the snake_case table
+      vocabulary the SUCCESS-path ledger rows already use
+      (``log_audit_event(table_name="nurse_workplace_assignments",
+      row_id=...)``), so ``get_by_resource()`` joins denials and mutations
+      into ONE resource history.
+
+    Degradation: a request without route metadata (fabricated Request in
+    unit harnesses) falls back to the legacy positional extraction, which
+    stays correct for the flat ``/api/v1/{resource}/{id}`` shape.
+    """
+    if request is None:
+        return None, None
+    scope = getattr(request, "scope", None) or {}
+    path_format = getattr(scope.get("route"), "path_format", None)
+    if path_format:
+        segments = [p for p in path_format.split("/") if p]
+        if segments[:2] == ["api", "v1"]:
+            segments = segments[2:]
+        resource_type: str | None = None
+        resource_id: int | None = None
+        for index, segment in enumerate(segments):
+            if not (segment.startswith("{") and segment.endswith("}")):
+                continue
+            if index > 0 and not segments[index - 1].startswith("{"):
+                resource_type = segments[index - 1]
+            raw = (scope.get("path_params") or {}).get(segment[1:-1].split(":")[0])
+            if raw is not None and str(raw).isdigit():
+                resource_id = int(raw)
+            # The FIRST templated param anchors the primary resource; later
+            # segments (e.g. a trailing /deactivate action) are ignored.
+            break
+        else:
+            if segments:  # collection route: no templated params at all
+                resource_type = segments[-1]
+        if resource_type:
+            resource_type = resource_type.replace("-", "_")
+        return resource_type, resource_id
+    # Legacy fallback: flat /api/v1/{resource}/{id} positional shape.
+    path_parts = [p for p in request.url.path.split("/") if p]
+    resource_type = None
+    resource_id = None
+    if len(path_parts) >= 3 and path_parts[0] == "api" and path_parts[1] == "v1":
+        resource_type = path_parts[2]
+    if len(path_parts) >= 4 and path_parts[3].isdigit():
+        resource_id = int(path_parts[3])
+    return resource_type, resource_id
+
+
+def require_active_roles(*roles: Any):
+    """
+    Dependency factory: SSOT role gate + User.is_active enforcement.
+
+    NURSE-V2 N2-2 review P1 (PR #3333): ``require_roles()`` authenticates the
+    JWT but does not enforce ``User.is_active`` — a deactivated privileged
+    account keeps its role-scoped access until the token expires (there is no
+    token-blacklist revoke in ``update_user()`` on ``is_active → false``).
+    Control planes that mint or revoke authorization primitives (nurse
+    workplace assignments) must fail closed on deactivation: this factory
+    composes the SSOT role check with ``app.api.deps.get_current_active_user``
+    (403 «Пользователь деактивирован» on ``is_active=False``) — the same
+    active-user semantics the rest of the API already exposes through
+    ``get_current_active_user``.
+
+    Использование:
+        @router.post("/admin/nurse-workplace-assignments")
+        def create(user=Depends(require_active_roles("Admin"))):
+            ...
+
+    Superuser bypass and 403 audit logging stay owned by the inner
+    ``require_roles`` gate; the active check applies to superusers too
+    (a deactivated superuser must not operate the control plane either).
+
+    Codex settle-2 P2 (PR #3333): the inactive-account denial is audited
+    HERE, actor-attributed, before the 403 is raised. The previous
+    composition resolved ``get_current_active_user`` as the first
+    parameter, so a deactivated (super)admin's 403 fired BEFORE the role
+    gate — the structured denial path never ran and the AuditMiddleware
+    only left a pre-auth anonymous request line: the stale
+    privileged-token attempt stayed unattributed. Now the plain
+    ``get_current_user`` resolves the account, the audited role gate runs
+    first (a wrong-role caller gets the role-gate denial WITH its own
+    logging), and the active check below writes an unconditional
+    ``UserAuditLog`` ACCESS_DENIED row (``log_audit_event`` — the ledger
+    row must land for non-critical control-plane resources too, where
+    ``log_critical_change`` table-gating would silently drop it) naming
+    the actor, the required roles and the denial reason. Codex post-settle
+    P2: the row's resource identity (``resource_type``/``resource_id``)
+    is derived from the matched route template by
+    ``_audit_resource_identity()`` — an admin-scoped denial lands in the
+    assignment's ``get_by_resource()`` history, not on the meaningless
+    ``resource_type="admin"`` with ``resource_id=NULL``.
+
+    NOTE: making ``require_roles()`` itself active-aware (834 endpoint call
+    sites) is deliberately NOT done here — that is a separate owner-gated
+    task; this factory is the in-scope closure for the NURSE-V2 control-plane
+    endpoints (and the pattern for N2-3 serving endpoints).
+    """
+    from fastapi import Depends, HTTPException, status
+
+    from app.api.deps import get_current_user, get_db
+    from app.models.user import User
+
+    role_gate = require_roles(*roles)
+
+    def _dep(
+        current_user: User = Depends(get_current_user),
+        db=Depends(get_db),
+        _role_gated: User = Depends(role_gate),
+    ) -> User:
+        # The role gate above has already run (and audited its own denials);
+        # every account that reaches this line carries one of the required
+        # roles. The active check closes the deactivated-(super)admin hole.
+        if not bool(getattr(current_user, "is_active", False)):
+            from app.core.audit import log_audit_event
+            from app.middleware.audit_middleware import get_current_request
+
+            request = get_current_request()
+            resource_type = None
+            resource_id = None
+            path_str = "unknown"
+            method_str = "UNKNOWN"
+            if request:
+                # Codex post-settle P2: route-template-anchored identity
+                # (see _audit_resource_identity) — the positional parse
+                # labeled admin-scoped denials resource_type="admin",
+                # resource_id=NULL, hiding them from get_by_resource().
+                resource_type, resource_id = _audit_resource_identity(request)
+                path_str = request.url.path
+                method_str = request.method
+
+            normalized_roles = getattr(role_gate, "required_roles", ()) or ()
+
+            audit_logger = logging.getLogger(__name__)
+            audit_logger.error(
+                "ACTIVE ACCOUNT DENIED",
+                extra={
+                    "required_roles": list(normalized_roles),
+                    "user_role": getattr(current_user, "role", None),
+                    "resource_type": resource_type or "unknown",
+                    "resource_id_present": resource_id is not None,
+                    "request_available": request is not None,
+                },
+            )
+            # Unconditional ledger row: log_critical_change would drop it for
+            # control-plane resources (table-gated to CRITICAL_TABLES).
+            try:
+                log_audit_event(
+                    db=db,
+                    user_id=current_user.id,
+                    action="ACCESS_DENIED",
+                    table_name=resource_type or "unknown",
+                    row_id=resource_id,
+                    old_values=None,
+                    new_values={
+                        "required_roles": list(normalized_roles),
+                        "user_role": getattr(current_user, "role", None),
+                        "denial_reason": "user_deactivated",
+                        "request_available": request is not None,
+                    },
+                    description=(
+                        f"403 Forbidden: {method_str} {path_str} - учетная "
+                        "запись деактивирована (требуются роли: "
+                        f"{', '.join(normalized_roles)})"
+                    ),
+                )
+                db.commit()
+            except Exception as e:  # noqa: BLE001
+                audit_logger.error(
+                    "Failed to log ACCESS_DENIED audit",
+                    extra={"exception_type": type(e).__name__},
+                    exc_info=True,
+                )
+
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Пользователь деактивирован",
+            )
+        return current_user
+
+    # Codex R6 #3092 contract: publish the normalized roles exactly the way
+    # require_roles() does, so the idempotency middleware's replay-time RBAC
+    # evaluation is unchanged for endpoints gated by this factory.
+    _dep.required_roles = role_gate.required_roles
+
+    return _dep
+
+
 def check_permission(user: Any, permission: str) -> bool:
     """
     Проверить разрешение пользователя (SSOT).
