@@ -152,12 +152,79 @@ def test_deactivated_admin_token_gets_403_and_writes_no_assignments(
         assert values.get("user_role") == "Admin"
         assert "деактивирована" in (row.description or "")
 
+    # Codex post-settle P2 (PR #3333): every denial row carries the ROUTE
+    # resource identity. The positional parser had labeled these rows
+    # resource_type="admin" (the scope segment) with resource_id=NULL, so
+    # they were invisible to the get_by_resource() history of the
+    # assignment the stale token tried to reach.
+    assert {row.resource_type for row in denial_rows} == {"nurse_workplace_assignments"}
+    # The collection denial (POST create) has no row to point at; the
+    # item denial (POST /1/deactivate) names the assignment id from the
+    # route param — not the free-form description alone.
+    assert {row.resource_id for row in denial_rows} == {None, 1}
+
     # The read side of the control plane is closed for the same token too.
     response = client.get(f"{_BASE_PATH}/1", headers=stale_token)
     assert response.status_code == 403, response.text
     response = client.get(_BASE_PATH, headers=stale_token)
     assert response.status_code == 403, response.text
     assert _assignment_count(db_session) == 0
+
+
+@pytest.mark.integration
+def test_denial_audit_lands_in_the_assignment_resource_history(
+    client: TestClient, db_session: Session
+) -> None:
+    """Codex post-settle P2 (PR #3333): denials join the SAME resource
+    history as the mutations.
+
+    The whole point of a structured resource identity on ACCESS_DENIED
+    rows is retrieval: ``CRUDUserAuditLog.get_by_resource()`` must surface
+    a stale-privileged-token attempt next to the assignment's own
+    CREATE/UPDATE rows. The positional parser broke this join
+    (resource_type="admin", resource_id=NULL); this pin proves the join
+    end-to-end through the real router.
+    """
+    from app.crud.user_management import user_audit_log
+    from tests.conftest import mint_access_token
+
+    operator = _admin(db_session, "n2v2_audit_operator")
+    nurse = _nurse(db_session, "n2v2_audit_nurse")
+    resource = _resource(db_session, "n2v2_audit_res")
+    headers = {"Authorization": f"Bearer {mint_access_token(operator)}"}
+
+    created = client.post(
+        _BASE_PATH,
+        json={"user_id": nurse.id, "queue_resource_id": resource.id},
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    assignment_id = created.json()["id"]
+
+    revoked = client.post(f"{_BASE_PATH}/{assignment_id}/deactivate", headers=headers)
+    assert revoked.status_code == 200, revoked.text
+
+    # A second admin's account is deactivated while its JWT stays
+    # unexpired — the exact settle-2 premise.
+    intruder = _admin(db_session, "n2v2_audit_intruder")
+    stale = {"Authorization": f"Bearer {mint_access_token(intruder)}"}
+    intruder.is_active = False
+    db_session.commit()
+
+    denied = client.post(f"{_BASE_PATH}/{assignment_id}/deactivate", headers=stale)
+    assert denied.status_code == 403, denied.text
+
+    # ONE history: the mutations and the denial are retrievable together
+    # by the structured identity the ledger queries filter on.
+    history = user_audit_log.get_by_resource(
+        db_session, "nurse_workplace_assignments", assignment_id
+    )
+    actions = {row.action for row in history}
+    assert actions == {"CREATE", "UPDATE", "ACCESS_DENIED"}
+    denial_row = next(row for row in history if row.action == "ACCESS_DENIED")
+    assert denial_row.user_id == intruder.id
+    assert denial_row.resource_type == "nurse_workplace_assignments"
+    assert denial_row.resource_id == assignment_id
 
 
 @pytest.mark.integration
