@@ -2416,6 +2416,252 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nurse/serving/workplaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Workplaces
+         * @description The caller's ACTIVE workplaces (self-scope; no admin surface).
+         *
+         *     One row per active NurseWorkplaceAssignment, enriched with the
+         *     resource mirror fields and the D2-resolved effective cabinet
+         *     (assignment override ?? resource default) — the station list the
+         *     tablet (N2-5) will offer as the shift context.
+         */
+        get: operations["list_my_workplaces_api_v1_nurse_serving_workplaces_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Station Entries
+         * @description The station board: waiting + active entries + the caller's claim.
+         *
+         *     ``waiting`` is the canonical call order (priority DESC, arrival
+         *     ASC, id ASC); ``active`` are the called/in_progress entries with
+         *     their station-routed services and execution state (the tablet's
+         *     "what is left to perform" list); ``my_entry`` is the caller's own
+         *     held claim — the §6 reconnect/reload contract (the active serving
+         *     is re-fetchable, never lost). ``late_pending`` surfaces TERMINAL
+         *     entries whose visit still has pending station-routed services (a
+         *     procedure prescribed after the last-completer flip): the serving
+         *     plane never reopens terminal entries — the servable path is the
+         *     existing rejoin flow (a new ticket for the same visit); the board
+         *     makes the state visible so nothing prescribed is silently stranded.
+         */
+        get: operations["get_station_entries_api_v1_nurse_serving_queue_resources__queue_resource_id__entries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/call-next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Call Next Patient
+         * @description Atomically claim the next waiting patient (§6, idempotent per Nurse).
+         *
+         *     The claim serializes on the station's queue row; a Nurse already
+         *     holding a called/in_progress entry at this station gets the SAME
+         *     entry back (``idempotent: true`` — the repeat/reconnect contract);
+         *     two nurses claiming concurrently always get DIFFERENT patients. The
+         *     transition is committed with an actor-attributed UserAuditLog row;
+         *     ``called_by_user_id`` is the claiming Nurse.
+         */
+        post: operations["call_next_patient_api_v1_nurse_serving_queue_resources__queue_resource_id__call_next_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/entries/{entry_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Serving
+         * @description Start serving the called patient (called -> in_progress).
+         *
+         *     Station-assignment-authorized (any assigned nurse may start a
+         *     called entry of her station — the admin-called display-board flow
+         *     works too); idempotent while in_progress (the D1 handover surface).
+         *     The visit is resolved (visit_id-first, else station-branch with the
+         *     open|in_progress widening) and linked to the entry; an ``open``
+         *     visit transitions to ``in_progress`` (the doctor-surface BUG-3
+         *     lesson). NOTHING closes the visit here.
+         */
+        post: operations["start_serving_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/executions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Service Execution
+         * @description Start an execution attempt of a concrete VisitService (D1 FINAL).
+         *
+         *     ``queue_entry_id`` is REQUIRED (the D1 contract for the nurse API —
+         *     the queue entry is the serving context, stored on the attempt); the
+         *     service must route to the station (D3: queue_tag match +
+         *     requires_doctor=false). Same-nurse repeat POST is a no-op (200 with
+         *     the existing in_progress attempt); a DIFFERENT nurse gets 409 (the
+         *     one-active claim). A retry after incomplete creates a NEW attempt
+         *     (attempt_no = previous + 1); history is never overwritten.
+         */
+        post: operations["start_service_execution_api_v1_nurse_serving_queue_resources__queue_resource_id__executions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/executions/{execution_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete Service Execution
+         * @description Complete an in_progress attempt (performed_by = the ACTUAL nurse).
+         *
+         *     D1 handover: one nurse may start, another finishes. The
+         *     last-completer contract: the completion that observes ALL
+         *     station-routed services of the visit done flips the queue entry to
+         *     ``served`` with ``served_by_user_id`` = the flipping nurse (§6
+         *     attribution); exactly one concurrent completion wins the flip.
+         *     Mid-flight assignment deactivation does not strand the attempt: the
+         *     STARTER may always complete what she started (graceful drain).
+         *     Same-nurse repeat = 200 no-op; a different actor on a terminal
+         *     attempt = 409.
+         */
+        post: operations["complete_service_execution_api_v1_nurse_serving_executions__execution_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/executions/{execution_id}/incomplete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Incomplete Service Execution
+         * @description Abort an in_progress attempt with a mandatory reason (no flip).
+         *
+         *     The service stays PENDING (the retry is a NEW attempt — D1
+         *     history); the queue entry must NOT flip to served. The entry-level
+         *     terminal (patient done, not everything performed) is the separate
+         *     entry-incomplete operation.
+         */
+        post: operations["incomplete_service_execution_api_v1_nurse_serving_executions__execution_id__incomplete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/entries/{entry_id}/no-show": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Entry No Show
+         * @description Mark the patient as no-show (queue-level only).
+         *
+         *     The sibling-pending services decision (N2-3 brief): VisitServices
+         *     and ServiceExecutions are deliberately NOT touched — the patient
+         *     may be restored (the existing Admin restore path) and serving
+         *     continues. The mutation is committed with an actor-attributed
+         *     UserAuditLog row.
+         */
+        post: operations["mark_entry_no_show_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__no_show_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/entries/{entry_id}/incomplete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Entry Incomplete
+         * @description Terminate the entry-level serving with a mandatory reason.
+         *
+         *     409 while any in_progress execution is linked — each attempt must
+         *     be resolved explicitly (billing/medical audit). The visit is NOT
+         *     closed (the §5 forbidden list); entry-level terminal states are
+         *     queue facts.
+         */
+        post: operations["mark_entry_incomplete_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__incomplete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/admin/queue-analytics/{specialist_id}": {
         parameters: {
             query?: never;
@@ -31542,6 +31788,272 @@ export type components = {
             };
         };
         /**
+         * NurseServingCallNextResponse
+         * @description The atomic claim result.
+         *
+         *     ``idempotent`` is True when the Nurse already held a called /
+         *     in_progress entry at this station and the SAME entry was returned
+         *     (the §6 "повтор запроса идемпотентен" / reconnect contract).
+         */
+        NurseServingCallNextResponse: {
+            entry: components["schemas"]["NurseServingEntryResponse"];
+            /** Idempotent */
+            idempotent: boolean;
+            /** Waiting Count */
+            waiting_count: number;
+        };
+        /**
+         * NurseServingEntryActionResponse
+         * @description Entry-level no-show / incomplete result.
+         */
+        NurseServingEntryActionResponse: {
+            /** Entry Id */
+            entry_id: number;
+            /** New Status */
+            new_status: string;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * NurseServingEntryIncompleteRequest
+         * @description Terminate the entry-level serving with a mandatory reason.
+         */
+        NurseServingEntryIncompleteRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * NurseServingEntryResponse
+         * @description A queue entry as the serving station sees it.
+         */
+        NurseServingEntryResponse: {
+            /** Id */
+            id: number;
+            /** Number */
+            number: number;
+            /** Status */
+            status: string;
+            /**
+             * Priority
+             * @default 0
+             */
+            priority: number;
+            /** Source */
+            source?: string | null;
+            /** Patient Id */
+            patient_id?: number | null;
+            /** Patient Name */
+            patient_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Queue Time */
+            queue_time?: string | null;
+            /** Called At */
+            called_at?: string | null;
+            /** Called By User Id */
+            called_by_user_id?: number | null;
+            /** Served By User Id */
+            served_by_user_id?: number | null;
+            /** Served At */
+            served_at?: string | null;
+            /** Visit Id */
+            visit_id?: number | null;
+            /**
+             * Is My Claim
+             * @default false
+             */
+            is_my_claim: boolean;
+            /** Services */
+            services?: components["schemas"]["NurseServingStationServiceState"][];
+        };
+        /**
+         * NurseServingErrorDetail
+         * @description The typed {"detail": ...} body every domain/auth error returns.
+         */
+        NurseServingErrorDetail: {
+            /** Detail */
+            detail: string;
+        };
+        /**
+         * NurseServingExecutionCreateRequest
+         * @description Start (or idempotently re-claim) a service execution attempt.
+         */
+        NurseServingExecutionCreateRequest: {
+            /**
+             * Queue Entry Id
+             * @description The served queue entry
+             */
+            queue_entry_id: number;
+            /**
+             * Visit Service Id
+             * @description The VisitService to perform
+             */
+            visit_service_id: number;
+        };
+        /**
+         * NurseServingExecutionIncompleteRequest
+         * @description Abort an in_progress attempt with a mandatory reason.
+         */
+        NurseServingExecutionIncompleteRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * NurseServingExecutionResponse
+         * @description One ServiceExecution attempt, with the entry-flip outcome.
+         */
+        NurseServingExecutionResponse: {
+            /** Id */
+            id: number;
+            /** Visit Service Id */
+            visit_service_id: number;
+            /** Queue Entry Id */
+            queue_entry_id?: number | null;
+            /** Attempt No */
+            attempt_no: number;
+            /** Status */
+            status: string;
+            /** Started By User Id */
+            started_by_user_id: number;
+            /** Started At */
+            started_at?: string | null;
+            /** Performed By User Id */
+            performed_by_user_id?: number | null;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Incomplete Reason */
+            incomplete_reason?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /**
+             * Entry Served
+             * @default false
+             */
+            entry_served: boolean;
+            /** Entry Served By User Id */
+            entry_served_by_user_id?: number | null;
+        };
+        /**
+         * NurseServingStartResponse
+         * @description Entry-level serving start (called -> in_progress).
+         */
+        NurseServingStartResponse: {
+            /** Entry Id */
+            entry_id: number;
+            /** Status */
+            status: string;
+            /** Visit Id */
+            visit_id?: number | null;
+            /** Visit Status */
+            visit_status?: string | null;
+            /** Idempotent */
+            idempotent: boolean;
+        };
+        /**
+         * NurseServingStationResponse
+         * @description The station state: queue metadata + waiting + active entries.
+         *
+         *     ``late_pending`` (codex round-2 P1): TERMINAL entries of today's
+         *     station queue whose visit still has PENDING station-routed services
+         *     — e.g. a procedure prescribed after the last-completer flip. The
+         *     serving plane deliberately does not reopen terminal entries; the
+         *     servable path is the existing rejoin flow (a new ticket for the same
+         *     visit — the next entry's serving sees ALL pending station services).
+         *     The board surfaces the state so nothing prescribed is silently
+         *     stranded and the desk can re-ticket.
+         */
+        NurseServingStationResponse: {
+            /** Queue Resource Id */
+            queue_resource_id: number;
+            /** Resource Queue Tag */
+            resource_queue_tag?: string | null;
+            /** Resource Display Name */
+            resource_display_name?: string | null;
+            /** Effective Cabinet */
+            effective_cabinet?: string | null;
+            /** Queue Id */
+            queue_id: number;
+            /** Queue Day */
+            queue_day?: string | null;
+            /** Waiting */
+            waiting: components["schemas"]["NurseServingEntryResponse"][];
+            /** Active */
+            active: components["schemas"]["NurseServingEntryResponse"][];
+            my_entry?: components["schemas"]["NurseServingEntryResponse"] | null;
+            /** Late Pending */
+            late_pending?: components["schemas"]["NurseServingEntryResponse"][];
+            /** Counts */
+            counts?: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * NurseServingStationServiceState
+         * @description One VisitService of the held entry's visit, routed to this station.
+         *
+         *     ``pending`` is the D3/last-completer predicate: a station-routed
+         *     service is pending until some attempt completed it or its LATEST
+         *     attempt was explicitly cancelled (an incomplete latest attempt still
+         *     needs a retry or an explicit entry-level terminal decision).
+         */
+        NurseServingStationServiceState: {
+            /** Visit Service Id */
+            visit_service_id: number;
+            /** Service Id */
+            service_id?: number | null;
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name?: string | null;
+            /**
+             * Qty
+             * @default 1
+             */
+            qty: number;
+            /** Latest Attempt No */
+            latest_attempt_no?: number | null;
+            /** Latest Attempt Status */
+            latest_attempt_status?: string | null;
+            /** In Progress Execution Id */
+            in_progress_execution_id?: number | null;
+            /**
+             * Pending
+             * @default true
+             */
+            pending: boolean;
+        };
+        /** NurseServingWorkplaceListResponse */
+        NurseServingWorkplaceListResponse: {
+            /** Items */
+            items: components["schemas"]["NurseServingWorkplaceResponse"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * NurseServingWorkplaceResponse
+         * @description One ACTIVE workplace of the calling Nurse (self-scope read).
+         */
+        NurseServingWorkplaceResponse: {
+            /** Assignment Id */
+            assignment_id: number;
+            /** Queue Resource Id */
+            queue_resource_id: number;
+            /** Resource Code */
+            resource_code?: string | null;
+            /** Resource Display Name */
+            resource_display_name?: string | null;
+            /** Resource Queue Tag */
+            resource_queue_tag?: string | null;
+            /** Resource Default Cabinet */
+            resource_default_cabinet?: string | null;
+            /** Cabinet Override */
+            cabinet_override?: string | null;
+            /** Effective Cabinet */
+            effective_cabinet?: string | null;
+        };
+        /**
          * NurseWorkplaceAssignmentCreateRequest
          * @description Admin request to assign a Nurse User to a QueueResource workplace.
          */
@@ -44518,6 +45030,631 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_workplaces_api_v1_nurse_serving_workplaces_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingWorkplaceListResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+        };
+    };
+    get_station_entries_api_v1_nurse_serving_queue_resources__queue_resource_id__entries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingStationResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description QueueResource не найден или очередь станции сегодня не активна */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    call_next_patient_api_v1_nurse_serving_queue_resources__queue_resource_id__call_next_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingCallNextResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Нет ожидающих пациентов, либо очередь станции не активна */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_serving_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingStartResponse"];
+                };
+            };
+            /** @description Недопустимый статус записи (требуется called) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Запись не найдена в очереди рабочего места */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_service_execution_api_v1_nurse_serving_queue_resources__queue_resource_id__executions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NurseServingExecutionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Идемпотентный повтор той же медсестрой (in_progress attempt) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingExecutionResponse"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingExecutionResponse"];
+                };
+            };
+            /** @description Запись не in_progress / не связана с визитом, услуга не маршрутизирована на станцию или чужой визит */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Запись очереди или VisitService не найдены */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Услуга уже исполняется другой медсестрой или уже выполнена */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_service_execution_api_v1_nurse_serving_executions__execution_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                execution_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingExecutionResponse"];
+                };
+            };
+            /** @description Исполнение не в статусе in_progress */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description ServiceExecution не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Уже завершено другим пользователем */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    incomplete_service_execution_api_v1_nurse_serving_executions__execution_id__incomplete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                execution_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NurseServingExecutionIncompleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingExecutionResponse"];
+                };
+            };
+            /** @description Исполнение не в статусе in_progress */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description ServiceExecution не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Уже отмечено незавершённым другим пользователем */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_entry_no_show_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__no_show_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingEntryActionResponse"];
+                };
+            };
+            /** @description Недопустимый статус записи (допустимо waiting или called) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Запись не найдена в очереди рабочего места */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Запись связана с незавершённым исполнением услуги */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_entry_incomplete_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__incomplete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NurseServingEntryIncompleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingEntryActionResponse"];
+                };
+            };
+            /** @description Недопустимый статус записи (допустимо called или in_progress) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Запись не найдена в очереди рабочего места */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Есть незавершённые исполнения услуг по записи */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
                 };
             };
             /** @description Validation Error */

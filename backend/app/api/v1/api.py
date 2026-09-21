@@ -77,6 +77,7 @@ from app.api.v1.endpoints import (
     mobile_api_extended,
     notification_websocket,
     notifications,
+    nurse_serving,
     nurse_workplace,
     observability,
     online_queue_new,
@@ -222,6 +223,10 @@ api_router.include_router(feature_flags.router, tags=["feature-flags"])
 # NURSE-V2 N2-2 (owner design-GO 2026-09-19): nurse workplace
 # assignment admin contract (create/read/deactivate).
 api_router.include_router(nurse_workplace.router, tags=["nurse-workplace-assignments"])
+# NURSE-V2 N2-3 (owner GO 2026-09-20): the assignment-scoped nurse
+# serving plane (workplaces / station board / call-next / start /
+# service executions / no-show / incomplete).
+api_router.include_router(nurse_serving.router, tags=["nurse-serving"])
 # Эндпоинты QR очередей (основной роутер для queue)
 api_router.include_router(qr_queue.router, prefix="/queue", tags=["qr-queue"])
 # Эндпоинты лимитов очередей
