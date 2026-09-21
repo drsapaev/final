@@ -85178,8 +85178,9 @@
             "title": "Message"
           },
           "replayed": {
+            "type": "boolean",
             "title": "Replayed",
-            "type": "boolean"
+            "default": false
           }
         },
         "type": "object",
@@ -85292,8 +85293,9 @@
             "title": "Department"
           },
           "replayed": {
+            "type": "boolean",
             "title": "Replayed",
-            "type": "boolean"
+            "default": false
           }
         },
         "type": "object",

@@ -317,8 +317,11 @@ def test_repeat_join_same_person_reuses_entry(pg_session, pg_engine):
 
 
 def test_repeat_of_claimed_session_creates_nothing(pg_session, pg_engine):
-    """(c) a repeated complete of the SAME session is rejected by the
-    atomic claim and adds no entries."""
+    """(c) a repeated complete of the SAME session NEVER adds entries —
+    round-4 (PR #3362, P1-2): the retry after a lost response re-uses the
+    original attempt identity and the joined session REPLAYS its saved
+    ticket (``replayed=True``) instead of refusing; either way the atomic
+    one-shot claim guarantees no second business action."""
     world = _seed_join_world(pg_session, "claim")
     from app.services.qr_queue import QRQueueService
 
@@ -330,10 +333,12 @@ def test_repeat_of_claimed_session_creates_nothing(pg_session, pg_engine):
     )
     assert first["success"] is True
 
-    with pytest.raises(ValueError):
-        svc.complete_join_session(
-            session_token, "SYNTHETIC-Claim Person", "+998900555666"
-        )
+    replay = svc.complete_join_session(
+        session_token, "SYNTHETIC-Claim Person", "+998900555666"
+    )
+    assert replay["success"] is True
+    assert replay["replayed"] is True
+    assert replay["queue_number"] == first["queue_number"]
     entries = _entries_for_queue(pg_session, world["queue_id"])
     assert len(entries) == 1
 
