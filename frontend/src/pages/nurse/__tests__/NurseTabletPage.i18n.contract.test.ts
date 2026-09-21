@@ -21,7 +21,7 @@ const SOURCES = [
   'NurseStationBoard.tsx',
   'NurseServiceList.tsx',
   'NurseWorkplacePicker.tsx',
-  'NurseIncompleteDialog.tsx',
+  'NurseReasonForm.tsx',
   'useNurseServingBoard.ts',
 ].map((rel) => fs.readFileSync(path.join(NURSE_DIR, rel), 'utf8'));
 

@@ -20,7 +20,7 @@ const SOURCES = [
   'src/pages/nurse/NurseStationBoard.tsx',
   'src/pages/nurse/NurseServiceList.tsx',
   'src/pages/nurse/NurseWorkplacePicker.tsx',
-  'src/pages/nurse/NurseIncompleteDialog.tsx',
+  'src/pages/nurse/NurseReasonForm.tsx',
   'src/pages/nurse/useNurseServingBoard.ts',
   'src/api/nurseServing.ts',
   'src/hooks/useNurseServingApi.ts',

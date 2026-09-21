@@ -12,7 +12,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
-import { NurseIncompleteDialog } from './NurseIncompleteDialog';
+import { NurseReasonForm } from './NurseReasonForm';
 import {
   NurseDrainingCard,
   NurseWorkplacePicker,
@@ -208,7 +208,7 @@ export default function NurseTabletPage() {
         </>
       )}
 
-      <NurseIncompleteDialog
+      <NurseReasonForm
         open={dialog != null}
         mode={dialog?.mode ?? 'execution'}
         busy={dialogBusy ?? false}

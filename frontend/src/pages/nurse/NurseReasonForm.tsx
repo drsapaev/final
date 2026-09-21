@@ -17,7 +17,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 const REASON_MAX_LENGTH = 200;
 
-export type NurseIncompleteDialogProps = {
+export type NurseReasonFormProps = {
   open: boolean;
   /** 'execution' — abort a service attempt; 'entry' — terminal entry exit. */
   mode: 'execution' | 'entry';
@@ -39,14 +39,14 @@ export function validateIncompleteReason(value: string): string | null {
   return null;
 }
 
-export function NurseIncompleteDialog({
+export function NurseReasonForm({
   open,
   mode,
   busy,
   onClose,
   onCancel,
   onSubmit,
-}: NurseIncompleteDialogProps) {
+}: NurseReasonFormProps) {
   const { t } = useTranslation();
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
