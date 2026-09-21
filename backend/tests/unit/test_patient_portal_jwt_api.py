@@ -507,7 +507,11 @@ class TestOpenAPIContract:
     def test_preview_publishes_typed_success_and_errors(self, openapi):
         preview = self._responses(openapi, "/api/v1/patients/booking/preview", "post")
         # Round-3 P2: `_require_patient`'s 404 is declared here too.
-        assert set(preview) == {"200", "400", "401", "403", "404", "422"}
+        # Round-7 (owner P2): the keyed surface is PUBLISHED — the middleware
+        # processes every preview that carries an Idempotency-Key (the
+        # operation-scoping tests below depend on it), so 409/503 are real
+        # runtime outcomes, not undocumented surprises.
+        assert set(preview) == {"200", "400", "401", "403", "404", "409", "422", "503"}
         assert (
             preview["404"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/PatientPortalErrorResponse"
@@ -516,6 +520,39 @@ class TestOpenAPIContract:
             preview["200"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/PatientPortalBookingPreviewResponse"
         )
+        assert (
+            preview["409"]["content"]["application/json"]["schema"]["$ref"]
+            == "#/components/schemas/PatientPortalErrorResponse"
+        )
+        assert (
+            preview["503"]["content"]["application/json"]["schema"]["$ref"]
+            == "#/components/schemas/PatientPortalErrorResponse"
+        )
+        assert "idempotency_payload_mismatch" in preview["409"]["description"]
+        assert "idempotency_uncertain_outcome" in preview["409"]["description"]
+        assert "idempotency_unavailable" in preview["503"]["description"]
+
+    def test_preview_publishes_optional_idempotency_key_header(self, openapi):
+        """Round-7 (owner P2): the keyed preview contract is explicit —
+        OPTIONAL header (a preview works without a key), bounded like the
+        create endpoint (1..128 chars)."""
+        operation = openapi["paths"]["/api/v1/patients/booking/preview"]["post"]
+        header_params = [
+            p
+            for p in operation.get("parameters", [])
+            if p.get("in") == "header" and p.get("name") == "Idempotency-Key"
+        ]
+        assert header_params, "Idempotency-Key header must be published on preview"
+        assert header_params[0]["required"] is False
+        # `str | None` serializes as anyOf(string, null) under Pydantic v2 —
+        # the constraints live on the string variant.
+        schema = header_params[0]["schema"]
+        string_variant = next(
+            (v for v in schema.get("anyOf", []) if v.get("type") == "string"),
+            schema,
+        )
+        assert string_variant.get("maxLength") == 128
+        assert string_variant.get("minLength") == 1
 
     def test_cabinet_publishes_typed_success_and_errors(self, openapi):
         cabinet = self._responses(openapi, "/api/v1/patients/cabinet/summary", "get")

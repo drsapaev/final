@@ -143,6 +143,11 @@ export type paths = {
         /**
          * Preview Patient Portal Booking
          * @description Non-mutating booking preview for the JWT patient portal.
+         *
+         *     Round-7 (owner P2): the keyed surface is PUBLISHED — the middleware
+         *     processes every preview that carries an Idempotency-Key (the operation
+         *     -scoping contract depends on it), so 409/503 are real runtime outcomes
+         *     of this endpoint, not undocumented surprises.
          */
         post: operations["preview_patient_portal_booking_api_v1_patients_booking_preview_post"];
         delete?: never;
@@ -41096,7 +41101,10 @@ export interface operations {
     preview_patient_portal_booking_api_v1_patients_booking_preview_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional. When sent, the keyed preview is processed by the idempotency middleware under the preview's OWN operation scope (a key shared with POST /patients/booking never cross-replays the two operations). Same key + same payload replays the preview; same key + changed payload is a 409 idempotency_payload_mismatch. Oversized keys are a 400 idempotency_key_invalid. */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -41151,6 +41159,15 @@ export interface operations {
                     "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
+            /** @description Idempotency conflict surfaced by the middleware — retry/reconcile decision reads the top-level code: idempotency_payload_mismatch / idempotency_in_flight / idempotency_uncertain_outcome / idempotency_scope_mismatch. The non-mutating preview has no endpoint-level slot conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -41158,6 +41175,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
         };

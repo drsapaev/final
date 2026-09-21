@@ -586,6 +586,21 @@ _PORTAL_503 = {
     ),
     "model": PatientPortalErrorResponse,
 }
+# Round-7 (owner P2, PR #3340): the preview endpoint is processed by the
+# same opt-in middleware whenever it carries an Idempotency-Key (the PR's
+# operation-scoping contract exercises exactly that), so its published
+# surface must describe the keyed outcomes too. Shared descriptions with a
+# preview-specific 409 note (a keyed preview can never hit the slot-409).
+_PORTAL_PREVIEW_409 = {
+    "description": (
+        "Idempotency conflict surfaced by the middleware — retry/reconcile "
+        "decision reads the top-level code: idempotency_payload_mismatch / "
+        "idempotency_in_flight / idempotency_uncertain_outcome / "
+        "idempotency_scope_mismatch. The non-mutating preview has no "
+        "endpoint-level slot conflict."
+    ),
+    "model": PatientPortalErrorResponse,
+}
 
 
 @router.get(
@@ -623,15 +638,42 @@ def get_patient_cabinet_summary(
 @router.post(
     "/booking/preview",
     response_model=PatientPortalBookingPreviewResponse,
-    responses={400: _PORTAL_400, 401: _PORTAL_401, 403: _PORTAL_403, 404: _PORTAL_404},
+    responses={
+        400: _PORTAL_400,
+        401: _PORTAL_401,
+        403: _PORTAL_403,
+        404: _PORTAL_404,
+        409: _PORTAL_PREVIEW_409,
+        503: _PORTAL_503,
+    },
 )
 def preview_patient_portal_booking(
     request_body: PatientPortalBookingRequest,
     request: Request,
+    idempotency_key: str | None = Header(
+        None,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=128,
+        description=(
+            "Optional. When sent, the keyed preview is processed by the "
+            "idempotency middleware under the preview's OWN operation scope "
+            "(a key shared with POST /patients/booking never cross-replays "
+            "the two operations). Same key + same payload replays the "
+            "preview; same key + changed payload is a 409 "
+            "idempotency_payload_mismatch. Oversized keys are a 400 "
+            "idempotency_key_invalid."
+        ),
+    ),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(_active_portal_user_audited("appointment", "preview")),
 ):
-    """Non-mutating booking preview for the JWT patient portal."""
+    """Non-mutating booking preview for the JWT patient portal.
+
+    Round-7 (owner P2): the keyed surface is PUBLISHED — the middleware
+    processes every preview that carries an Idempotency-Key (the operation
+    -scoping contract depends on it), so 409/503 are real runtime outcomes
+    of this endpoint, not undocumented surprises."""
     patient_id = _require_patient_audited(
         db, request, current_user, resource_type="appointment", action="preview"
     )

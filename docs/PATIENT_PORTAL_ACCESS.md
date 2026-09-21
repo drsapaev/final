@@ -334,3 +334,45 @@ the idempotency middleware + canonical Appointment reads):
   `key` / `name_ru` / `name_uz`), so the shared cabinet builder returned
   `department: null` for every booked row. It now displays `name_ru`
   (canonical `key` fallback) — Mini App and JWT portal both benefit.
+
+Round-7 hardening (review of PR #3340 @ `9bb31dc`, applies to the idempotency
+middleware + the published OpenAPI surface):
+
+- Redis outage AFTER the DB commit can no longer orphan an old-version
+  worker: the migration fence now writes a LEGACY execution intent
+  (owner-bound to the fence token) BEFORE the handler runs, and
+  `store_response()` reports whether Redis CONFIRMED the write instead of
+  returning `None` for both success and transport failure. A confirmed
+  outcome dual-writes both namespaces and only then deletes both intent
+  markers; a known non-2xx deletes them and releases the fence; a Redis
+  death on the post-commit store keeps the new-namespace intent, the
+  legacy intent and the fence up until the lease lapses — old workers
+  reconcile (`409 idempotency_uncertain_outcome`) instead of finding an
+  empty legacy namespace and re-executing the committed write. REQUIRED
+  coordination that loses Redis BETWEEN the two intent marks fails closed
+  (`503`) before executing.
+- The local scope-binding mirror and the local response snapshot are ONE
+  atomic entry: `(origin user + operation + key) → patient_scope →
+  payload_hash → response snapshot`, shared LRU fate. The round-6 layout
+  (two independent caches) let an LRU eviction of the binding leave a
+  live response invisible to the relink-refusal, so a re-linked card
+  could re-bind the key and execute a second write. Patient-scope
+  operations now replay from the atomic entry; the durable Redis layer
+  (unchanged layout) covers a fully evicted mirror. A KNOWN non-2xx
+  DROPS its pre-handler binding (local + value-guarded Redis twin), so a
+  flood of invalid keyed requests cannot evict durable successful
+  bindings — the round-6 eviction vector.
+- The bounded mirror is now O(1) per operation at capacity: overflow is
+  an immediate LRU popitem (the round-6 full TTL sweep per `set()` after
+  the bound was reached — O(N) per request, ~O(N²) for a flood — is
+  gone). TTL hygiene moved to a lazy expiry heap (incremental, bounded
+  budget per op) with amortized compaction, so expired entries are
+  reclaimed without ever scanning the whole store.
+- The keyed surface of `POST /patients/booking/preview` is PUBLISHED:
+  optional `Idempotency-Key` header (1..128 chars, same bound as the
+  create endpoint) plus typed `409` (idempotency_payload_mismatch /
+  idempotency_in_flight / idempotency_uncertain_outcome /
+  idempotency_scope_mismatch) and `503 idempotency_unavailable`. The
+  middleware already processed keyed previews (the operation-scoping
+  contract exercises it), so the generated TypeScript now describes the
+  real outcomes.

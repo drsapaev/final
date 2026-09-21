@@ -40,7 +40,7 @@ import uuid
 from typing import Any
 
 import pytest
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.testclient import TestClient
 
 from app.middleware import idempotency_middleware as idem_module
@@ -2745,6 +2745,405 @@ def _legacy_nkey(sub: str, key: str, kind: str, path: str = "/echo") -> str:
     return f"idem:{ns}:{key}:{kind}"
 
 
+def test_known_non_2xx_clears_pre_handler_legacy_intent(two_workers):
+    """Round-7 (owner P1): the pre-handler legacy intent is written under
+    the fence before execution. A RETURNED non-2xx is a KNOWN outcome
+    (nothing committed) — the intent must be cleared and the fence released
+    so old workers may re-run the request that provably did nothing."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "bad-legacy-intent-1"
+    legacy_ns = IdempotencyMiddleware._namespace(1)
+
+    first = client1.post("/bad", headers={**auth_headers("1"), "Idempotency-Key": key})
+    assert first.status_code == 400
+    assert _legacy_nkey("1", key, "intent") not in fake_redis.store, (
+        "the pre-handler legacy intent is cleared on a known non-2xx"
+    )
+    assert nkey("1", key, "intent", path="/bad") not in fake_redis.store
+    assert f"idem:{legacy_ns}:{key}:claim" not in fake_redis.store, (
+        "the fence is released on a known non-2xx"
+    )
+
+
+# ── Round-7 (owner review on 9bb31dc, PR #3340) ─────────────────────────
+
+
+def test_redis_death_at_store_response_keeps_legacy_intent_and_fence(
+    two_workers, monkeypatch
+):
+    """THE round-7 owner P1 scenario: the handler COMMITS, then Redis dies
+    exactly on the store_response() call — both outcome snapshots (current
+    AND legacy namespace) land nowhere, and the client may lose the HTTP
+    response. Round-6 deleted the intent markers on this path (a degraded
+    store looked identical to a confirmed one) and released the fence: once
+    the fence lease lapsed, an old-version worker found an EMPTY legacy
+    namespace — no response, no intent, no claim — and re-executed the
+    committed write.
+
+    Round-7: the legacy intent is written BEFORE the handler under the
+    still-held fence, store_response() reports its outcome, and the
+    non-durable path keeps EVERY unknown-outcome guard up."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "post-commit-redis-death-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    legacy_ns = IdempotencyMiddleware._namespace(1)
+    claim = idem_module._distributed_claim
+
+    real_set = fake_redis.set
+
+    def dying_set(key_, value_, **kwargs):
+        if key_.endswith(":resp"):
+            raise ConnectionError("simulated redis outage at store_response")
+        return real_set(key_, value_, **kwargs)
+
+    monkeypatch.setattr(fake_redis, "set", dying_set)
+    try:
+        first = client1.post("/echo", headers=headers)
+    finally:
+        monkeypatch.undo()
+
+    # The write is COMMITTED and the response still reaches the client.
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    # No snapshot landed anywhere…
+    assert nkey("1", key, "resp") not in fake_redis.store
+    assert _legacy_nkey("1", key, "resp") not in fake_redis.store
+    # …but the PRE-HANDLER legacy intent did (Redis was alive until the
+    # store), and every unknown-outcome guard stays up.
+    assert _legacy_nkey("1", key, "intent") in fake_redis.store, (
+        "the pre-handler legacy intent must survive the post-commit outage — "
+        "old workers reconcile against it instead of an empty namespace"
+    )
+    assert nkey("1", key, "intent") in fake_redis.store, (
+        "the new-namespace intent stays up for same-key retries"
+    )
+    assert f"idem:{legacy_ns}:{key}:claim" in fake_redis.store, (
+        "the fence is NOT released on a non-durable outcome (lapses with its lease)"
+    )
+
+    # Redis recovers (the outage was transient). The retry emulates a COLD
+    # second worker: this harness shares one process, so the shared local
+    # response cache (populated before the doomed distributed store) must be
+    # cleared — the client that lost the response retries from elsewhere.
+    claim._available = True
+    claim._failed_at = 0.0
+    idem_module._idempotency_cache.clear()
+    retry = client2.post("/echo", headers=headers)
+    assert retry.status_code == 409
+    assert retry.json()["code"] == "idempotency_in_flight"
+    assert counters["w2"]["calls"] == 0
+
+    # The leases lapse (fence + claim TTLs simulated away) — the exact
+    # old-version-protocol moment: the legacy namespace holds an INTENT
+    # without a response, which the old worker's own R9 contract refuses.
+    del fake_redis.store[f"idem:{legacy_ns}:{key}:claim"]
+    del fake_redis.store[nkey("1", key, "claim")]
+    late_retry = client2.post("/echo", headers=headers)
+    assert late_retry.status_code == 409
+    assert late_retry.json()["code"] == "idempotency_uncertain_outcome"
+    assert counters["w1"]["calls"] == 1 and counters["w2"]["calls"] == 0, (
+        "one logical submit, one execution — the committed write is never re-run"
+    )
+
+
+def test_legacy_intent_mark_transport_failure_is_fail_closed_for_required(
+    two_workers, monkeypatch
+):
+    """Round-7 (owner P1): REQUIRED coordination dies BETWEEN the two intent
+    marks — the legacy guard could not be recorded, so the write must not
+    run (the success path would leave old workers nothing durable). The
+    attempt cleans its OWN new-namespace marker and fails closed 503."""
+    client1, client2, counters, fake_redis = two_workers
+    claim = idem_module._distributed_claim
+    claim._required = True
+    key = "legacy-mark-dies-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    legacy_ns = IdempotencyMiddleware._namespace(1)
+
+    real_eval = fake_redis.eval
+    eval_calls = {"count": 0}
+
+    def dying_eval(script, numkeys, key_, *args):
+        if numkeys == 2:  # the intent-mark Lua
+            eval_calls["count"] += 1
+            if eval_calls["count"] == 2:
+                # The SECOND mark is the legacy one.
+                raise ConnectionError("simulated redis outage between marks")
+        return real_eval(script, numkeys, key_, *args)
+
+    monkeypatch.setattr(fake_redis, "eval", dying_eval)
+    try:
+        response = client1.post("/echo", headers=headers)
+    finally:
+        monkeypatch.undo()
+        claim._required = False
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "idempotency_unavailable"
+    assert counters["w1"]["calls"] == 0, (
+        "a required write never executes without its legacy migration guard"
+    )
+    assert nkey("1", key, "intent") not in fake_redis.store, (
+        "the attempt cleaned its own new-namespace marker before the 503"
+    )
+    assert _legacy_nkey("1", key, "intent") not in fake_redis.store
+
+
+def test_relinked_card_refused_after_invalid_key_flood(two_workers, monkeypatch):
+    """THE round-7 owner P1 #2 scenario: success for card A, then a flood
+    of INVALID keyed requests (the round-6 eviction vector — bindings were
+    created before endpoint validation and NEVER released), then the
+    account is re-linked to card B. The same key must refuse with 409
+    idempotency_scope_mismatch and the handler must stay at ONE call.
+
+    Round-7 fix (d): a known non-2xx DROPS its pre-handler binding (local +
+    value-guarded Redis twin), so the flood cannot evict the durable
+    successful binding that guards the live snapshot."""
+    client1, client2, counters, fake_redis = two_workers
+    from fastapi.responses import JSONResponse
+    from fastapi.testclient import TestClient as TC
+
+    monkeypatch.setattr(idem_module, "_MAX_SCOPE_BINDING_ENTRIES", 50)
+    saved_policy = idem_module._patient_replay_policy_sync
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    saved_claim = idem_module._distributed_claim
+    idem_module._distributed_claim = _make_claim(fake_redis)
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Patient", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id or 1
+    )
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+        "patient:7",
+        False,
+        True,
+    )
+    idem_module._local_scope_bindings.clear()
+    idem_module._local_scope_bindings_expiry.clear()
+
+    counter = {"calls": 0}
+    app = FastAPI()
+    app.add_middleware(IdempotencyMiddleware)
+
+    @app.post("/booking-like")
+    async def _booking_like(request: Request):
+        if (request.headers.get("Idempotency-Key") or "").startswith("flood-"):
+            return JSONResponse(
+                status_code=422, content={"detail": {"reason": "invalid"}}
+            )
+        counter["calls"] += 1
+        return {"ok": True}
+
+    client = TC(app, raise_server_exceptions=False)
+    origin_ns = IdempotencyMiddleware._namespace(1, "POST:/booking-like")
+    key = "relink-flood-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    try:
+        first = client.post("/booking-like", headers=headers)
+        assert first.status_code == 200
+        assert counter["calls"] == 1
+
+        # The durable successful binding exists locally AND in Redis.
+        assert (origin_ns, key) in idem_module._local_scope_bindings
+        pscope_key = f"idem:{origin_ns}:{key}:pscope"
+        assert fake_redis.store.get(pscope_key) == "patient:7"
+
+        # The flood: 120 unique keys that all end in a KNOWN non-2xx — 120
+        # >> the 50-entry bound, the exact round-6 eviction vector.
+        for i in range(120):
+            flood = client.post(
+                "/booking-like",
+                headers={**auth_headers("1"), "Idempotency-Key": f"flood-{i}"},
+            )
+            assert flood.status_code == 422
+
+        # Round-7 fix (d): the flood left NOTHING behind — every invalid
+        # key's binding was dropped at its known outcome, so the durable
+        # successful binding SURVIVED (round-6 LRU-evicted it here).
+        assert (origin_ns, key) in idem_module._local_scope_bindings, (
+            "the durable successful binding must survive an invalid-key flood"
+        )
+        assert not any(
+            k[0] == origin_ns and k[1].startswith("flood-")
+            for k in idem_module._local_scope_bindings
+        ), "known non-2xx outcomes must not occupy binding slots"
+        _leftover = [
+            k
+            for k in fake_redis.store
+            if ":pscope" in k and k.split(":")[2].startswith("flood-")
+        ]
+        assert not _leftover, "the Redis twin bindings of the flood are dropped too"
+
+        # The account is re-linked to card B; the same key must refuse.
+        idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+            "patient:8",
+            False,
+            True,
+        )
+        replay = client.post("/booking-like", headers=headers)
+        assert replay.status_code == 409, replay.text
+        assert replay.json()["code"] == "idempotency_scope_mismatch"
+        assert counter["calls"] == 1, (
+            "one logical submit — the re-linked card never gets a second record"
+        )
+        assert fake_redis.store.get(pscope_key) == "patient:7"
+    finally:
+        idem_module._patient_replay_policy_sync = saved_policy
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
+        idem_module._distributed_claim = saved_claim
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
+        monkeypatch.undo()
+
+
+def test_patient_outcome_replays_atomically_and_survives_local_eviction(
+    two_workers, monkeypatch
+):
+    """Round-7 owner P1 #2 (fixes a+c): the LOCAL patient outcome is ONE
+    atomic entry — binding + payload hash + snapshot, shared LRU fate — and
+    the local replay path reads it directly. Even a FULL local eviction
+    (binding AND snapshot gone together) never re-executes the write: the
+    same-card retry replays from the durable Redis snapshot and the
+    re-linked card is refused by the durable Redis binding."""
+    client1, client2, counters, fake_redis = two_workers
+    saved_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+        "patient:7",
+        False,
+        True,
+    )
+    idem_module._local_scope_bindings.clear()
+    idem_module._local_scope_bindings_expiry.clear()
+    key = "atomic-replay-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    origin_ns = IdempotencyMiddleware._namespace(1, "POST:/echo")
+    try:
+        first = client1.post("/echo", headers=headers)
+        assert first.status_code == 200
+        assert counters["w1"]["calls"] == 1
+
+        # The atomic entry carries scope + snapshot (never a bare binding).
+        entry = idem_module._local_scope_bindings.get((origin_ns, key))
+        assert entry is not None and entry[1] == "patient:7"
+        assert entry[2] is not None, "the snapshot is attached to the binding"
+
+        # Same-card retry on a COLD worker replays through the distributed
+        # snapshot (the local mirror is per-process by definition).
+        replay = client2.post("/echo", headers=headers)
+        assert replay.status_code == 200
+        assert counters["w2"]["calls"] == 0
+
+        # Simulate a FULL local eviction (the atomic entry removes scope
+        # AND snapshot together — no orphaned response under a live key).
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
+
+        # The re-linked card is STILL refused — the durable Redis binding.
+        idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+            "patient:8",
+            False,
+            True,
+        )
+        relink = client2.post("/echo", headers=headers)
+        assert relink.status_code == 409
+        assert relink.json()["code"] == "idempotency_scope_mismatch"
+        assert counters["w1"]["calls"] == 1 and counters["w2"]["calls"] == 0
+
+        # And the SAME card replays from Redis — never re-executes.
+        idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+            "patient:7",
+            False,
+            True,
+        )
+        same_card = client2.post("/echo", headers=headers)
+        assert same_card.status_code == 200
+        assert counters["w2"]["calls"] == 0, (
+            "eviction of the local mirror must not make a live outcome re-executable"
+        )
+    finally:
+        idem_module._patient_replay_policy_sync = saved_policy
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
+
+
+def test_scope_binding_store_stays_incremental_after_fill(monkeypatch):
+    """Round-7 owner P2: after the bound is reached, set() stays O(1)-per-op
+    — overflow is an immediate LRU popitem (no full sweep), expired entries
+    are reclaimed incrementally through the lazy expiry heap, and the heap
+    itself is compacted when stale records outgrow the live store."""
+    monkeypatch.setattr(idem_module, "_MAX_SCOPE_BINDING_ENTRIES", 50)
+    idem_module._local_scope_bindings.clear()
+    idem_module._local_scope_bindings_expiry.clear()
+    saved_ttl = idem_module._CACHE_TTL_SECONDS
+    try:
+        # Expired entries are reclaimed INCREMENTALLY at the next set —
+        # with an immediately-expiring TTL the very set() that wrote the
+        # entry purges it again (no full sweep needed).
+        idem_module._CACHE_TTL_SECONDS = -1
+        idem_module._local_scope_binding_set("ns", "expired-1", "patient:1")
+        assert ("ns", "expired-1") not in idem_module._local_scope_bindings, (
+            "expired entries are reclaimed by the bounded-budget purge"
+        )
+        assert idem_module._local_scope_bindings_expiry == [], (
+            "the heap record is pruned together with the entry"
+        )
+        idem_module._CACHE_TTL_SECONDS = saved_ttl
+
+        # A flood of unique keys at the bound: the store stays bounded and
+        # the heap is compacted to the live set (no stale-record growth).
+        for i in range(300):
+            idem_module._local_scope_binding_set("ns", f"f{i}", "patient:1")
+        assert len(idem_module._local_scope_bindings) <= 50
+        assert len(idem_module._local_scope_bindings_expiry) <= len(
+            idem_module._local_scope_bindings
+        ) + 64, "stale heap records are compacted once they outgrow the store"
+        # The current record of a live entry is findable in the heap.
+        _live_expires = idem_module._local_scope_bindings[("ns", "f299")][0]
+        assert (_live_expires, ("ns", "f299")) in idem_module._local_scope_bindings_expiry
+        # The newest entries are alive, the oldest evicted (LRU intact).
+        assert idem_module._local_scope_binding_get("ns", "f0") is None
+        assert idem_module._local_scope_binding_get("ns", "f299") == "patient:1"
+    finally:
+        idem_module._CACHE_TTL_SECONDS = saved_ttl
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
+        monkeypatch.undo()
+
+
+def test_store_response_reports_confirmed_writes(fake_redis):
+    """Round-7 (owner P1): store_response returns True only when Redis
+    ANSWERED the SET; a degraded transport reports False instead of the
+    old None-for-both contract."""
+    import time as _time
+
+    from fastapi import Response as FastAPIResponse
+
+    claim = _make_claim(fake_redis)
+    ok = claim.store_response(
+        "ns-confirm",
+        "k1",
+        FastAPIResponse(content=b"{}", status_code=200),
+        payload_hash="h",
+        principal_role="Registrar",
+    )
+    assert ok is True
+    assert fake_redis.store["idem:ns-confirm:k1:resp"]
+
+    claim._available = False
+    # Inside the reconnect cooldown: the probe is throttled and the degraded
+    # transport must be REPORTED (False), never silently recovered.
+    claim._failed_at = _time.time()
+    degraded = claim.store_response(
+        "ns-confirm",
+        "k2",
+        FastAPIResponse(content=b"{}", status_code=200),
+    )
+    assert degraded is False
+    assert "idem:ns-confirm:k2:resp" not in fake_redis.store
+
+
 def test_pre_deploy_legacy_outcome_replays_and_migrates(two_workers):
     """Rollout compatibility: the namespace became operation-scoped in
     #3340, but outcomes committed by the PREVIOUS deployment live under the
@@ -3278,6 +3677,13 @@ def test_fence_dual_writes_outcome_to_legacy_namespace(two_workers):
     assert f"idem:{legacy_ns}:{key}:claim" not in fake_redis.store, (
         "the fence must be released after completion"
     )
+    # Round-7 (owner P1): the pre-handler LEGACY intent (written under the
+    # fence before execution) is cleared together with the new-namespace
+    # marker once the outcome is CONFIRMED durable in both namespaces.
+    assert _legacy_nkey("1", key, "intent") not in fake_redis.store, (
+        "the pre-handler legacy intent is cleared after the confirmed dual-write"
+    )
+    assert nkey("1", key, "intent") not in fake_redis.store
     # The dual-written snapshot replays under the SAME replay contract the
     # legacy read applies (load_response reads the legacy namespace).
     replayed, stored_hash, stored_role = claim.load_response(legacy_ns, key)
@@ -3324,8 +3730,6 @@ def test_required_redis_death_at_fence_returns_503(two_workers, monkeypatch):
     key = "fence-503-1"
     headers = {**auth_headers("1"), "Idempotency-Key": key}
 
-    real_set = fake_redis.set
-
     def dying_set(*args, **kwargs):
         raise ConnectionError("simulated redis outage")
 
@@ -3334,7 +3738,6 @@ def test_required_redis_death_at_fence_returns_503(two_workers, monkeypatch):
         response = client1.post("/echo", headers=headers)
     finally:
         monkeypatch.undo()
-        real_set  # keep the reference alive for clarity
         claim._required = False
 
     assert response.status_code == 503
@@ -3374,11 +3777,14 @@ def test_local_scope_bindings_bounded_lru(monkeypatch):
     attacker-reachable (every fresh keyed request writes an entry BEFORE
     endpoint validation), so it must be a BOUNDED LRU: a flood of unique
     keys evicts its own oldest entries instead of growing without limit,
-    and recently used entries survive."""
+    and recently used entries survive. Round-7: entries are ATOMIC
+    (scope + payload hash + snapshot) and a known non-2xx DROPS its
+    binding instead of occupying a slot for 24 h."""
     import time as _time
 
     monkeypatch.setattr(idem_module, "_MAX_SCOPE_BINDING_ENTRIES", 50)
     idem_module._local_scope_bindings.clear()
+    idem_module._local_scope_bindings_expiry.clear()
     try:
         for i in range(120):
             idem_module._local_scope_binding_set("ns", f"k{i}", "patient:1")
@@ -3395,20 +3801,55 @@ def test_local_scope_bindings_bounded_lru(monkeypatch):
         )
         assert len(idem_module._local_scope_bindings) <= 50
 
-        # Value-guarded extend: refreshes OUR scope, never a foreign one.
-        idem_module._local_scope_bindings[("ns", "k159")] = (
-            123.0,
-            "patient:2",
+        # Round-7: the outcome is stored ATOMICALLY with the binding —
+        # one entry carries scope + payload hash + snapshot (shared LRU
+        # fate), and the get helper reconstructs the replay contract view.
+        from fastapi import Response as FastAPIResponse
+
+        outcome = FastAPIResponse(
+            content=b'{"ok": true}', status_code=200, media_type="application/json"
         )
-        idem_module._local_scope_binding_extend("ns", "k159", "patient:9")
-        assert idem_module._local_scope_bindings[("ns", "k159")][0] == 123.0
-        idem_module._local_scope_binding_extend("ns", "k159", "patient:2")
+        idem_module._local_patient_outcome_store(
+            "ns", "atomic-1", "patient:3", outcome, "hash-1", "Patient"
+        )
+        entry = idem_module._local_scope_bindings[("ns", "atomic-1")]
+        assert entry[1] == "patient:3"
+        assert entry[2] is not None and entry[2][4] == "hash-1"
+        replayed, mismatch, role = idem_module._local_patient_outcome_get(
+            "ns", "atomic-1", "hash-1"
+        )
+        assert replayed is not None and replayed.status_code == 200
+        assert mismatch is False and role == "Patient"
+        changed, mismatch, _role = idem_module._local_patient_outcome_get(
+            "ns", "atomic-1", "hash-2"
+        )
+        assert changed is not None and mismatch is True, (
+            "a changed payload is flagged from the atomic snapshot"
+        )
+
+        # Value-guarded drop (known non-2xx): our own binding is removed,
+        # a foreign one is never touched.
+        idem_module._local_scope_binding_drop("ns", "atomic-1", "patient:9")
+        assert ("ns", "atomic-1") in idem_module._local_scope_bindings
+        idem_module._local_scope_binding_drop("ns", "atomic-1", "patient:3")
+        assert ("ns", "atomic-1") not in idem_module._local_scope_bindings
+
+        # Snapshot-only forget (role-changed re-execution): the binding
+        # survives, the snapshot is gone; a foreign scope is never touched.
+        idem_module._local_scope_binding_set("ns", "forget-1", "patient:4")
+        idem_module._local_patient_outcome_forget_snapshot("ns", "forget-1", "patient:9")
+        assert ("ns", "forget-1") in idem_module._local_scope_bindings, (
+            "a foreign scope never rewrites the entry"
+        )
+        idem_module._local_patient_outcome_forget_snapshot("ns", "forget-1", "patient:4")
+        assert idem_module._local_scope_bindings[("ns", "forget-1")][2] is None
         assert (
-            idem_module._local_scope_bindings[("ns", "k159")][0]
+            idem_module._local_scope_bindings[("ns", "forget-1")][0]
             > _time.time() + idem_module._CACHE_TTL_SECONDS - 1
-        ), "our own binding is refreshed to a full new TTL"
+        ), "the binding TTL is refreshed on the snapshot forget"
     finally:
         idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
         monkeypatch.undo()
 
 

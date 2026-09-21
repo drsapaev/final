@@ -200,17 +200,44 @@
           "patients"
         ],
         "summary": "Preview Patient Portal Booking",
-        "description": "Non-mutating booking preview for the JWT patient portal.",
+        "description": "Non-mutating booking preview for the JWT patient portal.\n\nRound-7 (owner P2): the keyed surface is PUBLISHED — the middleware\nprocesses every preview that carries an Idempotency-Key (the operation\n-scoping contract depends on it), so 409/503 are real runtime outcomes\nof this endpoint, not undocumented surprises.",
         "operationId": "preview_patient_portal_booking_api_v1_patients_booking_preview_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. When sent, the keyed preview is processed by the idempotency middleware under the preview's OWN operation scope (a key shared with POST /patients/booking never cross-replays the two operations). Same key + same payload replays the preview; same key + changed payload is a 409 idempotency_payload_mismatch. Oversized keys are a 400 idempotency_key_invalid.",
+              "title": "Idempotency-Key"
+            },
+            "description": "Optional. When sent, the keyed preview is processed by the idempotency middleware under the preview's OWN operation scope (a key shared with POST /patients/booking never cross-replays the two operations). Same key + same payload replays the preview; same key + changed payload is a 409 idempotency_payload_mismatch. Oversized keys are a 400 idempotency_key_invalid."
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PatientPortalBookingRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -263,6 +290,26 @@
               }
             }
           },
+          "409": {
+            "description": "Idempotency conflict surfaced by the middleware — retry/reconcile decision reads the top-level code: idempotency_payload_mismatch / idempotency_in_flight / idempotency_uncertain_outcome / idempotency_scope_mismatch. The non-mutating preview has no endpoint-level slot conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -273,12 +320,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/patients/booking": {
