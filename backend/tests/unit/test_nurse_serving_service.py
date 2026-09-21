@@ -24,7 +24,11 @@ The N2-3 brief decisions pinned here:
 
 from __future__ import annotations
 
+import json
+from typing import Any
+
 import pytest
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today
@@ -1486,3 +1490,197 @@ class TestCodexRound2ReplayFlipOutcome:
         assert replay["status"] == "completed"
         assert replay["entry_served"] is True
         assert replay["entry_served_by_user_id"] == nurse.id
+
+
+class TestCodexRound3ReasonPhiContainment:
+    """P1: the free-text clinical reason never enters the general
+    UserAuditLog (a different access/search/export surface) — presence
+    + length only; the full text stays in the clinical row."""
+
+    PHI = "Пациент с ВИЧ-инфекцией отказался от процедуры из-за тошноты"
+
+    def test_execution_incomplete_reason_stays_out_of_general_audit(
+        self, db_session: Session
+    ):
+        nurse = _nurse(db_session, "n23_phi_exec")
+        resource = _resource(db_session)
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "PhiExec")
+        entry = _entry(db_session, queue, 1, patient=patient)
+        service = NurseServingApiService(db_session)
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry.id)
+        visit = db_session.get(Visit, entry.visit_id)
+        svc = _service(db_session, "PHI1", queue_tag=resource.queue_tag)
+        vs = _visit_service(db_session, visit, svc)
+        execution = service.create_execution(
+            nurse.id, resource.id, queue_entry_id=entry.id, visit_service_id=vs.id
+        )
+
+        result = service.incomplete_execution(nurse.id, execution["id"], self.PHI)
+
+        # The clinical row keeps the full text (the profiled place).
+        assert result["incomplete_reason"] == self.PHI
+        row = db_session.get(ServiceExecution, execution["id"])
+        assert row.incomplete_reason == self.PHI
+
+        # The general audit ledger: presence + length, never the text —
+        # not in the description, not in ANY serialized values payload.
+        rows = [
+            r
+            for r in _audit_rows(db_session, "service_executions")
+            if r.action == "UPDATE" and r.resource_id == execution["id"]
+        ]
+        assert len(rows) == 1
+        audit = rows[0]
+        assert self.PHI not in (audit.description or "")
+        assert "ВИЧ" not in (audit.description or "")
+        assert self.PHI not in json.dumps(audit.old_values or {}, ensure_ascii=False)
+        assert self.PHI not in json.dumps(audit.new_values or {}, ensure_ascii=False)
+        assert "incomplete_reason" not in (audit.new_values or {})
+        assert audit.new_values["reason_present"] is True
+        assert audit.new_values["reason_length"] == len(self.PHI)
+
+    def test_entry_incomplete_reason_stays_out_of_general_audit(
+        self, db_session: Session
+    ):
+        nurse = _nurse(db_session, "n23_phi_entry")
+        resource = _resource(db_session)
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "PhiEntry")
+        entry = _entry(db_session, queue, 1, patient=patient)
+        service = NurseServingApiService(db_session)
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry.id)
+
+        result = service.mark_entry_incomplete(
+            nurse.id, resource.id, entry.id, self.PHI
+        )
+
+        # The clinical row keeps the full text (the profiled place).
+        assert result["reason"] == self.PHI
+        db_session.refresh(entry)
+        assert entry.incomplete_reason == self.PHI
+
+        # The general audit ledger: presence + length, never the text.
+        rows = [
+            r
+            for r in _audit_rows(db_session, "online_queue_entries")
+            if r.action == "MARK_INCOMPLETE" and r.resource_id == entry.id
+        ]
+        assert len(rows) == 1
+        audit = rows[0]
+        assert self.PHI not in (audit.description or "")
+        assert "ВИЧ" not in (audit.description or "")
+        assert self.PHI not in json.dumps(audit.old_values or {}, ensure_ascii=False)
+        assert self.PHI not in json.dumps(audit.new_values or {}, ensure_ascii=False)
+        assert audit.new_values == {
+            "status": "incomplete",
+            "reason_present": True,
+            "reason_length": len(self.PHI),
+        }
+
+
+class TestCodexRound3BoardQueryBudget:
+    """P2 (N+1): the station board's SQL budget is CONSTANT in the number
+    of board rows — batched enrichment, no late_pending re-enrichment.
+    Several tablets poll this board all day while the terminal list
+    grows, so a per-row query count would multiply across the fleet."""
+
+    def _board_world(
+        self,
+        db: Session,
+        *,
+        suffix: str,
+        n_active: int,
+        n_late: int,
+        n_done: int,
+    ) -> tuple[User, QueueResource]:
+        nurse = _nurse(db, f"n23_budget_{suffix}")
+        resource = _resource(db, f"budget_{suffix}")
+        _assignment(db, nurse, resource)
+        queue = _station_queue(db, resource)
+        svc = _service(db, f"BUD{suffix}", queue_tag=resource.queue_tag)
+        number = 0
+        for i in range(n_active):
+            number += 1
+            patient = _patient(db, f"Act{suffix}{i}")
+            visit = _visit(db, patient, department=resource.queue_tag)
+            _entry(
+                db,
+                queue,
+                number,
+                patient=patient,
+                status="in_progress",
+                visit=visit,
+            )
+            _visit_service(db, visit, svc)
+        for i in range(n_late):
+            number += 1
+            patient = _patient(db, f"Late{suffix}{i}")
+            visit = _visit(db, patient, department=resource.queue_tag)
+            _entry(db, queue, number, patient=patient, status="served", visit=visit)
+            _visit_service(db, visit, svc)  # pending -> late_pending
+        for i in range(n_done):
+            number += 1
+            patient = _patient(db, f"Done{suffix}{i}")
+            visit = _visit(db, patient, department=resource.queue_tag)
+            _entry(
+                db, queue, number, patient=patient, status="served", visit=visit
+            )  # no station services -> folded empty, NOT late_pending
+        return nurse, resource
+
+    @staticmethod
+    def _counted_station_state(
+        bind: object,
+        service: NurseServingApiService,
+        nurse_id: int,
+        resource_id: int,
+    ) -> tuple[dict[str, Any], int]:
+        """get_station_state under a before_cursor_execute counter."""
+        state: dict[str, int] = {"queries": 0}
+
+        def _count(*_args: object, **_kwargs: object) -> None:
+            state["queries"] += 1
+
+        event.listen(bind, "before_cursor_execute", _count)
+        try:
+            board = service.get_station_state(nurse_id, resource_id)
+        finally:
+            event.remove(bind, "before_cursor_execute", _count)
+        return board, state["queries"]
+
+    def test_board_query_count_is_constant_in_board_rows(self, db_session: Session):
+        nurse_small, resource_small = self._board_world(
+            db_session, suffix="s", n_active=2, n_late=2, n_done=2
+        )
+        nurse_large, resource_large = self._board_world(
+            db_session, suffix="l", n_active=6, n_late=8, n_done=8
+        )
+
+        service = NurseServingApiService(db_session)
+        bind = db_session.get_bind()
+        boards = []
+        counts = []
+        for nurse, resource in (
+            (nurse_small, resource_small),
+            (nurse_large, resource_large),
+        ):
+            board, counted = self._counted_station_state(
+                bind, service, nurse.id, resource.id
+            )
+            boards.append(board)
+            counts.append(counted)
+
+        # The worlds really do differ in board size (the pin has teeth).
+        assert len(boards[0]["active"]) == 2
+        assert boards[0]["counts"]["late_pending"] == 2
+        assert len(boards[1]["active"]) == 6
+        assert boards[1]["counts"]["late_pending"] == 8
+
+        # CONSTANT budget: the 22-row board costs the SAME SQL as the
+        # 6-row one (3 lookups + 3 entry lists + 2 enrichment batches).
+        assert counts[0] == counts[1]
+        assert counts[0] <= 12

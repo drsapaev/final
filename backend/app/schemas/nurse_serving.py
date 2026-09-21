@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class NurseServingErrorDetail(BaseModel):
@@ -187,16 +187,40 @@ class NurseServingExecutionResponse(BaseModel):
     entry_served_by_user_id: int | None = None
 
 
+def _normalize_mandatory_reason(value: str) -> str:
+    """Codex round-3 P2: a mandatory reason must carry CONTENT.
+
+    ``min_length=1`` counts whitespace codepoints, so a spaces-only
+    payload passed validation and was stored verbatim. Normalize:
+    strip, then fail closed on blank — and a VALID reason is stored
+    trimmed, so the clinical record never carries padding.
+    """
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("reason must not be blank")
+    return normalized
+
+
 class NurseServingExecutionIncompleteRequest(BaseModel):
     """Abort an in_progress attempt with a mandatory reason."""
 
     reason: str = Field(..., min_length=1, max_length=200)
+
+    @field_validator("reason")
+    @classmethod
+    def _reason_not_blank(cls, value: str) -> str:
+        return _normalize_mandatory_reason(value)
 
 
 class NurseServingEntryIncompleteRequest(BaseModel):
     """Terminate the entry-level serving with a mandatory reason."""
 
     reason: str = Field(..., min_length=1, max_length=200)
+
+    @field_validator("reason")
+    @classmethod
+    def _reason_not_blank(cls, value: str) -> str:
+        return _normalize_mandatory_reason(value)
 
 
 class NurseServingEntryActionResponse(BaseModel):

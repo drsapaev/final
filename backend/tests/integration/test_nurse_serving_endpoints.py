@@ -490,3 +490,98 @@ def test_serving_mutations_join_one_resource_history(
     actions = {row.action for row in history}
     assert {"CALL_NEXT", "START_SERVING"} <= actions
     assert all(row.user_id == nurse.id for row in history if row.user_id is not None)
+
+
+# ----------------------------------------------------------------------------
+# codex round-3 P2: a mandatory reason must carry content
+# ----------------------------------------------------------------------------
+
+
+def test_incomplete_reason_validation_through_router(
+    client: TestClient, db_session: Session
+) -> None:
+    """Blank and whitespace-only reasons fail 422 on BOTH incomplete
+    surfaces; a padded valid reason is stored (and echoed) trimmed."""
+    nurse = _user(db_session, "n23_ep_reason_val", "Nurse")
+    resource = _resource(db_session, "reasonval")
+    _assignment(db_session, nurse, resource)
+    queue = _queue(db_session, resource)
+    patient = _patient(db_session, "ReasonVal")
+    headers = _headers(db_session, nurse)
+
+    # --- the entry-level terminal ---
+    entry = _entry(db_session, queue, 1, patient)
+    client.post(f"{_BASE}/queue-resources/{resource.id}/call-next", headers=headers)
+    client.post(
+        f"{_BASE}/queue-resources/{resource.id}/entries/{entry.id}/start",
+        headers=headers,
+    )
+    for blank in ("", "   "):
+        response = client.post(
+            f"{_BASE}/queue-resources/{resource.id}/entries/{entry.id}/incomplete",
+            json={"reason": blank},
+            headers=headers,
+        )
+        assert response.status_code == 422, response.text
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/entries/{entry.id}/incomplete",
+        json={"reason": "  отказ пациента  "},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["reason"] == "отказ пациента"
+    db_session.refresh(entry)
+    assert entry.incomplete_reason == "отказ пациента"
+
+    # --- the execution-level abort ---
+    entry2 = _entry(db_session, queue, 2, patient)
+    client.post(f"{_BASE}/queue-resources/{resource.id}/call-next", headers=headers)
+    client.post(
+        f"{_BASE}/queue-resources/{resource.id}/entries/{entry2.id}/start",
+        headers=headers,
+    )
+    visit = db_session.get(Visit, entry2.visit_id)
+    station_service = Service(
+        code="REVAL1",
+        name="Reason validation procedure",
+        queue_tag=resource.queue_tag,
+        requires_doctor=False,
+        active=True,
+    )
+    db_session.add(station_service)
+    db_session.commit()
+    db_session.refresh(station_service)
+    vs = VisitService(
+        visit_id=visit.id,
+        service_id=station_service.id,
+        code=station_service.code,
+        name=station_service.name,
+        qty=1,
+    )
+    db_session.add(vs)
+    db_session.commit()
+    db_session.refresh(vs)
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/executions",
+        json={"queue_entry_id": entry2.id, "visit_service_id": vs.id},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    execution_id = response.json()["id"]
+
+    for blank in ("", "   "):
+        response = client.post(
+            f"{_BASE}/executions/{execution_id}/incomplete",
+            json={"reason": blank},
+            headers=headers,
+        )
+        assert response.status_code == 422, response.text
+    response = client.post(
+        f"{_BASE}/executions/{execution_id}/incomplete",
+        json={"reason": "  тошнота  "},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["incomplete_reason"] == "тошнота"
+    execution = db_session.get(ServiceExecution, execution_id)
+    assert execution.incomplete_reason == "тошнота"

@@ -287,27 +287,72 @@ class NurseServingApiService:
         The tablet's "what is left to perform" list for a called /
         in_progress patient. Empty when the entry has no linked visit
         yet (start links it).
+
+        Single-entry convenience over the batched loader below (the
+        mutation paths enrich exactly ONE entry — the same two queries
+        as before: VisitService JOIN Service, then the executions).
         """
-        if entry.visit_id is None:
-            return []
+        return self._station_services_batch([entry], resource)[entry.id]
+
+    def _station_services_batch(
+        self, entries: list[OnlineQueueEntry], resource: QueueResource
+    ) -> dict[int, list[dict[str, Any]]]:
+        """Per-entry station-services payloads for MANY entries, 2 queries.
+
+        Codex round-3 P2 (N+1): ALL entries' VisitServices + Services
+        load in ONE IN-batch query and all their ServiceExecutions in
+        ONE more; routing and folding happen in memory. The station
+        board polls with a CONSTANT query budget instead of the previous
+        per-row pair (2 queries per active/terminal entry, plus a full
+        second enrichment pass for every late_pending row) — the
+        terminal list grows during the working day and several tablets
+        poll the same board.
+        """
+        payloads: dict[int, list[dict[str, Any]]] = {entry.id: [] for entry in entries}
+        visit_ids = {entry.visit_id for entry in entries if entry.visit_id is not None}
+        if not visit_ids:
+            return payloads
         rows = (
             self.db.query(VisitService, Service)
             .outerjoin(Service, VisitService.service_id == Service.id)
-            .filter(VisitService.visit_id == entry.visit_id)
+            .filter(VisitService.visit_id.in_(visit_ids))
+            .order_by(VisitService.visit_id.asc(), VisitService.id.asc())
             .all()
         )
-        visit_service_ids = [vs.id for vs, _svc in rows]
+        rows_by_visit: dict[int, list[tuple[VisitService, Service | None]]] = {}
+        for visit_service, service in rows:
+            rows_by_visit.setdefault(visit_service.visit_id, []).append(
+                (visit_service, service)
+            )
+        visit_service_ids = [visit_service.id for visit_service, _svc in rows]
         executions: dict[int, list[ServiceExecution]] = {}
         if visit_service_ids:
             exec_rows = (
                 self.db.query(ServiceExecution)
                 .filter(ServiceExecution.visit_service_id.in_(visit_service_ids))
-                .order_by(ServiceExecution.attempt_no.asc())
+                .order_by(
+                    ServiceExecution.visit_service_id.asc(),
+                    ServiceExecution.attempt_no.asc(),
+                )
                 .all()
             )
             for execution in exec_rows:
                 executions.setdefault(execution.visit_service_id, []).append(execution)
+        for entry in entries:
+            if entry.visit_id is None:
+                continue
+            payloads[entry.id] = self._fold_station_service_items(
+                rows_by_visit.get(entry.visit_id, []), executions, resource
+            )
+        return payloads
 
+    @staticmethod
+    def _fold_station_service_items(
+        rows: list[tuple[VisitService, Service | None]],
+        executions: dict[int, list[ServiceExecution]],
+        resource: QueueResource,
+    ) -> list[dict[str, Any]]:
+        """Route + fold ONE visit's rows into the board service items."""
         items: list[dict[str, Any]] = []
         for visit_service, service in rows:
             if service is None or not _service_routed_to_station(service, resource):
@@ -343,6 +388,7 @@ class NurseServingApiService:
         my_user_id: int,
         resource: QueueResource | None = None,
         with_services: bool = False,
+        services: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "id": entry.id,
@@ -365,7 +411,11 @@ class NurseServingApiService:
             ),
             "services": [],
         }
-        if with_services and resource is not None:
+        if services is not None:
+            # Pre-folded by the batch loader (the board path): reuse
+            # as-is — no second enrichment pass (codex round-3 P2).
+            payload["services"] = services
+        elif with_services and resource is not None:
             payload["services"] = self._station_services_payload(entry, resource)
         return payload
 
@@ -499,15 +549,6 @@ class NurseServingApiService:
             .order_by(OnlineQueueEntry.id.asc())
             .all()
         )
-        waiting = [self._entry_payload(e, my_user_id=user_id) for e in waiting_rows]
-        active = [
-            self._entry_payload(
-                e, my_user_id=user_id, resource=resource, with_services=True
-            )
-            for e in active_rows
-        ]
-        my_entry = next((item for item in active if item["is_my_claim"]), None)
-
         # Codex round-2 P1 (late services are never SILENTLY stranded):
         # terminal entries of today's station queue whose visit still has
         # PENDING station-routed services — e.g. a procedure the doctor
@@ -529,16 +570,31 @@ class NurseServingApiService:
             .order_by(OnlineQueueEntry.id.asc())
             .all()
         )
+
+        waiting = [self._entry_payload(e, my_user_id=user_id) for e in waiting_rows]
+        # Codex round-3 P2 (batched enrichment): ALL active + terminal
+        # rows' station services load in TWO IN-batch queries, and the
+        # late_pending pass REUSES the already-folded items — the board
+        # keeps a constant query budget under tablet polling (the
+        # terminal list grows during the working day).
+        enriched = self._station_services_batch(
+            [*active_rows, *terminal_rows], resource
+        )
+        active = [
+            self._entry_payload(e, my_user_id=user_id, services=enriched[e.id])
+            for e in active_rows
+        ]
+        my_entry = next((item for item in active if item["is_my_claim"]), None)
+
         late_pending = []
         for terminal_entry in terminal_rows:
-            services = self._station_services_payload(terminal_entry, resource)
+            services = enriched[terminal_entry.id]
             if any(item["pending"] for item in services):
                 late_pending.append(
                     self._entry_payload(
                         terminal_entry,
                         my_user_id=user_id,
-                        resource=resource,
-                        with_services=True,
+                        services=services,
                     )
                 )
         return {
@@ -1407,14 +1463,21 @@ class NurseServingApiService:
                 f"{acting_username or user_id} marked attempt "
                 f"no={execution.attempt_no} of visit_service_id="
                 f"{execution.visit_service_id} incomplete "
-                f"(reason={reason!r})"
+                f"(reason_present=True, reason_length={len(reason)})"
             ),
             actor=self._actor_or_stub(user_id),
             old_values={"status": "in_progress"},
             new_values={
                 "status": "incomplete",
                 "performed_by_user_id": user_id,
-                "incomplete_reason": reason,
+                # Codex round-3 P1 (PHI containment): the free-text
+                # clinical reason lives ONLY in the clinical row
+                # (service_executions.incomplete_reason); the general
+                # UserAuditLog is a different access/search/export
+                # surface, so it records presence + length, never
+                # the text itself.
+                "reason_present": True,
+                "reason_length": len(reason),
             },
             audit_context=audit_context,
         )
@@ -1640,11 +1703,19 @@ class NurseServingApiService:
                 "NURSE-V2 N2-3: nurse "
                 f"{acting_username or user_id} marked entry "
                 f"id={entry.id} (number={entry.number}) incomplete "
-                f"(reason={reason!r})"
+                f"(reason_present=True, reason_length={len(reason)})"
             ),
             actor=self._actor_or_stub(user_id),
             old_values={"status": prior_status},
-            new_values={"status": "incomplete", "incomplete_reason": reason},
+            # Codex round-3 P1 (PHI containment): same contract as the
+            # execution-level incomplete — the clinical text stays ONLY
+            # in online_queue_entries.incomplete_reason; the general
+            # audit ledger records presence + length, never the text.
+            new_values={
+                "status": "incomplete",
+                "reason_present": True,
+                "reason_length": len(reason),
+            },
             audit_context=audit_context,
         )
         self.db.commit()
