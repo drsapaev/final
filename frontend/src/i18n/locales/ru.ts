@@ -10755,6 +10755,7 @@ const ru = {
     board_next: 'Следующий',
     board_waiting_count: 'Ожидают: {count}',
     board_empty_waiting: 'Ожидающих нет',
+    board_other_staff: 'Обслуживается другим сотрудником',
     queue_number: '№ {number}',
     patient_unnamed: 'Без имени',
     entry_status_waiting: 'Ожидает',

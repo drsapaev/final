@@ -46,15 +46,30 @@ export default function NurseTabletPage() {
     if (board.board == null) {
       return null;
     }
+    // Owner review (P1): the current patient is EXCLUSIVELY my_entry —
+    // the server's "the caller's own claim" answer. Another nurse's
+    // active entry must NEVER stand in for it: taking one used to show
+    // her patient as ours and hide [Вызвать следующего], collapsing the
+    // two-nurses-one-station concurrency contract (§6) into one line.
     const my = board.board.my_entry;
     if (my != null && (my.status === 'called' || my.status === 'in_progress')) {
       return my;
     }
-    const active = (board.board.active ?? []).find(
-      (entry) => entry.status === 'called' || entry.status === 'in_progress',
-    );
-    return active ?? null;
+    return null;
   }, [board.board]);
+
+  // The station's OTHER active entries — a read-only overview block
+  // ("being served by another staff member"), never a current patient
+  // and never an action surface.
+  const otherActive = useMemo(() => {
+    if (board.board == null) {
+      return [];
+    }
+    const myId = current?.id ?? null;
+    return (board.board.active ?? []).filter(
+      (entry) => entry.id !== myId,
+    );
+  }, [board.board, current]);
 
   const nextWaiting = board.board?.waiting?.[0] ?? null;
   const waitingCount = board.board?.counts?.waiting ?? 0;
@@ -174,11 +189,28 @@ export default function NurseTabletPage() {
               </button>
             </div>
           )}
+          {board.boardError != null && board.board != null && (
+            // Owner review: the read error is visible EVEN while the last
+            // rendered board stays on screen (§9 stale-state contract) —
+            // a transient failure must not be silent, and the data it
+            // shows is honestly labeled as possibly outdated.
+            <div className="nurse-notice nurse-notice--error" role="alert">
+              <span>{board.boardError.message}</span>
+              <button
+                type="button"
+                className="nurse-btn nurse-btn--small"
+                onClick={() => void board.refresh()}
+              >
+                {t('nurse.notice_retry_action')}
+              </button>
+            </div>
+          )}
           {(board.board != null || board.boardLoading) && (
             <NurseStationBoard
               stationLabel={stationLabel}
               cabinet={cabinet}
               current={current}
+              others={otherActive}
               nextWaiting={nextWaiting}
               waitingCount={waitingCount}
               pendingKeys={board.pending}

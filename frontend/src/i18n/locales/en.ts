@@ -10611,6 +10611,7 @@ const en = {
     board_next: 'Next',
     board_waiting_count: 'Waiting: {count}',
     board_empty_waiting: 'No waiting patients',
+    board_other_staff: 'Being served by another staff member',
     queue_number: 'No. {number}',
     patient_unnamed: 'Unnamed',
     entry_status_waiting: 'Waiting',

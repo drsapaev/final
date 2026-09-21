@@ -155,6 +155,37 @@
   color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
 }
 
+/* ——— the read-only "another staff member" block (owner review) —— */
+
+.nurse-card--others {
+  border-left: 4px solid var(--mac-border, rgba(184, 200, 218, 1));
+}
+
+.nurse-others__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2, 8px);
+}
+
+.nurse-others__row {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-3, 12px);
+  flex-wrap: wrap;
+}
+
+.nurse-others__row .nurse-next__number {
+  font-size: 17px;
+}
+
+.nurse-others__row .nurse-next__name {
+  font-size: 15px;
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
 .nurse-idle__text,
 .nurse-hint,
 .nurse-services__empty,
@@ -374,6 +405,14 @@
   font-size: 15px;
 }
 
+/* Owner review: the board-read error stays visible WHILE the last
+ * rendered board is kept (§9) — danger-tinted, never dismissible data
+ * staleness going unnoticed. */
+.nurse-notice--error {
+  border-left: 4px solid var(--mac-danger-strong, rgba(217, 44, 32, 1));
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
+}
+
 .nurse-notice__close {
   margin-left: auto;
   border: none;
@@ -459,6 +498,7 @@
 [data-theme='dark'] .nurse-service,
 [data-theme='dark'] .nurse-draining__item,
 [data-theme='dark'] .nurse-notice,
+[data-theme='dark'] .nurse-others__row,
 [data-theme='dark'] .nurse-btn--choice {
   background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
   color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));

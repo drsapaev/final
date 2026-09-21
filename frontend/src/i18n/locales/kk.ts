@@ -10611,6 +10611,7 @@ const kk = {
     board_next: 'Келесі',
     board_waiting_count: 'Күтуде: {count}',
     board_empty_waiting: 'Күтіп тұрған пациент жоқ',
+    board_other_staff: 'Басқа қызметкер қабылдауда',
     queue_number: '№ {number}',
     patient_unnamed: 'Аты жоқ',
     entry_status_waiting: 'Күтуде',

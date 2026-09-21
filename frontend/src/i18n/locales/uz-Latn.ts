@@ -10612,6 +10612,7 @@ const uzLatn = {
     board_next: 'Keyingi',
     board_waiting_count: 'Kutmoqda: {count}',
     board_empty_waiting: 'Kutayotgan bemor yo‘q',
+    board_other_staff: 'Boshqa xodim qabul qilmoqda',
     queue_number: '№ {number}',
     patient_unnamed: 'Nomsiz',
     entry_status_waiting: 'Kutmoqda',

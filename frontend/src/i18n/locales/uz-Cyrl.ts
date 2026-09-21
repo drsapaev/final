@@ -10622,6 +10622,7 @@ const uzCyrl = {
     board_next: 'Кейинги',
     board_waiting_count: 'Кутмоқда: {count}',
     board_empty_waiting: 'Кутаётган бемор йўқ',
+    board_other_staff: 'Бошқа ходим қабул қилмоқда',
     queue_number: '№ {number}',
     patient_unnamed: 'Номсиз',
     entry_status_waiting: 'Кутмоқда',

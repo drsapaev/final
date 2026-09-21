@@ -12,8 +12,26 @@
  *  - 200 idempotent replay  -> render the durable server state (refetch);
  *  - 409                    -> no guesswork, no retry loop — refetch board;
  *  - 403 assignment loss    -> refetch workplaces, back to the picker;
- *  - 404 station gone       -> unavailable state, refetch workplaces;
+ *  - 404 operation-specific -> refetch the board (another staffer took
+ *    the patient / no one is waiting / the execution is already gone) —
+ *    NEVER "station unavailable": that verdict belongs to the board GET
+ *    itself (owner review: a call-next 404 used to eject the nurse from
+ *    a perfectly healthy station);
  *  - 5xx/network            -> keep the rendered state, surface Retry.
+ *
+ * Board-read boundary (owner review): 403/404 on the board GET clear the
+ * PHI from the screen IMMEDIATELY (403 also re-reads workplaces — the
+ * assignment world changed), while network/5xx keep the last rendered
+ * state; the error is visible EVEN when a previous board is still shown.
+ *
+ * Workplace discovery (owner review): the zero-workplace screen and the
+ * focus refresh re-read the workplaces list — a fresh assignment lands
+ * without a full page reload.
+ *
+ * Stale-response guard (owner review): board responses apply only when
+ * they still describe the CURRENT selection — a slow response for
+ * workplace A must never overwrite (or blank) workplace B after a quick
+ * switch (the epoch + selected check below).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -80,12 +98,40 @@ export function useNurseServingBoard() {
     };
   }, []);
 
+  /**
+   * The selection guard ref. applySelection is its ONLY writer (every
+   * selectedWorkplaceId patch goes through it) — a render-time sync
+   * from state could clobber the imperative write during the setState
+   * flush window and drop a legitimate board response.
+   */
   const selectedRef = useRef<number | null>(null);
-  selectedRef.current = state.selectedWorkplaceId;
+  const workplacesRef = useRef<NurseWorkplace[]>([]);
+  workplacesRef.current = state.workplaces;
+
+  /**
+   * The board-response epoch (owner review): every loadBoard bumps it;
+   * a response (success OR error) applies only when it is still the
+   * newest request AND still describes the current selection.
+   */
+  const boardEpochRef = useRef(0);
 
   const patch = useCallback((partial: Partial<NurseServingBoardState>) => {
     setState((prev) => ({ ...prev, ...partial }));
   }, []);
+
+  /**
+   * Selection write: the guard ref updates IMMEDIATELY (the stale-
+   * response check reads it while the setState flush is still pending —
+   * a response that lands in that window must still pass the
+   * selected-check), then converges with the rendered state.
+   */
+  const applySelection = useCallback(
+    (queueResourceId: number | null) => {
+      selectedRef.current = queueResourceId;
+      patch({ selectedWorkplaceId: queueResourceId });
+    },
+    [patch],
+  );
 
   // -------------------------------------------------------------------------
   // read plane
@@ -104,16 +150,92 @@ export function useNurseServingBoard() {
     }
   }, [api, patch]);
 
+  /**
+   * §4 selection invariant over a FRESH workplaces list: a still-granted
+   * selection stays; a revoked one drops to the picker; a lone workplace
+   * auto-selects (and loads its board) — the same rule the initial load
+   * applies, re-run whenever the assignment world is re-read.
+   */
+  const ensureSelection = useCallback(
+    async (items: NurseWorkplace[]): Promise<void> => {
+      const selected = selectedRef.current;
+      if (
+        selected != null &&
+        items.some((workplace) => workplace.queue_resource_id === selected)
+      ) {
+        return;
+      }
+      if (items.length === 1) {
+        applySelection(items[0].queue_resource_id);
+        patch({ notice: null });
+        await loadBoardRef.current(items[0].queue_resource_id);
+        return;
+      }
+      if (selected != null) {
+        applySelection(null);
+        patch({ board: null, boardError: null });
+      }
+    },
+    [applySelection, patch],
+  );
+
+  /** Late-bound so ensureSelection can call loadBoard declared below. */
+  const loadBoardRef = useRef<
+    (queueResourceId: number) => Promise<NurseStationBoard | null>
+  >(() => Promise.resolve(null));
+
   const loadBoard = useCallback(
     async (queueResourceId: number): Promise<NurseStationBoard | null> => {
+      const epoch = ++boardEpochRef.current;
       patch({ boardLoading: true, boardError: null });
       try {
         const board = await api.getStationBoard(queueResourceId);
+        if (
+          epoch !== boardEpochRef.current ||
+          selectedRef.current !== queueResourceId
+        ) {
+          // A newer request (or a workplace switch) superseded this
+          // response — applying it would render station A's PHI under
+          // station B's header.
+          return null;
+        }
         patch({ board, boardLoading: false });
         return board;
       } catch (err) {
+        if (
+          epoch !== boardEpochRef.current ||
+          selectedRef.current !== queueResourceId
+        ) {
+          // A stale failure never blanks the CURRENT station either.
+          return null;
+        }
         const status = api.nurseServingErrorStatus(err);
-        // §9: keep the last RENDERED server state — do not blank the board.
+        if (status === 403 || status === 404) {
+          // Access-revocation boundary (owner review): the PHI leaves
+          // the screen immediately. 403 = the assignment world changed
+          // (also re-read workplaces); 404 = this station surface is
+          // unavailable today. Network/5xx keep the rendered state.
+          patch({
+            board: null,
+            boardLoading: false,
+            boardError: {
+              status,
+              message: api.nurseServingErrorText(
+                err,
+                'errors.nurse.board_unavailable',
+              ),
+            },
+          });
+          if (status === 403) {
+            // Fire-and-forget list refresh — the selection decision
+            // belongs to the caller (initial load / picker), never to a
+            // load->403->reset loop.
+            void loadWorkplaces();
+          }
+          return null;
+        }
+        // §9: keep the last RENDERED server state — do not blank the
+        // board — but make the error visible even alongside it.
         setState((prev) => ({
           ...prev,
           boardLoading: false,
@@ -125,8 +247,9 @@ export function useNurseServingBoard() {
         return null;
       }
     },
-    [api, patch],
+    [api, loadWorkplaces, patch],
   );
+  loadBoardRef.current = loadBoard;
 
   const loadDraining = useCallback(async (): Promise<void> => {
     patch({ drainingLoading: true });
@@ -148,16 +271,14 @@ export function useNurseServingBoard() {
         board: null,
         boardError: null,
         ...(notice ? { notice } : {}),
-        ...(items.length === 1
-          ? { selectedWorkplaceId: items[0].queue_resource_id }
-          : { selectedWorkplaceId: null }),
       });
+      applySelection(items.length === 1 ? items[0].queue_resource_id : null);
       if (items.length === 1) {
-        await loadBoard(items[0].queue_resource_id);
+        await loadBoardRef.current(items[0].queue_resource_id);
       }
       return items;
     },
-    [loadBoard, loadWorkplaces, patch],
+    [applySelection, loadBoardRef, loadWorkplaces, patch],
   );
 
   const selectWorkplace = useCallback(
@@ -170,10 +291,11 @@ export function useNurseServingBoard() {
       } catch {
         // storage unavailable (private mode) — the hint is optional
       }
-      patch({ selectedWorkplaceId: queueResourceId, notice: null });
+      applySelection(queueResourceId);
+      patch({ notice: null });
       await loadBoard(queueResourceId);
     },
-    [loadBoard, patch],
+    [applySelection, loadBoard, patch],
   );
 
   // -------------------------------------------------------------------------
@@ -200,7 +322,7 @@ export function useNurseServingBoard() {
         }
         const selected = selectedRef.current;
         if (selected != null) {
-          await loadBoard(selected);
+          await loadBoardRef.current(selected);
         }
         return 'ok';
       } catch (err) {
@@ -214,7 +336,7 @@ export function useNurseServingBoard() {
           // §9: the state changed by another staff member -> refetch.
           const selected = selectedRef.current;
           if (selected != null) {
-            await loadBoard(selected);
+            await loadBoardRef.current(selected);
           }
           patch({ notice: 'nurse.notice_state_changed' });
           return 'conflict';
@@ -225,7 +347,20 @@ export function useNurseServingBoard() {
           return 'forbidden';
         }
         if (status === 404) {
-          await resetWorkplace('nurse.notice_station_unavailable');
+          // Owner review: operation-specific 404s — "no waiting patients",
+          // "the entry was taken by another staffer", "the execution is
+          // gone" — all mean REFRESH THE BOARD, not "station unavailable".
+          // A real station/queue loss surfaces through the board GET's own
+          // 403/404 handling; the old blanket reset ejected the nurse from
+          // a healthy station on an ordinary call-next race.
+          const selected = selectedRef.current;
+          if (selected != null) {
+            await loadBoardRef.current(selected);
+          }
+          if (opts.terminal) {
+            await loadDraining();
+          }
+          patch({ notice: 'nurse.notice_state_changed' });
           return 'not-found';
         }
         // 5xx / network: keep the rendered state, surface a retry notice
@@ -233,7 +368,7 @@ export function useNurseServingBoard() {
         return 'error';
       }
     },
-    [api, loadBoard, loadDraining, patch, resetWorkplace],
+    [api, loadDraining, patch, resetWorkplace],
   );
 
   const callNext = useCallback(
@@ -348,11 +483,11 @@ export function useNurseServingBoard() {
           : null;
       if (items.length === 1) {
         // §4: single workplace auto-selects; the server stays the SSOT.
-        patch({ selectedWorkplaceId: items[0].queue_resource_id });
-        await loadBoard(items[0].queue_resource_id);
+        applySelection(items[0].queue_resource_id);
+        await loadBoardRef.current(items[0].queue_resource_id);
       } else if (valid != null) {
-        patch({ selectedWorkplaceId: valid });
-        const board = await loadBoard(valid);
+        applySelection(valid);
+        const board = await loadBoardRef.current(valid);
         if (board == null) {
           // §4: the stored id failed (403/404) -> back to the picker.
           await resetWorkplace();
@@ -365,30 +500,79 @@ export function useNurseServingBoard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Silent refresh: board + draining, only when idle and visible. */
+  /**
+   * Silent refresh: board + draining, only when idle and visible.
+   *
+   * The board response applies only while it still describes the current
+   * selection (a user-driven loadBoard supersedes it via the epoch).
+   * 403 -> the full access-revocation reset (PHI out, workplaces re-read);
+   * 404 -> the station surface clears; network/5xx -> keep the rendered
+   * state. When the tablet sits on the zero-workplace screen (or nothing
+   * is selected), the workplaces list is re-read too — a fresh assignment
+   * lands without a page reload (owner review).
+   */
   const silentRefresh = useCallback(async () => {
     if (busyRef.current || state.pending.size > 0) return;
     busyRef.current = true;
     try {
       const selected = selectedRef.current;
+      const epoch = boardEpochRef.current;
       if (selected != null) {
         try {
           const board = await api.getStationBoard(selected);
-          patch({ board });
-        } catch {
-          // silent poll failure: keep the rendered state (§9)
+          if (
+            boardEpochRef.current === epoch &&
+            selectedRef.current === selected &&
+            mountedRef.current
+          ) {
+            patch({ board });
+          }
+        } catch (err) {
+          if (selectedRef.current === selected) {
+            const status = api.nurseServingErrorStatus(err);
+            if (status === 403) {
+              // assignment revoked: PHI out + workplaces re-read + notice
+              await resetWorkplace('nurse.notice_workplace_access_lost');
+            } else if (status === 404) {
+              patch({
+                board: null,
+                boardError: {
+                  status,
+                  message: api.nurseServingErrorText(
+                    err,
+                    'errors.nurse.board_unavailable',
+                  ),
+                },
+              });
+            }
+            // network/5xx: silent poll failure keeps the rendered state
+          }
         }
       }
       try {
         const data = await api.listDrainingExecutions();
-        patch({ draining: data.items ?? [] });
+        if (mountedRef.current) {
+          patch({ draining: data.items ?? [] });
+        }
       } catch {
         // discovery is best-effort
+      }
+      // Zero-workplace / nothing-selected discovery: re-read workplaces
+      // (throttled by the poll interval / focus throttle) so a new
+      // assignment appears without a full page reload.
+      if (
+        mountedRef.current &&
+        (workplacesRef.current.length === 0 || selectedRef.current == null)
+      ) {
+        const items = await loadWorkplaces();
+        if (mountedRef.current) {
+          await ensureSelection(items);
+        }
       }
     } finally {
       busyRef.current = false;
     }
-  }, [api, patch, state.pending.size]);
+  }, [api, ensureSelection, loadWorkplaces, patch, resetWorkplace, state.pending.size]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -415,13 +599,24 @@ export function useNurseServingBoard() {
     };
   }, [silentRefresh]);
 
+  /**
+   * Manual refresh: the FULL read plane — workplaces (the §4 access
+   * SSOT — an assignment may have appeared or vanished) + the board +
+   * the draining discovery.
+   */
   const refresh = useCallback(async () => {
+    const items = await loadWorkplaces();
     const selected = selectedRef.current;
-    if (selected != null) {
-      await loadBoard(selected);
+    if (
+      selected != null &&
+      items.some((workplace) => workplace.queue_resource_id === selected)
+    ) {
+      await loadBoardRef.current(selected);
+    } else {
+      await ensureSelection(items);
     }
     await loadDraining();
-  }, [loadBoard, loadDraining]);
+  }, [ensureSelection, loadBoardRef, loadDraining, loadWorkplaces]);
 
   return {
     ...state,

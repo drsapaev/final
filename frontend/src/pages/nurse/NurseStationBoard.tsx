@@ -18,6 +18,10 @@ export type NurseStationBoardProps = {
   stationLabel: string;
   cabinet: string | null;
   current: NurseBoardEntry | null;
+  /** The station's OTHER active entries (owner review): read-only
+   * overview — "being served by another staff member". They never
+   * become the current patient and never carry actions. */
+  others: NurseBoardEntry[];
   nextWaiting: NurseBoardEntry | null;
   waitingCount: number;
   pendingKeys: Set<string>;
@@ -37,6 +41,7 @@ export function NurseStationBoard({
   stationLabel,
   cabinet,
   current,
+  others,
   nextWaiting,
   waitingCount,
   isPending,
@@ -151,6 +156,34 @@ export function NurseStationBoard({
               {t('nurse.action_call_next')}
             </button>
           </div>
+        </div>
+      )}
+
+      {others.length > 0 && (
+        <div className="nurse-card nurse-card--others">
+          <div className="nurse-card__head">
+            <span className="nurse-card__caption">
+              {t('nurse.board_other_staff')}
+            </span>
+          </div>
+          <ul className="nurse-others__list">
+            {others.map((entry) => {
+              const otherStatusKey = `nurse.entry_status_${entry.status}`;
+              return (
+                <li key={entry.id} className="nurse-others__row">
+                  <span className="nurse-next__number">
+                    {t('nurse.queue_number', { number: String(entry.number) })}
+                  </span>
+                  <span className="nurse-next__name">
+                    {entry.patient_name || t('nurse.patient_unnamed')}
+                  </span>
+                  <span className={`nurse-badge nurse-badge--${entry.status}`}>
+                    {t(otherStatusKey)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
