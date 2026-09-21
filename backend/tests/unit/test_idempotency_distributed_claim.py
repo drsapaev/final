@@ -276,6 +276,10 @@ def two_workers(fake_redis: FakeRedis):
     saved_patient_policy = idem_module._patient_replay_policy_sync
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
     idem_module._distributed_claim = _make_claim(fake_redis)
+    # Round-9: the deployment-wide bridge anchor cache must not leak
+    # between tests (each test's fake store anchors its own window).
+    saved_anchor_cache = idem_module._BRIDGE_ANCHOR_CACHE
+    idem_module._BRIDGE_ANCHOR_CACHE = (False, 0.0)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
     # Codex R11 #3092: the canonical resolution is stubbed — numeric subs are
     # user ids as-is; username subjects get a stable synthetic id (same
@@ -298,6 +302,7 @@ def two_workers(fake_redis: FakeRedis):
     idem_module._distributed_claim = saved
     idem_module._check_principal_authorized_sync = saved_auth
     idem_module._patient_replay_policy_sync = saved_patient_policy
+    idem_module._BRIDGE_ANCHOR_CACHE = saved_anchor_cache
     idem_module._resolve_principal_id_sync = saved_resolve
 
 
@@ -4712,11 +4717,80 @@ def test_legacy_bridge_cutoff_pinned_is_absolute_and_restart_proof(monkeypatch):
     monkeypatch.setattr(settings, "IDEMPOTENCY_LEGACY_BRIDGE_MAX_AGE_SECONDS", 0.0)
     assert idem_module._legacy_bridge_active() is False
 
-    # Unpinned: the transitional process-start fallback (pre-round-9
-    # semantics preserved for an unconfigured rolling deploy).
-    monkeypatch.setattr(settings, "IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH", None)
-    monkeypatch.setattr(settings, "IDEMPOTENCY_LEGACY_BRIDGE_MAX_AGE_SECONDS", 90_090.0)
-    monkeypatch.setattr(idem_module, "_LEGACY_BRIDGE_EPOCH", now - 100.0)
-    assert idem_module._legacy_bridge_active() is True
-    monkeypatch.setattr(idem_module, "_LEGACY_BRIDGE_EPOCH", now - 90_100.0)
-    assert idem_module._legacy_bridge_active() is False
+    # Unpinned: the transitional process-start fallback — reachable ONLY
+    # when no shared store answers (no claim at all, anchor cache unset);
+    # the process epoch then governs, as documented.
+    saved_claim = idem_module._distributed_claim
+    saved_anchor_cache = idem_module._BRIDGE_ANCHOR_CACHE
+    idem_module._distributed_claim = None
+    idem_module._BRIDGE_ANCHOR_CACHE = (False, 0.0)
+    try:
+        monkeypatch.setattr(settings, "IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH", None)
+        monkeypatch.setattr(
+            settings, "IDEMPOTENCY_LEGACY_BRIDGE_MAX_AGE_SECONDS", 90_090.0
+        )
+        monkeypatch.setattr(idem_module, "_LEGACY_BRIDGE_EPOCH", now - 100.0)
+        assert idem_module._legacy_bridge_active() is True
+        monkeypatch.setattr(idem_module, "_LEGACY_BRIDGE_EPOCH", now - 90_100.0)
+        assert idem_module._legacy_bridge_active() is False
+    finally:
+        idem_module._distributed_claim = saved_claim
+        idem_module._BRIDGE_ANCHOR_CACHE = saved_anchor_cache
+
+
+def test_legacy_bridge_anchor_is_shared_across_workers(monkeypatch):
+    """Round-9 codex P2 follow-up: the UNPINNED legacy bridge window anchors
+    at the DEPLOYMENT's first start, persisted ONCE in the shared store
+    (SETNX). Two workers read ONE anchor, a restart (a fresh process with a
+    fresh process epoch) can never re-open the window, and once max_age
+    from the shared anchor elapses the bridge is dead for every worker."""
+    import time as _time
+
+    from app.core.config import settings
+
+    fake = FakeRedis()
+    saved_claim = idem_module._distributed_claim
+    saved_cache = idem_module._BRIDGE_ANCHOR_CACHE
+    saved_epoch = idem_module._LEGACY_BRIDGE_EPOCH
+    try:
+        monkeypatch.setattr(
+            settings, "IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH", None
+        )
+        t0 = _time.time()
+
+        # Worker 1 anchors the deployment window at its first check.
+        monkeypatch.setattr(idem_module, "_distributed_claim", _make_claim(fake))
+        monkeypatch.setattr(idem_module, "_BRIDGE_ANCHOR_CACHE", (False, 0.0))
+        monkeypatch.setattr(idem_module, "_LEGACY_BRIDGE_EPOCH", t0)
+        assert idem_module._legacy_bridge_active() is True
+        anchor = fake.store["idem:legacy_bridge_anchor"]
+        assert float(anchor) == pytest.approx(t0, abs=5)
+
+        # Worker 2 (another process) reads the SAME anchor — it does not
+        # re-arm its own window.
+        monkeypatch.setattr(idem_module, "_distributed_claim", _make_claim(fake))
+        monkeypatch.setattr(idem_module, "_BRIDGE_ANCHOR_CACHE", (False, 0.0))
+        monkeypatch.setattr(idem_module, "_LEGACY_BRIDGE_EPOCH", t0 + 3600)
+        assert idem_module._legacy_bridge_active() is True
+        assert fake.store["idem:legacy_bridge_anchor"] == anchor, (
+            "the anchor is written once per deployment (SETNX)"
+        )
+
+        # A RESTART of a worker (fresh process cache, fresh process epoch)
+        # cannot re-open the window — the shared anchor still governs.
+        monkeypatch.setattr(idem_module, "_BRIDGE_ANCHOR_CACHE", (False, 0.0))
+        monkeypatch.setattr(idem_module, "_LEGACY_BRIDGE_EPOCH", t0 + 3600)
+        assert idem_module._legacy_bridge_active() is True
+
+        # After max_age measured from the SHARED anchor the bridge is dead
+        # for every worker, restarts included.
+        fake.store["idem:legacy_bridge_anchor"] = str(t0 - 90_100.0)
+        monkeypatch.setattr(idem_module, "_BRIDGE_ANCHOR_CACHE", (False, 0.0))
+        assert idem_module._legacy_bridge_active() is False
+        monkeypatch.setattr(idem_module, "_BRIDGE_ANCHOR_CACHE", (False, 0.0))
+        assert idem_module._legacy_bridge_active() is False
+    finally:
+        idem_module._distributed_claim = saved_claim
+        idem_module._BRIDGE_ANCHOR_CACHE = saved_cache
+        idem_module._LEGACY_BRIDGE_EPOCH = saved_epoch
+        monkeypatch.undo()

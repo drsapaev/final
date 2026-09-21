@@ -125,21 +125,49 @@ _LEGACY_BRIDGE_DEFAULT_MAX_AGE_SECONDS = (
 )
 _LEGACY_BRIDGE_EPOCH = time.time()
 
+# Round-9 (codex P2, PR #3340 follow-up): the UNPINNED legacy bridge window is
+# anchored at the DEPLOYMENT's first start, persisted ONCE in the shared store
+# (SETNX, no TTL) — every worker and every RESTART reads the same anchor, so
+# the window can never be re-armed by a boot. The process-level cache only
+# mirrors the shared value within one worker's lifetime.
+_BRIDGE_ANCHOR_KEY = "idem:legacy_bridge_anchor"
+_BRIDGE_ANCHOR_CACHE: tuple[bool, float] = (False, 0.0)
+
+
+def _bridge_anchor() -> float:
+    """Process-cached read of the deployment-wide bridge anchor.
+
+    Unresolved while no shared store has answered in THIS process: the
+    fallback stays the process-start epoch (the bridge's distributed
+    operations are inert without Redis anyway). Once the store answers —
+    in this or any future process — the SHARED anchor governs and a
+    restart can never re-open the window."""
+    global _BRIDGE_ANCHOR_CACHE
+    resolved, value = _BRIDGE_ANCHOR_CACHE
+    if resolved:
+        return value
+    claim = get_distributed_claim()
+    if claim is not None and claim.try_available():
+        value = claim.bridge_anchor(time.time())
+        _BRIDGE_ANCHOR_CACHE = (True, value)
+        return value
+    return _LEGACY_BRIDGE_EPOCH
+
 
 def _legacy_bridge_active() -> bool:
     """True while the user-only legacy reconciliation may run (Round-8).
 
-    Round-9 (owner P2, PR #3340): the shutdown boundary is DEPLOYMENT-WIDE
-    and restart-proof. When ``IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH`` is
-    pinned, EVERY worker compares the current time against the SAME
+    Round-9 (owner P2 + codex P2, PR #3340): the shutdown boundary is
+    DEPLOYMENT-WIDE and restart-proof. When ``IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH``
+    is pinned, EVERY worker compares the current time against the SAME
     absolute Unix epoch — a rolling deploy, crash, worker restart or
     autoscaling replacement re-runs the same comparison against the same
     date and can never re-open the window (the previous process-start
     measurement re-armed the ~25 h window on every boot, so regularly
     restarted deployments kept the user-only aliasing hazard alive
-    indefinitely). The unpinned process-start window remains only as the
-    transitional fallback that keeps an unconfigured rolling deploy's
-    drain safe; production pins the cutoff (see the config comment).
+    indefinitely). UNPINNED, the window anchors at the deployment's FIRST
+    start persisted in the shared store (``idem:legacy_bridge_anchor``,
+    SETNX) — the restart-proof default, no operator action required.
     """
     try:
         from app.core.config import settings
@@ -160,7 +188,7 @@ def _legacy_bridge_active() -> bool:
     if cutoff is not None:
         # Absolute, shared, restart-proof boundary.
         return time.time() < float(cutoff)
-    return (time.time() - _LEGACY_BRIDGE_EPOCH) < max_age
+    return (time.time() - _bridge_anchor()) < max_age
 
 
 # Codex R2 #3092 (P1): after a transient Redis failure the layer degrades to
@@ -1214,6 +1242,36 @@ class DistributedIdempotencyClaim:
             self._claim_key(user_id, key),
             token,
         )
+
+    def bridge_anchor(self, now: float) -> float:
+        """Round-9 (codex P2, PR #3340 follow-up): the DEPLOYMENT-WIDE
+        legacy-bridge anchor, persisted ONCE in the shared store (SETNX,
+        no TTL).
+
+        The first worker that starts the rollout anchors the migration
+        window; every other worker — and every RESTART of every worker —
+        reads the same value instead of re-arming its own process-start
+        window. Returns the anchor epoch (``now`` only when the store is
+        unreachable, where the bridge is inert anyway)."""
+        raw = self._run(self._client.get, _BRIDGE_ANCHOR_KEY)
+        if raw:
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                pass
+        self._run(
+            self._client.set,
+            _BRIDGE_ANCHOR_KEY,
+            str(float(now)),
+            nx=True,
+        )
+        raw = self._run(self._client.get, _BRIDGE_ANCHOR_KEY)
+        if raw:
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                pass
+        return now
 
     def load_response(self, user_id: int | str, key: str) -> tuple[Response | None, str | None, str | None]:
         """Return (replay_response, stored_payload_hash, bound_principal_role)."""
