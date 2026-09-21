@@ -135,3 +135,97 @@ describe('usePendingAwareSessionExpiry (PR 3351, review round 6)', () => {
     expect(result.current).toBe(false);
   });
 });
+
+describe('usePendingAwareSessionExpiry (PR 3351, review round 7 — JWT refresh during deferred wait)', () => {
+  afterEach(() => {
+    window.sessionStorage.removeItem('auth_token');
+    vi.restoreAllMocks();
+  });
+
+  it('cancels the delayed redirect when the token was refreshed to a valid JWT while operations were pending', () => {
+    // PR 3351 (review round 7, P2): истечение → redirectPending →
+    // параллельный single-flight refresh обновил auth_token на JWT с
+    // будущим exp → последняя операция завершена → onExpired НЕ
+    // вызывается, redirectPending=false — восстановленная сессия не
+    // прерывается ложным logout.
+    installToken(Date.now() - 60_000);
+    const onExpired = vi.fn();
+    let pending = true;
+
+    const { result, rerender } = renderHook(
+      ({ signal }: { signal: number }) => usePendingAwareSessionExpiry({
+        hasPendingOperations: () => pending,
+        pendingOperationsSignal: signal,
+        onWarning: () => {},
+        onExpired,
+      }),
+      { initialProps: { signal: 0 } },
+    );
+
+    expect(onExpired).not.toHaveBeenCalled();
+    expect(result.current).toBe(true);
+
+    // Токен обновили (например, фоновый API-запрос сделал single-flight
+    // refresh) — новый JWT действует ещё час.
+    installToken(Date.now() + 60 * 60_000);
+
+    pending = false;
+    rerender({ signal: 1 });
+
+    expect(onExpired).not.toHaveBeenCalled();
+    expect(result.current).toBe(false);
+  });
+
+  it('still fires onExpired once when the token was never refreshed after expiry', () => {
+    // Комплемент предыдущего теста: refresh не случился — отложенный
+    // переход выполняется ровно один раз (прежний контракт round 6).
+    installToken(Date.now() - 60_000);
+    const onExpired = vi.fn();
+    let pending = true;
+
+    const { result, rerender } = renderHook(
+      ({ signal }: { signal: number }) => usePendingAwareSessionExpiry({
+        hasPendingOperations: () => pending,
+        pendingOperationsSignal: signal,
+        onWarning: () => {},
+        onExpired,
+      }),
+      { initialProps: { signal: 0 } },
+    );
+
+    expect(result.current).toBe(true);
+
+    pending = false;
+    rerender({ signal: 1 });
+
+    expect(onExpired).toHaveBeenCalledTimes(1);
+    expect(result.current).toBe(false);
+  });
+
+  it('fires onExpired when the token disappeared entirely while waiting', () => {
+    // Токен удалён (разлогин в другой вкладке / storage очищен) —
+    // сессии нет, redirect выполняется после завершения операций.
+    installToken(Date.now() - 60_000);
+    const onExpired = vi.fn();
+    let pending = true;
+
+    const { result, rerender } = renderHook(
+      ({ signal }: { signal: number }) => usePendingAwareSessionExpiry({
+        hasPendingOperations: () => pending,
+        pendingOperationsSignal: signal,
+        onWarning: () => {},
+        onExpired,
+      }),
+      { initialProps: { signal: 0 } },
+    );
+
+    expect(result.current).toBe(true);
+    window.sessionStorage.removeItem('auth_token');
+
+    pending = false;
+    rerender({ signal: 1 });
+
+    expect(onExpired).toHaveBeenCalledTimes(1);
+    expect(result.current).toBe(false);
+  });
+});

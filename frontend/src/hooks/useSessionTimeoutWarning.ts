@@ -32,8 +32,14 @@ const DEFAULT_POLL_INTERVAL = 30 * 1000; // 30 seconds
  * Parse the `exp` claim from a JWT without verifying the signature.
  * Returns the expiration time in milliseconds (epoch), or null if the
  * token is not a JWT or has no exp claim.
+ *
+ * PR 3351 (review round 7, P2): экспортируется для usePendingAwareSessionExpiry —
+ * перед отложенным (за pending-операциями) redirect нужно повторно
+ * проверить актуальный токен: single-flight refresh в API-клиенте мог
+ * уже обновить его, и принудительный logout прерывал бы восстановленную
+ * сессию.
  */
-function getTokenExpiryMs(token: string) {
+export function getTokenExpiryMs(token: string) {
   if (!token) return null;
   try {
     const parts = token.split('.');

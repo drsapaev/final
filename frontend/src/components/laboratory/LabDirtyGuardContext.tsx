@@ -117,6 +117,21 @@ import { useTranslation } from '../../i18n/useTranslation';
  *    актуальны всегда), поэтому слушатель установлен один раз и не
  *    зависит от перерисовок провайдера.
  *
+ *    PR 3351 (review round 7, P1): pending-защита разделена на ДВА сигнала.
+ *    Полный уход (beforeunload/guardRouteLeave/session-expiry) блокируется
+ *    при ЛЮБОЙ незавершённой операции — включая report CREATE (review
+ *    round 7: неидемпотентный POST /lab/report-instances). Но sentinel
+ *    (browser Back) вооружается только операциями, блокирующими и
+ *    КОНТЕКСТНЫЕ переходы (save/finalize/print/autosave/шаблонные операции):
+ *    для latest-wins CREATE in-lab Back — легитимный контекстный переход,
+ *    а вооружение sentinel-а рвало бы URL-контракт: in-lab replace (create
+ *    применил новый ?instance) меняет запись sentinel-а, twin ниже неё
+ *    хранит до-create URL, и collapse после завершения операции уводил бы
+ *    history.back()-ом на устаревший twin — URL и активный отчёт молча
+ *    откатывались на предыдущий бланк (stale restore). Поэтому сигналы
+ *    разнесены: hasPendingOperations (документ/маршрут/сессия) и
+ *    hasHistoryGuardPending (sentinel/popstate).
+ *
  * Инвариант sentinel: запись ПОД sentinel никогда не мутирует после arm
  * (replaceState действует на текущую запись, т.е. на сам sentinel). Вытесненный
  * sentinel опознаётся по двойнику (PR 3351, review round 4): запись на одну
@@ -400,8 +415,25 @@ export interface LabDirtyGuardContextValue {
    * Перерисовывает потребителей (и sentinel-хост) на флипах 0↔n —
    * pending-only операция (clone чистого шаблона, finalize/print чистого
    * отчёта) обязана блокировать уход с /lab так же, как dirty-черновик.
+   *
+   * PR 3351 (review round 7, P1): это ДОКУМЕНТ-уровневый сигнал (полный
+   * уход: beforeunload, guardRouteLeave, session-expiry) — включает report
+   * CREATE. Сигнал sentinel-а (browser Back) — отдельный,
+   * hasHistoryGuardPending (см. ниже): CREATE его не блокирует.
    */
   hasPendingOperations: boolean;
+  /**
+   * PR 3351 (review round 7, P1): pending-источники, вооружающие sentinel
+   * (browser Back) — операции, блокирующие и контекстные переходы
+   * (save/finalize/print/autosave/шаблонные операции), БЕЗ latest-wins
+   * report CREATE. Для create in-lab Back — легитимная навигация
+   * (latest-wins по operation-context), а вооружение sentinel-а ломало бы
+   * URL-контракт: collapse после завершения уходит history.back()-ом на
+   * twin-запись с до-create URL и молча откатывает активный отчёт.
+   */
+  setHistoryGuardPendingSources: (sources: string[]) => void;
+  /** Реактивный агрегат history-guard-источников (флипы 0↔n). */
+  hasHistoryGuardPending: boolean;
   /**
    * Route-level leave guard: pending-блок (любая незавершённая операция) +
    * dirty-диалог по ВСЕМ источникам (уход с /lab уничтожает каждый draft).
@@ -433,6 +465,21 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
     ));
   }, []);
   const hasPendingOperations = pendingOperationSources.length > 0;
+
+  // PR 3351 (review round 7, P1): второй pending-сигнал — для sentinel-а
+  // (browser Back). Те же флипы 0↔n, но состав уже: только операции,
+  // блокирующие контекстные переходы (без latest-wins report CREATE —
+  // иначе collapse sentinel-а после in-lab replace откатывал бы URL/отчёт
+  // на до-create запись). См. комментарий к типу контекста.
+  const historyGuardPendingSourcesRef = useRef<string[]>([]);
+  const [historyGuardPendingSources, setHistoryGuardPendingSourcesState] = useState<string[]>([]);
+  const setHistoryGuardPendingSources = useCallback((sources: string[]) => {
+    historyGuardPendingSourcesRef.current = sources;
+    setHistoryGuardPendingSourcesState((previous) => (
+      (previous.length === 0) === (sources.length === 0) ? previous : sources
+    ));
+  }, []);
+  const hasHistoryGuardPending = historyGuardPendingSources.length > 0;
 
   // Уход с /lab блокируется при любой незавершённой операции (save/finalize/
   // print/autosave любого источника) — переход посреди записи мог бы создать
@@ -485,6 +532,8 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
     hasDirtySources: guard.hasDirtySources,
     setPendingOperationSources,
     hasPendingOperations,
+    setHistoryGuardPendingSources,
+    hasHistoryGuardPending,
     guardRouteLeave,
     notifyDirtyStateChange: guard.notifyDirtyStateChange,
   }), [
@@ -496,6 +545,8 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
     guard.notifyDirtyStateChange,
     setPendingOperationSources,
     hasPendingOperations,
+    setHistoryGuardPendingSources,
+    hasHistoryGuardPending,
     guardRouteLeave,
   ]);
 
@@ -505,6 +556,7 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
       <LabLeaveRouteGuard
         hasDirtySources={guard.hasDirtySources}
         hasPendingOperations={hasPendingOperations}
+        hasHistoryGuardPending={hasHistoryGuardPending}
         guardRouteLeave={guardRouteLeave}
       />
       {guard.guardDialog}
@@ -517,10 +569,14 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
 function LabLeaveRouteGuard({
   hasDirtySources,
   hasPendingOperations,
+  hasHistoryGuardPending,
   guardRouteLeave,
 }: {
   hasDirtySources: () => boolean;
+  /** ДОКУМЕНТ-уровень (beforeunload): dirty ИЛИ любая операция, включая report CREATE. */
   hasPendingOperations: boolean;
+  /** Sentinel (browser Back): dirty ИЛИ операции, блокирующие контекстные переходы (без CREATE). */
+  hasHistoryGuardPending: boolean;
   guardRouteLeave: (leave: () => void) => boolean;
 }) {
   const navigate = useNavigate();
@@ -528,11 +584,20 @@ function LabLeaveRouteGuard({
   // popstate-listener всегда видит актуальные коллбеки без пересборки.
   const hasDirtyRef = useRef(hasDirtySources);
   hasDirtyRef.current = hasDirtySources;
-  // PR 3351 (review round 3, P1): pending-состояние участвует в решении
-  // sentinel-а: незавершённая операция блокирует browser Back так же,
-  // как dirty-черновик (clone чистого шаблона не идемпотентен).
+  // ДОКУМЕНТ-уровневый pending (доc review round 7: включает report CREATE)
+  // — питает ТОЛЬКО beforeunload (refresh/закрытие вкладки).
   const hasPendingRef = useRef(hasPendingOperations);
   hasPendingRef.current = hasPendingOperations;
+  // PR 3351 (review round 7, P1): sentinel-arming сигнал — dirty ИЛИ
+  // контекстно-блокирующие операции (save/finalize/print/autosave/шаблонные),
+  // БЕЗ latest-wins report CREATE: для create in-lab Back — легитимная
+  // навигация, а collapse вооружённого sentinel-а после in-lab replace
+  // (create применил новый ?instance) уводил бы history.back()-ом на
+  // twin-запись с до-create URL — URL и активный отчёт молча откатывались
+  // (stale restore предыдущего бланка). Документ-уровень (refresh/close,
+  // route-leave, session-expiry) при этом CREATE блокирует.
+  const hasHistoryPendingRef = useRef(hasHistoryGuardPending);
+  hasHistoryPendingRef.current = hasHistoryGuardPending;
   const guardRouteLeaveRef = useRef(guardRouteLeave);
   guardRouteLeaveRef.current = guardRouteLeave;
 
@@ -595,7 +660,10 @@ function LabLeaveRouteGuard({
     // конкурирующий traversal отменял navigate(-2) подтверждённого ухода.
     if (labLeaveSentinel.isLeaveIntent()) return;
     // PR 3351 (review round 3, P1): sentinel активен при dirty ИЛИ pending.
-    if (!hasDirtyRef.current() && !hasPendingRef.current) {
+    // PR 3351 (review round 7, P1): pending здесь — history-guard сигнал
+    // (контекстно-блокирующие операции, БЕЗ latest-wins report CREATE):
+    // см. комментарий к hasHistoryPendingRef выше.
+    if (!hasDirtyRef.current() && !hasHistoryPendingRef.current) {
       // Блокирующее состояние исчезло: не просто disarm — убираем фантомную
       // запись, иначе первый browser Back молча приземлится на дубликат /lab.
       if (labLeaveSentinel.isArmed()) labLeaveSentinel.collapse();
@@ -703,7 +771,10 @@ function LabLeaveRouteGuard({
       }
       // PR 3351 (review round 3, P1): pending-only тоже блокирует уход —
       // sentinel вооружён при dirty||pending, решение через guardRouteLeave.
-      if (!hasDirtyRef.current() && !hasPendingRef.current) {
+      // PR 3351 (review round 7, P1): тот же сигнал, что вооружал sentinel
+      // (history-guard: контекстно-блокирующие операции, без CREATE) —
+      // чем вооружились, тем и разоружаемся.
+      if (!hasDirtyRef.current() && !hasHistoryPendingRef.current) {
         labLeaveSentinel.disarm();
         return;
       }
@@ -771,6 +842,8 @@ export function useLabDirtyGuard(): LabDirtyGuardContextValue {
     hasDirtySources: standalone.hasDirtySources,
     setPendingOperationSources: () => {},
     hasPendingOperations: false,
+    setHistoryGuardPendingSources: () => {},
+    hasHistoryGuardPending: false,
     guardRouteLeave: (leave: () => void) => standalone.guardTransition(leave),
     notifyDirtyStateChange: standalone.notifyDirtyStateChange,
   }), [ctx, standalone]);

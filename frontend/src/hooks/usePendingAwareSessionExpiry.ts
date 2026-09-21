@@ -23,8 +23,12 @@
  *    переход»), hard navigation НЕ выполняется;
  *  - как только последняя операция завершается (реактивный сигнал
  *    pendingOperationsSignal меняется, а авторитетный аксессор
- *    hasPendingOperations() возвращает false) — onExpired вызывается
- *    ровно один раз и выполняет переход.
+ *    hasPendingOperations() возвращает false) — ПОВТОРНО проверяется
+ *    актуальный access token: за время ожидания его мог обновить
+ *    single-flight refresh в API-клиенте. Валидный токен отменяет
+ *    redirect (redirectPending=false, onExpired НЕ вызывается —
+ *    восстановленная сессия не прерывается ложным logout); истёкший —
+ *    onExpired вызывается ровно один раз и выполняет переход.
  *
  * Паттерн рефов — как везде в этом PR: коллбеки и аксессор обновляются
  * каждый рендер, поэтому 30-секундный опрос useSessionTimeoutWarning и
@@ -32,7 +36,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import useSessionTimeoutWarning from './useSessionTimeoutWarning';
+import useSessionTimeoutWarning, { getTokenExpiryMs } from './useSessionTimeoutWarning';
 
 export interface UsePendingAwareSessionExpiryOptions {
   /**
@@ -56,6 +60,32 @@ export interface UsePendingAwareSessionExpiryOptions {
    * и выполняет logout/redirect.
    */
   onExpired: () => void;
+}
+
+/**
+ * PR 3351 (review round 7, P2): повторная проверка АКТУАЛЬНОГО токена.
+ *
+ * За время ожидания (истечение → pending-операции → завершение) access
+ * token мог быть обновлён: общий API-клиент делает single-flight refresh
+ * перед запросами (в т.ч. фоновыми), а useSessionTimeoutWarning при виде
+ * токена с достаточным сроком жизни сбрасывает свои
+ * warningFiredRef/expiredFiredRef и продолжает штатный цикл. Без
+ * перепроверки обёртка выполняла отложенный onExpired вслепую — ложный
+ * logout и потеря рабочего контекста при уже восстановленной сессии.
+ *
+ * false (переход выполняется): токена нет / exp в прошлом / не парсится —
+ * на момент откладывания опрос УЖЕ видел истёкший JWT, поэтому «не
+ * парсится» трактуется как «сессия не восстановлена».
+ */
+function hasValidAccessTokenNow(): boolean {
+  try {
+    const token = window.sessionStorage.getItem('auth_token');
+    if (!token) return false;
+    const expiresAt = getTokenExpiryMs(token);
+    return expiresAt != null && expiresAt > Date.now();
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -96,10 +126,18 @@ export function usePendingAwareSessionExpiry({
   // операций читается из авторитетного аксессора (не из сигнала).
   // hasPendingOperations/коллбеки живут в render-time рефах — в deps
   // не нуждаются.
+  // PR 3351 (review round 7, P2): перед отложенным onExpired — повторная
+  // проверка токена. JWT истёк во время pending clone/finalize/create →
+  // redirectPending=true → параллельный запрос выполнил single-flight
+  // refresh → новый JWT валиден → операция завершена → redirectPending
+  // снимается БЕЗ onExpired: сессия восстановлена, ложный logout не
+  // выполняется. Токен по-прежнему истёк — прежнее поведение: переход
+  // ровно один раз после завершения последней операции.
   useEffect(() => {
     if (!redirectPending) return;
     if (hasPendingRef.current()) return;
     setRedirectPending(false);
+    if (hasValidAccessTokenNow()) return;
     onExpiredRef.current();
   }, [redirectPending, pendingOperationsSignal]);
 

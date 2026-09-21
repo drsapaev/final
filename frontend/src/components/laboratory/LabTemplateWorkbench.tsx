@@ -28,6 +28,12 @@ import SignersTab from './templateEditor/SignersTab';
 import PreviewTab from './templateEditor/PreviewTab';
 import { useTranslation } from '../../i18n/useTranslation';
 import { getErrorMessage } from '../../utils/type-guards';
+// PR 3351 (review round 7, P1): split-уровни pending-защиты (см. operationPending.ts).
+import {
+  LAB_OPERATION_PENDING_ALL,
+  LAB_OPERATION_PENDING_NONE,
+  type LabOperationPendingState,
+} from './operationPending';
 import { Archive, BadgeCheck, Download, Files, Plus, RotateCcw, SlidersHorizontal, SquareStack } from 'lucide-react';
 
 export default function LabTemplateWorkbench({
@@ -59,7 +65,12 @@ export default function LabTemplateWorkbench({
     options?: { onCancel?: () => void | Promise<void>; sourceIds?: string[] },
   ) => boolean;
   templateTransitionPending?: boolean;
-  onOperationPendingChange?: (pending: boolean) => void;
+  /**
+   * PR 3351 (review round 7, P1): split-уровни pending-защиты. Все операции
+   * шаблона (create/save/clone/archive) блокируют оба уровня; null (cleanup)
+   * снимает источник.
+   */
+  onOperationPendingChange?: (state: LabOperationPendingState | null) => void;
   notify?: (type: string, message: string) => void;
   [k: string]: unknown;
 }) {
@@ -145,9 +156,13 @@ export default function LabTemplateWorkbench({
   const interactionPending = saving || templateTransitionPending || !draftHydrated;
 
   useLayoutEffect(() => {
-    onOperationPendingChange?.(saving);
+    // PR 3351 (review round 7, P1): все операции шаблона (create/save/clone/
+    // archive) неидемпотентны или меняют список — блокируем и контекстные
+    // переходы, и полный уход с /lab. Split-семантика (latest-wins только
+    // внутри панели) нужна исключительно report CREATE.
+    onOperationPendingChange?.(saving ? LAB_OPERATION_PENDING_ALL : LAB_OPERATION_PENDING_NONE);
     return () => {
-      if (saving) onOperationPendingChange?.(false);
+      if (saving) onOperationPendingChange?.(null);
     };
   }, [onOperationPendingChange, saving]);
 

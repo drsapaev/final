@@ -14,6 +14,8 @@ import {
   getLabStatusVariant,
   signerFieldLabels
 } from './labUiLabels';
+// PR 3351 (review round 7, P1): split-уровни pending-защиты (см. operationPending.ts).
+import type { LabOperationPendingState } from './operationPending';
 
 // WF-08 fix: confirmation dialog для irreversible actions (Finalize, Revise).
 import { useConfirm } from '../common/ConfirmDialog';
@@ -132,7 +134,14 @@ export default function LabReportWorkbench({
   }) => () => void;
   /** PR 3351: вызывается при каждом изменении dirty-состояния (sentinel route-guard). */
   onDirtyStateChange?: () => void;
-  onOperationPendingChange?: (pending: boolean) => void;
+  /**
+   * PR 3351 (review round 7, P1): split-уровни pending-защиты.
+   * blocksContextTransition — контекстные переходы report-области;
+   * blocksDocumentLeave — полный уход с /lab (beforeunload/route-leave/
+   * sentinel/session-expiry). null (cleanup) снимает источник с обоих
+   * уровней.
+   */
+  onOperationPendingChange?: (state: LabOperationPendingState | null) => void;
   [k: string]: unknown;
 }) {
   const { t: rawT } = useTranslation();
@@ -234,17 +243,28 @@ export default function LabReportWorkbench({
     && !saving
     && !autoSaving;
 
-  // PR 3351 pending-контракт: create — latest-wins и НЕ блокирует
-  // контекстные переходы (поздний ответ отбрасывается по operation-context
-  // в handleInstanceChange). Все остальные операции (save draft, autosave,
-  // finalize, revise, print, notify) блокируют переходы report-области.
-  const reportOperationBlocksTransition = (saving && busyAction !== 'create') || autoSaving;
+  // PR 3351 pending-контракт (review round 7, P1): два независимых уровня.
+  // CREATE остаётся latest-wins для КОНТЕКСТНЫХ переходов (поздний ответ
+  // отбрасывается по operation-context в handleInstanceChange — смена
+  // пациента/отчёта не ждёт POST), но POST /lab/report-instances
+  // неидемпотентен: refresh/закрытие вкладки/уход с /lab/истечение сессии
+  // поверх летящего create теряли ответ, и оператор после повторного входа
+  // создавал второй бланк. Поэтому CREATE (как и save/autosave/finalize/
+  // revise/print/notify) блокирует ДОКУМЕНТ/маршрут: beforeunload
+  // провайдера, guardRouteLeave, sentinel и session-expiry redirect.
+  const reportBlocksContextTransition = (saving && busyAction !== 'create') || autoSaving;
+  const reportBlocksDocumentLeave = saving || autoSaving;
   useLayoutEffect(() => {
-    onOperationPendingChange?.(reportOperationBlocksTransition);
+    onOperationPendingChange?.({
+      blocksContextTransition: reportBlocksContextTransition,
+      blocksDocumentLeave: reportBlocksDocumentLeave,
+    });
     return () => {
-      if (reportOperationBlocksTransition) onOperationPendingChange?.(false);
+      if (reportBlocksContextTransition || reportBlocksDocumentLeave) {
+        onOperationPendingChange?.(null);
+      }
     };
-  }, [onOperationPendingChange, reportOperationBlocksTransition]);
+  }, [onOperationPendingChange, reportBlocksContextTransition, reportBlocksDocumentLeave]);
 
   useEffect(() => {
     const partial = partialDraftCommitRef.current;

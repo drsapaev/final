@@ -9,6 +9,7 @@ import LabReportWorkbench, {
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
 import type { DirtyGuardTransitionOptions } from '../components/laboratory/hooks/useDirtyTransitionGuard';
 import { useLabDirtyGuard } from '../components/laboratory/LabDirtyGuardContext';
+import type { LabOperationPendingState } from '../components/laboratory/operationPending';
 import { formatLabStatus } from '../components/laboratory/labUiLabels';
 import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -635,23 +636,42 @@ export default function LabPanel() {
     guardDialog,
     isDialogOpen,
     setPendingOperationSources,
+    setHistoryGuardPendingSources,
     notifyDirtyStateChange,
     hasPendingOperations,
   } = useLabDirtyGuard();
   const pendingOperationSourcesRef = useRef(new Set<string>());
-  const setOperationSourcePending = useCallback((source: string, pending: boolean) => {
-    if (pending) pendingOperationSourcesRef.current.add(source);
+  // PR 3351 (review round 7, P1): второй реестр — операции, блокирующие
+  // полный уход с /lab. Report CREATE не блокирует контекстные переходы
+  // (latest-wins), но его неидемпотентный POST обязан пережить refresh/
+  // закрытие вкладки/SPA-уход/истечение сессии — поэтому route-level guard
+  // (guardRouteLeave/sentinel/beforeunload/session-expiry через
+  // setPendingOperationSources) видит именно этот реестр.
+  const documentLeavePendingSourcesRef = useRef(new Set<string>());
+  const setOperationSourcePending = useCallback((
+    source: string,
+    state: LabOperationPendingState | null,
+  ) => {
+    if (state?.blocksContextTransition) pendingOperationSourcesRef.current.add(source);
     else pendingOperationSourcesRef.current.delete(source);
-    // PR 3351: тот же SSOT pending-источников — на уровне App (route-level
-    // leave guard блокирует уход с /lab при любой незавершённой операции).
-    setPendingOperationSources([...pendingOperationSourcesRef.current]);
-  }, [setPendingOperationSources]);
+    if (state?.blocksDocumentLeave) documentLeavePendingSourcesRef.current.add(source);
+    else documentLeavePendingSourcesRef.current.delete(source);
+    // PR 3351: SSOT pending-источников на уровне App — ДВА сигнала (review
+    // round 7). Документ-уровень (guardRouteLeave/beforeunload/session-
+    // expiry) видит реестр полного ухода — включая latest-wins report CREATE.
+    // Sentinel (browser Back) вооружается только контекстно-блокирующими
+    // операциями: для CREATE in-lab Back — легитимная навигация, а collapse
+    // вооружённого sentinel-а после in-lab replace (create применил новый
+    // ?instance) откатывал бы URL/отчёт на до-create twin-запись.
+    setPendingOperationSources([...documentLeavePendingSourcesRef.current]);
+    setHistoryGuardPendingSources([...pendingOperationSourcesRef.current]);
+  }, [setPendingOperationSources, setHistoryGuardPendingSources]);
   const handleReportOperationPendingChange = useCallback(
-    (pending: boolean) => setOperationSourcePending('report', pending),
+    (state: LabOperationPendingState | null) => setOperationSourcePending('report', state),
     [setOperationSourcePending],
   );
   const handleTemplateOperationPendingChange = useCallback(
-    (pending: boolean) => setOperationSourcePending('template', pending),
+    (state: LabOperationPendingState | null) => setOperationSourcePending('template', state),
     [setOperationSourcePending],
   );
   // PR 3351 (review round 6, P1): истечение сессии больше не делает hard
@@ -679,16 +699,19 @@ export default function LabPanel() {
       }
     },
   });
-  // Контракт блокирующих операций (PR 3351):
+  // Контракт блокирующих операций (PR 3351, review round 7 — split-уровни):
   // - report/template SAVE (draft, finalize, revise, print, autosave)
   //   блокирует КОНТЕКСТНЫЕ переходы затрагиваемого источника — переход
   //   посреди записи мог бы создать повторную запись или разрушительный
-  //   откат состояния;
-  // - report CREATE — latest-wins: переходы не блокируются, поздний
-  //   ответ отбрасывается по operation-context (epoch/selectionKey/
-  //   patientId) в handleInstanceChange;
+  //   откат состояния — И полный уход с /lab (beforeunload/route-leave/
+  //   sentinel/session-expiry);
+  // - report CREATE — latest-wins ТОЛЬКО для контекстных переходов
+  //   (sourceIds-скоуп): поздний ответ отбрасывается по operation-context
+  //   (epoch/selectionKey/patientId) в handleInstanceChange; но его
+  //   неидемпотентный POST блокирует полный уход с /lab наравне с
+  //   остальными операциями (documentLeavePendingSourcesRef);
   // - route-level уход с /lab (guardRouteLeave) блокируется при ЛЮБОМ
-  //   pending-источнике (см. LabDirtyGuardContext).
+  //   документ-уровневом pending-источнике (см. LabDirtyGuardContext).
   const guardTransition = useCallback((
     transition: () => void | Promise<void>,
     options?: DirtyGuardTransitionOptions,
@@ -1060,13 +1083,16 @@ export default function LabPanel() {
     options: { urlIntent?: boolean } = {},
   ) => {
     if (options.urlIntent) {
+      // PR 3351 (review round 7, P2): вкладка-база отката фиксируется
+      // ОДИН раз на всю цепочку намерений. Superseding intent, пришедший
+      // пока первый ждёт решения в dirty-dialog, видел бы activeTabRef уже
+      // нормализованным («нет tab → queue» — tab-sync первого intent-а) и
+      // затирал бы исходную вкладку отката (reports): Cancel возвращал бы
+      // на очередь вместо редактируемого отчёта.
+      if (pendingUrlIntentRef.current == null) {
+        preUrlIntentTabRef.current = activeTabRef.current;
+      }
       pendingUrlIntentRef.current = { targetId: instanceId };
-      // PR 3351 (review round 6, P2): вкладка на момент прихода внешнего
-      // намерения — база отката (resolveRollbackTabId). Захватывается
-      // синхронно ДО guard-диалога: tab-sync effect этого рендера уже
-      // мог закоммитить нормализацию «нет tab → queue» — замыкание
-      // useEffect-а видело бы не ту вкладку.
-      preUrlIntentTabRef.current = activeTabRef.current;
     }
     // PR5: публичный переход через dirty-guard (недавние отчёты,
     // восстановление ?instance=N из URL). Внутри подтверждённого перехода

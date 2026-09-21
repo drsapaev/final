@@ -1947,4 +1947,121 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     expect(new URL(page.url()).pathname).toBe('/lab');
     await expect(footerInput).toHaveValue('Несохранённый подвал');
   });
+
+  // PR 3351 (review round 7, P1): report CREATE больше не обходит защиту
+  // документа. POST /lab/report-instances неидемпотентен и без
+  // Idempotency-Key: refresh/закрытие вкладки/Profile-уход поверх летящего
+  // create теряли ответ — оператор после повторного входа создавал второй
+  // бланк для того же пациента. CREATE остаётся latest-wins ТОЛЬКО для
+  // контекстных переходов внутри панели (см. отдельный unit/contract
+  // coverage); полный уход блокируется наравне с save/finalize/print.
+  test('a pending report CREATE blocks unload and Profile leave until the POST completes, and executes exactly once (review round 7)', async ({ page }) => {
+    // Гейт create-ответа: POST «висит», пока тест не отпустит.
+    reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
+      releaseReportInstanceCreateResponse = resolve;
+    });
+    const dialogs: string[] = [];
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.type());
+      void dialog.dismiss().catch(() => {});
+    });
+
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    // Чистый контекст: отчёт #88 открыт, правок НЕТ — dirty=false у обоих
+    // workbench-ей. Блокирует только pending CREATE (split-уровень round 7:
+    // blocksDocumentLeave=true при blocksContextTransition=false).
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByLabel('Результат: Лейкоциты')).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const addButton = page.getByRole('button', { name: 'Добавить бланк' });
+    const createSent = page.waitForRequest((request) => (
+      request.method() === 'POST'
+      && request.url().endsWith('/api/v1/lab/report-instances')
+    ));
+    await addButton.click();
+    await createSent;
+    expect(reportInstanceCreatePostCount).toBe(1);
+    await expect(addButton).toBeDisabled();
+
+    // Refresh/close при чистых черновиках и висящем CREATE: beforeunload
+    // диалог, dismiss отменяет навигацию — SPA жива, POST не оборван.
+    await page.evaluate(() => { window.location.href = '/health'; }).catch(() => {});
+    await page.waitForTimeout(400);
+    expect(dialogs).toContain('beforeunload');
+    expect(new URL(page.url()).pathname).toBe('/lab');
+    await expect(addButton).toBeDisabled();
+    dialogs.length = 0;
+
+    // SPA route-leave (Profile) при висящем CREATE: pending-блок без
+    // destructive диалога, пользователь остаётся на /lab.
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.getByRole('menuitem', { name: 'Профиль' }).click();
+    await expect(page.getByRole('button', { name: 'Выйти без сохранения' })).toHaveCount(0);
+    await expect(page.getByText('сохраняется…').first()).toBeVisible();
+    await page.waitForTimeout(400);
+    expect(new URL(page.url()).pathname).toBe('/lab');
+
+    // CREATE завершён: pending снят → уход проходит без диалога, и за весь
+    // сценарий POST выполнился ровно один раз (дублей бланка нет).
+    releaseReportInstanceCreateResponse?.();
+    await expect(addButton).toBeEnabled();
+    await waitForReactToSettle(page);
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.getByRole('menuitem', { name: 'Профиль' }).click();
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).not.toBe('/lab');
+    expect(dialogs).toHaveLength(0);
+    expect(reportInstanceCreatePostCount).toBe(1);
+  });
+
+  // PR 3351 (review round 7, P2): вкладка-база отката фиксируется один раз
+  // на всю цепочку urlIntent-ов. Второй tab-less intent, пришедший пока
+  // первый ждёт решения в dirty-dialog, раньше затирал исходную вкладку
+  // (reports) нормализованным queue — Cancel возвращал на очередь и прятал
+  // редактируемый отчёт за другой вкладкой.
+  test('a superseding tab-less URL intent keeps the original rollback tab: Cancel returns to Reports (review round 7)', async ({ page }) => {
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    // Dirty-редактирование отчёта #88 на вкладке reports.
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('7.2');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await expect(panelTabs.getByRole('tab').nth(2)).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('reports');
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
+
+    // Внешний tab-less intent A (instance=89): guard-диалог открыт,
+    // pre-intent вкладка = reports.
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=89');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+
+    // Superseding tab-less intent B (instance=90) пока диалог intent A
+    // ждёт решения: цель обновляется, база отката — нет.
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=90');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await page.waitForTimeout(300);
+    await expect(dialog).toBeVisible();
+    expect(await dialog.count()).toBe(1);
+
+    // Cancel: откат к отчёту #88 на ИСХОДНОЙ вкладке reports (не queue),
+    // URL явно владеет tab, draft сохранён.
+    await dialog.getByRole('button', { name: 'Отмена' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(panelTabs.getByRole('tab').nth(2)).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('reports');
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await expect(fieldInput).toHaveValue('7.2');
+  });
 });
