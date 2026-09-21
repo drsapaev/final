@@ -9802,7 +9802,7 @@ const ru = {
     ni_poisk_po_uvedomleniyam: 'Поиск по уведомлениям',
     ni_vse_uvedomleniya: 'Все уведомления',
     ni_tolko_neprochitannye: 'Только непрочитанные',
-    ni_otkryt_uvedomlenie_item_titl: 'Открыть уведомление: {item.title}',
+    ni_otkryt_uvedomlenie_item_titl: 'Открыть уведомление: {title}',
     ni_uvedomleniya: 'Уведомления',
     // DoctorCalendar.jsx (dc_)
     dc_pn: 'Пн',

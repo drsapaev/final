@@ -1514,3 +1514,18 @@ export const ROUTE_REGISTRY = [
 export function getCanonicalRoutes() {
   return ROUTE_REGISTRY;
 }
+
+/**
+ * PR 3351 (review round 3, P1): resolve a pathname to its registry route.
+ *
+ * Route IDENTITY — not path prefixes — decides whether a navigation keeps
+ * the current screen mounted. '/lab/results' is not a registered route:
+ * the App wildcard redirects it to /not-found and unmounts LabPanel, so
+ * the lab leave guard must treat it as a transition AWAY from /lab. The
+ * reverse also holds: legacy redirect aliases ('/lab-panel') remount the
+ * panel after the redirect hop, so they are leaves as well — only the
+ * exact registry path that renders the screen preserves its state.
+ */
+export function findRouteByPath(pathname: string): (typeof ROUTE_REGISTRY)[number] | undefined {
+  return ROUTE_REGISTRY.find((route) => route.path === pathname);
+}

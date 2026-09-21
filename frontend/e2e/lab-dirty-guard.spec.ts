@@ -1038,6 +1038,273 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect.poll(() => new URL(page.url()).pathname).not.toBe('/lab');
   });
 
+  // ─── PR 3351, review round 3 ────────────────────────────────────────────────
+  // P1: центр уведомлений обходит guard; route identity вместо /lab/*-префикса;
+  // pending-only операция не блокирует уход; P2: фантомная sentinel-запись.
+
+  test('notification center navigation is guarded while a lab draft is dirty (review round 3)', async ({ page }) => {
+    await page.route('**/api/v1/notifications/inbox**', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        items: [{
+          id: 501,
+          type: 'message_received',
+          title: 'Новое сообщение',
+          message: 'Сообщение от регистратора',
+          created_at: '2026-09-13T09:00:00+00:00',
+          role: 'lab',
+          payload_snapshot: { metadata: { conversation_id: 77 } },
+        }],
+      }),
+    }));
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    // Колокольчик → центр уведомлений → клик по уведомлению message_received.
+    // Прежний прямой обход History API выполнял переход молча: LabPanel
+    // размонтировалась без решения пользователя.
+    await page.getByRole('button', { name: 'Уведомления', exact: true }).click();
+    const inbox = page.getByRole('dialog', { name: 'Центр уведомлений' });
+    await expect(inbox).toBeVisible();
+    await page.getByRole('button', { name: 'Открыть уведомление: Новое сообщение' }).click();
+
+    // Guard-диалог открыт (кнопка «Выйти без сохранения» уникальна для него),
+    // URL остался /lab.
+    const guardDiscard = page.getByRole('button', { name: 'Выйти без сохранения' });
+    await expect(guardDiscard).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/lab');
+
+    // Отмена: черновик и контекст нетронуты.
+    await page.getByRole('button', { name: 'Отмена' }).click();
+    await expect(guardDiscard).toHaveCount(0);
+    await expect(fieldInput).toHaveValue('6.5');
+    expect(new URL(page.url()).pathname).toBe('/lab');
+
+    // Подтверждённый уход: discard → переход по цели уведомления.
+    await page.getByRole('button', { name: 'Открыть уведомление: Новое сообщение' }).click();
+    await expect(guardDiscard).toBeVisible();
+    await guardDiscard.click();
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).not.toBe('/lab');
+  });
+
+  test('notification lab_results deep-link asks the guard instead of unmounting the panel (review round 3)', async ({ page }) => {
+    await page.route('**/api/v1/notifications/inbox**', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        items: [{
+          id: 502,
+          type: 'lab_results',
+          title: 'Готовы результаты',
+          message: 'Результаты анализов готовы',
+          created_at: '2026-09-13T09:05:00+00:00',
+          role: 'lab',
+          payload_snapshot: { metadata: {} },
+        }],
+      }),
+    }));
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    // '/lab/results' НЕ является зарегистрированным маршрутом: wildcard уводит
+    // на /not-found и размонтирует панель. Route identity обязан считать это
+    // уходом — guard-диалог, а не молчаливая потеря черновика.
+    await page.getByRole('button', { name: 'Уведомления', exact: true }).click();
+    const inbox = page.getByRole('dialog', { name: 'Центр уведомлений' });
+    await expect(inbox).toBeVisible();
+    await page.getByRole('button', { name: 'Открыть уведомление: Готовы результаты' }).click();
+
+    const guardDiscard = page.getByRole('button', { name: 'Выйти без сохранения' });
+    await expect(guardDiscard).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/lab');
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+
+    // Отмена: отчёт и введённое значение на месте.
+    await page.getByRole('button', { name: 'Отмена' }).click();
+    await expect(guardDiscard).toHaveCount(0);
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await expect(fieldInput).toHaveValue('6.5');
+    expect(new URL(page.url()).pathname).toBe('/lab');
+  });
+
+  test('pending-only clone blocks Profile/logout leave until the operation completes (review round 3)', async ({ page }) => {
+    let releaseClone: () => void = () => {};
+    const cloneGate = new Promise<void>((resolve) => { releaseClone = resolve; });
+    await page.route('**/api/v1/lab/templates/5/clone', async (route) => {
+      await cloneGate;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 7, code: 'rule_demo_copy', name: 'Rule Demo (копия)' }),
+      });
+    });
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    // Открываем отчёт (шаблон 5 становится выбранным), но НЕ редактируем:
+    // оба черновика чистые — блокирует только pending-операция.
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByLabel('Результат: Лейкоциты')).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await panelTabs.getByRole('tab').nth(1).click();
+    const cloneButton = page.getByRole('button', { name: 'Клонировать' });
+
+    // waitForRequest (не waitForResponse): gated-роут не отвечает, пока
+    // тест не отпустит гейт — сам факт отправки POST-а и есть pending.
+    const cloneSent = page.waitForRequest((request) => (
+      request.method() === 'POST'
+      && request.url().endsWith('/api/v1/lab/templates/5/clone')
+    ));
+    await cloneButton.click();
+    await cloneSent;
+    // POST отправлен и «висит» — операция pending, черновики чистые.
+    await expect(cloneButton).toBeDisabled();
+
+    // Profile во время pending: уход заблокирован (pending-контракт, без
+    // guard-диалога), пользователь остаётся на /lab.
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.getByRole('menuitem', { name: 'Профиль' }).click();
+    await expect(page.getByRole('button', { name: 'Выйти без сохранения' })).toHaveCount(0);
+    await expect(page.getByText('сохраняется…').first()).toBeVisible();
+    await page.waitForTimeout(400);
+    expect(new URL(page.url()).pathname).toBe('/lab');
+
+    // Logout во время pending: токен НЕ очищается (onLeave не выполнялся).
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.locator('#logout-header-btn').click();
+    await expect(page.getByRole('button', { name: 'Выйти без сохранения' })).toHaveCount(0);
+    await page.waitForTimeout(400);
+    const tokenDuringPending = await page.evaluate(() => window.sessionStorage.getItem('auth_token'));
+    expect(tokenDuringPending).toBeTruthy();
+    expect(new URL(page.url()).pathname).toBe('/lab');
+
+    // Операция завершена: pending снят, уход проходит без диалога.
+    releaseClone();
+    await expect(cloneButton).toBeEnabled();
+    await waitForReactToSettle(page);
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.getByRole('menuitem', { name: 'Профиль' }).click();
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).not.toBe('/lab');
+  });
+
+  test('browser Back is absorbed while a clean template clone is pending (review round 3)', async ({ page }) => {
+    let releaseClone: () => void = () => {};
+    const cloneGate = new Promise<void>((resolve) => { releaseClone = resolve; });
+    await page.route('**/api/v1/lab/templates/5/clone', async (route) => {
+      await cloneGate;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 7, code: 'rule_demo_copy', name: 'Rule Demo (копия)' }),
+      });
+    });
+    // Реальная история: /health -> /lab.
+    await page.goto('/health');
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByLabel('Результат: Лейкоциты')).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await panelTabs.getByRole('tab').nth(1).click();
+    const cloneButton = page.getByRole('button', { name: 'Клонировать' });
+    const cloneSent = page.waitForRequest((request) => (
+      request.method() === 'POST'
+      && request.url().endsWith('/api/v1/lab/templates/5/clone')
+    ));
+    await cloneButton.click();
+    await cloneSent;
+    await expect(cloneButton).toBeDisabled();
+
+    // Browser Back во время pending: sentinel (dirty||pending) вытесняется,
+    // pop абсорбируется, pending-блок оставляет пользователя на /lab.
+    await page.evaluate(() => window.history.back());
+    await expect(page.getByRole('button', { name: 'Выйти без сохранения' })).toHaveCount(0);
+    await expect(page.getByText('сохраняется…').first()).toBeVisible();
+    await page.waitForTimeout(400);
+    expect(new URL(page.url()).pathname).toBe('/lab');
+
+    // Операция завершена → sentinel свёрнут (фантомной записи нет) →
+    // ОДИН Back уходит на реальную предыдущую страницу.
+    releaseClone();
+    await expect(cloneButton).toBeEnabled();
+    await waitForReactToSettle(page);
+    await page.waitForTimeout(300);
+    await page.evaluate(() => window.history.back());
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
+  });
+
+  test('browser Back after a manual save leaves the lab in one press (review round 3)', async ({ page }) => {
+    // PR 3351 (review round 3, P2): sentinel не оставляет фантомную запись —
+    // после Save (draft стал clean) ОДНО нажатие Back уходит на предыдущую
+    // страницу, а не на молчаливый дубликат /lab.
+    await page.goto('/health');
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Сохранить черновик' }).click();
+    await expect.poll(() => bulkSavePostCount).toBe(1);
+    // Сохранение завершено: dirty снят, sentinel свёрнут.
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeHidden();
+    await waitForReactToSettle(page);
+    await page.waitForTimeout(300);
+
+    await page.evaluate(() => window.history.back());
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
+  });
+
+  test('Back after a confirmed Profile leave returns to the lab without a phantom duplicate (review round 3)', async ({ page }) => {
+    // PR 3351 (review round 3, P2): подтверждённый SPA-уход ЗАМЕНЯЕТ
+    // sentinel-запись (navigate replace): Back возвращается на реальный /lab,
+    // второй Back — на предыдущую страницу; дубликата /lab в истории нет.
+    await page.goto('/health');
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.getByRole('menuitem', { name: 'Профиль' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).not.toBe('/lab');
+
+    // Первый Back: возврат на /lab (панель перемонтируется — черновик был
+    // сброшен осознанно).
+    await page.evaluate(() => window.history.back());
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/lab');
+    // Второй Back: предыдущая страница — БЕЗ промежуточного дубля /lab
+    // (фантомная sentinel-запись заменена, а не запушена поверх).
+    await page.evaluate(() => window.history.back());
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
+  });
+
   test('late create from another appointment of the same patient is rejected', async ({ page }) => {
     reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
       releaseReportInstanceCreateResponse = resolve;

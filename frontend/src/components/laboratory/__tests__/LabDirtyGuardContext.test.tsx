@@ -5,6 +5,7 @@ import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  isLabRoutePath,
   LabDirtyGuardProvider,
   useGuardedLabNavigate,
   useLabDirtyGuard,
@@ -14,6 +15,9 @@ import i18n from '@/i18n';
 
 // PR 3351 (review round 2, P1): поведенческие тесты route-level leave guard —
 // общий реестр источников на уровне App + guarded navigate + pending-блок.
+// PR 3351 (review round 3): route identity вместо префикса /lab/*, pending
+// -only блокировка через useGuardedLabNavigate, реактивный
+// hasPendingOperations.
 
 /** Постоянный (вне Routes) индикатор текущего пути. */
 function LocationProbe() {
@@ -27,6 +31,7 @@ function LabPage({ onLeave }: { onLeave?: () => void }) {
     <div>
       <button type="button" onClick={() => navigate('/profile')}>leave</button>
       <button type="button" onClick={() => navigate('/lab?tab=templates')}>stay-in-lab</button>
+      <button type="button" onClick={() => navigate('/lab/results')}>leave-lab-results</button>
       <button type="button" onClick={() => navigate('/login', { onLeave })}>logout</button>
     </div>
   );
@@ -230,5 +235,127 @@ describe('LabDirtyGuardContext (PR 3351 route-level leave guard)', () => {
     });
     expect(started).toBe(true);
     expect(transition).toHaveBeenCalledTimes(1);
+  });
+
+  // PR 3351 (review round 3, P1): route identity, а не префикс /lab/*.
+  it('treats only the registered LabPanel route as staying in the lab', () => {
+    // Точный маршрут реестра — единственный, что сохраняет панель.
+    expect(isLabRoutePath('/lab')).toBe(true);
+    // Deep-link каталога уведомлений НЕ зарегистрирован: wildcard уводит на
+    // /not-found и размонтирует LabPanel — это уход.
+    expect(isLabRoutePath('/lab/results')).toBe(false);
+    expect(isLabRoutePath('/lab/results?critical=1')).toBe(false);
+    // Прочие маршруты и legacy-алиасы — уход (redirect перемонтирует панель).
+    expect(isLabRoutePath('/messages')).toBe(false);
+    expect(isLabRoutePath('/profile')).toBe(false);
+    expect(isLabRoutePath('/lab-panel')).toBe(false);
+  });
+
+  it('guards a navigation to the unregistered /lab/results deep-link (route identity)', async () => {
+    let reportDirty = true;
+    const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
+
+    render(
+      <TestApp
+        sourceIsDirty={() => reportDirty}
+        sourceDiscard={() => { reportDirty = false; }}
+        registration={registration}
+      />,
+    );
+    await act(async () => {
+      registration.current?.({
+        id: 'report',
+        isDirty: () => reportDirty,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+    });
+
+    // '/lab/results' не является маршрутом LabPanel — guard обязан спросить
+    // пользователя, а не молча отдать URL wildcard-redirect'у.
+    fireEvent.click(screen.getByRole('button', { name: 'leave-lab-results' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeVisible();
+    expect(screen.getByTestId('location')).toHaveTextContent('/lab');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByTestId('location')).toHaveTextContent('/lab');
+  });
+
+  // PR 3351 (review round 3, P1): pending-only операция блокирует уход через
+  // useGuardedLabNavigate даже при полностью чистых черновиках.
+  it('blocks a clean-draft leave while an operation is pending (pending-only guard)', async () => {
+    // Wrapper монтирует и hook-children, и LabPage с LocationProbe —
+    // guarded navigate кликается как реальный пользовательский сценарий.
+    const wrapper = ({ children }: { children?: React.ReactNode }) => (
+      <ThemeProvider>
+        <MemoryRouter initialEntries={['/lab']}>
+          <LabDirtyGuardProvider>
+            <LocationProbe />
+            {children}
+            <Routes>
+              <Route path="/lab" element={<LabPage />} />
+              <Route path="/profile" element={<div>profile page</div>} />
+              <Route path="/login" element={<div>login page</div>} />
+            </Routes>
+          </LabDirtyGuardProvider>
+        </MemoryRouter>
+      </ThemeProvider>
+    );
+    const { result } = renderHook(() => useLabDirtyGuard(), { wrapper });
+
+    // Чистый черновик + pending-операция (clone чистого шаблона).
+    act(() => {
+      result.current.setPendingOperationSources(['template']);
+    });
+    expect(result.current.hasPendingOperations).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'leave' }));
+    await act(async () => { await Promise.resolve(); });
+
+    // Переход заблокирован БЕЗ диалога (pending-контракт), пользователь и
+    // панель остаются на /lab.
+    expect(screen.getByTestId('location')).toHaveTextContent('/lab');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // Операция завершилась: уход проходит сразу (clean, без диалога).
+    act(() => {
+      result.current.setPendingOperationSources([]);
+    });
+    expect(result.current.hasPendingOperations).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'leave' }));
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByTestId('location')).toHaveTextContent('/profile');
+  });
+
+  // PR 3351 (review round 3, P1): pending флипает реактивный флаг контекста
+  // (sentinel-хост перевзвешивается на 0↔n, а не только на dirty).
+  it('publishes hasPendingOperations reactively across 0↔n flips only', () => {
+    const { result } = renderHook(() => useLabDirtyGuard(), {
+      wrapper: ({ children }) => (
+        <MemoryRouter>
+          <LabDirtyGuardProvider>{children}</LabDirtyGuardProvider>
+        </MemoryRouter>
+      ),
+    });
+
+    expect(result.current.hasPendingOperations).toBe(false);
+    act(() => {
+      result.current.setPendingOperationSources(['report']);
+    });
+    expect(result.current.hasPendingOperations).toBe(true);
+    // Состав меняется, агрегат не флипает — значение то же (без ре-рендера).
+    act(() => {
+      result.current.setPendingOperationSources(['report', 'template']);
+    });
+    expect(result.current.hasPendingOperations).toBe(true);
+    act(() => {
+      result.current.setPendingOperationSources(['template']);
+    });
+    expect(result.current.hasPendingOperations).toBe(true);
+    act(() => {
+      result.current.setPendingOperationSources([]);
+    });
+    expect(result.current.hasPendingOperations).toBe(false);
   });
 });

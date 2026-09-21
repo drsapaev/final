@@ -330,6 +330,44 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(headerSource).not.toContain('auth.clearToken(); setProfile(null); navigate(loginRoute)');
   });
 
+  it('wires every navigation writer through the guarded navigator (review round 3 P1)', () => {
+    // PR 3351 (review round 3, P1): центр уведомлений — последний обходной
+    // путь: прямой window.history.pushState + синтетический popstate миновал
+    // route-level leave guard. Все navigation writers обязаны использовать
+    // единый guarded navigator.
+    const inboxSource = fs.readFileSync(
+      path.resolve(__dirname, '../../components/notifications/NotificationInbox.tsx'),
+      'utf8',
+    );
+    expect(inboxSource).toContain('useGuardedLabNavigate()');
+    expect(inboxSource).not.toContain('window.history.pushState');
+    expect(inboxSource).not.toContain('new PopStateEvent');
+
+    // Route identity вместо префикса: только зарегистрированный маршрут
+    // LabPanel сохраняет панель ('/lab/results' — уход через wildcard).
+    const guardSource = fs.readFileSync(
+      path.resolve(__dirname, '../../components/laboratory/LabDirtyGuardContext.tsx'),
+      'utf8',
+    );
+    expect(guardSource).toContain('findRouteByPath(pathname)?.component === \'LabPanel\'');
+    expect(guardSource).not.toContain('pathname.startsWith(\'/lab/\')');
+
+    // Pending-only операция блокирует ЛЮБОЙ уход с /lab: guardRouteLeave
+    // вызывается безусловно (не только при dirty), sentinel вооружён при
+    // dirty ИЛИ pending, провайдер публикует реактивный hasPendingOperations.
+    expect(guardSource).toContain('const leavesLabRoute = !isLabRoutePath(targetPathname)');
+    expect(guardSource).not.toContain('!leavesLab || !hasDirtyRef.current()');
+    expect(guardSource).toContain('hasPendingOperations');
+    expect(guardSource).toContain('if (!hasDirtyRef.current() && !hasPendingRef.current)');
+    expect(guardSource).toContain('hasDirtySources={guard.hasDirtySources}');
+    expect(guardSource).toContain('hasPendingOperations={hasPendingOperations}');
+
+    // Sentinel не оставляет фантомную запись: collapse + замена записи при
+    // подтверждённом SPA-уходе (navigate replace).
+    expect(guardSource).toContain('collapse()');
+    expect(guardSource).toContain('replaceSentinelEntry');
+  });
+
   it('keeps report CREATE latest-wins: create does not block transitions', () => {
     const workbenchSource = fs.readFileSync(
       path.resolve(__dirname, '../../components/laboratory/LabReportWorkbench.tsx'),
