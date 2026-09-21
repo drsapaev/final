@@ -236,6 +236,10 @@ class JoinSessionCompleteMultipleResponse(BaseModel):
     entries: list[dict[str, Any]]
     errors: list[dict[str, Any]] | None = None
     message: str
+    # Round-4 (PR #3362, P1-2): True — the saved result of an ALREADY
+    # joined session was re-served (the retry after a lost response reused
+    # the original attempt identity); no second business action happened.
+    replayed: bool = False
 
 
 class JoinSessionCompleteResponse(BaseModel):
@@ -247,6 +251,9 @@ class JoinSessionCompleteResponse(BaseModel):
     estimated_wait_time: int
     specialist_name: str
     department: str
+    # Round-4 (PR #3362, P1-2): idempotent replay marker (see the multi
+    # response) — same session token re-served its saved ticket result.
+    replayed: bool = False
 
 
 class QueueStatusResponse(BaseModel):

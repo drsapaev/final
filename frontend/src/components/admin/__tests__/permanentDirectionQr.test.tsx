@@ -417,4 +417,45 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
         expect(row().querySelector('.admin-sdx-status-unknown')).toBeNull();
         expect(row().querySelector('.admin-sdx-status-err')).toBeNull();
     });
+
+    it('PIN 36 (round-4 P2-2): a LATE pre-refresh recheck answer never overwrites a fresher full read', async () => {
+        // The exact review race: R1 recheck started → admin hits Refresh →
+        // the full read R2 lands (supported=false) → the STALE R1 answers
+        // true late → the checklist row must STAY false (never «ложно
+        // зелёная» again).
+        setupApiMock({ data: methodsPayload(false) });
+        let resolveRecheck: (value: unknown) => void = () => {};
+        const pendingRecheck = new Promise((resolve) => {
+            resolveRecheck = resolve;
+        });
+        directionMocks.fetchDirectionEntryMethods.mockReturnValue(pendingRecheck as never);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        const row = () => screen.getByTestId('setup-row-permanent-address');
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-err')).toBeTruthy();
+        });
+        // provision at the initial generation; the recheck R1 hangs
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-unknown')).toBeTruthy();
+        });
+
+        // THE REFRESH: the full read R2 (gen bump) commits supported=false
+        // and clears the overrides
+        fireEvent.click(screen.getByTestId('setup-refresh'));
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-err')).toBeTruthy();
+        });
+
+        // the STALE R1 now answers true — it belongs to the previous
+        // generation and must be DROPPED (pre-fix: it flipped the row ok)
+        await React.act(async () => {
+            resolveRecheck(methodsPayload(true));
+        });
+        await React.act(async () => {});
+        expect(row().querySelector('.admin-sdx-status-ok')).toBeNull();
+        expect(row().querySelector('.admin-sdx-status-err')).toBeTruthy();
+    });
 });

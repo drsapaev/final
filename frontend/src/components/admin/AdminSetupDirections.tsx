@@ -107,6 +107,14 @@ const AdminSetupDirections = () => {
     // reload resynced it).
     const [postProvisionSupportByProfileKey, setPostProvisionSupportByProfileKey] =
         useState<Record<string, boolean | null | undefined>>({});
+    // RQ-18 follow-up round-4 (P2-2): request generation for the
+    // post-provision recheck. Every full read (loadCore) bumps the
+    // generation; a recheck callback is accepted ONLY when it was issued
+    // in the CURRENT generation — a late answer from a recheck that
+    // started BEFORE the refresh must never overwrite the fresher full
+    // read (the «ложно зелёная строка» race).
+    const supportGenerationRef = useRef(0);
+    const [supportGeneration, setSupportGeneration] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [wizard, setWizard] = useState<WizardState>(emptyWizard);
@@ -124,6 +132,11 @@ const AdminSetupDirections = () => {
 
     const loadCore = useCallback(async () => {
         try {
+            // Round-4 (P2-2): the new full read invalidates every recheck
+            // issued in a previous generation. Bumped BEFORE the awaits so
+            // an in-flight recheck is already stale from this moment.
+            supportGenerationRef.current += 1;
+            setSupportGeneration(supportGenerationRef.current);
             setLoading(true);
             setError(null);
             const [servicesRes, profilesRes, resourcesRows, doctorsRes] = await Promise.all([
@@ -222,11 +235,22 @@ const AdminSetupDirections = () => {
     // direction drops the stale «не готово» state; a failed recheck is an
     // honest unknown, never a confident «недоступно»).
     const handleQrSupportedChange = useCallback(
-        (profileKey: string, supported: boolean | null) => {
+        (profileKey: string, supported: boolean | null, generation?: number) => {
             // RQ-18 follow-up round-3 (P2): record the recheck answer as a
             // tri-state OVERRIDE — the last-known EntryMethodsDto is never
             // destroyed, so the row can move unknown → true (or → false)
             // when the recheck answers after the pending unknown.
+            // RQ-18 follow-up round-4 (P2-2): the override is accepted only
+            // from a recheck issued in the CURRENT generation — a late
+            // answer from a pre-refresh recheck is dropped (not older than
+            // the last full read, or it never lands).
+            const issuedGeneration =
+                typeof generation === 'number'
+                    ? generation
+                    : supportGenerationRef.current;
+            if (issuedGeneration < supportGenerationRef.current) {
+                return;
+            }
             setPostProvisionSupportByProfileKey((prev) => ({
                 ...prev,
                 [profileKey]: supported,
@@ -662,6 +686,7 @@ const AdminSetupDirections = () => {
                                                         tag={row.tag}
                                                         supported={row.permanentAddress}
                                                         onSupportedChange={handleQrSupportedChange}
+                                                        supportGeneration={supportGeneration}
                                                     />
                                                 ) : (
                                                     /* RQ-18 follow-up (P2-4): sibling tag rows of the

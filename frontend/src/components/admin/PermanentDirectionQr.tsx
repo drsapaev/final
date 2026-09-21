@@ -26,7 +26,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  *
  * Styles live in admin.css (RQ-18 section) — no inline styles (UI ratchet).
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Download, QrCode } from 'lucide-react';
 import { Button } from '../ui/macos';
@@ -56,7 +56,18 @@ interface PermanentDirectionQrProps {
      * direction must not keep claiming «запись недоступна», and a
      * direction deactivated mid-provision must not keep claiming ready).
      */
-    onSupportedChange?: (profileKey: string, supported: boolean | null) => void;
+    onSupportedChange?: (
+        profileKey: string,
+        supported: boolean | null,
+        generation?: number,
+    ) => void;
+    /**
+     * RQ-18 follow-up round-4 (P2-2): the parent's full-read generation.
+     * Every full read bumps it; a recheck answer is tagged with the
+     * generation it was issued in and is dropped by the parent when a
+     * NEWER full read already landed (the late-stale-overwrite race).
+     */
+    supportGeneration?: number;
 }
 
 type BlockState = 'idle' | 'loading' | 'shown' | 'error';
@@ -65,7 +76,7 @@ export function absolutePermanentUrl(publicCode: string): string {
     return `${window.location.origin}/q/${publicCode}`;
 }
 
-export default function PermanentDirectionQr({ profileKey, tag, supported, onSupportedChange }: PermanentDirectionQrProps) {
+export default function PermanentDirectionQr({ profileKey, tag, supported, onSupportedChange, supportGeneration }: PermanentDirectionQrProps) {
     const { t } = useTranslation();
     const [state, setState] = useState<BlockState>('idle');
     const [provisioned, setProvisioned] = useState<PublicAddressProvisionResponse | null>(null);
@@ -78,6 +89,19 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
     >(undefined);
     const [copied, setCopied] = useState(false);
     const qrWrapRef = useRef<HTMLDivElement | null>(null);
+    // RQ-18 follow-up round-4 (P2-2): latest-generation ref — the provision
+    // callback's closure would otherwise capture a STALE generation when
+    // the parent refreshed between renders (the prop is frozen at the
+    // render the callback was created in).
+    const supportGenerationRef = useRef(supportGeneration ?? 0);
+    supportGenerationRef.current = supportGeneration ?? supportGenerationRef.current;
+
+    // RQ-18 follow-up round-4 (P2-2): a new full read is the source of
+    // truth — any in-block post-provision recheck state from the previous
+    // generation is stale and must stop overriding the fresh prop.
+    useEffect(() => {
+        setPostProvisionSupported(undefined);
+    }, [supportGeneration]);
 
     // The parent flag was read BEFORE the provision — once a recheck has
     // answered, the fresh answer wins.
@@ -87,6 +111,11 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
     const provision = useCallback(async () => {
         try {
             setState('loading');
+            // Round-4 (P2-2): the generation this recheck belongs to —
+            // captured BEFORE the request so a Refresh that lands while it
+            // is in flight makes this answer stale for both the parent
+            // override and the local block state.
+            const recheckGeneration = supportGenerationRef.current;
             const res = await provisionPublicAddress(profileKey);
             setProvisioned(res);
             setCopied(false);
@@ -101,14 +130,22 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
             // still pending, and a direction deactivated mid-provision
             // must not keep claiming ready.
             setPostProvisionSupported(null);
-            onSupportedChange?.(profileKey, null);
+            onSupportedChange?.(profileKey, null, recheckGeneration);
             try {
                 const methods = await fetchDirectionEntryMethods(profileKey);
+                if (supportGenerationRef.current > recheckGeneration) {
+                    // A newer full read already landed — this recheck is
+                    // stale for the fresh generation; drop it entirely.
+                    return;
+                }
                 const fresh = readPermanentAddressSupported(methods);
                 setPostProvisionSupported(fresh);
-                onSupportedChange?.(profileKey, fresh);
+                onSupportedChange?.(profileKey, fresh, recheckGeneration);
             } catch (err) {
                 logger.warn(`entry-methods re-read failed for ${profileKey}`, err);
+                if (supportGenerationRef.current > recheckGeneration) {
+                    return;
+                }
                 // stays unknown — honest, never a confident claim
                 setPostProvisionSupported(null);
             }

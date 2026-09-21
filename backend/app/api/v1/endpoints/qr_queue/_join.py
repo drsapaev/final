@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.qr_queue._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.qr_queue._helpers import router
+from app.services.qr_queue._base import JoinSessionStateRefusal
 
 
 @router.post("/join/start", response_model=JoinSessionStartResponse)
@@ -113,6 +114,20 @@ def complete_join_session(
             )
             return JoinSessionCompleteResponse(**result)
 
+    except JoinSessionStateRefusal as e:
+        # Round-4 (PR #3362, P1-2/P2-1): a PROVEN session-state refusal —
+        # the machine-readable reason lets the client offer the honest
+        # recovery path (an explicit start-over for a pre-execution
+        # refusal; the reconcile/replay contract for a used session)
+        # instead of the blind «Internal server error» dead-end.
+        logger.warning(
+            "[complete_join_session] Сессионный отказ: reason=%s",
+            e.reason,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": e.reason, "message": str(e)},
+        ) from e
     except ValueError as e:
         logger.warning(
             "[complete_join_session] ValueError: %s",

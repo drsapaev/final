@@ -105,13 +105,120 @@ interface QueueJoinDraftData {
   [key: string]: unknown;
 }
 
+// RQ-18 follow-up round-4 (P1-1): a draft is only persistable when its
+// ownership is VERIFIABLE — the restore challenge is «re-enter the last
+// 4 digits of the draft's phone». A draft without at least that many
+// phone digits cannot be owner-verified and is NOT persisted (an
+// anonymous shared-device surface never returns unverified PHI).
+const DRAFT_CHALLENGE_DIGITS = 4;
+// Three wrong challenge answers erase the draft (fail-closed — no
+// unlimited 1/10000 guessing on a shared device).
+const DRAFT_CHALLENGE_MAX_FAILS = 3;
+
+const draftPhoneDigits = (phone: unknown): string =>
+  String(phone ?? '').replace(/\D/g, '');
+
+interface QueueJoinAttemptState {
+  ts: number;
+  publicCode: string;
+  sessionToken: string;
+  profileId: number | null;
+  directionTitle: string | null;
+  completeAttempted: boolean;
+  outcomeUnknown: boolean;
+}
+
+// RQ-18 follow-up round-4 (P1-2): the complete-attempt state survives a
+// reload AT LEAST within the current tab (sessionStorage, same TTL as the
+// draft). React refs alone reset on remount — a reload would silently
+// mint a NEW session while the previous attempt's business outcome was
+// still unknown, and the lowercase/uppercase URL alias of the same
+// permanent address would reset the guard too.
+const attemptStateRead = (key: string | null): QueueJoinAttemptState | null => {
+  if (!key) return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = safeJsonParse(raw) as Partial<QueueJoinAttemptState> | null;
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof parsed.ts === 'number' &&
+      typeof parsed.publicCode === 'string' &&
+      typeof parsed.sessionToken === 'string' &&
+      Date.now() - parsed.ts <= DIRECTION_DRAFT_TTL_MS
+    ) {
+      return {
+        ts: parsed.ts,
+        publicCode: parsed.publicCode,
+        sessionToken: parsed.sessionToken,
+        profileId: typeof parsed.profileId === 'number' ? parsed.profileId : null,
+        directionTitle:
+          typeof parsed.directionTitle === 'string' ? parsed.directionTitle : null,
+        completeAttempted: parsed.completeAttempted === true,
+        outcomeUnknown: parsed.outcomeUnknown === true,
+      };
+    }
+    window.sessionStorage.removeItem(key);
+    return null;
+  } catch {
+    return null;
+  }
+};
+const attemptStateWrite = (key: string | null, state: QueueJoinAttemptState): void => {
+  if (!key) return;
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(state));
+  } catch {
+    /* storage full/unavailable — the attempt-state is best-effort */
+  }
+};
+const attemptStateRemove = (key: string | null): void => {
+  if (!key) return;
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    /* noop */
+  }
+};
+
+// RQ-18 follow-up round-4 (P2-1): the backend now refuses an unclaimable
+// join session with a machine-readable reason instead of the masked
+// generic 400. Only these two reasons PROVE that nothing was created —
+// only they allow the explicit start-over offer. Network-class errors
+// stay an UNKNOWN outcome (no recovery that could duplicate a ticket).
+const JOIN_PRE_EXECUTION_REASONS = new Set([
+  'join_session_not_found',
+  'join_session_expired',
+]);
+
+const getJoinRefusalReason = (err: unknown): string | null => {
+  const detail = (err as HttpApiError | null)?.response?.data?.detail;
+  if (
+    detail &&
+    typeof detail === 'object' &&
+    !Array.isArray(detail) &&
+    typeof (detail as { reason?: unknown }).reason === 'string'
+  ) {
+    return (detail as { reason: string }).reason;
+  }
+  return null;
+};
+
 const QueueJoin = () => {
   const { token: paramToken } = useParams();
   // RQ-18 (S-15): public permanent-address route /q/:publicCode renders the
   // SAME QueueJoin experience. Direction mode is detected purely from the
   // route params — no second registration UI, no props plumbing.
-  const { publicCode: paramPublicCode } = useParams();
-  const directionCode = paramPublicCode || null;
+  // RQ-18 follow-up round-4 (P1-2): the backend resolves the public code
+  // as ``value.strip().lower()`` — /q/ABCD1234EFGH and /q/abcd1234efgh
+  // are THE SAME permanent address server-side. The client therefore uses
+  // ONE canonical identity for the storage keys, the start call and the
+  // attempt state, and replaces a non-canonical URL with the lowercase
+  // variant — an uppercase alias must never look like a «new code» that
+  // resets the complete-attempt guard.
+  const { publicCode: rawPublicCode } = useParams();
+  const directionCode = rawPublicCode ? rawPublicCode.trim().toLowerCase() : null;
   const directionMode = Boolean(directionCode);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -179,6 +286,34 @@ const QueueJoin = () => {
     : legacyToken
       ? `queue_join_form_${legacyToken}`
       : null;
+  // RQ-18 follow-up round-4 (P1-2): the attempt-state key — CANONICAL-code
+  // scoped, so both case variants of the URL share one attempt identity.
+  const attemptStorageKey = directionCode
+    ? `queue_join_attempt_qdir_${directionCode}`
+    : null;
+  // RQ-18 follow-up round-4 (P1-2): a hydrated attempt whose business
+  // outcome is UNKNOWN — the mount must NOT mint a new session; the
+  // patient gets the reconcile/start-over panel instead.
+  const [reconcile, setReconcile] = useState<{
+    sessionToken: string;
+    profileId: number | null;
+    directionTitle: string | null;
+  } | null>(null);
+  // The direction title for a reconcile-booted success screen (the
+  // directionInfo object does not survive a reload — the envelope does).
+  const [reconcileDirectionTitle, setReconcileDirectionTitle] = useState<
+    string | null
+  >(null);
+  // RQ-18 follow-up round-4 (P2-1): a CONFIRMED pre-execution refusal
+  // (machine reason from the backend) — the honest explicit recovery:
+  // «Сессия истекла до отправки. Начать заново» with a real button, not
+  // a blind retry loop against the same dead token.
+  const [preExecRefusal, setPreExecRefusal] = useState(false);
+  // RQ-18 follow-up round-4 (P1-1): the owner-verification challenge for
+  // a found draft — re-enter the last 4 digits of the draft's phone.
+  const [draftChallenge, setDraftChallenge] = useState('');
+  const [draftChallengeError, setDraftChallengeError] = useState<string | null>(null);
+  const [draftChallengeErased, setDraftChallengeErased] = useState(false);
 
   const draftGet = useCallback(
     (key: string): string | null =>
@@ -325,7 +460,23 @@ const QueueJoin = () => {
       return;
     }
     if (directionMode) {
-      draftSet(formStorageKey, JSON.stringify({ ts: Date.now(), data: formData }));
+      // RQ-18 follow-up round-4 (P1-1): the draft is persisted ONLY when
+      // its ownership is verifiable — the envelope carries the phone-tail
+      // check the restore challenge validates against. A draft with too
+      // few phone digits cannot be owner-verified and never persists.
+      const digits = draftPhoneDigits(formData.phone);
+      if (digits.length < DRAFT_CHALLENGE_DIGITS) {
+        draftRemove(formStorageKey);
+        return;
+      }
+      draftSet(
+        formStorageKey,
+        JSON.stringify({
+          ts: Date.now(),
+          v: { tail4: digits.slice(-DRAFT_CHALLENGE_DIGITS), fails: 0 },
+          data: formData,
+        }),
+      );
     } else {
       draftSet(formStorageKey, JSON.stringify(formData));
     }
@@ -362,12 +513,31 @@ const QueueJoin = () => {
     try {
       const parsed = saved ? safeJsonParse(saved) : null;
       if (directionMode) {
-        // { ts, data } envelope with a short TTL — a stale draft is a
-        // discarded draft.
-        const envelope = parsed as { ts?: unknown; data?: unknown } | null;
+        // { ts, v, data } envelope with a short TTL — a stale draft is a
+        // discarded draft. Round-4 (P1-1): the envelope also carries the
+        // ownership-verification block (phone tail); an envelope whose
+        // check is missing, malformed or inconsistent with the payload's
+        // phone is NOT verifiable and is discarded fail-closed.
+        const envelope = parsed as {
+          ts?: unknown;
+          v?: { tail4?: unknown } | null;
+          data?: unknown;
+        } | null;
         const ts = Number(envelope?.ts ?? 0);
         const data = envelope?.data as Record<string, unknown> | undefined;
-        if (data && typeof data === 'object' && Date.now() - ts <= DIRECTION_DRAFT_TTL_MS) {
+        const tail4 =
+          typeof envelope?.v?.tail4 === 'string' ? envelope.v.tail4 : '';
+        const payloadDigits = draftPhoneDigits(data?.phone);
+        const verifiable =
+          tail4.length === DRAFT_CHALLENGE_DIGITS &&
+          payloadDigits.length >= DRAFT_CHALLENGE_DIGITS &&
+          payloadDigits.endsWith(tail4);
+        if (
+          data &&
+          typeof data === 'object' &&
+          verifiable &&
+          Date.now() - ts <= DIRECTION_DRAFT_TTL_MS
+        ) {
           restored = {
             patientName: String(data.patientName ?? ''),
             phone: String(data.phone ?? ''),
@@ -393,16 +563,35 @@ const QueueJoin = () => {
     );
     if (directionMode && hasContent && restored) {
       // NEVER restore PHI silently on the shared permanent route: hold
-      // the draft for the owner's explicit confirmation (the prompt
-      // itself reveals nothing), keep the form empty meanwhile.
+      // the draft for the owner's explicit VERIFICATION (round-4: the
+      // phone-tail challenge — not a bare button), keep the form empty
+      // meanwhile. The prompt itself reveals no PHI.
       setPendingDraft(restored);
       setFormData({ patientName: '', phone: '', telegramId: '' });
     } else {
       setPendingDraft(null);
       setFormData(restored ?? { patientName: '', phone: '', telegramId: '' });
     }
+    // Round-4 (P1-1): every fresh hydration resets the challenge panel.
+    setDraftChallenge('');
+    setDraftChallengeError(null);
+    setDraftChallengeErased(false);
     setFormDraftHydrated(true);
   }, [formStorageKey, directionMode, draftGet, draftRemove]);
+
+  // RQ-18 follow-up round-4 (P1-2): the URL must carry the SAME canonical
+  // lowercase code the backend resolves by. A non-canonical variant is
+  // replaced (no history entry) — the alias never becomes a second
+  // identity for the attempt guard.
+  useEffect(() => {
+    if (!rawPublicCode || !directionMode) {
+      return;
+    }
+    const canonical = rawPublicCode.trim().toLowerCase();
+    if (rawPublicCode !== canonical) {
+      navigate(`/q/${canonical}`, { replace: true });
+    }
+  }, [rawPublicCode, directionMode, navigate]);
 
   // ✅ Функции объявлены до использования в useEffect
   const startJoinSession = useCallback(async () => {
@@ -540,6 +729,12 @@ const QueueJoin = () => {
       setSubmitResultUnknown(false);
       setShowSessionConsumedAdvisory(false);
       setSelectedSpecialists([]);
+      // RQ-18 follow-up round-4 (P1-2/P2-1): a NEW direction boot is the
+      // explicit start-over — the reconcile panel and the confirmed
+      // pre-execution refusal belong to the PREVIOUS lifecycle.
+      setReconcile(null);
+      setReconcileDirectionTitle(null);
+      setPreExecRefusal(false);
       // RQ-18 follow-up round-3 (P1): a NEW direction is the explicit
       // start-over — the previous code's complete attempt must not
       // forbid B's fresh session lifecycle, and its in-flight/late
@@ -603,6 +798,31 @@ const QueueJoin = () => {
     if (!directionMode) {
       return;
     }
+    // RQ-18 follow-up round-4 (P1-2): the attempt-state survives the
+    // reload. A hydrated attempt whose outcome is UNKNOWN (a complete
+    // request was sent, the response never arrived) FORBIDS the automatic
+    // session start on this mount — the patient gets the reconcile /
+    // start-over panel and the ORIGINAL attempt identity (session token)
+    // is preserved for the reconcile retry. A confirmed no-business-op
+    // outcome (machine reason) is removed — a fresh session duplicates
+    // nothing.
+    const attempt = attemptStateRead(attemptStorageKey);
+    if (attempt && attempt.publicCode === directionCode) {
+      if (attempt.completeAttempted && attempt.outcomeUnknown) {
+        completeAttemptedRef.current = true;
+        setReconcile({
+          sessionToken: attempt.sessionToken,
+          profileId: attempt.profileId,
+          directionTitle: attempt.directionTitle,
+        });
+        setReconcileDirectionTitle(attempt.directionTitle);
+        setStep('form');
+        return;
+      }
+      if (attempt.completeAttempted && !attempt.outcomeUnknown) {
+        attemptStateRemove(attemptStorageKey);
+      }
+    }
     // RQ-18 follow-up (P2-2): the guard compares CODES. StrictMode's dev
     // double-invoke re-runs this effect with the SAME code → skipped; a
     // changed :publicCode param inside the same route instance re-runs it
@@ -612,7 +832,24 @@ const QueueJoin = () => {
       return;
     }
     void runDirectionStart();
-  }, [directionMode, directionCode, runDirectionStart]);
+  }, [directionMode, directionCode, attemptStorageKey, runDirectionStart]);
+
+  // RQ-18 follow-up round-4 (P2-1): the EXPLICIT start-over — the only
+  // action that may mint a new session after a complete attempt (a
+  // confirmed pre-execution refusal or an unknown outcome). The typed
+  // form/draft is the patient's own context and is kept.
+  const handleStartOver = () => {
+    attemptStateRemove(attemptStorageKey);
+    completeAttemptedRef.current = false;
+    setReconcile(null);
+    setPreExecRefusal(false);
+    setSubmitResultUnknown(false);
+    setShowSessionConsumedAdvisory(false);
+    setError(null);
+    // Force the fresh public start (a new session, no business action).
+    directionStartRef.current = null;
+    void runDirectionStart();
+  };
 
   // Обратный отсчет до открытия очереди
   useEffect(() => {
@@ -845,7 +1082,22 @@ const QueueJoin = () => {
       // RQ-18 follow-up round-3 (P1): the attempt flag goes up BEFORE the
       // request — from this moment the result is unknown, whatever happens
       // to the response (a lost answer must never trigger a renewal).
+      // RQ-18 follow-up round-4 (P1-2): the attempt state ALSO persists to
+      // sessionStorage (per canonical code, same TTL as the draft) — a
+      // reload must not reset the guard and silently mint a new session
+      // while this attempt's business outcome is still unknown.
       completeAttemptedRef.current = true;
+      if (directionMode && attemptStorageKey && directionCode) {
+        attemptStateWrite(attemptStorageKey, {
+          ts: Date.now(),
+          publicCode: directionCode,
+          sessionToken: String(currentSessionToken ?? ''),
+          profileId: directionInfo?.profile_id ?? null,
+          directionTitle: directionInfo?.title ?? null,
+          completeAttempted: true,
+          outcomeUnknown: true,
+        });
+      }
       const joinResult = await completeQueueJoinSession(requestBody);
       if (
         directionMode &&
@@ -861,6 +1113,10 @@ const QueueJoin = () => {
         draftRemove(formStorageKey);
         setPendingDraft(null);
       }
+      // RQ-18 follow-up round-4 (P1-2): the attempt's outcome is KNOWN
+      // (success) — the persisted attempt state is no longer needed.
+      attemptStateRemove(attemptStorageKey);
+      setReconcile(null);
 
       // ✅ Отправляем событие обновления очереди для автоматического обновления таблицы
       if (joinResult.success) {
@@ -942,14 +1198,61 @@ const QueueJoin = () => {
         return;
       }
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.joinFailed));
+      const refusalReason = getJoinRefusalReason(error);
       if (isNetworkClassSubmitError(error)) {
         // RQ-10 (S-08): ответ потерян — результат отправки неизвестен.
+        // Round-4 (P1-2): the persisted attempt state keeps
+        // outcomeUnknown=true — a reload engages the reconcile panel with
+        // the ORIGINAL attempt identity instead of minting a new session.
         setSubmitResultUnknown(true);
+      } else if (
+        refusalReason !== null &&
+        JOIN_PRE_EXECUTION_REASONS.has(refusalReason)
+      ) {
+        // RQ-18 follow-up round-4 (P2-1): a CONFIRMED pre-execution
+        // refusal (the backend proved nothing was created) — offer the
+        // honest explicit start-over instead of a blind retry loop
+        // against the same dead token.
+        setPreExecRefusal(true);
+        if (attemptStorageKey) {
+          const attempt = attemptStateRead(attemptStorageKey);
+          if (attempt) {
+            attemptStateWrite(attemptStorageKey, {
+              ...attempt,
+              outcomeUnknown: false,
+            });
+          }
+        }
+      } else if (refusalReason === 'join_session_used') {
+        setShowSessionConsumedAdvisory(true);
+        if (attemptStorageKey) {
+          const attempt = attemptStateRead(attemptStorageKey);
+          if (attempt) {
+            attemptStateWrite(attemptStorageKey, {
+              ...attempt,
+              outcomeUnknown: false,
+            });
+          }
+        }
       } else if (submitResultUnknown) {
         // Повтор после потери ответа отклонен сервером (сессия уже использована
         // или истекла): запись могла быть создана первой попыткой — показываем
         // честный путь обращения вместо вводящего «сессия не найдена».
         setShowSessionConsumedAdvisory(true);
+      } else if (!isNetworkClassSubmitError(error)) {
+        // Round-4 (P1-2): any other CONFIRMED rejection reached the server
+        // and its transaction was refused/rolled back — no ticket exists,
+        // the persisted attempt outcome is known (a reload may safely
+        // boot a fresh session).
+        if (attemptStorageKey) {
+          const attempt = attemptStateRead(attemptStorageKey);
+          if (attempt) {
+            attemptStateWrite(attemptStorageKey, {
+              ...attempt,
+              outcomeUnknown: false,
+            });
+          }
+        }
       }
     } finally {
       // RQ-18 follow-up round-3 (P1): only the CURRENT page's own attempt
@@ -958,6 +1261,102 @@ const QueueJoin = () => {
       // change). A late finally of a superseded direction must never
       // re-enable the new page's submit mid-flight, and a hung attempt's
       // lock is invalidated by the new code's boot instead.
+      if (submitAttemptRef.current === attempt) {
+        submitAttemptRef.current = null;
+        setLoading(false);
+      }
+    }
+  };
+
+  // RQ-18 follow-up round-4 (P1-2): the reconcile retry — the patient
+  // re-checks the UNKNOWN attempt with its ORIGINAL identity (the same
+  // session token) instead of minting a new session. The backend answers
+  // decisively either way: a joined session replays its saved ticket, a
+  // still-pending session executes this same logical attempt, a proven
+  // dead session offers the explicit start-over.
+  const handleReconcileSubmit = async () => {
+    if (!reconcile || submitAttemptRef.current) {
+      return;
+    }
+    // The same validation the normal submit applies — the reconcile retry
+    // may EXECUTE the pending session, so the payload must be complete.
+    const trimmedPatientName = String(formData.patientName ?? '').trim();
+    const trimmedPhone = String(formData.phone ?? '').trim();
+    const cleanPhone = draftPhoneDigits(trimmedPhone);
+    if (trimmedPatientName.length < 2 || trimmedPatientName.length > 200) {
+      setError(
+        trimmedPatientName.length < 2
+          ? QUEUE_JOIN_MESSAGES.nameTooShort
+          : QUEUE_JOIN_MESSAGES.nameTooLong,
+      );
+      return;
+    }
+    if (cleanPhone.length !== 12) {
+      setError(QUEUE_JOIN_MESSAGES.phoneTooShort);
+      return;
+    }
+    const attempt = {
+      epoch: directionEpochRef.current,
+      code: directionCode,
+    };
+    submitAttemptRef.current = attempt;
+    setLoading(true);
+    setError(null);
+    const requestBody: Record<string, unknown> = {
+      session_token: reconcile.sessionToken,
+      patient_name: trimmedPatientName,
+      phone: cleanPhone,
+      telegram_id: formData.telegramId ? parseInt(String(formData.telegramId ?? '')) : null,
+    };
+    if (reconcile.profileId != null) {
+      requestBody.specialist_ids = [reconcile.profileId];
+      requestBody.specialist_entity_types = ['profile'];
+    }
+    try {
+      const joinResult = await completeQueueJoinSession(requestBody);
+      if (
+        directionMode &&
+        (attempt.epoch !== directionEpochRef.current ||
+          attempt.code !== directionCode)
+      ) {
+        return;
+      }
+      setResult(joinResult as unknown as QueueJoinResultLocal);
+      // The attempt's outcome is KNOWN — the persisted attempt state and
+      // the reconcile panel are no longer needed.
+      attemptStateRemove(attemptStorageKey);
+      setReconcile(null);
+      if (formStorageKey) {
+        draftRemove(formStorageKey);
+        setPendingDraft(null);
+      }
+      setSubmitResultUnknown(false);
+      setShowSessionConsumedAdvisory(false);
+      setStep('success');
+    } catch (err: unknown) {
+      if (
+        directionMode &&
+        (attempt.epoch !== directionEpochRef.current ||
+          attempt.code !== directionCode)
+      ) {
+        return;
+      }
+      setError(getApiErrorMessage(err, QUEUE_JOIN_MESSAGES.joinFailed));
+      const refusalReason = getJoinRefusalReason(err);
+      if (refusalReason !== null && JOIN_PRE_EXECUTION_REASONS.has(refusalReason)) {
+        // Proven: the original attempt produced NOTHING — the honest
+        // explicit start-over replaces the reconcile panel.
+        setPreExecRefusal(true);
+        attemptStateRemove(attemptStorageKey);
+      } else if (refusalReason === 'join_session_used') {
+        setShowSessionConsumedAdvisory(true);
+        attemptStateRemove(attemptStorageKey);
+      } else {
+        // Network-class or an in-flight processing claim — the outcome
+        // stays honestly UNKNOWN; the reconcile panel remains available.
+        setSubmitResultUnknown(true);
+      }
+    } finally {
       if (submitAttemptRef.current === attempt) {
         submitAttemptRef.current = null;
         setLoading(false);
@@ -983,14 +1382,62 @@ const QueueJoin = () => {
     }));
   };
 
-  // RQ-18 follow-up round-2 (P1): explicit draft-owner confirmation —
-  // restore applies the held draft; discard erases it from the device.
+  // RQ-18 follow-up round-4 (P1-1): the draft restore is OWNER-VERIFIED —
+  // the patient must re-enter the last digits of the draft's own phone.
+  // An anonymous «Restore» button is not an ownership control on a shared
+  // device: any next person could press it and read the previous
+  // patient's PHI. Three wrong answers erase the draft (fail-closed).
+  const bumpChallengeFails = (): number => {
+    const attemptKey = attemptStorageKey;
+    const draftKey = formStorageKey;
+    if (!draftKey || !attemptKey) return DRAFT_CHALLENGE_MAX_FAILS;
+    try {
+      const raw = window.sessionStorage.getItem(draftKey);
+      const parsed = raw ? (safeJsonParse(raw) as { ts?: unknown; v?: { tail4?: unknown; fails?: unknown }; data?: unknown } | null) : null;
+      if (!parsed || typeof parsed !== 'object') return DRAFT_CHALLENGE_MAX_FAILS;
+      const fails = Number(parsed.v?.fails ?? 0) + 1;
+      window.sessionStorage.setItem(
+        draftKey,
+        JSON.stringify({ ...parsed, v: { tail4: parsed.v?.tail4, fails } }),
+      );
+      return fails;
+    } catch {
+      return DRAFT_CHALLENGE_MAX_FAILS;
+    }
+  };
   const restoreFoundDraft = () => {
     if (!pendingDraft) {
       return;
     }
+    const expectedTail = draftPhoneDigits(pendingDraft.phone).slice(
+      -DRAFT_CHALLENGE_DIGITS,
+    );
+    if (draftChallenge !== expectedTail) {
+      const fails = bumpChallengeFails();
+      setDraftChallenge('');
+      if (fails >= DRAFT_CHALLENGE_MAX_FAILS) {
+        // Fail-closed: the draft is erased after too many wrong answers.
+        setPendingDraft(null);
+        if (formStorageKey) {
+          draftRemove(formStorageKey);
+        }
+        setFormData({ patientName: '', phone: '', telegramId: '' });
+        setDraftChallengeError(null);
+        setDraftChallengeErased(true);
+        return;
+      }
+      setDraftChallengeError(
+        t('misc.qj_draft_challenge_mismatch', {
+          left: String(DRAFT_CHALLENGE_MAX_FAILS - fails),
+        }),
+      );
+      return;
+    }
     setFormData({ ...pendingDraft });
     setPendingDraft(null);
+    setDraftChallenge('');
+    setDraftChallengeError(null);
+    setDraftChallengeErased(false);
   };
   const discardFoundDraft = () => {
     setPendingDraft(null);
@@ -998,6 +1445,8 @@ const QueueJoin = () => {
       draftRemove(formStorageKey);
     }
     setFormData({ patientName: '', phone: '', telegramId: '' });
+    setDraftChallenge('');
+    setDraftChallengeError(null);
   };
 
   // RQ-18 follow-up round-2 (P1): leaving the route discards the draft —
@@ -1355,8 +1804,11 @@ const QueueJoin = () => {
     // RQ-18 follow-up (P1-1/P2-1): in direction mode the ticket belongs to
     // the DIRECTION — label it with the direction title, never the raw
     // internal department code (qdir:*) or the clinic-wide sentinel name.
+    // Round-4 (P1-2): a reconcile-booted success keeps the direction title
+    // from the persisted attempt envelope (directionInfo does not survive
+    // a reload).
     const singleSpecialistLabel = directionMode
-      ? directionInfo?.title ?? null
+      ? directionInfo?.title ?? reconcileDirectionTitle ?? null
       : result?.specialist_name ?? singleEntry?.specialist_name ?? null;
 
     // Подпись неудачного направления: по выбранному специалисту, иначе по id.
@@ -1393,9 +1845,10 @@ const QueueJoin = () => {
     const firstSuccessEntry = result?.entries?.[0];
     // RQ-18 follow-up (P1-1/P2-1): in direction mode the footer names the
     // DIRECTION (getDepartmentName cannot resolve the internal qdir:* code
-    // and would fall back to a generic label).
+    // and would fall back to a generic label); round-4: the reconcile
+    // envelope's direction title is the fallback after a reload.
     const departmentName = directionMode
-      ? directionInfo?.title ?? ''
+      ? directionInfo?.title ?? reconcileDirectionTitle ?? ''
       : getDepartmentName(firstSuccessEntry?.department || firstSuccessEntry?.specialty);
 
     return (
@@ -1943,19 +2396,96 @@ const QueueJoin = () => {
         {step === 'form' && (
           <div className="qj-select-section">
             <form onSubmit={handleFormSubmit} className="qj-form">
+              {/* RQ-18 follow-up round-4 (P1-2): the reconcile panel — the
+                  previous attempt's outcome is UNKNOWN, so this mount never
+                  mints a new session. The patient either re-checks the
+                  attempt with its ORIGINAL session token or explicitly
+                  starts over. */}
+              {directionMode && reconcile && !preExecRefusal && (
+                <div className="qj-reconcile" data-testid="qj-reconcile-banner" role="alert">
+                  <p className="qj-reconcile-text" data-testid="qj-reconcile-text">
+                    {t('misc.qj_reconcile_title')}
+                  </p>
+                  <p className="qj-reconcile-hint">{t('misc.qj_reconcile_hint')}</p>
+                  <div className="qj-reconcile-actions">
+                    <button
+                      type="button"
+                      className="qj-draft-btn qj-draft-btn-primary"
+                      data-testid="qj-reconcile-check"
+                      disabled={loading}
+                      onClick={() => {
+                        void handleReconcileSubmit();
+                      }}
+                    >
+                      {t('misc.qj_reconcile_check')}
+                    </button>
+                    <button
+                      type="button"
+                      className="qj-draft-btn qj-draft-btn-secondary"
+                      data-testid="qj-reconcile-start-over"
+                      onClick={handleStartOver}
+                    >
+                      {t('misc.qj_reconcile_start_over')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {directionMode && reconcile && preExecRefusal && (
+                <div className="qj-reconcile" data-testid="qj-reconcile-banner" role="alert">
+                  <p className="qj-reconcile-text" data-testid="qj-preexec-refusal">
+                    {t('misc.qj_preexec_refusal')}
+                  </p>
+                  <div className="qj-reconcile-actions">
+                    <button
+                      type="button"
+                      className="qj-draft-btn qj-draft-btn-primary"
+                      data-testid="qj-reconcile-start-over"
+                      onClick={handleStartOver}
+                    >
+                      {t('misc.qj_reconcile_start_over')}
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* RQ-18 follow-up round-2 (P1): a found draft is never applied
                   silently — the device may be shared, so its owner must
-                  explicitly confirm; the prompt reveals no PHI. */}
+                  explicitly confirm; the prompt reveals no PHI.
+                  RQ-18 follow-up round-4 (P1-1): the confirmation is a REAL
+                  ownership check — re-enter the last digits of the draft's
+                  phone. An anonymous button would hand A's PHI to whoever
+                  opens the shared device next. */}
               {directionMode && pendingDraft && (
                 <div className="qj-draft-confirm" data-testid="qj-draft-confirm" role="status" aria-live="polite">
                   <p className="qj-draft-confirm-text" data-testid="qj-draft-confirm-text">
-                    {t('misc.qj_draft_found')}
+                    {t('misc.qj_draft_challenge_title')}
                   </p>
+                  <Input
+                    data-testid="qj-draft-challenge-input"
+                    type="text"
+                    inputMode="numeric"
+                    aria-label={t('misc.qj_draft_challenge_label')}
+                    value={draftChallenge}
+                    onChange={(e) => {
+                      setDraftChallenge(
+                        draftPhoneDigits(e.target.value).slice(0, DRAFT_CHALLENGE_DIGITS),
+                      );
+                      setDraftChallengeError(null);
+                    }}
+                    className="qj-draft-challenge-input"
+                    placeholder={t('misc.qj_draft_challenge_placeholder')}
+                    autoComplete="off"
+                  />
+                  {draftChallengeError && (
+                    <p className="qj-draft-challenge-error" data-testid="qj-draft-challenge-error" role="alert">
+                      {draftChallengeError}
+                    </p>
+                  )}
                   <div className="qj-draft-confirm-actions">
                     <button
                       type="button"
                       className="qj-draft-btn qj-draft-btn-primary"
                       data-testid="qj-draft-restore"
+                      disabled={draftChallenge.length !== DRAFT_CHALLENGE_DIGITS}
                       onClick={restoreFoundDraft}
                     >
                       {t('misc.qj_draft_restore')}
@@ -1970,6 +2500,11 @@ const QueueJoin = () => {
                     </button>
                   </div>
                 </div>
+              )}
+              {directionMode && draftChallengeErased && !pendingDraft && (
+                <p className="qj-draft-challenge-error" data-testid="qj-draft-challenge-erased" role="alert">
+                  {t('misc.qj_draft_challenge_failed')}
+                </p>
               )}
               {/* ФИО - macOS стиль */}
               <div>
@@ -2174,53 +2709,78 @@ const QueueJoin = () => {
                       {t('misc.qj_session_consumed_advisory')}
                     </p>
                   )}
+                  {preExecRefusal && (
+                    // RQ-18 follow-up round-4 (P2-1): a CONFIRMED
+                    // pre-execution refusal — nothing was created, the
+                    // backend proved it. The honest recovery is the EXPLICIT
+                    // start-over (a new session only after this deliberate
+                    // action), never an automatic renewal.
+                    <div className="qj-preexec-recovery">
+                      <p className="qj-error-advisory" data-testid="qj-preexec-refusal">
+                        {t('misc.qj_preexec_refusal')}
+                      </p>
+                      <button
+                        type="button"
+                        className="qj-draft-btn qj-draft-btn-primary"
+                        data-testid="qj-start-over"
+                        onClick={handleStartOver}
+                      >
+                        {t('misc.qj_reconcile_start_over')}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Кнопки - macOS стиль */}
-              <div className="flex" style={{ gap: 'var(--mac-spacing-3)', paddingTop: '16px' }}>
-                <button
-                  type="button"
-                  onClick={() => setStep('info')}
-                  style={{
-                    flex: 1,
-                    background: 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)',
-                    color: 'var(--mac-accent-blue)',
-                    padding: '14px 20px',
-                    borderRadius: 'var(--mac-radius-lg)',
-                    border: 'none',
-                    fontSize: 'var(--mac-font-size-xl)',
-                    fontWeight: 'var(--mac-font-weight-semibold)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
-                >
-                  {t('misc.qj_back_btn')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  style={{
-                    flex: 1,
-                    background: loading ? 'var(--mac-text-tertiary)' : 'var(--mac-accent-blue)',
-                    color: 'var(--mac-text-on-accent)',
-                    padding: '14px 20px',
-                    borderRadius: 'var(--mac-radius-lg)',
-                    border: 'none',
-                    fontSize: 'var(--mac-font-size-xl)',
-                    fontWeight: 'var(--mac-font-weight-semibold)',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease',
-                    boxShadow: loading ? 'none' : '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
-                  }}
-                  onMouseEnter={(e) => !loading && (e.currentTarget.style.background = 'var(--mac-accent-blue-hover)')}
-                  onMouseLeave={(e) => !loading && (e.currentTarget.style.background = 'var(--mac-accent-blue)')}
-                >
-                  {loading ? t('misc.qj_joining_btn') : t('misc.qj_join_btn')}
-                </button>
-              </div>
+              {/* Кнопки - macOS стиль. Round-4 (P1-2): in reconcile mode the
+                  normal submit is replaced by the reconcile panel's actions —
+                  a plain submit here would hit the attempt guard (no
+                  auto-renewal) or send the UNKNOWN attempt again blindly. */}
+              {!(directionMode && reconcile) && (
+                <div className="flex" style={{ gap: 'var(--mac-spacing-3)', paddingTop: '16px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setStep('info')}
+                    style={{
+                      flex: 1,
+                      background: 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)',
+                      color: 'var(--mac-accent-blue)',
+                      padding: '14px 20px',
+                      borderRadius: 'var(--mac-radius-lg)',
+                      border: 'none',
+                      fontSize: 'var(--mac-font-size-xl)',
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
+                  >
+                    {t('misc.qj_back_btn')}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                      flex: 1,
+                      background: loading ? 'var(--mac-text-tertiary)' : 'var(--mac-accent-blue)',
+                      color: 'var(--mac-text-on-accent)',
+                      padding: '14px 20px',
+                      borderRadius: 'var(--mac-radius-lg)',
+                      border: 'none',
+                      fontSize: 'var(--mac-font-size-xl)',
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s ease',
+                      boxShadow: loading ? 'none' : '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
+                    }}
+                    onMouseEnter={(e) => !loading && (e.currentTarget.style.background = 'var(--mac-accent-blue-hover)')}
+                    onMouseLeave={(e) => !loading && (e.currentTarget.style.background = 'var(--mac-accent-blue)')}
+                  >
+                    {loading ? t('misc.qj_joining_btn') : t('misc.qj_join_btn')}
+                  </button>
+                </div>
+              )}
             </form>
           </div>
         )}

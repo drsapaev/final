@@ -5,7 +5,18 @@ Split from qr_queue_service.py.
 from __future__ import annotations
 
 from app.services.qr_queue._base import *  # noqa: F401, F403
-from app.services.qr_queue._base import QRQueueServiceMixinBase
+from app.services.qr_queue._base import (
+    JOIN_SESSION_PROCESSING_STATUS,
+    JoinSessionStateRefusal,
+    QRQueueServiceMixinBase,
+)
+
+# Machine-readable reasons for a complete attempt that provably did NOT
+# reach the business operation (round-4 review, PR #3362: P1-2 + P2-1).
+JOIN_SESSION_REASON_NOT_FOUND = "join_session_not_found"
+JOIN_SESSION_REASON_EXPIRED = "join_session_expired"
+JOIN_SESSION_REASON_PROCESSING = "join_session_processing"
+JOIN_SESSION_REASON_USED = "join_session_used"
 
 
 class SessionsMixin(QRQueueServiceMixinBase):
@@ -46,6 +57,203 @@ class SessionsMixin(QRQueueServiceMixinBase):
             )
             .first()
         )
+
+    def _classify_unclaimed_join_session(self, session_token: str) -> str:
+        """PROVEN reason why the one-shot claim missed for this token.
+
+        Round-4 (P1-2/P2-1): the pre-claim state is inspectable without
+        executing any business action:
+          - no row at all            -> join_session_not_found
+          - pending but past TTL     -> join_session_expired
+          - held by a concurrent claim -> join_session_processing
+          - already joined           -> join_session_used
+        """
+        row = (
+            self.db.query(QueueJoinSession)
+            .filter(QueueJoinSession.session_token == session_token)
+            .first()
+        )
+        if row is None:
+            return JOIN_SESSION_REASON_NOT_FOUND
+        if row.status == "joined":
+            return JOIN_SESSION_REASON_USED
+        if row.status == JOIN_SESSION_PROCESSING_STATUS:
+            return JOIN_SESSION_REASON_PROCESSING
+        if row.expires_at is not None:
+            # SQLite test sessions store naive UTC datetimes; PostgreSQL
+            # stores tz-aware ones — normalize before comparing.
+            expires_cmp = row.expires_at
+            if expires_cmp.tzinfo is None:
+                expires_cmp = expires_cmp.replace(tzinfo=UTC)
+            if expires_cmp <= datetime.now(UTC):
+                return JOIN_SESSION_REASON_EXPIRED
+        # Pending and unexpired yet unclaimable — treat as an in-flight
+        # claim (same ambiguity class as ``processing``).
+        return JOIN_SESSION_REASON_PROCESSING
+
+    def _resolve_entry_specialist_name(self, entry: OnlineQueueEntry | None) -> str:
+        """Best-effort owner name for a replayed ticket (registry axis
+        first — the same precedence the join metadata uses)."""
+        if entry is None:
+            return ""
+        queue: DailyQueue | None = entry.queue
+        if queue is not None and queue.queue_resource_id is not None:
+            resource = queue.queue_resource
+            return (resource.display_name if resource is not None else "") or "Ресурс очереди"
+        if queue is not None and queue.specialist_id:
+            doctor = (
+                self.db.query(Doctor)
+                .filter(Doctor.id == queue.specialist_id)
+                .first()
+            )
+            if doctor is not None and doctor.user is not None and doctor.user.full_name:
+                return doctor.user.full_name
+        return ""
+
+    def _replay_active_queue_metrics(self, entry: OnlineQueueEntry) -> tuple[int, int]:
+        """Current (waiting|called) length and the matching wait estimate
+        for a replayed ticket — the same filters the fresh join uses for
+        ``queue_length_before``."""
+        active_length = (
+            self.db.query(func.count(OnlineQueueEntry.id))
+            .filter(
+                OnlineQueueEntry.queue_id == entry.queue_id,
+                OnlineQueueEntry.status.in_(["waiting", "called"]),
+            )
+            .scalar()
+            or 0
+        )
+        try:
+            from app.crud.clinic import get_queue_settings
+
+            avg_minutes = int(
+                (get_queue_settings(self.db) or {}).get("estimated_wait_minutes", 15)
+            )
+        except Exception:  # pragma: no cover — settings are advisory here
+            avg_minutes = 15
+        return active_length, active_length * avg_minutes
+
+    def _replay_joined_session_single(
+        self,
+        session: QueueJoinSession,
+        qr_token: QueueToken | None,
+    ) -> dict[str, Any]:
+        """Idempotent re-serve of a joined session's saved ticket result.
+
+        Round-4 (P1-2, server-side hardening): after a lost complete
+        response the patient's retry re-uses the ORIGINAL attempt identity
+        (the same session token). A joined session replays its saved
+        result instead of refusing — the retry becomes decisive in both
+        directions (replayed ticket OR proven expired) and can never
+        mint a second business attempt.
+        """
+        entry: OnlineQueueEntry | None = None
+        if session.queue_entry_id:
+            entry = (
+                self.db.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.id == session.queue_entry_id)
+                .first()
+            )
+        active_length, estimated_wait = (
+            self._replay_active_queue_metrics(entry)
+            if entry is not None
+            else (0, 0)
+        )
+        return {
+            "success": True,
+            "queue_number": entry.number if entry is not None else session.queue_number,
+            "queue_length": active_length,
+            "estimated_wait_time": estimated_wait,
+            "specialist_name": self._resolve_entry_specialist_name(entry),
+            "department": (qr_token.department if qr_token is not None else "") or "",
+            "replayed": True,
+        }
+
+    def _replay_joined_session_multiple(
+        self,
+        session: QueueJoinSession,
+        qr_token: QueueToken | None,
+        specialist_ids: list[int] | None,
+    ) -> dict[str, Any]:
+        """Replay for the multi-specialist complete surface.
+
+        A direction-scoped session (the permanent /q/<code> route) joins
+        EXACTLY ONE profile — its replay is exact from the saved entry.
+        A legacy clinic-wide join of N specialists is NOT exactly
+        reconstructible from the session row (only the first entry is
+        saved), so it refuses with the honest ``join_session_used``
+        reason instead of guessing.
+        """
+        direction_scoped = bool(
+            qr_token is not None
+            and qr_token.is_clinic_wide
+            and (qr_token.department or "").startswith(queue_service.PUBLIC_ADDRESS_DEPARTMENT_PREFIX)
+        )
+        if not direction_scoped:
+            raise JoinSessionStateRefusal(
+                JOIN_SESSION_REASON_USED,
+                "Сессия уже использована: результат первой попытки уже выдан",
+            )
+
+        entry: OnlineQueueEntry | None = None
+        if session.queue_entry_id:
+            entry = (
+                self.db.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.id == session.queue_entry_id)
+                .first()
+            )
+        if entry is None:
+            # The saved ticket no longer exists — nothing honest to replay.
+            raise JoinSessionStateRefusal(
+                JOIN_SESSION_REASON_USED,
+                "Сессия уже использована: результат первой попытки уже выдан",
+            )
+        active_length, estimated_wait = self._replay_active_queue_metrics(entry)
+        replayed_entry = {
+            "specialist_id": (specialist_ids or [None])[0],
+            "queue_entry_id": entry.id,
+            "queue_number": entry.number,
+            "duplicate": True,
+            "queue_length": active_length,
+            "estimated_wait_time": estimated_wait,
+            "specialist_name": self._resolve_entry_specialist_name(entry),
+            "department": (qr_token.department if qr_token is not None else "") or "",
+        }
+        return {
+            "success": True,
+            "queue_time": (entry.queue_time or datetime.now(UTC)).isoformat(),
+            "entries": [replayed_entry],
+            "errors": None,
+            "message": "Повторный запрос: результат первой попытки",
+            "replayed": True,
+        }
+
+    def _replay_joined_session(
+        self,
+        session_token: str,
+        specialist_ids: list[int] | None = None,
+    ) -> dict[str, Any] | None:
+        """Return a replayable saved result for a joined session, or None
+        when the token is not a joined session at all (the caller then
+        raises the classified refusal)."""
+        row = (
+            self.db.query(QueueJoinSession)
+            .filter(
+                QueueJoinSession.session_token == session_token,
+                QueueJoinSession.status == "joined",
+            )
+            .first()
+        )
+        if row is None:
+            return None
+        qr_token = (
+            self.db.query(QueueToken)
+            .filter(QueueToken.token == row.qr_token)
+            .first()
+        )
+        if specialist_ids:
+            return self._replay_joined_session_multiple(row, qr_token, specialist_ids)
+        return self._replay_joined_session_single(row, qr_token)
 
 
     def start_join_session(
@@ -166,7 +374,18 @@ class SessionsMixin(QRQueueServiceMixinBase):
         session = self._claim_pending_join_session(session_token)
 
         if not session:
-            raise ValueError("Сессия не найдена или истекла")
+            # Round-4 (P1-2/P2-1): an unclaimable token is either a
+            # REPLAYABLE joined session (the retry after a lost response
+            # re-uses the original attempt identity) or a PROVEN
+            # pre-execution refusal — classified with a machine-readable
+            # reason, never a masked generic 400.
+            replay = self._replay_joined_session(session_token)
+            if replay is not None:
+                return replay
+            raise JoinSessionStateRefusal(
+                self._classify_unclaimed_join_session(session_token),
+                "Сессия не найдена или истекла",
+            )
 
         # Получаем информацию о токене
         qr_token = (
@@ -298,7 +517,16 @@ class SessionsMixin(QRQueueServiceMixinBase):
         session = self._claim_pending_join_session(session_token)
 
         if not session:
-            raise ValueError("Сессия не найдена или истекла")
+            # Round-4 (P1-2/P2-1): same contract as the single path — a
+            # joined direction session replays its saved ticket; everything
+            # else refuses with a PROVEN machine-readable reason.
+            replay = self._replay_joined_session(session_token, specialist_ids)
+            if replay is not None:
+                return replay
+            raise JoinSessionStateRefusal(
+                self._classify_unclaimed_join_session(session_token),
+                "Сессия не найдена или истекла",
+            )
 
         qr_token = (
             self.db.query(QueueToken)

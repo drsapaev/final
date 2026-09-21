@@ -785,3 +785,67 @@
   background: color-mix(in srgb, var(--mac-text-tertiary, darkgray) 16%, transparent);
   color: var(--mac-text-primary, black);
 }
+
+/* RQ-18 follow-up round-4 (P1-1): the draft ownership challenge. */
+.qj-draft-challenge-error {
+  margin: var(--mac-spacing-2, 8px) 0 0;
+  font-size: var(--mac-font-size-xs, 11px);
+  color: var(--mac-error, red);
+  line-height: 1.4;
+}
+
+/* RQ-18 follow-up round-4 (P1-2): the reconcile panel — the previous
+   attempt's outcome is unknown; the mount never mints a new session. */
+.qj-reconcile {
+  background: color-mix(in srgb, var(--mac-warning, orange) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mac-warning, orange) 42%, transparent);
+  border-radius: var(--mac-radius-lg, 12px);
+  padding: var(--mac-spacing-3, 12px) var(--mac-spacing-4, 16px);
+  margin-bottom: var(--mac-spacing-4, 16px);
+  text-align: left;
+}
+
+.qj-reconcile-text {
+  margin: 0 0 var(--mac-spacing-2, 8px);
+  font-size: var(--mac-font-size-sm, 13px);
+  font-weight: var(--mac-font-weight-semibold, 600);
+  color: var(--mac-text-primary, black);
+  line-height: 1.45;
+}
+
+.qj-reconcile-hint {
+  margin: 0 0 var(--mac-spacing-3, 12px);
+  font-size: var(--mac-font-size-xs, 11px);
+  color: var(--mac-text-secondary, darkgray);
+  line-height: 1.45;
+}
+
+.qj-reconcile-actions {
+  display: flex;
+  gap: var(--mac-spacing-3, 12px);
+}
+
+/* RQ-18 follow-up round-4 (P2-1): the confirmed pre-execution refusal
+   recovery block inside the form error area. */
+.qj-preexec-recovery {
+  margin-top: var(--mac-spacing-3, 12px);
+  padding-top: var(--mac-spacing-3, 12px);
+  border-top: 1px solid color-mix(in srgb, var(--mac-error, red) 32%, transparent);
+}
+
+.qj-preexec-recovery .qj-error-advisory {
+  margin-bottom: var(--mac-spacing-3, 12px);
+}
+
+/* Round-4 (P1-1): the ownership-challenge input (ratchet: no inline styles). */
+.qj-draft-challenge-input {
+  width: 100%;
+  padding: var(--mac-spacing-3, 12px) var(--mac-spacing-4, 16px);
+  border: 1px solid color-mix(in srgb, var(--mac-text-secondary, darkgray) 24%, transparent);
+  border-radius: var(--mac-radius-lg, 12px);
+  font-size: var(--mac-font-size-xl, 18px);
+  letter-spacing: 0.2em;
+  background: var(--mac-bg-secondary, white);
+  color: var(--mac-text-primary, black);
+  outline: none;
+}

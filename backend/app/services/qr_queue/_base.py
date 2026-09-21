@@ -44,6 +44,23 @@ logger = logging.getLogger(__name__)
 JOIN_SESSION_PROCESSING_STATUS = "joining"
 
 
+class JoinSessionStateRefusal(ValueError):
+    """A complete-time refusal that is PROVEN from the join-session row.
+
+    Round-4 review (PR #3362, P2-1): the public complete endpoint used to
+    mask every ValueError behind a generic 400 «Internal server error», so
+    the patient's client could not distinguish a CONFIRMED pre-execution
+    refusal (nothing was created — an explicit start-over is safe) from an
+    unknown business outcome (a renewal/restart must stay forbidden).
+    Carrying a machine-readable ``reason`` lets the frontend offer the
+    honest recovery path for each class instead of dead-ending.
+    """
+
+    def __init__(self, reason: str, message: str):
+        super().__init__(message)
+        self.reason = reason
+
+
 def _now(tz=None) -> datetime:
     """Return the current datetime, honoring test monkeypatches.
 

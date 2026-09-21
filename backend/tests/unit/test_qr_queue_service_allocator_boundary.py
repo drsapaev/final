@@ -198,7 +198,11 @@ def test_complete_join_session_multiple_uses_queue_domain_boundary(monkeypatch):
 
 
 @pytest.mark.unit
-def test_complete_join_session_claim_rejects_replay_before_allocator(monkeypatch):
+def test_complete_join_session_claim_replays_joined_before_allocator(monkeypatch):
+    """Round-4 (PR #3362, P1-2): the retry after a lost complete response
+    re-uses the ORIGINAL attempt identity. A joined session REPLAYS its
+    saved result — and the replay is served BEFORE the allocator: a
+    repeated complete never reaches the business operation twice."""
     session = SimpleNamespace(
         qr_token="qr-token",
         status="pending",
@@ -244,13 +248,19 @@ def test_complete_join_session_claim_rejects_replay_before_allocator(monkeypatch
         telegram_id=77,
     )
 
-    with pytest.raises(ValueError, match="Сессия"):
-        service.complete_join_session(
-            session_token="session-token",
-            patient_name="Replay Patient",
-            phone="+998900000138",
-            telegram_id=78,
-        )
+    # Round-4: the retry with the SAME session token REPLAYS the saved
+    # result — a decisive 200-shaped answer instead of the old masked
+    # ValueError dead-end.
+    replay = service.complete_join_session(
+        session_token="session-token",
+        patient_name="Replay Patient",
+        phone="+998900000138",
+        telegram_id=78,
+    )
 
+    assert replay["success"] is True
+    assert replay["replayed"] is True
     assert session.status == "joined"
+    # the replay is served BEFORE the allocator — the business operation
+    # ran exactly ONCE for this session
     assert domain_service.allocate_ticket.call_count == 1

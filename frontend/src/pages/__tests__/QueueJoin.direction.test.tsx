@@ -32,7 +32,7 @@
  */
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const queueApiMocks = vi.hoisted(() => ({
@@ -64,6 +64,58 @@ function renderDirectionRoute(code = 'abcd1234efgh') {
             </MemoryRouter>
         </React.StrictMode>,
     );
+}
+
+/** Renders the route PLUS navigation/location probes for the round-4
+ * canonical-URL pins. `lastQjPath` mirrors the live URL after navigations. */
+let lastQjPath = '';
+const LocationProbe = () => {
+    const location = useLocation();
+    lastQjPath = location.pathname;
+    return null;
+};
+const NavButton = ({ to }: { to: string }) => {
+    const navigate = useNavigate();
+    return (
+        <button type="button" data-testid={`nav-${to}`} onClick={() => navigate(to)}>
+            go {to}
+        </button>
+    );
+};
+function renderDirectionRouteWithNav(initialPath: string) {
+    return render(
+        <React.StrictMode>
+            <MemoryRouter initialEntries={[initialPath]}>
+                <LocationProbe />
+                <NavButton to={`/q/${CANONICAL_CODE}`} />
+                <NavButton to={`/q/${CANONICAL_CODE.toUpperCase()}`} />
+                <Routes>
+                    <Route path="/q/:publicCode" element={<QueueJoin />} />
+                </Routes>
+            </MemoryRouter>
+        </React.StrictMode>,
+    );
+}
+
+const CANONICAL_CODE = 'abcd1234efgh';
+const DRAFT_PHONE = '+998 (90) 123-45-67';
+const DRAFT_TAIL = '4567';
+
+/** Builds a round-4 draft envelope (with the ownership-verification block). */
+function draftEnvelope(name: string, phone = DRAFT_PHONE, telegramId = '') {
+    const digits = phone.replace(/\D/g, '');
+    return {
+        ts: Date.now(),
+        v: { tail4: digits.slice(-4), fails: 0 },
+        data: { patientName: name, phone, telegramId },
+    };
+}
+
+/** Passes the round-4 ownership challenge and applies the draft. */
+async function restoreDraftViaChallenge(tail = DRAFT_TAIL) {
+    const input = await screen.findByTestId('qj-draft-challenge-input');
+    fireEvent.change(input, { target: { value: tail } });
+    fireEvent.click(screen.getByTestId('qj-draft-restore'));
 }
 
 /**
@@ -145,6 +197,10 @@ async function fillAndSubmit(name = 'Тест Пациент') {
 beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    // round-4: the attempt-state and the draft both live in sessionStorage —
+    // full isolation between pins.
+    window.sessionStorage.clear();
+    lastQjPath = '';
 });
 
 afterEach(() => {
@@ -324,14 +380,16 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         await screen.findByText(/заполните форму/i);
         fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
         await screen.findByTestId('qj-draft-confirm');
-        // the form stays EMPTY until the explicit restore (silent prefill forbidden)
+        // the form stays EMPTY until the owner-verified restore (silent prefill
+        // forbidden; round-4: a bare button click no longer applies the draft)
         const nameBefore = (await screen.findByLabelText(/фио пациента/i)) as HTMLInputElement;
         expect(nameBefore.value).toBe('');
         // the confirmation prompt reveals NO PHI
         const prompt = screen.getByTestId('qj-draft-confirm');
         expect(prompt.textContent).not.toMatch(/Иванов|\+998|123-45-67/);
-        // explicit owner confirmation applies the draft
-        fireEvent.click(screen.getByTestId('qj-draft-restore'));
+        // explicit owner confirmation applies the draft (round-4: via the
+        // phone-tail challenge)
+        await restoreDraftViaChallenge();
         const nameInput = (await screen.findByLabelText(/фио пациента/i)) as HTMLInputElement;
         expect(nameInput.value).toBe('Иванов Иван');
     });
@@ -385,10 +443,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
     it('PIN 23 (round-2 P1): discard erases the draft; typing supersedes it', async () => {
         window.sessionStorage.setItem(
             'queue_join_form_qdir_abcd1234efgh',
-            JSON.stringify({
-                ts: Date.now(),
-                data: { patientName: 'Черновик Пациент', phone: '+998 (90) 222-33-44', telegramId: '' },
-            }),
+            JSON.stringify(draftEnvelope('Черновик Пациент', '+998 (90) 222-33-44')),
         );
         directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
         renderDirectionRoute();
@@ -403,6 +458,9 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         // typing again persists the NEW patient's own draft (fresh envelope)
         fireEvent.change(screen.getByLabelText(/фио пациента/i), {
             target: { value: 'Новый Пациент' },
+        });
+        fireEvent.change(screen.getByLabelText(/номер телефона/i), {
+            target: { value: DRAFT_PHONE },
         });
         const stored = window.sessionStorage.getItem('queue_join_form_qdir_abcd1234efgh');
         expect(stored).toBeTruthy();
@@ -954,10 +1012,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
     it('PIN 30 (round-3 P2): a pending draft confirmation survives remounts — the stored draft is kept', async () => {
         window.sessionStorage.setItem(
             'queue_join_form_qdir_abcd1234efgh',
-            JSON.stringify({
-                ts: Date.now(),
-                data: { patientName: 'Ожидающий Пациент', phone: '+998 (90) 444-55-66', telegramId: '' },
-            }),
+            JSON.stringify(draftEnvelope('Ожидающий Пациент', '+998 (90) 444-55-66')),
         );
         directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
         const first = renderDirectionRoute();
@@ -976,9 +1031,190 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         const stored = window.sessionStorage.getItem('queue_join_form_qdir_abcd1234efgh');
         expect(stored).toBeTruthy();
         expect(JSON.parse(stored as string).data.patientName).toBe('Ожидающий Пациент');
-        // the owner can still restore it
-        fireEvent.click(screen.getByTestId('qj-draft-restore'));
+        // the owner can still restore it (round-4: via the phone-tail challenge)
+        await restoreDraftViaChallenge('5566');
         const nameInput = (await screen.findByLabelText(/фио пациента/i)) as HTMLInputElement;
         expect(nameInput.value).toBe('Ожидающий Пациент');
+    });
+
+    it('PIN 32 (round-4 P1-1): the restore is OWNER-VERIFIED — a wrong phone tail never reveals the draft PHI', async () => {
+        window.sessionStorage.setItem(
+            'queue_join_form_qdir_abcd1234efgh',
+            JSON.stringify(draftEnvelope('Пациент А')),
+        );
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+        await screen.findByTestId('qj-draft-confirm');
+        // patient B types a WRONG tail and presses Restore — the challenge
+        // refuses; the button alone (no digits) is disabled
+        expect(screen.getByTestId('qj-draft-restore').hasAttribute('disabled')).toBe(true);
+        fireEvent.change(screen.getByTestId('qj-draft-challenge-input'), {
+            target: { value: '0000' },
+        });
+        fireEvent.click(screen.getByTestId('qj-draft-restore'));
+        // B still sees NO PHI: the form is empty, the banner reveals nothing
+        await screen.findByTestId('qj-draft-challenge-error');
+        expect((screen.getByLabelText(/фио пациента/i) as HTMLInputElement).value).toBe('');
+        const banner = screen.getByTestId('qj-draft-confirm');
+        expect(banner.textContent).not.toMatch(/Пациент А|\+998|123-45-67/);
+        // the CORRECT tail (the owner's own phone digits) applies the draft
+        await restoreDraftViaChallenge();
+        expect((screen.getByLabelText(/фио пациента/i) as HTMLInputElement).value).toBe('Пациент А');
+    });
+
+    it('PIN 32b (round-4 P1-1): three wrong challenge answers ERASE the draft (fail-closed)', async () => {
+        window.sessionStorage.setItem(
+            'queue_join_form_qdir_abcd1234efgh',
+            JSON.stringify(draftEnvelope('Пациент А')),
+        );
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+        await screen.findByTestId('qj-draft-confirm');
+        for (let i = 0; i < 3; i += 1) {
+            fireEvent.change(screen.getByTestId('qj-draft-challenge-input'), {
+                target: { value: i === 2 ? '9999' : '0000' },
+            });
+            fireEvent.click(screen.getByTestId('qj-draft-restore'));
+            await React.act(async () => {});
+        }
+        // fail-closed: the draft is gone, the banner is gone, PHI not revealed
+        expect(screen.queryByTestId('qj-draft-confirm')).toBeNull();
+        expect(window.sessionStorage.getItem('queue_join_form_qdir_abcd1234efgh')).toBeNull();
+        expect(screen.getByTestId('qj-draft-challenge-erased')).toBeTruthy();
+        expect((screen.getByLabelText(/фио пациента/i) as HTMLInputElement).value).toBe('');
+    });
+
+    it('PIN 33 (round-4 P1-2): a lost complete response survives the reload — NO new session, the retry re-uses the ORIGINAL attempt identity', async () => {
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        queueApiMocks.completeQueueJoinSession.mockRejectedValueOnce({
+            response: { status: 502, data: { detail: 'bad gateway' } },
+        });
+        const first = renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        await fillAndSubmit();
+        // the response was lost — the honest unknown banner is up
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
+        });
+        expect(
+            window.sessionStorage.getItem('queue_join_attempt_qdir_abcd1234efgh'),
+        ).toBeTruthy();
+        first.unmount();
+
+        // THE RELOAD: the attempt state is hydrated, outcome UNKNOWN —
+        // the mount must NOT mint a new session and must NOT run the
+        // legacy flow; the reconcile panel engages instead.
+        queueApiMocks.completeQueueJoinSession.mockResolvedValueOnce(COMPLETE_MULTI_RESPONSE);
+        renderDirectionRoute();
+        await screen.findByTestId('qj-reconcile-banner');
+        // the public start-session was NOT called again (1 call from the
+        // first mount only) — a new session would bypass the one-shot
+        // complete contract for the still-unknown attempt
+        expect(directionApiMocks.startPublicDirectionSession).toHaveBeenCalledTimes(1);
+        expect(queueApiMocks.startQueueJoinSession).not.toHaveBeenCalled();
+
+        // the patient restores their own draft (owner-verified) and
+        // re-checks the attempt
+        await restoreDraftViaChallenge();
+        fireEvent.click(screen.getByTestId('qj-reconcile-check'));
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(2);
+        });
+        // the retry carries the ORIGINAL session token — the same attempt
+        // identity, never a second business attempt under a new token
+        const retryPayload = queueApiMocks.completeQueueJoinSession.mock.calls[1][0] as {
+            session_token?: string;
+        };
+        expect(retryPayload.session_token).toBe('dir-session-token');
+        // the joined session replayed the saved ticket → the success step
+        await waitFor(() => {
+            expect(screen.getByText(/ваш номер/i)).toBeTruthy();
+        });
+        // the attempt envelope is consumed
+        expect(
+            window.sessionStorage.getItem('queue_join_attempt_qdir_abcd1234efgh'),
+        ).toBeNull();
+    });
+
+    it('PIN 34 (round-4 P1-2): a non-canonical (uppercase) URL uses the canonical lowercase identity and replaces itself', async () => {
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        renderDirectionRouteWithNav('/q/ABCD1234EFGH');
+        await screen.findByText(/заполните форму/i);
+        // the start call used the CANONICAL code — the backend resolves
+        // strip().lower(), and so must the client identity
+        expect(directionApiMocks.startPublicDirectionSession).toHaveBeenCalledWith('abcd1234efgh');
+        // the URL was replaced with the canonical variant
+        expect(lastQjPath).toBe('/q/abcd1234efgh');
+    });
+
+    it('PIN 34b (round-4 P1-2): an unknown attempt survives the case-alias navigation — no new session for /q/ABCD after /q/abcd', async () => {
+        window.sessionStorage.setItem(
+            `queue_join_attempt_qdir_${CANONICAL_CODE}`,
+            JSON.stringify({
+                ts: Date.now(),
+                publicCode: CANONICAL_CODE,
+                sessionToken: 'dir-session-token',
+                profileId: 7,
+                directionTitle: 'Лаборатория',
+                completeAttempted: true,
+                outcomeUnknown: true,
+            }),
+        );
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        renderDirectionRouteWithNav(`/q/${CANONICAL_CODE}`);
+        // unknown attempt → reconcile instead of an automatic start
+        await screen.findByTestId('qj-reconcile-banner');
+        expect(directionApiMocks.startPublicDirectionSession).not.toHaveBeenCalled();
+        // navigating to the UPPERCASE alias of the SAME address must not
+        // reset the guard or mint a session (the pre-fix second bypass)
+        fireEvent.click(screen.getByTestId(`nav-/q/${CANONICAL_CODE.toUpperCase()}`));
+        await React.act(async () => {});
+        await screen.findByTestId('qj-reconcile-banner');
+        expect(directionApiMocks.startPublicDirectionSession).not.toHaveBeenCalled();
+        expect(queueApiMocks.startQueueJoinSession).not.toHaveBeenCalled();
+    });
+
+    it('PIN 35 (round-4 P2-1): a CONFIRMED pre-execution refusal offers the explicit start-over — a new session only after the deliberate action', async () => {
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        queueApiMocks.completeQueueJoinSession.mockRejectedValue({
+            response: {
+                status: 400,
+                data: { detail: { reason: 'join_session_expired', message: 'Сессия истекла' } },
+            },
+        });
+        renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        await fillAndSubmit();
+        // the confirmed refusal surfaces the honest recovery offer
+        await screen.findByTestId('qj-preexec-refusal');
+        expect(screen.getByTestId('qj-start-over')).toBeTruthy();
+        // no blind retry loop: the submit did not auto-renew anything
+        expect(directionApiMocks.startPublicDirectionSession).toHaveBeenCalledTimes(1);
+        expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
+        // the machine-reason refusal updated the persisted attempt outcome —
+        // a reload boots a FRESH session safely (nothing was created)
+        const attemptState = JSON.parse(
+            window.sessionStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
+        );
+        expect(attemptState.outcomeUnknown).toBe(false);
+
+        // THE EXPLICIT START-OVER: mints a new session on the deliberate click
+        queueApiMocks.completeQueueJoinSession.mockResolvedValue(COMPLETE_MULTI_RESPONSE);
+        fireEvent.click(screen.getByTestId('qj-start-over'));
+        await waitFor(() => {
+            expect(directionApiMocks.startPublicDirectionSession).toHaveBeenCalledTimes(2);
+        });
+        await screen.findByText(/заполните форму/i);
+        await fillAndSubmit('Второй Пациент');
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(2);
+        });
+        await waitFor(() => {
+            expect(screen.getByText(/ваш номер/i)).toBeTruthy();
+        });
     });
 });
