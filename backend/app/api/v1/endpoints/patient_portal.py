@@ -83,6 +83,8 @@ from app.api.v1.endpoints.telegram_webhook._helpers import (
     MINI_APP_FORMS_REQUEST_ERROR_REASONS,
 )
 from app.crud.appointment import appointment as appointment_crud
+from app.crud.clinic import clinic_today
+from app.models.clinic import Doctor
 from app.models.department import Department
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
@@ -540,6 +542,46 @@ def _with_resolved_department(
     return payload
 
 
+def _resolve_doctor_routing_department(
+    doctor_row: Doctor,
+    submitted_department_row: Department | None,
+) -> Department:
+    """Round-9 (owner P1, PR #3340): a doctor-booking's routing department is
+    the doctor's CANONICAL department — never the independently submitted
+    string.
+
+    The previous flow persisted the submitted `department` (or NULL when
+    omitted) next to the requested doctor: a cardiology doctor booked into
+    a dentistry department stored contradictory routing data (the row
+    surfaced in one doctor's schedule and in the WRONG department's), and
+    a doctor-only booking stored `department_id = NULL` — a routing
+    context no schedule could join on. Both booking surfaces (preview and
+    create) resolve through THIS helper, so preview and create always
+    agree on the routing context.
+
+    Refusals are controlled 400s BEFORE any mutation:
+
+    * ``doctor_department_missing`` — the doctor has no canonical
+      department (an explicit refusal, not a NULL routing context);
+    * ``doctor_department_mismatch`` — the submitted department is not
+      the doctor's own. Compared by the resolved department's id, which
+      is key-equivalent: the submitted row was looked up BY key.
+    """
+    if doctor_row.department_id is None or doctor_row.department is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "doctor_department_missing"},
+        )
+    if submitted_department_row is not None and int(submitted_department_row.id) != int(
+        doctor_row.department_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "doctor_department_mismatch"},
+        )
+    return doctor_row.department
+
+
 # Shared OpenAPI error responses (P2: documented error surface).
 _PORTAL_400 = {
     "description": (
@@ -689,9 +731,18 @@ def preview_patient_portal_booking(
                 department=request_body.department,
                 notes=request_body.notes,
                 services=request_body.services,
+                # Round-9 (owner P2, PR #3340): the past-day check follows
+                # the CLINIC's calendar (Asia/Tashkent queue-settings SSOT
+                # `clinic_today`), not the UTC host's `date.today()` — on a
+                # UTC host between 00:00 and 04:59 Tashkent time the old
+                # validation accepted the previous clinic day and let
+                # patients create already-past appointments.
+                today=clinic_today(db),
             )
         except TelegramMiniAppSessionScopeError as exc:
-            raise _raise_scope_error(exc, _booking_scope_status_code(exc.reason)) from exc
+            raise _raise_scope_error(
+                exc, _booking_scope_status_code(exc.reason)
+            ) from exc
         # P1 (round 2): the department must resolve (canonical key, active) even
         # for a preview — PR-C2 submits what preview accepted, so a failure here
         # must surface BEFORE the create call.
@@ -699,6 +750,19 @@ def preview_patient_portal_booking(
         # builder stripped the raw request string, so resolving the raw one
         # could 400 on " cardio " the preview had already accepted.
         department_row = _resolve_portal_department(db, preview.draft.department)
+        # Round-9 (owner P1): a doctor-booking preview returns the SAME
+        # routing context create will persist — the doctor's canonical
+        # department (or a controlled 400 for a departmentless/mismatched
+        # doctor). A missing Doctor row keeps the pre-round-9 preview
+        # shape; create's eligibility gate still answers 404 for it.
+        if preview.draft.doctor_id is not None:
+            doctor_row = (
+                db.query(Doctor).filter(Doctor.id == preview.draft.doctor_id).first()
+            )
+            if doctor_row is not None:
+                department_row = _resolve_doctor_routing_department(
+                    doctor_row, department_row
+                )
     except HTTPException as exc:
         # Round-3 (owner P2): denial leaves a trail row (SSOT parity).
         _log_portal_denied(
@@ -793,9 +857,13 @@ def create_patient_portal_booking(
                 department=request_body.department,
                 notes=request_body.notes,
                 services=request_body.services,
+                # Round-9 (owner P2): clinic-local calendar — see preview.
+                today=clinic_today(db),
             )
         except TelegramMiniAppSessionScopeError as exc:
-            raise _raise_scope_error(exc, _booking_scope_status_code(exc.reason)) from exc
+            raise _raise_scope_error(
+                exc, _booking_scope_status_code(exc.reason)
+            ) from exc
         # P1 (round 2): resolve BEFORE any mutation — unknown/inactive keys are a
         # 400, never a silently-NULL routing context on the created row.
         # Round-4 (owner P2): SSOT-NORMALIZED draft value (see preview).
@@ -808,7 +876,7 @@ def create_patient_portal_booking(
             # (web/mobile/telegram) serialize on the doctor row. The lock is
             # taken BEFORE eligibility so a concurrent deactivation must commit
             # first (same ordering as the Mini App create path).
-            lock_doctor_for_slot_reservation(db, preview.draft.doctor_id)
+            doctor_row = lock_doctor_for_slot_reservation(db, preview.draft.doctor_id)
 
             try:
                 ensure_doctor_eligible_for_appointment(db, preview.draft.doctor_id)
@@ -820,6 +888,19 @@ def create_patient_portal_booking(
                         "message": exc.detail,
                     },
                 ) from exc
+
+            if doctor_row is not None:
+                # Round-9 (owner P1): the persisted routing context is the
+                # doctor's CANONICAL department — resolved AFTER eligibility
+                # so the established doctor_not_eligible contract is
+                # unchanged, and BEFORE the slot check (a routing refusal
+                # never creates anything). The submitted department either
+                # matches the doctor's own or the request is a controlled
+                # 400; a departmentless doctor is an explicit refusal, not
+                # a NULL department_id.
+                department_row = _resolve_doctor_routing_department(
+                    doctor_row, department_row
+                )
 
             if preview.draft.appointment_time:
                 if appointment_crud.is_time_slot_occupied(

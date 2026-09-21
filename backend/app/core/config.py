@@ -162,6 +162,20 @@ class Settings(BaseSettings):
     # pre-#3340 workers remain AND their snapshots have expired).
     IDEMPOTENCY_LEGACY_BRIDGE_MAX_AGE_SECONDS: float = Field(default=90_090.0)
 
+    # Round-9 (owner P2, PR #3340): the ABSOLUTE, deployment-wide legacy
+    # bridge cutoff (Unix epoch seconds). Every worker compares the current
+    # time against THIS one timestamp, so a rolling deploy, crash, worker
+    # restart or autoscaling replacement can never re-open the migration
+    # window — a restarted process re-runs the same comparison against the
+    # same date. When unset, the bridge falls back to the pre-Round-9
+    # process-start window (IDEMPOTENCY_LEGACY_BRIDGE_MAX_AGE_SECONDS from
+    # worker start) — a TRANSITIONAL default that only keeps the rolling
+    # deploy drain safe; pin this cutoff in the deployment environment to
+    # make the shutdown restart-proof. `0`-style past values (any epoch in
+    # the past) disable the bridge for every worker at once; the max-age
+    # setting still hard-disables it immediately when set to 0.
+    IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH: float | None = Field(default=None)
+
     # --- Payment providers ---
     CLICK_ENABLED: bool = Field(default=False, description="Enable Click payments")
     CLICK_SERVICE_ID: str | None = Field(default=None, description="Click service id")

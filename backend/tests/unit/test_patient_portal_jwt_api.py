@@ -883,8 +883,19 @@ class TestDeniedAuditRows:
         assert row.extra_data["reason"] == "department_unknown"
 
     def test_occupied_slot_denial_writes_audit_row(
-        self, client, linked_patient_headers, db_session, test_patient, test_doctor
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_patient,
+        test_doctor,
+        portal_department,
     ):
+        # Round-9 (owner P1): a doctor booking requires the doctor's
+        # canonical department — bind the harness doctor before booking.
+        test_doctor.department_id = portal_department.id
+        db_session.commit()
+
         body = {
             "appointmentDate": self.future_date,
             "appointmentTime": "10:00",
@@ -1355,3 +1366,229 @@ class TestRegistrarReadModelDepartmentContract:
         assert all(
             r["id"] != appointment_id + 10000 for r in other.json()
         ), "a foreign department's filter must not leak the row"
+
+
+class TestDoctorDepartmentRouting:
+    """Round-9 owner P1 (PR #3340): a doctor-booking's routing department is
+    the doctor's CANONICAL department — never the independently submitted
+    string. Preview and create agree on the routing context; a foreign
+    submitted department is a controlled 400; a departmentless doctor is an
+    explicit refusal instead of a persisted NULL."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def _bind_doctor(self, db_session: Session, test_doctor, portal_department):
+        test_doctor.department_id = portal_department.id
+        db_session.commit()
+        db_session.refresh(test_doctor)
+
+    def test_create_persists_doctor_canonical_department(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_doctor,
+        portal_department,
+    ):
+        self._bind_doctor(db_session, test_doctor, portal_department)
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "route-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+            },
+        )
+        assert created.status_code == 201, created.json()
+        row = db_session.get(Appointment, created.json()["appointment_id"])
+        assert row is not None
+        # Pre-round-9 this row was created with department_id = NULL.
+        assert row.department_id == portal_department.id
+
+    def test_preview_and_create_agree_on_routing_context(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_doctor,
+        portal_department,
+    ):
+        self._bind_doctor(db_session, test_doctor, portal_department)
+        preview = client.post(
+            "/api/v1/patients/booking/preview",
+            headers={**linked_patient_headers, "Idempotency-Key": "route-pv-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+            },
+        )
+        assert preview.status_code == 200, preview.json()
+        assert preview.json()["appointment"]["department_id"] == portal_department.id, (
+            "the preview echoes the doctor's canonical routing context"
+        )
+
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "route-cr-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+            },
+        )
+        assert created.status_code == 201, created.json()
+        row = db_session.get(Appointment, created.json()["appointment_id"])
+        assert row.department_id == portal_department.id
+
+    def test_foreign_submitted_department_rejected_400(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_doctor,
+        portal_department,
+    ):
+        self._bind_doctor(db_session, test_doctor, portal_department)
+        other = Department(
+            key="dentistry",
+            name_ru="Стоматология",
+            name_uz="Stomatologiya",
+            active=True,
+        )
+        db_session.add(other)
+        db_session.commit()
+
+        body = {
+            "appointmentDate": self.future_date,
+            "doctorId": test_doctor.id,
+            "department": other.key,
+        }
+        preview = client.post(
+            "/api/v1/patients/booking/preview",
+            headers={**linked_patient_headers, "Idempotency-Key": "route-pv-2"},
+            json=body,
+        )
+        assert preview.status_code == 400, preview.json()
+        assert preview.json()["detail"]["reason"] == "doctor_department_mismatch"
+
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "route-cr-2"},
+            json=body,
+        )
+        assert created.status_code == 400, created.json()
+        assert created.json()["detail"]["reason"] == "doctor_department_mismatch"
+        assert db_session.query(Appointment).count() == 0, (
+            "a routing contradiction never materializes an appointment"
+        )
+
+    def test_departmentless_doctor_explicitly_refused(
+        self, client, linked_patient_headers, db_session, test_doctor
+    ):
+        # The harness doctor has NO canonical department: an explicit 400,
+        # never a silent NULL routing context (create + preview).
+        body = {"appointmentDate": self.future_date, "doctorId": test_doctor.id}
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "route-cr-3"},
+            json=body,
+        )
+        assert created.status_code == 400, created.json()
+        assert created.json()["detail"]["reason"] == "doctor_department_missing"
+
+        preview = client.post(
+            "/api/v1/patients/booking/preview",
+            headers={**linked_patient_headers, "Idempotency-Key": "route-pv-3"},
+            json=body,
+        )
+        assert preview.status_code == 400, preview.json()
+        assert preview.json()["detail"]["reason"] == "doctor_department_missing"
+        assert db_session.query(Appointment).count() == 0
+
+    def test_matching_submitted_department_still_books(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_doctor,
+        portal_department,
+    ):
+        # The doctor's own department submitted explicitly: accepted, and
+        # the persisted FK is the same canonical department.
+        self._bind_doctor(db_session, test_doctor, portal_department)
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "route-cr-4"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": portal_department.key,
+            },
+        )
+        assert created.status_code == 201, created.json()
+        row = db_session.get(Appointment, created.json()["appointment_id"])
+        assert row.department_id == portal_department.id
+
+
+class TestClinicCalendarDateValidation:
+    """Round-9 owner P2 (PR #3340): the booking past-day check follows the
+    CLINIC's calendar (`clinic_today`, Asia/Tashkent queue-settings SSOT),
+    not the UTC host's `date.today()` — on a UTC host between 00:00 and
+    04:59 Tashkent time the old validation accepted the previous clinic
+    day and let patients create already-past appointments."""
+
+    def _shift_clinic_today(self, monkeypatch):
+        import app.api.v1.endpoints.patient_portal as portal_module
+
+        monkeypatch.setattr(
+            portal_module,
+            "clinic_today",
+            lambda db: date.today() + timedelta(days=1),
+        )
+
+    def test_previous_clinic_day_refused_on_both_surfaces(
+        self, client, linked_patient_headers, db_session, monkeypatch
+    ):
+        self._shift_clinic_today(monkeypatch)
+        # host-today is already YESTERDAY for the clinic (the UTC-host
+        # window the finding describes).
+        body = {"appointmentDate": str(date.today())}
+
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "cal-cr-1"},
+            json=body,
+        )
+        assert created.status_code == 400, created.json()
+        assert created.json()["detail"]["reason"] == "appointment_date_in_past"
+
+        preview = client.post(
+            "/api/v1/patients/booking/preview",
+            headers={**linked_patient_headers, "Idempotency-Key": "cal-pv-1"},
+            json=body,
+        )
+        assert preview.status_code == 400, preview.json()
+        assert preview.json()["detail"]["reason"] == "appointment_date_in_past"
+
+        assert db_session.query(Appointment).count() == 0, (
+            "an already-past (by the clinic calendar) day never books"
+        )
+
+    def test_clinic_today_is_still_accepted(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        portal_department,
+        monkeypatch,
+    ):
+        self._shift_clinic_today(monkeypatch)
+        # host-tomorrow == clinic-TODAY: valid on the clinic calendar.
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "cal-cr-2"},
+            json={
+                "appointmentDate": str(date.today() + timedelta(days=1)),
+                "department": portal_department.key,
+            },
+        )
+        assert created.status_code == 201, created.json()

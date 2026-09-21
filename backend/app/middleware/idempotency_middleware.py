@@ -127,10 +127,24 @@ _LEGACY_BRIDGE_EPOCH = time.time()
 
 
 def _legacy_bridge_active() -> bool:
-    """True while the user-only legacy reconciliation may run (Round-8)."""
+    """True while the user-only legacy reconciliation may run (Round-8).
+
+    Round-9 (owner P2, PR #3340): the shutdown boundary is DEPLOYMENT-WIDE
+    and restart-proof. When ``IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH`` is
+    pinned, EVERY worker compares the current time against the SAME
+    absolute Unix epoch — a rolling deploy, crash, worker restart or
+    autoscaling replacement re-runs the same comparison against the same
+    date and can never re-open the window (the previous process-start
+    measurement re-armed the ~25 h window on every boot, so regularly
+    restarted deployments kept the user-only aliasing hazard alive
+    indefinitely). The unpinned process-start window remains only as the
+    transitional fallback that keeps an unconfigured rolling deploy's
+    drain safe; production pins the cutoff (see the config comment).
+    """
     try:
         from app.core.config import settings
 
+        cutoff = getattr(settings, "IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH", None)
         max_age = float(
             getattr(
                 settings,
@@ -139,9 +153,13 @@ def _legacy_bridge_active() -> bool:
             )
         )
     except Exception:  # pragma: no cover - settings not initialized (tests)
+        cutoff = None
         max_age = _LEGACY_BRIDGE_DEFAULT_MAX_AGE_SECONDS
     if max_age <= 0:
         return False
+    if cutoff is not None:
+        # Absolute, shared, restart-proof boundary.
+        return time.time() < float(cutoff)
     return (time.time() - _LEGACY_BRIDGE_EPOCH) < max_age
 
 
@@ -855,6 +873,19 @@ def _local_scope_binding_set(
         existing = _local_scope_bindings.get(cache_key)
         if existing is not None and existing[1] == patient_scope:
             snapshot = existing[2]
+            # Round-9 (owner P2, PR #3340): a scope-only rebind — the
+            # Redis→local mirror runs on EVERY same-key retry whose scope
+            # GET answers — must NOT slide the local window. The previous
+            # unconditional fresh TTL turned the fixed 24 h contract into
+            # a sliding one: one replay at hour 23 re-armed the local
+            # snapshot to hour 47 while the Redis response and binding had
+            # already expired, so worker A replayed a stale 201 while
+            # worker B treated the key as fresh and re-executed the write.
+            # The entry keeps its ORIGINAL expiry (a live one — an already
+            # expired entry is rewritten with a fresh TTL, restoring a
+            # binding after concurrent eviction).
+            if existing[0] > time.time():
+                expires_at = existing[0]
         else:
             snapshot = None
     _local_scope_bindings[cache_key] = (expires_at, patient_scope, snapshot)
@@ -2693,9 +2724,60 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # upsert re-creates the binding before the handler starts. The
         # success path re-asserts again atomically with the response store.
         if patient_scope and origin_ns and claim is not None and claim.try_available():
-            claim.extend_scope_binding(
+            scope_confirmed = claim.extend_scope_binding(
                 origin_ns, idempotency_key, patient_scope, attempt_generation
             )
+            if not scope_confirmed:
+                # Round-9 (owner P1, PR #3340): the re-assert is a MANDATORY
+                # precondition, not a best-effort refresh — the previous
+                # fire-and-forget call let the handler start with an
+                # UNCONFIRMED scope. False means either the transport died
+                # on the very last check before the business write (a
+                # required deployment must not execute: the appointment
+                # could commit with neither a binding nor a durable intent,
+                # and after the claim lapsed another worker could repeat
+                # the write) or the origin binding already belongs to
+                # ANOTHER card (the stale-cleanup/relink race — only the
+                # successor attempt bound to the current card may execute).
+                # Neither the intent marker nor the endpoint may start on
+                # an unconfirmed scope: release the claim we own and the
+                # fence, then refuse — 409 scope mismatch when a re-read
+                # reliably detects the foreign card, 503 otherwise.
+                if claim_acquired and claim_token is not None:
+                    claim.release(user_id, idempotency_key, claim_token)
+                _release_legacy_fence()
+                rebound, bound_now = claim.bind_scope_if_absent(
+                    origin_ns, idempotency_key, patient_scope, attempt_generation
+                )
+                if rebound == _SCOPE_BINDING_RESOLVED and bound_now != patient_scope:
+                    logger.warning(
+                        "Idempotency scope re-assert lost to another card: key=%s "
+                        "bound to %s, current %s — refusing: user=%s path=%s",
+                        idempotency_key,
+                        bound_now,
+                        patient_scope,
+                        canonical_id,
+                        request.url.path,
+                    )
+                    return self._scope_mismatch_response()
+                logger.warning(
+                    "Idempotency scope re-assert unconfirmed before execution: "
+                    "user=%s key=%s path=%s — refusing keyed write",
+                    canonical_id,
+                    idempotency_key,
+                    request.url.path,
+                )
+                return Response(
+                    status_code=503,
+                    headers={"Retry-After": "2", "Cache-Control": "no-store"},
+                    content=(
+                        '{"code": "idempotency_unavailable", "detail": "Идемпотентность '
+                        "временно недоступна: принадлежность ключа не может быть "
+                        "подтверждена. Повторите запрос с тем же Idempotency-Key, когда "
+                        'координация восстановится."}'
+                    ),
+                    media_type="application/json",
+                )
 
         # Codex R16 #3092 (P1): lease renewal starts IMMEDIATELY after the
         # claim is acquired — not just before call_next. The pre-execution

@@ -4449,3 +4449,274 @@ def test_legacy_intent_lost_ack_cleaned_by_owner(two_workers, monkeypatch):
     retry = client2.post("/echo", headers=headers)
     assert retry.status_code == 200
     assert counters["w2"]["calls"] == 1
+
+
+# ── Round-9 (owner P1/P2, PR #3340) ─────────────────────────────────────────
+
+
+class _ReassertScenarioRedis(FakeRedis):
+    """Round-9 harness: intervenes at the POST-ACQUIRE scope re-assert —
+    the FIRST ``scope-upsert`` eval of a patient dispatch. The pre-handler
+    bind uses plain GET/SET NX, so the re-assert is exactly the first
+    Lua upsert a patient attempt executes. The hook fires ONCE; later
+    upserts (the recovered retry, the success-path store) pass through."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.reassert_seen = False
+
+    def _on_reassert(self, scope_key: str) -> None:
+        """Hook for the scenario (raise or tamper)."""
+
+    def eval(self, script: str, numkeys: int, *keys_and_args: str) -> int:
+        if "scope-upsert" in script and not self.reassert_seen:
+            self.reassert_seen = True
+            self._on_reassert(keys_and_args[0])
+        return super().eval(script, numkeys, *keys_and_args)
+
+
+class _TransportDownAtReassertRedis(_ReassertScenarioRedis):
+    """The re-assert EVAL dies on the transport: the scope cannot be
+    confirmed on the very last check before the business write."""
+
+    def _on_reassert(self, scope_key: str) -> None:
+        raise ConnectionError("simulated transport failure on scope re-assert")
+
+
+class _RelinkedAtReassertRedis(_ReassertScenarioRedis):
+    """Between the successor's acquire and its re-assert, the origin
+    binding was re-bound to ANOTHER card (the stale-cleanup/relink race).
+    The upsert then correctly refuses to touch the foreign binding."""
+
+    def _on_reassert(self, scope_key: str) -> None:
+        self.store[scope_key] = "patient:99|stale-attempt"
+
+
+def _install_patient_worker(monkeypatch, fake_redis, patient_scope: str = "patient:7"):
+    """Wire ONE harness worker with a patient-scoped policy (round-7 test
+    pattern): saves and restores every singleton the dispatch reads."""
+    saved = (
+        idem_module._distributed_claim,
+        idem_module._check_principal_authorized_sync,
+        idem_module._resolve_principal_id_sync,
+        idem_module._patient_replay_policy_sync,
+    )
+    idem_module._distributed_claim = _make_claim(fake_redis)
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (
+        True,
+        "Patient",
+        False,
+    )
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id or 1
+    )
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+        patient_scope,
+        False,
+        True,
+    )
+    idem_module._local_scope_bindings.clear()
+    idem_module._local_scope_bindings_expiry.clear()
+    counter = {"calls": 0}
+
+    def _restore():
+        (
+            idem_module._distributed_claim,
+            idem_module._check_principal_authorized_sync,
+            idem_module._resolve_principal_id_sync,
+            idem_module._patient_replay_policy_sync,
+        ) = saved
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
+
+    return counter, _restore
+
+
+def test_scope_reassert_transport_failure_fails_closed_503(monkeypatch):
+    """Round-9 owner P1 (mandatory concurrency test): B acquires the claim,
+    then Redis dies ON the scope re-assert. The unconfirmed scope must NOT
+    let the endpoint run: handler calls = 0, answer 503
+    idempotency_unavailable. After recovery the SAME key executes normally
+    (the refused attempt left neither intent nor outcome behind)."""
+
+    fake = _TransportDownAtReassertRedis()
+    counter, restore = _install_patient_worker(monkeypatch, fake)
+    from fastapi.testclient import TestClient as TC
+
+    app = FastAPI()
+    app.add_middleware(IdempotencyMiddleware)
+
+    @app.post("/booking-like")
+    async def _booking_like() -> dict[str, Any]:
+        counter["calls"] += 1
+        return {"ok": True}
+
+    client = TC(app, raise_server_exceptions=False)
+    key = "reassert-503-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    try:
+        first = client.post("/booking-like", headers=headers)
+        assert first.status_code == 503, first.text
+        assert first.json()["code"] == "idempotency_unavailable"
+        assert counter["calls"] == 0, "an unconfirmed scope never runs the handler"
+
+        # Recovery: the reconnect cooldown elapses and the lease of the
+        # released-but-unreachable claim lapses. The re-assert hook is a
+        # one-shot — the recovered retry's own upsert passes through.
+        claim = idem_module._distributed_claim
+        claim._available = True
+        claim._failed_at = 0.0
+        # The claim (and intent) namespaces carry the PATIENT scope — the
+        # origin namespace is only the scope binding's.
+        claim_ns = IdempotencyMiddleware._namespace(
+            1, "POST:/booking-like", "patient:7"
+        )
+        fake.store.pop(f"idem:{claim_ns}:{key}:claim", None)
+
+        retry = client.post("/booking-like", headers=headers)
+        assert retry.status_code == 200, retry.text
+        assert counter["calls"] == 1
+    finally:
+        restore()
+
+
+def test_scope_reassert_lost_to_relinked_card_refuses_409(monkeypatch):
+    """Round-9 owner P1 (mandatory concurrency test): the successor attempt
+    B acquires the claim, but the origin binding was re-bound to another
+    card before B's re-assert. Only the attempt bound to the CURRENT card
+    may execute: B is refused with 409 idempotency_scope_mismatch, the
+    handler never runs."""
+    fake = _RelinkedAtReassertRedis()
+    counter, restore = _install_patient_worker(monkeypatch, fake)
+    from fastapi.testclient import TestClient as TC
+
+    app = FastAPI()
+    app.add_middleware(IdempotencyMiddleware)
+
+    @app.post("/booking-like")
+    async def _booking_like() -> dict[str, Any]:
+        counter["calls"] += 1
+        return {"ok": True}
+
+    client = TC(app, raise_server_exceptions=False)
+    key = "reassert-409-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    try:
+        response = client.post("/booking-like", headers=headers)
+        assert response.status_code == 409, response.text
+        assert response.json()["code"] == "idempotency_scope_mismatch"
+        assert counter["calls"] == 0, (
+            "the attempt that lost the binding to a foreign card never executes"
+        )
+        # The foreign binding survives untouched (compare semantics).
+        assert fake.store.get(
+            f"idem:{IdempotencyMiddleware._namespace(1, 'POST:/booking-like')}:{key}:pscope",
+            "",
+        ).startswith("patient:99|")
+    finally:
+        restore()
+
+
+def test_local_snapshot_expiry_does_not_slide_on_mirror(monkeypatch):
+    """Round-9 owner P2: a scope-only rebind (the Redis→local mirror) keeps
+    the entry's ORIGINAL expiry — one replay at hour 23 must not re-arm the
+    local snapshot to hour 47 while the Redis binding and response have
+    already expired. After the fixed window lapses the local replay is
+    GONE; a restore after expiry still gets a fresh window (the eviction-
+    restore contract), and a foreign scope never inherits a snapshot."""
+    import time as _time
+
+    from fastapi import Response
+
+    try:
+        key = "no-slide-1"
+        snapshot = (201, {"x": "1"}, b"{}", "application/json", "hash1", "Patient")
+        idem_module._local_scope_binding_set("ns1", key, "patient:7", snapshot)
+        cache_key = ("ns1", key)
+        entry = idem_module._local_scope_bindings[cache_key]
+
+        # The entry was born 23h ago: one hour of its fixed window left.
+        aged = (_time.time() + 3600, entry[1], entry[2])
+        idem_module._local_scope_bindings[cache_key] = aged
+
+        # A Redis→local mirror at hour 23 (scope-only rebind).
+        idem_module._local_scope_binding_mirror("ns1", key, "patient:7")
+        mirrored = idem_module._local_scope_bindings[cache_key]
+        assert mirrored[2] == snapshot, "the snapshot is preserved (round-8)"
+        assert mirrored[0] == aged[0], (
+            "the fixed window must NOT slide on a mirror/replay"
+        )
+
+        # After the fixed window lapses there is NO local replay left.
+        idem_module._local_scope_bindings[cache_key] = (
+            _time.time() - 1,
+            mirrored[1],
+            mirrored[2],
+        )
+        response, mismatch, role = idem_module._local_patient_outcome_get(
+            "ns1", key, "hash1"
+        )
+        assert response is None, "the expired local outcome is not replayable"
+
+        # An explicit writer (a NEW outcome) still re-arms the window.
+        idem_module._local_patient_outcome_store(
+            "ns1",
+            key,
+            "patient:7",
+            Response(content=b"{}", status_code=201, media_type="application/json"),
+            "hash2",
+            "Patient",
+        )
+        restored = idem_module._local_scope_bindings[cache_key]
+        assert restored[0] > _time.time() + 3600 * 23, (
+            "a fresh outcome starts a fresh fixed window"
+        )
+
+        # A foreign-scope mirror never inherits the entry (or its window).
+        idem_module._local_scope_binding_mirror("ns1", "other-key", "patient:8")
+        foreign = idem_module._local_scope_bindings[("ns1", "other-key")]
+        assert foreign[2] is None
+    finally:
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
+
+
+def test_legacy_bridge_cutoff_pinned_is_absolute_and_restart_proof(monkeypatch):
+    """Round-9 owner P2: the legacy bridge shutdown is an ABSOLUTE,
+    deployment-wide cutoff. A pinned past date disables the bridge for
+    EVERY worker, and a restart (a fresh process epoch) cannot re-open the
+    window; a pinned future date keeps it running regardless of the
+    process epoch; max_age = 0 still hard-disables; the UNPINNED fallback
+    keeps the transitional process-start semantics."""
+    import time as _time
+
+    from app.core.config import settings
+
+    now = _time.time()
+    # Pinned in the past + a FRESH process epoch: dead, and a restart
+    # (same fresh epoch everywhere) can never re-arm it.
+    monkeypatch.setattr(settings, "IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH", now - 1.0)
+    monkeypatch.setattr(idem_module, "_LEGACY_BRIDGE_EPOCH", now)
+    assert idem_module._legacy_bridge_active() is False
+    monkeypatch.setattr(idem_module, "_LEGACY_BRIDGE_EPOCH", now - 10_000.0)
+    assert idem_module._legacy_bridge_active() is False
+
+    # Pinned in the future: active on every worker, whatever the fallback
+    # epoch says.
+    monkeypatch.setattr(
+        settings, "IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH", now + 3600.0
+    )
+    assert idem_module._legacy_bridge_active() is True
+
+    # max_age = 0 hard-disables even a live cutoff.
+    monkeypatch.setattr(settings, "IDEMPOTENCY_LEGACY_BRIDGE_MAX_AGE_SECONDS", 0.0)
+    assert idem_module._legacy_bridge_active() is False
+
+    # Unpinned: the transitional process-start fallback (pre-round-9
+    # semantics preserved for an unconfigured rolling deploy).
+    monkeypatch.setattr(settings, "IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH", None)
+    monkeypatch.setattr(settings, "IDEMPOTENCY_LEGACY_BRIDGE_MAX_AGE_SECONDS", 90_090.0)
+    monkeypatch.setattr(idem_module, "_LEGACY_BRIDGE_EPOCH", now - 100.0)
+    assert idem_module._legacy_bridge_active() is True
+    monkeypatch.setattr(idem_module, "_LEGACY_BRIDGE_EPOCH", now - 90_100.0)
+    assert idem_module._legacy_bridge_active() is False
