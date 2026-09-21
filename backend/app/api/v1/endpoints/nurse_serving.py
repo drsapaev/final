@@ -40,6 +40,7 @@ from app.core.audit import audit_log_dependency
 from app.models.user import User
 from app.schemas.nurse_serving import (
     NurseServingCallNextResponse,
+    NurseServingDrainingExecutionListResponse,
     NurseServingEntryActionResponse,
     NurseServingEntryIncompleteRequest,
     NurseServingErrorDetail,
@@ -147,6 +148,33 @@ def get_station_entries(
     return _run(
         lambda: _service(db).get_station_state(current_user.id, queue_resource_id)
     )
+
+
+@router.get(
+    f"{_BASE}/draining-executions",
+    response_model=NurseServingDrainingExecutionListResponse,
+    responses={**_AUTH_ERROR_RESPONSES},
+)
+def list_draining_executions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_active_roles("Nurse")),
+):
+    """Drain-recovery discovery (N2-5 §8 backend follow-up): read-only.
+
+    The graceful drain (N2-3) keeps the terminal complete/incomplete
+    mutations authorized for the STARTER after a mid-flight assignment
+    deactivation — but the read plane (workplaces list empty, station
+    board 403) gave a RELOADED tablet no way to discover the execution
+    id, making the drain unreachable from the UI. This self-scope read
+    closes exactly that loop: it returns the caller's OWN in_progress
+    executions that today's station board does NOT already surface (no
+    active assignment on the station, or the entry no longer belongs
+    to the station's today queue), with the station/entry/service
+    context needed to finish them through the existing terminal
+    endpoints. No mutations, no new authorization surface, no
+    client-side workaround.
+    """
+    return _run(lambda: _service(db).list_draining_executions(current_user.id))
 
 
 @router.post(
