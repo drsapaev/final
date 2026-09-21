@@ -25,3 +25,6 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+## 2025-02-23 - Async File Validations Need Loading Indicators
+**Learning:** During chat operations, async file validations (like magic-number checks that prevent malicious uploads) can take time to process. Without a loading indicator, the UI appears frozen or unresponsive to the user.
+**Action:** Always include a visual loading indicator (like a spinner) on file upload triggers when asynchronous validation is occurring, and set `aria-hidden="true"` on the spinner to prevent redundant announcements if the parent button is already labeled.
