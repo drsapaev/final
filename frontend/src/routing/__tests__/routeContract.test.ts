@@ -191,18 +191,17 @@ describe('docs snapshot', () => {
   });
 });
 
-// NURSE-V2 N2-2 (review P2, PR #3333): Nurse is login-capable, so a
-// successful login must land on a route that actually admits the role.
-// Before the fix the home lookup missed Nurse, fell through to the shared
-// '/clinical/search' fallback (role-scoped WITHOUT Nurse) and the
-// RouteAccessBoundary bounced the freshly authenticated user to
-// /forbidden.
-describe('NURSE-V2 N2-2 nurse login landing', () => {
-  it('routes a Nurse profile to the authenticated profile screen — not /clinical/search, not /forbidden', () => {
+// NURSE-V2 N2-5: the canonical Nurse home is the tablet workspace
+// /nurse (role-scoped, Nurse ONLY). N2-2 parked the landing on the
+// authenticated profile screen until this surface shipped — the profile
+// is no longer the Nurse home.
+describe('NURSE-V2 N2-5 nurse tablet home', () => {
+  it('routes a Nurse profile to /nurse — the role-scoped tablet workspace', () => {
     const nurse = { role: 'Nurse' };
 
     const target = getRoleHomeRoute(nurse);
-    expect(target).toBe('/clinical/profile');
+    expect(target).toBe('/nurse');
+    expect(target).not.toBe('/clinical/profile');
     expect(target).not.toBe('/clinical/search');
     expect(target).not.toBe('/forbidden');
 
@@ -212,7 +211,7 @@ describe('NURSE-V2 N2-2 nurse login landing', () => {
     expect(isRouteAccessibleToProfile(route, nurse)).toBe(true);
 
     // ...and the login surface computes the exact same destination.
-    expect(getRouteForProfile(nurse)).toBe('/clinical/profile');
+    expect(getRouteForProfile(nurse)).toBe('/nurse');
   });
 
   it('keeps the Nurse privilege-zero on role-scoped surfaces (N2-2)', () => {
@@ -226,5 +225,22 @@ describe('NURSE-V2 N2-2 nurse login landing', () => {
     expect(hasRouteAccess(nurse, '/doctor')).toBe(false);
     expect(hasRouteAccess(nurse, '/cashier')).toBe(false);
     expect(hasRouteAccess(nurse, '/lab')).toBe(false);
+  });
+
+  it('grants /nurse to Nurse and ONLY Nurse (N2-5 §2)', () => {
+    // every other role — including Admin — is denied on the tablet.
+    expect(hasRouteAccess({ role: 'Nurse' }, '/nurse')).toBe(true);
+    expect(hasRouteAccess({ role: 'Doctor' }, '/nurse')).toBe(false);
+    expect(hasRouteAccess({ role: 'Registrar' }, '/nurse')).toBe(false);
+    expect(hasRouteAccess({ role: 'Cashier' }, '/nurse')).toBe(false);
+    expect(hasRouteAccess({ role: 'Lab' }, '/nurse')).toBe(false);
+    expect(hasRouteAccess({ role: 'Patient' }, '/nurse')).toBe(false);
+    expect(hasRouteAccess({ role: 'Admin' }, '/nurse')).toBe(false);
+  });
+
+  it('renders /nurse as a frameless tablet surface (no clinical sidebar)', () => {
+    const nurse = { role: 'Nurse' };
+    const chrome = getRouteChromeState('/nurse', '', nurse);
+    expect(chrome.hideSidebar).toBe(true);
   });
 });
