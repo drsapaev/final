@@ -376,4 +376,70 @@ describe('LabDirtyGuardContext (PR 3351 route-level leave guard)', () => {
     });
     expect(result.current.hasPendingOperations).toBe(false);
   });
+
+  // PR 3351 (review round 6, P1): полная защита документа (refresh /
+  // закрытие вкладки) живёт на уровне провайдера и срабатывает при
+  // dirty-черновике ИЛИ незавершённой операции — per-workbench-хуки на
+  // одном dirty-state пропускали pending-only мутацию (clone чистого
+  // шаблона, finalize/print чистого отчёта).
+  it('blocks beforeunload while a dirty source is registered and unblocks once it goes clean (review round 6)', async () => {
+    const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
+    const sourceIsDirty = vi.fn(() => true);
+
+    render(
+      <TestApp
+        sourceIsDirty={sourceIsDirty}
+        registration={registration}
+      />,
+    );
+    await act(async () => {
+      registration.current?.({
+        id: 'template',
+        isDirty: sourceIsDirty,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+    });
+
+    const blocked = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(blocked);
+    expect(blocked.defaultPrevented).toBe(true);
+
+    // Источник стал чистым (save/discard) — unload больше не блокируется.
+    sourceIsDirty.mockReturnValue(false);
+    const allowed = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(allowed);
+    expect(allowed.defaultPrevented).toBe(false);
+  });
+
+  it('blocks beforeunload while an operation is pending even with clean drafts (review round 6)', () => {
+    const { result } = renderHook(() => useLabDirtyGuard(), {
+      wrapper: ({ children }) => (
+        <MemoryRouter>
+          <LabDirtyGuardProvider>{children}</LabDirtyGuardProvider>
+        </MemoryRouter>
+      ),
+    });
+
+    // Чистые черновики и нет операций — unload свободен.
+    const clean = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+
+    // Pending-only операция (clone чистого шаблона): черновики чистые,
+    // но неидемпотентный POST нельзя обрывать перезагрузкой документа.
+    act(() => {
+      result.current.setPendingOperationSources(['template']);
+    });
+    const blocked = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(blocked);
+    expect(blocked.defaultPrevented).toBe(true);
+
+    // Операция завершена — unload снова свободен.
+    act(() => {
+      result.current.setPendingOperationSources([]);
+    });
+    const allowed = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(allowed);
+    expect(allowed.defaultPrevented).toBe(false);
+  });
 });

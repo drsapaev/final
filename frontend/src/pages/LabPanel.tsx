@@ -13,7 +13,7 @@ import { formatLabStatus } from '../components/laboratory/labUiLabels';
 import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
-import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
+import { usePendingAwareSessionExpiry } from '../hooks/usePendingAwareSessionExpiry';
 import { useLabHotkeys } from '../hooks/useLabHotkeys';
 import notifyService from '../services/notify';
 import './lab.css';
@@ -151,6 +151,41 @@ function getTemplateResolutionContextKey(appointment: Record<string, unknown> | 
   return JSON.stringify(buildTemplateResolutionPayload(appointment));
 }
 
+// PR 3351 (review round 6, P2): canonical /lab без ?tab= — это вкладка
+// очереди (defaultItem: 'queue' в routeRegistry). Синхронизация URL→state
+// нормализует отсутствующий/неизвестный tab к дефолту: раньше Header brand
+// и Command Palette делали replace на /lab, query удалялся, а activeTab
+// оставался Templates — URL показывал одно (Queue после reload), экран —
+// другое (Templates); адрес нельзя было ни сохранить, ни скопировать, ни
+// восстановить.
+const LAB_TAB_IDS = ['queue', 'templates', 'reports'] as const;
+
+function resolveLabTabId(requested: string | null): string {
+  return (LAB_TAB_IDS as readonly string[]).includes(requested ?? '')
+    ? (requested as string)
+    : 'queue';
+}
+
+// Внешний URL с валидным ?tab= сам владеет видимой вкладкой; без него откат
+// внешнего намерения возвращает пользователя на вкладку, активную ДО
+// намерения (preUrlIntentTabRef — tab-sync effect мог уже закоммитить
+// нормализацию «нет tab → queue», пока висел guard-диалог), а не на
+// молчаливый default; последний рубеж — текущая вкладка, затем 'queue'.
+function resolveRollbackTabId(
+  urlTab: string | null,
+  preIntentTab: string | null,
+  currentTab: string,
+): string {
+  const knownTabs = LAB_TAB_IDS as readonly string[];
+  if (urlTab != null && knownTabs.includes(urlTab)) {
+    return urlTab;
+  }
+  if (preIntentTab != null && knownTabs.includes(preIntentTab)) {
+    return preIntentTab;
+  }
+  return knownTabs.includes(currentTab) ? currentTab : 'queue';
+}
+
 export default function LabPanel() {
   const { t: rawT } = useTranslation();
   const t = rawT;
@@ -168,7 +203,17 @@ export default function LabPanel() {
     ? parsedInstanceParam
     : null;
 
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'queue');
+  const [activeTab, setActiveTab] = useState(() => resolveLabTabId(searchParams.get('tab')));
+  // PR 3351 (review round 6, P2): render-time ref активной вкладки —
+  // захват pre-intent вкладки в loadInstance читает значение ДО того, как
+  // tab-sync effect закоммитит нормализацию (эффекты одного прохода
+  // видят ещё старый state).
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  // Вкладка на момент прихода внешнего urlIntent (см. resolveRollbackTabId
+  // и rollback-запись в syncUrlToCurrentContext). null — намерения нет,
+  // откату нечего восстанавливать.
+  const preUrlIntentTabRef = useRef<string | null>(null);
   const [appointments, setAppointments] = useState<Record<string, unknown>[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   // STRAT#7: server-side pagination state для очереди.
@@ -291,16 +336,6 @@ export default function LabPanel() {
   const loadedHistoryForPatientRef = useRef<string | number | null>(null);
   const reportHistoryRequestRef = useRef(0);
   const recentReportsRequestRef = useRef(0);
-  useSessionTimeoutWarning({
-    onWarning: () => setSessionWarning({ active: true }),
-    onExpired: () => {
-      setSessionWarning(null);
-      notifyService.error(t('misc.lp_sessiya_istekla_pozhaluysta_'));
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
-    },
-  });
 
   const mergeResolvedVisitIntoState = useCallback((appointmentId: string | number, visitId: string | number) => {
     if (!appointmentId || !visitId) {
@@ -326,12 +361,21 @@ export default function LabPanel() {
   }, []);
 
   useEffect(() => {
-    const nextTab = searchParams.get('tab');
-    if (!nextTab) {
-      return;
-    }
+    // PR 3351 (review round 6, P2): отсутствующий/неизвестный ?tab=
+    // нормализуется к default-вкладке Queue — URL /lab обязан означать
+    // ровно то, что откроется после reload (раньше sync молча пропускал
+    // «нет таба», и brand/palette рассинхронизировали адрес и экран).
+    const requestedTab = searchParams.get('tab');
+    const nextTab = resolveLabTabId(requestedTab);
     if (nextTab !== activeTab) {
       setActiveTab(nextTab);
+    }
+    // PR 3351 (review round 6, P2): URL снова явно владеет вкладкой —
+    // память pre-intent вкладки (восстановление в rollback/WF-15)
+    // закрывается, чтобы не протечь в будущие shell-переходы на
+    // canonical /lab (brand = home = очередь, а не устаревший tab).
+    if (requestedTab != null && (LAB_TAB_IDS as readonly string[]).includes(requestedTab)) {
+      preUrlIntentTabRef.current = null;
     }
   }, [activeTab, searchParams]);
 
@@ -381,6 +425,18 @@ export default function LabPanel() {
     } else {
       params.delete('instance');
     }
+    // PR 3351 (review round 6, P2): rollback-URL обязан явно владеть tab.
+    // После нормализации «нет tab → queue» в tab-sync эффекте откат внешнего
+    // намерения без явного tab молча переключал бы пользователя на вкладку
+    // очереди (например: dirty report на /lab?tab=reports → внешний
+    // /lab?instance=89 без tab → отмена → очередь вместо reports).
+    // Приоритет: валидный tab адреса (внешний URL владеет вкладкой) →
+    // вкладка до начала urlIntent → текущая вкладка → default 'queue'.
+    params.set('tab', resolveRollbackTabId(
+      params.get('tab'),
+      preUrlIntentTabRef.current,
+      activeTabRef.current,
+    ));
     navigateReplace(params.toString());
   }, [currentSearchParams, navigateReplace]);
 
@@ -580,6 +636,7 @@ export default function LabPanel() {
     isDialogOpen,
     setPendingOperationSources,
     notifyDirtyStateChange,
+    hasPendingOperations,
   } = useLabDirtyGuard();
   const pendingOperationSourcesRef = useRef(new Set<string>());
   const setOperationSourcePending = useCallback((source: string, pending: boolean) => {
@@ -597,6 +654,31 @@ export default function LabPanel() {
     (pending: boolean) => setOperationSourcePending('template', pending),
     [setOperationSourcePending],
   );
+  // PR 3351 (review round 6, P1): истечение сессии больше не делает hard
+  // navigation поверх незавершённой операции. Прежний код вызывал
+  // window.location.href = '/login' прямо из onExpired опроса — это полная
+  // перезагрузка документа ПОВЕРХ висящего неидемпотентного POST (clone
+  // без Idempotency-Key, finalize/print): ответ терялся, список не
+  // обновлялся, и оператор после повторного входа повторял clone, создавая
+  // вторую копию. Теперь: чистое состояние — прежнее поведение (тост +
+  // переход); pending-операция — redirectPending рендерит не-dismissable
+  // диалог «операция завершается, затем переход», а onExpired (redirect)
+  // вызывается ровно один раз после снятия последнего pending-источника.
+  // hasPendingOperations из контекста — реактивный boolean (провайдер
+  // перерисовывает на флипах 0↔n): render-time ref обёртки всегда держит
+  // свежее замыкание, сигнал перевыполняет ожидающий эффект.
+  const sessionRedirectPending = usePendingAwareSessionExpiry({
+    hasPendingOperations: () => hasPendingOperations,
+    pendingOperationsSignal: hasPendingOperations,
+    onWarning: () => setSessionWarning({ active: true }),
+    onExpired: () => {
+      setSessionWarning(null);
+      notifyService.error(t('misc.lp_sessiya_istekla_pozhaluysta_'));
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    },
+  });
   // Контракт блокирующих операций (PR 3351):
   // - report/template SAVE (draft, finalize, revise, print, autosave)
   //   блокирует КОНТЕКСТНЫЕ переходы затрагиваемого источника — переход
@@ -979,6 +1061,12 @@ export default function LabPanel() {
   ) => {
     if (options.urlIntent) {
       pendingUrlIntentRef.current = { targetId: instanceId };
+      // PR 3351 (review round 6, P2): вкладка на момент прихода внешнего
+      // намерения — база отката (resolveRollbackTabId). Захватывается
+      // синхронно ДО guard-диалога: tab-sync effect этого рендера уже
+      // мог закоммитить нормализацию «нет tab → queue» — замыкание
+      // useEffect-а видело бы не ту вкладку.
+      preUrlIntentTabRef.current = activeTabRef.current;
     }
     // PR5: публичный переход через dirty-guard (недавние отчёты,
     // восстановление ?instance=N из URL). Внутри подтверждённого перехода
@@ -1027,6 +1115,8 @@ export default function LabPanel() {
           };
           pendingUrlIntentRef.current = null;
           syncUrlToCurrentContext();
+          // Откат потребил pre-intent вкладку — URL снова явно владеет tab.
+          preUrlIntentTabRef.current = null;
         } : undefined,
       },
     );
@@ -1092,6 +1182,25 @@ export default function LabPanel() {
     } else {
       params.delete('instance');
     }
+    // PR 3351 (review round 6, P2): URL без валидного tab при живой памяти
+    // pre-intent вкладки получает её явно. Два сценария: (1) подтверждённый
+    // urlIntent-откат — sentinel-collapse (dirty→clean) делает history.back()
+    // на внешнюю tab-less запись, её POP-рендер запускает нормализацию
+    // «нет tab → queue», и без этой записи WF-15 дописывал бы patient без
+    // tab, молча уводя пользователя с вкладки подтверждённого перехода;
+    // (2) возврат внешнего URL к АКТИВНОМУ отчёту без tab — отчёт открыт,
+    // редактор должен остаться видимым, а не прятаться за вкладкой очереди.
+    // Память закрывается в tab-sync эффекте, как только URL снова владеет
+    // валидным tab (canonical /lab при shell-переходе её не наследует).
+    const intentTab = preUrlIntentTabRef.current;
+    const urlTab = params.get('tab');
+    if (
+      intentTab != null
+      && (LAB_TAB_IDS as readonly string[]).includes(intentTab)
+      && !(LAB_TAB_IDS as readonly string[]).includes(urlTab ?? '')
+    ) {
+      params.set('tab', intentTab);
+    }
     // Только если params реально изменились —避免 лишних navigate
     const current = currentSearchParams();
     if (params.toString() !== current.toString()) {
@@ -1156,11 +1265,21 @@ export default function LabPanel() {
       if (pendingUrlIntentRef.current) {
         pendingUrlIntentRef.current = null;
         dismissPendingTransition();
+        // PR 3351 (review round 6, P2): URL вернулся к АКТИВНОМУ отчёту,
+        // диалог снят. WF-15 в этом же проходе эффектов уже пропущен
+        // (pendingUrlIntentRef ещё висел при его запуске), а после закрытия
+        // диалога его deps не изменятся — эффект не перезапустится. Без
+        // явной записи внешние tab-less URL (?patient&instance без tab)
+        // нормализуются на вкладку очереди, и открытый редактор отчёта
+        // прячется. Пишем tab из pre-intent памяти (rollback-контракт
+        // syncUrlToCurrentContext: валидный tab адреса → pre-intent →
+        // текущая вкладка), URL становится полностью явным.
+        syncUrlToCurrentContext();
       }
       return;
     }
     loadInstance(instanceId, { urlIntent: true });
-  }, [activeInstanceId, dismissPendingTransition, instanceParamId, loadInstance]);
+  }, [activeInstanceId, dismissPendingTransition, instanceParamId, loadInstance, syncUrlToCurrentContext]);
 
   // STRAT#16: cleanup — отменяем все pending запросы при unmount компонента.
   // Предотвращает setState-after-unmark warnings и network waste.
@@ -1525,6 +1644,30 @@ export default function LabPanel() {
                   Продлить сессию
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {/* PR 3351 (review round 6, P1): сессия истекла поверх pending-
+            операции — не-dismissable диалог. Hard navigation на /login
+            отложена до завершения последней операции: обрыв документа
+            убивал висящий неидемпотентный POST (clone/finalize/print без
+            Idempotency-Key), ответ терялся, и оператор повторял операцию,
+            создавая дубль. onExpired (redirect) вызывается ровно один раз
+            после снятия последнего pending-источника. */}
+        {sessionRedirectPending && (
+          <div
+            role="alertdialog"
+            aria-label={t('misc.lp_perehod_posle_zaversheniya')}
+            className="lab-session-warning-overlay"
+          >
+            <div className="lab-session-warning-dialog">
+              <h3 className="lab-session-warning-title">
+                {t('misc.lp_sessiya_istekla_zavershenie')}
+              </h3>
+              <p className="lab-session-warning-text">
+                {t('misc.lp_sessiya_istekla_zavershenie_t')}
+              </p>
+              <div className="lab-session-redirect-spinner" aria-hidden="true" />
             </div>
           </div>
         )}

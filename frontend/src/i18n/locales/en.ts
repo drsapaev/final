@@ -8573,6 +8573,9 @@ const en = {
     lp_patsient_selectedappointment: 'Patient #{patient_id}',
     lp_preduprezhdenie_ob_istecheni: 'Предупреждение об истечении сессии',
     lp_prodlevaem_sessiyu: 'Продлеваем сессию...',
+    lp_sessiya_istekla_zavershenie: 'Session expired: finishing the operation',
+    lp_sessiya_istekla_zavershenie_t: 'Your session has expired, but an operation is still in progress. Once it completes, the page will automatically redirect to the login screen — do not close the tab.',
+    lp_perehod_posle_zaversheniya: 'Redirect after the operation completes',
     lp_panel_laboratorii: 'Панель лаборатории',
     // EMRStatusIndicator.jsx (esi_) manual: formatRelativeTime
     esi_tolko_chto: 'только что',

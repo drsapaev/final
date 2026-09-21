@@ -185,6 +185,25 @@
   font-size: 14px;
 }
 
+/* PR 3351 (review round 6, P1): не-dismissable диалог «сессия истекла,
+   операция завершается» — переход на /login отложен до снятия последнего
+   pending-источника (hard navigation обрывала неидемпотентный POST). */
+.lab-session-redirect-spinner {
+  width: 22px;
+  height: 22px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 3px solid var(--mac-border, #d8dde8);
+  border-top-color: var(--mac-accent, #dc2626);
+  animation: lab-session-redirect-spin 0.9s linear infinite;
+}
+
+@keyframes lab-session-redirect-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────────────
  * L-H-4 fix: LabQueueWorkbench — миграция inline-стилей в CSS.
  * Аналогичная миграция уже выполнена для Cashier/Registrar/Admin/Doctor.

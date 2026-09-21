@@ -1815,4 +1815,136 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
     await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/clinical/profile');
   });
+
+  // PR 3351 (review round 6, P1): полная защита документа (refresh / закрытие
+  // вкладки) обязана учитывать pending-операции, а не только dirty-state.
+  // Прежние per-workbench beforeunload-хуки ставили слушатель только по
+  // dirty-флагу: clone ЧИСТОГО шаблона (неидемпотентный POST без
+  // Idempotency-Key) обрывался без предупреждения — ответ терялся, список
+  // не обновлялся, и оператор повторял clone, создавая вторую копию.
+  // Провайдер-level beforeunload (dirty ИЛИ pending) закрывает сценарий:
+  // попытка покинуть документ блокируется, POST висит и завершается ровно
+  // один раз, после завершения reload свободен.
+  test('a pending clone blocks the unload attempt via beforeunload and the POST executes exactly once (review round 6)', async ({ page }) => {
+    let releaseClone: () => void = () => {};
+    const cloneGate = new Promise<void>((resolve) => { releaseClone = resolve; });
+    let clonePostCount = 0;
+    await page.route('**/api/v1/lab/templates/5/clone', async (route) => {
+      clonePostCount += 1;
+      await cloneGate;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 7, code: 'rule_demo_copy', name: 'Rule Demo (копия)' }),
+      });
+    });
+
+    // Явный обработчик beforeunload-диалогов: dismiss = «остаться на
+    // странице» (навигация отменяется). Без обработчика Playwright тоже
+    // dismiss-ит — но тогда «диалог был» неотличимо от «диалога не было».
+    const dialogs: string[] = [];
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.type());
+      void dialog.dismiss().catch(() => {});
+    });
+
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    // Открываем отчёт (шаблон 5 становится выбранным), но НЕ редактируем:
+    // оба черновика чистые — блокирует только pending-операция.
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByLabel('Результат: Лейкоциты')).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await panelTabs.getByRole('tab').nth(1).click();
+    const cloneButton = page.getByRole('button', { name: 'Клонировать' });
+    const cloneSent = page.waitForRequest((request) => (
+      request.method() === 'POST'
+      && request.url().endsWith('/api/v1/lab/templates/5/clone')
+    ));
+    await cloneButton.click();
+    await cloneSent;
+    await expect(cloneButton).toBeDisabled();
+    expect(clonePostCount).toBe(1);
+
+    // Попытка покинуть документ при чистых черновиках и висящем POST:
+    // beforeunload-диалог, dismiss отменяет навигацию — SPA жива, POST не
+    // оборван (остаётся disabled = pending).
+    await page.evaluate(() => { window.location.href = '/health'; }).catch(() => {});
+    await page.waitForTimeout(400);
+    expect(dialogs).toContain('beforeunload');
+    expect(new URL(page.url()).pathname).toBe('/lab');
+    await expect(cloneButton).toBeDisabled();
+
+    // Операция завершена: pending снят → попытка уйти проходит БЕЗ
+    // beforeunload-диалога, и за весь сценарий clone выполнился ровно
+    // один раз (дублей нет — оператору не нужно повторять запрос).
+    releaseClone();
+    await expect(cloneButton).toBeEnabled();
+    dialogs.length = 0;
+    await page.evaluate(() => { window.location.href = '/health'; }).catch(() => {});
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
+    expect(dialogs).toHaveLength(0);
+    expect(clonePostCount).toBe(1);
+  });
+
+  // PR 3351 (review round 6, P2): canonical /lab (defaultItem: 'queue' в
+  // routeRegistry) обязан означать ровно то, что откроется после reload:
+  // URL /lab без ?tab= — вкладка очереди. Прежний tab-sync молча пропускал
+  // «нет таба»: после Header brand адрес показывал /lab, а экран оставался
+  // на Templates — адрес нельзя было ни сохранить, ни скопировать, ни
+  // восстановить. Черновик шаблона при этом не теряется: все три workbench
+  // смонтированы одновременно (hidden-секции), смена вкладки их не
+  // размонтирует.
+  test('Header brand to canonical /lab shows the Queue tab and keeps the templates draft mounted (review round 6)', async ({ page }) => {
+    await page.goto('/lab?tab=templates');
+    await expect(new URL(page.url()).searchParams.get('tab')).toBe('templates');
+    await page.waitForTimeout(700);
+
+    // Dirty-черновик шаблона без пациента: под-вкладка «Оформление» → подвал.
+    await page.getByRole('tab', { name: 'Оформление' }).click();
+    const footerInput = page.getByLabel('Подвал шаблона');
+    await expect(footerInput).toBeEnabled();
+    await footerInput.fill('Несохранённый подвал');
+    await waitForReactToSettle(page);
+
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await expect(panelTabs.getByRole('tab').nth(1)).toHaveAttribute('aria-selected', 'true');
+    const historyLengthBeforeBrand = await page.evaluate(() => window.history.length);
+
+    // Header brand → canonical /lab. Это in-lab replace (round 5): history
+    // не растёт, второй /lab-записи нет; guard-диалога нет — внутренняя
+    // смена вкладки не уничтожает draft.
+    await page.getByTitle('На главную').click();
+    await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe('/lab');
+    expect(await page.evaluate(() => window.history.length)).toBe(historyLengthBeforeBrand);
+
+    // URL /lab = вкладка очереди: адрес и экран согласованы, после reload
+    // открылась бы та же вкладка (раньше экран оставался на Templates).
+    await expect(panelTabs.getByRole('tab').nth(0)).toHaveAttribute('aria-selected', 'true');
+    await expect(panelTabs.getByRole('tab').nth(1)).toHaveAttribute('aria-selected', 'false');
+
+    // Черновик шаблона жив (hidden-секция): возврат на вкладку шаблонов
+    // возвращает редактор с тем же несохранённым подвалом.
+    await expect(footerInput).toHaveValue('Несохранённый подвал');
+    await panelTabs.getByRole('tab').nth(1).click();
+    await expect(footerInput).toBeVisible();
+    await expect(footerInput).toHaveValue('Несохранённый подвал');
+    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('templates');
+
+    // Dirty-черновик: защита документа теперь у провайдера (бывший
+    // per-workbench хук) — попытка покинуть документ блокируется и в этой
+    // конфигурации (dirty ИЛИ pending, единый владелец).
+    const dialogs: string[] = [];
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.type());
+      void dialog.dismiss().catch(() => {});
+    });
+    await page.evaluate(() => { window.location.href = '/health'; }).catch(() => {});
+    await page.waitForTimeout(400);
+    expect(dialogs).toContain('beforeunload');
+    expect(new URL(page.url()).pathname).toBe('/lab');
+    await expect(footerInput).toHaveValue('Несохранённый подвал');
+  });
 });

@@ -8584,6 +8584,9 @@ const uzCyrl = {
     lp_patsient_selectedappointment: 'Пациент №{patient_id}',
     lp_preduprezhdenie_ob_istecheni: 'Предупреждение об истечении сессии',
     lp_prodlevaem_sessiyu: 'Продлеваем сессию...',
+    lp_sessiya_istekla_zavershenie: 'Сессия тугади: операция якунланмоқда',
+    lp_sessiya_istekla_zavershenie_t: 'Сессиянгиз тугади, аммо операция ҳали бажарилмоқда. У тугагач, саҳифа автоматик равишда кириш саҳифасига ўтади — варақни ёпманг.',
+    lp_perehod_posle_zaversheniya: 'Операция тугагандан кейин ўтиш',
     lp_panel_laboratorii: 'Панель лаборатории',
     // EMRStatusIndicator.jsx (esi_) manual: formatRelativeTime
     esi_tolko_chto: 'только что',

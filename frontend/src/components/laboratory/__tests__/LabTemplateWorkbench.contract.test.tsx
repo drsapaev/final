@@ -558,7 +558,17 @@ describe('LabTemplateWorkbench guard save freshness (PR5 review fix)', () => {
     expect(onTemplatesChanged).toHaveBeenCalledTimes(1);
   });
 
-  it('blocks beforeunload while the template draft is dirty', async () => {
+  // PR 3351 (review round 6, P1): защита документа (refresh / закрытие
+  // вкладки) переехала с per-workbench-хука (только dirty-state) на
+  // уровень LabDirtyGuardProvider (dirty ИЛИ pending — см.
+  // LabDirtyGuardContext.test.tsx). Workbench больше НЕ регистрирует
+  // собственный beforeunload-слушатель: dirty-состояние предоставляется
+  // через зарегистрированный источник, а блокировка/разблокировка
+  // unload-а — решение провайдера по общему реестру.
+  it('does not register a document-level beforeunload listener itself: dirty state is exposed via the registered source (review round 6)', async () => {
+    const registerDirtySource = vi.fn(
+      (_source: { id: string; isDirty: () => boolean; save: () => Promise<void>; discard?: () => void }) => () => {},
+    );
     render(
       <ThemeProvider>
         <LabTemplateWorkbenchRaw
@@ -566,6 +576,7 @@ describe('LabTemplateWorkbench guard save freshness (PR5 review fix)', () => {
           selectedTemplate={ruleTemplateFixture}
           onSelectTemplate={vi.fn()}
           onTemplatesChanged={vi.fn(async () => {})}
+          registerDirtySource={registerDirtySource}
           notify={vi.fn()}
         />
       </ThemeProvider>
@@ -578,14 +589,20 @@ describe('LabTemplateWorkbench guard save freshness (PR5 review fix)', () => {
       target: { value: 'Гемоглобин, изменённый' },
     });
 
+    // Dirty-состояние видно через зарегистрированный источник (его
+    // читает провайдер), но самого слушателя у workbench больше нет —
+    // без провайдера событие проходит без блокировки.
+    const source = registerDirtySource.mock.calls[0][0] as { isDirty: () => boolean };
+    expect(source.isDirty()).toBe(true);
     const event = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(event);
-    expect(event.defaultPrevented).toBe(true);
+    expect(event.defaultPrevented).toBe(false);
   });
 
   // PR #3351 (P1 — Discard): registered discard сбрасывает черновик шаблона
   // к hydrate(activeVersion): не dirty, поле возвращает серверное значение,
-  // beforeunload больше не блокируется.
+  // источник больше не dirty (блокировку beforeunload в этот момент
+  // снимает провайдер — review round 6).
   it('registered discard resets the template draft to the hydrated version', async () => {
     const registerDirtySource = vi.fn(
       (_source: { id: string; isDirty: () => boolean; save: () => Promise<void>; discard?: () => void }) => () => {},
@@ -625,10 +642,6 @@ describe('LabTemplateWorkbench guard save freshness (PR5 review fix)', () => {
 
     expect(screen.getByLabelText('Название поля')).toHaveValue('Гемоглобин');
     expect(source.isDirty()).toBe(false);
-
-    const event = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(event);
-    expect(event.defaultPrevented).toBe(false);
   });
 
   // PR #3351 (P1 — гидратация и идентичность черновика): смена

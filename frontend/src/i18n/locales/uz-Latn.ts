@@ -8574,6 +8574,9 @@ const uzLatn = {
     lp_patsient_selectedappointment: 'Bemor №{patient_id}',
     lp_preduprezhdenie_ob_istecheni: 'Предупреждение об истечении сессии',
     lp_prodlevaem_sessiyu: 'Продлеваем сессию...',
+    lp_sessiya_istekla_zavershenie: 'Sessiya tugadi: operatsiya yakunlanmoqda',
+    lp_sessiya_istekla_zavershenie_t: 'Sessiyangiz tugadi, ammo operatsiya hali bajarilmoqda. U yakunlangach, sahifa avtomatik ravishda kirish sahifasiga o‘tadi — varaqni yopmang.',
+    lp_perehod_posle_zaversheniya: 'Operatsiya yakunlangandan keyin o‘tish',
     lp_panel_laboratorii: 'Панель лаборатории',
     // EMRStatusIndicator.jsx (esi_) manual: formatRelativeTime
     esi_tolko_chto: 'только что',

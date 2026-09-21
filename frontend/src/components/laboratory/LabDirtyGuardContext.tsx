@@ -106,6 +106,17 @@ import { useTranslation } from '../../i18n/useTranslation';
  *    переход принудительным SPA-переходом на последнюю не-lab страницу
  *    сессии, если traversal не состоялся — leaveIntent не зависает.
  *
+ *    PR 3351 (review round 6, P1): полная защита документа (refresh /
+ *    закрытие вкладки) тоже живёт ЗДЕСЬ, на уровне провайдера, и
+ *    срабатывает при dirty-черновиках ИЛИ незавершённых операциях.
+ *    Прежние per-workbench beforeunload-хуки закрывали только dirty-state:
+ *    pending-only мутация (clone чистого шаблона, finalize/print чистого
+ *    отчёта) терялась без предупреждения — браузер обрывал неидемпотентный
+ *    POST, ответ пропадал, и оператор повторял clone, создавая вторую
+ *    копию. Условие проверяется ВНУТРИ обработчика (render-time рефы
+ *    актуальны всегда), поэтому слушатель установлен один раз и не
+ *    зависит от перерисовок провайдера.
+ *
  * Инвариант sentinel: запись ПОД sentinel никогда не мутирует после arm
  * (replaceState действует на текущую запись, т.е. на сам sentinel). Вытесненный
  * sentinel опознаётся по двойнику (PR 3351, review round 4): запись на одну
@@ -524,6 +535,29 @@ function LabLeaveRouteGuard({
   hasPendingRef.current = hasPendingOperations;
   const guardRouteLeaveRef = useRef(guardRouteLeave);
   guardRouteLeaveRef.current = guardRouteLeave;
+
+  // PR 3351 (review round 6, P1): beforeunload на уровне общего провайдера —
+  // полная защита документа при dirty-черновиках ИЛИ незавершённых
+  // операциях. Это заменяет per-workbench-хуки, которые ставили слушатель
+  // только по dirty-state: pending-only мутация (clone чистого шаблона,
+  // publish/finalize/print чистого отчёта) не блокировала refresh/закрытие
+  // — неидемпотентный POST обрывался, ответ терялся, и оператор повторял
+  // операцию, создавая дубль. Условие проверяется внутри обработчика по
+  // render-time рефам (см. hasDirtyRef/hasPendingRef выше): слушатель не
+  // нужно перевешивать на флипах состояния, он всегда видит актуальный
+  // реестр. Вне /lab реестр пуст (источники снимаются при unmount), и
+  // обработчик молча пропускает unload.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasDirtyRef.current() && !hasPendingRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   const location = useLocation();
   // PR 3351 (review round 5, P2): последняя не-lab страница SPA-сессии —
   // цель гарантированного завершения подтверждённого ухода, если

@@ -8573,6 +8573,9 @@ const kk = {
     lp_patsient_selectedappointment: 'Науқас №{patient_id}',
     lp_preduprezhdenie_ob_istecheni: 'Предупреждение об истечении сессии',
     lp_prodlevaem_sessiyu: 'Продлеваем сессию...',
+    lp_sessiya_istekla_zavershenie: 'Сессия аяқталды: операцияны аяқтаудамыз',
+    lp_sessiya_istekla_zavershenie_t: 'Сессияңыз аяқталды, бірақ операция әлі орындалуда. Ол аяқталғаннан кейін бет автоматты түрде кіру бетіне өтеді — қойындыны жаппаңыз.',
+    lp_perehod_posle_zaversheniya: 'Операция аяқталғаннан кейін ауысу',
     lp_panel_laboratorii: 'Панель лаборатории',
     // EMRStatusIndicator.jsx (esi_) manual: formatRelativeTime
     esi_tolko_chto: 'только что',

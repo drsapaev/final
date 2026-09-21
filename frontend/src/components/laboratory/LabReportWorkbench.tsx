@@ -274,20 +274,13 @@ export default function LabReportWorkbench({
     };
   }, [activeInstance?.id]);
 
-  // Navigation guard: предотвращает потерю данных при refresh/close.
-  // Используем beforeunload напрямую (без useNavigationGuard) —
-  // useNavigationGuard требует <Router> context, что ломает unit-тесты.
-  // Переключение табов внутри SPA не теряет state (LabPanel хранит
-  // selectedAppointment/activeInstance в useState).
-  useEffect(() => {
-    if (!isDirty) return;
-    const handler = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [isDirty]);
+  // PR 3351 (review round 6, P1): beforeunload для полного документа
+  // (refresh/закрытие вкладки) больше не ставится здесь. Единственный
+  // владелец — LabDirtyGuardProvider: он видит ОБЩЕЕ состояние
+  // (dirty-источники ИЛИ незавершённые операции), поэтому pending-only
+  // мутация (finalize/print чистого отчёта) тоже блокирует unload.
+  // Workbench-хук на одном isDirty этот сценарий пропускал. Внутренние
+  // SPA-переходы по-прежнему идут через guardTransition (scope-контракт).
 
   // WF-22 fix: keyboard shortcuts для efficiency.
   // Ctrl+S (Cmd+S на Mac) → save draft (preventDefault — браузер не показывает Save Dialog)

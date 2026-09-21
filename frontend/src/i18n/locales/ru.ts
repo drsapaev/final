@@ -8702,6 +8702,9 @@ const ru = {
     lp_patsient_selectedappointment: 'Пациент №{patient_id}',
     lp_preduprezhdenie_ob_istecheni: 'Предупреждение об истечении сессии',
     lp_prodlevaem_sessiyu: 'Продлеваем сессию...',
+    lp_sessiya_istekla_zavershenie: 'Сессия истекла: завершаем операцию',
+    lp_sessiya_istekla_zavershenie_t: 'Ваша сессия истекла, но операция ещё выполняется. Как только она завершится, страница автоматически перейдёт на страницу входа — не закрывайте вкладку.',
+    lp_perehod_posle_zaversheniya: 'Переход после завершения операции',
     lp_panel_laboratorii: 'Панель лаборатории',
     // EMRStatusIndicator.jsx (esi_) manual: formatRelativeTime
     esi_tolko_chto: 'только что',

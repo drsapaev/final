@@ -185,7 +185,7 @@ describe('LabPanel queue/report status contract', () => {
     expect(source).toContain('const instanceParam = searchParams.get(\'instance\')');
     expect(source).toContain('}, [loadLabAppointments, loadRecentReports, loadTemplates]);');
     expect(source).toContain('instanceParamId');
-    expect(source).toContain('}, [activeInstanceId, dismissPendingTransition, instanceParamId, loadInstance]);');
+    expect(source).toContain('}, [activeInstanceId, dismissPendingTransition, instanceParamId, loadInstance, syncUrlToCurrentContext]);');
   });
 
   it('makes report transitions latest-wins and marks every state-driven URL change', () => {
@@ -466,6 +466,86 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     // popstate-обработчика: drift-ветка обязана пропускать twin-landing
     // (иначе remark помечал двойника и глотал вытеснение).
     expect(guardSource).toContain('poppedOntoTwin');
+  });
+
+  it('owns document protection at the provider level and defers session-expiry redirects past pending operations (review round 6)', () => {
+    // PR 3351 (review round 6, P1): beforeunload (refresh / закрытие
+    // вкладки) раньше ставили сами workbench'и — и только по dirty-state.
+    // Pending-only мутация (clone чистого шаблона, finalize/print чистого
+    // отчёта — неидемпотентные POST без Idempotency-Key) обрывалась без
+    // предупреждения. Единственный владелец защиты документа — провайдер:
+    // он видит ОБЩЕЕ состояние (dirty-источники ИЛИ pending-операции).
+    const readComponent = (relative: string) => fs.readFileSync(
+      path.resolve(__dirname, relative),
+      'utf8',
+    );
+    const templateWorkbenchSource = readComponent('../../components/laboratory/LabTemplateWorkbench.tsx');
+    const reportWorkbenchSource = readComponent('../../components/laboratory/LabReportWorkbench.tsx');
+    expect(templateWorkbenchSource).not.toContain('addEventListener(\'beforeunload\'');
+    expect(reportWorkbenchSource).not.toContain('addEventListener(\'beforeunload\'');
+
+    const guardSource = readComponent('../../components/laboratory/LabDirtyGuardContext.tsx');
+    expect(guardSource).toContain('window.addEventListener(\'beforeunload\', handleBeforeUnload)');
+    // Условие внутри обработчика — dirty ИЛИ pending по render-time рефам
+    // (слушатель не перевешивается на флипах состояния).
+    expect(guardSource).toContain('if (!hasDirtyRef.current() && !hasPendingRef.current) return;');
+
+    // PR 3351 (review round 6, P1): истечение сессии больше не делает hard
+    // navigation поверх pending-операции. LabPanel переводится на
+    // usePendingAwareSessionExpiry; прямой window.location.href = '/login'
+    // остаётся ровно один — внутри onExpired (после снятия pending).
+    const labPanelSource = readLabPanelSource();
+    expect(labPanelSource).toContain('usePendingAwareSessionExpiry({');
+    expect(labPanelSource).not.toContain('useSessionTimeoutWarning({');
+    expect(labPanelSource.match(/window\.location\.href = '\/login';/g)?.length).toBe(1);
+    const hookSource = readComponent('../../hooks/usePendingAwareSessionExpiry.ts');
+    // Истечение поверх pending — контролируемое ожидание, redirect ровно
+    // один раз после завершения последней операции.
+    expect(hookSource).toContain('setRedirectPending(true)');
+    expect(hookSource).toContain('onExpiredRef.current();');
+    // Не-dismissable диалог «операция завершается, затем переход».
+    expect(labPanelSource).toContain('sessionRedirectPending && (');
+    expect(labPanelSource).toContain('lp_sessiya_istekla_zavershenie');
+  });
+
+  it('normalizes a missing or unknown ?tab= to the canonical Queue home and keeps the rollback tab explicit (review round 6)', () => {
+    // PR 3351 (review round 6, P2): canonical /lab (defaultItem: 'queue' в
+    // routeRegistry) обязан означать ровно то, что откроется после reload:
+    // URL /lab без ?tab= — вкладка очереди. Прежний sync молча пропускал
+    // «нет таба», и shell-переходы (Header brand, Command Palette) на
+    // canonical /lab рассинхронизировали адрес и экран.
+    const labPanelSource = readLabPanelSource();
+    expect(labPanelSource).toContain('function resolveLabTabId(');
+    expect(labPanelSource).toContain('const LAB_TAB_IDS = [\'queue\', \'templates\', \'reports\'] as const;');
+    // Ранний выход «нет таба → ничего не делать» удалён.
+    expect(labPanelSource).not.toContain('if (!nextTab) {');
+    // Нормализация применяется и к initial state, и к tab-sync эффекту.
+    expect(labPanelSource.match(/resolveLabTabId\(/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(labPanelSource).toContain('const requestedTab = searchParams.get(\'tab\');');
+    // URL с валидным tab закрывает память pre-intent вкладки — canonical
+    // /lab при shell-переходах (brand = home = очередь) её не наследует.
+    expect(labPanelSource).toContain('preUrlIntentTabRef.current = null;');
+    // WF-15 восстанавливает tab из pre-intent памяти, когда внешний
+    // tab-less URL (или sentinel-collapse POP) оставляет адрес без tab.
+    expect(labPanelSource).toContain('params.set(\'tab\', intentTab);');
+
+    // Rollback внешнего намерения обязан явно владеть tab: после
+    // нормализации «нет tab → queue» откат без явного tab молча
+    // переключал бы пользователя на вкладку очереди (dirty report на
+    // /lab?tab=reports → внешний /lab?instance=89 без tab → отмена →
+    // очередь вместо reports). Приоритет: валидный tab адреса → вкладка
+    // до начала urlIntent → текущая вкладка → 'queue'.
+    expect(labPanelSource).toContain('function resolveRollbackTabId(');
+    expect(labPanelSource).toContain('preUrlIntentTabRef.current = activeTabRef.current;');
+    expect(labPanelSource).toContain('params.set(\'tab\', resolveRollbackTabId(');
+    // Захват pre-intent вкладки — в urlIntent-ветке loadInstance (синхронно
+    // ДО guard-диалога: tab-sync effect этого рендера уже мог закоммитить
+    // нормализацию), потребление — в onCancel отката после
+    // syncUrlToCurrentContext (URL снова явно владеет tab).
+    const urlIntentCapture = labPanelSource.indexOf('if (options.urlIntent) {');
+    const captureWrite = labPanelSource.indexOf('preUrlIntentTabRef.current = activeTabRef.current;', urlIntentCapture);
+    expect(captureWrite).toBeGreaterThan(urlIntentCapture);
+    expect(labPanelSource).toContain('preUrlIntentTabRef.current = null;');
   });
 
   it('keeps report CREATE latest-wins: create does not block transitions', () => {

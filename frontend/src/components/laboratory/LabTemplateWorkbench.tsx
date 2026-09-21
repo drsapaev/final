@@ -695,17 +695,12 @@ export default function LabTemplateWorkbench({
     });
   }, []);
 
-  // Защищаем закрытие/перезагрузку вкладки тем же признаком dirty, который
-  // использует внутренний transition guard.
-  useEffect(() => {
-    if (!templateDirty) return undefined;
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [templateDirty]);
+  // PR 3351 (review round 6, P1): beforeunload для полного документа
+  // (refresh/закрытие вкладки) больше не ставится здесь. Единственный
+  // владелец — LabDirtyGuardProvider: он видит ОБЩЕЕ состояние
+  // (dirty-источники ИЛИ незавершённые операции), поэтому pending-only
+  // мутация (clone чистого шаблона) тоже блокирует unload. Workbench-хук
+  // на одном dirty-state этот сценарий пропускал.
 
   // PR4: единый список ошибок валидации текущего draft для inline-блока;
   // хендлеры Save/Publish используют те же проверки перед любым запросом.
