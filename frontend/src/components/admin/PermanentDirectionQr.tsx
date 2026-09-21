@@ -92,11 +92,16 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
             setCopied(false);
             setState('shown');
             // RQ-18 follow-up (P2-3): the `supported` prop is stale by
-            // construction after a provision (it was read before). Re-read
-            // the entry-methods: a freshly provisioned healthy direction
-            // must drop the «запись недоступна» note, and a direction
-            // deactivated mid-provision must not keep claiming ready.
-            // Until the re-read answers, nothing is asserted.
+            // construction after a provision (it was read before).
+            // RQ-18 follow-up round-2 (P2): the post-provision status is
+            // ATOMIC — until the re-read answers, the state is UNKNOWN
+            // (both here and in the parent checklist row): a freshly
+            // provisioned healthy direction must not keep the stale
+            // «запись недоступна» note even while the recheck request is
+            // still pending, and a direction deactivated mid-provision
+            // must not keep claiming ready.
+            setPostProvisionSupported(null);
+            onSupportedChange?.(profileKey, null);
             try {
                 const methods = await fetchDirectionEntryMethods(profileKey);
                 const fresh = readPermanentAddressSupported(methods);
@@ -104,6 +109,7 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
                 onSupportedChange?.(profileKey, fresh);
             } catch (err) {
                 logger.warn(`entry-methods re-read failed for ${profileKey}`, err);
+                // stays unknown — honest, never a confident claim
                 setPostProvisionSupported(null);
             }
         } catch (err) {

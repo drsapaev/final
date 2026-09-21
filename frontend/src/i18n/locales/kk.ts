@@ -7133,6 +7133,10 @@ const kk = {
     qj_retry_btn: 'Попробовать снова',
     qj_home_btn: 'Главная страница',
     qj_direction_unavailable: 'Бағыт қолжетімсіз',
+    // RQ-18 follow-up round-2 (P1)
+    qj_draft_found: 'Бұл құрылғыда толтырылмаған өтініш сақталған. Қалпына келтіру керек пе?',
+    qj_draft_restore: 'Қалпына келтіру',
+    qj_draft_discard: 'Өшіріп, жаңадан толтыру',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',
     qj_waiting_until_open: 'до открытия записи',

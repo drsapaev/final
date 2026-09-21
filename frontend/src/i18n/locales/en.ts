@@ -7133,6 +7133,11 @@ const en = {
     qj_retry_btn: 'Попробовать снова',
     qj_home_btn: 'Главная страница',
     qj_direction_unavailable: 'This direction is unavailable',
+    // RQ-18 follow-up round-2 (P1): draft-owner confirmation — the prompt
+    // reveals no PHI (no name/phone) on the shared permanent route.
+    qj_draft_found: 'This device has an unfinished registration draft. Restore it?',
+    qj_draft_restore: 'Restore',
+    qj_draft_discard: 'Discard and start fresh',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',
     qj_waiting_until_open: 'до открытия записи',

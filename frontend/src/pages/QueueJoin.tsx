@@ -89,6 +89,22 @@ const isNetworkClassSubmitError = (err: unknown): boolean => {
   return status === 0 || status === 502 || status === 503 || status === 504;
 };
 
+// RQ-18 follow-up round-2 (P1): the permanent public code is SHARED by
+// every patient of the direction — the typed draft (name/phone) is PHI
+// and must never persist in long-lived localStorage under it. The
+// direction draft lives in sessionStorage (survives a reload, dies with
+// the browser session), carries a short TTL, and is NEVER restored
+// silently — its owner must explicitly confirm the restore (and the
+// confirmation prompt reveals no PHI either).
+const DIRECTION_DRAFT_TTL_MS = 15 * 60 * 1000; // matches the session TTL
+
+interface QueueJoinDraftData {
+  patientName: string;
+  phone: string;
+  telegramId: string;
+  [key: string]: unknown;
+}
+
 const QueueJoin = () => {
   const { token: paramToken } = useParams();
   // RQ-18 (S-15): public permanent-address route /q/:publicCode renders the
@@ -146,11 +162,38 @@ const QueueJoin = () => {
   // телефон восстановимыми после перезагрузки страницы, когда сессия
   // истекла, а также разводит черновики разных направлений при /q/A →
   // /q/B (P2-2: у каждого кода свой черновик).
+  // RQ-18 follow-up round-2 (P1): постоянный код ОБЩИЙ для всех пациентов
+  // направления — PHI-черновик направления живёт ТОЛЬКО в sessionStorage
+  // (переживает reload, умирает с браузерной сессией) с коротким TTL;
+  // legacy-ключ по короткоживущему QR-токену сохраняет прежнее поведение.
   const formStorageKey = token
     ? `queue_join_form_${token}`
     : directionCode
       ? `queue_join_form_qdir_${directionCode}`
       : null;
+
+  const draftGet = useCallback(
+    (key: string): string | null =>
+      directionMode
+        ? window.sessionStorage.getItem(key)
+        : window.localStorage.getItem(key),
+    [directionMode],
+  );
+  const draftSet = useCallback(
+    (key: string, value: string): void => {
+      if (directionMode) {
+        window.sessionStorage.setItem(key, value);
+      } else {
+        window.localStorage.setItem(key, value);
+      }
+    },
+    [directionMode],
+  );
+  const draftRemove = useCallback((key: string): void => {
+    // Belt & suspenders: clear BOTH stores — no PHI may linger either way.
+    window.sessionStorage.removeItem(key);
+    window.localStorage.removeItem(key);
+  }, []);
 
   // Состояния
   const [step, setStep] = useState<'loading' | 'waiting' | 'info' | 'select-specialists' | 'form' | 'success' | 'error'>('loading');
@@ -188,6 +231,14 @@ const QueueJoin = () => {
   // changed :publicCode param) must start B's session and drop A's whole
   // client context; StrictMode re-invokes with the SAME code and skips.
   const directionStartRef = useRef<string | null>(null);
+  // RQ-18 follow-up round-2 (P1): request epoch — every async response
+  // (start AND complete) is bound to the epoch it was issued in, so a
+  // LATE answer for a superseded code can never overwrite the freshly
+  // booted direction (out-of-order A/B responses).
+  const directionEpochRef = useRef(0);
+  // RQ-18 follow-up round-2 (P1): a found-but-unconfirmed draft — never
+  // applied to the form until its owner explicitly restores it.
+  const [pendingDraft, setPendingDraft] = useState<QueueJoinDraftData | null>(null);
   // The typed direction the session is scoped to — the completion of a
   // direction session is the PROFILE choice of this very direction (§8:
   // the backend rejects doctor/untyped choices for qdir-scoped sessions).
@@ -220,6 +271,9 @@ const QueueJoin = () => {
   //    the load effect for the current key has actually read the store —
   //    otherwise StrictMode's simulated remount re-runs the persist setup
   //    with the initial empty state and wipes the stored draft.
+  // RQ-18 follow-up round-2 (P1): the direction draft is written to
+  // sessionStorage in a { ts, data } envelope (TTL refreshed on every
+  // write); the legacy per-token draft keeps its raw localStorage shape.
   const formDataOwnerRef = useRef<string | null>(null);
   const [formDraftHydrated, setFormDraftHydrated] = useState(false);
   useEffect(() => {
@@ -231,37 +285,77 @@ const QueueJoin = () => {
       return;
     }
     if (!formData.patientName && !formData.phone && !formData.telegramId) {
-      localStorage.removeItem(formStorageKey);
+      draftRemove(formStorageKey);
       return;
     }
-    localStorage.setItem(formStorageKey, JSON.stringify(formData));
-  }, [formData, formStorageKey, formDraftHydrated]);
+    if (directionMode) {
+      draftSet(formStorageKey, JSON.stringify({ ts: Date.now(), data: formData }));
+    } else {
+      draftSet(formStorageKey, JSON.stringify(formData));
+    }
+  }, [formData, formStorageKey, formDraftHydrated, directionMode, draftSet, draftRemove]);
 
   useEffect(() => {
+    // RQ-18 follow-up round-2 (P1): switching directions discards the
+    // PREVIOUS code's draft entirely — permanent codes belong to
+    // different directions and their drafts must not linger.
+    const previousKey = formDataOwnerRef.current;
+    if (previousKey && previousKey !== formStorageKey) {
+      draftRemove(previousKey);
+    }
     if (!formStorageKey) {
       formDataOwnerRef.current = null;
       setFormDraftHydrated(false);
+      setPendingDraft(null);
       return;
     }
     formDataOwnerRef.current = formStorageKey;
-    const saved = localStorage.getItem(formStorageKey);
+    const saved = draftGet(formStorageKey);
+    let restored: QueueJoinDraftData | null = null;
     try {
       const parsed = saved ? safeJsonParse(saved) : null;
-      if (parsed && typeof parsed === 'object') {
-        setFormData({
-          patientName: (parsed as Record<string, unknown>).patientName || '',
-          phone: (parsed as Record<string, unknown>).phone || '',
-          telegramId: (parsed as Record<string, unknown>).telegramId || '',
-        });
-      } else {
-        setFormData({ patientName: '', phone: '', telegramId: '' });
+      if (directionMode) {
+        // { ts, data } envelope with a short TTL — a stale draft is a
+        // discarded draft.
+        const envelope = parsed as { ts?: unknown; data?: unknown } | null;
+        const ts = Number(envelope?.ts ?? 0);
+        const data = envelope?.data as Record<string, unknown> | undefined;
+        if (data && typeof data === 'object' && Date.now() - ts <= DIRECTION_DRAFT_TTL_MS) {
+          restored = {
+            patientName: String(data.patientName ?? ''),
+            phone: String(data.phone ?? ''),
+            telegramId: String(data.telegramId ?? ''),
+          };
+        } else if (saved) {
+          draftRemove(formStorageKey);
+        }
+      } else if (parsed && typeof parsed === 'object') {
+        const record = parsed as Record<string, unknown>;
+        restored = {
+          patientName: String(record.patientName ?? ''),
+          phone: String(record.phone ?? ''),
+          telegramId: String(record.telegramId ?? ''),
+        };
       }
     } catch {
-      localStorage.removeItem(formStorageKey);
+      draftRemove(formStorageKey);
+      restored = null;
+    }
+    const hasContent = Boolean(
+      restored && (restored.patientName || restored.phone || restored.telegramId),
+    );
+    if (directionMode && hasContent && restored) {
+      // NEVER restore PHI silently on the shared permanent route: hold
+      // the draft for the owner's explicit confirmation (the prompt
+      // itself reveals nothing), keep the form empty meanwhile.
+      setPendingDraft(restored);
       setFormData({ patientName: '', phone: '', telegramId: '' });
+    } else {
+      setPendingDraft(null);
+      setFormData(restored ?? { patientName: '', phone: '', telegramId: '' });
     }
     setFormDraftHydrated(true);
-  }, [formStorageKey]);
+  }, [formStorageKey, directionMode, draftGet, draftRemove]);
 
   // ✅ Функции объявлены до использования в useEffect
   const startJoinSession = useCallback(async () => {
@@ -385,6 +479,11 @@ const QueueJoin = () => {
     // patient's context intact.
     const isNewCode = directionStartRef.current !== directionCode;
     directionStartRef.current = directionCode;
+    // RQ-18 follow-up round-2 (P1): this start is bound to its request
+    // epoch — a LATE response for a superseded code (/q/A answered after
+    // /q/B already booted) is dropped in try/catch/finally and can never
+    // overwrite the freshly booted direction.
+    const epoch = ++directionEpochRef.current;
     if (isNewCode) {
       setSessionToken(null);
       setQueueInfo(null);
@@ -401,6 +500,10 @@ const QueueJoin = () => {
     setStep('loading');
     try {
       const res = await startPublicDirectionSession(directionCode);
+      // Out-of-order responses: A answered after B booted — drop it.
+      if (epoch !== directionEpochRef.current || directionCode !== directionStartRef.current) {
+        return;
+      }
       const nextQueueInfo: QueueJoinPageInfo = (res.queue_info ?? {}) as QueueJoinPageInfo;
       const selectableSpecialists: QueueSpecialist[] = Array.isArray(nextQueueInfo.selectable_specialists)
         ? nextQueueInfo.selectable_specialists
@@ -417,6 +520,10 @@ const QueueJoin = () => {
       // submit time. The info step shows the direction composition.
       setStep('info');
     } catch (error: unknown) {
+      // A late failure of a superseded start must not touch B's state either.
+      if (epoch !== directionEpochRef.current || directionCode !== directionStartRef.current) {
+        return;
+      }
       const status = Number((error as HttpApiError | null)?.response?.status ?? 0);
       setAvailableSpecialists([]);
       setSessionToken(null);
@@ -431,7 +538,9 @@ const QueueJoin = () => {
       }
       setStep('error');
     } finally {
-      setIsSpecialistsLoading(false);
+      if (epoch === directionEpochRef.current && directionCode === directionStartRef.current) {
+        setIsSpecialistsLoading(false);
+      }
     }
   }, [directionCode, getApiErrorMessage]);
 
@@ -505,8 +614,18 @@ const QueueJoin = () => {
     if (directionMode && (!currentSessionToken || directionSessionKnownExpired)) {
       // RQ-18 (§10): safe session-start retry — the direction start-session
       // creates a fresh short-lived session (no business action duplicated).
+      // Round-2 (P1): bound to the current epoch — if the direction was
+      // superseded while the renewal was in flight, the submit aborts
+      // silently (the user is already on another direction's flow).
+      const renewalEpoch = directionEpochRef.current;
       try {
         const res = await startPublicDirectionSession(directionCode as string);
+        if (
+          renewalEpoch !== directionEpochRef.current ||
+          directionStartRef.current !== directionCode
+        ) {
+          return;
+        }
         currentSessionToken = res.session_token;
         setSessionToken(res.session_token);
         setSessionExpiresAt(res.expires_at ?? null);
@@ -515,6 +634,12 @@ const QueueJoin = () => {
         // The renewal is transparent: the patient stays on the form step
         // with their typed context and the submit proceeds below.
       } catch (error: unknown) {
+        if (
+          renewalEpoch !== directionEpochRef.current ||
+          directionStartRef.current !== directionCode
+        ) {
+          return;
+        }
         const status = Number((error as HttpApiError | null)?.response?.status ?? 0);
         if (status === 404) {
           setDirectionUnavailable(true);
@@ -548,6 +673,11 @@ const QueueJoin = () => {
 
     setLoading(true);
     setError(null);
+
+    // RQ-18 follow-up round-2 (P1): the complete answer is bound to the
+    // request epoch — a LATE complete for a superseded direction must
+    // never render A's ticket under B's URL. Captured before the request.
+    const submitEpoch = directionEpochRef.current;
 
     try {
       // Валидация данных перед отправкой
@@ -630,12 +760,22 @@ const QueueJoin = () => {
         );
       }
 
+      // RQ-18 follow-up round-2 (P1): bound to the submit epoch (captured
+      // above, before the request).
       const joinResult = await completeQueueJoinSession(requestBody);
+      if (
+        directionMode &&
+        (submitEpoch !== directionEpochRef.current ||
+          directionStartRef.current !== directionCode)
+      ) {
+        return;
+      }
       setResult(joinResult as unknown as QueueJoinResultLocal);
       // ✅ Очищаем session_token из localStorage после успешного присоединения
       localStorage.removeItem(`queue_session_${token}`);
       if (formStorageKey) {
-        localStorage.removeItem(formStorageKey);
+        draftRemove(formStorageKey);
+        setPendingDraft(null);
       }
 
       // ✅ Отправляем событие обновления очереди для автоматического обновления таблицы
@@ -708,6 +848,15 @@ const QueueJoin = () => {
       setStep('success');
 
     } catch (error: unknown) {
+      // Round-2 (P1): a late failure of a superseded submit must not paint
+      // errors onto the freshly booted direction.
+      if (
+        directionMode &&
+        (submitEpoch !== directionEpochRef.current ||
+          directionStartRef.current !== directionCode)
+      ) {
+        return;
+      }
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.joinFailed));
       if (isNetworkClassSubmitError(error)) {
         // RQ-10 (S-08): ответ потерян — результат отправки неизвестен.
@@ -727,10 +876,45 @@ const QueueJoin = () => {
     if (error) {
       setError(null);
     }
+    if (pendingDraft) {
+      // Round-2 (P1): typing supersedes the found draft — discard it for
+      // good (no silent double-ownership of the device's draft slot).
+      setPendingDraft(null);
+      if (formStorageKey) {
+        draftRemove(formStorageKey);
+      }
+    }
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
+  };
+
+  // RQ-18 follow-up round-2 (P1): explicit draft-owner confirmation —
+  // restore applies the held draft; discard erases it from the device.
+  const restoreFoundDraft = () => {
+    if (!pendingDraft) {
+      return;
+    }
+    setFormData({ ...pendingDraft });
+    setPendingDraft(null);
+  };
+  const discardFoundDraft = () => {
+    setPendingDraft(null);
+    if (formStorageKey) {
+      draftRemove(formStorageKey);
+    }
+    setFormData({ patientName: '', phone: '', telegramId: '' });
+  };
+
+  // RQ-18 follow-up round-2 (P1): leaving the route discards the draft —
+  // no PHI may survive an intentional exit to the home page.
+  const goHome = () => {
+    if (directionCode && formStorageKey) {
+      draftRemove(formStorageKey);
+    }
+    setPendingDraft(null);
+    navigate('/');
   };
 
   // ✅ Функция форматирования узбекского номера телефона
@@ -772,6 +956,13 @@ const QueueJoin = () => {
     const formatted = formatUzbekPhone(input);
     if (error) {
       setError(null);
+    }
+    if (pendingDraft) {
+      // Round-2 (P1): typing supersedes the found draft — discard it.
+      setPendingDraft(null);
+      if (formStorageKey) {
+        draftRemove(formStorageKey);
+      }
     }
 
     // Обновляем состояние с отформатированным значением для отображения
@@ -923,7 +1114,7 @@ const QueueJoin = () => {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={goHome}
               className="qj-recovery-btn qj-recovery-btn-danger"
             >
               {t('misc.qj_home_btn')}
@@ -1012,7 +1203,7 @@ const QueueJoin = () => {
 
           <div className="flex gap-3">
             <button
-              onClick={() => navigate('/')}
+              onClick={goHome}
               className="qj-btn-secondary"
               onMouseEnter={(e) => e.currentTarget.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
@@ -1061,6 +1252,13 @@ const QueueJoin = () => {
     const singleEntry = successEntries[0];
     const singleWaitTime =
       result?.estimated_wait_time ?? singleEntry?.estimated_wait_time;
+    // RQ-18 follow-up round-2 (P2): «перед вами» = live count of patients
+    // ahead (queue_length_before from the backend) — NOT ticket-number − 1.
+    // Numbering may start at 100, have gaps, or include served/cancelled
+    // patients, so the ticket number and the waiting count are not
+    // interchangeable (queue_number=100 with queue_length=0 must show 0).
+    const singleQueueLength =
+      result?.queue_length ?? singleEntry?.queue_length;
     // RQ-18 follow-up (P1-1/P2-1): in direction mode the ticket belongs to
     // the DIRECTION — label it with the direction title, never the raw
     // internal department code (qdir:*) or the clinic-wide sentinel name.
@@ -1188,9 +1386,10 @@ const QueueJoin = () => {
                     <Users style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                     <span className="qj-info-label">{t('misc.qj_ahead_of_you')}</span>
                   </div>
-                  {/* RQ-18 follow-up (P2-1): clamped — a missing/first
-                      ticket must never render a negative count. */}
-                  <span className="qj-info-value">{t('misc.qj_count_short', { count: Math.max(Number(singleEntryNumber ?? 0) - 1, 0) })}</span>
+                  {/* RQ-18 follow-up round-2 (P2): «перед вами» is the
+                      backend-provided queue_length (live waiting count),
+                      clamped — never derived from the ticket number. */}
+                  <span className="qj-info-value">{t('misc.qj_count_short', { count: Math.max(Number(singleQueueLength ?? 0), 0) })}</span>
                 </div>
 
                 {singleWaitTime != null && (
@@ -1265,7 +1464,7 @@ const QueueJoin = () => {
           )}
 
           <button
-            onClick={() => navigate('/')}
+            onClick={goHome}
             type="button"
             className="qj-recovery-btn qj-recovery-btn-success"
           >
@@ -1651,6 +1850,34 @@ const QueueJoin = () => {
         {step === 'form' && (
           <div className="qj-select-section">
             <form onSubmit={handleFormSubmit} className="qj-form">
+              {/* RQ-18 follow-up round-2 (P1): a found draft is never applied
+                  silently — the device may be shared, so its owner must
+                  explicitly confirm; the prompt reveals no PHI. */}
+              {directionMode && pendingDraft && (
+                <div className="qj-draft-confirm" data-testid="qj-draft-confirm" role="status" aria-live="polite">
+                  <p className="qj-draft-confirm-text" data-testid="qj-draft-confirm-text">
+                    {t('misc.qj_draft_found')}
+                  </p>
+                  <div className="qj-draft-confirm-actions">
+                    <button
+                      type="button"
+                      className="qj-draft-btn qj-draft-btn-primary"
+                      data-testid="qj-draft-restore"
+                      onClick={restoreFoundDraft}
+                    >
+                      {t('misc.qj_draft_restore')}
+                    </button>
+                    <button
+                      type="button"
+                      className="qj-draft-btn qj-draft-btn-secondary"
+                      data-testid="qj-draft-discard"
+                      onClick={discardFoundDraft}
+                    >
+                      {t('misc.qj_draft_discard')}
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* ФИО - macOS стиль */}
               <div>
                 <label
@@ -1737,6 +1964,13 @@ const QueueJoin = () => {
                     }}
                     onPaste={(e) => {
                       e.preventDefault();
+                      if (pendingDraft) {
+                        // Round-2 (P1): pasting supersedes the found draft.
+                        setPendingDraft(null);
+                        if (formStorageKey) {
+                          draftRemove(formStorageKey);
+                        }
+                      }
                       const pastedText = e.clipboardData.getData('text');
                       const formatted = formatUzbekPhone(pastedText);
                       setFormData(prev => ({

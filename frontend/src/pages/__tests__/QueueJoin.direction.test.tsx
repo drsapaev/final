@@ -300,7 +300,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         expect(queueApiMocks.startQueueJoinSession).not.toHaveBeenCalled();
     });
 
-    it('PIN 16 (red on merged main): the typed draft survives a full remount on the same /q/:code', async () => {
+    it('PIN 16 (round-2 P1): a found draft is NEVER restored silently — the owner must confirm', async () => {
         directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
         const first = renderDirectionRoute();
         await screen.findByText(/заполните форму/i);
@@ -312,12 +312,295 @@ describe('RQ-18 — /q/:publicCode public route', () => {
             target: { value: '+998 (90) 123-45-67' },
         });
         first.unmount();
-        // full page reload equivalent: fresh mount, session expired long ago
+        // same browser session reload: the draft is found but NOT applied
         renderDirectionRoute();
         await screen.findByText(/заполните форму/i);
         fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
-        const nameInput = await screen.findByLabelText(/фио пациента/i);
-        expect((nameInput as HTMLInputElement).value).toBe('Иванов Иван');
+        await screen.findByTestId('qj-draft-confirm');
+        // the form stays EMPTY until the explicit restore (silent prefill forbidden)
+        const nameBefore = (await screen.findByLabelText(/фио пациента/i)) as HTMLInputElement;
+        expect(nameBefore.value).toBe('');
+        // the confirmation prompt reveals NO PHI
+        const prompt = screen.getByTestId('qj-draft-confirm');
+        expect(prompt.textContent).not.toMatch(/Иванов|\+998|123-45-67/);
+        // explicit owner confirmation applies the draft
+        fireEvent.click(screen.getByTestId('qj-draft-restore'));
+        const nameInput = (await screen.findByLabelText(/фио пациента/i)) as HTMLInputElement;
+        expect(nameInput.value).toBe('Иванов Иван');
+    });
+
+    it('PIN 21 (red on 569d15f5): a NEW browser session never sees the previous patient PHI', async () => {
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        const first = renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+        fireEvent.change(await screen.findByLabelText(/фио пациента/i), {
+            target: { value: 'Пациент А' },
+        });
+        fireEvent.change(screen.getByLabelText(/номер телефона/i), {
+            target: { value: '+998 (90) 555-11-22' },
+        });
+        first.unmount();
+        // NEW browser session on the SHARED device: sessionStorage does not
+        // survive it — and the draft must not live in long-lived localStorage.
+        window.sessionStorage.clear();
+        renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+        await screen.findByLabelText(/фио пациента/i);
+        // no confirmation banner (nothing found) and no prefill
+        expect(screen.queryByTestId('qj-draft-confirm')).toBeNull();
+        const nameInput = (screen.getByLabelText(/фио пациента/i) as HTMLInputElement);
+        expect(nameInput.value).toBe('');
+        // the permanent shared code never carries PHI in long-lived storage
+        expect(window.localStorage.getItem('queue_join_form_qdir_abcd1234efgh')).toBeNull();
+    });
+
+    it('PIN 22 (red on 569d15f5): a stale draft past the TTL is discarded, not restored', async () => {
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        window.sessionStorage.setItem(
+            'queue_join_form_qdir_abcd1234efgh',
+            JSON.stringify({
+                ts: Date.now() - 16 * 60 * 1000, // past the 15-minute TTL
+                data: { patientName: 'Старый Пациент', phone: '+998 (90) 111-00-00', telegramId: '' },
+            }),
+        );
+        renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+        await screen.findByLabelText(/фио пациента/i);
+        expect(screen.queryByTestId('qj-draft-confirm')).toBeNull();
+        expect((screen.getByLabelText(/фио пациента/i) as HTMLInputElement).value).toBe('');
+        // the expired draft is erased from the device
+        expect(window.sessionStorage.getItem('queue_join_form_qdir_abcd1234efgh')).toBeNull();
+    });
+
+    it('PIN 23 (round-2 P1): discard erases the draft; typing supersedes it', async () => {
+        window.sessionStorage.setItem(
+            'queue_join_form_qdir_abcd1234efgh',
+            JSON.stringify({
+                ts: Date.now(),
+                data: { patientName: 'Черновик Пациент', phone: '+998 (90) 222-33-44', telegramId: '' },
+            }),
+        );
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+        await screen.findByTestId('qj-draft-confirm');
+        fireEvent.click(screen.getByTestId('qj-draft-discard'));
+        // banner gone, form empty, storage erased
+        expect(screen.queryByTestId('qj-draft-confirm')).toBeNull();
+        expect((screen.getByLabelText(/фио пациента/i) as HTMLInputElement).value).toBe('');
+        expect(window.sessionStorage.getItem('queue_join_form_qdir_abcd1234efgh')).toBeNull();
+        // typing again persists the NEW patient's own draft (fresh envelope)
+        fireEvent.change(screen.getByLabelText(/фио пациента/i), {
+            target: { value: 'Новый Пациент' },
+        });
+        const stored = window.sessionStorage.getItem('queue_join_form_qdir_abcd1234efgh');
+        expect(stored).toBeTruthy();
+        expect(JSON.parse(stored as string).data.patientName).toBe('Новый Пациент');
+    });
+
+    it('PIN 24 (round-2 P1): leaving to the home page discards the draft — no PHI survives the exit', async () => {
+        window.sessionStorage.setItem(
+            'queue_join_form_qdir_abcd1234efgh',
+            JSON.stringify({
+                ts: Date.now(),
+                data: { patientName: 'Уходящий Пациент', phone: '+998 (90) 333-44-55', telegramId: '' },
+            }),
+        );
+        directionApiMocks.startPublicDirectionSession.mockRejectedValue({
+            response: { status: 500, data: { detail: 'boom' } },
+        });
+        renderDirectionRoute();
+        // a non-404 start failure renders the generic error screen (with the
+        // home button) — not the unified refusal marker (that one is 404-only)
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /главная/i })).toBeTruthy();
+        });
+        fireEvent.click(screen.getByRole('button', { name: /главная/i }));
+        expect(window.sessionStorage.getItem('queue_join_form_qdir_abcd1234efgh')).toBeNull();
+        expect(window.localStorage.getItem('queue_join_form_qdir_abcd1234efgh')).toBeNull();
+    });
+
+    it('PIN 19 (red on 569d15f5): a LATE start answer for /q/A never overwrites the booted /q/B', async () => {
+        const CODE_A = 'aaaa1111bbbb';
+        const CODE_B = 'cccc2222dddd';
+        let resolveA: (value: unknown) => void = () => {};
+        const pendingA = new Promise((resolve) => {
+            resolveA = resolve;
+        });
+        directionApiMocks.startPublicDirectionSession.mockImplementation((code: string) =>
+            code === CODE_A
+                ? pendingA
+                : Promise.resolve({
+                      ...DIRECTION_START_RESPONSE,
+                      session_token: 'session-B',
+                      direction: { ...DIRECTION_START_RESPONSE.direction, title: 'Направление Б', public_code: CODE_B },
+                  }),
+        );
+        queueApiMocks.completeQueueJoinSession.mockResolvedValue(COMPLETE_MULTI_RESPONSE);
+
+        function NavigateToB() {
+            const navigate = useNavigate();
+            return (
+                <button type="button" data-testid="nav-to-b" onClick={() => navigate(`/q/${CODE_B}`)}>
+                    go-b
+                </button>
+            );
+        }
+
+        render(
+            <React.StrictMode>
+                <MemoryRouter initialEntries={[`/q/${CODE_A}`]}>
+                    <Routes>
+                        <Route
+                            path="/q/:publicCode"
+                            element={
+                                <>
+                                    <QueueJoin />
+                                    <NavigateToB />
+                                </>
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </React.StrictMode>,
+        );
+
+        // A is still pending — navigate to B; B boots first
+        fireEvent.click(screen.getByTestId('nav-to-b'));
+        await screen.findByText('Направление Б');
+        // NOW the slow A response arrives out of order
+        await React.act(async () => {
+            resolveA({
+                ...DIRECTION_START_RESPONSE,
+                session_token: 'session-A',
+                direction: { ...DIRECTION_START_RESPONSE.direction, title: 'Направление А', public_code: CODE_A },
+            });
+        });
+        // the page/session MUST still belong to B
+        expect(screen.getByText('Направление Б')).toBeTruthy();
+        expect(screen.queryByText('Направление А')).toBeNull();
+        // a submit under B's URL uses B's session, not the late A session
+        fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+        fireEvent.change(await screen.findByLabelText(/фио пациента/i), { target: { value: 'Пациент Б' } });
+        fireEvent.change(screen.getByLabelText(/номер телефона/i), { target: { value: '+998 (90) 123-45-67' } });
+        await React.act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /присоединиться/i }));
+        });
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalled();
+        });
+        expect(queueApiMocks.completeQueueJoinSession.mock.calls[0][0].session_token).toBe('session-B');
+    });
+
+    it('PIN 20 (red on 569d15f5): a LATE complete answer for A never renders A\'s ticket under /q/B', async () => {
+        const CODE_A = 'aaaa1111bbbb';
+        const CODE_B = 'cccc2222dddd';
+        let resolveStartA: (value: unknown) => void = () => {};
+        let resolveCompleteA: (value: unknown) => void = () => {};
+        const pendingStartA = new Promise((resolve) => {
+            resolveStartA = resolve;
+        });
+        const pendingCompleteA = new Promise((resolve) => {
+            resolveCompleteA = resolve;
+        });
+        directionApiMocks.startPublicDirectionSession.mockImplementation((code: string) =>
+            code === CODE_A
+                ? pendingStartA
+                : Promise.resolve({
+                      ...DIRECTION_START_RESPONSE,
+                      session_token: 'session-B',
+                      direction: { ...DIRECTION_START_RESPONSE.direction, title: 'Направление Б', public_code: CODE_B },
+                  }),
+        );
+        queueApiMocks.completeQueueJoinSession.mockReturnValue(pendingCompleteA as never);
+
+        function NavigateToB() {
+            const navigate = useNavigate();
+            return (
+                <button type="button" data-testid="nav-to-b" onClick={() => navigate(`/q/${CODE_B}`)}>
+                    go-b
+                </button>
+            );
+        }
+
+        render(
+            <React.StrictMode>
+                <MemoryRouter initialEntries={[`/q/${CODE_A}`]}>
+                    <Routes>
+                        <Route
+                            path="/q/:publicCode"
+                            element={
+                                <>
+                                    <QueueJoin />
+                                    <NavigateToB />
+                                </>
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </React.StrictMode>,
+        );
+
+        // A's START resolves (reaching the form), the COMPLETE stays pending
+        await React.act(async () => {
+            resolveStartA({
+                ...DIRECTION_START_RESPONSE,
+                session_token: 'session-A',
+                direction: { ...DIRECTION_START_RESPONSE.direction, title: 'Направление А', public_code: CODE_A },
+            });
+        });
+        await screen.findByText('Направление А');
+        // fill A's form and submit — complete(A) stays pending
+        fireEvent.click(screen.getByRole('button', { name: /продолжить/i }));
+        fireEvent.change(await screen.findByLabelText(/фио пациента/i), { target: { value: 'Пациент А' } });
+        fireEvent.change(screen.getByLabelText(/номер телефона/i), { target: { value: '+998 (90) 123-45-67' } });
+        await React.act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /присоединиться/i }));
+        });
+        // navigate to B while A's complete is still in flight; B boots
+        fireEvent.click(screen.getByTestId('nav-to-b'));
+        await screen.findByText('Направление Б');
+        // the LATE A complete resolves — its ticket must NOT render under /q/B
+        await React.act(async () => {
+            resolveCompleteA(COMPLETE_MULTI_RESPONSE);
+        });
+        await React.act(async () => {});
+        expect(screen.getByText('Направление Б')).toBeTruthy();
+        expect(screen.queryByText(/ваш номер/i)).toBeNull();
+        expect(screen.queryByText('№3')).toBeNull();
+    });
+
+    it('PIN 25 (red on 569d15f5): «перед вами» uses the backend queue_length — 100/0 shows 0, never 99', async () => {
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        queueApiMocks.completeQueueJoinSession.mockResolvedValue({
+            ...COMPLETE_MULTI_RESPONSE,
+            entries: [
+                {
+                    specialist_id: 7,
+                    queue_entry_id: 101,
+                    queue_number: 100,
+                    duplicate: false,
+                    queue_length: 0,
+                    estimated_wait_time: 0,
+                    specialist_name: 'Все специалисты',
+                    department: 'qdir:lab-key',
+                },
+            ],
+        });
+        renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        await fillAndSubmit();
+        await waitFor(() => {
+            expect(screen.getByText(/ваш номер/i)).toBeTruthy();
+        });
+        expect(screen.getByText('№100')).toBeTruthy();
+        // the LIVE waiting count (0), not ticket-number − 1 (99)
+        expect(screen.getByText('0 к.')).toBeTruthy();
+        expect(screen.queryByText('99 к.')).toBeNull();
     });
 
     it('PIN 17 (red on merged main): /q/A → /q/B inside one mount starts B and drops A entirely', async () => {

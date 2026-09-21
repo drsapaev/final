@@ -7144,6 +7144,10 @@ const uzCyrl = {
     qj_retry_btn: 'Попробовать снова',
     qj_home_btn: 'Главная страница',
     qj_direction_unavailable: 'Йўналиш мавжуд эмас',
+    // RQ-18 follow-up round-2 (P1)
+    qj_draft_found: 'Бу қурилмада тўлдирилмаган аризa сақланган. Тиклаш керакми?',
+    qj_draft_restore: 'Тиклаш',
+    qj_draft_discard: 'Ўчириб, қайтадан тўлдириш',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',
     qj_waiting_until_open: 'до открытия записи',

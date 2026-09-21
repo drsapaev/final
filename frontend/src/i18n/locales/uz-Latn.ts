@@ -7134,6 +7134,10 @@ const uzLatn = {
     qj_retry_btn: 'Qayta urinib ko‘ring',
     qj_home_btn: 'Bosh sahifa',
     qj_direction_unavailable: 'Yo‘nalish mavjud emas',
+    // RQ-18 follow-up round-2 (P1)
+    qj_draft_found: 'Bu qurilmada to‘ldirilmagan ariza saqlangan. Tiklash kerakmi?',
+    qj_draft_restore: 'Tiklash',
+    qj_draft_discard: 'O‘chirib, qaytadan to‘ldirish',
     qj_waiting_title: 'Navbat tez orada ochiladi',
     qj_waiting_will_open_at: 'Navbatga yozilish {time} da ochiladi',
     qj_waiting_until_open: 'yozilish ochilishigacha',

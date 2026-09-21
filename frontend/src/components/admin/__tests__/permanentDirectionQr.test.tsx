@@ -170,16 +170,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 2: provision response renders the QR image and the /q/<code> URL', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
         renderScreen();
         const btn = await screen.findByTestId('setup-qr-provision-lab');
@@ -190,16 +181,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 3: re-provision (reload recovery) keeps the SAME code (created=false path)', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: true },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(true) });
         directionMocks.provisionPublicAddress.mockResolvedValue({
             ...PROVISION_RESPONSE,
             created: false,
@@ -214,16 +196,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 4: QR payload is the absolute canonical frontend origin + /q/<public_code>', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
         renderScreen();
         fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
@@ -244,16 +217,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 6: the permanent surface never shows expiry/TTL phrasing and always the non-token note', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
         const { container } = renderScreen();
         fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
@@ -266,16 +230,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 6b: created=false while supported=false → QR shown WITH an honest not-bookable note', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         directionMocks.provisionPublicAddress.mockResolvedValue({
             ...PROVISION_RESPONSE,
             created: false,
@@ -283,20 +238,17 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
         renderScreen();
         fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
         expect(await screen.findByTestId('setup-qr-image-lab')).toBeTruthy();
-        expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
+        // the note shows only after the recheck PROVES false; the
+        // transient pending state is pinned separately in PIN 8 (a
+        // controlled pending recheck promise)
+        await waitFor(() => {
+            expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
+        });
+        expect(screen.queryByTestId('setup-qr-unknown-lab')).toBeNull();
     });
 
     it('PIN 6c: provision failure shows an explicit error — no silent fake success', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         directionMocks.provisionPublicAddress.mockRejectedValue(
             new Error('provision refused'),
         );
@@ -309,16 +261,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 7-loop: checklist load does NOT loop — GET count stays bounded (pre-existing main defect found by the QR state pin)', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         renderScreen();
         await screen.findByTestId('setup-qr-provision-lab');
         await new Promise((r) => setTimeout(r, 400));
@@ -329,7 +272,35 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
         expect(calls).toBeLessThanOrEqual(8);
     });
 
-    it('PIN 8 (red on merged main): after provision the entry-methods are re-read — the not-bookable note disappears when the direction became bookable', async () => {
+    it('PIN 8 (round-2 P2): while the post-provision recheck is pending the state is an honest UNKNOWN — no stale not-bookable note; a proven true drops the note', async () => {
+        setupApiMock({ data: methodsPayload(false) });
+        let resolveRecheck: (value: unknown) => void = () => {};
+        const pendingRecheck = new Promise((resolve) => {
+            resolveRecheck = resolve;
+        });
+        directionMocks.fetchDirectionEntryMethods.mockReturnValue(pendingRecheck as never);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        // the recheck is still in flight: NO stale «недоступна» note, honest unknown
+        expect(screen.queryByTestId('setup-qr-not-bookable-note-lab')).toBeNull();
+        expect(screen.getByTestId('setup-qr-unknown-lab')).toBeTruthy();
+        // the parent row was told the same thing atomically (unknown, not false)
+        expect(
+          screen.getByTestId('setup-row-permanent-address').querySelector('.admin-sdx-status-unknown'),
+        ).toBeTruthy();
+        // the recheck answers: the direction became bookable
+        await React.act(async () => {
+            resolveRecheck(methodsPayload(true));
+        });
+        await waitFor(() => {
+            expect(screen.queryByTestId('setup-qr-unknown-lab')).toBeNull();
+        });
+        expect(screen.queryByTestId('setup-qr-not-bookable-note-lab')).toBeNull();
+    });
+
+    it('PIN 8b: after provision the entry-methods are re-read — the not-bookable note disappears when the direction became bookable', async () => {
         setupApiMock({ data: methodsPayload(false) });
         mockRecheck(true);
         directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
@@ -353,10 +324,12 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
         renderScreen();
         fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
         await screen.findByTestId('setup-qr-image-lab');
-        expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
+        await waitFor(() => {
+            expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
+        });
     });
 
-    it('PIN 10 (red on merged main): a failed recheck renders the honest UNKNOWN state — never a confident «недоступно» note', async () => {
+    it('PIN 10 (round-2 P2): a failed recheck renders the honest UNKNOWN state — in the QR block AND in the parent checklist row', async () => {
         setupApiMock({ data: methodsPayload(false) });
         mockRecheck('fail');
         directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
@@ -368,6 +341,13 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
             expect(screen.getByTestId('setup-qr-unknown-lab')).toBeTruthy();
         });
         expect(screen.queryByTestId('setup-qr-not-bookable-note-lab')).toBeNull();
+        // the PARENT row is unknown too — never the confident red «не готово»
+        expect(
+          screen.getByTestId('setup-row-permanent-address').querySelector('.admin-sdx-status-unknown'),
+        ).toBeTruthy();
+        expect(
+          screen.getByTestId('setup-row-permanent-address').querySelector('.admin-sdx-status-err'),
+        ).toBeNull();
     });
 
     it('PIN 11 (red on merged main): one QR block PER PROFILE KEY — a two-tag profile renders the block once, siblings get a pointer', async () => {

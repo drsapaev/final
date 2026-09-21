@@ -7262,6 +7262,11 @@ const ru = {
     qj_retry_btn: 'Попробовать снова',
     qj_home_btn: 'Главная страница',
     qj_direction_unavailable: 'Направление недоступно',
+    // RQ-18 follow-up round-2 (P1): draft-owner confirmation — the prompt
+    // reveals no PHI (no name/phone) on the shared permanent route.
+    qj_draft_found: 'На этом устройстве есть незавершённый черновик заявки. Восстановить его?',
+    qj_draft_restore: 'Восстановить',
+    qj_draft_discard: 'Стереть и заполнить заново',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',
     qj_waiting_until_open: 'до открытия записи',

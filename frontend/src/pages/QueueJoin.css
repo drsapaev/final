@@ -741,3 +741,47 @@
   margin-top: var(--mac-spacing-2, 8px);
   text-align: left;
 }
+
+/* RQ-18 follow-up round-2 (P1): explicit draft-owner confirmation on the
+   shared permanent route — the prompt reveals no PHI (no name/phone in
+   the text), tokens only (UI ratchet). */
+.qj-draft-confirm {
+  background: color-mix(in srgb, var(--mac-bg-secondary, white) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mac-text-tertiary, darkgray) 38%, transparent);
+  border-radius: var(--mac-radius-lg, 12px);
+  padding: var(--mac-spacing-3, 12px) var(--mac-spacing-4, 16px);
+  margin-bottom: var(--mac-spacing-4, 16px);
+  text-align: left;
+}
+
+.qj-draft-confirm-text {
+  margin: 0 0 var(--mac-spacing-3, 12px);
+  font-size: var(--mac-font-size-sm, 13px);
+  color: var(--mac-text-primary, black);
+  line-height: 1.45;
+}
+
+.qj-draft-confirm-actions {
+  display: flex;
+  gap: var(--mac-spacing-3, 12px);
+}
+
+.qj-draft-btn {
+  flex: 1;
+  padding: 10px 14px;
+  border: none;
+  border-radius: var(--mac-radius-md, 10px);
+  font-size: var(--mac-font-size-sm, 13px);
+  font-weight: var(--mac-font-weight-semibold, 600);
+  cursor: pointer;
+}
+
+.qj-draft-btn-primary {
+  background: var(--mac-accent-blue, #3478f6);
+  color: var(--mac-text-on-accent, white);
+}
+
+.qj-draft-btn-secondary {
+  background: color-mix(in srgb, var(--mac-text-tertiary, darkgray) 16%, transparent);
+  color: var(--mac-text-primary, black);
+}
