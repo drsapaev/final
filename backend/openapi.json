@@ -224,7 +224,7 @@
             }
           },
           "400": {
-            "description": "Request-shaped validation failure (see detail.reason)",
+            "description": "Request-shaped validation failure (see detail.reason); on keyed endpoints also an invalid Idempotency-Key header (code=idempotency_key_invalid)",
             "content": {
               "application/json": {
                 "schema": {
@@ -302,10 +302,11 @@
             "schema": {
               "type": "string",
               "minLength": 1,
-              "description": "Required. Retries of the SAME booking attempt must reuse the same key — the middleware replays the committed response instead of creating a second appointment.",
+              "maxLength": 128,
+              "description": "Required. Retries of the SAME booking attempt must reuse the same key — the middleware replays the committed response instead of creating a second appointment. Bounded to 128 characters (longer keys are a 400 idempotency_key_invalid).",
               "title": "Idempotency-Key"
             },
-            "description": "Required. Retries of the SAME booking attempt must reuse the same key — the middleware replays the committed response instead of creating a second appointment."
+            "description": "Required. Retries of the SAME booking attempt must reuse the same key — the middleware replays the committed response instead of creating a second appointment. Bounded to 128 characters (longer keys are a 400 idempotency_key_invalid)."
           }
         ],
         "requestBody": {
@@ -330,7 +331,7 @@
             }
           },
           "400": {
-            "description": "Request-shaped validation failure (see detail.reason)",
+            "description": "Request-shaped validation failure (see detail.reason); on keyed endpoints also an invalid Idempotency-Key header (code=idempotency_key_invalid)",
             "content": {
               "application/json": {
                 "schema": {
@@ -370,7 +371,17 @@
             }
           },
           "409": {
-            "description": "Doctor time slot already occupied (or idempotency payload mismatch)",
+            "description": "Doctor time slot already occupied; or an idempotency conflict surfaced by the middleware — retry/reconcile decision reads the top-level code: idempotency_payload_mismatch / idempotency_in_flight / idempotency_uncertain_outcome / idempotency_scope_mismatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientPortalErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery",
             "content": {
               "application/json": {
                 "schema": {
@@ -412,7 +423,7 @@
             }
           },
           "400": {
-            "description": "Request-shaped validation failure (see detail.reason)",
+            "description": "Request-shaped validation failure (see detail.reason); on keyed endpoints also an invalid Idempotency-Key header (code=idempotency_key_invalid)",
             "content": {
               "application/json": {
                 "schema": {
@@ -94740,6 +94751,17 @@
               }
             ],
             "title": "Detail"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
           }
         },
         "type": "object",
@@ -112253,6 +112275,39 @@
               }
             ],
             "title": "Department"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "department_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Key"
+          },
+          "department_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Name"
           },
           "visit_date": {
             "anyOf": [

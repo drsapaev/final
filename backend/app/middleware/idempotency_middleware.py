@@ -83,6 +83,19 @@ _SCOPE_BINDING_UNAVAILABLE = "unavailable"
 # Max entries to prevent unbounded memory growth
 _MAX_CACHE_ENTRIES = 10_000
 
+# Round-6 (owner P1, PR #3340): the Idempotency-Key header is caller-owned
+# and unbounded otherwise — a flood of unique 10k-char keys allocated memory
+# in the middleware, Redis and the scope-binding mirror for every request
+# BEFORE any endpoint validation could refuse it. 128 chars covers every
+# real generator (uuid4 hex = 32, ULID = 26) while bounding key material.
+_IDEMPOTENCY_KEY_MAX_LENGTH = 128
+
+# Round-6 (owner P1, PR #3340): the in-process scope-binding mirror is
+# attacker-reachable (every keyed request with a fresh key creates an entry
+# BEFORE endpoint validation), so it is a bounded LRU — the response cache
+# bound above, same budget.
+_MAX_SCOPE_BINDING_ENTRIES = 10_000
+
 # Codex R2 #3092 (P2): the in-flight claim is a SHORT renewable lease, not
 # the response TTL. If a worker dies mid-request, same-key retries receive
 # 409 only until the lease lapses (seconds), after which the operation may
@@ -633,6 +646,10 @@ _local_scope_bindings: OrderedDict[tuple[str, str], tuple[float, str]] = Ordered
 
 
 def _sweep_local_scope_bindings(now: float | None = None) -> None:
+    """Full TTL sweep — O(N). Round-6 (owner P1): invoked only under memory
+    pressure (the store exceeded its bound), never on the per-request fast
+    path, so the previous every-op full scan (O(N) per request → O(N²) for a
+    flood of unique keys) is gone."""
     now = time.time() if now is None else now
     stale = [k for k, entry in _local_scope_bindings.items() if entry[0] <= now]
     for k in stale:
@@ -640,17 +657,57 @@ def _sweep_local_scope_bindings(now: float | None = None) -> None:
 
 
 def _local_scope_binding_get(origin_ns: str, key: str) -> str | None:
-    _sweep_local_scope_bindings()
-    entry = _local_scope_bindings.get((str(origin_ns), key))
-    return entry[1] if entry is not None else None
+    """O(1): only THIS entry's TTL is examined (plus LRU re-ordering)."""
+    cache_key = (str(origin_ns), key)
+    entry = _local_scope_bindings.get(cache_key)
+    if entry is None:
+        return None
+    if entry[0] <= time.time():
+        _local_scope_bindings.pop(cache_key, None)
+        return None
+    _local_scope_bindings.move_to_end(cache_key)
+    return entry[1]
 
 
 def _local_scope_binding_set(origin_ns: str, key: str, patient_scope: str) -> None:
-    _sweep_local_scope_bindings()
-    _local_scope_bindings[(str(origin_ns), key)] = (
+    """Round-6 (owner P1): bounded LRU/TTL store.
+
+    The per-op cost is O(1); the O(N) TTL sweep runs only when the store
+    grew past its hard bound, and an LRU popitem caps it even when every
+    entry is still live (a flood of unique keys evicts its OWN oldest
+    entries instead of growing the process without limit)."""
+    cache_key = (str(origin_ns), key)
+    _local_scope_bindings[cache_key] = (
         time.time() + _CACHE_TTL_SECONDS,
         patient_scope,
     )
+    _local_scope_bindings.move_to_end(cache_key)
+    if len(_local_scope_bindings) > _MAX_SCOPE_BINDING_ENTRIES:
+        _sweep_local_scope_bindings()
+    while len(_local_scope_bindings) > _MAX_SCOPE_BINDING_ENTRIES:
+        _local_scope_bindings.popitem(last=False)
+
+
+def _local_scope_binding_extend(
+    origin_ns: str, key: str, patient_scope: str
+) -> None:
+    """Round-6 (owner P2): keep the LOCAL binding alive as long as the local
+    response snapshot it guards.
+
+    The binding is written BEFORE the handler while the response snapshot is
+    cached AFTER it; in a local-only deployment (no distributed claim to
+    refresh) both entries otherwise start their 24h clocks at different
+    instants and the binding expires FIRST — a retry inside that window
+    would re-bind the key to a re-linked card and execute a second write.
+    Value-guarded like the Redis twin: a foreign binding is never touched."""
+    cache_key = (str(origin_ns), key)
+    entry = _local_scope_bindings.get(cache_key)
+    if entry is not None and entry[1] == patient_scope:
+        _local_scope_bindings[cache_key] = (
+            time.time() + _CACHE_TTL_SECONDS,
+            patient_scope,
+        )
+        _local_scope_bindings.move_to_end(cache_key)
 
 
 def get_idempotency_cache() -> IdempotencyResponseCache:
@@ -1289,6 +1346,28 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             # No key — pass through (idempotency is opt-in)
             return await call_next(request)
 
+        # Round-6 (owner P1, PR #3340): bound the caller-owned key BEFORE any
+        # allocation (body read, principal resolution, Redis keys, mirror
+        # entries). An oversized key is a non-executing 400: executing a
+        # keyed write WITHOUT protection would defeat the middleware's whole
+        # purpose, and silently truncating/normalizing would alias distinct
+        # keys onto one identity.
+        if len(idempotency_key) > _IDEMPOTENCY_KEY_MAX_LENGTH:
+            logger.warning(
+                "Idempotency key rejected (length %s > %s): path=%s",
+                len(idempotency_key), _IDEMPOTENCY_KEY_MAX_LENGTH, request.url.path,
+            )
+            return Response(
+                status_code=400,
+                headers={"Cache-Control": "no-store"},
+                content=(
+                    '{"code": "idempotency_key_invalid", "detail": "The '
+                    'Idempotency-Key header must be 1..128 characters. Send a '
+                    'shorter key."}'
+                ),
+                media_type="application/json",
+            )
+
         # Codex R2 #3092 (P1): bind the key to the request payload. Reading
         # the body here is safe with BaseHTTPMiddleware — the buffered body
         # is replayed to the downstream app.
@@ -1393,6 +1472,29 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # попытки мог удалить маркер другой tokenless-попытки. UUID делает
         # compare-and-delete точным для tokenless-пути.
         tokenless_marker: str | None = None
+
+        # Round-6 (owner P1, PR #3340): LEGACY MIGRATION FENCE state. When
+        # this worker owns the legacy in-flight claim (acquired BEFORE any
+        # legacy read — see the reconciliation block below), the fence rides
+        # along with the new-namespace claim until the operation completes:
+        # an old-version worker can then never start or continue an
+        # execution of this key in parallel. ``legacy_fence_keep_on_exit``
+        # marks the one refusal path where the fence must OUTLIVE the
+        # request (a new worker is executing; the held fence is what keeps
+        # old workers off the key until the dual-written outcome lands).
+        legacy_fence_ns: str | None = None
+        legacy_fence_token: str | None = None
+        legacy_fence_keep_on_exit = False
+
+        def _release_legacy_fence() -> None:
+            """Release the legacy fence we own (compare-and-delete).
+
+            Non-mutating when this request never held the fence or already
+            released it. Never touches a fence held by another worker."""
+            nonlocal legacy_fence_token
+            if legacy_fence_ns is not None and legacy_fence_token is not None:
+                claim.release(legacy_fence_ns, idempotency_key, legacy_fence_token)
+                legacy_fence_token = None
 
         # Codex R7 #3092 (P1): fail closed when coordination is REQUIRED
         # (explicit IDEMPOTENCY_REDIS_URL) but unavailable. Degrading to the
@@ -1648,27 +1750,38 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 _idempotency_cache.invalidate(user_id, idempotency_key)
                 replayed = None
 
-            # Round-4 (owner P1): rollout compatibility for the namespace
-            # change. Pre-#3340 the namespace was the user-only hash; outcome
-            # snapshots and execution-intent markers written by the PREVIOUS
-            # deployment stay there for up to 24h and are INVISIBLE under the
-            # new operation-scoped namespace — a same-key retry after deploy
-            # would re-execute a write whose outcome is already committed or
-            # unknown (the duplicate the whole machinery exists to prevent).
-            # Reconcile against the LEGACY namespace before claiming:
+            # Round-6 (owner P1): the reconciliation against the PRE-#3340
+            # user-only namespace is a real MIGRATION FENCE, not a read.
+            # Round-4/5 probed legacy artifacts read-only and THEN claimed
+            # only the new operation-scoped namespace, which left two rolling
+            # -deploy interleavings open:
+            #   1. probe reports "empty" → the request reaches an OLD worker,
+            #      which acquires the legacy claim and starts executing →
+            #      this worker acquires the NEW claim and both versions run
+            #      one logical write in parallel;
+            #   2. the old worker COMPLETES between the three separate probe
+            #      GETs — the first GET saw no response, by the claim/intent
+            #      reads the response was stored and the markers dropped →
+            #      three misses, the write re-executed.
+            # The fence closes both:
+            #   - THIS worker first SET-NX-acquires the LEGACY claim — the
+            #     very marker old workers must hold to execute, so once the
+            #     fence is owned, no old worker can start or continue this
+            #     key (a live old-worker claim makes our acquire fail and is
+            #     answered 409 in-flight after ONE re-read);
+            #   - legacy artifacts are re-read only UNDER the fence, so the
+            #     picture can no longer change behind the reads;
             #   - a stored legacy RESPONSE replays under the same replay
             #     contract (payload hash, principal authorization, endpoint
-            #     role policy) and MIGRATES to the current namespace, so the
-            #     legacy read happens at most once per key;
-            #   - a legacy in-flight CLAIM (rolling deploy: the old worker is
-            #     mid-execution) is refused as in-flight — Round-5 (owner P1):
-            #     the executing old worker holds BOTH markers (the short
-            #     claim AND the long-lived intent), so the claim must be
-            #     consulted FIRST; its outcome lands under the legacy
-            #     namespace when the old worker completes;
-            #   - a legacy INTENT WITHOUT a claim is refused conservatively
-            #     (409 idempotency_uncertain_outcome) — the pre-deploy
-            #     attempt reached execution and its result is unknown.
+            #     role policy) and MIGRATES to the current namespace;
+            #   - a legacy INTENT without a response is refused
+            #     conservatively (409 idempotency_uncertain_outcome);
+            #   - with the fence held and the legacy namespace empty, the
+            #     fence is held TOGETHER with the new claim until completion
+            #     (a dedicated lease-renewal loop keeps it alive for long
+            #     handlers) and the outcome is DUAL-WRITTEN to BOTH
+            #     namespaces, so old-version workers reconcile against the
+            #     snapshot once the fence lease lapses.
             # Scoped to principals WITHOUT a patient scope: pre-#3340
             # endpoints carry no patient scoping, so a legacy snapshot cannot
             # be attributed to the CURRENT card — replaying it across a card
@@ -1677,104 +1790,271 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             # endpoint is NEW in #3340 (no legacy keys exist for
             # patient-scope principals); staff endpoints — the legacy keyed
             # traffic — reconcile fully.
-            if not patient_scope and claim.try_available():
-                legacy_ns = self._namespace(canonical_id)
-                (
-                    (legacy_resp, legacy_hash, legacy_role),
-                    legacy_intent,
-                    legacy_claim,
-                ) = claim.probe_legacy_artifacts(legacy_ns, idempotency_key)
-                if legacy_resp is not None:
-                    if legacy_hash and legacy_hash != incoming_hash:
-                        logger.warning(
-                            "Idempotency payload mismatch (legacy namespace): "
-                            "user=%s key=%s path=%s",
-                            canonical_id,
-                            idempotency_key,
-                            request.url.path,
-                        )
-                        return self._payload_mismatch_response()
-                    authorized, current_role, current_superuser = (
-                        await self._principal_authorized(
-                            request, principal_payload, require_active_doctor_profile=True
-                        )
+
+            async def _legacy_replay_decision(
+                legacy_resp: Response | None,
+                legacy_hash: str | None,
+                legacy_role: str | None,
+            ) -> str:
+                """Shared replay contract for a legacy snapshot (both the
+                fenced and the contended path): payload binding → principal
+                authorization → endpoint role policy. Returns one of
+                "mismatch" / "unauthorized" / "replay" / "endpoint_policy" /
+                "role_changed" — the caller owns every side effect."""
+                if legacy_hash and legacy_hash != incoming_hash:
+                    logger.warning(
+                        "Idempotency payload mismatch (legacy namespace): "
+                        "user=%s key=%s path=%s",
+                        canonical_id,
+                        idempotency_key,
+                        request.url.path,
                     )
-                    if not authorized:
-                        logger.warning(
-                            "Idempotency legacy replay refused (principal not authorized): "
-                            "user=%s key=%s path=%s",
-                            canonical_id,
-                            idempotency_key,
-                            request.url.path,
-                        )
-                        return _principal_refusal_response()
-                    permitted = self._role_permitted_for_replay(
-                        request,
+                    return "mismatch"
+                authorized, current_role, current_superuser = (
+                    await self._principal_authorized(
+                        request, principal_payload, require_active_doctor_profile=True
+                    )
+                )
+                if not authorized:
+                    logger.warning(
+                        "Idempotency legacy replay refused (principal not authorized): "
+                        "user=%s key=%s path=%s",
+                        canonical_id,
+                        idempotency_key,
+                        request.url.path,
+                    )
+                    return "unauthorized"
+                permitted = self._role_permitted_for_replay(
+                    request,
+                    legacy_role,
+                    current_role,
+                    current_superuser,
+                )
+                if permitted is True or (
+                    permitted is None
+                    and (legacy_role is None or current_role == legacy_role)
+                ):
+                    return "replay"
+                if permitted is False:
+                    # Endpoint policy refuses the current role — the
+                    # endpoint's require_roles 403s exactly as for a
+                    # fresh request; the legacy snapshot is KEPT.
+                    logger.warning(
+                        "Idempotency legacy replay refused (endpoint policy): "
+                        "user=%s key=%s path=%s (stored=%s current=%s) — falling through",
+                        canonical_id,
+                        idempotency_key,
+                        request.url.path,
                         legacy_role,
                         current_role,
-                        current_superuser,
                     )
-                    if permitted is True or (
-                        permitted is None
-                        and (legacy_role is None or current_role == legacy_role)
-                    ):
-                        # Migrate the committed outcome to the current
-                        # namespace (bounded TTL extension) so subsequent
-                        # replays resolve without the legacy read.
-                        claim.store_response(
-                            user_id,
-                            idempotency_key,
-                            legacy_resp,
-                            payload_hash=legacy_hash or "",
-                            principal_role=legacy_role,
+                    return "endpoint_policy"
+                # permitted is None AND role changed: conservative R4 analog.
+                return "role_changed"
+
+            if not patient_scope and claim.try_available():
+                legacy_ns = self._namespace(canonical_id)
+                legacy_token = claim.acquire(legacy_ns, idempotency_key)
+                if legacy_token is not None:
+                    # Own the fence state IMMEDIATELY: every branch below
+                    # (replay, refusal, fall-through, execution) releases it
+                    # through the shared compare-and-delete closure.
+                    legacy_fence_ns = legacy_ns
+                    legacy_fence_token = legacy_token
+                    # FENCE HELD: no old worker can claim or execute this key
+                    # while we own it. Re-read the artifacts NOW — an old
+                    # worker that completed between the fence and this read
+                    # is seen; nothing can start behind it any more.
+                    (
+                        (legacy_resp, legacy_hash, legacy_role),
+                        legacy_intent,
+                        _own_fence_marker,
+                    ) = claim.probe_legacy_artifacts(legacy_ns, idempotency_key)
+                    # An EMPTY legacy namespace UNDER OUR FENCE is exactly the
+                    # interleaving round-4/5 could not close: an old worker
+                    # could claim and execute between the old read-only probe
+                    # and the new-namespace acquire. With the fence held that
+                    # is impossible — the request simply proceeds to the new
+                    # claim keeping the fence. A stored RESPONSE replays
+                    # below; an intent without a response refuses
+                    # conservatively.
+                    if legacy_resp is not None:
+                        decision = await _legacy_replay_decision(
+                            legacy_resp, legacy_hash, legacy_role
                         )
-                        _idempotency_cache.set(
-                            user_id,
-                            idempotency_key,
-                            legacy_resp,
-                            incoming_hash,
-                            principal_role=legacy_role,
-                        )
-                        logger.info(
-                            "Idempotency legacy replay migrated to current namespace: "
-                            "user=%s key=%s path=%s",
-                            canonical_id,
-                            idempotency_key,
-                            request.url.path,
-                        )
-                        return legacy_resp
-                    if permitted is False:
-                        # Endpoint policy refuses the current role — the
-                        # endpoint's require_roles 403s exactly as for a
-                        # fresh request; the legacy snapshot is KEPT.
+                        if decision == "mismatch":
+                            _release_legacy_fence()
+                            return self._payload_mismatch_response()
+                        if decision == "unauthorized":
+                            # Non-executing refusal — the fence must not
+                            # outlive the request that holds it.
+                            _release_legacy_fence()
+                            return _principal_refusal_response()
+                        if decision == "replay":
+                            # Migrate the committed outcome to the current
+                            # namespace (bounded TTL extension) so subsequent
+                            # replays resolve without the legacy read.
+                            claim.store_response(
+                                user_id,
+                                idempotency_key,
+                                legacy_resp,
+                                payload_hash=legacy_hash or "",
+                                principal_role=legacy_role,
+                            )
+                            _idempotency_cache.set(
+                                user_id,
+                                idempotency_key,
+                                legacy_resp,
+                                incoming_hash,
+                                principal_role=legacy_role,
+                            )
+                            logger.info(
+                                "Idempotency legacy replay migrated to current namespace: "
+                                "user=%s key=%s path=%s",
+                                canonical_id,
+                                idempotency_key,
+                                request.url.path,
+                            )
+                            _release_legacy_fence()
+                            return legacy_resp
+                        if decision == "endpoint_policy":
+                            _release_legacy_fence()
+                            return await call_next(request)
+                        # decision == "role_changed": drop the stale legacy
+                        # snapshot and re-execute UNDER THE FENCE — old
+                        # workers stay blocked; the completion paths
+                        # dual-write the fresh outcome to both namespaces and
+                        # release the fence.
+                        claim.forget_response(legacy_ns, idempotency_key)
+                    elif legacy_intent:
+                        # The pre-deploy attempt reached execution and died
+                        # before its outcome landed (the intent survives its
+                        # claim). We now HOLD the fence — release it and let
+                        # the durable intent marker speak for itself (old
+                        # workers refuse on it too).
+                        _release_legacy_fence()
+                        return self._uncertain_outcome_response()
+                else:
+                    # The fence is HELD ELSEWHERE — an old-version worker owns
+                    # the legacy claim and is executing this key right now
+                    # (or died within its lease window). Distinguish a live
+                    # old worker from a transport failure.
+                    if claim.required and not claim.try_available():
                         logger.warning(
-                            "Idempotency legacy replay refused (endpoint policy): "
-                            "user=%s key=%s path=%s (stored=%s current=%s) — falling through",
+                            "Idempotency coordination unavailable while fencing legacy "
+                            "claim (required Redis degraded): user=%s key=%s path=%s — "
+                            "refusing keyed write",
+                            canonical_id, idempotency_key, request.url.path,
+                        )
+                        return Response(
+                            status_code=503,
+                            headers={"Retry-After": "2", "Cache-Control": "no-store"},
+                            content=(
+                                '{"code": "idempotency_unavailable", "detail": "Идемпотентность '
+                                'временно недоступна: распределённая координация не отвечает. '
+                                'Повторите запрос с тем же Idempotency-Key."}'
+                            ),
+                            media_type="application/json",
+                        )
+                    # One re-read under contention: the old worker may have
+                    # completed between our failed fence and this read.
+                    (
+                        (legacy_resp, legacy_hash, legacy_role),
+                        _contended_intent,
+                        _contended_claim,
+                    ) = claim.probe_legacy_artifacts(legacy_ns, idempotency_key)
+                    if legacy_resp is not None:
+                        decision = await _legacy_replay_decision(
+                            legacy_resp, legacy_hash, legacy_role
+                        )
+                        if decision == "mismatch":
+                            return self._payload_mismatch_response()
+                        if decision == "unauthorized":
+                            return _principal_refusal_response()
+                        if decision == "replay":
+                            claim.store_response(
+                                user_id,
+                                idempotency_key,
+                                legacy_resp,
+                                payload_hash=legacy_hash or "",
+                                principal_role=legacy_role,
+                            )
+                            _idempotency_cache.set(
+                                user_id,
+                                idempotency_key,
+                                legacy_resp,
+                                incoming_hash,
+                                principal_role=legacy_role,
+                            )
+                            logger.info(
+                                "Idempotency legacy replay migrated to current namespace: "
+                                "user=%s key=%s path=%s",
+                                canonical_id,
+                                idempotency_key,
+                                request.url.path,
+                            )
+                            return legacy_resp
+                        if decision == "endpoint_policy":
+                            return await call_next(request)
+                        # decision == "role_changed" WITHOUT the fence: the
+                        # legacy claim is held by an old worker — re-executing
+                        # here would run BOTH versions in parallel (the exact
+                        # race the fence exists for). Refuse in-flight: the
+                        # same-key retry after the old worker finishes either
+                        # fences the legacy claim or replays the migrated
+                        # outcome. The stale snapshot is KEPT.
+                        logger.warning(
+                            "Idempotency legacy snapshot role binding stale while an old "
+                            "worker may still be executing: user=%s key=%s path=%s — "
+                            "refusing in-flight",
+                            canonical_id, idempotency_key, request.url.path,
+                        )
+                        return Response(
+                            status_code=409,
+                            headers={"Retry-After": "1", "Cache-Control": "no-store"},
+                            content=(
+                                '{"code": "idempotency_in_flight", "detail": "Request with this Idempotency-Key is '
+                                'still being processed. Retry with the same key."}'
+                            ),
+                            media_type="application/json",
+                        )
+                    if _contended_claim:
+                        # Round-5 contract (still pinned): a LIVE legacy claim
+                        # means an old worker is mid-execution RIGHT NOW — it
+                        # holds BOTH markers (the short claim AND the long
+                        # intent), so the answer is in-flight ("retry the
+                        # same key"), never uncertain-outcome (whose body
+                        # advises a NEW key and would stack a second commit
+                        # on top of the running one).
+                        logger.warning(
+                            "Idempotency legacy claim still in flight (pre-deploy worker): "
+                            "user=%s key=%s path=%s — refusing",
                             canonical_id,
                             idempotency_key,
                             request.url.path,
-                            legacy_role,
-                            current_role,
                         )
-                        return await call_next(request)
-                    # permitted is None AND role changed: conservative R4
-                    # analog — drop the stale legacy binding so the
-                    # re-execution re-stores under the fresh role.
-                    claim.forget_response(legacy_ns, idempotency_key)
-                elif legacy_claim:
-                    # Round-5 (owner P1): the claim is checked BEFORE the
-                    # intent. While an old worker is executing, it holds
-                    # BOTH markers — the short in-flight claim AND the
-                    # long-lived execution intent (written before the
-                    # handler started). Matching the intent first answered
-                    # every in-flight retry with 409 uncertain_outcome,
-                    # whose body advises a NEW key — but the old worker was
-                    # STILL RUNNING: the client would retry under a fresh
-                    # key and the old worker's commit would land on top →
-                    # two visits/bills/queue entries for one attempt. The
-                    # claim is the precise "still executing" signal; the
-                    # uncertain-outcome reconcile is for an intent that
-                    # SURVIVES its claim (the worker died mid-execution).
+                        return Response(
+                            status_code=409,
+                            headers={"Retry-After": "1", "Cache-Control": "no-store"},
+                            content=(
+                                '{"code": "idempotency_in_flight", "detail": "Request with this Idempotency-Key is '
+                                'still being processed. Retry with the same key."}'
+                            ),
+                            media_type="application/json",
+                        )
+                    if _contended_intent:
+                        # The claim is GONE but the intent survived: the
+                        # pre-deploy attempt reached execution and died
+                        # between our failed fence and this read — the
+                        # outcome is unknown (R9 reconcile).
+                        logger.warning(
+                            "Idempotency legacy execution intent without outcome "
+                            "(pre-deploy attempt): user=%s key=%s path=%s — refusing",
+                            canonical_id,
+                            idempotency_key,
+                            request.url.path,
+                        )
+                        return self._uncertain_outcome_response()
                     logger.warning(
                         "Idempotency legacy claim still in flight (pre-deploy worker): "
                         "user=%s key=%s path=%s — refusing",
@@ -1791,15 +2071,6 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         ),
                         media_type="application/json",
                     )
-                elif legacy_intent:
-                    logger.warning(
-                        "Idempotency legacy execution intent without outcome "
-                        "(pre-deploy attempt): user=%s key=%s path=%s — refusing",
-                        canonical_id,
-                        idempotency_key,
-                        request.url.path,
-                    )
-                    return self._uncertain_outcome_response()
 
             claim_token = claim.acquire(user_id, idempotency_key)
             claim_acquired = claim_token is not None
@@ -1810,6 +2081,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 replayed, stored_hash, stored_role = claim.load_response(user_id, idempotency_key)
                 if replayed is not None:
                     if stored_hash and stored_hash != incoming_hash:
+                        _release_legacy_fence()
                         return self._payload_mismatch_response()
                     # Codex R4 #3092 (P1): the post-claim replay path runs the
                     # SAME authorization + role binding as the earlier branches —
@@ -1827,6 +2099,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                             "Idempotency post-inflight replay refused (principal not authorized): user=%s key=%s path=%s",
                             user_id, idempotency_key, request.url.path,
                         )
+                        _release_legacy_fence()
                         return _principal_refusal_response()
                     permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
                     if permitted is False or (
@@ -1836,16 +2109,28 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                             "Idempotency post-inflight replay refused (role not permitted): user=%s key=%s path=%s",
                             user_id, idempotency_key, request.url.path,
                         )
+                        _release_legacy_fence()
                         return await call_next(request)
                     logger.info(
                         "Idempotency distributed replay (post-inflight): user=%s key=%s",
                         user_id, idempotency_key,
                     )
+                    # Round-6: the outcome that JUST completed is dual-written
+                    # to the legacy namespace by its round-6 executor, so a
+                    # released fence can never expose an empty legacy picture
+                    # to an old worker.
+                    _release_legacy_fence()
                     return replayed
                 logger.warning(
                     "Idempotency conflict: key=%s user=%s is in flight on another worker",
                     idempotency_key, user_id,
                 )
+                # Round-6: the executing worker is a NEW worker (it holds the
+                # new-namespace claim). KEEP our legacy fence — it is the only
+                # thing keeping old-version workers off this key while that
+                # execution runs; once it completes, its dual-written legacy
+                # snapshot reconciles them after the fence lease lapses.
+                legacy_fence_keep_on_exit = True
                 return Response(
                     status_code=409,
                     headers={"Retry-After": "1", "Cache-Control": "no-store"},
@@ -1879,6 +2164,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             if replayed is not None:
                 if stored_hash and stored_hash != incoming_hash:
                     claim.release(user_id, idempotency_key, claim_token)
+                    _release_legacy_fence()
                     return self._payload_mismatch_response()
                 authorized, current_role, current_superuser = await self._principal_authorized(
                     request, principal_payload, require_active_doctor_profile=True
@@ -1890,6 +2176,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     )
                     # Codex R8 #3092 (P1): неисполняющий отказ, снапшот хранится.
                     claim.release(user_id, idempotency_key, claim_token)
+                    _release_legacy_fence()
                     return _principal_refusal_response()
                 permitted = self._role_permitted_for_replay(request, stored_role, current_role, current_superuser)
                 if permitted is True or (
@@ -1900,6 +2187,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         user_id, idempotency_key, request.url.path,
                     )
                     claim.release(user_id, idempotency_key, claim_token)
+                    _release_legacy_fence()
                     return replayed
                 if permitted is False:
                     # Политика эндпоинта отказывает текущей роли — require_roles
@@ -1910,6 +2198,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         user_id, idempotency_key, request.url.path, stored_role, current_role,
                     )
                     claim.release(user_id, idempotency_key, claim_token)
+                    _release_legacy_fence()
                     return await call_next(request)
                 # permitted is None (политика неизвестна) И метка роли
                 # сменилась: консервативный R4 — эвикт устаревшей привязки и
@@ -1932,14 +2221,25 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # the OWNER TOKEN (Codex R3), so once ownership is lost they are
         # harmless no-ops against the foreign claim.
         lease_task: asyncio.Task | None = None
+        legacy_lease_task: asyncio.Task | None = None
 
         def _cancel_lease() -> None:
             if lease_task is not None:
                 lease_task.cancel()
+            if legacy_lease_task is not None:
+                legacy_lease_task.cancel()
 
         if claim is not None and claim_acquired and claim_token is not None:
             lease_task = asyncio.create_task(
                 _renew_lease_loop(claim, user_id, idempotency_key, claim_token)
+            )
+        if legacy_fence_ns is not None and legacy_fence_token is not None:
+            # Round-6 (owner P1): the legacy fence needs the SAME lifetime as
+            # the operation. Without its own renewal loop a handler longer
+            # than the lease would let the fence lapse mid-execution and an
+            # old worker could claim the legacy key and execute in parallel.
+            legacy_lease_task = asyncio.create_task(
+                _renew_lease_loop(claim, legacy_fence_ns, idempotency_key, legacy_fence_token)
             )
 
         # Codex R17 #3267 (P2): the try/finally covers the WHOLE lifetime
@@ -1991,6 +2291,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 )
                 if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                     claim.release(user_id, idempotency_key, claim_token)
+                _release_legacy_fence()
                 _cancel_lease()
                 return _principal_refusal_response()
 
@@ -2015,6 +2316,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 )
                 if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                     claim.release(user_id, idempotency_key, claim_token)
+                _release_legacy_fence()
                 _cancel_lease()
                 return self._uncertain_outcome_response()
             # Codex R16 #3092 (P1): атомарная перепроверка владения ПЕРЕД
@@ -2032,6 +2334,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                 if not claim.renew(user_id, idempotency_key, claim_token):
                     _cancel_lease()
+                    # Round-6: every outcome below is NON-EXECUTING — the
+                    # legacy fence must not outlive this request.
+                    _release_legacy_fence()
                     if claim.try_available():
                         replayed, stored_hash, stored_role = claim.load_response(user_id, idempotency_key)
                         if replayed is not None:
@@ -2137,6 +2442,10 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # Keep the same key: another attempt may still be running
                     # or may already have committed. Never run this handler or
                     # invoke failed-write intent cleanup after an owner refusal.
+                    # Round-6: a still-owned legacy fence is released; if the
+                    # fence already lapsed (the new owner fenced it), this is
+                    # a compare-and-delete no-op.
+                    _release_legacy_fence()
                     return Response(
                         status_code=409,
                         headers={"Retry-After": "1", "Cache-Control": "no-store"},
@@ -2178,6 +2487,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # распределённого, ни локального маркера — значит
                     # локальная запись создана именно ЭТОЙ попыткой.
                     _clear_local_execution_intent(user_id, idempotency_key)
+                    _release_legacy_fence()
                     _cancel_lease()
                     return Response(
                         status_code=503,
@@ -2214,6 +2524,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     claim.clear_execution_intent_owned(
                         user_id, idempotency_key, tokenless_marker
                     )
+                    _release_legacy_fence()
                     _cancel_lease()
                     return Response(
                         status_code=409,
@@ -2235,6 +2546,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 )
                 if claim_acquired and claim_token is not None:
                     claim.release(user_id, idempotency_key, claim_token)
+                _release_legacy_fence()
                 _cancel_lease()
                 return Response(
                     status_code=503,
@@ -2275,6 +2587,22 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # unknown and the retry must reconcile (409), not re-execute.
                 if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                     claim.release(user_id, idempotency_key, claim_token)
+                # Round-6 (owner P1): the legacy fence stays HELD (its lease
+                # expires on its own) and the unknown-outcome intent is
+                # DUAL-WRITTEN into the legacy namespace so OLD-version
+                # workers reconcile (their own R9 contract) instead of
+                # re-executing a possibly-committed write once the fence
+                # lease lapses. Best-effort: a degraded transport simply
+                # leaves the fence to lapse.
+                if legacy_fence_ns is not None and legacy_fence_token is not None:
+                    try:
+                        claim.mark_execution_intent(
+                            legacy_fence_ns,
+                            idempotency_key,
+                            tokenless_marker=uuid.uuid4().hex,
+                        )
+                    except Exception:  # pragma: no cover - best-effort marker
+                        pass
                 raise
 
             # Cache only successful responses (2xx) — don't cache errors,
@@ -2299,6 +2627,16 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # execution — retain the committed outcome unconditionally (no
                 # post-commit DB re-query to lose), the replay re-checks it.
                 _idempotency_cache.set(user_id, idempotency_key, cached_response, incoming_hash, principal_role=exec_role)
+                if patient_scope and origin_ns:
+                    # Round-6 (owner P2): refresh the LOCAL scope-binding
+                    # mirror on the SAME instant the local response snapshot
+                    # is stored. In a local-only deployment (no distributed
+                    # claim) both entries otherwise start their 24h clocks at
+                    # different instants — the binding (written BEFORE the
+                    # handler) expires before the snapshot (stored AFTER it),
+                    # and a retry inside that window could re-bind the key to
+                    # a re-linked card and execute a second write.
+                    _local_scope_binding_extend(origin_ns, idempotency_key, patient_scope)
                 if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                     # Codex R1 #3092 (P1): snapshot for CROSS-WORKER replay, then
                     # drop the in-flight claim so later retries replay instead
@@ -2306,6 +2644,19 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # the payload hash — changed data is never replayed as the
                     # original success.
                     claim.store_response(user_id, idempotency_key, cached_response, payload_hash=incoming_hash, principal_role=exec_role)
+                    # Round-6 (owner P1): DUAL-WRITE the committed outcome to
+                    # the LEGACY namespace WHILE the fence is still held — an
+                    # old-version worker that acquires the legacy claim after
+                    # the fence lease lapses must find this snapshot and
+                    # replay it, never an empty namespace it would re-execute.
+                    if legacy_fence_ns is not None and legacy_fence_token is not None:
+                        claim.store_response(
+                            legacy_fence_ns,
+                            idempotency_key,
+                            cached_response,
+                            payload_hash=incoming_hash,
+                            principal_role=exec_role,
+                        )
                     claim.release(user_id, idempotency_key, claim_token)
                     if patient_scope and origin_ns:
                         # Round-5 (owner P1): the snapshot now outlives the
@@ -2317,6 +2668,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         claim.extend_scope_binding(
                             origin_ns, idempotency_key, patient_scope
                         )
+                _release_legacy_fence()
                 # Codex R9 #3092 (P1): outcome is now durable — drop the intent
                 # marker so later same-key requests replay normally.
                 # PR 3319: удаление привязано к маркеру ЭТОЙ попытки —
@@ -2372,12 +2724,22 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 _clear_local_execution_intent(user_id, idempotency_key)
             if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
                 claim.release(user_id, idempotency_key, claim_token)
+            # Round-6: a returned non-2xx is a KNOWN outcome (validation
+            # refused, nothing committed) — the fence is released; an old
+            # worker retry would re-run a request that provably did nothing.
+            _release_legacy_fence()
             return response
         finally:
             if lease_task is not None:
                 lease_task.cancel()
                 try:
                     await lease_task
+                except asyncio.CancelledError:
+                    pass
+            if legacy_lease_task is not None:
+                legacy_lease_task.cancel()
+                try:
+                    await legacy_lease_task
                 except asyncio.CancelledError:
                     pass
             if (
@@ -2391,6 +2753,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # see a stale 409 until the lease TTL lapses.
                 if claim.try_available():
                     claim.release(user_id, idempotency_key, claim_token)
+            if not execution_started and not legacy_fence_keep_on_exit:
+                # Round-6: nothing executed and the fence is not deliberately
+                # kept (the in-flight refusal that shields a NEW worker's
+                # execution) — free it; a held-but-dead request must not
+                # block old-version workers longer than its lease anyway.
+                _release_legacy_fence()
 
     @staticmethod
     def _payload_mismatch_response() -> Response:

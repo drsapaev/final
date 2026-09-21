@@ -3145,3 +3145,333 @@ def test_scope_binding_extend_is_value_guarded(fake_redis):
     # An unbound key stays unbound (nothing invented).
     claim.extend_scope_binding(origin_ns, "k-missing", "patient:1")
     assert f"idem:{origin_ns}:k-missing:pscope" not in fake_redis.store
+
+
+# ── Round-6 (owner review on 113d155, PR #3340): migration fence ────────────
+
+
+def test_legacy_fence_blocks_old_worker_claiming_between_probe_and_new_acquire(
+    two_workers, monkeypatch
+):
+    """THE rolling-deploy race the round-4/5 read-only probe could not close:
+    the request of an OLD worker acquires the legacy claim AFTER the new
+    worker's probe and starts executing, while the new worker acquires only
+    the NEW-namespace claim — one logical write executed TWICE in parallel
+    by two application versions.
+
+    Round-6 fences FIRST: the legacy SET NX belongs to the new worker before
+    it reads anything, so the old worker's claim attempt (emulated exactly at
+    the old interleaving point — immediately before the new-namespace
+    acquire) must FAIL and the old worker never executes."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "fence-race-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    claim = idem_module._distributed_claim
+    legacy_ns = IdempotencyMiddleware._namespace(1)
+    legacy_claim_key = f"idem:{legacy_ns}:{key}:claim"
+
+    real_acquire = DistributedIdempotencyClaim.acquire
+    old_worker = {"claim_ok": None}
+
+    def racing_acquire(self, user_id, k):
+        if user_id != legacy_ns:
+            # The old interleaving point: an old-version worker tries the
+            # legacy claim right after the (round-4/5) probe and before the
+            # new-namespace acquire.
+            old_worker["claim_ok"] = fake_redis.set(
+                legacy_claim_key, "old-worker-token", nx=True, ex=90
+            )
+        return real_acquire(self, user_id, k)
+
+    monkeypatch.setattr(DistributedIdempotencyClaim, "acquire", racing_acquire)
+    try:
+        response = client1.post("/echo", headers=headers)
+    finally:
+        monkeypatch.undo()
+
+    assert response.status_code == 200
+    assert counters["w1"]["calls"] == 1, "only the NEW worker executes"
+    assert old_worker["claim_ok"] is None, (
+        "the legacy fence must be held by THIS worker at the moment the old "
+        "worker would claim the legacy namespace — the old worker's SET NX "
+        "must fail (no parallel old/new execution of one key)"
+    )
+    # The fence is released after completion (compare-and-delete) and the
+    # outcome is DUAL-WRITTEN to the legacy namespace for old workers.
+    assert legacy_claim_key not in fake_redis.store
+    assert _legacy_nkey("1", key, "resp") in fake_redis.store
+
+
+def test_legacy_outcome_landing_between_fence_and_probe_replays(
+    two_workers, monkeypatch
+):
+    """The second round-4/5 hole: the old worker completes BETWEEN the three
+    separate probe GETs — the response read saw nothing, by the marker reads
+    the response was stored and the markers dropped → three misses and the
+    write re-executed. Round-6 reads the legacy artifacts only AFTER owning
+    the fence: an old worker completing in that window is REPLAYED and
+    migrated, never re-executed."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "fence-complete-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    claim = idem_module._distributed_claim
+    legacy_ns = IdempotencyMiddleware._namespace(1)
+
+    from starlette.responses import Response as StarletteResponse
+
+    real_probe = DistributedIdempotencyClaim.probe_legacy_artifacts
+
+    def completing_old_worker_probe(self, ns, k):
+        if ns == legacy_ns and k == key:
+            # The old worker finishes EXACTLY between the fence and the
+            # probe: its committed outcome lands in the legacy namespace.
+            claim.store_response(
+                legacy_ns,
+                k,
+                StarletteResponse(
+                    content=b'{"ok": true, "committed": "old-worker"}',
+                    status_code=200,
+                    media_type="application/json",
+                ),
+                payload_hash=idem_module.payload_hash(b""),
+                principal_role="Registrar",
+            )
+        return real_probe(self, ns, k)
+
+    monkeypatch.setattr(
+        DistributedIdempotencyClaim, "probe_legacy_artifacts", completing_old_worker_probe
+    )
+    try:
+        response = client1.post("/echo", headers=headers)
+    finally:
+        monkeypatch.undo()
+
+    assert response.status_code == 200
+    assert response.content == b'{"ok": true, "committed": "old-worker"}'
+    assert counters["w1"]["calls"] == 0, (
+        "the just-completed legacy outcome must replay, never re-execute"
+    )
+    # Migrated to the current namespace; the fence is released.
+    assert nkey("1", key, "resp") in fake_redis.store
+    assert f"idem:{legacy_ns}:{key}:claim" not in fake_redis.store
+
+
+def test_fence_dual_writes_outcome_to_legacy_namespace(two_workers):
+    """Round-6 requirement: the committed outcome is DUAL-WRITTEN to BOTH
+    namespaces while the fence is held and released only after the write —
+    an old-version worker that acquires the legacy claim after the fence
+    lease lapses must find the snapshot and replay, never an empty legacy
+    namespace it would re-execute."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "dual-write-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    claim = idem_module._distributed_claim
+    legacy_ns = IdempotencyMiddleware._namespace(1)
+
+    first = client1.post("/echo", headers=headers)
+    assert first.status_code == 200
+    assert counters["w1"]["calls"] == 1
+
+    assert _legacy_nkey("1", key, "resp") in fake_redis.store, (
+        "the outcome must be dual-written to the legacy namespace"
+    )
+    assert f"idem:{legacy_ns}:{key}:claim" not in fake_redis.store, (
+        "the fence must be released after completion"
+    )
+    # The dual-written snapshot replays under the SAME replay contract the
+    # legacy read applies (load_response reads the legacy namespace).
+    replayed, stored_hash, stored_role = claim.load_response(legacy_ns, key)
+    assert replayed is not None
+    assert stored_hash == idem_module.payload_hash(b"")
+    assert stored_role == "Registrar"
+
+
+def test_crash_dual_writes_legacy_intent_and_keeps_fence(two_workers):
+    """A crash AFTER execution started leaves the outcome unknown. The NEW
+    claim is released (the retry reconciles via the new-namespace intent),
+    the legacy fence is KEPT (it lapses with its own lease) and an
+    unknown-outcome intent is DUAL-WRITTEN to the legacy namespace — an
+    old-version worker must reconcile (409 uncertain), never re-execute a
+    possibly-committed write once the fence lease lapses."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "dual-crash-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    legacy_ns = IdempotencyMiddleware._namespace(1)
+
+    first = client1.post("/boom", headers=headers)
+    assert first.status_code == 500
+
+    assert nkey("1", key, "claim", path="/boom") not in fake_redis.store, (
+        "the new-namespace claim is released on crash (R9 contract)"
+    )
+    assert f"idem:{legacy_ns}:{key}:intent" in fake_redis.store, (
+        "the unknown-outcome intent must be dual-written to the legacy namespace"
+    )
+    assert f"idem:{legacy_ns}:{key}:claim" in fake_redis.store, (
+        "the legacy fence stays held after a crash (lapses with its lease)"
+    )
+
+
+def test_required_redis_death_at_fence_returns_503(two_workers, monkeypatch):
+    """Coordination REQUIRED dies between the initial availability gate and
+    the fence acquire: acquire() returns None because of the transport
+    failure, not because of contention — the honest answer is the
+    non-executing 503 (Retry-After 2), never a misleading 409 and never a
+    local execution."""
+    client1, client2, counters, fake_redis = two_workers
+    claim = idem_module._distributed_claim
+    claim._required = True
+    key = "fence-503-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+
+    real_set = fake_redis.set
+
+    def dying_set(*args, **kwargs):
+        raise ConnectionError("simulated redis outage")
+
+    monkeypatch.setattr(fake_redis, "set", dying_set)
+    try:
+        response = client1.post("/echo", headers=headers)
+    finally:
+        monkeypatch.undo()
+        real_set  # keep the reference alive for clarity
+        claim._required = False
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "idempotency_unavailable"
+    assert counters["w1"]["calls"] == 0
+
+
+# ── Round-6 (owner review on 113d155, PR #3340): key bound + bounded mirror ─
+
+
+def test_oversized_key_rejected_400_before_any_allocation(two_workers):
+    """Round-6 owner P1: the Idempotency-Key header is caller-owned — an
+    oversized key is refused NON-EXECUTING (400 idempotency_key_invalid)
+    BEFORE the body read, principal resolution, Redis keys or the scope
+    mirror allocate anything. 128 chars exactly is accepted."""
+    client1, client2, counters, fake_redis = two_workers
+    idem_module._local_scope_bindings.clear()
+
+    response = client1.post(
+        "/echo",
+        headers={**auth_headers("1"), "Idempotency-Key": "k" * 129},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "idempotency_key_invalid"
+    assert counters["w1"]["calls"] == 0
+    assert fake_redis.store == {}, "no Redis state may be created for a refused key"
+    assert not idem_module._local_scope_bindings, "no mirror entry for a refused key"
+
+    ok = client1.post(
+        "/echo", headers={**auth_headers("1"), "Idempotency-Key": "k" * 128}
+    )
+    assert ok.status_code == 200, "the boundary length itself is valid"
+
+
+def test_local_scope_bindings_bounded_lru(monkeypatch):
+    """Round-6 owner P1: the process-local scope-binding mirror is
+    attacker-reachable (every fresh keyed request writes an entry BEFORE
+    endpoint validation), so it must be a BOUNDED LRU: a flood of unique
+    keys evicts its own oldest entries instead of growing without limit,
+    and recently used entries survive."""
+    import time as _time
+
+    monkeypatch.setattr(idem_module, "_MAX_SCOPE_BINDING_ENTRIES", 50)
+    idem_module._local_scope_bindings.clear()
+    try:
+        for i in range(120):
+            idem_module._local_scope_binding_set("ns", f"k{i}", "patient:1")
+        assert len(idem_module._local_scope_bindings) <= 50
+        # Oldest entries evicted, newest present.
+        assert idem_module._local_scope_binding_get("ns", "k0") is None
+        assert idem_module._local_scope_binding_get("ns", "k119") == "patient:1"
+        # LRU: a GET makes the entry recent; later inserts must not evict it.
+        assert idem_module._local_scope_binding_get("ns", "k100") == "patient:1"
+        for i in range(120, 160):
+            idem_module._local_scope_binding_set("ns", f"k{i}", "patient:2")
+        assert idem_module._local_scope_binding_get("ns", "k100") == "patient:1", (
+            "a recently used binding must survive LRU eviction"
+        )
+        assert len(idem_module._local_scope_bindings) <= 50
+
+        # Value-guarded extend: refreshes OUR scope, never a foreign one.
+        idem_module._local_scope_bindings[("ns", "k159")] = (
+            123.0,
+            "patient:2",
+        )
+        idem_module._local_scope_binding_extend("ns", "k159", "patient:9")
+        assert idem_module._local_scope_bindings[("ns", "k159")][0] == 123.0
+        idem_module._local_scope_binding_extend("ns", "k159", "patient:2")
+        assert (
+            idem_module._local_scope_bindings[("ns", "k159")][0]
+            > _time.time() + idem_module._CACHE_TTL_SECONDS - 1
+        ), "our own binding is refreshed to a full new TTL"
+    finally:
+        idem_module._local_scope_bindings.clear()
+        monkeypatch.undo()
+
+
+def test_local_only_binding_outlives_response_snapshot(two_workers, monkeypatch):
+    """Round-6 owner P2: in a LOCAL-ONLY deployment (no distributed claim)
+    the binding is written BEFORE the handler while the response snapshot is
+    cached AFTER it — with the same 24h TTL the binding always expired
+    FIRST, and a retry inside that window re-bound the key to a re-linked
+    card and executed a second write. The binding must be refreshed on the
+    SAME instant the response snapshot is stored."""
+    saved_claim = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    saved_policy = idem_module._patient_replay_policy_sync
+    idem_module._distributed_claim = None
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Patient", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id or 1
+    )
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+        "patient:7",
+        False,
+        True,
+    )
+    idem_module._local_scope_bindings.clear()
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient as TC
+
+    key = "local-extend-1"
+    origin_ns = IdempotencyMiddleware._namespace(1, "POST:/booking-like")
+    seen = {}
+
+    app = FastAPI()
+    app.add_middleware(IdempotencyMiddleware)
+
+    @app.post("/booking-like")
+    async def _booking_like():
+        # Capture the binding expiry DURING the handler (before the
+        # response snapshot is stored).
+        entry = idem_module._local_scope_bindings.get((origin_ns, key))
+        seen["during"] = entry[0] if entry else None
+        return {"ok": True}
+
+    client = TC(app, raise_server_exceptions=False)
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    try:
+        first = client.post("/booking-like", headers=headers)
+        assert first.status_code == 200
+        entry = idem_module._local_scope_bindings.get((origin_ns, key))
+        assert entry is not None, "the binding is mirrored locally"
+        assert seen["during"] is not None, "the binding existed before the handler"
+        assert entry[0] > seen["during"], (
+            "the binding expiry must be REFRESHED at response-store time — "
+            "it may never expire before the snapshot it guards"
+        )
+
+        # Same-key retry replays the local snapshot (binding intact).
+        second = client.post("/booking-like", headers=headers)
+        assert second.status_code == 200
+    finally:
+        idem_module._distributed_claim = saved_claim
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._resolve_principal_id_sync = saved_resolve
+        idem_module._patient_replay_policy_sync = saved_policy
+        idem_module._local_scope_bindings.clear()

@@ -444,7 +444,11 @@ class TestOpenAPIContract:
         booking = self._responses(openapi, "/api/v1/patients/booking", "post")
         # Round-3 P2: 404 is real (no linked Patient profile / doctor
         # eligibility) and must be published.
-        assert set(booking) == {"201", "400", "401", "403", "404", "409", "422"}
+        # Round-6 (owner P2): 503 is real — required idempotency coordination
+        # down (code=idempotency_unavailable) — and must be published too.
+        assert set(booking) == {
+            "201", "400", "401", "403", "404", "409", "422", "503",
+        }
         assert (
             booking["201"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/PatientPortalBookingCreatedResponse"
@@ -457,6 +461,11 @@ class TestOpenAPIContract:
             booking["409"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/PatientPortalErrorResponse"
         )
+        assert (
+            booking["503"]["content"]["application/json"]["schema"]["$ref"]
+            == "#/components/schemas/PatientPortalErrorResponse"
+        )
+        assert "idempotency_unavailable" in booking["503"]["description"]
 
     def test_booking_requires_idempotency_key_header(self, openapi):
         operation = openapi["paths"]["/api/v1/patients/booking"]["post"]
@@ -467,6 +476,33 @@ class TestOpenAPIContract:
         ]
         assert header_params, "Idempotency-Key header must be published"
         assert header_params[0]["required"] is True
+        # Round-6 (owner P1): the caller-owned key is BOUNDED — oversized
+        # keys are a 400 idempotency_key_invalid, the contract is published.
+        assert header_params[0]["schema"].get("maxLength") == 128
+        assert header_params[0]["schema"].get("minLength") == 1
+
+    def test_idempotency_error_code_is_typed(self, openapi):
+        """Round-6 (owner P2): the middleware's 409/503 bodies carry a
+        machine top-level `code` the client must branch on (retry the same
+        key / new key / reconcile / wait for Redis). The published DTO must
+        describe it, or the regenerated TypeScript silently drops half the
+        runtime contract."""
+        schema = openapi["components"]["schemas"]["PatientPortalErrorResponse"]
+        props = schema["properties"]
+        assert "code" in props
+        # `str | None` serializes as anyOf(string, null) under Pydantic v2.
+        code_types = {
+            variant.get("type") for variant in props["code"].get("anyOf", [])
+        }
+        assert "string" in code_types, "code must be a string-typed discriminator"
+        # Optional: endpoint-level errors (slot occupied) carry no code.
+        assert "code" not in schema.get("required", [])
+        assert "idempotency_scope_mismatch" in self._responses(
+            openapi, "/api/v1/patients/booking", "post"
+        )["409"]["description"]
+        assert "idempotency_uncertain_outcome" in self._responses(
+            openapi, "/api/v1/patients/booking", "post"
+        )["409"]["description"]
 
     def test_preview_publishes_typed_success_and_errors(self, openapi):
         preview = self._responses(openapi, "/api/v1/patients/booking/preview", "post")
@@ -1140,3 +1176,145 @@ class TestCanonicalDepartmentFilter:
         )
         assert other.status_code == 200, other.text
         assert all(a["id"] != appointment_id for a in other.json())
+
+
+class TestRegistrarReadModelDepartmentContract:
+    """Round-6 owner P1: /registrar/visits and /registrar/all-appointments
+    still fed the ORM RELATIONSHIP into a `department: str | None` read DTO —
+    the first portal-created row (non-NULL department_id) failed response
+    validation (or produced a Department object in the dict), the broad
+    `except Exception` swallowed it and the portal booking silently
+    DISAPPEARED from the working registrar read-model (PatientPickupView
+    reads /registrar/visits for patient history).
+
+    The unified mapper (department_id / department_key / department_name /
+    legacy department = canonical key) must give every Appointment read
+    surface the SAME contract for one portal-created row."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def test_portal_booking_department_contract_across_all_read_surfaces(
+        self,
+        client,
+        linked_patient_headers,
+        admin_auth_headers,
+        db_session,
+        portal_department,
+        test_patient,
+    ):
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "registrar-contract-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "department": portal_department.key,
+            },
+        )
+        assert created.status_code == 201, created.json()
+        appointment_id = created.json()["appointment_id"]
+
+        expected = {
+            "department": portal_department.key,
+            "department_id": portal_department.id,
+            "department_key": portal_department.key,
+            "department_name": portal_department.name_ru,
+        }
+
+        # 1. Canonical list — GET /api/v1/appointments/
+        listed = client.get("/api/v1/appointments/", headers=admin_auth_headers)
+        assert listed.status_code == 200, listed.text
+        item = next(a for a in listed.json() if a["id"] == appointment_id)
+        for field, value in expected.items():
+            assert item[field] == value, f"canonical list.{field}"
+
+        # 2. Canonical detail — GET /api/v1/appointments/{id}
+        detail = client.get(
+            f"/api/v1/appointments/{appointment_id}", headers=admin_auth_headers
+        )
+        assert detail.status_code == 200, detail.text
+        for field, value in expected.items():
+            assert detail.json()[field] == value, f"canonical detail.{field}"
+
+        # 3. Working registrar read-model — GET /api/v1/registrar/visits
+        #    (the appointments block used to be silently dropped for rows
+        #    with a persisted department_id).
+        visits = client.get(
+            f"/api/v1/registrar/visits?patient_id={test_patient.id}&limit=500",
+            headers=admin_auth_headers,
+        )
+        assert visits.status_code == 200, visits.text
+        # Legacy appointments are exposed under the +10000 id offset.
+        appointment_row = next(
+            (
+                r
+                for r in visits.json()
+                if r["id"] == appointment_id + 10000 and r["patient_id"] == test_patient.id
+            ),
+            None,
+        )
+        assert appointment_row is not None, (
+            "the portal-created booking must appear in /registrar/visits — "
+            "a Department object in the response DTO used to make the broad "
+            "except drop the whole appointments block"
+        )
+        for field, value in expected.items():
+            assert appointment_row[field] == value, f"registrar/visits.{field}"
+
+        # 4. Merged listing — GET /api/v1/registrar/all-appointments
+        merged = client.get(
+            "/api/v1/registrar/all-appointments?limit=1000", headers=admin_auth_headers
+        )
+        assert merged.status_code == 200, merged.text
+        merged_row = next(
+            (
+                r
+                for r in merged.json()["data"]
+                if r.get("appointment_id") == appointment_id
+            ),
+            None,
+        )
+        assert merged_row is not None, "the booking must appear in all-appointments"
+        for field, value in expected.items():
+            assert merged_row[field] == value, f"all-appointments.{field}"
+
+    def test_department_filter_on_registrar_visits_matches_portal_row(
+        self,
+        client,
+        linked_patient_headers,
+        admin_auth_headers,
+        db_session,
+        portal_department,
+        test_patient,
+    ):
+        """The ?department= filter of /registrar/visits compared the ORM
+        RELATIONSHIP to the string parameter (ArgumentError → the broad
+        except dropped the appointments block). Same repair as the canonical
+        list: filter through the relationship predicate."""
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "registrar-filter-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "department": portal_department.key,
+            },
+        )
+        assert created.status_code == 201, created.json()
+        appointment_id = created.json()["appointment_id"]
+
+        filtered = client.get(
+            f"/api/v1/registrar/visits?department={portal_department.key}&limit=500",
+            headers=admin_auth_headers,
+        )
+        assert filtered.status_code == 200, filtered.text
+        rows = [r for r in filtered.json() if r["id"] == appointment_id + 10000]
+        assert len(rows) == 1, "the booked row must match its own department key"
+        assert rows[0]["department_key"] == portal_department.key
+
+        other = client.get(
+            "/api/v1/registrar/visits?department=derma&limit=500",
+            headers=admin_auth_headers,
+        )
+        assert other.status_code == 200, other.text
+        assert all(
+            r["id"] != appointment_id + 10000 for r in other.json()
+        ), "a foreign department's filter must not leak the row"

@@ -191,7 +191,7 @@ class AppointmentsApiService:
                     "patient_last_name": str(patient_last_name) if patient_last_name else None,
                     "patient_first_name": str(patient_first_name) if patient_first_name else None,
                     "doctor_id": int(apt.doctor_id) if apt.doctor_id else None,
-                    "department": str(apt.department) if apt.department else None,
+                    "department": apt.department_key,  # Round-6 (owner P1): key, not the ORM relationship object
                     "appointment_date": apt.appointment_date.isoformat() if apt.appointment_date else None,
                     "appointment_time": str(apt.appointment_time) if apt.appointment_time else None,
                     "status": str(apt.status),

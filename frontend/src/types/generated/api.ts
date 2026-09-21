@@ -32887,6 +32887,8 @@ export type components = {
         PatientPortalErrorResponse: {
             /** Detail */
             detail: components["schemas"]["PatientPortalErrorDetail"] | string;
+            /** Code */
+            code?: string | null;
         };
         /** PatientPortalFormField */
         PatientPortalFormField: {
@@ -39472,6 +39474,12 @@ export type components = {
             doctor_specialty?: string | null;
             /** Department */
             department?: string | null;
+            /** Department Id */
+            department_id?: number | null;
+            /** Department Key */
+            department_key?: string | null;
+            /** Department Name */
+            department_name?: string | null;
             /** Visit Date */
             visit_date?: string | null;
             /** Visit Time */
@@ -41107,7 +41115,7 @@ export interface operations {
                     "application/json": components["schemas"]["PatientPortalBookingPreviewResponse"];
                 };
             };
-            /** @description Request-shaped validation failure (see detail.reason) */
+            /** @description Request-shaped validation failure (see detail.reason); on keyed endpoints also an invalid Idempotency-Key header (code=idempotency_key_invalid) */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -41158,7 +41166,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                /** @description Required. Retries of the SAME booking attempt must reuse the same key — the middleware replays the committed response instead of creating a second appointment. */
+                /** @description Required. Retries of the SAME booking attempt must reuse the same key — the middleware replays the committed response instead of creating a second appointment. Bounded to 128 characters (longer keys are a 400 idempotency_key_invalid). */
                 "Idempotency-Key": string;
             };
             path?: never;
@@ -41179,7 +41187,7 @@ export interface operations {
                     "application/json": components["schemas"]["PatientPortalBookingCreatedResponse"];
                 };
             };
-            /** @description Request-shaped validation failure (see detail.reason) */
+            /** @description Request-shaped validation failure (see detail.reason); on keyed endpoints also an invalid Idempotency-Key header (code=idempotency_key_invalid) */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -41215,7 +41223,7 @@ export interface operations {
                     "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
-            /** @description Doctor time slot already occupied (or idempotency payload mismatch) */
+            /** @description Doctor time slot already occupied; or an idempotency conflict surfaced by the middleware — retry/reconcile decision reads the top-level code: idempotency_payload_mismatch / idempotency_in_flight / idempotency_uncertain_outcome / idempotency_scope_mismatch */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -41231,6 +41239,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
         };
@@ -41253,7 +41270,7 @@ export interface operations {
                     "application/json": components["schemas"]["PatientPortalFormsResponse"];
                 };
             };
-            /** @description Request-shaped validation failure (see detail.reason) */
+            /** @description Request-shaped validation failure (see detail.reason); on keyed endpoints also an invalid Idempotency-Key header (code=idempotency_key_invalid) */
             400: {
                 headers: {
                     [name: string]: unknown;

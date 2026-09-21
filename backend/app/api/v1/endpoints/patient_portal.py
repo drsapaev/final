@@ -134,6 +134,15 @@ class PatientPortalErrorResponse(BaseModel):
     # string details; portal scope guards raise {"reason": ...}. The union
     # keeps the published schema honest about both runtime shapes.
     detail: PatientPortalErrorDetail | str
+    # Round-6 (owner P2, PR #3340): the keyed-write middleware answers 409/
+    # 503 bodies that carry a machine top-level `code` the client MUST
+    # branch on (retry same key vs. new key vs. reconcile vs. wait for
+    # Redis): `idempotency_in_flight`, `idempotency_uncertain_outcome`,
+    # `idempotency_payload_mismatch`, `idempotency_scope_mismatch`,
+    # `idempotency_unavailable` (503), `idempotency_key_invalid` (400).
+    # Endpoint-level errors (e.g. the slot-occupied 409) carry no code —
+    # the field stays optional to describe both runtime shapes honestly.
+    code: str | None = None
 
 
 class PatientPortalScope(BaseModel):
@@ -533,7 +542,11 @@ def _with_resolved_department(
 
 # Shared OpenAPI error responses (P2: documented error surface).
 _PORTAL_400 = {
-    "description": "Request-shaped validation failure (see detail.reason)",
+    "description": (
+        "Request-shaped validation failure (see detail.reason); on keyed "
+        "endpoints also an invalid Idempotency-Key header "
+        "(code=idempotency_key_invalid)"
+    ),
     "model": PatientPortalErrorResponse,
 }
 _PORTAL_401 = {
@@ -556,7 +569,21 @@ _PORTAL_404_BOOKING = {
     "model": PatientPortalErrorResponse,
 }
 _PORTAL_409 = {
-    "description": "Doctor time slot already occupied (or idempotency payload mismatch)",
+    "description": (
+        "Doctor time slot already occupied; or an idempotency conflict "
+        "surfaced by the middleware — retry/reconcile decision reads the "
+        "top-level code: idempotency_payload_mismatch / "
+        "idempotency_in_flight / idempotency_uncertain_outcome / "
+        "idempotency_scope_mismatch"
+    ),
+    "model": PatientPortalErrorResponse,
+}
+_PORTAL_503 = {
+    "description": (
+        "Required distributed idempotency coordination is temporarily "
+        "unavailable (code=idempotency_unavailable). Non-executing: retry "
+        "the SAME Idempotency-Key after recovery"
+    ),
     "model": PatientPortalErrorResponse,
 }
 
@@ -669,6 +696,7 @@ def preview_patient_portal_booking(
         403: _PORTAL_403,
         404: _PORTAL_404_BOOKING,
         409: _PORTAL_409,
+        503: _PORTAL_503,
     },
 )
 def create_patient_portal_booking(
@@ -678,10 +706,12 @@ def create_patient_portal_booking(
         ...,
         alias="Idempotency-Key",
         min_length=1,
+        max_length=128,
         description=(
             "Required. Retries of the SAME booking attempt must reuse the "
             "same key — the middleware replays the committed response instead "
-            "of creating a second appointment."
+            "of creating a second appointment. Bounded to 128 characters "
+            "(longer keys are a 400 idempotency_key_invalid)."
         ),
     ),
     db: Session = Depends(deps.get_db),
