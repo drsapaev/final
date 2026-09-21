@@ -13,6 +13,8 @@ identity contract: the serving mutations and denials surface in ONE
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -585,3 +587,232 @@ def test_incomplete_reason_validation_through_router(
     assert response.json()["incomplete_reason"] == "тошнота"
     execution = db_session.get(ServiceExecution, execution_id)
     assert execution.incomplete_reason == "тошнота"
+
+
+# ----------------------------------------------------------------------------
+# N2-3 follow-up (N2-5 §8): the drain-recovery discovery endpoint
+# ----------------------------------------------------------------------------
+def test_draining_executions_auth_matrix(
+    client: TestClient, db_session: Session
+) -> None:
+    """Anonymous 401 / wrong role 403 on the discovery read (fail-closed)."""
+    response = client.get(f"{_BASE}/draining-executions")
+    assert response.status_code == 401, response.text
+
+    doctor = _user(db_session, "n2dr_ep_doctor", "Doctor")
+    response = client.get(
+        f"{_BASE}/draining-executions", headers=_headers(db_session, doctor)
+    )
+    assert response.status_code == 403, response.text
+
+
+def test_draining_discovery_flow_through_router(
+    client: TestClient, db_session: Session
+) -> None:
+    """The §8 reload scenario end-to-end: deactivation mid-flight ->
+    read plane collapses -> discovery surfaces the execution -> the
+    drain finishes it -> discovery is empty again."""
+    nurse = _user(db_session, "n2dr_ep_nurse", "Nurse")
+    resource = _resource(db_session, "procedures_dr_ep")
+    _assignment(db_session, nurse, resource)
+    queue = _queue(db_session, resource)
+    patient = _patient(db_session, "Reload")
+    entry = _entry(db_session, queue, 1, patient)
+    headers = _headers(db_session, nurse)
+
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/call-next", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/entries/{entry.id}/start",
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    visit_id = response.json()["visit_id"]
+    assert visit_id is not None
+
+    station_service = Service(
+        code="DR-EP-PROC",
+        name="Procedure DR-EP",
+        queue_tag=resource.queue_tag,
+        requires_doctor=False,
+        active=True,
+    )
+    db_session.add(station_service)
+    db_session.commit()
+    db_session.refresh(station_service)
+    vs = VisitService(
+        visit_id=visit_id,
+        service_id=station_service.id,
+        code=station_service.code,
+        name=station_service.name,
+        qty=1,
+    )
+    db_session.add(vs)
+    db_session.commit()
+    db_session.refresh(vs)
+
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/executions",
+        json={"queue_entry_id": entry.id, "visit_service_id": vs.id},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    execution_id = response.json()["id"]
+
+    # mid-flight deactivation: the read plane the reload would see
+    row = (
+        db_session.query(NurseWorkplaceAssignment)
+        .filter(
+            NurseWorkplaceAssignment.user_id == nurse.id,
+            NurseWorkplaceAssignment.queue_resource_id == resource.id,
+        )
+        .first()
+    )
+    row.is_active = False
+    db_session.commit()
+
+    response = client.get(f"{_BASE}/workplaces", headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 0
+
+    response = client.get(
+        f"{_BASE}/queue-resources/{resource.id}/entries", headers=headers
+    )
+    assert response.status_code == 403, response.text
+
+    # the discovery: exactly the caller's own unfinished execution
+    response = client.get(f"{_BASE}/draining-executions", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["total"] == 1
+    item = body["items"][0]
+    assert item["execution"]["id"] == execution_id
+    assert item["execution"]["status"] == "in_progress"
+    assert item["station"]["queue_resource_id"] == resource.id
+    assert item["entry"]["entry_id"] == entry.id
+    assert item["entry"]["patient_name"] == "Reload"
+    assert item["service"]["visit_service_id"] == vs.id
+
+    # the drain through the discovered id
+    response = client.post(
+        f"{_BASE}/executions/{execution_id}/complete", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "completed"
+
+    response = client.get(f"{_BASE}/draining-executions", headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 0
+
+
+def test_draining_discovery_empty_for_fresh_nurse(
+    client: TestClient, db_session: Session
+) -> None:
+    nurse = _user(db_session, "n2dr_ep_fresh", "Nurse")
+    response = client.get(
+        f"{_BASE}/draining-executions", headers=_headers(db_session, nurse)
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {"items": [], "total": 0}
+
+
+def test_draining_discovery_after_reassignment_and_day_rollover(
+    client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    """Owner-review round (P1 + P2) through the HTTP plane.
+
+    A next-day re-assignment must NOT hide the day-D execution: the
+    board resolves TODAY's queue only, so the discovery has to keep
+    answering the execution id (the terminal drain stays reachable
+    from a reloaded tablet). The station context answers the cabinet
+    of the assignment that was in effect at the START (temporal
+    resolution), not the latest re-assignment's cabinet.
+    """
+    import app.services.nurse_serving_api_service as svc_module
+
+    nurse = _user(db_session, "n2dr_ep_reatt", "Nurse")
+    resource = _resource(db_session, "procedures_reatt_ep")
+    _assignment(db_session, nurse, resource)
+    queue = _queue(db_session, resource)
+    patient = _patient(db_session, "ReattEp")
+    entry = _entry(db_session, queue, 1, patient)
+    headers = _headers(db_session, nurse)
+
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/call-next", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/entries/{entry.id}/start",
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    visit_id = response.json()["visit_id"]
+
+    station_service = Service(
+        code="REATT-EP-PROC",
+        name="Procedure Reatt EP",
+        queue_tag=resource.queue_tag,
+        requires_doctor=False,
+        active=True,
+    )
+    db_session.add(station_service)
+    db_session.commit()
+    db_session.refresh(station_service)
+    vs = VisitService(
+        visit_id=visit_id,
+        service_id=station_service.id,
+        code=station_service.code,
+        name=station_service.name,
+        qty=1,
+    )
+    db_session.add(vs)
+    db_session.commit()
+    db_session.refresh(vs)
+
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/executions",
+        json={"queue_entry_id": entry.id, "visit_service_id": vs.id},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    execution_id = response.json()["id"]
+
+    # mid-flight deactivation, then the next-day re-assignment (the
+    # partial unique permits a NEW active row for the same pair)
+    row = (
+        db_session.query(NurseWorkplaceAssignment)
+        .filter(
+            NurseWorkplaceAssignment.user_id == nurse.id,
+            NurseWorkplaceAssignment.queue_resource_id == resource.id,
+        )
+        .first()
+    )
+    row.is_active = False
+    db_session.commit()
+    _assignment(db_session, nurse, resource)
+
+    # the day rolls over: the station board would resolve tomorrow's
+    # queue and never show the day-D entry again
+    tomorrow = clinic_today(db_session) + timedelta(days=1)
+    monkeypatch.setattr(svc_module, "clinic_today", lambda _db: tomorrow)
+
+    response = client.get(f"{_BASE}/draining-executions", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["total"] == 1, body
+    item = body["items"][0]
+    assert item["execution"]["id"] == execution_id
+    assert item["station"]["queue_resource_id"] == resource.id
+    # the assignment in effect at the start had NO cabinet override and
+    # the resource default is not a provable snapshot -> honest null
+    assert item["station"]["effective_cabinet"] is None
+
+    # the drain through the discovered id still completes
+    response = client.post(
+        f"{_BASE}/executions/{execution_id}/complete", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "completed"

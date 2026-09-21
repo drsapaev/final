@@ -2478,6 +2478,39 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nurse/serving/draining-executions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Draining Executions
+         * @description Drain-recovery discovery (N2-5 §8 backend follow-up): read-only.
+         *
+         *     The graceful drain (N2-3) keeps the terminal complete/incomplete
+         *     mutations authorized for the STARTER after a mid-flight assignment
+         *     deactivation — but the read plane (workplaces list empty, station
+         *     board 403) gave a RELOADED tablet no way to discover the execution
+         *     id, making the drain unreachable from the UI. This self-scope read
+         *     closes exactly that loop: it returns the caller's OWN in_progress
+         *     executions that today's station board does NOT already surface (no
+         *     active assignment on the station, or the entry no longer belongs
+         *     to the station's today queue), with the station/entry/service
+         *     context needed to finish them through the existing terminal
+         *     endpoints. No mutations, no new authorization surface, no
+         *     client-side workaround.
+         */
+        get: operations["list_draining_executions_api_v1_nurse_serving_draining_executions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/call-next": {
         parameters: {
             query?: never;
@@ -31808,6 +31841,72 @@ export type components = {
             waiting_count: number;
         };
         /**
+         * NurseServingDrainingEntryRef
+         * @description The queue entry context of a draining execution.
+         */
+        NurseServingDrainingEntryRef: {
+            /** Entry Id */
+            entry_id: number;
+            /** Number */
+            number: number;
+            /** Patient Name */
+            patient_name?: string | null;
+        };
+        /**
+         * NurseServingDrainingExecutionItem
+         * @description One discoverable drain candidate: the caller's own unfinished work.
+         */
+        NurseServingDrainingExecutionItem: {
+            execution: components["schemas"]["NurseServingExecutionResponse"];
+            station: components["schemas"]["NurseServingDrainingStationRef"];
+            entry: components["schemas"]["NurseServingDrainingEntryRef"];
+            service: components["schemas"]["NurseServingDrainingServiceRef"];
+        };
+        /**
+         * NurseServingDrainingExecutionListResponse
+         * @description The drain-recovery discovery payload (self-scope, read-only).
+         */
+        NurseServingDrainingExecutionListResponse: {
+            /** Items */
+            items?: components["schemas"]["NurseServingDrainingExecutionItem"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
+        /**
+         * NurseServingDrainingServiceRef
+         * @description The VisitService a draining execution performs.
+         */
+        NurseServingDrainingServiceRef: {
+            /** Visit Service Id */
+            visit_service_id: number;
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name?: string | null;
+            /**
+             * Qty
+             * @default 1
+             */
+            qty: number;
+        };
+        /**
+         * NurseServingDrainingStationRef
+         * @description The station a draining execution belongs to (display context).
+         */
+        NurseServingDrainingStationRef: {
+            /** Queue Resource Id */
+            queue_resource_id: number;
+            /** Resource Code */
+            resource_code?: string | null;
+            /** Resource Display Name */
+            resource_display_name?: string | null;
+            /** Effective Cabinet */
+            effective_cabinet?: string | null;
+        };
+        /**
          * NurseServingEntryActionResponse
          * @description Entry-level no-show / incomplete result.
          */
@@ -45178,6 +45277,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_draining_executions_api_v1_nurse_serving_draining_executions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingDrainingExecutionListResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
                 };
             };
         };

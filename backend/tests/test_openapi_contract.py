@@ -514,6 +514,10 @@ def test_openapi_nurse_serving_publishes_domain_and_auth_errors(
         entry_incomplete["responses"]
     )
 
+    # N2-3 follow-up (N2-5 §8): the drain-recovery discovery read.
+    draining = schema["paths"][f"{base}/draining-executions"]["get"]
+    assert {"200", "401", "403"} <= set(draining["responses"])
+
     # Every published error on every operation carries the typed
     # {"detail": ...} body (NurseServingErrorDetail).
     operations = (
@@ -526,6 +530,7 @@ def test_openapi_nurse_serving_publishes_domain_and_auth_errors(
         incomplete,
         no_show,
         entry_incomplete,
+        draining,
     )
     for operation in operations:
         for code in ("400", "401", "403", "404", "409"):

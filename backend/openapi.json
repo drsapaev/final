@@ -6932,6 +6932,53 @@
         }
       }
     },
+    "/api/v1/nurse/serving/draining-executions": {
+      "get": {
+        "tags": [
+          "nurse-serving"
+        ],
+        "summary": "List Draining Executions",
+        "description": "Drain-recovery discovery (N2-5 §8 backend follow-up): read-only.\n\nThe graceful drain (N2-3) keeps the terminal complete/incomplete\nmutations authorized for the STARTER after a mid-flight assignment\ndeactivation — but the read plane (workplaces list empty, station\nboard 403) gave a RELOADED tablet no way to discover the execution\nid, making the drain unreachable from the UI. This self-scope read\ncloses exactly that loop: it returns the caller's OWN in_progress\nexecutions that today's station board does NOT already surface (no\nactive assignment on the station, or the entry no longer belongs\nto the station's today queue), with the station/entry/service\ncontext needed to finish them through the existing terminal\nendpoints. No mutations, no new authorization surface, no\nclient-side workaround.",
+        "operationId": "list_draining_executions_api_v1_nurse_serving_draining_executions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseServingDrainingExecutionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется аутентификация (JWT отсутствует или недействителен)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseServingErrorDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NurseServingErrorDetail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/call-next": {
       "post": {
         "tags": [
@@ -91534,6 +91581,168 @@
         ],
         "title": "NurseServingCallNextResponse",
         "description": "The atomic claim result.\n\n``idempotent`` is True when the Nurse already held a called /\nin_progress entry at this station and the SAME entry was returned\n(the §6 \"повтор запроса идемпотентен\" / reconnect contract)."
+      },
+      "NurseServingDrainingEntryRef": {
+        "properties": {
+          "entry_id": {
+            "type": "integer",
+            "title": "Entry Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "patient_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "number"
+        ],
+        "title": "NurseServingDrainingEntryRef",
+        "description": "The queue entry context of a draining execution."
+      },
+      "NurseServingDrainingExecutionItem": {
+        "properties": {
+          "execution": {
+            "$ref": "#/components/schemas/NurseServingExecutionResponse"
+          },
+          "station": {
+            "$ref": "#/components/schemas/NurseServingDrainingStationRef"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/NurseServingDrainingEntryRef"
+          },
+          "service": {
+            "$ref": "#/components/schemas/NurseServingDrainingServiceRef"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution",
+          "station",
+          "entry",
+          "service"
+        ],
+        "title": "NurseServingDrainingExecutionItem",
+        "description": "One discoverable drain candidate: the caller's own unfinished work."
+      },
+      "NurseServingDrainingExecutionListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NurseServingDrainingExecutionItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "NurseServingDrainingExecutionListResponse",
+        "description": "The drain-recovery discovery payload (self-scope, read-only)."
+      },
+      "NurseServingDrainingServiceRef": {
+        "properties": {
+          "visit_service_id": {
+            "type": "integer",
+            "title": "Visit Service Id"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "qty": {
+            "type": "integer",
+            "title": "Qty",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_service_id"
+        ],
+        "title": "NurseServingDrainingServiceRef",
+        "description": "The VisitService a draining execution performs."
+      },
+      "NurseServingDrainingStationRef": {
+        "properties": {
+          "queue_resource_id": {
+            "type": "integer",
+            "title": "Queue Resource Id"
+          },
+          "resource_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Code"
+          },
+          "resource_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Display Name"
+          },
+          "effective_cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Cabinet"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queue_resource_id"
+        ],
+        "title": "NurseServingDrainingStationRef",
+        "description": "The station a draining execution belongs to (display context)."
       },
       "NurseServingEntryActionResponse": {
         "properties": {
