@@ -259,7 +259,7 @@ test('S-15 admin: setup → permanent QR provision → same code on re-provision
   await page.getByTestId(`setup-qr-provision-${resourceTag}`).click();
   const urlEl = page.getByTestId(`setup-qr-url-${resourceTag}`);
   await expect(urlEl).toBeVisible({ timeout: 15000 });
-  const urlText = await urlEl.textContent();
+  const urlText = (await urlEl.textContent()) || '';
   expect(urlText).toMatch(/\/q\/[a-z0-9]{12}$/);
   publicCode = (urlText.match(/\/q\/([a-z0-9]{12})/) as RegExpMatchArray)[1];
   expect(page.getByTestId(`setup-qr-image-${resourceTag}`)).toBeVisible();
@@ -276,7 +276,7 @@ test('S-15 admin: setup → permanent QR provision → same code on re-provision
   await showBtn.click();
   const urlEl2 = page.getByTestId(`setup-qr-url-${resourceTag}`);
   await expect(urlEl2).toBeVisible({ timeout: 15000 });
-  expect(await urlEl2.textContent()).toContain(publicCode);
+  expect((await urlEl2.textContent()) || '').toContain(publicCode);
 
   // скачивание PNG (адрес без PII, имя файла из opaque-кода)
   const [download] = await Promise.all([
