@@ -26,7 +26,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * ссылается на него). Статусы всегда пересчитываются из API.
  * Стили — в admin.css (секция RQ-17), без inline-styles (UI ratchet).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     ArrowRight,
@@ -53,6 +53,7 @@ import {
 } from '../ui/macos';
 import { type QueueResourceDto, listQueueResources } from '../../api/queueResources';
 import QueueResourceManager from './QueueResourceManager';
+import PermanentDirectionQr from './PermanentDirectionQr';
 import {
     type Checklist,
     type ChecklistDoctorDto,
@@ -100,6 +101,17 @@ const AdminSetupDirections = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [wizard, setWizard] = useState<WizardState>(emptyWizard);
+
+    // RQ-18: react-i18next's `t` gets a new identity on every render, so
+    // using it directly in loadCore's deps made the mount effect re-run
+    // FOREVER (measured: 360 GETs in 400ms on main — the checklist
+    // unmounted/remounted in a loop and any in-block state was wiped).
+    // The ref keeps loadCore's identity stable; language switches still
+    // take effect on the next render.
+    const tRef = useRef(t);
+    useEffect(() => {
+        tRef.current = t;
+    });
 
     const loadCore = useCallback(async () => {
         try {
@@ -153,11 +165,11 @@ const AdminSetupDirections = () => {
             setEntryMethodsByProfileKey(Object.fromEntries(methods));
         } catch (err) {
             logger.error('Error loading setup directions data:', err);
-            setError(t('admin2.sdx_load_failed'));
+            setError(tRef.current('admin2.sdx_load_failed'));
         } finally {
             setLoading(false);
         }
-    }, [t]);
+    }, []);
 
     useEffect(() => {
         void loadCore();
@@ -595,6 +607,13 @@ const AdminSetupDirections = () => {
                                                     </tr>
                                                 </tbody>
                                             </table>
+                                            {row.owningProfile?.key && row.owningProfileVisible && (
+                                                <PermanentDirectionQr
+                                                    profileKey={String(row.owningProfile.key)}
+                                                    tag={row.tag}
+                                                    supported={row.permanentAddress}
+                                                />
+                                            )}
                                         </div>
                                     ))}
                                 </div>

@@ -17,7 +17,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * значений (теги профилей/услуг), не вводится руками.
  * Стили — в admin.css (секция RQ-17), без inline-styles (UI ratchet).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Plus,
     Edit2,
@@ -115,6 +115,16 @@ const QueueResourceManager = ({
         [services, profiles],
     );
 
+    // RQ-18: react-i18next's `t` gets a new identity on every render, so the
+    // `[t]` dep made the mount effect re-fire FOREVER (the registry view was
+    // stuck in «Загрузка реестра…» spamming GET /queue-resources — found by
+    // the S-15 e2e). The ref keeps loadResources' identity stable; language
+    // switches still take effect on the next render.
+    const tRef = useRef(t);
+    useEffect(() => {
+        tRef.current = t;
+    });
+
     const loadResources = useCallback(async () => {
         try {
             setLoading(true);
@@ -124,12 +134,12 @@ const QueueResourceManager = ({
         } catch (err) {
             logger.error('Error loading queue resources:', err);
             setError(
-                queueResourceErrorText(err, t('admin2.qrm_load_failed')),
+                queueResourceErrorText(err, tRef.current('admin2.qrm_load_failed')),
             );
         } finally {
             setLoading(false);
         }
-    }, [t]);
+    }, []);
 
     useEffect(() => {
         void loadResources();
