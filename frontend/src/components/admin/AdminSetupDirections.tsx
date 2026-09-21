@@ -187,6 +187,52 @@ const AdminSetupDirections = () => {
         [services, profiles, resources, entryMethodsByProfileKey, doctors],
     );
 
+    // RQ-18 follow-up (P2-4): the permanent address is provisioned PER
+    // PROFILE, while checklist rows are per-tag — a profile carrying
+    // several queue_tags must render its QR block ONCE (the first visible
+    // tag row owns it), not once per tag with independent React states.
+    // Pure derivation — no render-order mutations (StrictMode-safe).
+    const qrRowByProfileKey = useMemo(() => {
+        const first: Record<string, string> = {};
+        for (const row of Object.values(checklist)) {
+            const key = row.owningProfile?.key;
+            if (key && row.owningProfileVisible && !(String(key) in first)) {
+                first[String(key)] = row.tag;
+            }
+        }
+        return first;
+    }, [checklist]);
+
+    // RQ-18 follow-up (P2-3): the QR block re-reads entry-methods after a
+    // provision and reports the fresh permanent_address.supported — the
+    // checklist row status must follow (a freshly provisioned healthy
+    // direction drops the stale «не готово» state; a failed recheck is an
+    // honest unknown, never a confident «недоступно»).
+    const handleQrSupportedChange = useCallback(
+        (profileKey: string, supported: boolean | null) => {
+            setEntryMethodsByProfileKey((prev) => {
+                const current = prev[profileKey];
+                if (supported === null || !current) {
+                    // Recheck failed → the whole row status becomes an
+                    // honest unknown (null entry = unknown icon/label).
+                    return { ...prev, [profileKey]: null };
+                }
+                return {
+                    ...prev,
+                    [profileKey]: {
+                        ...current,
+                        entry_methods: (current.entry_methods || []).map((m) =>
+                            m.method === 'permanent_address'
+                                ? { ...m, supported }
+                                : m,
+                        ),
+                    },
+                };
+            });
+        },
+        [],
+    );
+
     const wizardTagOptions = useMemo(
         () => candidateTags(services, profiles).map((tag) => ({ value: tag, label: tag })),
         [services, profiles],
@@ -608,11 +654,27 @@ const AdminSetupDirections = () => {
                                                 </tbody>
                                             </table>
                                             {row.owningProfile?.key && row.owningProfileVisible && (
-                                                <PermanentDirectionQr
-                                                    profileKey={String(row.owningProfile.key)}
-                                                    tag={row.tag}
-                                                    supported={row.permanentAddress}
-                                                />
+                                                qrRowByProfileKey[String(row.owningProfile.key)] === row.tag ? (
+                                                    <PermanentDirectionQr
+                                                        profileKey={String(row.owningProfile.key)}
+                                                        tag={row.tag}
+                                                        supported={row.permanentAddress}
+                                                        onSupportedChange={handleQrSupportedChange}
+                                                    />
+                                                ) : (
+                                                    /* RQ-18 follow-up (P2-4): sibling tag rows of the
+                                                       SAME profile show a pointer instead of a second,
+                                                       independent QR block — the address belongs to the
+                                                       profile as a whole, not to an individual tag. */
+                                                    <div
+                                                        className="admin-sdx-qr-dedupe-note"
+                                                        data-testid={`setup-qr-dedupe-${row.tag}`}
+                                                    >
+                                                        {t('admin2.qrdx_dedupe_note', {
+                                                            tag: qrRowByProfileKey[String(row.owningProfile.key)],
+                                                        })}
+                                                    </div>
+                                                )
                                             )}
                                         </div>
                                     ))}

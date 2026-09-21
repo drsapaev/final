@@ -436,6 +436,21 @@ def start_public_direction_session(
         profile, info.get("selectable_specialists")
     )
 
+    # RQ-18 follow-up (owner round-1 P1-1): the shared token-info builder
+    # runs the clinic-wide branch for the minted is_clinic_wide token and
+    # emits the CLINIC SENTINEL display fields («Клиника» /
+    # «Все специалисты» / queue_length 0). A direction session must
+    # present the DIRECTION the patient is joining — the routing decision
+    # itself stays untouched in the join path. Live queue statistics are
+    # deliberately NOT synthesized here: resolving the exact (tag, day)
+    # surface at start time would duplicate the join-path routing
+    # resolution (drift hazard); the real numbers arrive with the
+    # join-time result (entries[].queue_length / estimated_wait_time).
+    _direction_title = profile.title_ru or profile.title or profile.key
+    info["department_name"] = _direction_title
+    info["specialist_name"] = None
+    info["queue_length"] = None
+
     return PublicDirectionStartResponse(
         session_token=result["session_token"],
         expires_at=result["expires_at"],

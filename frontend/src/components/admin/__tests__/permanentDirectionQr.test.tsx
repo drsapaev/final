@@ -18,6 +18,15 @@
  *  - supported=false + created=false (address exists, direction not
  *    bookable right now) shows the QR with an honest not-bookable note,
  *    never a false «готово».
+ *
+ * RQ-18 follow-up (owner round-1 review of merged #3360):
+ *  - P2-3: after a successful provision the entry-methods are RE-READ —
+ *    a freshly provisioned healthy direction drops the stale
+ *    «запись недоступна» note; a failed recheck renders the honest
+ *    unknown state, never a confident «недоступно»;
+ *  - P2-4: one QR block PER PROFILE KEY — a profile carrying several
+ *    queue_tags renders the block once; sibling tag rows show a pointer
+ *    note instead of independent duplicate QR states.
  */
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -42,6 +51,7 @@ vi.mock('../../../api/queueResources', () => queueResourcesMocks);
 
 const directionMocks = vi.hoisted(() => ({
     provisionPublicAddress: vi.fn(),
+    fetchDirectionEntryMethods: vi.fn(),
 }));
 
 vi.mock('../../../api/queueDirections', () => directionMocks);
@@ -70,6 +80,28 @@ const PROFILE_ROW = {
     show_on_qr_page: true,
     queue_tags: ['lab'],
 };
+
+/** Builds an entry-methods payload with the given permanent_address flag. */
+function methodsPayload(supported: boolean) {
+    return {
+        direction_key: 'lab-key',
+        entry_methods: [
+            { method: 'session_qr', supported: true },
+            { method: 'permanent_address', supported },
+            { method: 'view_only', supported: true },
+        ],
+    };
+}
+
+/** Default post-provision recheck behavior for existing pins. */
+function mockRecheck(afterProvisionSupported: boolean | 'fail') {
+    directionMocks.fetchDirectionEntryMethods.mockImplementation(
+        (_profileKey: string) =>
+            afterProvisionSupported === 'fail'
+                ? Promise.reject(new Error('recheck failed'))
+                : Promise.resolve(methodsPayload(afterProvisionSupported)),
+    );
+}
 
 function setupApiMock(entryMethods: { data: unknown } | null) {
     apiMocks.get.mockImplementation((url: string) => {
@@ -114,6 +146,9 @@ const PROVISION_RESPONSE = {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    // default recheck: mirrors the pre-provision flag (false) — explicit
+    // pins override this per test
+    mockRecheck(false);
 });
 
 describe('RQ-18 — permanent direction QR admin surface', () => {
@@ -292,5 +327,80 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
         const calls = apiMocks.get.mock.calls.length;
         expect(calls).toBeGreaterThan(0);
         expect(calls).toBeLessThanOrEqual(8);
+    });
+
+    it('PIN 8 (red on merged main): after provision the entry-methods are re-read — the not-bookable note disappears when the direction became bookable', async () => {
+        setupApiMock({ data: methodsPayload(false) });
+        mockRecheck(true);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        // the recheck happened against the right direction
+        await waitFor(() => {
+            expect(directionMocks.fetchDirectionEntryMethods).toHaveBeenCalledWith('lab-key');
+        });
+        // freshly provisioned healthy direction: NO stale «недоступна» note
+        await waitFor(() => {
+            expect(screen.queryByTestId('setup-qr-not-bookable-note-lab')).toBeNull();
+        });
+    });
+
+    it('PIN 9: the recheck is honest in the reverse race — supported=false after provision keeps the note', async () => {
+        setupApiMock({ data: methodsPayload(false) });
+        mockRecheck(false);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
+    });
+
+    it('PIN 10 (red on merged main): a failed recheck renders the honest UNKNOWN state — never a confident «недоступно» note', async () => {
+        setupApiMock({ data: methodsPayload(false) });
+        mockRecheck('fail');
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        // honest unknown banner (read failed), QR stays shown
+        await waitFor(() => {
+            expect(screen.getByTestId('setup-qr-unknown-lab')).toBeTruthy();
+        });
+        expect(screen.queryByTestId('setup-qr-not-bookable-note-lab')).toBeNull();
+    });
+
+    it('PIN 11 (red on merged main): one QR block PER PROFILE KEY — a two-tag profile renders the block once, siblings get a pointer', async () => {
+        const MULTI_TAG_PROFILE = { ...PROFILE_ROW, queue_tags: ['lab', 'lab_extra'] };
+        apiMocks.get.mockImplementation((url: string) => {
+            if (url.startsWith('/services?')) {
+                return Promise.resolve({ data: [SERVICE_ROW] });
+            }
+            if (url.startsWith('/queues/profiles')) {
+                return Promise.resolve({ data: { profiles: [MULTI_TAG_PROFILE] } });
+            }
+            if (url.startsWith('/services/admin/doctors')) {
+                return Promise.resolve({ data: [] });
+            }
+            if (url.includes('/entry-methods')) {
+                return Promise.resolve({ data: methodsPayload(false) });
+            }
+            return Promise.reject(new Error(`unexpected GET ${url}`));
+        });
+        queueResourcesMocks.listQueueResources.mockResolvedValue([]);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        // both tag rows exist
+        await screen.findByTestId('setup-checklist-row-lab');
+        await screen.findByTestId('setup-checklist-row-lab_extra');
+        // but exactly ONE QR block for the single owning profile
+        await screen.findByTestId('setup-qr-block-lab');
+        const blocks = screen.getAllByTestId(/^setup-qr-block-/).filter((el) =>
+            el.getAttribute('data-testid')?.startsWith('setup-qr-block-'),
+        );
+        expect(blocks.length).toBe(1);
+        // the sibling row shows a pointer instead of a second block
+        expect(screen.getByTestId('setup-qr-dedupe-lab_extra')).toBeTruthy();
+        expect(screen.queryByTestId('setup-qr-block-lab_extra')).toBeNull();
     });
 });

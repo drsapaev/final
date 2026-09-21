@@ -2493,6 +2493,7 @@ const uzLatn = {
         unknown: 'Doimiy QR holati noma‘lum (holatni o‘qishda xatolik)',
         failed: 'Doimiy QR yaratib bo‘lmadi',
         sr_qr: 'Yo‘nalishning doimiy manzili QR kodi',
+        dedupe_note: 'Bu yo‘nalishning doimiy QR’i «{tag}» qatorida ko‘rsatilgan — manzil butun profilga tegishli, alohida tegga emas.',
         },
     qrm_title: 'QueueResource reyestri',
     qrm_subtitle: 'Teglarning resurs egallari. Yaratish — draft; faollashtirish §3.1 invariant gate orqali. code/queue_tag yaratilgandan keyin o\'zgarmaydi (§3.2).',

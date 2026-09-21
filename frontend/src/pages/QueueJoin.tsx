@@ -141,7 +141,16 @@ const QueueJoin = () => {
 
   // Получаем токен из URL параметров или query параметров (для PWA пути)
   const token = paramToken || searchParams.get('token');
-  const formStorageKey = token ? `queue_join_form_${token}` : null;
+  // RQ-18 follow-up (P1-2): у постоянного адреса нет legacy QR-токена —
+  // черновик формы живёт на СВОЁМ ключе по public_code. Это делает ФИО и
+  // телефон восстановимыми после перезагрузки страницы, когда сессия
+  // истекла, а также разводит черновики разных направлений при /q/A →
+  // /q/B (P2-2: у каждого кода свой черновик).
+  const formStorageKey = token
+    ? `queue_join_form_${token}`
+    : directionCode
+      ? `queue_join_form_qdir_${directionCode}`
+      : null;
 
   // Состояния
   const [step, setStep] = useState<'loading' | 'waiting' | 'info' | 'select-specialists' | 'form' | 'success' | 'error'>('loading');
@@ -165,9 +174,20 @@ const QueueJoin = () => {
   // RQ-18: honest unified-refusal marker for the permanent-address route
   // (unknown/archived/hidden/tombstoned/retired are indistinguishable).
   const [directionUnavailable, setDirectionUnavailable] = useState(false);
-  // RQ-18 (§10): EXACTLY ONE public start-session per mount — the ref guard
+  // RQ-18 follow-up (P1-2): client-known expiry of the direction session
+  // (QueueJoinSession lives 15 minutes server-side). A token that is
+  // ALREADY expired at submit time is transparently renewed BEFORE the
+  // first business attempt — a session start duplicates no business
+  // action; the RQ-10 result-unknown honesty for a lost complete-response
+  // stays fully in force (no renewal after a complete attempt).
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
+  // RQ-18 (§10): EXACTLY ONE public start-session per mount — the ref
   // survives the StrictMode dev double-invoke of effects.
-  const directionStartRef = useRef(false);
+  // RQ-18 follow-up (P2-2): the guard holds the LAST STARTED public code,
+  // not a boolean — /q/A → /q/B inside one route instance (same mount,
+  // changed :publicCode param) must start B's session and drop A's whole
+  // client context; StrictMode re-invokes with the SAME code and skips.
+  const directionStartRef = useRef<string | null>(null);
   // The typed direction the session is scoped to — the completion of a
   // direction session is the PROFILE choice of this very direction (§8:
   // the backend rejects doctor/untyped choices for qdir-scoped sessions).
@@ -191,30 +211,23 @@ const QueueJoin = () => {
     return fallbackMessage;
   }, []);
 
+  // RQ-18 follow-up (P1-2): the persist effect runs BEFORE the load
+  // effect and is guarded by BOTH the owner key and the hydration flag.
+  //  - owner key: on a /q/A → /q/B switch the commit where formStorageKey
+  //    changed still carries A's formData — writing it into B's key would
+  //    corrupt the new draft; the load effect owns that commit.
+  //  - hydration: the ref starts DISARMED and persist stays silent until
+  //    the load effect for the current key has actually read the store —
+  //    otherwise StrictMode's simulated remount re-runs the persist setup
+  //    with the initial empty state and wipes the stored draft.
+  const formDataOwnerRef = useRef<string | null>(null);
+  const [formDraftHydrated, setFormDraftHydrated] = useState(false);
   useEffect(() => {
-    if (!formStorageKey) {
+    if (!formStorageKey || !formDraftHydrated) {
       return;
     }
-    const saved = localStorage.getItem(formStorageKey);
-    if (!saved) {
-      return;
-    }
-    try {
-      const parsed = safeJsonParse(saved);
-      if (parsed && typeof parsed === 'object') {
-        setFormData({
-          patientName: parsed.patientName || '',
-          phone: parsed.phone || '',
-          telegramId: parsed.telegramId || '',
-        });
-      }
-    } catch {
-      localStorage.removeItem(formStorageKey);
-    }
-  }, [formStorageKey]);
-
-  useEffect(() => {
-    if (!formStorageKey) {
+    if (formDataOwnerRef.current !== formStorageKey) {
+      // Stale draft from another code/key — the load effect owns this commit.
       return;
     }
     if (!formData.patientName && !formData.phone && !formData.telegramId) {
@@ -222,7 +235,33 @@ const QueueJoin = () => {
       return;
     }
     localStorage.setItem(formStorageKey, JSON.stringify(formData));
-  }, [formData, formStorageKey]);
+  }, [formData, formStorageKey, formDraftHydrated]);
+
+  useEffect(() => {
+    if (!formStorageKey) {
+      formDataOwnerRef.current = null;
+      setFormDraftHydrated(false);
+      return;
+    }
+    formDataOwnerRef.current = formStorageKey;
+    const saved = localStorage.getItem(formStorageKey);
+    try {
+      const parsed = saved ? safeJsonParse(saved) : null;
+      if (parsed && typeof parsed === 'object') {
+        setFormData({
+          patientName: (parsed as Record<string, unknown>).patientName || '',
+          phone: (parsed as Record<string, unknown>).phone || '',
+          telegramId: (parsed as Record<string, unknown>).telegramId || '',
+        });
+      } else {
+        setFormData({ patientName: '', phone: '', telegramId: '' });
+      }
+    } catch {
+      localStorage.removeItem(formStorageKey);
+      setFormData({ patientName: '', phone: '', telegramId: '' });
+    }
+    setFormDraftHydrated(true);
+  }, [formStorageKey]);
 
   // ✅ Функции объявлены до использования в useEffect
   const startJoinSession = useCallback(async () => {
@@ -336,8 +375,29 @@ const QueueJoin = () => {
     if (!directionCode) {
       return;
     }
+    // RQ-18 follow-up (P2-2): a code CHANGE inside one route instance must
+    // drop the PREVIOUS direction's whole client context — session, result
+    // and advisories. The typed form is NOT reset here: each code owns its
+    // own draft key, and the guarded load effect (formStorageKey change)
+    // swaps in the new code's own draft — wiping here would race the load
+    // effect and destroy a just-restored draft on remounts (pinned).
+    // A same-code re-entry (StrictMode skip, error-screen retry) keeps the
+    // patient's context intact.
+    const isNewCode = directionStartRef.current !== directionCode;
+    directionStartRef.current = directionCode;
+    if (isNewCode) {
+      setSessionToken(null);
+      setQueueInfo(null);
+      setDirectionInfo(null);
+      setSessionExpiresAt(null);
+      setResult(null);
+      setSubmitResultUnknown(false);
+      setShowSessionConsumedAdvisory(false);
+      setSelectedSpecialists([]);
+    }
     setIsSpecialistsLoading(true);
     setDirectionUnavailable(false);
+    setError(null);
     setStep('loading');
     try {
       const res = await startPublicDirectionSession(directionCode);
@@ -347,6 +407,7 @@ const QueueJoin = () => {
         : [];
 
       setSessionToken(res.session_token);
+      setSessionExpiresAt(res.expires_at ?? null);
       setQueueInfo(nextQueueInfo);
       setAvailableSpecialists(selectableSpecialists);
       setDirectionInfo(res.direction);
@@ -378,12 +439,16 @@ const QueueJoin = () => {
     if (!directionMode) {
       return;
     }
-    if (directionStartRef.current) {
+    // RQ-18 follow-up (P2-2): the guard compares CODES. StrictMode's dev
+    // double-invoke re-runs this effect with the SAME code → skipped; a
+    // changed :publicCode param inside the same route instance re-runs it
+    // with the NEW code → the previous direction's session is dropped and
+    // B's session starts (no stale A session under a B URL).
+    if (directionStartRef.current === directionCode) {
       return;
     }
-    directionStartRef.current = true;
     void runDirectionStart();
-  }, [directionMode, runDirectionStart]);
+  }, [directionMode, directionCode, runDirectionStart]);
 
   // Обратный отсчет до открытия очереди
   useEffect(() => {
@@ -422,18 +487,33 @@ const QueueJoin = () => {
     // ✅ Проверяем наличие session_token
     let currentSessionToken = sessionToken;
 
-    if (!currentSessionToken && directionMode) {
+    // RQ-18 follow-up (P1-2): client-known expiry — the direction session
+    // lives 15 minutes; a token that is ALREADY expired at submit time is
+    // renewed transparently BEFORE the first business attempt (a session
+    // start duplicates no business action) and the typed form stays
+    // exactly as the patient left it. A merely missing token is renewed
+    // the same way (§10 safe session-start retry). A token rejected AFTER
+    // a complete attempt follows the RQ-10 honesty contract — no automatic
+    // renewal there, because the first attempt's result may be unknown.
+    const directionSessionKnownExpired = Boolean(
+      currentSessionToken &&
+        directionMode &&
+        sessionExpiresAt &&
+        Date.parse(sessionExpiresAt) <= Date.now(),
+    );
+
+    if (directionMode && (!currentSessionToken || directionSessionKnownExpired)) {
       // RQ-18 (§10): safe session-start retry — the direction start-session
-      // creates a fresh short-lived session (no business action duplicated);
-      // the complete-registration honesty (RQ-10) stays fully in force.
-      setStep('loading');
+      // creates a fresh short-lived session (no business action duplicated).
       try {
         const res = await startPublicDirectionSession(directionCode as string);
         currentSessionToken = res.session_token;
         setSessionToken(res.session_token);
+        setSessionExpiresAt(res.expires_at ?? null);
         setQueueInfo((res.queue_info ?? {}) as QueueJoinPageInfo);
         setDirectionInfo(res.direction);
-        setStep('info');
+        // The renewal is transparent: the patient stays on the form step
+        // with their typed context and the submit proceeds below.
       } catch (error: unknown) {
         const status = Number((error as HttpApiError | null)?.response?.status ?? 0);
         if (status === 404) {
@@ -973,6 +1053,21 @@ const QueueJoin = () => {
       successEntries[0]?.queue_number ??
       successEntries[0]?.number;
 
+    // RQ-18 follow-up (P2-1): multi-result payload carries the ticket
+    // metrics INSIDE entries[0] (top-level queue_length / estimated_wait_time /
+    // specialist_name do not exist in that shape) — the single-entry view
+    // must fall back to them, otherwise a direction ticket shows a
+    // fabricated «−1 впереди» and hides the wait time and owner name.
+    const singleEntry = successEntries[0];
+    const singleWaitTime =
+      result?.estimated_wait_time ?? singleEntry?.estimated_wait_time;
+    // RQ-18 follow-up (P1-1/P2-1): in direction mode the ticket belongs to
+    // the DIRECTION — label it with the direction title, never the raw
+    // internal department code (qdir:*) or the clinic-wide sentinel name.
+    const singleSpecialistLabel = directionMode
+      ? directionInfo?.title ?? null
+      : result?.specialist_name ?? singleEntry?.specialist_name ?? null;
+
     // Подпись неудачного направления: по выбранному специалисту, иначе по id.
     const failedDirectionLabel = (specialistId: number | string | undefined): string => {
       const match = availableSpecialists.find(
@@ -1005,7 +1100,12 @@ const QueueJoin = () => {
     };
 
     const firstSuccessEntry = result?.entries?.[0];
-    const departmentName = getDepartmentName(firstSuccessEntry?.department || firstSuccessEntry?.specialty);
+    // RQ-18 follow-up (P1-1/P2-1): in direction mode the footer names the
+    // DIRECTION (getDepartmentName cannot resolve the internal qdir:* code
+    // and would fall back to a generic label).
+    const departmentName = directionMode
+      ? directionInfo?.title ?? ''
+      : getDepartmentName(firstSuccessEntry?.department || firstSuccessEntry?.specialty);
 
     return (
       <main className="min-h-screen flex items-center justify-center p-4 qj-page-base" aria-labelledby="queue-join-success-title">
@@ -1088,10 +1188,12 @@ const QueueJoin = () => {
                     <Users style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                     <span className="qj-info-label">{t('misc.qj_ahead_of_you')}</span>
                   </div>
-                  <span className="qj-info-value">{t('misc.qj_count_short', { count: Number(result?.queue_number ?? 0) - 1 })}</span>
+                  {/* RQ-18 follow-up (P2-1): clamped — a missing/first
+                      ticket must never render a negative count. */}
+                  <span className="qj-info-value">{t('misc.qj_count_short', { count: Math.max(Number(singleEntryNumber ?? 0) - 1, 0) })}</span>
                 </div>
 
-                {result?.estimated_wait_time && (
+                {singleWaitTime != null && (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -1104,11 +1206,11 @@ const QueueJoin = () => {
                       <Timer style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                       <span className="qj-info-label">{t('misc.qj_waiting_label')}</span>
                     </div>
-                    <span className="qj-info-value">{formatWaitTime(Number(result?.estimated_wait_time ?? 0))}</span>
+                    <span className="qj-info-value">{formatWaitTime(Number(singleWaitTime ?? 0))}</span>
                   </div>
                 )}
 
-                {result?.specialist_name && (
+                {singleSpecialistLabel && (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -1121,7 +1223,7 @@ const QueueJoin = () => {
                       <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                       <span className="qj-info-label">{t('misc.qj_label_specialist')}</span>
                     </div>
-                    <span className="qj-info-value">{String(result?.specialist_name ?? '')}</span>
+                    <span className="qj-info-value">{String(singleSpecialistLabel)}</span>
                   </div>
                 )}
               </div>
@@ -1194,13 +1296,26 @@ const QueueJoin = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div className="flex items-center" style={{ opacity: 0.95 }}>
               <MapPin style={{ width: '16px', height: '16px', marginRight: 'var(--mac-spacing-2)', flexShrink: 0 }} />
-              <span style={{ fontSize: 'var(--mac-font-size-base)', lineHeight: '1.4' }}>{queueInfo?.department_name || t('misc.qj_general_practice')}</span>
+              {/* RQ-18 follow-up (P1-1): in direction mode the patient must
+                  see the DIRECTION they are joining — the display SSOT is
+                  the direction object, never the clinic-wide sentinel
+                  queue_info fields («Клиника»). */}
+              <span style={{ fontSize: 'var(--mac-font-size-base)', lineHeight: '1.4' }}>
+                {directionMode
+                  ? directionInfo?.title || queueInfo?.department_name || t('misc.qj_general_practice')
+                  : queueInfo?.department_name || t('misc.qj_general_practice')}
+              </span>
             </div>
 
-            <div className="flex items-center" style={{ opacity: 0.9 }}>
-              <User style={{ width: '16px', height: '16px', marginRight: 'var(--mac-spacing-2)', flexShrink: 0 }} />
-              <span style={{ fontSize: 'var(--mac-font-size-sm)', lineHeight: '1.4' }}>{queueInfo?.specialist_name}</span>
-            </div>
+            {/* RQ-18 follow-up (P1-1): a direction is not a specialist —
+                the clinic-wide sentinel «Все специалисты» row is never
+                shown on the permanent-address route. */}
+            {!directionMode && (
+              <div className="flex items-center" style={{ opacity: 0.9 }}>
+                <User style={{ width: '16px', height: '16px', marginRight: 'var(--mac-spacing-2)', flexShrink: 0 }} />
+                <span style={{ fontSize: 'var(--mac-font-size-sm)', lineHeight: '1.4' }}>{queueInfo?.specialist_name}</span>
+              </div>
+            )}
 
             {queueInfo?.target_date && (
               <div className="flex items-center" style={{
@@ -1411,6 +1526,15 @@ const QueueJoin = () => {
         {step === 'info' && (
           <div className="qj-select-section">
             {/* Статус очереди - macOS стиль с правильным spacing */}
+            {/* RQ-18 follow-up (P1-1): in direction mode the start response
+                carries NO live queue statistics — the clinic-wide builder
+                emits sentinel zeros for the minted token, and the follow-up
+                endpoint override replaces them with null. A fabricated
+                «0 в очереди / ~0 мин» is never shown; the real numbers
+                arrive with the ticket result (P2-1 normalization). If a
+                future contract delivers honest per-direction stats through
+                an explicit field, consuming it is a deliberate follow-up. */}
+            {!directionMode && (
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
@@ -1481,6 +1605,7 @@ const QueueJoin = () => {
                 }}>{t('misc.qj_estimated_wait')}</div>
               </div>
             </div>
+            )}
 
             {/* Текст и кнопка с правильными отступами */}
             <div style={{

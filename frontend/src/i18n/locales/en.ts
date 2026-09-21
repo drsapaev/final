@@ -2492,6 +2492,7 @@ const en = {
         unknown: 'Permanent QR status is unknown (status read failed)',
         failed: 'Failed to create the permanent QR',
         sr_qr: 'QR code of the permanent direction address',
+        dedupe_note: 'This direction’s permanent QR is shown in the «{tag}» row — the address belongs to the whole profile, not to an individual tag.',
         },
     qrm_title: 'QueueResource registry',
     qrm_subtitle: 'Resource owners of tags. Creation is draft; activation goes through the §3.1 invariant gate. code/queue_tag are immutable after creation (§3.2).',
