@@ -103,7 +103,18 @@ function doctorAuth(page: import('@playwright/test').Page) {
 
 function mockNurseServing(
   page: import('@playwright/test').Page,
-  { workplaces = WORKPLACES, board = BOARD, profile = NURSE_PROFILE } = {},
+  {
+    workplaces = WORKPLACES,
+    board = BOARD,
+    profile = NURSE_PROFILE,
+  }: {
+    // The payloads are structural JSON for route.fulfill — the board
+    // stays permissive so a handover board (with the N2-5 predicate
+    // fields the base BOARD literal does not infer) passes through.
+    workplaces?: typeof WORKPLACES;
+    board?: Record<string, unknown>;
+    profile?: typeof NURSE_PROFILE;
+  } = {},
 ) {
   // ONE handler for the whole API surface (the authenticatedQa pattern):
   // unmocked paths would hit the dev-server proxy and fail ECONNREFUSED

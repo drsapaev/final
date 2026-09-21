@@ -192,7 +192,7 @@
   margin: 0 0 var(--mac-spacing-2, 8px);
   padding: var(--mac-spacing-2, 8px) var(--mac-spacing-3, 12px);
   border-radius: var(--mac-radius-md, 8px);
-  background: var(--mac-accent-muted, rgba(215, 225, 238, 1));
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
   border-left: 4px solid var(--mac-accent, rgba(0, 122, 255, 1));
   font-size: 15px;
   color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
@@ -217,7 +217,7 @@
   margin: 0 0 var(--mac-spacing-2, 8px);
   padding: var(--mac-spacing-2, 8px) var(--mac-spacing-3, 12px);
   border-radius: var(--mac-radius-md, 8px);
-  background: var(--mac-warning-muted, rgba(255, 241, 204, 1));
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
   border-left: 4px solid var(--mac-warning, rgba(255, 159, 10, 1));
   font-size: 14px;
   color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
