@@ -31857,6 +31857,10 @@ export type components = {
              * @default false
              */
             is_my_claim: boolean;
+            /** Claim Owner Assignment Active */
+            claim_owner_assignment_active?: boolean | null;
+            /** Actionable By Current User */
+            actionable_by_current_user?: boolean | null;
             /** Services */
             services?: components["schemas"]["NurseServingStationServiceState"][];
         };

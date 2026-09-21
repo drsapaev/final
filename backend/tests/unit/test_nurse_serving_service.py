@@ -145,6 +145,7 @@ def _entry(
     status: str = "waiting",
     priority: int = 0,
     visit: Visit | None = None,
+    called_by: int | None = None,
 ) -> OnlineQueueEntry:
     entry = OnlineQueueEntry(
         queue_id=queue.id,
@@ -155,6 +156,8 @@ def _entry(
         priority=priority,
         source="desk",
         visit_id=visit.id if visit else None,
+        called_by_user_id=called_by,
+        called_at=datetime.now(UTC) if called_by is not None else None,
     )
     db.add(entry)
     db.commit()
@@ -1080,6 +1083,237 @@ class TestReadPlane:
 
 
 # ----------------------------------------------------------------------------
+# H. N2-5 owner review round (P1): the server-derived D1 handover predicate
+# ----------------------------------------------------------------------------
+
+
+class TestHandoverPredicate:
+    """The board tells the tablet WHICH active entries are actionable.
+
+    The start/terminal endpoints authorize ANY assigned nurse of the
+    station, but a foreign entry may only surface as an action surface
+    when the SERVER proves the takeover: the claim owner (called_by)
+    no longer holds an ACTIVE assignment on THIS station — or never
+    existed (the admin-called display-board flow). An owner still
+    working keeps her entry read-only for the colleagues."""
+
+    def test_revoked_owner_leaves_the_entry_actionable(self, db_session: Session):
+        # The owner's exact scenario: A calls the patient, her assignment
+        # is revoked before the service starts; B (active assignment on
+        # the same station) must see a takeover surface, not a dead end.
+        owner = _nurse(db_session, "n25_hand_owner_revoked")
+        colleague = _nurse(db_session, "n25_hand_colleague_revoked")
+        resource = _resource(db_session, "handover1")
+        _assignment(db_session, owner, resource, active=False)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        entry = _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Галина Передача"),
+            status="called",
+            called_by=owner.id,
+        )
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = next(e for e in state["active"] if e["id"] == entry.id)
+        assert foreign["is_my_claim"] is False
+        assert foreign["claim_owner_assignment_active"] is False
+        assert foreign["actionable_by_current_user"] is True
+        assert state["my_entry"] is None
+
+    def test_active_owner_keeps_the_entry_read_only_for_colleagues(
+        self, db_session: Session
+    ):
+        owner = _nurse(db_session, "n25_hand_owner_active")
+        colleague = _nurse(db_session, "n25_hand_colleague_active")
+        resource = _resource(db_session, "handover2")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        entry = _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Иван Занят"),
+            status="in_progress",
+            called_by=owner.id,
+        )
+
+        service = NurseServingApiService(db_session)
+        colleague_view = service.get_station_state(colleague.id, resource.id)
+        foreign = next(e for e in colleague_view["active"] if e["id"] == entry.id)
+        assert foreign["claim_owner_assignment_active"] is True
+        assert foreign["actionable_by_current_user"] is False
+        assert colleague_view["my_entry"] is None
+        # The owner herself still sees her claim as the current patient.
+        owner_view = service.get_station_state(owner.id, resource.id)
+        assert owner_view["my_entry"] is not None
+        assert owner_view["my_entry"]["actionable_by_current_user"] is True
+        assert owner_view["my_entry"]["claim_owner_assignment_active"] is True
+
+    def test_own_claim_is_actionable(self, db_session: Session):
+        nurse = _nurse(db_session, "n25_hand_own")
+        resource = _resource(db_session, "handover3")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Оксана Своя"),
+            status="called",
+            called_by=nurse.id,
+        )
+        state = NurseServingApiService(db_session).get_station_state(
+            nurse.id, resource.id
+        )
+        assert state["my_entry"] is not None
+        assert state["my_entry"]["claim_owner_assignment_active"] is True
+        assert state["my_entry"]["actionable_by_current_user"] is True
+
+    def test_admin_called_entry_without_owner_is_actionable(self, db_session: Session):
+        # The display-board admin call: called_by is NULL — every
+        # assigned nurse may start it (the start_entry contract).
+        nurse = _nurse(db_session, "n25_hand_admincall")
+        resource = _resource(db_session, "handover4")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Пётр Админ"),
+            status="called",
+        )
+        state = NurseServingApiService(db_session).get_station_state(
+            nurse.id, resource.id
+        )
+        assert state["my_entry"] is None
+        entry = state["active"][0]
+        assert entry["called_by_user_id"] is None
+        assert entry["claim_owner_assignment_active"] is False
+        assert entry["actionable_by_current_user"] is True
+
+    def test_owner_working_on_another_station_does_not_block_the_takeover(
+        self, db_session: Session
+    ):
+        # The ownership check is STATION-scoped: A lost THIS station's
+        # assignment but still works another one — the entry she called
+        # here stays takeover-eligible for this station's assigned staff.
+        owner = _nurse(db_session, "n25_hand_owner_moved")
+        colleague = _nurse(db_session, "n25_hand_colleague_moved")
+        this_station = _resource(db_session, "handover5")
+        other_station = _resource(db_session, "handover5_other")
+        _assignment(db_session, owner, other_station)
+        _assignment(db_session, colleague, this_station)
+        queue = _station_queue(db_session, this_station)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Леонид Межстанция"),
+            status="in_progress",
+            called_by=owner.id,
+        )
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, this_station.id
+        )
+        foreign = state["active"][0]
+        assert foreign["claim_owner_assignment_active"] is False
+        assert foreign["actionable_by_current_user"] is True
+
+    def test_waiting_and_terminal_rows_do_not_carry_the_predicate(
+        self, db_session: Session
+    ):
+        nurse = _nurse(db_session, "n25_hand_shapes")
+        resource = _resource(db_session, "handover6")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        waiting = _entry(db_session, queue, 1, patient=_patient(db_session, "Wait N25"))
+        # A terminal row that REALLY surfaces on the board: a visit with
+        # a pending station service -> late_pending.
+        served_visit = _visit(
+            db_session,
+            _patient(db_session, "Done N25"),
+            department=resource.queue_tag,
+        )
+        svc = _service(db_session, "HAND6", queue_tag=resource.queue_tag)
+        _visit_service(db_session, served_visit, svc)
+        served = _entry(
+            db_session,
+            queue,
+            2,
+            patient=_patient(db_session, "Done N25"),
+            status="served",
+            visit=served_visit,
+            called_by=nurse.id,
+        )
+        state = NurseServingApiService(db_session).get_station_state(
+            nurse.id, resource.id
+        )
+        waiting_item = next(e for e in state["waiting"] if e["id"] == waiting.id)
+        assert "claim_owner_assignment_active" not in waiting_item
+        assert "actionable_by_current_user" not in waiting_item
+        terminal_item = next(e for e in state["late_pending"] if e["id"] == served.id)
+        assert terminal_item is not None
+        assert "claim_owner_assignment_active" not in terminal_item
+        assert "actionable_by_current_user" not in terminal_item
+
+    def test_full_takeover_flow_through_the_predicate(self, db_session: Session):
+        # End-to-end D1 handover from the colleague's chair: the board
+        # says actionable -> start -> execute -> complete flips the entry.
+        owner = _nurse(db_session, "n25_flow_owner")
+        colleague = _nurse(db_session, "n25_flow_colleague")
+        resource = _resource(db_session, "handover7")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Марина Приём")
+        entry = _entry(db_session, queue, 1, patient=patient, called_by=owner.id)
+        service = NurseServingApiService(db_session)
+        service.call_next(owner.id, resource.id)
+
+        # The owner's shift ends mid-flight: assignment revoked BEFORE
+        # the service started; the colleague's board flags the takeover.
+        owner_assignment = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == owner.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .one()
+        )
+        owner_assignment.is_active = False
+        db_session.commit()
+
+        state = service.get_station_state(colleague.id, resource.id)
+        assert state["active"][0]["actionable_by_current_user"] is True
+
+        start = service.start_entry(colleague.id, resource.id, entry.id)
+        assert start["status"] == "in_progress"
+        assert start["idempotent"] is False
+
+        visit = db_session.get(Visit, entry.visit_id)
+        svc = _service(db_session, "HAND1", queue_tag=resource.queue_tag)
+        vs = _visit_service(db_session, visit, svc)
+        execution = service.create_execution(
+            colleague.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=vs.id,
+        )
+        completion = service.complete_execution(colleague.id, execution["id"])
+        assert completion["entry_served"] is True
+        assert completion["entry_served_by_user_id"] == colleague.id
+        db_session.refresh(entry)
+        assert entry.status == "served"
+
+
+# ----------------------------------------------------------------------------
 # I. codex round-1 regressions (station chain / visit-day transfer / replay)
 # ----------------------------------------------------------------------------
 
@@ -1600,8 +1834,15 @@ class TestCodexRound3BoardQueryBudget:
         n_done: int,
     ) -> tuple[User, QueueResource]:
         nurse = _nurse(db, f"n23_budget_{suffix}")
+        # N2-5 owner review round: the board carries claim owners now —
+        # a colleague with her own active assignment alternates the
+        # called_by attribution so the handover-predicate batch query
+        # actually RUNS in both worlds (the constant-budget pin keeps
+        # its teeth on the new lookup too).
+        colleague = _nurse(db, f"n23_budget_peer_{suffix}")
         resource = _resource(db, f"budget_{suffix}")
         _assignment(db, nurse, resource)
+        _assignment(db, colleague, resource)
         queue = _station_queue(db, resource)
         svc = _service(db, f"BUD{suffix}", queue_tag=resource.queue_tag)
         number = 0
@@ -1616,6 +1857,7 @@ class TestCodexRound3BoardQueryBudget:
                 patient=patient,
                 status="in_progress",
                 visit=visit,
+                called_by=(nurse.id if i % 2 == 0 else colleague.id),
             )
             _visit_service(db, visit, svc)
         for i in range(n_late):
@@ -1680,9 +1922,18 @@ class TestCodexRound3BoardQueryBudget:
         assert boards[0]["counts"]["late_pending"] == 2
         assert len(boards[1]["active"]) == 6
         assert boards[1]["counts"]["late_pending"] == 8
+        # The handover predicate really is populated on every active row:
+        # the READER's own claims (even rows) stay actionable, while the
+        # colleague's claims (odd rows) keep her ACTIVE assignment —
+        # claim_owner_assignment_active=True and read-only for the reader.
+        for board in boards:
+            for index, item in enumerate(board["active"]):
+                assert item["claim_owner_assignment_active"] is True
+                assert item["actionable_by_current_user"] is (index % 2 == 0)
 
         # CONSTANT budget: the 22-row board costs the SAME SQL as the
-        # 6-row one (3 lookups + 3 entry lists + 2 enrichment batches).
+        # 6-row one (3 lookups + 3 entry lists + 2 enrichment batches +
+        # 1 claim-owner assignment batch — the N2-5 handover lookup).
         assert counts[0] == counts[1]
         assert counts[0] <= 12
 

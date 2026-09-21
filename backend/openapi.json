@@ -91519,6 +91519,28 @@
             "title": "Is My Claim",
             "default": false
           },
+          "claim_owner_assignment_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Owner Assignment Active"
+          },
+          "actionable_by_current_user": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actionable By Current User"
+          },
           "services": {
             "items": {
               "$ref": "#/components/schemas/NurseServingStationServiceState"

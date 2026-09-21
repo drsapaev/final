@@ -389,7 +389,12 @@ class NurseServingApiService:
         resource: QueueResource | None = None,
         with_services: bool = False,
         services: list[dict[str, Any]] | None = None,
+        claim_owner_assignment_active: bool | None = None,
     ) -> dict[str, Any]:
+        is_my_claim = (
+            entry.called_by_user_id == my_user_id
+            and entry.status in _ENTRY_ACTIVE_STATES
+        )
         payload: dict[str, Any] = {
             "id": entry.id,
             "number": entry.number,
@@ -405,12 +410,18 @@ class NurseServingApiService:
             "served_by_user_id": entry.served_by_user_id,
             "served_at": entry.served_at,
             "visit_id": entry.visit_id,
-            "is_my_claim": (
-                entry.called_by_user_id == my_user_id
-                and entry.status in _ENTRY_ACTIVE_STATES
-            ),
+            "is_my_claim": is_my_claim,
             "services": [],
         }
+        if claim_owner_assignment_active is not None:
+            # N2-5 owner review round (P1, the D1 handover): the board's
+            # server-derived actionability. Only get_station_state passes
+            # the fact (for ACTIVE rows) — everywhere else the fields stay
+            # absent (schema default None: the predicate does not apply).
+            payload["claim_owner_assignment_active"] = claim_owner_assignment_active
+            payload["actionable_by_current_user"] = (
+                is_my_claim or not claim_owner_assignment_active
+            )
         if services is not None:
             # Pre-folded by the batch loader (the board path): reuse
             # as-is — no second enrichment pass (codex round-3 P2).
@@ -880,8 +891,41 @@ class NurseServingApiService:
         enriched = self._station_services_batch(
             [*active_rows, *terminal_rows], resource
         )
+        # N2-5 owner review round (P1, the D1 handover): which claim
+        # owners still hold an ACTIVE assignment on THIS station — ONE
+        # batched query for the whole board (the constant-budget pin).
+        # An owner whose assignment is gone leaves her called/in_progress
+        # entry actionable for the remaining assigned nurses — the exact
+        # takeover the start/terminal endpoints sanction; an owner-less
+        # (admin-called) entry is actionable for every assigned nurse.
+        claim_owner_ids = {
+            e.called_by_user_id for e in active_rows if e.called_by_user_id is not None
+        }
+        owners_with_active_assignment: set[int] = set()
+        if claim_owner_ids:
+            owner_rows = (
+                self.db.query(NurseWorkplaceAssignment.user_id)
+                .filter(
+                    NurseWorkplaceAssignment.user_id.in_(claim_owner_ids),
+                    NurseWorkplaceAssignment.queue_resource_id == resource.id,
+                    NurseWorkplaceAssignment.is_active.is_(True),
+                )
+                .all()
+            )
+            owners_with_active_assignment = {row[0] for row in owner_rows}
         active = [
-            self._entry_payload(e, my_user_id=user_id, services=enriched[e.id])
+            self._entry_payload(
+                e,
+                my_user_id=user_id,
+                services=enriched[e.id],
+                claim_owner_assignment_active=(
+                    e.called_by_user_id is not None
+                    and (
+                        e.called_by_user_id == user_id
+                        or e.called_by_user_id in owners_with_active_assignment
+                    )
+                ),
+            )
             for e in active_rows
         ]
         my_entry = next((item for item in active if item["is_my_claim"]), None)

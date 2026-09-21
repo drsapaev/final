@@ -353,6 +353,91 @@ def test_full_serving_flow_with_last_completer_flip(
     assert visit.status == "in_progress"
 
 
+def test_station_board_publishes_the_handover_predicate(
+    client: TestClient, db_session: Session
+) -> None:
+    """N2-5 owner review round (P1): the board response carries the
+    server-derived D1 handover predicate — a revoked claim owner leaves
+    her entry actionable for the remaining assigned staff; an active
+    owner keeps hers read-only; waiting rows carry no predicate."""
+    owner = _user(db_session, "n25_ep_owner", "Nurse")
+    colleague = _user(db_session, "n25_ep_colleague", "Nurse")
+    resource = _resource(db_session, "handover_ep")
+    _assignment(db_session, owner, resource, active=False)
+    _assignment(db_session, colleague, resource)
+    queue = _queue(db_session, resource)
+    patient = _patient(db_session, "Зина Эндпоинт")
+    entry = OnlineQueueEntry(
+        queue_id=queue.id,
+        number=1,
+        patient_id=patient.id,
+        patient_name=patient.first_name,
+        status="called",
+        source="desk",
+        called_by_user_id=owner.id,
+    )
+    db_session.add(entry)
+    waiting = _entry(db_session, queue, 2, _patient(db_session, "Wait Ep"))
+    db_session.commit()
+
+    response = client.get(
+        f"{_BASE}/queue-resources/{resource.id}/entries",
+        headers=_headers(db_session, colleague),
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    active = next(e for e in body["active"] if e["id"] == entry.id)
+    assert active["is_my_claim"] is False
+    assert active["claim_owner_assignment_active"] is False
+    assert active["actionable_by_current_user"] is True
+    waiting_item = next(e for e in body["waiting"] if e["id"] == waiting.id)
+    assert waiting_item["claim_owner_assignment_active"] is None
+    assert waiting_item["actionable_by_current_user"] is None
+
+    # The takeover is REAL through the router: the colleague starts the
+    # orphaned called entry (the start endpoint authorizes her).
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/entries/{entry.id}/start",
+        headers=_headers(db_session, colleague),
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "in_progress"
+    assert response.json()["idempotent"] is False
+
+
+def test_station_board_keeps_an_active_owners_entry_read_only(
+    client: TestClient, db_session: Session
+) -> None:
+    owner = _user(db_session, "n25_ep_owner_active", "Nurse")
+    colleague = _user(db_session, "n25_ep_colleague_active", "Nurse")
+    resource = _resource(db_session, "handover_ep2")
+    _assignment(db_session, owner, resource)
+    _assignment(db_session, colleague, resource)
+    queue = _queue(db_session, resource)
+    patient = _patient(db_session, "Тимур Активен")
+    entry = OnlineQueueEntry(
+        queue_id=queue.id,
+        number=1,
+        patient_id=patient.id,
+        patient_name=patient.first_name,
+        status="in_progress",
+        source="desk",
+        called_by_user_id=owner.id,
+    )
+    db_session.add(entry)
+    db_session.commit()
+
+    response = client.get(
+        f"{_BASE}/queue-resources/{resource.id}/entries",
+        headers=_headers(db_session, colleague),
+    )
+    assert response.status_code == 200, response.text
+    active = response.json()["active"][0]
+    assert active["claim_owner_assignment_active"] is True
+    assert active["actionable_by_current_user"] is False
+    assert response.json()["my_entry"] is None
+
+
 def test_execution_conflict_matrix_through_router(
     client: TestClient, db_session: Session
 ) -> None:
