@@ -4718,11 +4718,15 @@ def test_legacy_bridge_cutoff_pinned_is_absolute_and_restart_proof(monkeypatch):
     assert idem_module._legacy_bridge_active() is False
 
     # Unpinned: the transitional process-start fallback — reachable ONLY
-    # when no shared store answers (no claim at all, anchor cache unset);
-    # the process epoch then governs, as documented.
+    # when no shared store answers (no claim AT ALL, anchor cache unset);
+    # the process epoch then governs, as documented. get_distributed_claim
+    # is stubbed too: on a host with a live Redis service the lazy claim
+    # builder would otherwise hand the fallback a REAL store (whose fresh
+    # anchor legitimately governs and would mask the fallback semantics).
     saved_claim = idem_module._distributed_claim
     saved_anchor_cache = idem_module._BRIDGE_ANCHOR_CACHE
     idem_module._distributed_claim = None
+    monkeypatch.setattr(idem_module, "get_distributed_claim", lambda: None)
     idem_module._BRIDGE_ANCHOR_CACHE = (False, 0.0)
     try:
         monkeypatch.setattr(settings, "IDEMPOTENCY_LEGACY_BRIDGE_CUTOFF_EPOCH", None)
