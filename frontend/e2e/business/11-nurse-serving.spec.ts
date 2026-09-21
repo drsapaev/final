@@ -164,6 +164,41 @@ test.describe('Business: NURSE-V2 N2-5 tablet', () => {
     await expect(page.getByRole('button', { name: 'Вызвать следующего' })).toBeVisible();
   });
 
+  test('D1 handover: a server-proven actionable entry renders [Принять пациента]', async ({ page }) => {
+    await nurseAuth(page);
+    // The claim owner's assignment is GONE — the server marks the
+    // orphaned called entry actionable for the signed-in nurse.
+    const handoverBoard = {
+      ...BOARD,
+      waiting: [],
+      counts: { waiting: 0 },
+      active: [
+        {
+          ...BOARD.waiting[0],
+          id: 42,
+          number: 42,
+          status: 'called',
+          patient_name: 'Ольга Передача',
+          called_by_user_id: 999,
+          is_my_claim: false,
+          claim_owner_assignment_active: false,
+          actionable_by_current_user: true,
+        },
+      ],
+      my_entry: null,
+    };
+    await mockNurseServing(page, { board: handoverBoard });
+    await page.goto('/nurse');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('Ольга Передача')).toBeVisible();
+    await expect(
+      page.getByText(/Сотрудник, вызвавший пациента, недоступен/),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Принять пациента' })).toBeVisible();
+    // An owner-gone entry is NOT a foreign read-only row.
+    await expect(page.getByText('Обслуживается другим сотрудником')).toHaveCount(0);
+  });
+
   test('Doctor is denied on /nurse (Nurse-only route)', async ({ page }) => {
     await doctorAuth(page);
     await mockNurseServing(page, {

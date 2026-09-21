@@ -7,6 +7,13 @@
  *  - in_progress          -> the station-routed service list (each with its own actions).
  * NO visit-close action exists here (§5): «Выполнено» completes a
  * ServiceExecution, the Visit stays open — the server decides the flip.
+ *
+ * Owner review round (P1, the D1 handover): when the current card is a
+ * server-proven takeover (the claim owner's assignment is gone), the
+ * called-state start action reads [Принять пациента] and the card carries
+ * the handover banner; the others block adds the explicit takeover
+ * action ONLY on rows the server marks actionable — an owner still
+ * working keeps her row read-only.
  */
 
 import type { NurseBoardEntry } from '@/api/nurseServing';
@@ -19,8 +26,8 @@ export type NurseStationBoardProps = {
   cabinet: string | null;
   current: NurseBoardEntry | null;
   /** The station's OTHER active entries (owner review): read-only
-   * overview — "being served by another staff member". They never
-   * become the current patient and never carry actions. */
+   * overview — "being served by another staff member" — except a
+   * server-proven handover row, which carries the takeover action. */
   others: NurseBoardEntry[];
   nextWaiting: NurseBoardEntry | null;
   waitingCount: number;
@@ -57,6 +64,9 @@ export function NurseStationBoard({
   const callNextBusy = isPending('call-next');
   const statusKey =
     current != null ? `nurse.entry_status_${current.status}` : null;
+  // Owner review round (P1): a server-proven takeover — not my claim,
+  // but the board says the claim owner is gone and I may act.
+  const isTakeover = current != null && current.is_my_claim !== true;
 
   return (
     <section className="nurse-board" aria-label={stationLabel}>
@@ -72,6 +82,14 @@ export function NurseStationBoard({
               </span>
             )}
           </div>
+          {isTakeover && (
+            // The D1 handover banner: the patient was called by a staffer
+            // who no longer holds an active assignment on this station —
+            // the server explicitly hands the service to the current user.
+            <p className="nurse-handover__banner" role="status">
+              {t('nurse.handover_banner')}
+            </p>
+          )}
           <div className="nurse-current__who">
             <span className="nurse-current__number">
               {t('nurse.queue_number', { number: String(current.number) })}
@@ -94,7 +112,9 @@ export function NurseStationBoard({
                 disabled={isPending(`start:${current.id}`)}
                 onClick={() => onStart(current.id)}
               >
-                {t('nurse.action_start')}
+                {isTakeover
+                  ? t('nurse.action_takeover')
+                  : t('nurse.action_start')}
               </button>
               <button
                 type="button"
@@ -169,6 +189,10 @@ export function NurseStationBoard({
           <ul className="nurse-others__list">
             {others.map((entry) => {
               const otherStatusKey = `nurse.entry_status_${entry.status}`;
+              // Owner review round (P1): ONLY a server-proven actionable
+              // row gets the takeover action — the claim owner's active
+              // assignment keeps her entry read-only for the colleagues.
+              const actionable = entry.actionable_by_current_user === true;
               return (
                 <li key={entry.id} className="nurse-others__row">
                   <span className="nurse-next__number">
@@ -180,6 +204,23 @@ export function NurseStationBoard({
                   <span className={`nurse-badge nurse-badge--${entry.status}`}>
                     {t(otherStatusKey)}
                   </span>
+                  {actionable ? (
+                    <>
+                      <span className="nurse-others__note">
+                        {t('nurse.others_handover')}
+                      </span>
+                      <button
+                        type="button"
+                        className="nurse-btn nurse-btn--small nurse-btn--primary"
+                        disabled={isPending(`start:${entry.id}`)}
+                        onClick={() => onStart(entry.id)}
+                      >
+                        {entry.status === 'called'
+                          ? t('nurse.action_takeover')
+                          : t('nurse.action_takeover_continue')}
+                      </button>
+                    </>
+                  ) : null}
                 </li>
               );
             })}

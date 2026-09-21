@@ -503,6 +503,9 @@ const OTHER_NURSE_BOARD: NurseStationBoard = {
       patient_name: 'Ольга Чужая',
       called_by_user_id: 999,
       is_my_claim: false,
+      // The owner still holds an ACTIVE assignment — read-only for us.
+      claim_owner_assignment_active: true,
+      actionable_by_current_user: false,
     },
   ],
   my_entry: null,
@@ -731,5 +734,463 @@ describe('NURSE-V2 N2-5 tablet — workplaces discovery (owner review P2)', () =
     workplacesMock.mockResolvedValue({ items: [WORKPLACE_A], total: 1 });
     fireEvent(window, new Event('focus'));
     expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// owner-review round 2 — P1: the server-proven D1 handover
+// ---------------------------------------------------------------------------
+const HANDOVER_CALLED_BOARD: NurseStationBoard = {
+  ...WAITING_BOARD,
+  waiting: [],
+  counts: { waiting: 0 },
+  active: [
+    {
+      ...WAITING_BOARD.waiting[0],
+      id: 42,
+      number: 42,
+      status: 'called',
+      patient_name: 'Ольга Передача',
+      called_by_user_id: 999,
+      is_my_claim: false,
+      // The owner's assignment is GONE — the server hands it to us.
+      claim_owner_assignment_active: false,
+      actionable_by_current_user: true,
+    },
+  ],
+  my_entry: null,
+};
+
+const HANDOVER_IN_PROGRESS_BOARD: NurseStationBoard = {
+  ...HANDOVER_CALLED_BOARD,
+  active: [
+    {
+      ...HANDOVER_CALLED_BOARD.active[0],
+      status: 'in_progress',
+      visit_id: 77,
+      services: [
+        {
+          visit_service_id: 701,
+          service_id: 9,
+          code: 'INJ01',
+          name: 'Инъекция',
+          qty: 1,
+          latest_attempt_no: null,
+          latest_attempt_status: null,
+          in_progress_execution_id: null,
+          pending: true,
+        },
+      ],
+    },
+  ],
+};
+
+describe('NURSE-V2 N2-5 tablet — the D1 handover (owner review round 2 P1)', () => {
+  it('a revoked owner leaves the called entry actionable: banner + [Принять пациента]', async () => {
+    const user = userEvent.setup();
+    setup({ board: HANDOVER_CALLED_BOARD });
+    // The takeover renders as the CURRENT patient — the server said so.
+    expect(await screen.findByText('Ольга Передача')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Сотрудник, вызвавший пациента, недоступен/),
+    ).toBeInTheDocument();
+    // The explicit takeover action (NOT the plain start label).
+    const accept = screen.getByRole('button', { name: 'Принять пациента' });
+    expect(accept).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Начать приём' })).not.toBeInTheDocument();
+    await user.click(accept);
+    await waitFor(() => expect(startMock).toHaveBeenCalledWith(10, 42));
+  });
+
+  it('a revoked owner leaves the in_progress entry serviceable: banner + services', async () => {
+    setup({ board: HANDOVER_IN_PROGRESS_BOARD });
+    expect(await screen.findByText('Ольга Передача')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Сотрудник, вызвавший пациента, недоступен/),
+    ).toBeInTheDocument();
+    // The service list renders with its own start action — the D1
+    // takeover of an already-started service.
+    expect(await screen.findByText('Инъекция')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Начать услугу' })).toBeEnabled();
+  });
+
+  it('an actionable foreign entry in the others block carries the takeover action', async () => {
+    const user = userEvent.setup();
+    // my own claim is current; the orphaned entry waits in the others block.
+    const board: NurseStationBoard = {
+      ...HANDOVER_CALLED_BOARD,
+      my_entry: {
+        ...WAITING_BOARD.waiting[0],
+        id: 11,
+        status: 'called',
+        is_my_claim: true,
+        claim_owner_assignment_active: true,
+        actionable_by_current_user: true,
+      },
+      active: [
+        {
+          ...WAITING_BOARD.waiting[0],
+          id: 11,
+          status: 'called',
+          is_my_claim: true,
+          claim_owner_assignment_active: true,
+          actionable_by_current_user: true,
+        },
+        ...HANDOVER_CALLED_BOARD.active,
+      ],
+    };
+    setup({ board });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+    expect(screen.getByText('Ольга Передача')).toBeInTheDocument();
+    expect(screen.getByText('Доступна передача обслуживания')).toBeInTheDocument();
+    const takeover = screen.getByRole('button', { name: 'Принять пациента' });
+    await user.click(takeover);
+    await waitFor(() => expect(startMock).toHaveBeenCalledWith(10, 42));
+  });
+
+  it('an active owner keeps her entry read-only — no takeover surface', async () => {
+    setup({ board: OTHER_NURSE_BOARD });
+    expect(await screen.findByText('Ольга Чужая')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Доступна передача обслуживания'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Принять пациента' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Продолжить обслуживание' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Сотрудник, вызвавший пациента, недоступен/)).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// owner-review round 2 — P1: switching stations clears A's board at once
+// ---------------------------------------------------------------------------
+describe('NURSE-V2 N2-5 tablet — station switch PHI boundary (owner review round 2 P1)', () => {
+  it('A loaded -> choose B (pending): A\'s patient leaves the screen IMMEDIATELY', async () => {
+    const user = userEvent.setup();
+    setup({ workplaces: [WORKPLACE_A, WORKPLACE_B], board: WAITING_BOARD });
+    expect(await screen.findByText('Выберите рабочее место')).toBeInTheDocument();
+
+    let resolveB: (value: NurseStationBoard) => void = () => {};
+    boardMock.mockImplementation((id: number) => {
+      if (id === 20) {
+        return new Promise<NurseStationBoard>((resolve) => {
+          resolveB = resolve;
+        });
+      }
+      return Promise.resolve(WAITING_BOARD);
+    });
+
+    await user.click(screen.getByRole('button', { name: /Процедурный кабинет/ }));
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+    // The header already says A while its board is rendered.
+    expect(screen.getByRole('heading', { name: 'Процедурный кабинет' })).toBeInTheDocument();
+
+    // Switch to B — B's response is PENDING: A's patient must already be gone.
+    await user.click(screen.getByRole('button', { name: /Перевязочная/ }));
+    expect(screen.getByRole('heading', { name: 'Перевязочная' })).toBeInTheDocument();
+    expect(screen.queryByText('Анна Тестова')).not.toBeInTheDocument();
+    expect(screen.getByText('Загрузка…')).toBeInTheDocument();
+
+    // B lands — its own patient renders.
+    resolveB(BOARD_B);
+    expect(await screen.findByText('Мария Гонка')).toBeInTheDocument();
+  });
+
+  it('A loaded -> choose B (network error): A\'s patient NEVER renders under B\'s header', async () => {
+    const user = userEvent.setup();
+    setup({ workplaces: [WORKPLACE_A, WORKPLACE_B], board: WAITING_BOARD });
+    expect(await screen.findByText('Выберите рабочее место')).toBeInTheDocument();
+
+    boardMock.mockImplementation((id: number) => {
+      if (id === 20) {
+        return Promise.reject(new Error('Network Error'));
+      }
+      return Promise.resolve(WAITING_BOARD);
+    });
+
+    await user.click(screen.getByRole('button', { name: /Процедурный кабинет/ }));
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Перевязочная/ }));
+    // B fails — the error is visible and station A's PHI stays OUT.
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText('Анна Тестова')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Перевязочная' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Повторить' })).toBeEnabled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// owner-review round 2 — P1: revocation clears ALL PHI synchronously
+// ---------------------------------------------------------------------------
+const DRAINING_ITEM = {
+  execution: {
+    id: 55,
+    visit_service_id: 702,
+    queue_entry_id: 11,
+    attempt_no: 1,
+    status: 'in_progress',
+    started_by_user_id: 3,
+    started_at: null,
+    performed_by_user_id: null,
+    completed_at: null,
+    incomplete_reason: null,
+    created_at: null,
+    updated_at: null,
+    entry_served: false,
+    entry_served_by_user_id: null,
+  },
+  station: {
+    queue_resource_id: 30,
+    resource_code: 'proc3',
+    resource_display_name: 'Старая станция',
+    effective_cabinet: '2',
+  },
+  entry: { entry_id: 11, number: 17, patient_name: 'Анна Тестова' },
+  service: { visit_service_id: 702, code: 'DRESS01', name: 'Перевязка', qty: 1 },
+};
+
+describe('NURSE-V2 N2-5 tablet — synchronous revocation (owner review round 2 P1)', () => {
+  it('mutation 403: board AND draining PHI clear BEFORE the hung workplaces re-read resolves', async () => {
+    const user = userEvent.setup();
+    setup({
+      board: CALLED_BOARD,
+      draining: { items: [DRAINING_ITEM], total: 1 },
+    });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Незавершённая работа после смены рабочего места/),
+    ).toBeInTheDocument();
+
+    // The workplaces re-read NEVER resolves — the PHI must still be gone.
+    workplacesMock.mockImplementation(
+      () => new Promise(() => {
+        /* hung forever */
+      }),
+    );
+    // The mutation under test is the START of the called patient.
+    startMock.mockRejectedValue({
+      response: { status: 403, data: { detail: 'нет активного назначения' } },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Начать приём' }));
+    // The regression the owner demanded: PHI out BEFORE the resolution.
+    await waitFor(() => {
+      expect(screen.queryByText('Анна Тестова')).not.toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/Незавершённая работа после смены рабочего места/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Выполнено' }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/Нет доступа к этому рабочему месту/),
+    ).toBeInTheDocument();
+  });
+
+  it('draining GET 403: the drain card (PHI + terminal actions) clears at once', async () => {
+    setup({
+      board: WAITING_BOARD,
+      draining: { items: [DRAINING_ITEM], total: 1 },
+    });
+    expect(
+      await screen.findByText(/Незавершённая работа после смены рабочего места/),
+    ).toBeInTheDocument();
+
+    // The revocation is real: the world answers with NO workplaces left.
+    workplacesMock.mockResolvedValue({ items: [], total: 0 });
+    drainingMock.mockRejectedValue({
+      response: { status: 403, data: { detail: 'role revoked' } },
+    });
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Незавершённая работа после смены рабочего места/),
+      ).not.toBeInTheDocument();
+    });
+    // The unified clear also took the board's patient + the selection.
+    expect(screen.queryByText('Анна Тестова')).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/Нет доступа к этому рабочему месту/),
+    ).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// owner-review round 2 — P2: a stale silent-poll FAILURE is discarded
+// ---------------------------------------------------------------------------
+describe('NURSE-V2 N2-5 tablet — stale silent failures (owner review round 2 P2)', () => {
+  it('a LATE 403 from a superseded silent poll never blanks the fresh board', async () => {
+    const user = userEvent.setup();
+    setup({ board: WAITING_BOARD });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+
+    let rejectSilent: (reason: unknown) => void = () => {};
+    let silentStarted = false;
+    boardMock.mockImplementation((id: number) => {
+      if (id === 10 && !silentStarted) {
+        silentStarted = true;
+        return new Promise((_resolve, reject) => {
+          rejectSilent = reject;
+        });
+      }
+      return Promise.resolve(WAITING_BOARD);
+    });
+
+    // The silent poll starts (a pending board GET)...
+    fireEvent(window, new Event('focus'));
+    await waitFor(() => expect(silentStarted).toBe(true));
+    // ...then a manual refresh supersedes it and lands a FRESH board.
+    await user.click(screen.getByRole('button', { name: 'Обновить' }));
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+
+    // The silent poll finally fails with 403 — it must be DISCARDED.
+    rejectSilent({ response: { status: 403, data: { detail: 'stale' } } });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(screen.getByText('Анна Тестова')).toBeInTheDocument();
+    expect(screen.queryByText(/Нет доступа к этому рабочему месту/)).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// owner-review round 2 — P2: workplaces failure is not "no assignments"
+// ---------------------------------------------------------------------------
+describe('NURSE-V2 N2-5 tablet — workplaces failure contract (owner review round 2 P2)', () => {
+  it('network failure on refresh: the workflow STAYS, the error is VISIBLE', async () => {
+    const user = userEvent.setup();
+    setup({ board: WAITING_BOARD });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+
+    workplacesMock.mockRejectedValue(new Error('Network Error'));
+    await user.click(screen.getByRole('button', { name: 'Обновить' }));
+
+    expect(
+      await screen.findByText(/Не удалось обновить рабочие места/),
+    ).toBeInTheDocument();
+    // NOT a proven "no assignments" — the current workflow survives.
+    expect(screen.queryByText('Нет назначенного рабочего места')).not.toBeInTheDocument();
+    expect(screen.getByText('Анна Тестова')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Процедурный кабинет' })).toBeInTheDocument();
+  });
+
+  it('network failure on the zero-workplace screen: the "none assigned" claim disappears', async () => {
+    const user = userEvent.setup();
+    setup({ workplaces: [] });
+    expect(await screen.findByText('Нет назначенного рабочего места')).toBeInTheDocument();
+
+    workplacesMock.mockRejectedValue(new Error('Network Error'));
+    await user.click(screen.getByRole('button', { name: 'Обновить' }));
+
+    expect(
+      await screen.findByText(/Не удалось обновить рабочие места/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Нет назначенного рабочего места')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// owner-review round 2 — P2: a late draining response cannot resurrect
+// ---------------------------------------------------------------------------
+describe('NURSE-V2 N2-5 tablet — draining epoch (owner review round 2 P2)', () => {
+  it('a LATE silent draining response never resurrects a completed card', async () => {
+    const user = userEvent.setup();
+    // The mount read brings the drain item in (setup's default mock).
+    setup({
+      board: WAITING_BOARD,
+      draining: { items: [DRAINING_ITEM], total: 1 },
+    });
+    expect(
+      await screen.findByText(/Незавершённая работа после смены рабочего места/),
+    ).toBeInTheDocument();
+
+    // Every read AFTER the mount: #1 = the silent refresh GET (pending
+    // until we release it), #2+ = empty (the terminal refetch).
+    let drainingCalls = 0;
+    let resolveStale: (value: unknown) => void = () => {};
+    drainingMock.mockImplementation(() => {
+      drainingCalls += 1;
+      if (drainingCalls === 1) {
+        return new Promise((resolve) => {
+          resolveStale = resolve;
+        });
+      }
+      return Promise.resolve({ items: [], total: 0 });
+    });
+
+    // A silent draining refresh starts (a pending GET)...
+    fireEvent(window, new Event('focus'));
+    await waitFor(() => expect(drainingCalls).toBeGreaterThanOrEqual(1));
+
+    // ...the nurse completes the execution — the terminal refetch
+    // returns the EMPTY list and the card disappears...
+    const complete = await screen.findAllByRole('button', { name: 'Выполнено' });
+    await user.click(complete[0]);
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Незавершённая работа после смены рабочего места/),
+      ).not.toBeInTheDocument();
+    });
+
+    // ...then the stale silent GET finally answers with the OLD item.
+    resolveStale({ items: [DRAINING_ITEM], total: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(
+      screen.queryByText(/Незавершённая работа после смены рабочего места/),
+    ).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// owner-review round 2 — P1/P2: the draining read error contract
+// ---------------------------------------------------------------------------
+describe('NURSE-V2 N2-5 tablet — draining read errors (owner review round 2)', () => {
+  it('draining 404: the unprovable items drop, no warning banner', async () => {
+    setup({
+      board: WAITING_BOARD,
+      draining: { items: [DRAINING_ITEM], total: 1 },
+    });
+    expect(
+      await screen.findByText(/Незавершённая работа после смены рабочего места/),
+    ).toBeInTheDocument();
+
+    drainingMock.mockRejectedValue({
+      response: { status: 404, data: { detail: 'surface unavailable' } },
+    });
+    fireEvent(window, new Event('focus'));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Незавершённая работа после смены рабочего места/),
+      ).not.toBeInTheDocument();
+    });
+    // 404 is a PROVEN drop — not a stale-state warning.
+    expect(screen.queryByText(/данные не обновились/)).not.toBeInTheDocument();
+    // The main board is untouched by a draining 404.
+    expect(screen.getByText('Анна Тестова')).toBeInTheDocument();
+  });
+
+  it('draining network failure: the stale list STAYS with a visible warning', async () => {
+    setup({
+      board: WAITING_BOARD,
+      draining: { items: [DRAINING_ITEM], total: 1 },
+    });
+    expect(
+      await screen.findByText(/Незавершённая работа после смены рабочего места/),
+    ).toBeInTheDocument();
+
+    drainingMock.mockRejectedValue(new Error('Network Error'));
+    fireEvent(window, new Event('focus'));
+
+    expect(
+      await screen.findByText(/Незавершённая работа могла измениться/),
+    ).toBeInTheDocument();
+    // §9 stale-state contract: the last rendered drain list survives.
+    expect(screen.getByText('Анна Тестова')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Выполнено' }).length).toBe(1);
   });
 });

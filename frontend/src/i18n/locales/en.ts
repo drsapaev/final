@@ -10649,6 +10649,13 @@ const en = {
     notice_retry: 'Network error. Last data preserved — please retry',
     notice_retry_action: 'Retry',
     notice_dismiss: 'Dismiss notification',
+    handover_banner: 'The staffer who called this patient is unavailable — continue the service',
+    action_takeover: 'Accept patient',
+    action_takeover_continue: 'Continue service',
+    others_handover: 'Handover available',
+    draining_stale: 'Unfinished work may have changed — the data did not refresh',
+    workplaces_unavailable: 'Could not refresh workplaces — check the connection',
+
   },
 };
 

@@ -18,6 +18,8 @@ import type {
 
 import { useTranslation } from '../../i18n/useTranslation';
 
+import type { NurseBoardError } from './useNurseServingBoard';
+
 export type NurseWorkplacePickerProps = {
   workplaces: NurseWorkplace[];
   loading: boolean;
@@ -90,6 +92,10 @@ export function NurseWorkplacePicker({
 
 export type NurseDrainingCardProps = {
   items: NurseServingDrainingExecutionItemDto[];
+  /** Owner review round (P2): the stale-draining warning — network/5xx
+   *  keep the last rendered list, honestly labeled as possibly
+   *  outdated (401/403 cleared the items entirely; 404 dropped them). */
+  error: NurseBoardError;
   isPending: (key: string) => boolean;
   onComplete: (executionId: number) => void;
   onIncomplete: (executionId: number) => void;
@@ -97,13 +103,14 @@ export type NurseDrainingCardProps = {
 
 export function NurseDrainingCard({
   items,
+  error,
   isPending,
   onComplete,
   onIncomplete,
 }: NurseDrainingCardProps) {
   const { t } = useTranslation();
 
-  if (items.length === 0) {
+  if (items.length === 0 && error == null) {
     return null;
   }
 
@@ -111,54 +118,61 @@ export function NurseDrainingCard({
     <div className="nurse-card nurse-card--draining">
       <h2 className="nurse-draining__title">{t('nurse.draining_title')}</h2>
       <p className="nurse-draining__hint">{t('nurse.draining_hint')}</p>
-      <ul className="nurse-draining__list">
-        {items.map((item) => (
-          <li key={item.execution.id} className="nurse-draining__item">
-            <div className="nurse-draining__info">
-              <span className="nurse-draining__station">
-                {item.station.resource_display_name ||
-                  item.station.resource_code ||
-                  `#${item.station.queue_resource_id}`}
-                {item.station.effective_cabinet != null
-                  ? ` · ${t('nurse.station_cabinet', { cabinet: item.station.effective_cabinet })}`
-                  : ''}
-              </span>
-              <span className="nurse-draining__who">
-                {t('nurse.queue_number', { number: String(item.entry.number) })}
-                {item.entry.patient_name
-                  ? ` · ${item.entry.patient_name}`
-                  : ''}
-              </span>
-              <span className="nurse-draining__service">
-                {item.service.name ||
-                  item.service.code ||
-                  `#${item.service.visit_service_id}`}
-                {` · ${t('nurse.service_attempt', {
-                  attempt: String(item.execution.attempt_no),
-                })}`}
-              </span>
-            </div>
-            <div className="nurse-draining__actions">
-              <button
-                type="button"
-                className="nurse-btn nurse-btn--success"
-                disabled={isPending(`complete:${item.execution.id}`)}
-                onClick={() => onComplete(item.execution.id)}
-              >
-                {t('nurse.action_service_complete')}
-              </button>
-              <button
-                type="button"
-                className="nurse-btn nurse-btn--warning"
-                disabled={isPending(`incomplete:${item.execution.id}`)}
-                onClick={() => onIncomplete(item.execution.id)}
-              >
-                {t('nurse.action_service_incomplete')}
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {error != null && (
+        <p className="nurse-draining__stale" role="alert">
+          {t('nurse.draining_stale')}
+        </p>
+      )}
+      {items.length > 0 && (
+        <ul className="nurse-draining__list">
+          {items.map((item) => (
+            <li key={item.execution.id} className="nurse-draining__item">
+              <div className="nurse-draining__info">
+                <span className="nurse-draining__station">
+                  {item.station.resource_display_name ||
+                    item.station.resource_code ||
+                    `#${item.station.queue_resource_id}`}
+                  {item.station.effective_cabinet != null
+                    ? ` · ${t('nurse.station_cabinet', { cabinet: item.station.effective_cabinet })}`
+                    : ''}
+                </span>
+                <span className="nurse-draining__who">
+                  {t('nurse.queue_number', { number: String(item.entry.number) })}
+                  {item.entry.patient_name
+                    ? ` · ${item.entry.patient_name}`
+                    : ''}
+                </span>
+                <span className="nurse-draining__service">
+                  {item.service.name ||
+                    item.service.code ||
+                    `#${item.service.visit_service_id}`}
+                  {` · ${t('nurse.service_attempt', {
+                    attempt: String(item.execution.attempt_no),
+                  })}`}
+                </span>
+              </div>
+              <div className="nurse-draining__actions">
+                <button
+                  type="button"
+                  className="nurse-btn nurse-btn--success"
+                  disabled={isPending(`complete:${item.execution.id}`)}
+                  onClick={() => onComplete(item.execution.id)}
+                >
+                  {t('nurse.action_service_complete')}
+                </button>
+                <button
+                  type="button"
+                  className="nurse-btn nurse-btn--warning"
+                  disabled={isPending(`incomplete:${item.execution.id}`)}
+                  onClick={() => onIncomplete(item.execution.id)}
+                >
+                  {t('nurse.action_service_incomplete')}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

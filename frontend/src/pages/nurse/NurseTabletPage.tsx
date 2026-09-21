@@ -7,9 +7,15 @@
  * from the N2-3 server contract; a reload rebuilds the whole state from
  * the server (§8). PHI hygiene (§11): no patient names/phones/reasons in
  * the console, no client-side audit — the server UserAuditLog is SSOT.
+ *
+ * Owner review round: the board renders ONLY while it still describes
+ * the SELECTED station (a board for A never lingers under B's header);
+ * the current patient is my claim OR the server-proven D1 handover; a
+ * revocation (or a station switch) closes any open PHI dialog; a failed
+ * workplaces read is a visible error, never a "no assignments" claim.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { NurseReasonForm } from './NurseReasonForm';
@@ -42,8 +48,23 @@ export default function NurseTabletPage() {
     [board.workplaces, board.selectedWorkplaceId],
   );
 
+  /**
+   * Owner review round (P1): the station board renders ONLY when it
+   * still describes the SELECTED station — the belt-and-suspenders to
+   * the state machine's switch-clearing (a stale A board must never
+   * paint its patient, services or actions under B's header).
+   */
+  const stationBoard = useMemo(() => {
+    if (board.board == null || board.selectedWorkplaceId == null) {
+      return null;
+    }
+    return board.board.queue_resource_id === board.selectedWorkplaceId
+      ? board.board
+      : null;
+  }, [board.board, board.selectedWorkplaceId]);
+
   const current = useMemo(() => {
-    if (board.board == null) {
+    if (stationBoard == null) {
       return null;
     }
     // Owner review (P1): the current patient is EXCLUSIVELY my_entry —
@@ -51,28 +72,36 @@ export default function NurseTabletPage() {
     // active entry must NEVER stand in for it: taking one used to show
     // her patient as ours and hide [Вызвать следующего], collapsing the
     // two-nurses-one-station concurrency contract (§6) into one line.
-    const my = board.board.my_entry;
+    const my = stationBoard.my_entry;
     if (my != null && (my.status === 'called' || my.status === 'in_progress')) {
       return my;
     }
-    return null;
-  }, [board.board]);
+    // Owner review round (P1, the D1 handover): the ONE sanctioned
+    // exception — an active entry the SERVER marks actionable for this
+    // user (the claim owner's assignment is gone, or an admin-called
+    // entry with no owner). A foreign entry whose owner still works
+    // here stays read-only (the others block) — the predicate is
+    // server-derived, never guessed client-side.
+    const handover = (stationBoard.active ?? []).find(
+      (entry) => entry.actionable_by_current_user === true,
+    );
+    return handover ?? null;
+  }, [stationBoard]);
 
   // The station's OTHER active entries — a read-only overview block
   // ("being served by another staff member"), never a current patient
-  // and never an action surface.
+  // and never an action surface — EXCEPT a server-proven handover row,
+  // which carries the explicit takeover action (owner review round).
   const otherActive = useMemo(() => {
-    if (board.board == null) {
+    if (stationBoard == null) {
       return [];
     }
     const myId = current?.id ?? null;
-    return (board.board.active ?? []).filter(
-      (entry) => entry.id !== myId,
-    );
-  }, [board.board, current]);
+    return (stationBoard.active ?? []).filter((entry) => entry.id !== myId);
+  }, [stationBoard, current]);
 
-  const nextWaiting = board.board?.waiting?.[0] ?? null;
-  const waitingCount = board.board?.counts?.waiting ?? 0;
+  const nextWaiting = stationBoard?.waiting?.[0] ?? null;
+  const waitingCount = stationBoard?.counts?.waiting ?? 0;
 
   const stationLabel =
     selectedWorkplace?.resource_display_name ||
@@ -86,6 +115,17 @@ export default function NurseTabletPage() {
       (isPending(`complete:${dialog.executionId}`) ||
         isPending(`incomplete:${dialog.executionId}`))) ||
       (dialog.entryId != null && isPending(`entry-incomplete:${dialog.entryId}`)));
+
+  /**
+   * Owner review round (P1): a revocation or a station switch closes
+   * any open PHI dialog — the entry it was invoked for no longer
+   * renders on this surface.
+   */
+  useEffect(() => {
+    if (dialog != null && stationBoard == null) {
+      setDialog(null);
+    }
+  }, [dialog, stationBoard]);
 
   // Stable dialog callbacks: the Modal kit re-runs its focus effect when
   // `onClose` changes identity — an inline arrow would restart it on every
@@ -157,15 +197,36 @@ export default function NurseTabletPage() {
         </div>
       )}
 
-      <NurseWorkplacePicker
-        workplaces={board.workplaces}
-        loading={board.workplacesLoading}
-        selectedWorkplaceId={board.selectedWorkplaceId}
-        onSelect={(id) => void board.selectWorkplace(id)}
-      />
+      {board.workplacesError != null && (
+        // Owner review round (P2): a failed workplaces read is VISIBLE —
+        // never silently treated as "no assignments assigned".
+        <div className="nurse-notice nurse-notice--error" role="alert">
+          <span>{t('nurse.workplaces_unavailable')}</span>
+          <button
+            type="button"
+            className="nurse-btn nurse-btn--small"
+            onClick={() => void board.refresh()}
+          >
+            {t('nurse.notice_retry_action')}
+          </button>
+        </div>
+      )}
+
+      {/* An empty list UNDER a read error is unproven — the error notice
+          above is the honest display; the "no workplace assigned" card
+          renders only when the server actually said so. */}
+      {(board.workplaces.length > 0 || board.workplacesError == null) && (
+        <NurseWorkplacePicker
+          workplaces={board.workplaces}
+          loading={board.workplacesLoading}
+          selectedWorkplaceId={board.selectedWorkplaceId}
+          onSelect={(id) => void board.selectWorkplace(id)}
+        />
+      )}
 
       <NurseDrainingCard
         items={board.draining}
+        error={board.drainingError}
         isPending={isPending}
         onComplete={(executionId) => void board.completeExecution(executionId)}
         onIncomplete={(executionId) =>
@@ -175,7 +236,7 @@ export default function NurseTabletPage() {
 
       {board.selectedWorkplaceId != null && (
         <>
-          {board.boardError != null && board.board == null && (
+          {board.boardError != null && stationBoard == null && (
             <div className="nurse-card nurse-card--error" role="alert">
               <p className="nurse-error__text">
                 {t('errors.nurse.board_unavailable')}
@@ -189,7 +250,7 @@ export default function NurseTabletPage() {
               </button>
             </div>
           )}
-          {board.boardError != null && board.board != null && (
+          {board.boardError != null && stationBoard != null && (
             // Owner review: the read error is visible EVEN while the last
             // rendered board stays on screen (§9 stale-state contract) —
             // a transient failure must not be silent, and the data it
@@ -205,7 +266,7 @@ export default function NurseTabletPage() {
               </button>
             </div>
           )}
-          {(board.board != null || board.boardLoading) && (
+          {(stationBoard != null || board.boardLoading) && (
             <NurseStationBoard
               stationLabel={stationLabel}
               cabinet={cabinet}
@@ -232,7 +293,7 @@ export default function NurseTabletPage() {
               }
             />
           )}
-          {board.boardLoading && board.board == null && (
+          {board.boardLoading && stationBoard == null && (
             <p className="nurse-hint" aria-live="polite">
               {t('nurse.loading')}
             </p>

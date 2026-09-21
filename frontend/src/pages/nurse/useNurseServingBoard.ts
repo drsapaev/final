@@ -11,7 +11,8 @@
  * but that is UX only — the backend stays the correctness boundary:
  *  - 200 idempotent replay  -> render the durable server state (refetch);
  *  - 409                    -> no guesswork, no retry loop — refetch board;
- *  - 403 assignment loss    -> refetch workplaces, back to the picker;
+ *  - 403 assignment loss    -> the SYNCHRONOUS revocation clear below,
+ *    then the workplaces re-read (owner review round);
  *  - 404 operation-specific -> refetch the board (another staffer took
  *    the patient / no one is waiting / the execution is already gone) —
  *    NEVER "station unavailable": that verdict belongs to the board GET
@@ -32,6 +33,27 @@
  * they still describe the CURRENT selection — a slow response for
  * workplace A must never overwrite (or blank) workplace B after a quick
  * switch (the epoch + selected check below).
+ *
+ * Owner review round additions:
+ *  - Station-switch PHI boundary (P1): switching A -> B clears the
+ *    rendered A board IMMEDIATELY (a pending or failing B request must
+ *    never leave A's patient under B's header — the board also renders
+ *    only while it matches the current selection, see NurseTabletPage).
+ *  - Synchronous revocation (P1): every 401/403 path runs the SAME
+ *    synchronous action FIRST — bump ALL request epochs, clear board,
+ *    draining, selection — and only THEN re-read the workplaces world;
+ *    the draining discovery clears with the board (a revoked role must
+ *    not keep its PHI + terminal actions alive on a shared tablet).
+ *  - Stale silent-poll failures (P2): the catch of a silent board poll
+ *    passes the SAME epoch + selection check as the success path — a
+ *    late 403 for a superseded request never blanks the current state.
+ *  - Distinguishable workplaces failure (P2): a network/5xx failure of
+ *    the workplaces GET proves NOTHING — the previous list stays, a
+ *    visible error appears; only a server-confirmed empty list (or an
+ *    access loss) may drop the workflow.
+ *  - Draining epoch (P2): terminal mutations and newer draining reads
+ *    supersede every earlier in-flight draining response — a late
+ *    answer can never resurrect an already-completed card.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -55,9 +77,23 @@ export type NurseBoardError = {
   message: string;
 } | null;
 
+/**
+ * Owner review round (P2): the workplaces read result is DISTINGUISHABLE —
+ * `{ok: true, items}` is a server-confirmed list (empty included), while
+ * `{ok: false, status}` failed WITHOUT proving anything about the
+ * assignments (network/5xx keep the current workflow; 401/403 is an
+ * access loss and runs the synchronous revocation clear).
+ */
+export type NurseWorkplacesResult =
+  | { ok: true; items: NurseWorkplace[] }
+  | { ok: false; status: number | null };
+
 export type NurseServingBoardState = {
   workplaces: NurseWorkplace[];
   workplacesLoading: boolean;
+  /** A visible read error when the workplaces GET failed without
+   *  proving the list empty (owner review P2) — the stale list stays. */
+  workplacesError: NurseBoardError;
   /** null = not chosen yet; a persisted id is a HINT, never access. */
   selectedWorkplaceId: number | null;
   board: NurseStationBoard | null;
@@ -66,6 +102,9 @@ export type NurseServingBoardState = {
   /** The N2-3 follow-up drain-recovery discovery (§8 reload restore). */
   draining: NurseServingDrainingExecutionItemDto[];
   drainingLoading: boolean;
+  /** The stale-draining warning (owner review): network/5xx keep the
+   *  last rendered list, honestly labeled as possibly outdated. */
+  drainingError: NurseBoardError;
   /** Transient, non-PHI notice key after a mutation outcome (§9). */
   notice: string | null;
   /** Keys of in-flight mutations — buttons disable on these (§7). */
@@ -77,12 +116,14 @@ export function useNurseServingBoard() {
   const [state, setState] = useState<NurseServingBoardState>({
     workplaces: [],
     workplacesLoading: true,
+    workplacesError: null,
     selectedWorkplaceId: null,
     board: null,
     boardLoading: false,
     boardError: null,
     draining: [],
     drainingLoading: true,
+    drainingError: null,
     notice: null,
     pending: new Set<string>(),
   });
@@ -115,6 +156,21 @@ export function useNurseServingBoard() {
    */
   const boardEpochRef = useRef(0);
 
+  /**
+   * The draining-response epoch (owner review round, P2): every
+   * draining read bumps it; a terminal mutation bumps it too — a late
+   * response for an already-superseded read can never resurrect a
+   * completed drain card.
+   */
+  const drainingEpochRef = useRef(0);
+
+  /**
+   * Which station the RENDERED board describes (owner review round,
+   * P1): a board for workplace A must never linger — not while B loads,
+   * not after B fails — under workplace B's header.
+   */
+  const boardResourceIdRef = useRef<number | null>(null);
+
   const patch = useCallback((partial: Partial<NurseServingBoardState>) => {
     setState((prev) => ({ ...prev, ...partial }));
   }, []);
@@ -133,22 +189,85 @@ export function useNurseServingBoard() {
     [patch],
   );
 
+  /**
+   * The SYNCHRONOUS revocation clear (owner review round, P1): ALL PHI
+   * leaves the screen at once — every request epoch is bumped (in-flight
+   * responses become stale), the board, the draining discovery and the
+   * selection clear — BEFORE any second request runs. A slow, hung or
+   * dead workplaces re-read must never keep a revoked patient on the
+   * shared tablet; the re-read itself is orchestrated by the caller.
+   */
+  const clearAllPhi = useCallback(
+    (notice?: string) => {
+      boardEpochRef.current += 1;
+      drainingEpochRef.current += 1;
+      boardResourceIdRef.current = null;
+      applySelection(null);
+      patch({
+        board: null,
+        boardError: null,
+        boardLoading: false,
+        draining: [],
+        drainingLoading: false,
+        drainingError: null,
+        ...(notice ? { notice } : {}),
+      });
+    },
+    [applySelection, patch],
+  );
+
   // -------------------------------------------------------------------------
   // read plane
   // -------------------------------------------------------------------------
 
-  const loadWorkplaces = useCallback(async (): Promise<NurseWorkplace[]> => {
-    patch({ workplacesLoading: true });
-    try {
-      const data = await api.listWorkplaces();
-      const items = data.items ?? [];
-      patch({ workplaces: items, workplacesLoading: false });
-      return items;
-    } catch {
-      patch({ workplaces: [], workplacesLoading: false });
-      return [];
-    }
-  }, [api, patch]);
+  const loadWorkplaces = useCallback(
+    async (): Promise<NurseWorkplacesResult> => {
+      patch({ workplacesLoading: true });
+      try {
+        const data = await api.listWorkplaces();
+        const items = data.items ?? [];
+        patch({
+          workplaces: items,
+          workplacesLoading: false,
+          workplacesError: null,
+        });
+        return { ok: true, items };
+      } catch (err) {
+        const status = api.nurseServingErrorStatus(err);
+        if (status === 401 || status === 403) {
+          // Access loss: the unified synchronous clear (PHI out) — the
+          // list itself describes access, so it goes too.
+          clearAllPhi('nurse.notice_workplace_access_lost');
+          patch({ workplaces: [], workplacesLoading: false, workplacesError: null });
+          return { ok: false, status };
+        }
+        // Owner review round (P2): a network/5xx failure proves NOTHING
+        // about the assignments — the previous list STAYS, the error is
+        // visible, and nothing drops the current workflow.
+        patch({
+          workplacesLoading: false,
+          workplacesError: {
+            status,
+            message: api.nurseServingErrorText(err, 'nurse.workplaces_unavailable'),
+          },
+        });
+        return { ok: false, status };
+      }
+    },
+    [api, clearAllPhi, patch],
+  );
+
+  /**
+   * Access revoked anywhere (board/draining/mutation 403): PHI out
+   * synchronously, THEN the assignment world is re-read asynchronously.
+   */
+  const handleAccessRevoked = useCallback(
+    (notice?: string) => {
+      clearAllPhi(notice);
+      void loadWorkplaces();
+    },
+    [clearAllPhi, loadWorkplaces],
+  );
 
   /**
    * §4 selection invariant over a FRESH workplaces list: a still-granted
@@ -173,6 +292,7 @@ export function useNurseServingBoard() {
       }
       if (selected != null) {
         applySelection(null);
+        boardResourceIdRef.current = null;
         patch({ board: null, boardError: null });
       }
     },
@@ -187,7 +307,17 @@ export function useNurseServingBoard() {
   const loadBoard = useCallback(
     async (queueResourceId: number): Promise<NurseStationBoard | null> => {
       const epoch = ++boardEpochRef.current;
-      patch({ boardLoading: true, boardError: null });
+      if (boardResourceIdRef.current !== queueResourceId) {
+        // Owner review round (P1): the request describes a DIFFERENT
+        // station than the rendered board — station A's patient leaves
+        // the screen NOW, not after B lands (and not at all on B's
+        // network failure). A same-station reload keeps the rendered
+        // state (§9).
+        boardResourceIdRef.current = null;
+        patch({ board: null, boardError: null, boardLoading: true });
+      } else {
+        patch({ boardLoading: true, boardError: null });
+      }
       try {
         const board = await api.getStationBoard(queueResourceId);
         if (
@@ -199,6 +329,7 @@ export function useNurseServingBoard() {
           // station B's header.
           return null;
         }
+        boardResourceIdRef.current = queueResourceId;
         patch({ board, boardLoading: false });
         return board;
       } catch (err) {
@@ -213,11 +344,19 @@ export function useNurseServingBoard() {
         if (status === 403 || status === 404) {
           // Access-revocation boundary (owner review): the PHI leaves
           // the screen immediately. 403 = the assignment world changed
-          // (also re-read workplaces); 404 = this station surface is
-          // unavailable today. Network/5xx keep the rendered state.
+          // (also re-read workplaces — and the draining discovery clears
+          // with the board: the same role world guards it); 404 = this
+          // station surface is unavailable today. Network/5xx keep the
+          // rendered state. The selection decision belongs to the caller
+          // (initial load / picker / silent poll reset) — never to a
+          // load->403->reset loop.
+          boardResourceIdRef.current = null;
+          drainingEpochRef.current += 1;
           patch({
             board: null,
             boardLoading: false,
+            draining: [],
+            drainingError: null,
             boardError: {
               status,
               message: api.nurseServingErrorText(
@@ -227,9 +366,8 @@ export function useNurseServingBoard() {
             },
           });
           if (status === 403) {
-            // Fire-and-forget list refresh — the selection decision
-            // belongs to the caller (initial load / picker), never to a
-            // load->403->reset loop.
+            // Fire-and-forget list refresh — its own 403 would run the
+            // full synchronous revocation clear.
             void loadWorkplaces();
           }
           return null;
@@ -251,34 +389,74 @@ export function useNurseServingBoard() {
   );
   loadBoardRef.current = loadBoard;
 
-  const loadDraining = useCallback(async (): Promise<void> => {
-    patch({ drainingLoading: true });
-    try {
-      const data = await api.listDrainingExecutions();
-      patch({ draining: data.items ?? [], drainingLoading: false });
-    } catch {
-      // The discovery is a bonus surface: a failure here never blocks
-      // the main board — just keep the previous list.
-      patch({ drainingLoading: false });
-    }
-  }, [api, patch]);
+  const loadDraining = useCallback(
+    async (opts: { silent?: boolean } = {}): Promise<void> => {
+      const epoch = ++drainingEpochRef.current;
+      if (!opts.silent) {
+        patch({ drainingLoading: true });
+      }
+      try {
+        const data = await api.listDrainingExecutions();
+        if (epoch !== drainingEpochRef.current) {
+          // Superseded by a newer read or a terminal mutation — a late
+          // answer must never resurrect an already-completed card.
+          return;
+        }
+        patch({
+          draining: data.items ?? [],
+          drainingLoading: false,
+          drainingError: null,
+        });
+      } catch (err) {
+        if (epoch !== drainingEpochRef.current) {
+          return;
+        }
+        const status = api.nurseServingErrorStatus(err);
+        if (status === 401 || status === 403) {
+          // Owner review round (P1): the endpoint is Nurse-role-guarded —
+          // a revoked role must not keep the stale drain items (ФИО,
+          // service, terminal actions) on a shared tablet. The unified
+          // synchronous clear + the asynchronous workplaces re-read.
+          handleAccessRevoked('nurse.notice_workplace_access_lost');
+          return;
+        }
+        if (status === 404) {
+          // The discovery surface is unavailable — its items are no
+          // longer provably accessible: drop them.
+          patch({ draining: [], drainingLoading: false, drainingError: null });
+          return;
+        }
+        // network/5xx: keep the stale list, but label it honestly
+        // (owner review round: a visible warning, never a silent lie).
+        patch({
+          drainingLoading: false,
+          drainingError: {
+            status,
+            message: api.nurseServingErrorText(err, 'nurse.draining_stale'),
+          },
+        });
+      }
+    },
+    [api, handleAccessRevoked, patch],
+  );
 
   /** §4: 403/404 on the chosen workplace -> recheck workplaces, re-pick. */
   const resetWorkplace = useCallback(
     async (notice?: string) => {
-      const items = await loadWorkplaces();
-      patch({
-        board: null,
-        boardError: null,
-        ...(notice ? { notice } : {}),
-      });
+      // Owner review round (P1): the PHI clears SYNCHRONOUSLY — before
+      // the workplaces re-read even starts. A hung listWorkplaces must
+      // never keep a revoked patient on screen (the regression pins
+      // exactly this ordering).
+      clearAllPhi(notice);
+      const result = await loadWorkplaces();
+      const items = result.ok ? result.items : [];
       applySelection(items.length === 1 ? items[0].queue_resource_id : null);
       if (items.length === 1) {
         await loadBoardRef.current(items[0].queue_resource_id);
       }
       return items;
     },
-    [applySelection, loadBoardRef, loadWorkplaces, patch],
+    [applySelection, clearAllPhi, loadBoardRef, loadWorkplaces],
   );
 
   const selectWorkplace = useCallback(
@@ -317,7 +495,9 @@ export function useNurseServingBoard() {
           return { ...prev, pending: next, notice: null };
         });
         if (opts.terminal) {
-          // a terminal outcome may have finished drain work too
+          // a terminal outcome may have finished drain work too — the
+          // epoch bump also invalidates every earlier draining response
+          // (owner review round, P2)
           await loadDraining();
         }
         const selected = selectedRef.current;
@@ -342,7 +522,10 @@ export function useNurseServingBoard() {
           return 'conflict';
         }
         if (status === 403) {
-          // assignment lost / never granted for THIS station
+          // assignment lost / never granted for THIS station — the PHI
+          // clears synchronously inside resetWorkplace, then the world
+          // is re-read (owner review round: no window where a revoked
+          // patient outlives a slow second request).
           await resetWorkplace('nurse.notice_workplace_access_lost');
           return 'forbidden';
         }
@@ -465,9 +648,10 @@ export function useNurseServingBoard() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const items = await loadWorkplaces();
+      const result = await loadWorkplaces();
       await loadDraining();
       if (cancelled) return;
+      const items = result.ok ? result.items : [];
       let preferred: number | null = null;
       try {
         const raw = window.localStorage.getItem(WORKPLACE_PREFERENCE_KEY);
@@ -503,9 +687,10 @@ export function useNurseServingBoard() {
   /**
    * Silent refresh: board + draining, only when idle and visible.
    *
-   * The board response applies only while it still describes the current
-   * selection (a user-driven loadBoard supersedes it via the epoch).
-   * 403 -> the full access-revocation reset (PHI out, workplaces re-read);
+   * The board response (success OR failure — owner review round, P2)
+   * applies only while it still describes the current selection and no
+   * newer request superseded it (the epoch + selected check). 403 -> the
+   * full synchronous revocation reset (PHI out, workplaces re-read);
    * 404 -> the station surface clears; network/5xx -> keep the rendered
    * state. When the tablet sits on the zero-workplace screen (or nothing
    * is selected), the workplaces list is re-read too — a fresh assignment
@@ -525,15 +710,25 @@ export function useNurseServingBoard() {
             selectedRef.current === selected &&
             mountedRef.current
           ) {
+            boardResourceIdRef.current = selected;
             patch({ board });
           }
         } catch (err) {
-          if (selectedRef.current === selected) {
+          // Owner review round (P2): a stale FAILURE is discarded exactly
+          // like a stale success — the epoch + selection check, never
+          // the selection check alone (a late 403 for a superseded
+          // request must not blank the fresh state or trigger a reset).
+          if (
+            boardEpochRef.current === epoch &&
+            selectedRef.current === selected
+          ) {
             const status = api.nurseServingErrorStatus(err);
             if (status === 403) {
-              // assignment revoked: PHI out + workplaces re-read + notice
+              // assignment revoked: PHI out synchronously + workplaces
+              // re-read + notice
               await resetWorkplace('nurse.notice_workplace_access_lost');
             } else if (status === 404) {
+              boardResourceIdRef.current = null;
               patch({
                 board: null,
                 boardError: {
@@ -549,30 +744,35 @@ export function useNurseServingBoard() {
           }
         }
       }
-      try {
-        const data = await api.listDrainingExecutions();
-        if (mountedRef.current) {
-          patch({ draining: data.items ?? [] });
-        }
-      } catch {
-        // discovery is best-effort
-      }
+      // The draining discovery refresh goes through loadDraining — the
+      // epoch guard keeps a late answer from resurrecting a completed
+      // card, and 401/403 run the synchronous revocation clear.
+      await loadDraining({ silent: true });
       // Zero-workplace / nothing-selected discovery: re-read workplaces
       // (throttled by the poll interval / focus throttle) so a new
-      // assignment appears without a full page reload.
+      // assignment appears without a full page reload. A failed read
+      // proves nothing — only a server-confirmed list may re-select.
       if (
         mountedRef.current &&
         (workplacesRef.current.length === 0 || selectedRef.current == null)
       ) {
-        const items = await loadWorkplaces();
-        if (mountedRef.current) {
-          await ensureSelection(items);
+        const result = await loadWorkplaces();
+        if (mountedRef.current && result.ok) {
+          await ensureSelection(result.items);
         }
       }
     } finally {
       busyRef.current = false;
     }
-  }, [api, ensureSelection, loadWorkplaces, patch, resetWorkplace, state.pending.size]);
+  }, [
+    api,
+    ensureSelection,
+    loadDraining,
+    loadWorkplaces,
+    patch,
+    resetWorkplace,
+    state.pending.size,
+  ]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -602,18 +802,24 @@ export function useNurseServingBoard() {
   /**
    * Manual refresh: the FULL read plane — workplaces (the §4 access
    * SSOT — an assignment may have appeared or vanished) + the board +
-   * the draining discovery.
+   * the draining discovery. A failed workplaces read proves NOTHING
+   * (owner review round, P2): the current workflow stays and the board
+   * still gets its own refresh chance.
    */
   const refresh = useCallback(async () => {
-    const items = await loadWorkplaces();
+    const result = await loadWorkplaces();
     const selected = selectedRef.current;
-    if (
-      selected != null &&
-      items.some((workplace) => workplace.queue_resource_id === selected)
-    ) {
+    if (result.ok) {
+      if (
+        selected != null &&
+        result.items.some((workplace) => workplace.queue_resource_id === selected)
+      ) {
+        await loadBoardRef.current(selected);
+      } else {
+        await ensureSelection(result.items);
+      }
+    } else if (selected != null) {
       await loadBoardRef.current(selected);
-    } else {
-      await ensureSelection(items);
     }
     await loadDraining();
   }, [ensureSelection, loadBoardRef, loadDraining, loadWorkplaces]);

@@ -186,6 +186,23 @@
   color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
 }
 
+/* ——— the D1 handover (owner review round: server-proven takeover) — */
+
+.nurse-handover__banner {
+  margin: 0 0 var(--mac-spacing-2, 8px);
+  padding: var(--mac-spacing-2, 8px) var(--mac-spacing-3, 12px);
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-accent-muted, rgba(215, 225, 238, 1));
+  border-left: 4px solid var(--mac-accent, rgba(0, 122, 255, 1));
+  font-size: 15px;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+.nurse-others__note {
+  font-size: 13px;
+  color: var(--mac-accent, rgba(0, 122, 255, 1));
+}
+
 .nurse-idle__text,
 .nurse-hint,
 .nurse-services__empty,
@@ -194,6 +211,16 @@
   margin: 0;
   font-size: 16px;
   color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+.nurse-draining__stale {
+  margin: 0 0 var(--mac-spacing-2, 8px);
+  padding: var(--mac-spacing-2, 8px) var(--mac-spacing-3, 12px);
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-warning-muted, rgba(255, 241, 204, 1));
+  border-left: 4px solid var(--mac-warning, rgba(255, 159, 10, 1));
+  font-size: 14px;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
 }
 
 .nurse-empty__title {
@@ -500,6 +527,12 @@
 [data-theme='dark'] .nurse-notice,
 [data-theme='dark'] .nurse-others__row,
 [data-theme='dark'] .nurse-btn--choice {
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+[data-theme='dark'] .nurse-handover__banner,
+[data-theme='dark'] .nurse-draining__stale {
   background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
   color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
 }

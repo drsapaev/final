@@ -10650,6 +10650,13 @@ const uzLatn = {
     notice_retry: 'Tarmoq xatosi. Oxirgi ma’lumot saqlandi — qayta urinib ko‘ring',
     notice_retry_action: 'Qayta urinish',
     notice_dismiss: 'Bildirishnomani yopish',
+    handover_banner: 'Bemorni chaqirgan xodim mavjud emas — xizmatni davom ettiring',
+    action_takeover: 'Bemorni qabul qilish',
+    action_takeover_continue: 'Xizmatni davom ettirish',
+    others_handover: 'Xizmatni berish mumkin',
+    draining_stale: 'Tugallanmagan ish o‘zgarishi mumkin — ma’lumot yangilanmadi',
+    workplaces_unavailable: 'Ish o‘rinlarini yangilash mumkin bo‘lmadi — aloqani tekshiring',
+
   },
 };
 

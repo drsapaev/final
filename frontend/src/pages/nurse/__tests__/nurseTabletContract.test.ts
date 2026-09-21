@@ -42,7 +42,7 @@ describe('NURSE-V2 N2-5 tablet — source contracts', () => {
     }
     // The API module is the typed boundary over the generated schemas.
     const apiModule = read('src/api/nurseServing.ts');
-    const typesApiMarker = "from '@/types/api'";
+    const typesApiMarker = 'from \'@/types/api\'';
     expect(apiModule).toContain(typesApiMarker);
     expect(apiModule).toMatch(/NurseServingWorkplaceDto/);
     // The generated file carries the draining contract (N2-3 follow-up).
