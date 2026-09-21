@@ -131,7 +131,7 @@ describe('Lab guarded navigator history contract (PR 3351 review round 5)', () =
 
   it('replaces (never pushes) an in-lab navigation while the sentinel is armed', async () => {
     const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
-    renderLabApp({ registration, sourceIsDirty: () => true });
+    renderLabApp({ registration });
     await registerDirtySource(registration);
 
     // Sentinel вооружён: текущая запись помечена.
@@ -153,7 +153,7 @@ describe('Lab guarded navigator history contract (PR 3351 review round 5)', () =
 
   it('is a full no-op for a navigation to the already-open lab URL', async () => {
     const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
-    renderLabApp({ registration, sourceIsDirty: () => true });
+    renderLabApp({ registration });
     await registerDirtySource(registration);
 
     fireEvent.click(screen.getByRole('button', { name: 'to-lab-templates' }));
@@ -201,7 +201,7 @@ describe('Lab guarded navigator history contract (PR 3351 review round 5)', () =
 
   it('a confirmed leave replaces the sentinel entry and lands on the non-lab route', async () => {
     const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
-    renderLabApp({ registration, sourceIsDirty: () => true });
+    renderLabApp({ registration });
     await registerDirtySource(registration);
     expect(sentinelMarkerPresent()).toBe(true);
     const armedLength = window.history.length;
