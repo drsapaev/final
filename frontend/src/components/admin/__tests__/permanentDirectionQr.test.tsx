@@ -383,4 +383,38 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
         expect(screen.getByTestId('setup-qr-dedupe-lab_extra')).toBeTruthy();
         expect(screen.queryByTestId('setup-qr-block-lab_extra')).toBeNull();
     });
+
+    it('PIN 31 (round-3 P2): the parent checklist row follows the recheck — unknown while pending, ready after a proven true', async () => {
+        setupApiMock({ data: methodsPayload(false) });
+        let resolveRecheck: (value: unknown) => void = () => {};
+        const pendingRecheck = new Promise((resolve) => {
+            resolveRecheck = resolve;
+        });
+        directionMocks.fetchDirectionEntryMethods.mockReturnValue(pendingRecheck as never);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        const row = () => screen.getByTestId('setup-row-permanent-address');
+        // pre-provision: definitive false → red/not-ready
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-err')).toBeTruthy();
+        });
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        // pending recheck: the row goes honest UNKNOWN (atomic round-2 contract)
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-unknown')).toBeTruthy();
+        });
+        // the recheck PROVES true → the row must become ready — never stuck
+        // at unknown (the pre-fix parent wiped the whole entry-methods
+        // object on the null notify, so a later true hit `!current` and
+        // only a full page reload resynced the row)
+        await React.act(async () => {
+            resolveRecheck(methodsPayload(true));
+        });
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-ok')).toBeTruthy();
+        });
+        expect(row().querySelector('.admin-sdx-status-unknown')).toBeNull();
+        expect(row().querySelector('.admin-sdx-status-err')).toBeNull();
+    });
 });

@@ -155,8 +155,16 @@ const QueueJoin = () => {
     directionUnavailable: t('misc.qj_direction_unavailable'),
   };
 
-  // Получаем токен из URL параметров или query параметров (для PWA пути)
-  const token = paramToken || searchParams.get('token');
+  // Получаем токен из URL параметров или query параметров (для PWA пути).
+  // RQ-18 follow-up round-3 (P1): direction mode ignores the legacy token
+  // COMPLETELY — a foreign `?token=` query must never define the draft
+  // identity of a permanent address. One shared token would otherwise be
+  // the SAME storage key for /q/A and /q/B: no rehydration on the switch,
+  // A's typed PHI stays in memory and is submitted under B's session —
+  // PHI leakage AND wrong clinical routing in one.
+  const legacyToken = directionMode
+    ? null
+    : paramToken || searchParams.get('token');
   // RQ-18 follow-up (P1-2): у постоянного адреса нет legacy QR-токена —
   // черновик формы живёт на СВОЁМ ключе по public_code. Это делает ФИО и
   // телефон восстановимыми после перезагрузки страницы, когда сессия
@@ -166,10 +174,10 @@ const QueueJoin = () => {
   // направления — PHI-черновик направления живёт ТОЛЬКО в sessionStorage
   // (переживает reload, умирает с браузерной сессией) с коротким TTL;
   // legacy-ключ по короткоживущему QR-токену сохраняет прежнее поведение.
-  const formStorageKey = token
-    ? `queue_join_form_${token}`
-    : directionCode
-      ? `queue_join_form_qdir_${directionCode}`
+  const formStorageKey = directionCode
+    ? `queue_join_form_qdir_${directionCode}`
+    : legacyToken
+      ? `queue_join_form_${legacyToken}`
       : null;
 
   const draftGet = useCallback(
@@ -236,6 +244,25 @@ const QueueJoin = () => {
   // LATE answer for a superseded code can never overwrite the freshly
   // booted direction (out-of-order A/B responses).
   const directionEpochRef = useRef(0);
+  // RQ-18 follow-up round-3 (P1): a complete attempt makes the session's
+  // business result UNKNOWN (the response may have been lost) — from that
+  // moment the automatic session renewal is FORBIDDEN until an explicit
+  // start-over (a NEW publicCode resets this). The backend one-shot claim
+  // lives INSIDE one session token: silently minting a fresh session
+  // after a lost complete response would bypass the whole
+  // «used session → reconcile» mechanism and turn a safe retry into a
+  // second business attempt.
+  const completeAttemptedRef = useRef(false);
+  // RQ-18 follow-up round-3 (P1): the submit lock is claimed IMMEDIATELY
+  // (before the first await — the button's disabled attribute only flips
+  // after a React re-render, so two fast clicks would both pass a mere
+  // `loading` check and mint TWO sessions) and it is EPOCH+CODE-SCOPED:
+  // a superseded attempt's finally must neither release — nor keep
+  // blocking — the NEW direction's submit button.
+  const submitAttemptRef = useRef<{
+    epoch: number;
+    code: string | null;
+  } | null>(null);
   // RQ-18 follow-up round-2 (P1): a found-but-unconfirmed draft — never
   // applied to the form until its owner explicitly restores it.
   const [pendingDraft, setPendingDraft] = useState<QueueJoinDraftData | null>(null);
@@ -284,6 +311,15 @@ const QueueJoin = () => {
       // Stale draft from another code/key — the load effect owns this commit.
       return;
     }
+    // RQ-18 follow-up round-3 (P2): a found-but-unconfirmed draft must
+    // SURVIVE rerenders and remounts — the empty form under the pending
+    // confirmation banner is NOT an empty draft. Erasing here deleted the
+    // stored copy right after the banner appeared, so a second reload
+    // (or a crash) lost both the banner and the draft for good — the
+    // reload-recovery semantics were only true for the FIRST reload.
+    if (directionMode && pendingDraft) {
+      return;
+    }
     if (!formData.patientName && !formData.phone && !formData.telegramId) {
       draftRemove(formStorageKey);
       return;
@@ -293,13 +329,14 @@ const QueueJoin = () => {
     } else {
       draftSet(formStorageKey, JSON.stringify(formData));
     }
-  }, [formData, formStorageKey, formDraftHydrated, directionMode, draftSet, draftRemove]);
+  }, [formData, formStorageKey, formDraftHydrated, pendingDraft, directionMode, draftSet, draftRemove]);
 
   useEffect(() => {
     // RQ-18 follow-up round-2 (P1): switching directions discards the
     // PREVIOUS code's draft entirely — permanent codes belong to
     // different directions and their drafts must not linger.
     const previousKey = formDataOwnerRef.current;
+    const keyChanged = Boolean(previousKey) && previousKey !== formStorageKey;
     if (previousKey && previousKey !== formStorageKey) {
       draftRemove(previousKey);
     }
@@ -308,6 +345,16 @@ const QueueJoin = () => {
       setFormDraftHydrated(false);
       setPendingDraft(null);
       return;
+    }
+    // RQ-18 follow-up round-3 (P1): an explicit context drop on ANY key
+    // change — the new key hydrates from a CLEAN slate, never from the
+    // previous direction's in-memory form or its held draft. Changing
+    // the key string alone is not the contract: the form and the
+    // pending-draft state must be provably reset before the new
+    // hydration runs.
+    if (keyChanged) {
+      setPendingDraft(null);
+      setFormData({ patientName: '', phone: '', telegramId: '' });
     }
     formDataOwnerRef.current = formStorageKey;
     const saved = draftGet(formStorageKey);
@@ -359,20 +406,20 @@ const QueueJoin = () => {
 
   // ✅ Функции объявлены до использования в useEffect
   const startJoinSession = useCallback(async () => {
-    if (!token) {
+    if (!legacyToken) {
       setIsSpecialistsLoading(false);
       return;
     }
     setIsSpecialistsLoading(true);
     try {
-      const sessionData = await startQueueJoinSession(token);
+      const sessionData = await startQueueJoinSession(legacyToken);
       const nextQueueInfo: QueueJoinPageInfo = (sessionData.queue_info ?? {}) as QueueJoinPageInfo;
       const selectableSpecialists: QueueSpecialist[] = Array.isArray(nextQueueInfo.selectable_specialists)
         ? nextQueueInfo.selectable_specialists
         : [];
 
       setSessionToken(sessionData.session_token);
-      localStorage.setItem(`queue_session_${token}`, sessionData.session_token);
+      localStorage.setItem(`queue_session_${legacyToken}`, sessionData.session_token);
       setQueueInfo(nextQueueInfo);
       setAvailableSpecialists(selectableSpecialists);
 
@@ -389,10 +436,10 @@ const QueueJoin = () => {
     } finally {
       setIsSpecialistsLoading(false);
     }
-  }, [getApiErrorMessage, token]);
+  }, [getApiErrorMessage, legacyToken]);
 
   const loadTokenInfo = useCallback(async () => {
-    if (!token) {
+    if (!legacyToken) {
       setError(MISSING_QUEUE_TOKEN_MESSAGE);
       setStep('error');
       setIsSpecialistsLoading(false);
@@ -402,7 +449,7 @@ const QueueJoin = () => {
     try {
       setStep('loading');
       setIsSpecialistsLoading(true);
-      const tokenInfoRaw = await fetchQrTokenInfo(token);
+      const tokenInfoRaw = await fetchQrTokenInfo(legacyToken);
       const tokenInfo = tokenInfoRaw as unknown as QueueJoinPageInfo;
       setQueueInfo(tokenInfo);
       const tokenSpecialists = Array.isArray(tokenInfo.selectable_specialists)
@@ -432,7 +479,7 @@ const QueueJoin = () => {
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.qrTokenUnavailable));
       setStep('error');
     }
-  }, [getApiErrorMessage, startJoinSession, token]);
+  }, [getApiErrorMessage, startJoinSession, legacyToken]);
 
   // Загрузка информации о токене при монтировании
   useEffect(() => {
@@ -441,7 +488,7 @@ const QueueJoin = () => {
     if (directionMode) {
       return;
     }
-    if (!token) {
+    if (!legacyToken) {
       setSessionToken(null);
       setQueueInfo(null);
       setAvailableSpecialists([]);
@@ -452,12 +499,12 @@ const QueueJoin = () => {
     }
 
     // ✅ Пытаемся восстановить session_token из localStorage
-    const savedSessionToken = localStorage.getItem(`queue_session_${token}`);
+    const savedSessionToken = localStorage.getItem(`queue_session_${legacyToken}`);
     if (savedSessionToken) {
       setSessionToken(savedSessionToken);
     }
     loadTokenInfo();
-  }, [token, loadTokenInfo, directionMode]);
+  }, [legacyToken, loadTokenInfo, directionMode]);
 
   // RQ-18 (S-15, §8/§10): the ONLY boot of the permanent-address route —
   //   public_code → ONE public start-session → session_token + queue_info
@@ -493,6 +540,14 @@ const QueueJoin = () => {
       setSubmitResultUnknown(false);
       setShowSessionConsumedAdvisory(false);
       setSelectedSpecialists([]);
+      // RQ-18 follow-up round-3 (P1): a NEW direction is the explicit
+      // start-over — the previous code's complete attempt must not
+      // forbid B's fresh session lifecycle, and its in-flight/late
+      // submit attempt must neither keep B's submit disabled (a hung A
+      // must not make B unusable) nor later release B's own lock.
+      completeAttemptedRef.current = false;
+      submitAttemptRef.current = null;
+      setLoading(false);
     }
     setIsSpecialistsLoading(true);
     setDirectionUnavailable(false);
@@ -593,6 +648,23 @@ const QueueJoin = () => {
       return;
     }
 
+    // RQ-18 follow-up round-3 (P1): claim the attempt lock BEFORE any
+    // await — `loading` alone cannot protect the submit, because the
+    // disabled attribute only flips after a re-render. A second click
+    // while the first attempt is in flight returns immediately: one
+    // renewal and one complete — never two sessions.
+    if (submitAttemptRef.current) {
+      return;
+    }
+    // RQ-18 follow-up round-2 (P1): the complete answer is bound to the
+    // request epoch — a LATE complete for a superseded direction must
+    // never render A's ticket under B's URL. Captured before any await
+    // (the transparent renewal below does NOT move the epoch).
+    const submitEpoch = directionEpochRef.current;
+    const attempt = { epoch: submitEpoch, code: directionCode };
+    submitAttemptRef.current = attempt;
+    setLoading(true);
+
     // ✅ Проверяем наличие session_token
     let currentSessionToken = sessionToken;
 
@@ -611,7 +683,16 @@ const QueueJoin = () => {
         Date.parse(sessionExpiresAt) <= Date.now(),
     );
 
-    if (directionMode && (!currentSessionToken || directionSessionKnownExpired)) {
+    // RQ-18 follow-up round-3 (P1): the renewal gate now also checks
+    // completeAttemptedRef — once a complete request has been SENT, the
+    // first attempt's business result is unknown (the response may have
+    // been lost), and minting a fresh session would bypass the one-shot
+    // «used session → reconcile» contract and duplicate the attempt.
+    if (
+      directionMode &&
+      !completeAttemptedRef.current &&
+      (!currentSessionToken || directionSessionKnownExpired)
+    ) {
       // RQ-18 (§10): safe session-start retry — the direction start-session
       // creates a fresh short-lived session (no business action duplicated).
       // Round-2 (P1): bound to the current epoch — if the direction was
@@ -648,6 +729,8 @@ const QueueJoin = () => {
           setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.directionUnavailable));
         }
         setStep('error');
+        // Round-3 (P1): this attempt is still current — release our lock.
+        submitAttemptRef.current = null;
         setLoading(false);
         return;
       }
@@ -655,7 +738,7 @@ const QueueJoin = () => {
 
     if (!currentSessionToken) {
       // Пытаемся восстановить из localStorage
-      currentSessionToken = localStorage.getItem(`queue_session_${token}`);
+      currentSessionToken = localStorage.getItem(`queue_session_${legacyToken}`);
 
       if (!currentSessionToken) {
         // Если нет сохраненной сессии, создаем новую
@@ -664,6 +747,9 @@ const QueueJoin = () => {
         currentSessionToken = sessionToken;
         if (!currentSessionToken) {
           setError(QUEUE_JOIN_MESSAGES.sessionCreateFailed);
+          // Round-3 (P1): legacy flow — release the lock on failure.
+          submitAttemptRef.current = null;
+          setLoading(false);
           return;
         }
       } else {
@@ -671,13 +757,7 @@ const QueueJoin = () => {
       }
     }
 
-    setLoading(true);
     setError(null);
-
-    // RQ-18 follow-up round-2 (P1): the complete answer is bound to the
-    // request epoch — a LATE complete for a superseded direction must
-    // never render A's ticket under B's URL. Captured before the request.
-    const submitEpoch = directionEpochRef.current;
 
     try {
       // Валидация данных перед отправкой
@@ -762,6 +842,10 @@ const QueueJoin = () => {
 
       // RQ-18 follow-up round-2 (P1): bound to the submit epoch (captured
       // above, before the request).
+      // RQ-18 follow-up round-3 (P1): the attempt flag goes up BEFORE the
+      // request — from this moment the result is unknown, whatever happens
+      // to the response (a lost answer must never trigger a renewal).
+      completeAttemptedRef.current = true;
       const joinResult = await completeQueueJoinSession(requestBody);
       if (
         directionMode &&
@@ -772,7 +856,7 @@ const QueueJoin = () => {
       }
       setResult(joinResult as unknown as QueueJoinResultLocal);
       // ✅ Очищаем session_token из localStorage после успешного присоединения
-      localStorage.removeItem(`queue_session_${token}`);
+      localStorage.removeItem(`queue_session_${legacyToken}`);
       if (formStorageKey) {
         draftRemove(formStorageKey);
         setPendingDraft(null);
@@ -868,7 +952,16 @@ const QueueJoin = () => {
         setShowSessionConsumedAdvisory(true);
       }
     } finally {
-      setLoading(false);
+      // RQ-18 follow-up round-3 (P1): only the CURRENT page's own attempt
+      // may release the lock (identity check — the ref is either this
+      // attempt's object, a newer attempt's, or null after a code
+      // change). A late finally of a superseded direction must never
+      // re-enable the new page's submit mid-flight, and a hung attempt's
+      // lock is invalidated by the new code's boot instead.
+      if (submitAttemptRef.current === attempt) {
+        submitAttemptRef.current = null;
+        setLoading(false);
+      }
     }
   };
 

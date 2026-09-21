@@ -98,6 +98,15 @@ const AdminSetupDirections = () => {
     const [entryMethodsByProfileKey, setEntryMethodsByProfileKey] = useState<
         Record<string, EntryMethodsDto | null>
     >({});
+    // RQ-18 follow-up round-3 (P2): post-provision recheck answers as a
+    // SEPARATE tri-state override (undefined = no recheck answer yet;
+    // boolean = proven; null = recheck failed → honest unknown). Writing
+    // null INTO entryMethodsByProfileKey destroyed the last-known
+    // EntryMethodsDto — a later `true` then hit `!current` and the
+    // checklist row was stuck at unknown forever (only a full page
+    // reload resynced it).
+    const [postProvisionSupportByProfileKey, setPostProvisionSupportByProfileKey] =
+        useState<Record<string, boolean | null | undefined>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [wizard, setWizard] = useState<WizardState>(emptyWizard);
@@ -163,6 +172,9 @@ const AdminSetupDirections = () => {
                 }),
             );
             setEntryMethodsByProfileKey(Object.fromEntries(methods));
+            // A fresh FULL read is the new source of truth — any
+            // post-provision override from a previous lifecycle is stale.
+            setPostProvisionSupportByProfileKey({});
         } catch (err) {
             logger.error('Error loading setup directions data:', err);
             setError(tRef.current('admin2.sdx_load_failed'));
@@ -183,8 +195,9 @@ const AdminSetupDirections = () => {
                 resources,
                 entryMethodsByProfileKey,
                 doctors,
+                postProvisionSupportByProfileKey,
             ),
-        [services, profiles, resources, entryMethodsByProfileKey, doctors],
+        [services, profiles, resources, entryMethodsByProfileKey, doctors, postProvisionSupportByProfileKey],
     );
 
     // RQ-18 follow-up (P2-4): the permanent address is provisioned PER
@@ -210,25 +223,14 @@ const AdminSetupDirections = () => {
     // honest unknown, never a confident «недоступно»).
     const handleQrSupportedChange = useCallback(
         (profileKey: string, supported: boolean | null) => {
-            setEntryMethodsByProfileKey((prev) => {
-                const current = prev[profileKey];
-                if (supported === null || !current) {
-                    // Recheck failed → the whole row status becomes an
-                    // honest unknown (null entry = unknown icon/label).
-                    return { ...prev, [profileKey]: null };
-                }
-                return {
-                    ...prev,
-                    [profileKey]: {
-                        ...current,
-                        entry_methods: (current.entry_methods || []).map((m) =>
-                            m.method === 'permanent_address'
-                                ? { ...m, supported }
-                                : m,
-                        ),
-                    },
-                };
-            });
+            // RQ-18 follow-up round-3 (P2): record the recheck answer as a
+            // tri-state OVERRIDE — the last-known EntryMethodsDto is never
+            // destroyed, so the row can move unknown → true (or → false)
+            // when the recheck answers after the pending unknown.
+            setPostProvisionSupportByProfileKey((prev) => ({
+                ...prev,
+                [profileKey]: supported,
+            }));
         },
         [],
     );
