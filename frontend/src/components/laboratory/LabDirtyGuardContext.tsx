@@ -87,6 +87,25 @@ import { useTranslation } from '../../i18n/useTranslation';
  *    запись — sentinel + цель остаётся in-lab → маркер и sentinelHref
  *    синхронны с любой заменой URL, независимо от React.
  *
+ *    PR 3351 (review round 5, P1): push поверх sentinel'а закрыт СИСТЕМНО,
+ *    на уровне guarded navigator-а: переход с lab-маршрута на тот же
+ *    lab-маршрут (Header brand → /lab, Command Palette → Lab Panel) —
+ *    replace (идентичный URL — полный no-op), независимо от автора вызова.
+ *    Дельта -2 подтверждённого ухода больше не зависит от дисциплины
+ *    отдельных writers: вторая /lab-запись не создаётся ни при armed
+ *    sentinel, ни до его вооружения.
+ *
+ *    PR 3351 (review round 5, P2): прямой вход в /lab без реальной
+ *    предыдущей записи (новая вкладка). arm() фиксирует наличие
+ *    предшественника под twin-записью (router idx документа начинается
+ *    с 0; fallback — history.length до пуша). Вытеснение sentinel'а без
+ *    предшественника абсорбируется БЕЗ destructive-диалога: подтверждённому
+ *    уходу некуда приземляться (go(-2) за границей history — no-op), а
+ *    Discard уже необратимо сбросил бы черновик. Для остальных случаев
+ *    подтверждённый уход проверяет фактическое приземление и завершает
+ *    переход принудительным SPA-переходом на последнюю не-lab страницу
+ *    сессии, если traversal не состоялся — leaveIntent не зависает.
+ *
  * Инвариант sentinel: запись ПОД sentinel никогда не мутирует после arm
  * (replaceState действует на текущую запись, т.е. на сам sentinel). Вытесненный
  * sentinel опознаётся по двойнику (PR 3351, review round 4): запись на одну
@@ -114,6 +133,14 @@ export function isLabRoutePath(pathname: string): boolean {
 
 const SENTINEL_STATE_KEY = '__labLeaveGuardSentinel';
 
+/**
+ * PR 3351 (review round 5, P2): задержка перед проверкой фактического
+ * приземления подтверждённого browser-Back ухода (navigate(-2)). In-bounds
+ * traversal дёшев: popstate + router-рендер успевают уложиться в десятки
+ * мс; 300 мс — запас, исключающий гонку с легитимным переходом.
+ */
+const CONFIRMED_LEAVE_COMPLETION_TIMEOUT_MS = 300;
+
 const labLeaveSentinel = {
   armed: false,
   sentinelHref: null as string | null,
@@ -133,6 +160,36 @@ const labLeaveSentinel = {
    * под ней старый маркер. replace-дрейф длину не меняет.
    */
   armedLength: null as number | null,
+  /**
+   * PR 3351 (review round 5, P2): существует ли РЕАЛЬНАЯ запись ПОД
+   * twin-записью — туда, куда должен приземлиться подтверждённый уход
+   * (navigate(-2): sentinel → twin → предыдущая страница). При прямом
+   * входе в /lab в новой вкладке под twin НИЧЕГО нет: go(-2) за границей
+   * history — no-op, а destructive Discard уже сбросил бы черновик.
+   *
+   * Вычисляется ОДИН раз при первом arm «lab-заезда» (до появления
+   * собственных synthetic-записей) и живёт до фактического ухода с /lab
+   * (layout-эффект сбрасывает на не-lab рендере): пересчёт на каждом arm
+   * ломался о собственные записи sentinel'а — после абсорбции/коллапса
+   * история содержит forward-слот старого sentinel'а (length ≥ 2) даже
+   * при прямом входе без предшественника, и второй Back снова открывал бы
+   * dead-end диалог. Критерии первого arm: router idx обнуляется на первом
+   * entry документа (react-router getUrlBasedHistory инициализирует
+   * fresh-load состояние replaceState'ом {idx: 0}), поэтому idx > 0
+   * гарантирует запись под twin; idx === 0 + history.length > 1 — внешняя
+   * (кросс-документная) запись под twin; idx === 0 + length === 1 —
+   * настоящий прямой вход без предшественника. Записи без router-состояния
+   * (внешний pushState urlIntent-флоу) — консервативный fallback на длину.
+   */
+  stayHasPredecessor: null as boolean | null,
+  resetStayPredecessor() {
+    labLeaveSentinel.stayHasPredecessor = null;
+  },
+  /** Предшественник, зафиксированный текущим (вооружённым) arm-циклом. */
+  armedWithPredecessor: false,
+  hadRealPredecessor() {
+    return labLeaveSentinel.armedWithPredecessor;
+  },
   /** PR 3351 (review round 3, P2): ждём popstate от collapse-back(). */
   collapsing: false,
   /**
@@ -170,6 +227,18 @@ const labLeaveSentinel = {
     // replace — декоратор ставится лениво при первом arm (идемпотентно).
     installSentinelHistoryPatch();
     if (labLeaveSentinel.armed) return;
+    // PR 3351 (review round 5, P2): предшественник вычисляется при ПЕРВОМ
+    // arm lab-заезда (до появления собственных synthetic-записей) и
+    // переиспользуется для перевзвешиваний внутри заезда.
+    if (labLeaveSentinel.stayHasPredecessor === null) {
+      const twinState = window.history.state as Record<string, unknown> | null;
+      const twinIdx = typeof twinState?.idx === 'number' ? twinState.idx : null;
+      const lengthBeforeArm = window.history.length;
+      // Записи без router-состояния (внешний pushState urlIntent-флоу) —
+      // консервативный fallback на длину: единственная запись до пуша
+      // означает прямой вход без предшественника.
+      labLeaveSentinel.stayHasPredecessor = (twinIdx ?? 0) > 0 || lengthBeforeArm > 1;
+    }
     window.history.pushState(labLeaveSentinel.sentinelState(), '', url);
     labLeaveSentinel.armed = true;
     labLeaveSentinel.sentinelHref = url;
@@ -178,6 +247,7 @@ const labLeaveSentinel = {
     const armedState = window.history.state as Record<string, unknown> | null;
     labLeaveSentinel.sentinelIdx = typeof armedState?.idx === 'number' ? armedState.idx : null;
     labLeaveSentinel.armedLength = window.history.length;
+    labLeaveSentinel.armedWithPredecessor = labLeaveSentinel.stayHasPredecessor;
   },
   /**
    * Роутер заменил URL текущей (sentinel) записи (navigateReplace внутри
@@ -195,6 +265,7 @@ const labLeaveSentinel = {
     labLeaveSentinel.sentinelHref = null;
     labLeaveSentinel.sentinelIdx = null;
     labLeaveSentinel.armedLength = null;
+    labLeaveSentinel.armedWithPredecessor = false;
   },
   /**
    * PR 3351 (review round 4, P2): pop приземлился на «двойника» — запись
@@ -454,6 +525,15 @@ function LabLeaveRouteGuard({
   const guardRouteLeaveRef = useRef(guardRouteLeave);
   guardRouteLeaveRef.current = guardRouteLeave;
   const location = useLocation();
+  // PR 3351 (review round 5, P2): последняя не-lab страница SPA-сессии —
+  // цель гарантированного завершения подтверждённого ухода, если
+  // navigate(-2) не смог приземлиться (go за границей history — no-op).
+  // Присваивание в render (тот же паттерн, что hasDirtyRef): popstate-
+  // listener и таймер fallback-а всегда видят актуальное значение.
+  const lastNonLabLocationRef = useRef<{ pathname: string; search: string } | null>(null);
+  if (!isLabRoutePath(location.pathname)) {
+    lastNonLabLocationRef.current = { pathname: location.pathname, search: location.search };
+  }
 
   // Arm/disarm sentinel. Эффект без deps — выполняется на каждом рендере
   // хоста (провайдер перерисовывается на флипах dirty/pending), операции
@@ -467,6 +547,9 @@ function LabLeaveRouteGuard({
       // PR 3351 (review round 3, P2): подтверждённый уход приземлился —
       // leave-flow закончился, sentinel возвращается обычному циклу.
       labLeaveSentinel.endLeaveIntent();
+      // PR 3351 (review round 5, P2): lab-заезд завершён — предшественник
+      // следующего заезда будет вычислен заново.
+      labLeaveSentinel.resetStayPredecessor();
       return;
     }
     // PR 3351 (review round 3, P2): пока route-leave решение в полёте
@@ -488,6 +571,24 @@ function LabLeaveRouteGuard({
       labLeaveSentinel.isArmed()
       && window.location.href !== labLeaveSentinel.getHref()
     ) {
+      // PR 3351 (review round 5): pop-приземление на ДВОЙНИКА — это
+      // вытеснение sentinel'а (browser Back), а не дрейф. React 19
+      // коммитит POP-рендер СИНХРОННО внутри dispatch popstate — ДО нашего
+      // popstate-обработчика, — и прежняя drift-ветка remark'ом помечала
+      // twin-запись (например, после brand-роллбека, когда URL sentinel'а
+      // разошёлся с URL двойника): обработчик затем видел «landed on
+      // sentinel» и глотал Back без диалога, а guard съезжал вниз —
+      // следующий Back покидал /lab молча. Twin-подпись (тот же router-idx
+      // без маркера) достоверно отличает вытеснение от replace-дрейфа
+      // (replace сохраняет idx, но маркер merge-ит декоратор) и от внешнего
+      // pushState (нет router-idx) — решение остаётся за popstate-
+      // обработчиком.
+      const landedState = window.history.state as Record<string, unknown> | null;
+      const landedIdx = typeof landedState?.idx === 'number' ? landedState.idx : null;
+      const poppedOntoTwin = !labLeaveSentinel.isSentinelEntry()
+        && labLeaveSentinel.sentinelIdx !== null
+        && landedIdx === labLeaveSentinel.sentinelIdx;
+      if (poppedOntoTwin) return;
       // PR 3351 (review round 4, P2): дрейф href при вооружённом sentinel —
       // это replace текущей (sentinel) записи ИЛИ чужой push поверх неё.
       // Replace (роутер: смена ?instance / ?tab): длина истории не меняется —
@@ -520,6 +621,31 @@ function LabLeaveRouteGuard({
   // ИЛИ незавершённых операциях (PR 3351, review round 3).
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
+    /**
+     * PR 3351 (review round 5, P2): подтверждённый browser-Back уход обязан
+     * ЗАВЕРШИТЬСЯ. navigate(-2) — no-op, когда под twin-записью нет реальной
+     * записи (вытесненные forward-записи, exotic-состояния history): popstate
+     * не приходит, роутер не перерисовывается, leaveIntent зависает, а
+     * черновик уже сброшен Discard-ом — приложение уничтожило данные, не
+     * выполнив обещанный переход. Проверяем фактическое приземление после
+     * traversal-а: всё ещё на lab-маршруте → принудительный SPA-переход на
+     * последнюю не-lab страницу сессии (replace), который гарантированно
+     * завершает leave-flow (layout-эффект видит не-lab pathname и снимает
+     * leaveIntent).
+     */
+    const scheduleConfirmedLeaveCompletion = () => {
+      window.setTimeout(() => {
+        // Переход уже приземлился (layout-эффект снял leaveIntent) —
+        // или документ выгружается (кросс-документный -2) — ничего не делаем.
+        if (!labLeaveSentinel.isLeaveIntent()) return;
+        if (!isLabRoutePath(window.location.pathname)) return;
+        const fallback = lastNonLabLocationRef.current;
+        navigate(
+          fallback ? { pathname: fallback.pathname, search: fallback.search } : '/health',
+          { replace: true },
+        );
+      }, CONFIRMED_LEAVE_COMPLETION_TIMEOUT_MS);
+    };
     const handlePopState = () => {
       // PR 3351 (review round 3, P2): pop от collapse — возврат с фантомной
       // sentinel-записи на реальный /lab. Глотаем: sentinel разоружён, URL
@@ -548,17 +674,30 @@ function LabLeaveRouteGuard({
         return;
       }
       if (labLeaveSentinel.isDisplacedTwin()) {
+        // PR 3351 (review round 5, P2): прямой вход без реальной предыдущей
+        // записи. Подтверждённому уходу некуда приземляться (go(-2) за
+        // границей history — no-op), а destructive Discard уже необратимо
+        // сбросил бы черновик — destructive-диалог для несуществующего
+        // назначения не открываем. Back абсорбируется перевзвешиванием
+        // sentinel (тот же механизм, что второй Back при открытом
+        // диалоге): панель смонтирована, черновик жив, уйти можно
+        // SPA-навигацией (Header/Profile/Logout через guard-диалог).
+        const hasRealPredecessor = labLeaveSentinel.hadRealPredecessor();
         // Sentinel вытеснен — это была попытка уйти с /lab. Перепушиваем
         // sentinel (второй Back при открытом диалоге тоже должен
         // абсорбироваться) и спрашиваем пользователя.
         labLeaveSentinel.disarm();
         labLeaveSentinel.arm(window.location.href);
+        if (!hasRealPredecessor) return;
         guardRouteLeaveRef.current(() => {
           labLeaveSentinel.disarm();
           // Sentinel + дублированная /lab-запись → реальная предыдущая
           // страница. Внутренние переходы /lab используют replace (не
-          // создают записей), поэтому дельта всегда ровно две записи.
+          // создают записей), поэтому дельта всегда ровно две записи;
+          // fallback ниже гарантирует завершение, если traversal
+          // не приземлился (round 5, P2).
           navigate(-2);
+          scheduleConfirmedLeaveCompletion();
         });
         return;
       }
@@ -568,7 +707,7 @@ function LabLeaveRouteGuard({
       labLeaveSentinel.disarm();
       labLeaveSentinel.arm(window.location.href);
     };
-    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('popstate', handlePopState as EventListener);
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
@@ -601,6 +740,23 @@ export function useLabDirtyGuard(): LabDirtyGuardContextValue {
     guardRouteLeave: (leave: () => void) => standalone.guardTransition(leave),
     notifyDirtyStateChange: standalone.notifyDirtyStateChange,
   }), [ctx, standalone]);
+}
+
+/**
+ * PR 3351 (review round 5, P1): полный href цели навигации — для no-op
+ * детекции «уже на этом URL» в in-lab переходах guarded navigator-а.
+ * Строка резолвится против текущего href (относительные '?…'/'#…'),
+ * объект собирается из pathname+search+hash.
+ */
+function resolveToHref(to: To): string {
+  if (typeof to === 'string') {
+    return new URL(to, window.location.href).href;
+  }
+  const pathname = to.pathname ?? window.location.pathname;
+  const search = to.search ?? '';
+  const hash = to.hash ?? '';
+  const path = `${pathname}${search}${hash}`;
+  return new URL(path, window.location.href).href;
 }
 
 /**
@@ -639,6 +795,25 @@ export function useGuardedLabNavigate() {
     // панель), поэтому это уход, а не внутренний переход.
     const leavesLabRoute = !isLabRoutePath(targetPathname);
     if (!leavesLabRoute) {
+      // PR 3351 (review round 5, P1): переход УЖЕ с lab-маршрута на тот же
+      // lab-маршрут (LabPanel смонтирован) — это внутренняя перезапись URL,
+      // и она НЕ может пушить запись поверх sentinel'а. Штатные shell-
+      // писатели (Header brand → canonical /lab, Command Palette → Lab
+      // Panel) делают это БЕЗ replace — push создавал вторую /lab-запись:
+      // при вооружённом sentinel дельта -2 подтверждённого ухода вела на
+      // устаревшую помеченную копию вместо реальной предыдущей страницы, а
+      // push при чистом черновике оставлял /lab-запись под будущим arm.
+      // Идентичный URL — полный no-op (навигация на уже открытый
+      // canonical /lab ничего не должна менять в history).
+      if (isLabRoutePath(window.location.pathname)) {
+        if (resolveToHref(to) !== window.location.href) {
+          onLeave?.();
+          navigate(to as To, { ...navigateOptions, replace: true });
+        } else {
+          onLeave?.();
+        }
+        return;
+      }
       onLeave?.();
       navigate(to as To, navigateOptions);
       return;

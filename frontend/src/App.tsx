@@ -184,7 +184,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState(() => auth.getState());
   const chrome = getRouteChromeState(location.pathname, location.search, authState.profile as unknown as RouteProfile) as unknown as Record<string, unknown> & {
     sidebarItems?: unknown[]; sidebarSections?: unknown[]; activeSidebarItem?: string;
-    hideHeader?: boolean; hideSidebar?: boolean; route?: { id?: string };
+    hideHeader?: boolean; hideSidebar?: boolean; route?: { id?: string; component?: string };
     sidebarPreset?: { navigation?: string; queryParam?: string };
   };
   const compactSidebar = isMobile && !chrome.hideSidebar;
@@ -208,16 +208,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
     if (chrome.sidebarPreset?.navigation === 'query') {
       const params = new URLSearchParams(location.search);
       params.set(String(chrome.sidebarPreset.queryParam), String(item.id));
-      // PR 3351 (review round 4, P2): замена вкладки через query — REPLACE,
-      // не push. In-lab переход внутри того же экрана не создаёт history-
-      // запись: sentinel-контракт «под вооружённым sentinel ровно одна
-      // настоящая /lab-запись» (подтверждённый уход = navigate(-2), после
-      // Save — один Back) требует, чтобы ВСЕ внутренние /lab-писатели
-      // использовали replace. Push сломал бы дельту -2 и оставлял бы под
-      // sentinel помеченную копию: первый Back после Save «пропадал», а
-      // Back после подтверждённого Profile-перехода приземлялся на устаревшую
-      // /lab-копию вместо реальной записи.
-      navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
+      // PR 3351 (review round 5, P1): replace — ТОЛЬКО для маршрута,
+      // рендерящего LabPanel. Doctor-панели (doctor/cardiology/dermatology/
+      // dentistry) делят этот query-код, но их контракт — PUSH (P-029,
+      // useDoctorPanelState): browser Back ходит между вкладками панели, а
+      // replace размонтировал бы панель целиком вместе с несохранёнными
+      // visitData/bloodTestForm/emr. Для LabPanel replace сохраняет
+      // sentinel-контракт «под вооружённым sentinel ровно одна настоящая
+      // /lab-запись» (подтверждённый уход = navigate(-2), после Save —
+      // один Back): внутренние /lab-переходы не создают history-записей.
+      const replaceQueryEntry = chrome.route?.component === 'LabPanel';
+      navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: replaceQueryEntry });
       // Collapse after navigation on mobile
       if (compactSidebar) setMobileSidebarExpanded(false);
       return;

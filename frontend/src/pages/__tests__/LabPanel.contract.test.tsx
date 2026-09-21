@@ -380,15 +380,17 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(registrySource).toContain("matchPath({ path: route.path, end: true }, pathname)");
     expect(registrySource).not.toContain('route.path === pathname');
 
-    // PR 3351 (review round 4, P2): query-навигация sidebar — replace, не
-    // push: внутренние /lab-переходы не создают history-записей, иначе
-    // дельта -2 подтверждённого ухода ломается, а под sentinel остаётся
-    // помеченная копия («мёртвый» Back после Save).
+    // PR 3351 (review round 4, P2): query-навигация sidebar для /lab —
+    // replace, не push: внутренние /lab-переходы не создают history-записей,
+    // иначе дельта -2 подтверждённого ухода ломается, а под sentinel остаётся
+    // помеченная копия («мёртвый» Back после Save). Round 5 уточнил скоуп:
+    // replace только для маршрута LabPanel (см. следующий тест), поэтому
+    // здесь проверяется router-матчинг + форма query-ветки.
     const appSource = fs.readFileSync(
       path.resolve(__dirname, '../../App.tsx'),
       'utf8',
     );
-    expect(appSource).toContain('search: `?${params.toString()}` }, { replace: true })');
+    expect(appSource).toContain('search: `?${params.toString()}` }, { replace: replaceQueryEntry })');
 
     const guardSource = fs.readFileSync(
       path.resolve(__dirname, '../../components/laboratory/LabDirtyGuardContext.tsx'),
@@ -411,6 +413,59 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     // Декоратор merge-ит маркер прямо в history.replaceState.
     expect(guardSource).toContain('installSentinelHistoryPatch()');
     expect(guardSource).toContain('[SENTINEL_STATE_KEY]: true },');
+  });
+
+  it('scopes sidebar replace to the LabPanel route, keeps shell same-lab writers push-free and handles the no-predecessor direct entry (review round 5)', () => {
+    // PR 3351 (review round 5, P1): replace в query-ветке sidebar — ТОЛЬКО
+    // для маршрута LabPanel. Doctor-панели (doctor/cardiology/dermatology/
+    // dentistry) делят этот код, но их контракт — PUSH (P-029): browser Back
+    // ходит между вкладками панели; replace размонтировал бы панель вместе с
+    // несохранёнными клиническими черновиками.
+    const appSource = fs.readFileSync(
+      path.resolve(__dirname, '../../App.tsx'),
+      'utf8',
+    );
+    expect(appSource).toContain('const replaceQueryEntry = chrome.route?.component === \'LabPanel\'');
+    expect(appSource).toContain('{ replace: replaceQueryEntry }');
+    // Безусловный replace из round 4 убран — doctor-панели вернулись на push.
+    expect(appSource).not.toContain('search: `?${params.toString()}` }, { replace: true })');
+
+    // P-029 push-контракт doctor-панелей не тронут.
+    const doctorStateSource = fs.readFileSync(
+      path.resolve(__dirname, '../../hooks/useDoctorPanelState.ts'),
+      'utf8',
+    );
+    expect(doctorStateSource).toContain('navigate({ pathname: location.pathname, search: params.toString() }, { replace: false })');
+
+    // PR 3351 (review round 5, P1): push поверх sentinel'а закрыт системно —
+    // на уровне guarded navigator-а. Любой in-lab переход (Header brand →
+    // canonical /lab, Command Palette → Lab Panel) — replace, идентичный
+    // URL — no-op: вторая /lab-запись не создаётся ни при вооружённом
+    // sentinel, ни до его вооружения.
+    const guardSource = fs.readFileSync(
+      path.resolve(__dirname, '../../components/laboratory/LabDirtyGuardContext.tsx'),
+      'utf8',
+    );
+    expect(guardSource).toContain('function resolveToHref(to: To): string');
+    expect(guardSource).toContain('resolveToHref(to) !== window.location.href');
+    expect(guardSource).toContain('navigate(to as To, { ...navigateOptions, replace: true });');
+
+    // PR 3351 (review round 5, P2): arm() фиксирует наличие реальной записи
+    // под twin; вытеснение без предшественника не открывает destructive
+    // диалог, а подтверждённый уход проверяет фактическое приземление и
+    // гарантированно завершает переход (leaveIntent не зависает).
+    expect(guardSource).toContain('armedWithPredecessor');
+    expect(guardSource).toContain('hadRealPredecessor()');
+    expect(guardSource).toContain('scheduleConfirmedLeaveCompletion');
+    expect(guardSource).toContain('lastNonLabLocationRef');
+    // Предшественник вычисляется один раз на lab-заезд (reset при уходе с
+    // /lab) — пересчёт на каждом arm ломался о forward-слот sentinel'а.
+    expect(guardSource).toContain('stayHasPredecessor');
+    expect(guardSource).toContain('resetStayPredecessor');
+    // React 19 коммитит POP-рендер синхронно внутри dispatch popstate ДО
+    // popstate-обработчика: drift-ветка обязана пропускать twin-landing
+    // (иначе remark помечал двойника и глотал вытеснение).
+    expect(guardSource).toContain('poppedOntoTwin');
   });
 
   it('keeps report CREATE latest-wins: create does not block transitions', () => {

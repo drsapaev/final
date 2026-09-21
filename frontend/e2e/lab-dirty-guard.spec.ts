@@ -1688,4 +1688,131 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect(fieldInput).toHaveValue('6.6');
     await expect(page.getByText(/несохранённые изменения/)).toHaveCount(0);
   });
+
+  // PR 3351 (review round 5, P1): штатные same-Lab push writers — Header
+  // brand и Command Palette — не могут запушить запись поверх вооружённого
+  // sentinel'а. guarded navigator делает любой переход lab→lab replace'ом
+  // (идентичный URL — no-op): дельта -2 подтверждённого ухода остаётся
+  // корректной, устаревшая помеченная копия не остаётся в history.
+  test('Header brand does not push above the sentinel: cancel keeps the draft, confirmed Back leaves the lab (review round 5)', async ({ page }) => {
+    await page.goto('/health');
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+    const historyLengthBeforeBrand = await page.evaluate(() => window.history.length);
+
+    // Header brand → canonical /lab для lab-пользователя. Это internal
+    // переход (тот же маршрут LabPanel): с фиксом — replace, диалогом
+    // владеет urlIntent-флоу панели (удаление instance из URL).
+    await page.getByTitle('На главную').click();
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Отмена' }).click();
+    await expect(dialog).toBeHidden();
+
+    // Отмена внутреннего перехода: черновик жив, URL отчёта восстановлен,
+    // history НЕ выросла (replace поверх sentinel, не push).
+    await expect(fieldInput).toHaveValue('6.5');
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
+    expect(await page.evaluate(() => window.history.length)).toBe(historyLengthBeforeBrand);
+
+    // Browser Back вытесняет sentinel → guard-диалог → подтверждение
+    // РЕАЛЬНО покидает /lab (push поверх sentinel оставил бы под ним
+    // устаревшую копию: -2 приземлялся на неё, leaveIntent зависал).
+    await page.evaluate(() => window.history.back());
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
+  });
+
+  test('Command Palette navigation to Lab Panel does not push above the sentinel (review round 5)', async ({ page }) => {
+    await page.goto('/health');
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+    const historyLengthBeforePalette = await page.evaluate(() => window.history.length);
+
+    // Command Palette (Ctrl+K) → маршрут «Лаборатория» (canonical /lab).
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await expect(palette).toBeVisible();
+    await palette.getByLabel('Search commands').fill('Лаборатория');
+    await palette.getByRole('option', { name: /Лаборатория/ }).first().click();
+    // Палитра закрылась; диалогом владеет urlIntent-флоу панели.
+    await expect(palette).toHaveCount(0);
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Отмена' }).click();
+    await expect(dialog).toBeHidden();
+
+    // Отмена: черновик жив, URL отчёта восстановлен, history НЕ выросла.
+    await expect(fieldInput).toHaveValue('6.5');
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
+    expect(await page.evaluate(() => window.history.length)).toBe(historyLengthBeforePalette);
+
+    // Back → подтверждённый уход реально покидает /lab.
+    await page.evaluate(() => window.history.back());
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
+  });
+
+  // PR 3351 (review round 5, P2): прямой вход в /lab без реальной
+  // предыдущей записи. Под twin нет страницы: navigate(-2) за границей
+  // history — no-op, а destructive Discard уже необратимо сбросил бы
+  // черновик. Вытеснение sentinel'а абсорбируется БЕЗ диалога; SPA-уход
+  // (Profile) по-прежнему работает и завершается.
+  test('direct /lab entry without a previous page absorbs browser Back instead of a dead-end Discard dialog (review round 5)', async ({ page }) => {
+    // Первая и единственная навигация страницы — реального предшественника
+    // нет. page.goto оставляет под /lab начальную about:blank-запись
+    // (length 2), а реальный браузер при вводе адреса в новой вкладке
+    // ЗАМЕНЯЕТ её (length 1). location.replace воспроизводит реальный
+    // сценарий прямого входа: под /lab нет ни одной записи.
+    await page.goto('about:blank');
+    await page.evaluate(() => window.location.replace('http://localhost:5173/lab'));
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(700);
+    expect(await page.evaluate(() => window.history.length)).toBe(1);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    // Back: НЕ destructive-диалог — вытеснение абсорбируется (уходить
+    // некуда), панель смонтирована, черновик жив.
+    await page.evaluate(() => window.history.back());
+    await page.waitForTimeout(500);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(fieldInput).toHaveValue('6.5');
+    expect(new URL(page.url()).pathname).toBe('/lab');
+
+    // Повторный Back — тот же абсорб: guard не «умер», но и не предлагает
+    // несуществующее назначение.
+    await page.evaluate(() => window.history.back());
+    await page.waitForTimeout(500);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(fieldInput).toHaveValue('6.5');
+    expect(new URL(page.url()).pathname).toBe('/lab');
+
+    // SPA-уход по-прежнему доступен и ЗАВЕРШАЕТСЯ: подтверждённый Profile-
+    // переход уходит с /lab (leaveIntent не зависает).
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.getByRole('menuitem', { name: 'Профиль' }).click();
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/clinical/profile');
+  });
 });
