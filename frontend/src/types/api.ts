@@ -135,6 +135,10 @@ export type PatientActivationSessionUserDto = Schemas['PatientActivationSessionU
 // Queue (online queue + clinic queue)
 // ============================================================================
 
+export type PublicAddressProvisionResponseDto = Schemas['PublicAddressProvisionResponse'];
+export type PublicDirectionAddressInfoDto = Schemas['PublicDirectionAddressInfo'];
+export type PublicDirectionStartResponseDto = Schemas['PublicDirectionStartResponse'];
+export type DirectionEntryMethodsResponseDto = Schemas['DirectionEntryMethodsResponse'];
 export type QueueEntryResponse = Schemas['QueueEntryResponse'];
 export type QueueGroupInfo = Schemas['QueueGroupInfo'];
 export type QueueGroupsResponse = Schemas['QueueGroupsResponse'];

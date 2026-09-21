@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { CSSProperties, FormEvent, ChangeEvent, ReactNode } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -18,6 +18,8 @@ import {
   startQueueJoinSession,
   completeQueueJoinSession,
 } from '../api/queue';
+import { startPublicDirectionSession } from '../api/queueDirections';
+import type { PublicDirectionStartResponse } from '../api/queueDirections';
 import { formatRegistrarTime } from '../utils/dateUtils';
 import {
   Input,
@@ -89,6 +91,12 @@ const isNetworkClassSubmitError = (err: unknown): boolean => {
 
 const QueueJoin = () => {
   const { token: paramToken } = useParams();
+  // RQ-18 (S-15): public permanent-address route /q/:publicCode renders the
+  // SAME QueueJoin experience. Direction mode is detected purely from the
+  // route params — no second registration UI, no props plumbing.
+  const { publicCode: paramPublicCode } = useParams();
+  const directionCode = paramPublicCode || null;
+  const directionMode = Boolean(directionCode);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t: rawT } = useTranslation();
@@ -128,6 +136,7 @@ const QueueJoin = () => {
     missingSessionToken: t('misc.qj_missing_session_token'),
     joinFailed: t('misc.qj_join_failed'),
     selectSpecialist: t('misc.qj_select_specialist'),
+    directionUnavailable: t('misc.qj_direction_unavailable'),
   };
 
   // Получаем токен из URL параметров или query параметров (для PWA пути)
@@ -153,6 +162,18 @@ const QueueJoin = () => {
   // RQ-10 (S-08): потеря ответа при завершении join — честный статус повторной отправки.
   const [submitResultUnknown, setSubmitResultUnknown] = useState(false);
   const [showSessionConsumedAdvisory, setShowSessionConsumedAdvisory] = useState(false);
+  // RQ-18: honest unified-refusal marker for the permanent-address route
+  // (unknown/archived/hidden/tombstoned/retired are indistinguishable).
+  const [directionUnavailable, setDirectionUnavailable] = useState(false);
+  // RQ-18 (§10): EXACTLY ONE public start-session per mount — the ref guard
+  // survives the StrictMode dev double-invoke of effects.
+  const directionStartRef = useRef(false);
+  // The typed direction the session is scoped to — the completion of a
+  // direction session is the PROFILE choice of this very direction (§8:
+  // the backend rejects doctor/untyped choices for qdir-scoped sessions).
+  const [directionInfo, setDirectionInfo] = useState<
+    PublicDirectionStartResponse['direction'] | null
+  >(null);
 
   const getApiErrorMessage = useCallback((err: unknown, fallbackMessage: string): string => {
     const responseData = (err as HttpApiError)?.response?.data;
@@ -282,6 +303,11 @@ const QueueJoin = () => {
 
   // Загрузка информации о токене при монтировании
   useEffect(() => {
+    // RQ-18: the permanent-address route has its own boot below — the legacy
+    // QR-token boot must never run in direction mode.
+    if (directionMode) {
+      return;
+    }
     if (!token) {
       setSessionToken(null);
       setQueueInfo(null);
@@ -298,7 +324,66 @@ const QueueJoin = () => {
       setSessionToken(savedSessionToken);
     }
     loadTokenInfo();
-  }, [token, loadTokenInfo]);
+  }, [token, loadTokenInfo, directionMode]);
+
+  // RQ-18 (S-15, §8/§10): the ONLY boot of the permanent-address route —
+  //   public_code → ONE public start-session → session_token + queue_info
+  //   → the EXISTING QueueJoin state machine.
+  // Forbidden (and pinned in tests): a second start-session from
+  // StrictMode/rerender; the legacy startQueueJoinSession(session_token)
+  // mis-call; any clinic-wide QR-token fallback.
+  const runDirectionStart = useCallback(async () => {
+    if (!directionCode) {
+      return;
+    }
+    setIsSpecialistsLoading(true);
+    setDirectionUnavailable(false);
+    setStep('loading');
+    try {
+      const res = await startPublicDirectionSession(directionCode);
+      const nextQueueInfo: QueueJoinPageInfo = (res.queue_info ?? {}) as QueueJoinPageInfo;
+      const selectableSpecialists: QueueSpecialist[] = Array.isArray(nextQueueInfo.selectable_specialists)
+        ? nextQueueInfo.selectable_specialists
+        : [];
+
+      setSessionToken(res.session_token);
+      setQueueInfo(nextQueueInfo);
+      setAvailableSpecialists(selectableSpecialists);
+      setDirectionInfo(res.direction);
+      // Direction mode NEVER enters the clinic-wide specialist selector:
+      // the session can complete ONLY with the typed profile choice of its
+      // own direction (backend pin §3.1(а) RQ-16.d), which is attached at
+      // submit time. The info step shows the direction composition.
+      setStep('info');
+    } catch (error: unknown) {
+      const status = Number((error as HttpApiError | null)?.response?.status ?? 0);
+      setAvailableSpecialists([]);
+      setSessionToken(null);
+      setQueueInfo(null);
+      if (status === 404) {
+        // §11: ONE anonymous unavailable state — the server detail is already
+        // anonymized, and the UI keeps a single readable refusal regardless.
+        setDirectionUnavailable(true);
+        setError(QUEUE_JOIN_MESSAGES.directionUnavailable);
+      } else {
+        setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.directionUnavailable));
+      }
+      setStep('error');
+    } finally {
+      setIsSpecialistsLoading(false);
+    }
+  }, [directionCode, getApiErrorMessage]);
+
+  useEffect(() => {
+    if (!directionMode) {
+      return;
+    }
+    if (directionStartRef.current) {
+      return;
+    }
+    directionStartRef.current = true;
+    void runDirectionStart();
+  }, [directionMode, runDirectionStart]);
 
   // Обратный отсчет до открытия очереди
   useEffect(() => {
@@ -336,6 +421,32 @@ const QueueJoin = () => {
 
     // ✅ Проверяем наличие session_token
     let currentSessionToken = sessionToken;
+
+    if (!currentSessionToken && directionMode) {
+      // RQ-18 (§10): safe session-start retry — the direction start-session
+      // creates a fresh short-lived session (no business action duplicated);
+      // the complete-registration honesty (RQ-10) stays fully in force.
+      setStep('loading');
+      try {
+        const res = await startPublicDirectionSession(directionCode as string);
+        currentSessionToken = res.session_token;
+        setSessionToken(res.session_token);
+        setQueueInfo((res.queue_info ?? {}) as QueueJoinPageInfo);
+        setDirectionInfo(res.direction);
+        setStep('info');
+      } catch (error: unknown) {
+        const status = Number((error as HttpApiError | null)?.response?.status ?? 0);
+        if (status === 404) {
+          setDirectionUnavailable(true);
+          setError(QUEUE_JOIN_MESSAGES.directionUnavailable);
+        } else {
+          setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.directionUnavailable));
+        }
+        setStep('error');
+        setLoading(false);
+        return;
+      }
+    }
 
     if (!currentSessionToken) {
       // Пытаемся восстановить из localStorage
@@ -419,7 +530,14 @@ const QueueJoin = () => {
       };
 
       // Если выбраны специалисты (общий QR), добавляем их в запрос
-      if (selectedSpecialists && selectedSpecialists.length > 0) {
+      if (directionMode && directionInfo) {
+        // RQ-18 (§8): the direction session completes with the TYPED PROFILE
+        // choice of its own direction — the canonical resolver routes it to
+        // the right owner (resource surface / least-loaded eligible doctor).
+        // Doctor/untyped choices are rejected server-side for qdir sessions.
+        requestBody.specialist_ids = [directionInfo.profile_id];
+        requestBody.specialist_entity_types = ['profile'];
+      } else if (selectedSpecialists && selectedSpecialists.length > 0) {
         requestBody.specialist_ids = selectedSpecialists;
         // RQ-09.b (D-01): тип сущности передаётся явно — тип не выводится
         // на сервере из совпадения числового ID (Doctor.id и QueueProfile.id
@@ -694,7 +812,11 @@ const QueueJoin = () => {
   if (step === 'error') {
     return (
       <main className="min-h-screen flex items-center justify-center p-4 qj-page-base" aria-labelledby="queue-join-error-title">
-        <div className="max-w-md w-full text-center qj-glass-card" aria-describedby="queue-join-error-message">
+        <div
+          className="max-w-md w-full text-center qj-glass-card"
+          aria-describedby="queue-join-error-message"
+          data-testid={directionUnavailable ? 'qj-direction-unavailable' : undefined}
+        >
           <AlertCircle style={{
             width: '64px',
             height: '64px',
@@ -708,7 +830,12 @@ const QueueJoin = () => {
               type="button"
               onClick={() => {
                 setError(null);
-                loadTokenInfo();
+                if (directionMode) {
+                  // safe session-start retry (no business action duplicated)
+                  void runDirectionStart();
+                } else {
+                  loadTokenInfo();
+                }
               }}
               className="qj-recovery-btn qj-recovery-btn-primary"
             >
