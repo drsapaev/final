@@ -348,6 +348,26 @@ export const ROUTE_REGISTRY = [
     layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Join Queue' }),
   },
   {
+    // RQ-18 (S-15): permanent public address of a direction — the SAME
+    // QueueJoin experience in direction mode (ONE start-session per mount,
+    // existing complete flow). The address is permanent, NOT a token.
+    id: 'queue-join-direction',
+    path: '/q/:publicCode',
+    group: 'public',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'fullscreen',
+    auth: 'public',
+    roles: [],
+    entry: 'direct',
+    nav: false,
+    title: 'Join Queue',
+    owner: 'queue.public',
+    component: 'QueueJoin',
+    legacyRedirectFrom: [],
+    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Join Queue' }),
+  },
+  {
     id: 'telegram-mini-app-patient',
     path: '/telegram/mini-app/patient',
     group: 'public',
