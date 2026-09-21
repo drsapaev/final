@@ -25,6 +25,7 @@ The N2-3 brief decisions pinned here:
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -1684,3 +1685,551 @@ class TestCodexRound3BoardQueryBudget:
         # 6-row one (3 lookups + 3 entry lists + 2 enrichment batches).
         assert counts[0] == counts[1]
         assert counts[0] <= 12
+
+
+# ----------------------------------------------------------------------------
+# N2-3 follow-up (N2-5 §8): drain-recovery discovery
+# ----------------------------------------------------------------------------
+class TestDrainRecoveryDiscovery:
+    """The reload-discovery loop the graceful drain was missing.
+
+    Before this endpoint a mid-flight deactivation collapsed the read
+    plane to "no workplace" (empty workplaces list) + 403 board, so a
+    RELOADED tablet could not rediscover the in_progress execution the
+    drain still lets the starter finish — empirically proven on main
+    (the N2-5 §8 gate scenario).
+    """
+
+    def test_discovery_surfaces_own_execution_after_deactivation(self, db_session):
+        nurse = _nurse(db_session, "n2dr_a")
+        resource = _resource(db_session, "procedures_dr")
+        _assignment(db_session, nurse, resource, cabinet="7")
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Drain")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        execution = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        exec_id = execution["id"]
+
+        # mid-flight deactivation
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        # the read plane the reload has:
+        items, total = svc.list_workplaces(nurse.id)
+        assert total == 0
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            svc.get_station_state(nurse.id, resource.id)
+        _expect(exc, 403)
+
+        # the discovery closes the loop:
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        item = payload["items"][0]
+        assert item["execution"]["id"] == exec_id
+        assert item["execution"]["status"] == "in_progress"
+        assert item["execution"]["attempt_no"] == 1
+        assert item["station"]["queue_resource_id"] == resource.id
+        assert item["station"]["effective_cabinet"] == "7"
+        assert item["entry"]["entry_id"] == entry.id
+        assert item["entry"]["number"] == 1
+        assert item["entry"]["patient_name"] == "Drain"
+        assert item["service"]["visit_service_id"] == visit.services[0].id
+        assert item["service"]["name"] == f"Service {service.code}"
+
+        # and the drain is reachable end-to-end through the discovery id
+        result = svc.complete_execution(nurse.id, exec_id)
+        assert result["status"] == "completed"
+
+        # terminal work disappears from the discovery
+        assert svc.list_draining_executions(nurse.id)["total"] == 0
+
+    def test_discovery_is_empty_while_assignment_is_active(self, db_session):
+        nurse = _nurse(db_session, "n2dr_b")
+        resource = _resource(db_session, "procedures_dr2")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Active")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc2", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        # ACTIVE assignment: the board is the surface, no drain duplicate
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload == {"items": [], "total": 0}
+
+    def test_discovery_never_surfaces_another_nurses_work(self, db_session):
+        nurse_a = _nurse(db_session, "n2dr_starter")
+        nurse_b = _nurse(db_session, "n2dr_other")
+        resource = _resource(db_session, "procedures_dr3")
+        _assignment(db_session, nurse_a, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Cross")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc3", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse_a.id, resource.id, entry.id)
+        svc.create_execution(
+            nurse_a.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        # A's assignment deactivated mid-flight
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse_a.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        # B (never assigned here at all) must NOT discover A's execution
+        assert svc.list_draining_executions(nurse_b.id) == {"items": [], "total": 0}
+        # ...while A still can
+        assert svc.list_draining_executions(nurse_a.id)["total"] == 1
+
+    def test_discovery_tracks_only_the_latest_in_progress_attempt(
+        self,
+        db_session,
+    ):
+        nurse = _nurse(db_session, "n2dr_retry")
+        resource = _resource(db_session, "procedures_dr4")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Retry")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc4", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        first = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        # abort the first attempt, then re-claim (attempt 2)
+        svc.incomplete_execution(
+            nurse.id, first["id"], reason="пациент временно отложил"
+        )
+        second = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        assert second["attempt_no"] == 2
+
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        item = payload["items"][0]
+        assert item["execution"]["id"] == second["id"]
+        assert item["execution"]["attempt_no"] == 2
+        assert item["execution"]["status"] == "in_progress"
+
+    # ------------------------------------------------------------------
+    # owner-review round (PR #3358): an ACTIVE assignment alone is NOT
+    # proof the board covers the execution — P1
+    # ------------------------------------------------------------------
+    def test_reassignment_next_day_still_discovers_the_execution(
+        self, db_session, monkeypatch
+    ):
+        """P1 pin: day rollover + re-assignment -> the discovery returns.
+
+        The old predicate (\"an active assignment exists -> the board
+        covers it\") hid the day-D execution once the nurse was
+        re-assigned: the board resolves TODAY's queue and never shows
+        the day-D entry, so a RELOADED tablet had no way to obtain the
+        execution id again — the terminal drain stayed authorized but
+        unreachable, and the in_progress row kept blocking retries
+        through the partial unique index.
+        """
+        import app.services.nurse_serving_api_service as svc_module
+
+        nurse = _nurse(db_session, "n2dr_reatt")
+        resource = _resource(db_session, "procedures_reatt")
+        _assignment(db_session, nurse, resource, cabinet="7")
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Reatt")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "reatt_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        execution = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        exec_id = execution["id"]
+
+        # mid-flight deactivation ...
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+        # ... then the administrator re-assigns the SAME pair (the
+        # partial unique permits a new active row per pair).
+        _assignment(db_session, nurse, resource, cabinet="12")
+
+        # the day rolls over: the board now resolves tomorrow's queue
+        tomorrow = clinic_today(db_session) + timedelta(days=1)
+        monkeypatch.setattr(svc_module, "clinic_today", lambda _db: tomorrow)
+
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        assert payload["items"][0]["execution"]["id"] == exec_id
+        # the terminal drain is STILL reachable through the discovered id
+        result = svc.complete_execution(nurse.id, exec_id)
+        assert result["status"] == "completed"
+
+    def test_reassignment_same_day_board_provably_covers_no_duplicate(self, db_session):
+        """Guard: same-day re-assignment + the entry still active on
+        TODAY's queue -> the board REALLY covers it (my_entry carries
+        in_progress_execution_id), so the discovery adds no duplicate."""
+        nurse = _nurse(db_session, "n2dr_reatt_same")
+        resource = _resource(db_session, "procedures_reatt_same")
+        _assignment(db_session, nurse, resource, cabinet="7")
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "ReattSame")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "reatt_same_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        # the canonical claim flow: waiting -> called (called_by = nurse)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="waiting", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        claimed = svc.call_next(nurse.id, resource.id)
+        assert claimed["entry"]["id"] == entry.id
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        execution = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        exec_id = execution["id"]
+
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+        _assignment(db_session, nurse, resource, cabinet="12")
+
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload == {"items": [], "total": 0}
+
+        # ... and the exclusion is JUSTIFIED: the board (which the active
+        # assignment now opens) surfaces the execution id itself.
+        board = svc.get_station_state(nurse.id, resource.id)
+        assert board["my_entry"] is not None
+        assert board["my_entry"]["id"] == entry.id
+        service_execution_ids = [
+            item["in_progress_execution_id"] for item in board["my_entry"]["services"]
+        ]
+        assert exec_id in service_execution_ids
+
+    def test_day_rollover_without_reassignment_still_discovers(
+        self, db_session, monkeypatch
+    ):
+        """Guard: the plain day rollover (no re-assignment at all) keeps
+        the execution discoverable — the board of the NEW day cannot
+        show the day-D entry either."""
+        import app.services.nurse_serving_api_service as svc_module
+
+        nurse = _nurse(db_session, "n2dr_roll")
+        resource = _resource(db_session, "procedures_roll")
+        _assignment(db_session, nurse, resource, cabinet="3")
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Roll")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "roll_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        execution = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        tomorrow = clinic_today(db_session) + timedelta(days=1)
+        monkeypatch.setattr(svc_module, "clinic_today", lambda _db: tomorrow)
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        assert payload["items"][0]["execution"]["id"] == execution["id"]
+
+    # ------------------------------------------------------------------
+    # owner-review round (PR #3358): effective_cabinet = the assignment
+    # PROVABLY in effect at execution start — P2
+    # ------------------------------------------------------------------
+    def test_draining_cabinet_is_the_assignment_in_effect_at_start(self, db_session):
+        """P2 pin: the temporal resolution — the cabinet override of the
+        assignment that authorized the start, NOT the latest
+        re-assignment's value (assignment #1 cabinet 7 -> execution
+        started -> #1 deactivated -> #2 cabinet 12 -> #2 deactivated ->
+        recovery must answer cabinet 7)."""
+        nurse = _nurse(db_session, "n2dr_cab")
+        resource = _resource(db_session, "procedures_cab")
+        anchor = datetime.now(UTC)
+        first = NurseWorkplaceAssignment(
+            user_id=nurse.id,
+            queue_resource_id=resource.id,
+            cabinet_override="7",
+            is_active=True,
+            created_at=anchor - timedelta(hours=2),
+        )
+        db_session.add(first)
+        db_session.commit()
+
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Cabinet")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "cab_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        execution = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        exec_id = execution["id"]
+
+        # a LATER re-assignment in another cabinet (created AFTER the
+        # execution started), then BOTH rows deactivated.
+        second = NurseWorkplaceAssignment(
+            user_id=nurse.id,
+            queue_resource_id=resource.id,
+            cabinet_override="12",
+            is_active=True,
+            created_at=anchor + timedelta(hours=1),
+        )
+        db_session.add(second)
+        db_session.commit()
+        first.is_active = False
+        second.is_active = False
+        db_session.commit()
+
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        item = payload["items"][0]
+        assert item["execution"]["id"] == exec_id
+        assert item["station"]["effective_cabinet"] == "7"
+
+    def test_draining_cabinet_is_null_without_a_provable_snapshot(self, db_session):
+        """P2 pin: the assignment that authorized the start carried NO
+        override -> effective_cabinet is None. The resource's CURRENT
+        default_cabinet is not a provable historical snapshot (it is
+        mutable after the fact) — a possibly-wrong cabinet must not be
+        presented as the recovery context."""
+        nurse = _nurse(db_session, "n2dr_cab_null")
+        resource = _resource(db_session, "procedures_cab_null")
+        _assignment(db_session, nurse, resource)  # cabinet_override=None
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "CabNull")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "cab_null_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        assert payload["items"][0]["station"]["effective_cabinet"] is None
+
+    # ------------------------------------------------------------------
+    # owner-review round (PR #3358): the polling discovery keeps a
+    # CONSTANT query budget — P2 (the tablet polls every 30 seconds)
+    # ------------------------------------------------------------------
+    def test_draining_query_count_is_constant_in_executions(self, db_session):
+        """P2 pin: 1 draining execution costs the SAME SQL as 4 draining
+        executions on 4 different stations — entries/queues/resources/
+        visit services/services/assignments/today queues load in ONE
+        IN-batch each; the old code ran a per-execution N+1 (the row
+        list grows with every unfinished attempt)."""
+
+        def _world(suffix: str, stations: int) -> User:
+            nurse = _nurse(db_session, f"n2dr_qc_{suffix}")
+            for index in range(stations):
+                resource = _resource(db_session, f"procedures_qc_{suffix}_{index}")
+                _assignment(db_session, nurse, resource)
+                queue = _station_queue(db_session, resource)
+                patient = _patient(db_session, f"QC{suffix}{index}")
+                visit = _visit(db_session, patient, department="procedures")
+                service = _service(
+                    db_session, f"qc_{suffix}_{index}", queue_tag=resource.queue_tag
+                )
+                _visit_service(db_session, visit, service)
+                entry = _entry(
+                    db_session,
+                    queue,
+                    1,
+                    patient=patient,
+                    status="called",
+                    visit=visit,
+                )
+                svc = NurseServingApiService(db_session)
+                svc.start_entry(nurse.id, resource.id, entry.id)
+                svc.create_execution(
+                    nurse.id,
+                    resource.id,
+                    queue_entry_id=entry.id,
+                    visit_service_id=visit.services[0].id,
+                )
+                row = (
+                    db_session.query(NurseWorkplaceAssignment)
+                    .filter(
+                        NurseWorkplaceAssignment.user_id == nurse.id,
+                        NurseWorkplaceAssignment.queue_resource_id == resource.id,
+                    )
+                    .first()
+                )
+                row.is_active = False
+                db_session.commit()
+            return nurse
+
+        nurse_one = _world("one", stations=1)
+        nurse_many = _world("many", stations=4)
+
+        svc = NurseServingApiService(db_session)
+        bind = db_session.get_bind()
+
+        def _counted(user_id: int) -> tuple[dict[str, Any], int]:
+            state: dict[str, int] = {"queries": 0}
+
+            def _count(*_args: object, **_kwargs: object) -> None:
+                state["queries"] += 1
+
+            event.listen(bind, "before_cursor_execute", _count)
+            try:
+                payload = svc.list_draining_executions(user_id)
+            finally:
+                event.remove(bind, "before_cursor_execute", _count)
+            return payload, state["queries"]
+
+        payload_one, count_one = _counted(nurse_one.id)
+        payload_many, count_many = _counted(nurse_many.id)
+
+        # the worlds really do differ in draining rows (the pin has teeth)
+        assert payload_one["total"] == 1
+        assert payload_many["total"] == 4
+
+        # CONSTANT budget: 4 unfinished attempts on 4 stations cost the
+        # SAME SQL as 1 (the batches just carry more ids).
+        assert count_one == count_many
+        assert count_one <= 16
