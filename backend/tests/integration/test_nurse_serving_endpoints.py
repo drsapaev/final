@@ -13,6 +13,8 @@ identity contract: the serving mutations and denials surface in ONE
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -714,3 +716,103 @@ def test_draining_discovery_empty_for_fresh_nurse(
     )
     assert response.status_code == 200, response.text
     assert response.json() == {"items": [], "total": 0}
+
+
+def test_draining_discovery_after_reassignment_and_day_rollover(
+    client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    """Owner-review round (P1 + P2) through the HTTP plane.
+
+    A next-day re-assignment must NOT hide the day-D execution: the
+    board resolves TODAY's queue only, so the discovery has to keep
+    answering the execution id (the terminal drain stays reachable
+    from a reloaded tablet). The station context answers the cabinet
+    of the assignment that was in effect at the START (temporal
+    resolution), not the latest re-assignment's cabinet.
+    """
+    import app.services.nurse_serving_api_service as svc_module
+
+    nurse = _user(db_session, "n2dr_ep_reatt", "Nurse")
+    resource = _resource(db_session, "procedures_reatt_ep")
+    _assignment(db_session, nurse, resource)
+    queue = _queue(db_session, resource)
+    patient = _patient(db_session, "ReattEp")
+    entry = _entry(db_session, queue, 1, patient)
+    headers = _headers(db_session, nurse)
+
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/call-next", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/entries/{entry.id}/start",
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    visit_id = response.json()["visit_id"]
+
+    station_service = Service(
+        code="REATT-EP-PROC",
+        name="Procedure Reatt EP",
+        queue_tag=resource.queue_tag,
+        requires_doctor=False,
+        active=True,
+    )
+    db_session.add(station_service)
+    db_session.commit()
+    db_session.refresh(station_service)
+    vs = VisitService(
+        visit_id=visit_id,
+        service_id=station_service.id,
+        code=station_service.code,
+        name=station_service.name,
+        qty=1,
+    )
+    db_session.add(vs)
+    db_session.commit()
+    db_session.refresh(vs)
+
+    response = client.post(
+        f"{_BASE}/queue-resources/{resource.id}/executions",
+        json={"queue_entry_id": entry.id, "visit_service_id": vs.id},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    execution_id = response.json()["id"]
+
+    # mid-flight deactivation, then the next-day re-assignment (the
+    # partial unique permits a NEW active row for the same pair)
+    row = (
+        db_session.query(NurseWorkplaceAssignment)
+        .filter(
+            NurseWorkplaceAssignment.user_id == nurse.id,
+            NurseWorkplaceAssignment.queue_resource_id == resource.id,
+        )
+        .first()
+    )
+    row.is_active = False
+    db_session.commit()
+    _assignment(db_session, nurse, resource)
+
+    # the day rolls over: the station board would resolve tomorrow's
+    # queue and never show the day-D entry again
+    tomorrow = clinic_today(db_session) + timedelta(days=1)
+    monkeypatch.setattr(svc_module, "clinic_today", lambda _db: tomorrow)
+
+    response = client.get(f"{_BASE}/draining-executions", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["total"] == 1, body
+    item = body["items"][0]
+    assert item["execution"]["id"] == execution_id
+    assert item["station"]["queue_resource_id"] == resource.id
+    # the assignment in effect at the start had NO cabinet override and
+    # the resource default is not a provable snapshot -> honest null
+    assert item["station"]["effective_cabinet"] is None
+
+    # the drain through the discovered id still completes
+    response = client.post(
+        f"{_BASE}/executions/{execution_id}/complete", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "completed"

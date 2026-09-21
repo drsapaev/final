@@ -167,10 +167,12 @@ def list_draining_executions(
     board 403) gave a RELOADED tablet no way to discover the execution
     id, making the drain unreachable from the UI. This self-scope read
     closes exactly that loop: it returns the caller's OWN in_progress
-    executions on stations she no longer holds an ACTIVE assignment
-    for, with the station/entry/service context needed to finish them
-    through the existing terminal endpoints. No mutations, no new
-    authorization surface, no client-side workaround.
+    executions that today's station board does NOT already surface (no
+    active assignment on the station, or the entry no longer belongs
+    to the station's today queue), with the station/entry/service
+    context needed to finish them through the existing terminal
+    endpoints. No mutations, no new authorization surface, no
+    client-side workaround.
     """
     return _run(lambda: _service(db).list_draining_executions(current_user.id))
 

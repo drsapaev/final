@@ -245,8 +245,9 @@ class NurseServingDrainingStationRef(BaseModel):
     queue_resource_id: int
     resource_code: str | None = None
     resource_display_name: str | None = None
-    # Historical D2 resolution (the now-inactive assignment override ??
-    # resource default) — display-only context, never an authorization.
+    # Historical D2 resolution: the cabinet override of the assignment
+    # in effect at execution start (temporal resolution, None when no
+    # provable snapshot) — display-only context, never an authorization.
     effective_cabinet: str | None = None
 
 

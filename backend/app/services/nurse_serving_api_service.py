@@ -520,18 +520,33 @@ class NurseServingApiService:
     # endpoint closes exactly that loop (no mutations, no new
     # authorization surface, no client-side workaround).
     def list_draining_executions(self, user_id: int) -> dict[str, Any]:
-        """The caller's OWN in_progress executions on drained stations.
+        """The caller's OWN in_progress executions the board does NOT cover.
 
         An execution is a drain candidate when ALL hold:
         - ``started_by_user_id == caller`` (self-scope: another nurse's
           unfinished work is never surfaced here);
         - ``status == 'in_progress'`` (terminal attempts are history);
-        - the station chain validates (``_execution_station_or_error``:
-          entry + queue + D3 routing — orphaned rows stay invisible,
+        - the station chain validates (the batched equivalent of
+          ``_execution_station_or_error``: entry + queue + resource +
+          D3 routing — orphaned/cross-station rows stay invisible,
           exactly as before this endpoint);
-        - the caller holds NO active assignment on that station (with an
-          active assignment the station board already surfaces the
-          execution via ``in_progress_execution_id``).
+        - the station board does NOT provably cover it (owner-review
+          round, P1): the board surfaces the execution id ONLY when the
+          caller holds an ACTIVE assignment on the station AND the
+          entry belongs to the station's TODAY queue AND the entry is
+          still in an active status. An active assignment ALONE is not
+          proof — after a day rollover, or a re-assignment following
+          the mid-flight deactivation, the board resolves TODAY's queue
+          and never shows the day-D entry; an assignment-only
+          exclusion would make the execution id undiscoverable again
+          and strand the attempt ``in_progress`` (the 0072 partial
+          unique index would block every retry).
+
+        Query budget (owner-review round, P2): CONSTANT in the number
+        of draining executions — the tablet polls this endpoint every
+        30 seconds, so entries/queues/resources/visit services/
+        services/assignments/today-queues each load in ONE IN-batch
+        query and every per-execution decision folds in memory.
         """
         rows = (
             self.db.query(ServiceExecution)
@@ -542,60 +557,246 @@ class NurseServingApiService:
             .order_by(ServiceExecution.id.asc())
             .all()
         )
-        items: list[dict[str, Any]] = []
+        if not rows:
+            return {"items": [], "total": 0}
+        day = clinic_today(self.db)
+
+        # ---- batched station-chain resolution (one query per table) ----
+        entries = {
+            entry.id: entry
+            for entry in self.db.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.id.in_(
+                    [
+                        row.queue_entry_id
+                        for row in rows
+                        if row.queue_entry_id is not None
+                    ]
+                )
+            )
+        }
+        queues = {
+            queue.id: queue
+            for queue in self.db.query(DailyQueue).filter(
+                DailyQueue.id.in_({e.queue_id for e in entries.values()})
+            )
+        }
+        owner_resource_ids = {
+            queue.queue_resource_id
+            for queue in queues.values()
+            if queue.queue_resource_id is not None
+        }
+        tag_axis_tags = {
+            queue.queue_tag
+            for queue in queues.values()
+            if queue.queue_resource_id is None and queue.queue_tag is not None
+        }
+        resource_by_id: dict[int, QueueResource] = {}
+        resource_by_tag: dict[str, QueueResource] = {}
+        if owner_resource_ids:
+            resource_by_id = {
+                resource.id: resource
+                for resource in self.db.query(QueueResource).filter(
+                    QueueResource.id.in_(owner_resource_ids)
+                )
+            }
+        if tag_axis_tags:
+            # Mirrors ``_execution_station_resource``'s tag-axis
+            # fallback (the registry row for the exact tag); id-order
+            # makes the batched pick deterministic.
+            for resource in (
+                self.db.query(QueueResource)
+                .filter(QueueResource.queue_tag.in_(tag_axis_tags))
+                .order_by(QueueResource.id.asc())
+            ):
+                resource_by_id[resource.id] = resource
+                resource_by_tag.setdefault(resource.queue_tag, resource)
+        visit_services = {
+            vs.id: vs
+            for vs in self.db.query(VisitService).filter(
+                VisitService.id.in_([row.visit_service_id for row in rows])
+            )
+        }
+        services = {
+            service.id: service
+            for service in self.db.query(Service).filter(
+                Service.id.in_({vs.service_id for vs in visit_services.values()})
+            )
+        }
+
+        chains: list[
+            tuple[ServiceExecution, QueueResource, OnlineQueueEntry, VisitService]
+        ] = []
         for execution in rows:
-            try:
-                resource, entry = self._execution_station_or_error(execution)
-            except NurseServingApiDomainError:
+            entry = (
+                entries.get(execution.queue_entry_id)
+                if execution.queue_entry_id is not None
+                else None
+            )
+            if entry is None:
+                continue
+            queue = queues.get(entry.queue_id)
+            if queue is None:
+                continue
+            resource = (
+                resource_by_id.get(queue.queue_resource_id)
+                if queue.queue_resource_id is not None
+                else resource_by_tag.get(queue.queue_tag)
+            )
+            if resource is None:
+                continue
+            visit_service = visit_services.get(execution.visit_service_id)
+            service = (
+                services.get(visit_service.service_id)
+                if visit_service is not None
+                else None
+            )
+            if (
+                visit_service is None
+                or entry.visit_id is None
+                or visit_service.visit_id != entry.visit_id
+                or service is None
+                or not _service_routed_to_station(service, resource)
+            ):
                 # Orphaned/cross-station chains keep their pre-endpoint
                 # invisibility; admin tooling owns such rows.
                 continue
-            active = (
+            chains.append((execution, resource, entry, visit_service))
+
+        involved_resource_ids = {resource.id for _r, resource, _e, _vs in chains}
+        # The caller's ACTIVE assignments among the involved stations —
+        # the "can she even open this board?" half of the coverage
+        # proof (ONE query, folded below).
+        active_resource_ids: set[int] = set()
+        if involved_resource_ids:
+            active_resource_ids = {
+                row.queue_resource_id
+                for row in self.db.query(NurseWorkplaceAssignment).filter(
+                    NurseWorkplaceAssignment.user_id == user_id,
+                    NurseWorkplaceAssignment.queue_resource_id.in_(
+                        involved_resource_ids
+                    ),
+                    NurseWorkplaceAssignment.is_active.is_(True),
+                )
+            }
+        # The TODAY queue per involved tag — the batched equivalent of
+        # ``find_active_tag_queue`` (active (day, tag) rows; min id per
+        # tag, the same deterministic order the single lookup uses).
+        # The board's own resolution is ``find_active_tag_queue(today,
+        # resource.queue_tag)`` — comparing that queue's id to the
+        # entry's queue id IS the "is this entry on today's board"
+        # proof.
+        today_queue_id_by_tag: dict[str, int] = {}
+        involved_tags = {resource.queue_tag for _r, resource, _e, _vs in chains}
+        if involved_tags:
+            for queue in (
+                self.db.query(DailyQueue)
+                .filter(
+                    DailyQueue.day == day,
+                    DailyQueue.queue_tag.in_(involved_tags),
+                    DailyQueue.active.is_(True),
+                )
+                .order_by(DailyQueue.id.asc())
+            ):
+                today_queue_id_by_tag.setdefault(queue.queue_tag, queue.id)
+
+        # The pair's FULL assignment history (ONE query): the temporal
+        # cabinet resolution below walks it per execution.
+        history_by_resource: dict[int, list[NurseWorkplaceAssignment]] = {}
+        if involved_resource_ids:
+            for row in (
                 self.db.query(NurseWorkplaceAssignment)
                 .filter(
                     NurseWorkplaceAssignment.user_id == user_id,
-                    NurseWorkplaceAssignment.queue_resource_id == resource.id,
-                    NurseWorkplaceAssignment.is_active.is_(True),
+                    NurseWorkplaceAssignment.queue_resource_id.in_(
+                        involved_resource_ids
+                    ),
                 )
-                .first()
+                .order_by(NurseWorkplaceAssignment.id.asc())
+            ):
+                history_by_resource.setdefault(row.queue_resource_id, []).append(row)
+
+        items: list[dict[str, Any]] = []
+        for execution, resource, entry, visit_service in chains:
+            board_covers = (
+                resource.id in active_resource_ids
+                and today_queue_id_by_tag.get(resource.queue_tag) == entry.queue_id
+                and entry.status in _ENTRY_ACTIVE_STATES
             )
-            if active is not None:
-                # The board covers this one — no duplicate surface.
+            if board_covers:
+                # Provably surfaced by the caller's board (the active
+                # list / my_entry carry in_progress_execution_id) — no
+                # duplicate surface; the id stays discoverable there.
                 continue
-            items.append(self._draining_item_payload(execution, resource, entry))
+            items.append(
+                self._draining_item_payload(
+                    execution,
+                    resource,
+                    entry,
+                    visit_service,
+                    self._historical_cabinet(
+                        history_by_resource.get(resource.id, []),
+                        execution.started_at,
+                    ),
+                )
+            )
         return {"items": items, "total": len(items)}
+
+    @staticmethod
+    def _as_utc(value: datetime | None) -> datetime | None:
+        """Naive timestamps read as UTC (SQLite round-trips drop tzinfo).
+
+        The ``func.now()`` server default and ``_now()`` share the UTC
+        clock; PostgreSQL ``timestamptz`` values arrive aware — the
+        in-memory temporal comparisons below stay dialect-neutral.
+        """
+        if value is None:
+            return None
+        return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+    def _historical_cabinet(
+        self, rows: list[NurseWorkplaceAssignment], started_at: datetime
+    ) -> str | None:
+        """The cabinet PROVABLY in effect when the execution started.
+
+        Owner-review round (P2): the latest-by-id row for the
+        (nurse, resource) pair can be a LATER re-assignment — its
+        cabinet may differ from the one the work started in — and a
+        NULL override used to fall back to the resource's CURRENT
+        ``default_cabinet`` (mutable after the fact). The honest
+        resolution is temporal: among the pair's rows created
+        at-or-before ``started_at``, the newest one is the assignment
+        that authorized the start. Without such a row — or when it
+        carries no override — there is no provable snapshot, and the
+        payload reports ``None`` instead of a possibly-wrong cabinet
+        (display-only context either way; never an authorization).
+        """
+        started = self._as_utc(started_at)
+        in_effect: NurseWorkplaceAssignment | None = None
+        for row in rows:  # id-ascending = creation order
+            created = self._as_utc(row.created_at)
+            if created is not None and started is not None and created <= started:
+                in_effect = row
+        if in_effect is None or in_effect.cabinet_override is None:
+            return None
+        return in_effect.cabinet_override
 
     def _draining_item_payload(
         self,
         execution: ServiceExecution,
         resource: QueueResource,
         entry: OnlineQueueEntry,
+        visit_service: VisitService,
+        effective_cabinet: str | None,
     ) -> dict[str, Any]:
-        """Compose one drain candidate: execution + station/entry/service."""
-        visit_service = self.db.get(VisitService, execution.visit_service_id)
-        # Historical D2 cabinet: the deactivation leaves the (now
-        # inactive) assignment row readable, so the tablet can still show
-        # WHERE the unfinished work was being performed.
-        historical = (
-            self.db.query(NurseWorkplaceAssignment)
-            .filter(
-                NurseWorkplaceAssignment.user_id == execution.started_by_user_id,
-                NurseWorkplaceAssignment.queue_resource_id == resource.id,
-            )
-            .order_by(NurseWorkplaceAssignment.id.desc())
-            .first()
-        )
+        """Compose one drain candidate (pure in-memory — the batched
+        loader above owns every SQL statement)."""
         return {
             "execution": self._execution_payload(execution),
             "station": {
                 "queue_resource_id": resource.id,
                 "resource_code": resource.code,
                 "resource_display_name": resource.display_name,
-                "effective_cabinet": (
-                    self._effective_cabinet(historical, resource)
-                    if historical is not None
-                    else resource.default_cabinet
-                ),
+                "effective_cabinet": effective_cabinet,
             },
             "entry": {
                 "entry_id": entry.id,
@@ -604,9 +805,9 @@ class NurseServingApiService:
             },
             "service": {
                 "visit_service_id": execution.visit_service_id,
-                "code": visit_service.code if visit_service else None,
-                "name": visit_service.name if visit_service else None,
-                "qty": visit_service.qty if visit_service else 1,
+                "code": visit_service.code,
+                "name": visit_service.name,
+                "qty": visit_service.qty,
             },
         }
 
