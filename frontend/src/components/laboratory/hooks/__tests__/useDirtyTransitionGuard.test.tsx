@@ -437,4 +437,57 @@ describe('useDirtyTransitionGuard (PR5)', () => {
     expect(saveReport).toHaveBeenCalledTimes(1);
     expect(saveTemplate).not.toHaveBeenCalled();
   });
+
+  // PR 3351 (review round 2, P1): route-level leave guard — реактивное
+  // dirty-состояние для sentinel-контроллера на уровне App.
+  it('hasDirtySources tracks registered sources and notifyDirtyStateChange re-reads them', () => {
+    let reportDirty = false;
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    expect(result.current.hasDirtySources()).toBe(false);
+
+    let unregister: (() => void) | undefined;
+    act(() => {
+      unregister = result.current.registerDirtySource({
+        id: 'report',
+        isDirty: () => reportDirty,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+    });
+    // Источник зарегистрирован clean — notify не перевычисляет в dirty.
+    expect(result.current.hasDirtySources()).toBe(false);
+
+    // Источник стал dirty (workbench обновил ref и вызвал notify).
+    act(() => {
+      reportDirty = true;
+      result.current.notifyDirtyStateChange();
+    });
+    expect(result.current.hasDirtySources()).toBe(true);
+
+    // Повторный notify без флипа — идемпотентен (не может зациклить рендеры).
+    act(() => {
+      result.current.notifyDirtyStateChange();
+    });
+    expect(result.current.hasDirtySources()).toBe(true);
+
+    // Dirty-источник размонтировался (подтверждённый уход с /lab) —
+    // unregister тоже уведомляет: sentinel должен разоружиться.
+    act(() => {
+      unregister?.();
+    });
+    expect(result.current.hasDirtySources()).toBe(false);
+  });
+
+  it('notifyDirtyStateChange does not flip when a clean source registers', () => {
+    const { result } = renderHook(() => useDirtyTransitionGuard());
+    act(() => {
+      result.current.registerDirtySource({
+        id: 'template',
+        isDirty: () => false,
+        save: vi.fn().mockResolvedValue(undefined),
+      });
+      result.current.notifyDirtyStateChange();
+    });
+    expect(result.current.hasDirtySources()).toBe(false);
+    expect(result.current.isDialogOpen).toBe(false);
+  });
 });

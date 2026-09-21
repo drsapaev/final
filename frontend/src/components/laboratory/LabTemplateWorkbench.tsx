@@ -36,6 +36,7 @@ export default function LabTemplateWorkbench({
   onSelectTemplate,
   onTemplatesChanged,
   registerDirtySource,
+  onDirtyStateChange,
   guardTransition,
   templateTransitionPending = false,
   onOperationPendingChange = undefined,
@@ -51,6 +52,8 @@ export default function LabTemplateWorkbench({
     save: () => Promise<void>;
     discard?: () => void;
   }) => () => void;
+  /** PR 3351: вызывается при каждом изменении dirty-состояния (sentinel route-guard). */
+  onDirtyStateChange?: () => void;
   guardTransition?: (
     transition: () => void | Promise<void>,
     options?: { onCancel?: () => void | Promise<void>; sourceIds?: string[] },
@@ -442,7 +445,11 @@ export default function LabTemplateWorkbench({
       }
     };
     if (guardTransition) {
-      guardTransition(archiveAndRefresh);
+      // PR 3351 (review round 2, P1): archive меняет только шаблон — скоуп
+      // ['template']. Dirty report-draft не должен ни спрашиваться, ни
+      // сбрасываться: Queue/Templates/Reports смонтированы одновременно
+      // (hidden-секции), операция над шаблоном не уничтожает report-черновик.
+      guardTransition(archiveAndRefresh, { sourceIds: ['template'] });
       return;
     }
     await archiveAndRefresh();
@@ -467,7 +474,9 @@ export default function LabTemplateWorkbench({
       }
     };
     if (guardTransition) {
-      guardTransition(cloneAndRefresh);
+      // PR 3351 (review round 2, P1): clone меняет только шаблон — скоуп
+      // ['template'] (см. комментарий у archive).
+      guardTransition(cloneAndRefresh, { sourceIds: ['template'] });
       return;
     }
     await cloneAndRefresh();
@@ -647,8 +656,15 @@ export default function LabTemplateWorkbench({
   }, [draftHydrated, draftVersion, selectedTemplate, activeVersion]);
 
   const isTemplateDirtyRef = useRef(templateDirty);
+  // PR 3351 (route-level leave guard): обновляемый ref + notify на каждом
+  // рендере — route-guard перевзвешивает sentinel при флипе dirty.
+  const onDirtyStateChangeRef = useRef(onDirtyStateChange);
+  useEffect(() => {
+    onDirtyStateChangeRef.current = onDirtyStateChange;
+  });
   useEffect(() => {
     isTemplateDirtyRef.current = templateDirty;
+    onDirtyStateChangeRef.current?.();
   });
   const activeVersionRef = useRef(activeVersion);
   useEffect(() => {

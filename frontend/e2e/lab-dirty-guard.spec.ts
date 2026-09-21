@@ -755,6 +755,10 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     });
     const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
     await expect(dialog).toBeVisible();
+    // Транзиент pre-existing: даём urlIntent-флоу панели зафиксироваться
+    // (pendingUrlIntent + URL-sync) до второго внешнего перехода — иначе
+    // под нагрузкой полный прогон гонит два popstate в один кадр.
+    await waitForReactToSettle(page);
     await page.evaluate(() => {
       window.history.pushState({}, '', '/lab?patient=101&instance=88');
       window.dispatchEvent(new PopStateEvent('popstate'));
@@ -826,7 +830,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     expect(reportHistoryPatientRequests.at(-1)).toBe('102');
   });
 
-  test('a late report create cannot erase a URL intent guarded by a dirty template', async ({ page }) => {
+  test('a URL instance change under a dirty template loads the report without a dialog and keeps the template draft', async ({ page }) => {
     reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
       releaseReportInstanceCreateResponse = resolve;
     });
@@ -842,13 +846,21 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await page.getByRole('tab', { name: 'Оформление' }).click();
     const footerInput = page.getByLabel('Подвал шаблона');
     await footerInput.fill('Несохранённый подвал');
+    // У шаблонного workbench нет видимого dirty-бейджа (в отличие от отчёта) —
+    // даём notify-эффекту зафиксировать dirty в реестре guard-а.
+    await waitForReactToSettle(page);
 
+    // PR 3351 (review round 2, P1): смена report instance из внешнего URL —
+    // report-скоуп: dirty template-draft не спрашивается и не сбрасывается.
     await page.evaluate(() => {
       window.history.pushState({}, '', '/lab?instance=89');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    const dialog = page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' });
-    await expect(dialog).toBeVisible();
+
+    // Диалога нет: report-draft чист, template-draft вне области перехода.
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByText('Отчёт #89').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
 
     const createResponse = page.waitForResponse((response) => (
       response.request().method() === 'POST'
@@ -858,11 +870,172 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await createResponse;
     await waitForReactToSettle(page);
 
-    await expect(dialog).toBeVisible();
-    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
-    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    // Поздний create не может затереть URL intent (latest-wins по
+    // operation-context), а template-draft пережил смену отчёта.
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
+    await expect(footerInput).toHaveValue('Несохранённый подвал');
+  });
+
+  test('a dirty template survives a URL instance change without a guard dialog', async ({ page }) => {
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await panelTabs.getByRole('tab').nth(1).click();
+    await page.getByRole('tab', { name: 'Оформление' }).click();
+    const footerInput = page.getByLabel('Подвал шаблона');
+    await footerInput.fill('Несохранённый подвал');
+    await waitForReactToSettle(page);
+
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?instance=89');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    // PR 3351 (review round 2, P1, сценарий B): смена report instance
+    // (browser Back/Forward между ?instance=) не сбрасывает template-draft.
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByText('Отчёт #89').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
+
+    await panelTabs.getByRole('tab').nth(1).click();
+    await expect(footerInput).toHaveValue('Несохранённый подвал');
+  });
+
+  test('dirty report -> template Clone runs without a guard dialog and preserves the report draft', async ({ page }) => {
+    await page.route('**/api/v1/lab/templates/5/clone', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 7, code: 'rule_demo_copy', name: 'Rule Demo (копия)' }),
+    }));
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await panelTabs.getByRole('tab').nth(1).click();
+
+    // PR 3351 (review round 2, P1, сценарий A): clone меняет только шаблон
+    // (template-скоуп) — dirty report-draft не спрашивается и не сбрасывается.
+    const cloneResponse = page.waitForResponse((response) => (
+      response.request().method() === 'POST'
+      && response.url().endsWith('/api/v1/lab/templates/5/clone')
+    ));
+    await page.getByRole('button', { name: 'Клонировать' }).click();
+    await cloneResponse;
+    await waitForReactToSettle(page);
+
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await panelTabs.getByRole('tab').nth(2).click();
+    await expect(fieldInput).toHaveValue('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+  });
+
+  test('route leave via header Profile is guarded while a lab draft is dirty', async ({ page }) => {
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    // PR 3351 (review round 2, P1): SPA-уход с /lab (Header → Profile) больше
+    // не обходит dirty-guard.
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.getByRole('menuitem', { name: 'Профиль' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Отмена' }).click();
+    await expect(dialog).toBeHidden();
+
+    // Отмена: остались на /lab, черновик и контекст нетронуты.
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await expect(fieldInput).toHaveValue('6.5');
+    expect(new URL(page.url()).pathname).toBe('/lab');
+
+    // Подтверждённый уход: discard → профиль открывается.
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.getByRole('menuitem', { name: 'Профиль' }).click();
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    await expect.poll(() => new URL(page.url()).pathname).not.toBe('/lab');
+  });
+
+  test('browser Back to the previous route is guarded while a lab draft is dirty', async ({ page }) => {
+    // Реальная история: /health -> /lab (in-lab переходы используют replace
+    // и не создают записей, поэтому запись под /lab — предыдущая страница).
+    await page.goto('/health');
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    // PR 3351 (review round 2, P1): browser Back вытесняет sentinel — pop
+    // абсорбируется на том же /lab URL, guard-диалог спрашивает решение.
+    await page.evaluate(() => window.history.back());
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Отмена' }).click();
+    await expect(dialog).toBeHidden();
+
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await expect(fieldInput).toHaveValue('6.5');
+    expect(new URL(page.url()).pathname).toBe('/lab');
+
+    // Подтверждённый уход: discard → реальная предыдущая страница.
+    await page.evaluate(() => window.history.back());
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/health');
+  });
+
+  test('logout waits for the guard confirmation and keeps the session on cancel', async ({ page }) => {
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    // PR 3351 (review round 2, P1): logout очищает токен ТОЛЬКО после
+    // подтверждённого перехода (onLeave), не до него.
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.locator('#logout-header-btn').click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Отмена' }).click();
+    await expect(dialog).toBeHidden();
+
+    const tokenAfterCancel = await page.evaluate(() => window.sessionStorage.getItem('auth_token'));
+    expect(tokenAfterCancel).toBeTruthy();
+    expect(new URL(page.url()).pathname).toBe('/lab');
+    await expect(fieldInput).toHaveValue('6.5');
+
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.locator('#logout-header-btn').click();
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+
+    await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('auth_token'))).toBeNull();
+    await expect.poll(() => new URL(page.url()).pathname).not.toBe('/lab');
   });
 
   test('late create from another appointment of the same patient is rejected', async ({ page }) => {
@@ -1050,6 +1223,10 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
     await panelTabs.getByRole('tab').nth(0).click();
     await panelTabs.getByRole('tab').nth(1).click();
+    // Транзиент tab-sync (pre-existing): после двух быстрых переключений
+    // вкладок панель может отставать на шаг — ждём фактической видимости
+    // вкладки шаблонов перед поиском кнопки «Новый».
+    await expect(page.locator('#lab-panel-tabpanel-templates')).toBeVisible();
     await expect(footerInput).toHaveValue('Несохранённый подвал');
 
     // Заполняем форму нового шаблона и нажимаем Create. POST должен ждать

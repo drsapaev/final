@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AppProviders } from './providers/AppProviders';
@@ -17,6 +17,9 @@ import {
   Sidebar,
 } from './components/ui/macos';
 import HeaderNew from './components/layout/HeaderNew';
+// PR 3351 (review round 2, P1): route-level dirty guard для /lab — общий
+// реестр источников + диалог + sentinel против browser Back.
+import { LabDirtyGuardProvider, useGuardedLabNavigate } from './components/laboratory/LabDirtyGuardContext';
 // SW-05 fix: global command palette (Cmd+K)
 import { CommandPalette, type CommandProfile } from './components/common/CommandPalette';
 import GlobalNotificationCenter from './components/notifications/GlobalNotificationCenter';
@@ -173,7 +176,9 @@ function LoadingScreen() {
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const navigate = useNavigate();
+  // PR 3351: guarded navigate — sidebar и Command Palette уходят с /lab
+  // через dirty-guard при несохранённых черновиках.
+  const navigate = useGuardedLabNavigate();
   const { theme } = useTheme();
   const { isMobile } = useBreakpoint();
   const [authState, setAuthState] = useState(() => auth.getState());
@@ -455,7 +460,13 @@ export default function App() {
   return (
     <ThemeProvider>
       <AppProviders>
-        <AppContent />
+        {/* PR 3351 (review round 2, P1): dirty-guard реестр лаборатории на
+            уровне App — route-level leave guard (Header/Profile/Command
+            Palette/logout/browser Back) работает с теми же источниками и тем
+            же диалогом, что и переходы внутри LabPanel. */}
+        <LabDirtyGuardProvider>
+          <AppContent />
+        </LabDirtyGuardProvider>
         <ToastContainer
           position="bottom-right"
           autoClose={4000}

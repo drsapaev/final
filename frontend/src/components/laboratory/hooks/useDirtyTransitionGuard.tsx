@@ -81,6 +81,19 @@ export interface DirtyTransitionGuard {
   dismissPendingTransition: () => void;
   guardDialog: React.ReactNode;
   isDialogOpen: boolean;
+  /**
+   * PR 3351 (route-level leave guard): true когда хотя бы один
+   * зарегистрированный источник сейчас dirty. Читается на уровне App Shell
+   * (guarded navigate) до того, как переход начнётся.
+   */
+  hasDirtySources: () => boolean;
+  /**
+   * PR 3351: источники вызывают это при каждом изменении своего dirty-состояния
+   * (workbench'и — из эффекта, обновляющего их isDirty-ref, т.е. на каждом
+   * рендере). Перерисовка происходит только при реальном флипе агрегированного
+   * значения — notify с каждого рендера не может зациклить обновления.
+   */
+  notifyDirtyStateChange: () => void;
 }
 
 interface PendingDirtyTransition {
@@ -109,13 +122,35 @@ export function useDirtyTransitionGuard(options?: {
   const pendingTransitionRef = useRef<PendingDirtyTransition | null>(null);
   const [pendingTransition, setPendingTransition] = useState<PendingDirtyTransition | null>(null);
   const [busy, setBusy] = useState(false);
+  // PR 3351 (route-level leave guard): версия dirty-состояния. Бампается
+  // только при флипе агрегированного значения — провайдер уровня App Shell
+  // перерисовывается (и перевзвешивает sentinel) на флипах, а не на каждый
+  // keystroke.
+  const [, bumpDirtyVersion] = useState(0);
+  const lastNotifiedDirtyRef = useRef(false);
+
+  const hasDirtySources = useCallback(() => (
+    [...sourcesRef.current.values()].some((source) => source.isDirty())
+  ), []);
+
+  const notifyDirtyStateChange = useCallback(() => {
+    const dirty = [...sourcesRef.current.values()].some((source) => source.isDirty());
+    if (dirty === lastNotifiedDirtyRef.current) return;
+    lastNotifiedDirtyRef.current = dirty;
+    bumpDirtyVersion((version) => version + 1);
+  }, []);
 
   const registerDirtySource = useCallback((source: DirtyDraftSource) => {
     sourcesRef.current.set(source.id, source);
+    notifyDirtyStateChange();
     return () => {
       sourcesRef.current.delete(source.id);
+      // Источник с dirty-черновиком размонтировался (подтверждённый уход с
+      // /lab): агрегированное значение могло смениться — sentinel должен
+      // перевзвестись.
+      notifyDirtyStateChange();
     };
-  }, []);
+  }, [notifyDirtyStateChange]);
 
   const guardTransition = useCallback((
     transition: () => void | Promise<void>,
@@ -264,6 +299,8 @@ export function useDirtyTransitionGuard(options?: {
     dismissPendingTransition,
     guardDialog,
     isDialogOpen: pendingTransition !== null,
+    hasDirtySources,
+    notifyDirtyStateChange,
   };
 }
 

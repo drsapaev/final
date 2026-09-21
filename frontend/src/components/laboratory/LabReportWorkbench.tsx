@@ -101,6 +101,7 @@ export default function LabReportWorkbench({
   onRefreshRecentReports = undefined,
   onQueueChanged = undefined,
   registerDirtySource = undefined,
+  onDirtyStateChange = undefined,
   onOperationPendingChange = undefined,
   notify
 }: {
@@ -129,6 +130,8 @@ export default function LabReportWorkbench({
     save: () => Promise<void>;
     discard?: () => void;
   }) => () => void;
+  /** PR 3351: вызывается при каждом изменении dirty-состояния (sentinel route-guard). */
+  onDirtyStateChange?: () => void;
   onOperationPendingChange?: (pending: boolean) => void;
   [k: string]: unknown;
 }) {
@@ -625,8 +628,15 @@ export default function LabReportWorkbench({
   // PR5: регистрация dirty-состояния отчёта в панели — guard переходов
   // решает (сохранить / выйти без сохранения / отмена) по этому источнику.
   const isDirtyRef = useRef(isDirty);
+  // PR 3351 (route-level leave guard): обновляемый ref + notify на каждом
+  // рендере — route-guard перевзвешивает sentinel при флипе dirty.
+  const onDirtyStateChangeRef = useRef(onDirtyStateChange);
+  useEffect(() => {
+    onDirtyStateChangeRef.current = onDirtyStateChange;
+  });
   useEffect(() => {
     isDirtyRef.current = isDirty;
+    onDirtyStateChangeRef.current?.();
   });
   const registerDirtySourceRef = useRef(registerDirtySource);
   useEffect(() => {

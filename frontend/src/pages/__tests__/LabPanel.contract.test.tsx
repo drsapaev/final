@@ -271,7 +271,7 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     // не должен запрещать смену шаблона и наоборот.
     expect(guardBlock).toContain('options?.sourceIds');
     expect(guardBlock).toContain('options.sourceIds?.includes(source)');
-    // Полная область (внешняя URL-навигация) блокируется при любом pending.
+    // Полная область (переходы без sourceIds) блокируется при любом pending.
     expect(guardBlock).toContain(': [...pendingOperationSourcesRef.current]');
   });
 
@@ -281,8 +281,53 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(source).toContain("{ sourceIds: ['report'] }");
     // Смена шаблона / retry списка шаблонов — template-область.
     expect(source).toContain("{ sourceIds: ['template'] }");
-    // Внешняя URL-навигация спрашивает все источники.
-    expect(source).toContain('sourceIds: options.urlIntent ? undefined : [\'report\']');
+    // PR 3351 (review round 2, P1): смена report instance — даже из внешнего
+    // URL (urlIntent) — тоже report-область: смена отчёта не уничтожает
+    // template-черновик (секции смонтированы одновременно через hidden).
+    // Все источники спрашивает только route-level уход с /lab.
+    expect(source).not.toContain('sourceIds: options.urlIntent ? undefined');
+  });
+
+  it('scopes template archive/clone to the template source only (review round 2 P1)', () => {
+    const templateSource = fs.readFileSync(
+      path.resolve(__dirname, '../../components/laboratory/LabTemplateWorkbench.tsx'),
+      'utf8',
+    );
+    // PR 3351: archive/clone меняют только шаблон — dirty report-draft не
+    // должен спрашиваться и сбрасываться (сценарий A из ревью).
+    expect(templateSource).toContain("guardTransition(archiveAndRefresh, { sourceIds: ['template'] })");
+    expect(templateSource).toContain("guardTransition(cloneAndRefresh, { sourceIds: ['template'] })");
+    expect(templateSource).not.toContain('guardTransition(archiveAndRefresh)');
+    expect(templateSource).not.toContain('guardTransition(cloneAndRefresh)');
+  });
+
+  it('wires the route-level leave guard through the app shell (review round 2 P1)', () => {
+    const source = readLabPanelSource();
+    const appSource = fs.readFileSync(
+      path.resolve(__dirname, '../../App.tsx'),
+      'utf8',
+    );
+    const headerSource = fs.readFileSync(
+      path.resolve(__dirname, '../../components/layout/HeaderNew.tsx'),
+      'utf8',
+    );
+    const searchSource = fs.readFileSync(
+      path.resolve(__dirname, '../../components/search/GlobalSearchBar.tsx'),
+      'utf8',
+    );
+
+    // Guard-реестр поднят на уровень App: LabPanel берёт его из контекста,
+    // провайдер монтируется в App (внутри BrowserRouter).
+    expect(source).toContain('useLabDirtyGuard()');
+    expect(appSource).toContain('<LabDirtyGuardProvider>');
+    // Header / sidebar / Command Palette / глобальный поиск — через guarded
+    // navigate: уход с /lab при dirty-черновиках не может пройти молча.
+    expect(headerSource).toContain('useGuardedLabNavigate()');
+    expect(appSource).toContain('useGuardedLabNavigate()');
+    expect(searchSource).toContain('useGuardedLabNavigate()');
+    // Logout: clearToken только после подтверждённого перехода (onLeave).
+    expect(headerSource).toContain("navigate(loginRoute, { onLeave: () => { auth.clearToken(); setProfile(null); } })");
+    expect(headerSource).not.toContain('auth.clearToken(); setProfile(null); navigate(loginRoute)');
   });
 
   it('keeps report CREATE latest-wins: create does not block transitions', () => {

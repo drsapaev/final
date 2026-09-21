@@ -7,8 +7,8 @@ import LabReportWorkbench, {
   type LabReportOperationContext,
 } from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
-import { useDirtyTransitionGuard } from '../components/laboratory/hooks/useDirtyTransitionGuard';
 import type { DirtyGuardTransitionOptions } from '../components/laboratory/hooks/useDirtyTransitionGuard';
+import { useLabDirtyGuard } from '../components/laboratory/LabDirtyGuardContext';
 import { formatLabStatus } from '../components/laboratory/labUiLabels';
 import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -568,18 +568,27 @@ export default function LabPanel() {
   // H-2 fix: keyboard shortcuts for tab switching, refresh, clear selection.
   // PR5: единый dirty-guard для переходов, уничтожающих введённый draft
   // (смена пациента/отчёта/шаблона, Escape, восстановление из URL).
+  // PR 3351 (review round 2, P1): guard поднят на уровень App через
+  // LabDirtyGuardContext — тот же реестр источников и тот же диалог видит
+  // route-level leave guard (Header/Profile/Command Palette/logout/browser
+  // Back). Без провайдера (unit-тесты) — standalone-экземпляр.
   const {
     registerDirtySource,
     guardTransition: guardDirtyTransition,
     dismissPendingTransition,
     guardDialog,
     isDialogOpen,
-  } = useDirtyTransitionGuard();
+    setPendingOperationSources,
+    notifyDirtyStateChange,
+  } = useLabDirtyGuard();
   const pendingOperationSourcesRef = useRef(new Set<string>());
   const setOperationSourcePending = useCallback((source: string, pending: boolean) => {
     if (pending) pendingOperationSourcesRef.current.add(source);
     else pendingOperationSourcesRef.current.delete(source);
-  }, []);
+    // PR 3351: тот же SSOT pending-источников — на уровне App (route-level
+    // leave guard блокирует уход с /lab при любой незавершённой операции).
+    setPendingOperationSources([...pendingOperationSourcesRef.current]);
+  }, [setPendingOperationSources]);
   const handleReportOperationPendingChange = useCallback(
     (pending: boolean) => setOperationSourcePending('report', pending),
     [setOperationSourcePending],
@@ -596,8 +605,8 @@ export default function LabPanel() {
   // - report CREATE — latest-wins: переходы не блокируются, поздний
   //   ответ отбрасывается по operation-context (epoch/selectionKey/
   //   patientId) в handleInstanceChange;
-  // - внешняя URL-навигация (без sourceIds — все источники) блокируется
-  //   при ЛЮБОМ pending-источнике.
+  // - route-level уход с /lab (guardRouteLeave) блокируется при ЛЮБОМ
+  //   pending-источнике (см. LabDirtyGuardContext).
   const guardTransition = useCallback((
     transition: () => void | Promise<void>,
     options?: DirtyGuardTransitionOptions,
@@ -974,9 +983,11 @@ export default function LabPanel() {
     // PR5: публичный переход через dirty-guard (недавние отчёты,
     // восстановление ?instance=N из URL). Внутри подтверждённого перехода
     // используется applyInstanceTransition — подтверждение один раз.
-    // Внешняя URL-навигация (urlIntent) меняет весь контекст панели и
-    // спрашивает все dirty-источники; внутренние переходы — только
-    // report-draft.
+    // PR 3351 (review round 2, P1): смена report instance — даже из внешнего
+    // URL — затрагивает ТОЛЬКО report-draft: Queue/Templates/Reports
+    // смонтированы одновременно (hidden-секции), смена отчёта не уничтожает
+    // template-черновик и наоборот. Все источники спрашивает только
+    // route-level уход с /lab (guardRouteLeave).
     guardTransition(
       () => {
         if (options.urlIntent) {
@@ -995,7 +1006,7 @@ export default function LabPanel() {
         void applyInstanceTransition(instanceId, { urlIntent: options.urlIntent });
       },
       {
-        sourceIds: options.urlIntent ? undefined : ['report'],
+        sourceIds: ['report'],
         onCancel: options.urlIntent ? () => {
           // Keep a rollback contract while React Router is still exposing the
           // cancelled external URL. Otherwise the restore effect observes it
@@ -1383,6 +1394,7 @@ export default function LabPanel() {
           templates={templates}
           selectedTemplate={selectedTemplate}
           registerDirtySource={registerDirtySource}
+          onDirtyStateChange={notifyDirtyStateChange}
           guardTransition={guardTransition}
           templateTransitionPending={templateTransitionPending}
           onOperationPendingChange={handleTemplateOperationPendingChange}
@@ -1473,6 +1485,7 @@ export default function LabPanel() {
           reportHistory={reportHistory as unknown as never[]}
           recentReports={recentReports as unknown as never[]}
           registerDirtySource={registerDirtySource}
+          onDirtyStateChange={notifyDirtyStateChange}
           onOperationPendingChange={handleReportOperationPendingChange}
           activeInstance={activeInstance as unknown as null}
           instanceTransitionPending={instanceTransitionPending}
