@@ -29396,6 +29396,8 @@ export type components = {
             }[] | null;
             /** Message */
             message: string;
+            /** Replayed */
+            replayed?: boolean;
         };
         /**
          * JoinSessionCompleteRequest
@@ -29450,6 +29452,8 @@ export type components = {
             specialist_name: string;
             /** Department */
             department: string;
+            /** Replayed */
+            replayed?: boolean;
         };
         /**
          * JoinSessionStartRequest

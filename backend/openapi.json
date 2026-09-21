@@ -85176,6 +85176,10 @@
           "message": {
             "type": "string",
             "title": "Message"
+          },
+          "replayed": {
+            "title": "Replayed",
+            "type": "boolean"
           }
         },
         "type": "object",
@@ -85286,6 +85290,10 @@
           "department": {
             "type": "string",
             "title": "Department"
+          },
+          "replayed": {
+            "title": "Replayed",
+            "type": "boolean"
           }
         },
         "type": "object",
