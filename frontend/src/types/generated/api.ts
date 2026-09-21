@@ -69447,7 +69447,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    };
+                    }[];
                 };
             };
             /** @description Validation Error */
@@ -69527,7 +69527,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    };
+                    }[];
                 };
             };
             /** @description Validation Error */

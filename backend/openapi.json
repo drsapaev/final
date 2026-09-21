@@ -47022,8 +47022,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
                   "title": "Response Get Weekly Schedule Api V1 Schedule Weekly Get"
                 }
               }
@@ -47220,8 +47223,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
                   "title": "Response Get Available Slots Api V1 Schedule Available Slots Get"
                 }
               }
