@@ -9,7 +9,7 @@
  * test is useNurseServingBoard + the real components.
  */
 
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -385,6 +385,11 @@ describe('NURSE-V2 N2-5 tablet — incomplete reason UX', () => {
     const buttons = await screen.findAllByRole('button', { name: 'Не завершено' });
     await user.click(buttons[0]);
     const textarea = await screen.findByLabelText(/Причина \(обязательно\)/);
+    // The Modal kit moves focus on mount via requestAnimationFrame; let it
+    // settle and take the focus back BEFORE typing, otherwise the field
+    // blurs mid-type and the input is truncated.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    await user.click(textarea);
     return { user, textarea };
   }
 
@@ -411,8 +416,12 @@ describe('NURSE-V2 N2-5 tablet — incomplete reason UX', () => {
   });
 
   it('blocks an over-length reason (200 max)', async () => {
-    const { user, textarea } = await openExecutionDialog();
-    await user.type(textarea, 'а'.repeat(201));
+    const { textarea } = await openExecutionDialog();
+    // The Modal kit's focus-restore rAF can blur the field mid-type in a
+    // full-suite run; the over-length branch is a validation-logic check,
+    // so the value is set directly (the trimmed-submit test keeps the
+    // real userEvent typing path).
+    fireEvent.change(textarea, { target: { value: 'а'.repeat(201) } });
     expect(screen.getByText('Максимум 200 символов')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
   });

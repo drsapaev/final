@@ -5,12 +5,13 @@
  * trimmed, non-blank, at most 200 chars — the client validates for UX,
  * the backend re-validates fail-closed (the N2-3 round-3 discipline).
  * PHI (§11): the reason is sent to the clinical endpoint only — never
- * logged, never put into analytics.
+ * logged, never put into analytics. Built on the canonical Modal kit
+ * (the regression-audit modal-files ratchet).
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { Button } from '@/components/ui';
+import { Button, Modal } from '@/components/ui';
 
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -21,6 +22,8 @@ export type NurseIncompleteDialogProps = {
   /** 'execution' — abort a service attempt; 'entry' — terminal entry exit. */
   mode: 'execution' | 'entry';
   busy: boolean;
+  /** Passed to the Modal kit (undefined while busy = close locked). */
+  onClose?: () => void;
   onCancel: () => void;
   onSubmit: (reason: string) => void;
 };
@@ -40,6 +43,7 @@ export function NurseIncompleteDialog({
   open,
   mode,
   busy,
+  onClose,
   onCancel,
   onSubmit,
 }: NurseIncompleteDialogProps) {
@@ -50,75 +54,26 @@ export function NurseIncompleteDialog({
   useEffect(() => {
     if (open) {
       setValue('');
-      // focus for the tablet soft keyboard without scrolling jumps
-      window.setTimeout(() => inputRef.current?.focus(), 50);
+      // focus immediately for the tablet soft keyboard — a deferred
+      // focus races with in-flight typing and blurs the field mid-type
+      inputRef.current?.focus();
     }
   }, [open]);
 
   const errorKey = useMemo(() => validateIncompleteReason(value), [value]);
   const canSubmit = !busy && errorKey === null;
 
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div
-      className="nurse-dialog__backdrop"
-      role="presentation"
-      onClick={(event) => {
-        if (event.target === event.currentTarget && !busy) {
-          onCancel();
-        }
-      }}
-    >
-      <div
-        className="nurse-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="nurse-dialog-title"
-      >
-        <h2 id="nurse-dialog-title" className="nurse-dialog__title">
-          {t(
-            mode === 'execution'
-              ? 'nurse.reason_title_execution'
-              : 'nurse.reason_title_entry',
-          )}
-        </h2>
-        <label className="nurse-dialog__label" htmlFor="nurse-dialog-reason">
-          {t('nurse.reason_label')}
-        </label>
-        <textarea
-          id="nurse-dialog-reason"
-          ref={inputRef}
-          className="nurse-dialog__input"
-          value={value}
-          rows={4}
-          maxLength={REASON_MAX_LENGTH + 20}
-          aria-label={t('nurse.reason_label')}
-          aria-invalid={errorKey !== null}
-          aria-describedby="nurse-dialog-counter"
-          disabled={busy}
-          onChange={(event) => setValue(event.target.value)}
-        />
-        <div className="nurse-dialog__meta">
-          <span
-            id="nurse-dialog-counter"
-            className={
-              value.trim().length > REASON_MAX_LENGTH
-                ? 'nurse-dialog__counter nurse-dialog__counter--over'
-                : 'nurse-dialog__counter'
-            }
-          >
-            {value.trim().length}/{REASON_MAX_LENGTH}
-          </span>
-          {errorKey !== null && (
-            <span className="nurse-dialog__error" role="alert">
-              {t(errorKey)}
-            </span>
-          )}
-        </div>
-        <div className="nurse-dialog__actions">
+    <Modal
+      isOpen={open}
+      onClose={busy ? undefined : onClose ?? onCancel}
+      title={t(
+        mode === 'execution'
+          ? 'nurse.reason_title_execution'
+          : 'nurse.reason_title_entry',
+      )}
+      actions={
+        <>
           <Button variant="secondary" onClick={onCancel} disabled={busy}>
             {t('nurse.action_cancel')}
           </Button>
@@ -129,8 +84,42 @@ export function NurseIncompleteDialog({
           >
             {t('nurse.action_submit')}
           </Button>
-        </div>
+        </>
+      }
+    >
+      <label className="nurse-dialog__label" htmlFor="nurse-dialog-reason">
+        {t('nurse.reason_label')}
+      </label>
+      <textarea
+        id="nurse-dialog-reason"
+        ref={inputRef}
+        className="nurse-dialog__input"
+        value={value}
+        rows={4}
+        maxLength={REASON_MAX_LENGTH + 20}
+        aria-label={t('nurse.reason_label')}
+        aria-invalid={errorKey !== null}
+        aria-describedby="nurse-dialog-counter"
+        disabled={busy}
+        onChange={(event) => setValue(event.target.value)}
+      />
+      <div className="nurse-dialog__meta">
+        <span
+          id="nurse-dialog-counter"
+          className={
+            value.trim().length > REASON_MAX_LENGTH
+              ? 'nurse-dialog__counter nurse-dialog__counter--over'
+              : 'nurse-dialog__counter'
+          }
+        >
+          {value.trim().length}/{REASON_MAX_LENGTH}
+        </span>
+        {errorKey !== null && (
+          <span className="nurse-dialog__error" role="alert">
+            {t(errorKey)}
+          </span>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

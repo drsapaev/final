@@ -9,7 +9,7 @@
  * the console, no client-side audit — the server UserAuditLog is SSOT.
  */
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { NurseIncompleteDialog } from './NurseIncompleteDialog';
@@ -72,17 +72,26 @@ export default function NurseTabletPage() {
         isPending(`incomplete:${dialog.executionId}`))) ||
       (dialog.entryId != null && isPending(`entry-incomplete:${dialog.entryId}`)));
 
-  const handleDialogSubmit = (reason: string) => {
-    if (dialog == null) {
-      return;
-    }
-    if (dialog.mode === 'execution' && dialog.executionId != null) {
-      void board.incompleteExecution(dialog.executionId, reason);
-    } else if (dialog.mode === 'entry' && dialog.entryId != null) {
-      void board.entryIncomplete(dialog.entryId, reason);
-    }
-    setDialog(null);
-  };
+  // Stable dialog callbacks: the Modal kit re-runs its focus effect when
+  // `onClose` changes identity — an inline arrow would restart it on every
+  // keystroke and steal the focus mid-typing.
+  const handleDialogCancel = useCallback(() => setDialog(null), []);
+  const handleDialogSubmit = useCallback(
+    (reason: string) => {
+      setDialog((current) => {
+        if (current == null) {
+          return null;
+        }
+        if (current.mode === 'execution' && current.executionId != null) {
+          void board.incompleteExecution(current.executionId, reason);
+        } else if (current.mode === 'entry' && current.entryId != null) {
+          void board.entryIncomplete(current.entryId, reason);
+        }
+        return null;
+      });
+    },
+    [board],
+  );
 
   return (
     <div className="nurse-tablet">
@@ -203,7 +212,8 @@ export default function NurseTabletPage() {
         open={dialog != null}
         mode={dialog?.mode ?? 'execution'}
         busy={dialogBusy ?? false}
-        onCancel={() => setDialog(null)}
+        onClose={dialogBusy ? undefined : handleDialogCancel}
+        onCancel={handleDialogCancel}
         onSubmit={handleDialogSubmit}
       />
     </div>
