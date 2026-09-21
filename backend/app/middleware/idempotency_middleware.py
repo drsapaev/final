@@ -70,6 +70,16 @@ _IDEMPOTENT_METHODS = {"POST", "PUT", "PATCH"}
 # Default cache window: 24 hours. After that, the same key can be reused.
 _CACHE_TTL_SECONDS = 24 * 60 * 60
 
+# Round-5 (owner P1, PR #3340): tri-state outcome of a distributed scope
+# binding read. RESOLVED means Redis ANSWERED — the returned scope is the
+# key's effective binding (existing or freshly NX-written). UNAVAILABLE
+# means the identity is UNKNOWN: Redis unreachable, an op failed, or the
+# NX-then-re-read could not confirm a binding. The caller must treat these
+# differently — an absent binding may be created, an UNRESOLVED one must
+# never be invented locally.
+_SCOPE_BINDING_RESOLVED = "resolved"
+_SCOPE_BINDING_UNAVAILABLE = "unavailable"
+
 # Max entries to prevent unbounded memory growth
 _MAX_CACHE_ENTRIES = 10_000
 
@@ -352,26 +362,97 @@ def _normalize_idem_path(path: str) -> str:
     return re.sub(r"/+$", "", path) or "/"
 
 
+def _audit_keyed_patient_refusal(
+    request: Any, subject_patient_id: int, canonical_user_id: int
+) -> None:
+    """Round-5 (owner P2): denied PHI-audit row for a middleware refusal.
+
+    POST /patients/booking REQUIRES an Idempotency-Key, so a keyed request
+    is decided by THIS middleware before any endpoint dependency runs —
+    the round-4 audited principal factory never executes on a refusal
+    path, and the linked card's PHI trail lost the attempt. This writes
+    the SAME row contract the portal's audited dependency produces
+    (``outcome="denied"``, machine ``reason`` + ``surface: jwt_portal``
+    in extra_data, the linked card as subject and actor) directly through
+    the shared audit SSOT. Non-blocking by contract: an audit failure
+    never changes the refusal itself.
+
+    Resource mapping: the only keyed patient surface in #3340 is the
+    booking create (appointment/create, matching the endpoint's own
+    factory); future keyed patient surfaces fall back to the honest
+    generic (patient_portal/access) instead of a wrong resource label.
+    """
+    path = getattr(getattr(request, "url", None), "path", "") or ""
+    if path.rstrip("/").endswith("booking"):
+        resource_type, action = "appointment", "create"
+    else:
+        resource_type, action = "patient_portal", "access"
+    try:
+        generator = _resolve_request_db(request)
+        try:
+            db = next(generator)
+            from app.services.patient_access_audit import log_patient_access
+            from app.services.telegram_mini_app_init_data import (
+                TelegramMiniAppSessionScope,
+            )
+
+            log_patient_access(
+                db,
+                scope=TelegramMiniAppSessionScope(
+                    scope_type="patient",
+                    telegram_user_id=None,
+                    telegram_chat_id=None,
+                    patient_id=int(subject_patient_id),
+                ),
+                resource_type=resource_type,
+                action=action,
+                outcome="denied",
+                request=request,
+                extra_data={"reason": "user_deactivated", "surface": "jwt_portal"},
+            )
+        finally:
+            try:
+                next(generator)
+            except StopIteration:
+                pass
+            except Exception:  # pragma: no cover - generator teardown
+                pass
+    except Exception:
+        logger.warning(
+            "Idempotency denied-audit write failed for a deactivated patient "
+            "(keyed request); refusing without an audit row",
+            exc_info=True,
+        )
+
+
 def _patient_replay_policy_sync(
     request: Any, canonical_user_id: int
-) -> tuple[str, bool]:
+) -> tuple[str, bool, bool | None]:
     """Round-3 (owner P1): patient-aware replay policy, one DB roundtrip.
 
-    Returns ``(patient_scope, fall_through)``:
+    Returns ``(patient_scope, fall_through, user_is_active)``:
 
     - non-Patient principal (or user row gone — later exec-auth refuses
-      fail-closed): ``("", False)`` — namespace carries NO patient scope;
-    - Patient with an ACTIVE card: ``("patient:{id}", False)`` — the
-      namespace (local cache, Redis claim, execution intents) is bound to
-      the CURRENT card id, so a snapshot made under card A can never be
-      served after the account is re-linked to card B;
-    - Patient with a MISSING or SOFT-DELETED card: ``("", True)`` — the
-      caller falls through to the endpoint WITHOUT any idempotency
+      fail-closed): ``("", False, None)`` — namespace carries NO patient
+      scope;
+    - Patient with an ACTIVE card: ``("patient:{id}", False, is_active)``
+      — the namespace (local cache, Redis claim, execution intents) is
+      bound to the CURRENT card id, so a snapshot made under card A can
+      never be served after the account is re-linked to card B;
+    - Patient with a MISSING or SOFT-DELETED card: ``("", True, None)``
+      — the caller falls through to the endpoint WITHOUT any idempotency
       machinery: no cached snapshot, no claim, no intent. The endpoint's
       own guards answer 404 patient_profile_required / 403
       patient_link_invalid (and write the denied audit row) exactly as
       they would for a first request. Replaying a committed booking to a
       revoked card is precisely the leak this policy closes.
+
+    Round-5 (owner P2): ``User.is_active`` is now part of the SAME query.
+    A DEACTIVATED account with a live card is refused HERE — the keyed
+    request must never reach the binding/claim machinery (and through it
+    the later non-auditing exec-auth refusal). The denied audit row is
+    written in this same DB pass (see ``_audit_keyed_patient_refusal``);
+    the dispatch then answers the non-executing 403.
     """
     generator = _resolve_request_db(request)
     try:
@@ -382,18 +463,21 @@ def _patient_replay_policy_sync(
         from app.models.user import User
 
         row = db.execute(
-            select(User.role, Patient.id, Patient.is_deleted)
+            select(User.role, Patient.id, Patient.is_deleted, User.is_active)
             .outerjoin(Patient, Patient.user_id == User.id)
             .where(User.id == int(canonical_user_id))
         ).first()
         if row is None:
-            return "", False
-        role, patient_id, is_deleted = row
+            return "", False, None
+        role, patient_id, is_deleted, user_is_active = row
         if str(role or "").strip().casefold() != "patient":
-            return "", False
+            return "", False, None
         if patient_id is None or bool(is_deleted):
-            return "", True
-        return f"patient:{int(patient_id)}", False
+            return "", True, None
+        user_is_active = bool(user_is_active)
+        if not user_is_active:
+            _audit_keyed_patient_refusal(request, int(patient_id), canonical_user_id)
+        return f"patient:{int(patient_id)}", False, user_is_active
     finally:
         try:
             next(generator)
@@ -623,6 +707,14 @@ class DistributedIdempotencyClaim:
     # memory, because two staging workers would execute the same keyed write
     # concurrently and duplicate visits/invoices/queue entries.
     _required: bool = False
+    # Round-5 (owner P1, PR #3340): True once Redis has ANSWERED at least
+    # once in this worker's lifetime. While it is False the process has
+    # never seen a reachable Redis, so no binding can exist "only in Redis"
+    # from THIS worker's point of view and the per-process mirror is the
+    # legitimate coordination SSOT (the no-Redis / ARQ-fallback contract).
+    # Once True, a degraded Redis hides bindings that may exist ONLY there
+    # — an unknown-scope keyed request must then refuse conservatively.
+    _ever_available: bool = False
 
     def __init__(self, redis_url: str, ttl: int = _CACHE_TTL_SECONDS, lease_seconds: int = _IN_FLIGHT_LEASE_SECONDS, required: bool = False) -> None:
         self._ttl = ttl
@@ -642,6 +734,7 @@ class DistributedIdempotencyClaim:
             client.ping()
             self._client = client
             self._available = True
+            self._ever_available = True
             # Codex R2 #3092 (P1): never log credentials from the URI.
             logger.info("Idempotency distributed claim active via Redis (%s)", redact_redis_url(redis_url))
         except Exception as exc:  # pragma: no cover - depends on deployment
@@ -706,6 +799,7 @@ class DistributedIdempotencyClaim:
         try:
             self._client.ping()
             self._available = True
+            self._ever_available = True
             logger.info("Idempotency Redis connection recovered after transient failure")
             return True
         except Exception as exc:
@@ -850,18 +944,25 @@ class DistributedIdempotencyClaim:
 
     def bind_scope_if_absent(
         self, origin_ns: str, key: str, patient_scope: str
-    ) -> str | None:
-        """Bind the key's FIRST patient scope; return the EFFECTIVE binding.
+    ) -> tuple[str, str | None]:
+        """Bind the key's FIRST patient scope; report the EFFECTIVE binding.
 
-        The existing binding always wins: GET before the SET NX, then a
-        re-read to resolve a lost-SET race (another attempt landed its NX
-        first). Returns None only when Redis is unavailable or the op
-        failed — the caller falls back to the per-process mirror."""
+        Round-5 (owner P1): the result is a TRI-STATE — ``absent`` and
+        ``failed`` are different states and the caller must not conflate
+        them. ``(SCOPE_BINDING_RESOLVED, scope)`` means Redis ANSWERED:
+        either the existing binding (which always wins: GET before the SET
+        NX) or our own NX write confirmed by the re-read.
+        ``(SCOPE_BINDING_UNAVAILABLE, None)`` means the key's identity is
+        UNKNOWN — Redis unreachable, an op failed, or the lost-SET race
+        could not be re-read. The caller MUST NOT invent a binding from an
+        UNAVAILABLE result: with required coordination that is a 503, and
+        a local fallback would let two workers bind the same key to two
+        different cards and execute the write twice."""
         if not self._ensure_available() or self._client is None:
-            return None
+            return _SCOPE_BINDING_UNAVAILABLE, None
         stored = self._run(self._client.get, self._scope_key(origin_ns, key))
         if stored:
-            return str(stored)
+            return _SCOPE_BINDING_RESOLVED, str(stored)
         self._run(
             self._client.set,
             self._scope_key(origin_ns, key),
@@ -870,7 +971,37 @@ class DistributedIdempotencyClaim:
             ex=self._ttl,
         )
         stored = self._run(self._client.get, self._scope_key(origin_ns, key))
-        return str(stored) if stored else None
+        if stored:
+            return _SCOPE_BINDING_RESOLVED, str(stored)
+        # The SET NX reported nothing and the re-read saw nothing: a
+        # concurrent worker may or may not have landed its NX between our
+        # two reads. The binding state is UNRESOLVED — never invent one.
+        return _SCOPE_BINDING_UNAVAILABLE, None
+
+    def extend_scope_binding(
+        self, origin_ns: str, key: str, patient_scope: str
+    ) -> None:
+        """Round-5 (owner P1): keep the binding alive as long as the snapshot
+        it guards.
+
+        The binding is written BEFORE the handler runs while the response
+        snapshot is stored AFTER it completes; left alone, the binding can
+        expire first and in that window the same key would be re-bindable
+        to a DIFFERENT card (the snapshot it protected is still live).
+        Called when the outcome is stored. Value-guarded: refreshes only a
+        binding that still holds OUR scope — a foreign value (a re-bound
+        key) is never overwritten. Best-effort by contract: an outage here
+        leaves the original TTL, which the deploy window tolerates."""
+        if not self._ensure_available() or self._client is None:
+            return
+        stored = self._run(self._client.get, self._scope_key(origin_ns, key))
+        if stored and str(stored) == patient_scope:
+            self._run(
+                self._client.set,
+                self._scope_key(origin_ns, key),
+                patient_scope,
+                ex=self._ttl,
+            )
 
     def probe_legacy_artifacts(
         self, legacy_ns: str, key: str
@@ -1213,7 +1344,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # id; a missing/soft-deleted card bypasses replay entirely so the
         # endpoint's own guards (404/403 + denied audit) answer the retry.
         try:
-            patient_scope, patient_fall_through = await asyncio.to_thread(
+            (
+                patient_scope,
+                patient_fall_through,
+                patient_user_active,
+            ) = await asyncio.to_thread(
                 _patient_replay_policy_sync, request, canonical_id
             )
         except Exception:
@@ -1230,6 +1365,20 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 canonical_id, idempotency_key, request.url.path,
             )
             return await call_next(request)
+        if patient_scope and patient_user_active is False:
+            # Round-5 (owner P2): a DEACTIVATED patient account is refused
+            # BEFORE any idempotency machinery runs. The keyed booking's
+            # audited principal factory cannot see this request (the
+            # middleware decides first), so the denied PHI-audit row was
+            # already written inside the policy check (same DB pass) — the
+            # refusal here is NON-EXECUTING: nothing is bound, claimed or
+            # replayed, and the endpoint never starts.
+            logger.warning(
+                "Idempotency replay policy: DEACTIVATED patient account; refusing "
+                "keyed write (non-executing, audited): user=%s key=%s path=%s",
+                canonical_id, idempotency_key, request.url.path,
+            )
+            return _principal_refusal_response()
 
         user_id = self._namespace(canonical_id, op_scope, patient_scope)
 
@@ -1281,20 +1430,88 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # like a FRESH key after a re-link — the cached snapshot became
         # invisible and the write re-ran for the new card). The re-linked
         # card books with a NEW key, per the endpoint contract.
+        #
+        # Round-5 (owner P1): the binding states are handled EXPLICITLY —
+        #   * Redis RESOLVED the binding → mirrored into the per-process
+        #     store, so a LATER outage in this worker still knows the key's
+        #     card (the previous Redis-only binding was invisible to the
+        #     mirror and a degraded retry after a re-link re-bound the key
+        #     to the NEW card and executed for it);
+        #   * required coordination that degraded AFTER the initial gate
+        #     (Redis dies ON the scope GET/SET) → 503 fail-closed — the
+        #     local fallback here is exactly the fail-open the required
+        #     deployment forbids (two workers could both go local);
+        #   * degraded OPTIONAL coordination with a KNOWN mirror binding →
+        #     compare against it (a mismatch still refuses cross-card);
+        #   * degraded OPTIONAL coordination with NO known binding →
+        #     conservative 503: the key may be bound in Redis only, and
+        #     binding it to the CURRENT card would execute a foreign
+        #     attempt. The client retries the SAME key after recovery;
+        #   * NO distributed layer at all → the per-process mirror IS the
+        #     coordination store (same best-effort contract as the intent
+        #     markers) and a first-seen key binds locally.
+        origin_ns = ""
         if patient_scope:
             origin_ns = self._namespace(canonical_id, op_scope)
             bound_scope: str | None = None
+            binding_resolved = False
             if claim is not None and claim.try_available():
-                bound_scope = claim.bind_scope_if_absent(
+                binding_outcome, redis_bound = claim.bind_scope_if_absent(
                     origin_ns, idempotency_key, patient_scope
                 )
-            if bound_scope is None:
-                # Redis unavailable/op failed — per-process mirror (same
-                # best-effort contract as the execution-intent markers).
-                bound_scope = _local_scope_binding_get(origin_ns, idempotency_key)
-                if bound_scope is None:
+                if binding_outcome == _SCOPE_BINDING_RESOLVED:
+                    binding_resolved = True
+                    bound_scope = redis_bound
+                    # Round-5 (owner P1): mirror the Redis-resolved binding
+                    # so the degraded path below can still see it.
+                    _local_scope_binding_set(origin_ns, idempotency_key, bound_scope)
+            if not binding_resolved:
+                if claim is not None and claim.required:
+                    logger.warning(
+                        "Idempotency scope binding unresolved (required Redis degraded "
+                        "after the initial gate): user=%s key=%s path=%s — refusing "
+                        "keyed write",
+                        canonical_id, idempotency_key, request.url.path,
+                    )
+                    return Response(
+                        status_code=503,
+                        headers={"Retry-After": "2", "Cache-Control": "no-store"},
+                        content=(
+                            '{"code": "idempotency_unavailable", "detail": "Идемпотентность '
+                            'временно недоступна: распределённая координация не отвечает. '
+                            'Повторите запрос с тем же Idempotency-Key."}'
+                        ),
+                        media_type="application/json",
+                    )
+                mirror_scope = _local_scope_binding_get(origin_ns, idempotency_key)
+                if mirror_scope is not None:
+                    bound_scope = mirror_scope
+                elif claim is None or not claim._ever_available:
+                    # No distributed layer at all, or Redis has NEVER answered
+                    # in this worker's lifetime: no binding can exist "only in
+                    # Redis" from this process's point of view — the mirror IS
+                    # the coordination store (same best-effort contract as the
+                    # execution-intent markers), a first-seen key binds here.
                     _local_scope_binding_set(origin_ns, idempotency_key, patient_scope)
                     bound_scope = patient_scope
+                else:
+                    logger.warning(
+                        "Idempotency scope binding unknown while coordination is "
+                        "degraded: user=%s key=%s path=%s — refusing conservatively "
+                        "(the key may be bound in Redis only)",
+                        canonical_id, idempotency_key, request.url.path,
+                    )
+                    return Response(
+                        status_code=503,
+                        headers={"Retry-After": "2", "Cache-Control": "no-store"},
+                        content=(
+                            '{"code": "idempotency_unavailable", "detail": "Идемпотентность '
+                            'временно недоступна: принадлежность ключа не может быть '
+                            'проверена. Повторите запрос с тем же Idempotency-Key, когда '
+                            'координация восстановится."}'
+                        ),
+                        media_type="application/json",
+                    )
             if bound_scope != patient_scope:
                 logger.warning(
                     "Idempotency scope mismatch: key=%s bound to %s but current "
@@ -1443,12 +1660,15 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             #     contract (payload hash, principal authorization, endpoint
             #     role policy) and MIGRATES to the current namespace, so the
             #     legacy read happens at most once per key;
-            #   - a legacy INTENT without a response is refused
-            #     conservatively (409 idempotency_uncertain_outcome) — the
-            #     pre-deploy attempt may have committed;
             #   - a legacy in-flight CLAIM (rolling deploy: the old worker is
-            #     mid-execution) is refused as in-flight; its outcome lands
-            #     under the legacy namespace when the old worker completes.
+            #     mid-execution) is refused as in-flight — Round-5 (owner P1):
+            #     the executing old worker holds BOTH markers (the short
+            #     claim AND the long-lived intent), so the claim must be
+            #     consulted FIRST; its outcome lands under the legacy
+            #     namespace when the old worker completes;
+            #   - a legacy INTENT WITHOUT a claim is refused conservatively
+            #     (409 idempotency_uncertain_outcome) — the pre-deploy
+            #     attempt reached execution and its result is unknown.
             # Scoped to principals WITHOUT a patient scope: pre-#3340
             # endpoints carry no patient scoping, so a legacy snapshot cannot
             # be attributed to the CURRENT card — replaying it across a card
@@ -1541,16 +1761,20 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # analog — drop the stale legacy binding so the
                     # re-execution re-stores under the fresh role.
                     claim.forget_response(legacy_ns, idempotency_key)
-                elif legacy_intent:
-                    logger.warning(
-                        "Idempotency legacy execution intent without outcome "
-                        "(pre-deploy attempt): user=%s key=%s path=%s — refusing",
-                        canonical_id,
-                        idempotency_key,
-                        request.url.path,
-                    )
-                    return self._uncertain_outcome_response()
                 elif legacy_claim:
+                    # Round-5 (owner P1): the claim is checked BEFORE the
+                    # intent. While an old worker is executing, it holds
+                    # BOTH markers — the short in-flight claim AND the
+                    # long-lived execution intent (written before the
+                    # handler started). Matching the intent first answered
+                    # every in-flight retry with 409 uncertain_outcome,
+                    # whose body advises a NEW key — but the old worker was
+                    # STILL RUNNING: the client would retry under a fresh
+                    # key and the old worker's commit would land on top →
+                    # two visits/bills/queue entries for one attempt. The
+                    # claim is the precise "still executing" signal; the
+                    # uncertain-outcome reconcile is for an intent that
+                    # SURVIVES its claim (the worker died mid-execution).
                     logger.warning(
                         "Idempotency legacy claim still in flight (pre-deploy worker): "
                         "user=%s key=%s path=%s — refusing",
@@ -1567,6 +1791,15 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         ),
                         media_type="application/json",
                     )
+                elif legacy_intent:
+                    logger.warning(
+                        "Idempotency legacy execution intent without outcome "
+                        "(pre-deploy attempt): user=%s key=%s path=%s — refusing",
+                        canonical_id,
+                        idempotency_key,
+                        request.url.path,
+                    )
+                    return self._uncertain_outcome_response()
 
             claim_token = claim.acquire(user_id, idempotency_key)
             claim_acquired = claim_token is not None
@@ -2074,6 +2307,16 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # original success.
                     claim.store_response(user_id, idempotency_key, cached_response, payload_hash=incoming_hash, principal_role=exec_role)
                     claim.release(user_id, idempotency_key, claim_token)
+                    if patient_scope and origin_ns:
+                        # Round-5 (owner P1): the snapshot now outlives the
+                        # binding's original write instant — refresh the
+                        # binding TTL so the key's card identity stays
+                        # resolvable for as long as the snapshot it guards
+                        # (a re-bindable window between the two TTLs would
+                        # let a re-linked card claim the same key).
+                        claim.extend_scope_binding(
+                            origin_ns, idempotency_key, patient_scope
+                        )
                 # Codex R9 #3092 (P1): outcome is now durable — drop the intent
                 # marker so later same-key requests replay normally.
                 # PR 3319: удаление привязано к маркеру ЭТОЙ попытки —

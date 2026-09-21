@@ -156,6 +156,9 @@ def _make_claim(fake: FakeRedis) -> DistributedIdempotencyClaim:
     claim._prefix = "idem"
     claim._client = fake
     claim._available = True
+    # The harness Redis is "up from boot": bindings may exist only in Redis
+    # (round-5 owner P1 — the degraded-path decision reads this flag).
+    claim._ever_available = True
     return claim
 
 
@@ -230,7 +233,7 @@ def two_workers(fake_redis: FakeRedis):
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
     idem_module._distributed_claim = _make_claim(fake_redis)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
     # Codex R11 #3092: the canonical resolution is stubbed — numeric subs are
@@ -398,7 +401,7 @@ def test_redis_unavailable_falls_back_to_in_memory(monkeypatch):
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
     claim = object.__new__(DistributedIdempotencyClaim)
     claim._ttl = 24 * 60 * 60
     claim._client = None
@@ -825,8 +828,8 @@ def test_unresolvable_principal_is_refused_non_executing(two_workers, monkeypatc
     client1, client2, counters, fake_redis = two_workers
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
-    monkeypatch.setattr(idem_module, "_patient_replay_policy_sync", lambda request, canonical_id: ("", False))
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
+    monkeypatch.setattr(idem_module, "_patient_replay_policy_sync", lambda request, canonical_id: ("", False, True))
     monkeypatch.setattr(idem_module, "_resolve_principal_id_sync", lambda *a, **k: None)
 
     response = client1.post("/echo", headers={**auth_headers("1"), "Idempotency-Key": "ghost-key"})
@@ -1370,7 +1373,7 @@ def test_required_redis_down_refuses_keyed_write_then_recovers(monkeypatch):
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
     claim = _down_claim(required=True)
     idem_module._distributed_claim = claim
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
@@ -1409,7 +1412,7 @@ def test_optional_redis_down_keeps_in_memory_degrade(monkeypatch):
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
     claim = _down_claim(required=False)
     idem_module._distributed_claim = claim
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
@@ -1491,7 +1494,7 @@ def test_required_intent_write_must_be_confirmed_before_execution(monkeypatch):
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
     claim = object.__new__(DistributedIdempotencyClaim)
     claim._ttl = 24 * 60 * 60
     claim._prefix = "idem"
@@ -1531,7 +1534,7 @@ def test_replay_rechecks_resource_authorization_for_same_role(monkeypatch):
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
 
     calls: list[bool] = []
 
@@ -2062,7 +2065,7 @@ def test_failed_intent_write_recovery_does_not_block_same_key_retry(monkeypatch)
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
     claim = object.__new__(DistributedIdempotencyClaim)
     claim._ttl = 24 * 60 * 60
     claim._prefix = "idem"
@@ -2291,7 +2294,7 @@ def test_recovered_tokenless_attempt_refuses_over_foreign_intent(monkeypatch):
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
     idem_module._distributed_claim = _wire_outage_claim(fake)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
     idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
@@ -2356,7 +2359,7 @@ def test_recovered_tokenless_attempt_executes_once_without_foreign_intent(monkey
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
     idem_module._distributed_claim = _wire_outage_claim(fake)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
     idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
@@ -2469,7 +2472,7 @@ def test_tokenless_lost_set_response_cleans_own_marker(monkeypatch):
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
     idem_module._distributed_claim = _wire_outage_claim(fake)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
     idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
@@ -2653,7 +2656,7 @@ def test_failed_owned_cleanup_keeps_fast_retries_fail_closed(monkeypatch):
     saved_auth = idem_module._check_principal_authorized_sync
     saved_resolve = idem_module._resolve_principal_id_sync
     saved_patient_policy = idem_module._patient_replay_policy_sync
-    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: ("", False, True)
     idem_module._distributed_claim = _wire_outage_claim(fake)
     idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Registrar", False)
     idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
@@ -2851,6 +2854,7 @@ def test_patient_scope_principal_skips_legacy_reconciliation(two_workers):
     idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
         "patient:5",
         False,
+        True,
     )
     try:
         fresh = client2.post("/echo", headers=headers)
@@ -2880,6 +2884,7 @@ def test_scope_binding_refuses_relinked_card_across_workers(two_workers):
         idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
             "patient:7",
             False,
+            True,
         )
         first = client1.post("/echo", headers=headers)
         assert first.status_code == 200
@@ -2895,6 +2900,7 @@ def test_scope_binding_refuses_relinked_card_across_workers(two_workers):
         idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
             "patient:8",
             False,
+            True,
         )
         replay = client2.post("/echo", headers=headers)
         assert replay.status_code == 409, replay.text
@@ -2903,3 +2909,239 @@ def test_scope_binding_refuses_relinked_card_across_workers(two_workers):
     finally:
         idem_module._patient_replay_policy_sync = saved_policy
         idem_module._local_scope_bindings.clear()
+
+
+# ── Round-5 (owner review on d4d160e, PR #3340) ─────────────────────────────
+
+
+def test_pre_deploy_legacy_claim_and_intent_returns_in_flight(two_workers):
+    """Round-5 owner P1: while an old worker EXECUTES, it holds BOTH legacy
+    markers — the short in-flight claim AND the long-lived execution intent
+    (written before the handler started). The retry must be refused as
+    in-flight (retry the SAME key), never as uncertain-outcome (whose body
+    advises a NEW key — following it duplicates the commit the old worker is
+    about to land)."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "legacy-inflight-both-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+
+    # The pre-deploy worker is mid-execution: claim + intent both present.
+    fake_redis.store[_legacy_nkey("1", key, "claim")] = uuid.uuid4().hex
+    fake_redis.store[_legacy_nkey("1", key, "intent")] = uuid.uuid4().hex
+
+    retry = client2.post("/echo", headers=headers)
+    assert retry.status_code == 409, retry.text
+    assert retry.json()["code"] == "idempotency_in_flight", (
+        "an executing old worker must answer in-flight, not uncertain-outcome"
+    )
+    assert retry.headers.get("Retry-After") == "1"
+    assert counters["w2"]["calls"] == 0
+
+    # Once the old worker finished (claim gone, intent reconciled by its
+    # stored outcome), the intent-only state reconciles conservatively.
+    del fake_redis.store[_legacy_nkey("1", key, "claim")]
+    from starlette.responses import Response
+
+    idem_module._distributed_claim.store_response(
+        IdempotencyMiddleware._namespace(1),
+        key,
+        Response(content=b'{"ok": true, "late": "old-worker"}', status_code=200),
+        payload_hash=idem_module.payload_hash(b""),
+        principal_role="Registrar",
+    )
+    # The stored outcome answers the retry (the uncertain intent is cleared
+    # by the completing old worker); a bare intent would still reconcile.
+    del fake_redis.store[_legacy_nkey("1", key, "intent")]
+    final = client2.post("/echo", headers=headers)
+    assert final.status_code == 200
+    assert final.content == b'{"ok": true, "late": "old-worker"}'
+    assert counters["w2"]["calls"] == 0
+
+
+def _scope_get_failing_redis(fake: FakeRedis) -> FakeRedis:
+    """Redis whose scope-binding GET fails while everything else (ping
+    included) works — the 'dies ON the scope GET' window the round-5 owner
+    review pinned for required coordination."""
+
+    class _Failing(FakeRedis):
+        def get(self, key: str) -> str | None:
+            if key.endswith(":pscope"):
+                raise ConnectionError("simulated scope-get failure")
+            return super().get(key)
+
+    failing = _Failing()
+    failing.store = fake.store
+    failing.ttls = fake.ttls
+    failing.fail_next_ops = fake.fail_next_ops
+    return failing
+
+
+def test_required_redis_failure_on_scope_binding_refuses_503(monkeypatch):
+    """Round-5 owner P1 (scenario A): required coordination passes the
+    initial gate, then Redis fails ON the scope GET/SET. The binding state
+    is UNKNOWN — the middleware must refuse 503 (non-executing) instead of
+    inventing a local binding, and it must not leave a mirror binding for
+    the refused request."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 60.0)
+    saved = idem_module._distributed_claim
+    saved_auth = idem_module._check_principal_authorized_sync
+    saved_resolve = idem_module._resolve_principal_id_sync
+    saved_patient_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+        "patient:5",
+        False,
+        True,
+    )
+    healthy = FakeRedis()
+    claim = _make_claim(_scope_get_failing_redis(healthy))
+    claim._required = True
+    claim._lease_seconds = 90
+    claim._failed_at = 0.0
+    idem_module._distributed_claim = claim
+    idem_module._check_principal_authorized_sync = lambda *a, **k: (True, "Patient", False)
+    idem_module._resolve_principal_id_sync = lambda request, user_id, username: (
+        user_id if user_id is not None else 9005
+    )
+    idem_module._local_scope_bindings.clear()
+    try:
+        counter = {"calls": 0}
+        client = TestClient(_make_app(counter), raise_server_exceptions=False)
+        h1 = auth_headers("1")
+        r1 = client.post(
+            "/echo", headers={**h1, "Idempotency-Key": "scope-fail-req-1"}
+        )
+        assert r1.status_code == 503, r1.text
+        assert r1.json()["code"] == "idempotency_unavailable"
+        assert counter["calls"] == 0, (
+            "required coordination that fails on the binding must not execute"
+        )
+        assert not any(
+            k[1] == "scope-fail-req-1" for k in idem_module._local_scope_bindings
+        ), "the refused attempt must not leave a local binding for the key"
+    finally:
+        idem_module._distributed_claim = saved
+        idem_module._check_principal_authorized_sync = saved_auth
+        idem_module._patient_replay_policy_sync = saved_patient_policy
+        idem_module._resolve_principal_id_sync = saved_resolve
+        idem_module._local_scope_bindings.clear()
+
+
+def test_relinked_card_outage_refuses_via_mirrored_binding(two_workers, monkeypatch):
+    """Round-5 owner P1 (scenario B): a Redis-resolved binding is MIRRORED
+    into the per-process store, so a later outage still knows which card the
+    key belongs to. A re-linked card retrying the same key during the outage
+    gets 409 scope_mismatch — the previous code kept the Redis-only binding
+    invisible to the mirror, re-bound the key to the NEW card and executed
+    for it."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 60.0)
+    import time as _time
+
+    client1, client2, counters, fake_redis = two_workers
+    key = "relink-outage-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    saved_policy = idem_module._patient_replay_policy_sync
+    try:
+        # Card A books with Redis up: binding lands in Redis AND the mirror.
+        idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+            "patient:7",
+            False,
+            True,
+        )
+        first = client1.post("/echo", headers=headers)
+        assert first.status_code == 200
+        assert counters["w1"]["calls"] == 1
+        origin_ns = IdempotencyMiddleware._namespace(1, "POST:/echo")
+        assert (
+            fake_redis.store.get(f"idem:{origin_ns}:{key}:pscope") == "patient:7"
+        )
+        assert any(
+            k[1] == key for k in idem_module._local_scope_bindings
+        ), "the Redis-resolved binding must be mirrored for outage resilience"
+
+        # Redis outage on this worker (cooldown keeps it down for the retry).
+        claim = idem_module._distributed_claim
+        claim._available = False
+        claim._failed_at = _time.time()
+
+        # The account is re-linked to card B; the same key during the outage
+        # must be refused by the MIRRORED binding — never re-bound.
+        idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+            "patient:8",
+            False,
+            True,
+        )
+        replay = client2.post("/echo", headers=headers)
+        assert replay.status_code == 409, replay.text
+        assert replay.json()["code"] == "idempotency_scope_mismatch"
+        assert counters["w2"]["calls"] == 0
+        # The binding was never re-written to card B.
+        assert (
+            fake_redis.store.get(f"idem:{origin_ns}:{key}:pscope") == "patient:7"
+        )
+    finally:
+        idem_module._patient_replay_policy_sync = saved_policy
+        idem_module._local_scope_bindings.clear()
+
+
+def test_degraded_binding_unknown_scope_refuses_conservatively(two_workers, monkeypatch):
+    """Round-5 owner P1 (fix 4): with degraded coordination and NO known
+    binding, the key may be bound in Redis only (invisible while Redis is
+    down). The attempt is refused conservatively — binding the key to the
+    CURRENT card would execute a foreign attempt for a re-linked card."""
+    monkeypatch.setattr(idem_module, "_RECONNECT_COOLDOWN_SECONDS", 60.0)
+    import time as _time
+
+    client1, client2, counters, fake_redis = two_workers
+    key = "degraded-unknown-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    saved_policy = idem_module._patient_replay_policy_sync
+    try:
+        idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+            "patient:9",
+            False,
+            True,
+        )
+        # Outage BEFORE any binding exists anywhere for this key.
+        claim = idem_module._distributed_claim
+        claim._available = False
+        claim._failed_at = _time.time()
+
+        response = client1.post("/echo", headers=headers)
+        assert response.status_code == 503, response.text
+        assert response.json()["code"] == "idempotency_unavailable"
+        assert counters["w1"]["calls"] == 0, (
+            "an unknown binding under degraded coordination must not execute"
+        )
+        assert not any(
+            k[1] == key for k in idem_module._local_scope_bindings
+        ), "the conservative refusal must not bind the key to the current card"
+    finally:
+        idem_module._patient_replay_policy_sync = saved_policy
+        idem_module._local_scope_bindings.clear()
+
+
+def test_scope_binding_extend_is_value_guarded(fake_redis):
+    """Round-5 owner P1 (fix 5): the binding TTL is refreshed when the
+    outcome is stored, so the card identity outlives the snapshot it guards.
+    The refresh is value-guarded: a foreign binding is never overwritten."""
+    claim = _make_claim(fake_redis)
+    claim._required = False
+    claim._lease_seconds = 90
+    claim._failed_at = 0.0
+    origin_ns = "extend-ns"
+    outcome, bound = claim.bind_scope_if_absent(origin_ns, "k-ext", "patient:1")
+    assert outcome == idem_module._SCOPE_BINDING_RESOLVED
+    assert bound == "patient:1"
+    scope_key = f"idem:{origin_ns}:k-ext:pscope"
+    assert fake_redis.store[scope_key] == "patient:1"
+
+    # A foreign scope never overwrites the binding.
+    claim.extend_scope_binding(origin_ns, "k-ext", "patient:2")
+    assert fake_redis.store[scope_key] == "patient:1"
+    # Our own scope refresh keeps the value and re-arms the TTL.
+    claim.extend_scope_binding(origin_ns, "k-ext", "patient:1")
+    assert fake_redis.store[scope_key] == "patient:1"
+    assert fake_redis.ttls[scope_key] == claim._ttl
+    # An unbound key stays unbound (nothing invented).
+    claim.extend_scope_binding(origin_ns, "k-missing", "patient:1")
+    assert f"idem:{origin_ns}:k-missing:pscope" not in fake_redis.store

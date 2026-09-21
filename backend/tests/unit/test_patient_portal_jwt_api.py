@@ -1052,3 +1052,91 @@ class TestCabinetDepartmentLabel:
         ]
         assert len(booked) == 1
         assert booked[0]["department"] == portal_department.name_ru
+
+
+class TestDeactivatedKeyedBookingAudit:
+    """Round-5 owner P2: POST /patients/booking requires an Idempotency-Key,
+    so a deactivated account's request is decided by the idempotency
+    MIDDLEWARE before any endpoint dependency runs — the round-4 audited
+    principal factory never executes on that path. The middleware must
+    write the denied PHI-audit row itself (same contract: outcome=denied,
+    reason=user_deactivated, surface=jwt_portal, the linked card as
+    subject) and answer the non-executing 403."""
+
+    def test_deactivated_keyed_booking_writes_denied_row(
+        self, client, linked_patient_headers, db_session, test_patient
+    ):
+        user = db_session.query(User).filter(User.username == "portal_patient").first()
+        assert user is not None
+        user.is_active = False
+        db_session.commit()
+
+        future_date = str(date.today() + timedelta(days=3))
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "deact-audit-1"},
+            json={"appointmentDate": future_date},
+        )
+        assert response.status_code == 403
+        assert db_session.query(Appointment).count() == 0
+
+        row = (
+            db_session.query(PatientAccessAuditLog)
+            .filter(
+                PatientAccessAuditLog.subject_patient_id == test_patient.id,
+                PatientAccessAuditLog.outcome == "denied",
+            )
+            .order_by(PatientAccessAuditLog.id.desc())
+            .first()
+        )
+        assert row is not None, (
+            "the keyed booking refusal must leave a row in the per-patient trail"
+        )
+        assert row.extra_data["reason"] == "user_deactivated"
+        assert row.extra_data["surface"] == "jwt_portal"
+        assert row.resource_type == "appointment"
+        assert row.action == "create"
+
+
+class TestCanonicalDepartmentFilter:
+    """Round-5 owner P2: the declared `?department=` filter of the canonical
+    appointment list compared the ORM RELATIONSHIP to the string parameter —
+    ArgumentError, 500. The natural registrar query for a department with a
+    portal-created booking must answer 200 with the right rows."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def test_department_filter_returns_200_after_portal_booking(
+        self,
+        client,
+        linked_patient_headers,
+        admin_auth_headers,
+        db_session,
+        portal_department,
+    ):
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "canonical-filter-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "department": portal_department.key,
+            },
+        )
+        assert created.status_code == 201, created.json()
+        appointment_id = created.json()["appointment_id"]
+
+        listed = client.get(
+            f"/api/v1/appointments/?department={portal_department.key}",
+            headers=admin_auth_headers,
+        )
+        assert listed.status_code == 200, listed.text
+        items = [a for a in listed.json() if a["id"] == appointment_id]
+        assert len(items) == 1, "the booked row must match its own department key"
+        assert items[0]["department_key"] == portal_department.key
+
+        # A different department's filter is 200 and never leaks the row.
+        other = client.get(
+            "/api/v1/appointments/?department=derma", headers=admin_auth_headers
+        )
+        assert other.status_code == 200, other.text
+        assert all(a["id"] != appointment_id for a in other.json())
