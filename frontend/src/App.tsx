@@ -208,7 +208,16 @@ function AppShell({ children }: { children: React.ReactNode }) {
     if (chrome.sidebarPreset?.navigation === 'query') {
       const params = new URLSearchParams(location.search);
       params.set(String(chrome.sidebarPreset.queryParam), String(item.id));
-      navigate({ pathname: location.pathname, search: `?${params.toString()}` });
+      // PR 3351 (review round 4, P2): замена вкладки через query — REPLACE,
+      // не push. In-lab переход внутри того же экрана не создаёт history-
+      // запись: sentinel-контракт «под вооружённым sentinel ровно одна
+      // настоящая /lab-запись» (подтверждённый уход = navigate(-2), после
+      // Save — один Back) требует, чтобы ВСЕ внутренние /lab-писатели
+      // использовали replace. Push сломал бы дельту -2 и оставлял бы под
+      // sentinel помеченную копию: первый Back после Save «пропадал», а
+      // Back после подтверждённого Profile-перехода приземлялся на устаревшую
+      // /lab-копию вместо реальной записи.
+      navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: true });
       // Collapse after navigation on mobile
       if (compactSidebar) setMobileSidebarExpanded(false);
       return;

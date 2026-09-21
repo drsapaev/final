@@ -368,6 +368,51 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(guardSource).toContain('replaceSentinelEntry');
   });
 
+  it('resolves lab route identity with the router matcher and keeps sidebar query navigation replace-only (review round 4)', () => {
+    // PR 3351 (review round 4, P1): findRouteByPath обязан использовать
+    // matcher React Router (matchPath { end: true }), а не точное строковое
+    // равенство: '/lab/' рендерит LabPanel через trailing-slash
+    // нормализацию роутера, и guard не должен считать такой URL уходом.
+    const registrySource = fs.readFileSync(
+      path.resolve(__dirname, '../../routing/routeRegistry.ts'),
+      'utf8',
+    );
+    expect(registrySource).toContain("matchPath({ path: route.path, end: true }, pathname)");
+    expect(registrySource).not.toContain('route.path === pathname');
+
+    // PR 3351 (review round 4, P2): query-навигация sidebar — replace, не
+    // push: внутренние /lab-переходы не создают history-записей, иначе
+    // дельта -2 подтверждённого ухода ломается, а под sentinel остаётся
+    // помеченная копия («мёртвый» Back после Save).
+    const appSource = fs.readFileSync(
+      path.resolve(__dirname, '../../App.tsx'),
+      'utf8',
+    );
+    expect(appSource).toContain('search: `?${params.toString()}` }, { replace: true })');
+
+    const guardSource = fs.readFileSync(
+      path.resolve(__dirname, '../../components/laboratory/LabDirtyGuardContext.tsx'),
+      'utf8',
+    );
+    // Вытеснение sentinel'а опознаётся по двойнику (тот же router-idx без
+    // маркера), а не по href: после in-lab replace (смена ?instance / ?tab)
+    // URL двойника расходится с sentinel-URL, и href-эвристика молча
+    // глотала browser Back как «in-lab дрейф». Push поверх вооружённого
+    // sentinel'а (рост history.length) перевзвешивает sentinel, а не
+    // помечает чужую запись.
+    expect(guardSource).toContain('isDisplacedTwin()');
+    expect(guardSource).toContain('sentinelIdx');
+    expect(guardSource).toContain('armedLength');
+    expect(guardSource).not.toContain('window.location.href === labLeaveSentinel.getHref()');
+
+    // Маркер переживает router-replace СИНХРОННО: render-based remark
+    // полагался на коммит рендера, который React 18 может прервать
+    // (supersede-навигация) — маркер затирался, collapse не находил запись.
+    // Декоратор merge-ит маркер прямо в history.replaceState.
+    expect(guardSource).toContain('installSentinelHistoryPatch()');
+    expect(guardSource).toContain('[SENTINEL_STATE_KEY]: true },');
+  });
+
   it('keeps report CREATE latest-wins: create does not block transitions', () => {
     const workbenchSource = fs.readFileSync(
       path.resolve(__dirname, '../../components/laboratory/LabReportWorkbench.tsx'),

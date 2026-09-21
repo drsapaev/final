@@ -1305,6 +1305,135 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
   });
 
+  // ─── PR 3351, review round 4 ────────────────────────────────────────────────
+  // P1: route identity строго по matcher'у React Router (trailing-slash /lab/);
+  // P2: query-sidebar навигация не создаёт history-записей (replace) —
+  // инвариант sentinel «один Back после Save» и «Back без устаревшей копии».
+
+  test('browser Back guard works on the trailing-slash /lab/ URL (review round 4)', async ({ page }) => {
+    // PR 3351 (review round 4, P1): '/lab/' не канонизируется (Vercel отдаёт
+    // index.html как есть), но React Router матчит его маршруту '/lab' и
+    // продолжает рендерить LabPanel. Guard обязан считать такой URL «в /lab»:
+    // прежде findRouteByPath сравнивал строки, sentinel не вооружался, и
+    // browser Back молча размонтировал панель с dirty-черновиком.
+    //
+    // Deep-link с уже готовыми параметрами (?tab=templates): sync-эффект
+    // панели пишет URL только при изменении params — адрес остаётся '/lab/'
+    // на всё время редактирования шаблона, и sentinel вооружается именно на
+    // trailing-slash URL.
+    await page.goto('/health');
+    await page.goto('/lab/?tab=templates');
+    expect(new URL(page.url()).pathname).toBe('/lab/');
+    await page.waitForTimeout(700);
+
+    await page.getByRole('tab', { name: 'Оформление' }).click();
+    const footerInput = page.getByLabel('Подвал шаблона');
+    await expect(footerInput).toBeEnabled();
+    await footerInput.fill('Несохранённый подвал');
+    // У шаблонного workbench нет видимого dirty-бейджа — даём notify-эффекту
+    // зафиксировать dirty в реестре guard-а.
+    await waitForReactToSettle(page);
+    expect(new URL(page.url()).pathname).toBe('/lab/');
+
+    // Sentinel вооружён и на '/lab/': Back вытесняет его, pop абсорбируется
+    // на том же URL, guard-диалог спрашивает решение.
+    await page.evaluate(() => window.history.back());
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Отмена' }).click();
+    await expect(dialog).toBeHidden();
+
+    // Отмена: панель смонтирована на trailing-slash URL, черновик жив.
+    await expect(footerInput).toHaveValue('Несохранённый подвал');
+    expect(new URL(page.url()).pathname).toBe('/lab/');
+
+    // Подтверждённый уход: sentinel + дубль → реальная предыдущая страница.
+    await page.evaluate(() => window.history.back());
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
+  });
+
+  test('a sidebar tab switch keeps history clean: one Back after Save leaves the lab (review round 4)', async ({ page }) => {
+    // PR 3351 (review round 4, P2): query-навигация sidebar (смена ?tab) —
+    // replace, не push. Push создавал запись поверх sentinel'а и ломал
+    // контракт «после Save один Back уходит на предыдущую страницу»: первый
+    // Back молча приземлялся на помеченную копию под sentinel.
+    await page.goto('/health');
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    // Смена вкладки через SIDEBAR (query-навигация) при dirty-черновике:
+    // in-lab переход без диалога и — с фиксом — без новой history-записи.
+    // Открытие отчёта само переключает панель на вкладку reports (Бланки) —
+    // возвращаемся к редактору отчёта через sidebar.
+    const sidebarNav = page.locator('.mac-sidebar-nav');
+    await sidebarNav.getByRole('button', { name: 'Шаблоны' }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('templates');
+    // Dirty-черновик отчёта пережил смену вкладки (workbench смонтирован в
+    // скрытой секции): возвращаемся на вкладку отчёта и сохраняем.
+    await sidebarNav.getByRole('button', { name: 'Бланки' }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('reports');
+    await expect(fieldInput).toBeVisible();
+    await expect(fieldInput).toHaveValue('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Сохранить черновик' }).click();
+    await expect.poll(() => bulkSavePostCount).toBe(1);
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeHidden();
+    await waitForReactToSettle(page);
+    await page.waitForTimeout(300);
+
+    // ОДИН Back уходит на реальную предыдущую страницу: две смены вкладки не
+    // добавили записей — под sentinel осталась ровно одна /lab-запись.
+    await page.evaluate(() => window.history.back());
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
+  });
+
+  test('after a sidebar tab switch a confirmed Profile leave keeps exactly one lab history entry (review round 4)', async ({ page }) => {
+    // PR 3351 (review round 4, P2): подтверждённый SPA-уход заменяет
+    // sentinel-запись. При push-навигации sidebar под заменённой записью
+    // оставалась помеченная копия: Back возвращал пользователя на устаревший
+    // /lab-дубль, и только следующий Back — на реальную запись.
+    await page.goto('/health');
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    await fieldInput.fill('6.5');
+    await expect(page.getByText(/несохранённые изменения/).first()).toBeVisible();
+
+    // Смена вкладки через sidebar при dirty-черновике (replace — записей нет).
+    await page.locator('.mac-sidebar-nav').getByRole('button', { name: 'Шаблоны' }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('templates');
+
+    // Подтверждённый уход: discard → профиль.
+    await page.getByRole('button', { name: 'Профиль пользователя' }).click();
+    await page.getByRole('menuitem', { name: 'Профиль' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).not.toBe('/lab');
+
+    // Первый Back: РОВНО одна /lab-запись — реальная запись с вкладкой
+    // отчёта (не устаревшая копия с ?tab=templates под заменённым sentinel;
+    // открытие отчёта само переключает панель на tab=reports).
+    await page.evaluate(() => window.history.back());
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/lab');
+    expect(new URL(page.url()).searchParams.get('tab')).toBe('reports');
+    // Второй Back: предыдущая страница — без промежуточного /lab-дубля.
+    await page.evaluate(() => window.history.back());
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
+  });
+
   test('late create from another appointment of the same patient is rejected', async ({ page }) => {
     reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
       releaseReportInstanceCreateResponse = resolve;

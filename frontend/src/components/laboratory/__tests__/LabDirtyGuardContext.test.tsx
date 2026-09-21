@@ -251,6 +251,24 @@ describe('LabDirtyGuardContext (PR 3351 route-level leave guard)', () => {
     expect(isLabRoutePath('/lab-panel')).toBe(false);
   });
 
+  // PR 3351 (review round 4, P1): route identity разрешается ТЕМ же
+  // matcher'ом, которым <Route path="/lab"> матчит реальные URL — иначе
+  // URL, который роутер продолжает рендерить как LabPanel, guard считал бы
+  // уходом и молча пропускал вооружение sentinel.
+  it('resolves route identity with the React Router matcher (trailing slash, case)', () => {
+    // Trailing-slash URL: App не канонизирует URL (Vercel отдаёт index.html
+    // как есть), а React Router матчит '/lab/' маршруту '/lab' — панель
+    // остаётся смонтированной, значит это НЕ уход с /lab.
+    expect(isLabRoutePath('/lab/')).toBe(true);
+    // Роутер регистронезависим по умолчанию (<Route> без caseSensitive) —
+    // guard обязан разрешать '/Lab' так же, как роутер рендерит его в LabPanel.
+    expect(isLabRoutePath('/Lab')).toBe(true);
+    // Разные spellings — все ещё уход/не-маршрут LabPanel.
+    expect(isLabRoutePath('/lab//results')).toBe(false);
+    expect(isLabRoutePath('/lab-panel/')).toBe(false);
+    expect(isLabRoutePath('/LAB/RESULTS')).toBe(false);
+  });
+
   it('guards a navigation to the unregistered /lab/results deep-link (route identity)', async () => {
     let reportDirty = true;
     const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};

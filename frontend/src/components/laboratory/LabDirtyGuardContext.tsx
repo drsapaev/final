@@ -63,11 +63,36 @@ import { useTranslation } from '../../i18n/useTranslation';
  *    Подтверждённый SPA-уход заменяет sentinel-запись (navigate replace),
  *    поэтому Back возвращает на /lab без второго дубля.
  *
+ *    PR 3351 (review round 4, P2): sentinel-контракт «внутренние /lab-
+ *    переходы не создают history-записей» (все писатели используют replace)
+ *    теперь двусторонне защищён. Вытеснение sentinel'а (browser Back)
+ *    опознаётся по ДВОЙНИКУ — записи с тем же router-idx без маркера:
+ *    arm() пушит копию состояния записи-двойника, поэтому href-сравнение
+ *    больше не нужно (после любого in-lab replace — смена ?instance / ?tab
+ *    — URL записи-двойника расходится с sentinel-URL, и прежняя href-
+ *    эвристика молча глотала Back как «in-lab дрейф»). А push-дрейф —
+ *    писатель, запутивший запись ПОВЕРХ вооружённого sentinel'а —
+ *    опознаётся по росту history.length и перевзвешивает sentinel поверх
+ *    нового верха, вместо remark'а чужой записи (двойной маркер → «мёртвые»
+ *    Back-нажатия после Save).
+ *
+ *    Маркер sentinel'а переживает router-replace СИНХРОННО — декоратором
+ *    history.replaceState (installSentinelHistoryPatch): смена ?tab через
+ *    sidebar / ?instance через navigateReplace заменяет ТЕКУЩУЮ (sentinel)
+ *    запись новым router-состоянием и затирает маркер; render-based remark
+ *    полагался на коммит рендера, а React 18 может прервать transition-
+ *    рендер (следующая навигация supersede) — маркер терялся навсегда,
+ *    collapse() не находил sentinel-запись и фантом оставался в истории.
+ *    Декоратор merge-ит маркер прямо в полёт replaceState: armed + текущая
+ *    запись — sentinel + цель остаётся in-lab → маркер и sentinelHref
+ *    синхронны с любой заменой URL, независимо от React.
+ *
  * Инвариант sentinel: запись ПОД sentinel никогда не мутирует после arm
- * (replaceState действует на текущую запись, т.е. на сам sentinel), поэтому
- * «вытесненный sentinel» опознаётся по landing href === sentinel href.
- * Если роутер заменил URL текущей (sentinel) записи, sentinel перевзвешивается
- * (disarm + arm) — сравнение остаётся осмысленным.
+ * (replaceState действует на текущую запись, т.е. на сам sentinel). Вытесненный
+ * sentinel опознаётся по двойнику (PR 3351, review round 4): запись на одну
+ * ниже с тем же router-idx и без маркера. Если роутер заменил URL текущей
+ * (sentinel) записи, sentinel переотмечается (remark) — сравнение по idx
+ * остаётся осмысленным.
  */
 
 /**
@@ -92,6 +117,22 @@ const SENTINEL_STATE_KEY = '__labLeaveGuardSentinel';
 const labLeaveSentinel = {
   armed: false,
   sentinelHref: null as string | null,
+  /**
+   * PR 3351 (review round 4, P2): router-idx записи sentinel. arm() пушит
+   * копию состояния текущей записи (тот же usr/key/idx) — «двойник» на одну
+   * запись ниже. Вытеснение (browser Back) = pop на двойник: тот же idx,
+   * нет маркера. Хранится отдельно от href: in-lab replace-писатели меняют
+   * URL sentinel-записи, но не idx (роутер replace сохраняет idx), поэтому
+   * idx-сравнение переживает смену ?instance / ?tab, а href-сравнение — нет.
+   */
+  sentinelIdx: null as number | null,
+  /**
+   * PR 3351 (review round 4, P2): history.length сразу после arm(). Рост
+   * длины при дрейфе href = push ПОВЕРХ вооружённого sentinel'а (писатель
+   * нарушил replace-контракт): remark пометил бы чужую запись и оставил бы
+   * под ней старый маркер. replace-дрейф длину не меняет.
+   */
+  armedLength: null as number | null,
   /** PR 3351 (review round 3, P2): ждём popstate от collapse-back(). */
   collapsing: false,
   /**
@@ -125,15 +166,25 @@ const labLeaveSentinel = {
     // Новый arm-цикл отменяет незавершённый collapse: pushState обрывает
     // отложенный traversal, флаг должен быть сброшен вручную.
     labLeaveSentinel.collapsing = false;
+    // PR 3351 (review round 4, P2): маркер обязан переживать router-
+    // replace — декоратор ставится лениво при первом arm (идемпотентно).
+    installSentinelHistoryPatch();
     if (labLeaveSentinel.armed) return;
     window.history.pushState(labLeaveSentinel.sentinelState(), '', url);
     labLeaveSentinel.armed = true;
     labLeaveSentinel.sentinelHref = url;
+    // PR 3351 (review round 4, P2): idx копируется из записи-двойника —
+    // по нему popstate-обработчик отличает вытеснение от in-lab дрейфа.
+    const armedState = window.history.state as Record<string, unknown> | null;
+    labLeaveSentinel.sentinelIdx = typeof armedState?.idx === 'number' ? armedState.idx : null;
+    labLeaveSentinel.armedLength = window.history.length;
   },
   /**
    * Роутер заменил URL текущей (sentinel) записи (navigateReplace внутри
    * /lab). НЕ пушим новую запись — переотмечаем ту же: инвариант «запись под
    * sentinel смежна с дельтой -2 до реальной предыдущей страницы» сохраняется.
+   * replaceState действует на ту же запись — idx не меняется (роутер
+   * replace пишет прежний idx), sentinelIdx остаётся корректным.
    */
   remark(url: string) {
     window.history.replaceState(labLeaveSentinel.sentinelState(), '', url);
@@ -142,6 +193,27 @@ const labLeaveSentinel = {
   disarm() {
     labLeaveSentinel.armed = false;
     labLeaveSentinel.sentinelHref = null;
+    labLeaveSentinel.sentinelIdx = null;
+    labLeaveSentinel.armedLength = null;
+  },
+  /**
+   * PR 3351 (review round 4, P2): pop приземлился на «двойника» — запись
+   * на одну ниже sentinel с тем же router-idx и без маркера. Это
+   * вытеснение sentinel'а (browser Back), а не in-lab дрейф: arm() пушит
+   * копию состояния текущей записи, поэтому idx двойника === sentinel-idx.
+   * Прежняя href-эвристика ломалась после ЛЮБОГО in-lab replace (смена
+   * ?instance через navigateReplace или ?tab через sidebar): URL двойника
+   * расходился с sentinel-URL, Back молча абсорбировался как «дрейф»,
+   * а следующий Back мог уйти с /lab БЕЗ диалога. Для записей без router-
+   * состояния (внешние pushState) — консервативный href-fallback.
+   */
+  isDisplacedTwin() {
+    const landedState = window.history.state as Record<string, unknown> | null;
+    const landedIdx = typeof landedState?.idx === 'number' ? landedState.idx : null;
+    if (labLeaveSentinel.sentinelIdx !== null && landedIdx !== null) {
+      return landedIdx === labLeaveSentinel.sentinelIdx;
+    }
+    return window.location.href === labLeaveSentinel.sentinelHref;
   },
   /**
    * PR 3351 (review round 3, P2): disarm + очистка фантомной записи.
@@ -173,6 +245,56 @@ const labLeaveSentinel = {
     );
   },
 };
+
+/**
+ * PR 3351 (review round 4, P2): синхронный декоратор history.replaceState.
+ *
+ * Все внутренние /lab-писатели (sidebar ?tab, navigateReplace ?instance)
+ * заменяют ТЕКУЩУЮ запись — при вооружённом sentinel это сама sentinel-
+ * запись, и router-replace затирает маркер в history.state новым
+ * состоянием {usr, key, idx}. Render-based remark в layout-эффекте
+ * востанавливал маркер ПОСЛЕ коммита рендера — но React 18 имеет право
+ * прервать transition-рендер (следующая навигация supersede предыдущую),
+ * и тогда промежуточная замена вообще не рендерится: маркер терялся
+ * навсегда, collapse() не находил sentinel-запись (disarm без back) и
+ * «мёртвый» дубль оставался в истории — первый Back после Save
+ * приземлялся на фантом. Декоратор решает проблему на уровне самого
+ * History API: замена armed-sentinel-записи на IN-LAB URL происходит с
+ * маркером и синхронным sentinelHref — независимо от React. Leave-replace
+ * (цель вне /lab: подтверждённый уход через navigate replace) проходит
+ * БЕЗ маркера — запись назначения не наследует sentinel-личность.
+ */
+let sentinelHistoryPatchInstalled = false;
+
+function installSentinelHistoryPatch() {
+  if (sentinelHistoryPatchInstalled || typeof window === 'undefined') return;
+  sentinelHistoryPatchInstalled = true;
+  const originalReplaceState = window.history.replaceState.bind(window.history);
+  window.history.replaceState = (
+    data: unknown,
+    unused: string,
+    url?: string | URL | null,
+  ): void => {
+    const targetPathname = url == null
+      ? window.location.pathname
+      : new URL(String(url), window.location.href).pathname;
+    const isSentinelReplace = labLeaveSentinel.isArmed()
+      && labLeaveSentinel.isSentinelEntry()
+      && isLabRoutePath(targetPathname);
+    if (isSentinelReplace && data != null && typeof data === 'object') {
+      originalReplaceState(
+        { ...(data as Record<string, unknown>), [SENTINEL_STATE_KEY]: true },
+        unused,
+        url,
+      );
+      if (url != null) {
+        labLeaveSentinel.sentinelHref = new URL(String(url), window.location.href).href;
+      }
+      return;
+    }
+    originalReplaceState(data, unused, url);
+  };
+}
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 
@@ -366,11 +488,28 @@ function LabLeaveRouteGuard({
       labLeaveSentinel.isArmed()
       && window.location.href !== labLeaveSentinel.getHref()
     ) {
-      // Роутер заменил URL текущей (sentinel) записи — переотмечаем ту же
-      // запись (replaceState), чтобы запись под sentinel осталась смежной
-      // с реальной предыдущей страницей, а сравнение landing href в
-      // popstate-обработчике — верным.
-      labLeaveSentinel.remark(window.location.href);
+      // PR 3351 (review round 4, P2): дрейф href при вооружённом sentinel —
+      // это replace текущей (sentinel) записи ИЛИ чужой push поверх неё.
+      // Replace (роутер: смена ?instance / ?tab): длина истории не меняется —
+      // переотмечаем ту же запись. Push поверх sentinel (писатель нарушил
+      // replace-контракт): длина выросла, запись с router-idx — remark пометил
+      // бы ЧУЖУЮ запись и оставил бы старый маркер под ней (двойной маркер
+      // глотает Back после Save, «мёртвые» нажатия). Перевзвешиваем sentinel
+      // поверх нового верха: guard остаётся активным, twin-детекция корректно
+      // опознает вытеснение. Внешние pushState без router-состояния (urlIntent
+      // флоу панели) остаются на remark-пути — прежнее поведение.
+      const routerPushedAboveSentinel = labLeaveSentinel.armedLength !== null
+        && window.history.length > labLeaveSentinel.armedLength
+        && typeof (window.history.state as Record<string, unknown> | null)?.idx === 'number';
+      if (routerPushedAboveSentinel) {
+        labLeaveSentinel.disarm();
+      } else {
+        // Роутер заменил URL текущей (sentinel) записи — переотмечаем ту же
+        // запись (replaceState), чтобы запись под sentinel осталась смежной
+        // с реальной предыдущей страницей, а сравнение landing-idx в
+        // popstate-обработчике — верным.
+        labLeaveSentinel.remark(window.location.href);
+      }
     }
     labLeaveSentinel.arm(window.location.href);
     // location в deps не нужен: эффект идемпотентен и выполняется на каждом
@@ -408,7 +547,7 @@ function LabLeaveRouteGuard({
         labLeaveSentinel.disarm();
         return;
       }
-      if (window.location.href === labLeaveSentinel.getHref()) {
+      if (labLeaveSentinel.isDisplacedTwin()) {
         // Sentinel вытеснен — это была попытка уйти с /lab. Перепушиваем
         // sentinel (второй Back при открытом диалоге тоже должен
         // абсорбироваться) и спрашиваем пользователя.
