@@ -81,6 +81,13 @@ _CACHE_TTL_SECONDS = 24 * 60 * 60
 _SCOPE_BINDING_RESOLVED = "resolved"
 _SCOPE_BINDING_UNAVAILABLE = "unavailable"
 
+# Round-8 (owner P1, PR #3340): sentinel for the local atomic-entry writer —
+# "keep the snapshot the entry already holds". A plain ``None`` now EXPLICITLY
+# removes a stored snapshot (role-changed re-execution); an OMITTED argument
+# no longer silently wipes a live local outcome — the Redis→local binding
+# mirror used to do exactly that with the old unconditional tuple replace.
+_SNAPSHOT_UNCHANGED: Any = object()
+
 # Max entries to prevent unbounded memory growth
 _MAX_CACHE_ENTRIES = 10_000
 
@@ -102,6 +109,41 @@ _MAX_SCOPE_BINDING_ENTRIES = 10_000
 # 409 only until the lease lapses (seconds), after which the operation may
 # re-run — the response was never stored, so no cached success is lost.
 _IN_FLIGHT_LEASE_SECONDS = 90
+
+# Round-8 (owner P2, PR #3340): the user-only legacy bridge (migration fence,
+# legacy replay and the every-success dual-write) is bounded by a rollout
+# window. Left unbounded, a staff client reusing one key across TWO different
+# POST operations collides in the user-only namespace forever (payload
+# mismatch for another operation's body, or another operation's response
+# replayed outright). The window covers the old workers' drain plus the
+# legacy response TTL (24 h) they may have left behind; after it lapses the
+# middleware consults ONLY the operation-scoped namespace.
+# IDEMPOTENCY_LEGACY_BRIDGE_MAX_AGE_SECONDS overrides the window (0 disables
+# the bridge immediately).
+_LEGACY_BRIDGE_DEFAULT_MAX_AGE_SECONDS = (
+    _CACHE_TTL_SECONDS + _IN_FLIGHT_LEASE_SECONDS + 3600
+)
+_LEGACY_BRIDGE_EPOCH = time.time()
+
+
+def _legacy_bridge_active() -> bool:
+    """True while the user-only legacy reconciliation may run (Round-8)."""
+    try:
+        from app.core.config import settings
+
+        max_age = float(
+            getattr(
+                settings,
+                "IDEMPOTENCY_LEGACY_BRIDGE_MAX_AGE_SECONDS",
+                _LEGACY_BRIDGE_DEFAULT_MAX_AGE_SECONDS,
+            )
+        )
+    except Exception:  # pragma: no cover - settings not initialized (tests)
+        max_age = _LEGACY_BRIDGE_DEFAULT_MAX_AGE_SECONDS
+    if max_age <= 0:
+        return False
+    return (time.time() - _LEGACY_BRIDGE_EPOCH) < max_age
+
 
 # Codex R2 #3092 (P1): after a transient Redis failure the layer degrades to
 # in-memory and re-probes at most once per cooldown. A Redis restart/timeout
@@ -150,6 +192,70 @@ _INTENT_MARK_LUA = (
 # marker its own SET NX inserted — never a foreign attempt's token-bound
 # unknown-outcome marker (R9).
 _TOKENLESS_INTENT_VALUE = "1"
+
+# ── Round-8 (owner P1 #2 + P2, PR #3340): scope-binding value protocol ──────
+#
+# The distributed binding value is "<patient_scope>|<attempt-generation>".
+# The generation binds DELETION rights to the attempt that wrote the value:
+# a known non-2xx cleanup is an atomic compare-and-delete of the FULL value,
+# so a successor attempt that re-asserted the binding under ITS generation
+# (post-acquire) can never have its in-flight binding deleted by the stale
+# attempt's cleanup (the round-7 GET+DELETE twin deleted by scope alone —
+# and A/B share the same scope value, so the guard could not tell the
+# generations apart).
+
+
+def _scope_binding_value(patient_scope: str, generation: str) -> str:
+    return f"{patient_scope}|{generation}"
+
+
+def _scope_from_binding_value(value: str) -> str:
+    """The patient scope component of a binding value (generation stripped).
+
+    Values written before the generation protocol (no delimiter) degrade to
+    the whole string — the scope is the identity, the generation only gates
+    deletion rights."""
+    scope, _sep, _generation = value.partition("|")
+    return scope
+
+
+# Restore-or-refresh, value-guarded: an ABSENT binding is re-created (the
+# successor's post-acquire re-assert and the success-path extension must
+# survive a stale attempt's in-between cleanup), a SAME-scope binding is
+# refreshed with the caller's generation, a FOREIGN scope is never touched.
+_SCOPE_UPSERT_LUA = (
+    "-- scope-upsert\n"
+    "local v = redis.call('get', KEYS[1]); "
+    "if v and (string.sub(v, 1, string.len(ARGV[1])) ~= ARGV[1] "
+    "or string.sub(v, string.len(ARGV[1]) + 1, string.len(ARGV[1]) + 1) ~= '|') "
+    "then return 0 end "
+    "redis.call('set', KEYS[1], ARGV[2], 'EX', ARGV[3]); return 1"
+)
+
+# Known non-2xx cleanup: delete ONLY the binding value THIS attempt wrote
+# (full compare-and-delete on scope AND generation).
+_SCOPE_CAS_DELETE_LUA = (
+    "-- scope-cas-delete\n"
+    "if redis.call('get', KEYS[1]) == ARGV[1] then "
+    "return redis.call('del', KEYS[1]) else return 0 end"
+)
+
+# Success path for patient operations: the response snapshot and the
+# scope-binding extension are ONE script. The binding can then never expire
+# before the outcome it guards (the owner's P2 relink window: response
+# stored at T1, binding expiring at T0+24h < T1+24h). Return 1 = response
+# stored AND binding extended/restored; 2 = response stored but the binding
+# holds a FOREIGN scope (never overwritten — the outcome is not treated as
+# durable); transport failure reports (False, False).
+_STORE_RESPONSE_WITH_SCOPE_LUA = (
+    "-- store+scope\n"
+    "redis.call('set', KEYS[1], ARGV[1], 'EX', ARGV[2]); "
+    "local v = redis.call('get', KEYS[2]); "
+    "if v and (string.sub(v, 1, string.len(ARGV[3])) ~= ARGV[3] "
+    "or string.sub(v, string.len(ARGV[3]) + 1, string.len(ARGV[3]) + 1) ~= '|') "
+    "then return 2 end "
+    "redis.call('set', KEYS[2], ARGV[4], 'EX', ARGV[2]); return 1"
+)
 
 
 class _IntentClaimLost(RuntimeError):
@@ -708,20 +814,49 @@ def _local_scope_binding_get(origin_ns: str, key: str) -> str | None:
     return entry[1]
 
 
+def _local_scope_binding_mirror(origin_ns: str, key: str, patient_scope: str) -> None:
+    """Round-8 (owner P1, PR #3340): mirror a Redis-RESOLVED binding into the
+    local store WITHOUT destroying a locally stored response snapshot.
+
+    The dispatch mirrors the binding on EVERY same-key retry whose scope GET
+    succeeds — including the retry that was about to replay the LOCAL
+    snapshot because Redis died on the next response GET. The previous
+    unconditional tuple replace wiped the snapshot to None at exactly that
+    moment, the local replay source vanished, and the next degraded retry
+    re-executed the handler. The sentinel-based set keeps the snapshot."""
+    _local_scope_binding_set(origin_ns, key, patient_scope)
+
+
 def _local_scope_binding_set(
     origin_ns: str,
     key: str,
     patient_scope: str,
-    snapshot: tuple[int, dict[str, str], bytes, str | None, str, str | None] | None = None,
+    snapshot: (
+        tuple[int, dict[str, str], bytes, str | None, str, str | None]
+        | None
+        | Any
+    ) = _SNAPSHOT_UNCHANGED,
 ) -> None:
     """Round-7 (owner P1 #2 + P2, PR #3340): bounded O(1)-per-op store.
 
     Overflow is resolved by an immediate LRU popitem — no full sweep on the
     hot path. TTL hygiene is the lazy expiry heap above (incremental,
     bounded budget per op). ``snapshot`` attaches the outcome atomically:
-    the binding and its response share one entry and one TTL."""
+    the binding and its response share one entry and one TTL.
+
+    Round-8 (owner P1, PR #3340): the default is the ``_SNAPSHOT_UNCHANGED``
+    sentinel — a call that only (re)binds the scope PRESERVES the snapshot
+    the entry already holds (guarded by the scope: a foreign scope never
+    inherits a foreign outcome). An explicit ``snapshot=None`` REMOVES a
+    stored snapshot (role-changed re-execution path)."""
     cache_key = (str(origin_ns), key)
     expires_at = time.time() + _CACHE_TTL_SECONDS
+    if snapshot is _SNAPSHOT_UNCHANGED:
+        existing = _local_scope_bindings.get(cache_key)
+        if existing is not None and existing[1] == patient_scope:
+            snapshot = existing[2]
+        else:
+            snapshot = None
     _local_scope_bindings[cache_key] = (expires_at, patient_scope, snapshot)
     _local_scope_bindings.move_to_end(cache_key)
     heapq.heappush(_local_scope_bindings_expiry, (expires_at, cache_key))
@@ -805,16 +940,13 @@ def _local_patient_outcome_forget_snapshot(
 ) -> None:
     """Drop ONLY the stored snapshot (role-changed re-execution path) while
     keeping the binding alive — the card identity is unchanged and must
-    keep guarding the key. Value-guarded like every binding writer."""
+    keep guarding the key. Value-guarded like every binding writer; the
+    explicit ``snapshot=None`` is the Round-8 sentinel contract for an
+    intentional removal."""
     cache_key = (str(origin_ns), key)
     entry = _local_scope_bindings.get(cache_key)
     if entry is not None and entry[1] == patient_scope:
-        _local_scope_bindings[cache_key] = (
-            time.time() + _CACHE_TTL_SECONDS,
-            patient_scope,
-            None,
-        )
-        _local_scope_bindings.move_to_end(cache_key)
+        _local_scope_binding_set(origin_ns, key, patient_scope, snapshot=None)
 
 
 def _local_scope_binding_drop(origin_ns: str, key: str, patient_scope: str) -> None:
@@ -1061,7 +1193,7 @@ class DistributedIdempotencyClaim:
             return None, None, None
         return _decode_response_snapshot(raw)
 
-    def store_response(self, user_id: int | str, key: str, response: Response, ttl: int | None = None, payload_hash: str = "", principal_role: str | None = None) -> bool:
+    def store_response(self, user_id: int | str, key: str, response: Response, ttl: int | None = None, payload_hash: str = "", principal_role: str | None = None, operation_scope: str | None = None) -> bool:
         """Store the outcome snapshot and REPORT whether Redis confirmed it.
 
         Round-7 (owner P1, PR #3340): the previous contract returned ``None``
@@ -1073,21 +1205,28 @@ class DistributedIdempotencyClaim:
         lease lapsed, an old-version worker saw an empty legacy namespace and
         re-executed the committed write.
 
+        Round-8 (owner P2, PR #3340): ``operation_scope`` stamps the snapshot
+        with the operation it was produced by (method + path). The user-only
+        legacy namespace mixes operations under one key — the stamp is what
+        lets the legacy replay skip another operation's snapshot instead of
+        refusing it as a payload mismatch or replaying it outright.
+
         Returns True only when Redis ANSWERED the SET; False on a degraded
         transport. Callers gate their intent-marker cleanup on it."""
         if not self._ensure_available() or self._client is None:
             return False
         body = getattr(response, "body", b"") or b""
-        snapshot = json.dumps(
-            {
-                "status": response.status_code,
-                "headers": dict(response.headers),
-                "media_type": response.media_type,
-                "body_b64": base64.b64encode(body).decode("ascii"),
-                "payload_hash": payload_hash,
-                "principal_role": principal_role,
-            }
-        )
+        snapshot_payload: dict[str, Any] = {
+            "status": response.status_code,
+            "headers": dict(response.headers),
+            "media_type": response.media_type,
+            "body_b64": base64.b64encode(body).decode("ascii"),
+            "payload_hash": payload_hash,
+            "principal_role": principal_role,
+        }
+        if operation_scope:
+            snapshot_payload["operation_scope"] = operation_scope
+        snapshot = json.dumps(snapshot_payload)
         stored = self._run(
             self._client.set,
             self._resp_key(user_id, key),
@@ -1095,6 +1234,70 @@ class DistributedIdempotencyClaim:
             ex=ttl or self._ttl,
         )
         return bool(stored)
+
+    def store_response_with_scope(
+        self,
+        user_id: int | str,
+        key: str,
+        response: Response,
+        payload_hash: str = "",
+        principal_role: str | None = None,
+        operation_scope: str | None = None,
+        origin_ns: str = "",
+        patient_scope: str = "",
+        generation: str = "",
+        ttl: int | None = None,
+    ) -> tuple[bool, bool]:
+        """Store the outcome snapshot AND extend the scope binding ATOMICALLY
+        (Round-8 owner P2, PR #3340 — patient operations only).
+
+        The binding is written at T0 (before the handler) and the response
+        at T1 (after it); with independent TTLs the binding always expired
+        FIRST, and a Redis failure inside the separate extend left a response
+        that outlived its guard by exactly the handler duration — the window
+        in which a re-linked card could re-bind the key and execute a second
+        write. One script now stores the snapshot and restores-or-refreshes
+        the binding under THIS attempt's generation, or stores nothing:
+
+        Returns ``(response_stored, scope_extended)`` — (True, True) when
+        Redis confirmed both; (True, False) when the response landed but the
+        binding holds a FOREIGN scope (never overwritten); (False, False)
+        on a degraded transport. The caller counts the patient outcome
+        durable only when BOTH are True."""
+        if not self._ensure_available() or self._client is None:
+            return False, False
+        body = getattr(response, "body", b"") or b""
+        snapshot_payload: dict[str, Any] = {
+            "status": response.status_code,
+            "headers": dict(response.headers),
+            "media_type": response.media_type,
+            "body_b64": base64.b64encode(body).decode("ascii"),
+            "payload_hash": payload_hash,
+            "principal_role": principal_role,
+        }
+        if operation_scope:
+            snapshot_payload["operation_scope"] = operation_scope
+        snapshot = json.dumps(snapshot_payload)
+        result = self._run(
+            self._client.eval,
+            _STORE_RESPONSE_WITH_SCOPE_LUA,
+            2,
+            self._resp_key(user_id, key),
+            self._scope_key(origin_ns, key),
+            snapshot,
+            str(ttl or self._ttl),
+            patient_scope,
+            _scope_binding_value(patient_scope, generation),
+        )
+        if result == 1:
+            return True, True
+        if result == 2:
+            # The response is stored, but the binding was re-bound by a
+            # foreign scope in the meantime — it is never overwritten, and
+            # the outcome is NOT treated as durable (the mismatch refusal
+            # guards the orphaned snapshot instead).
+            return True, False
+        return False, False
 
     def forget_response(self, user_id: int | str, key: str) -> None:
         """Drop the stored response snapshot (stale role binding — Codex R4
@@ -1124,14 +1327,17 @@ class DistributedIdempotencyClaim:
         return f"idem:{user_id}:{key}:pscope"
 
     def load_scope_binding(self, origin_ns: str, key: str) -> str | None:
-        """The patient scope this key was first bound to (None if unbound)."""
+        """The patient scope this key was first bound to (None if unbound).
+
+        Round-8: the stored value carries the owning attempt's generation
+        (``scope|generation``) — only the scope component is returned."""
         if not self._ensure_available() or self._client is None:
             return None
         stored = self._run(self._client.get, self._scope_key(origin_ns, key))
-        return str(stored) if stored else None
+        return _scope_from_binding_value(str(stored)) if stored else None
 
     def bind_scope_if_absent(
-        self, origin_ns: str, key: str, patient_scope: str
+        self, origin_ns: str, key: str, patient_scope: str, generation: str
     ) -> tuple[str, str | None]:
         """Bind the key's FIRST patient scope; report the EFFECTIVE binding.
 
@@ -1145,30 +1351,35 @@ class DistributedIdempotencyClaim:
         could not be re-read. The caller MUST NOT invent a binding from an
         UNAVAILABLE result: with required coordination that is a 503, and
         a local fallback would let two workers bind the same key to two
-        different cards and execute the write twice."""
+        different cards and execute the write twice.
+
+        Round-8 (owner P1 #2): the NX write records THIS attempt's
+        generation (``scope|generation``). The post-acquire re-assert and
+        the known non-2xx compare-and-delete use the same generation, so a
+        stale attempt's cleanup can never delete a successor's binding."""
         if not self._ensure_available() or self._client is None:
             return _SCOPE_BINDING_UNAVAILABLE, None
         stored = self._run(self._client.get, self._scope_key(origin_ns, key))
         if stored:
-            return _SCOPE_BINDING_RESOLVED, str(stored)
+            return _SCOPE_BINDING_RESOLVED, _scope_from_binding_value(str(stored))
         self._run(
             self._client.set,
             self._scope_key(origin_ns, key),
-            patient_scope,
+            _scope_binding_value(patient_scope, generation),
             nx=True,
             ex=self._ttl,
         )
         stored = self._run(self._client.get, self._scope_key(origin_ns, key))
         if stored:
-            return _SCOPE_BINDING_RESOLVED, str(stored)
+            return _SCOPE_BINDING_RESOLVED, _scope_from_binding_value(str(stored))
         # The SET NX reported nothing and the re-read saw nothing: a
         # concurrent worker may or may not have landed its NX between our
         # two reads. The binding state is UNRESOLVED — never invent one.
         return _SCOPE_BINDING_UNAVAILABLE, None
 
     def extend_scope_binding(
-        self, origin_ns: str, key: str, patient_scope: str
-    ) -> None:
+        self, origin_ns: str, key: str, patient_scope: str, generation: str
+    ) -> bool:
         """Round-5 (owner P1): keep the binding alive as long as the snapshot
         it guards.
 
@@ -1176,22 +1387,33 @@ class DistributedIdempotencyClaim:
         snapshot is stored AFTER it completes; left alone, the binding can
         expire first and in that window the same key would be re-bindable
         to a DIFFERENT card (the snapshot it protected is still live).
-        Called when the outcome is stored. Value-guarded: refreshes only a
-        binding that still holds OUR scope — a foreign value (a re-bound
-        key) is never overwritten. Best-effort by contract: an outage here
-        leaves the original TTL, which the deploy window tolerates."""
-        if not self._ensure_available() or self._client is None:
-            return
-        stored = self._run(self._client.get, self._scope_key(origin_ns, key))
-        if stored and str(stored) == patient_scope:
-            self._run(
-                self._client.set,
-                self._scope_key(origin_ns, key),
-                patient_scope,
-                ex=self._ttl,
-            )
 
-    def clear_scope_binding(self, origin_ns: str, key: str, patient_scope: str) -> None:
+        Round-8 (owner P1 #2 + P2, PR #3340): atomic restore-or-refresh
+        with generation re-stamping, and the result is now REPORTED:
+        - an ABSENT binding is RE-CREATED under the caller's generation —
+          a stale attempt's in-between cleanup (compare-and-delete of ITS
+          generation) can no longer leave a successor's live execution
+          without a binding; the success-path extension restores it;
+        - a SAME-scope binding is refreshed with the caller's generation;
+        - a FOREIGN scope is never touched (False).
+        True means Redis CONFIRMED the upsert; a transport failure reports
+        False and the caller must not count the outcome durable."""
+        if not self._ensure_available() or self._client is None:
+            return False
+        result = self._run(
+            self._client.eval,
+            _SCOPE_UPSERT_LUA,
+            1,
+            self._scope_key(origin_ns, key),
+            patient_scope,
+            _scope_binding_value(patient_scope, generation),
+            str(self._ttl),
+        )
+        return result == 1
+
+    def clear_scope_binding(
+        self, origin_ns: str, key: str, patient_scope: str, generation: str
+    ) -> bool:
         """Round-7 (owner P1 #2, PR #3340): drop the scope binding of a KNOWN
         non-2xx outcome.
 
@@ -1200,39 +1422,62 @@ class DistributedIdempotencyClaim:
         outcome is provably "nothing applied". Deleting those bindings on
         the known non-2xx path keeps the slots for DURABLE successful
         bindings (the ones that guard live response snapshots against a
-        re-linked card). Value-guarded like the extend twin: a binding that
-        no longer holds OUR scope is never touched."""
+        re-linked card).
+
+        Round-8 (owner P1 #2): atomic compare-and-delete of the FULL value
+        (scope AND generation) — the previous separate GET+DELETE could
+        delete a SUCCESSOR attempt's binding mid-execution, because both
+        attempts share the same scope value and the old guard could not
+        tell the generations apart. True only when THIS attempt's own
+        binding generation was deleted."""
         if not self._ensure_available() or self._client is None:
-            return
-        stored = self._run(self._client.get, self._scope_key(origin_ns, key))
-        if stored and str(stored) == patient_scope:
-            self._run(self._client.delete, self._scope_key(origin_ns, key))
+            return False
+        result = self._run(
+            self._client.eval,
+            _SCOPE_CAS_DELETE_LUA,
+            1,
+            self._scope_key(origin_ns, key),
+            _scope_binding_value(patient_scope, generation),
+        )
+        return result == 1
 
     def probe_legacy_artifacts(
         self, legacy_ns: str, key: str
-    ) -> tuple[tuple[Response | None, str | None, str | None], bool, bool]:
+    ) -> tuple[tuple[Response | None, str | None, str | None], bool, bool, str | None]:
         """Round-4 (owner P1): ONE read pass over the PRE-#3340 namespace.
 
         Returns ``((response, payload_hash, principal_role), has_intent,
-        has_in_flight)`` for the artifacts the previous deployment wrote
-        under the user-only hash. Read-only by contract — the legacy
-        namespace belongs to the pre-deploy workers (only the explicit
-        stale-role ``forget_response`` in the dispatch legacy branch ever
-        clears anything there). Reads the raw keys directly: the production
-        methods wrap the same state, but the probe must stay a single
-        independent pass no other in-flight bookkeeping can re-order.
-        """
+        has_in_flight, legacy_operation_scope)`` for the artifacts the
+        previous deployment wrote under the user-only hash. Read-only by
+        contract — the legacy namespace belongs to the pre-deploy workers
+        (only the explicit stale-role ``forget_response`` in the dispatch
+        legacy branch ever clears anything there). Reads the raw keys
+        directly: the production methods wrap the same state, but the probe
+        must stay a single independent pass no other in-flight bookkeeping
+        can re-order.
+
+        Round-8 (owner P2, PR #3340): snapshots written by THIS deployment
+        carry an ``operation_scope`` stamp — the caller refuses to replay a
+        stamp belonging to a DIFFERENT operation (one user-only key reused
+        across two POST operations must never alias). Old-worker snapshots
+        carry no stamp (None) and keep the migration replay contract."""
         if not self._ensure_available() or self._client is None:
-            return (None, None, None), False, False
+            return (None, None, None), False, False, None
         raw = self._run(self._client.get, self._resp_key(legacy_ns, key))
         legacy = _decode_response_snapshot(raw) if raw else (None, None, None)
+        legacy_op_scope: str | None = None
+        if raw:
+            try:
+                legacy_op_scope = json.loads(raw).get("operation_scope")
+            except Exception:
+                legacy_op_scope = None
         has_intent = bool(
             self._run(self._client.get, self._intent_key(legacy_ns, key))
         )
         has_claim = bool(
             self._run(self._client.get, self._claim_key(legacy_ns, key))
         )
-        return legacy, has_intent, has_claim
+        return legacy, has_intent, has_claim, legacy_op_scope
 
     # ── Codex R9 #3092 (P1): durable pre-execution intent marker ──────────
     #
@@ -1620,6 +1865,14 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # попытки мог удалить маркер другой tokenless-попытки. UUID делает
         # compare-and-delete точным для tokenless-пути.
         tokenless_marker: str | None = None
+        # Round-8 (owner P1 #2, PR #3340): per-attempt GENERATION for the
+        # scope-binding protocol. Every binding write of THIS attempt (NX
+        # bind, post-acquire re-assert, success extension) carries it, and
+        # the known non-2xx cleanup compare-and-deletes the FULL value — a
+        # stale attempt can then never delete a successor's in-flight
+        # binding (both attempts share the same patient scope, so the
+        # round-7 scope-only guard could not tell the generations apart).
+        attempt_generation = uuid.uuid4().hex
 
         # Round-6 (owner P1, PR #3340): LEGACY MIGRATION FENCE state. When
         # this worker owns the legacy in-flight claim (acquired BEFORE any
@@ -1707,14 +1960,20 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             binding_resolved = False
             if claim is not None and claim.try_available():
                 binding_outcome, redis_bound = claim.bind_scope_if_absent(
-                    origin_ns, idempotency_key, patient_scope
+                    origin_ns, idempotency_key, patient_scope, attempt_generation
                 )
                 if binding_outcome == _SCOPE_BINDING_RESOLVED:
                     binding_resolved = True
                     bound_scope = redis_bound
                     # Round-5 (owner P1): mirror the Redis-resolved binding
                     # so the degraded path below can still see it.
-                    _local_scope_binding_set(origin_ns, idempotency_key, bound_scope)
+                    # Round-8 (owner P1): the mirror PRESERVES a locally
+                    # stored snapshot — the previous unconditional tuple
+                    # replace wiped the local outcome on every same-key
+                    # retry whose scope GET answered, exactly before the
+                    # response GET whose failure made that local outcome
+                    # the only replay source left.
+                    _local_scope_binding_mirror(origin_ns, idempotency_key, bound_scope)
             if not binding_resolved:
                 if claim is not None and claim.required:
                     logger.warning(
@@ -1959,6 +2218,13 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             # endpoint is NEW in #3340 (no legacy keys exist for
             # patient-scope principals); staff endpoints — the legacy keyed
             # traffic — reconcile fully.
+            #
+            # Round-8 (owner P2, PR #3340): the bridge is bounded by a
+            # rollout window (drain + legacy response TTL). After the cutoff
+            # the user-only namespace is no longer read, written or fenced —
+            # the operation-scoped namespace is the only truth, and one key
+            # can no longer alias two different POST operations through the
+            # user-only hash.
 
             async def _legacy_replay_decision(
                 legacy_resp: Response | None,
@@ -2021,7 +2287,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 # permitted is None AND role changed: conservative R4 analog.
                 return "role_changed"
 
-            if not patient_scope and claim.try_available():
+            if not patient_scope and claim.try_available() and _legacy_bridge_active():
                 legacy_ns = self._namespace(canonical_id)
                 legacy_token = claim.acquire(legacy_ns, idempotency_key)
                 if legacy_token is not None:
@@ -2038,7 +2304,32 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         (legacy_resp, legacy_hash, legacy_role),
                         legacy_intent,
                         _own_fence_marker,
+                        legacy_op_scope,
                     ) = claim.probe_legacy_artifacts(legacy_ns, idempotency_key)
+                    # Round-8 (owner P2): a snapshot stamped with a DIFFERENT
+                    # operation belongs to another POST under the same
+                    # user-only key. It is neither replayed nor refused as a
+                    # payload mismatch — the operation-scoped namespace
+                    # decides this request (release the fence and fall
+                    # through to the new-namespace claim). Old-worker
+                    # snapshots carry no stamp and keep the migration
+                    # replay contract for the bounded bridge window.
+                    legacy_foreign_op = (
+                        legacy_resp is not None
+                        and legacy_op_scope is not None
+                        and legacy_op_scope != op_scope
+                    )
+                    if legacy_foreign_op:
+                        logger.info(
+                            "Idempotency legacy snapshot belongs to another operation; "
+                            "skipping user-only replay: user=%s key=%s path=%s "
+                            "(legacy op=%s)",
+                            canonical_id,
+                            idempotency_key,
+                            request.url.path,
+                            legacy_op_scope,
+                        )
+                        _release_legacy_fence()
                     # An EMPTY legacy namespace UNDER OUR FENCE is exactly the
                     # interleaving round-4/5 could not close: an old worker
                     # could claim and execute between the old read-only probe
@@ -2047,7 +2338,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # claim keeping the fence. A stored RESPONSE replays
                     # below; an intent without a response refuses
                     # conservatively.
-                    if legacy_resp is not None:
+                    elif legacy_resp is not None:
                         decision = await _legacy_replay_decision(
                             legacy_resp, legacy_hash, legacy_role
                         )
@@ -2069,6 +2360,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                                 legacy_resp,
                                 payload_hash=legacy_hash or "",
                                 principal_role=legacy_role,
+                                operation_scope=op_scope,
                             )
                             _idempotency_cache.set(
                                 user_id,
@@ -2131,8 +2423,19 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         (legacy_resp, legacy_hash, legacy_role),
                         _contended_intent,
                         _contended_claim,
+                        _contended_op_scope,
                     ) = claim.probe_legacy_artifacts(legacy_ns, idempotency_key)
-                    if legacy_resp is not None:
+                    # Round-8 (owner P2): another operation's stamped snapshot
+                    # is neither replayed nor mismatch-refused — the
+                    # operation-scoped namespace decides; the in-flight
+                    # markers below still answer conservatively while an
+                    # execution actually holds the legacy claim.
+                    _contended_foreign_op = (
+                        legacy_resp is not None
+                        and _contended_op_scope is not None
+                        and _contended_op_scope != op_scope
+                    )
+                    if legacy_resp is not None and not _contended_foreign_op:
                         decision = await _legacy_replay_decision(
                             legacy_resp, legacy_hash, legacy_role
                         )
@@ -2147,6 +2450,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                                 legacy_resp,
                                 payload_hash=legacy_hash or "",
                                 principal_role=legacy_role,
+                                operation_scope=op_scope,
                             )
                             _idempotency_cache.set(
                                 user_id,
@@ -2379,6 +2683,19 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 )
                 claim.forget_response(user_id, idempotency_key)
                 _idempotency_cache.invalidate(user_id, idempotency_key)
+
+        # Round-8 (owner P1 #2, PR #3340): re-assert the scope binding UNDER
+        # the just-acquired claim, re-stamped with THIS attempt's generation.
+        # From this point the stale attempt's known non-2xx cleanup (a full
+        # compare-and-delete of ITS OWN generation) can no longer delete the
+        # binding while THIS attempt executes — and if the stale cleanup ran
+        # between our bind read and this re-assert, the restore-or-refresh
+        # upsert re-creates the binding before the handler starts. The
+        # success path re-asserts again atomically with the response store.
+        if patient_scope and origin_ns and claim is not None and claim.try_available():
+            claim.extend_scope_binding(
+                origin_ns, idempotency_key, patient_scope, attempt_generation
+            )
 
         # Codex R16 #3092 (P1): lease renewal starts IMMEDIATELY after the
         # claim is acquired — not just before call_next. The pre-execution
@@ -2776,6 +3093,19 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                             _clear_local_execution_intent(user_id, idempotency_key)
                             claim.release(user_id, idempotency_key, claim_token)
                         _clear_local_execution_intent(legacy_fence_ns, idempotency_key)
+                        # Round-8 (owner P2, PR #3340): lost-ack cleanup — the
+                        # mark EVAL may have LANDED server-side while the
+                        # client lost the reply (confirmed=False covers both
+                        # "not written" and "written, response lost"). Without
+                        # this owner-guarded delete the orphaned legacy intent
+                        # holds a FALSE 24 h idempotency_uncertain_outcome
+                        # over a request that provably never reached the
+                        # handler. The fence token binds the delete to THIS
+                        # attempt's marker — a foreign attempt's unknown-
+                        # outcome protection is never touched.
+                        claim.clear_execution_intent_if_owner(
+                            legacy_fence_ns, idempotency_key, legacy_fence_token
+                        )
                         _release_legacy_fence()
                         _cancel_lease()
                         return Response(
@@ -2913,35 +3243,68 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 if claim is not None and claim_acquired and claim_token is not None:
                     stored_current = False
                     stored_legacy = True
+                    scope_extended = True
                     if claim.try_available():
-                        # Codex R1 #3092 (P1): snapshot for CROSS-WORKER replay.
-                        # Codex R2 #3092 (P1): the snapshot carries the payload
-                        # hash — changed data is never replayed as the
-                        # original success.
-                        stored_current = claim.store_response(user_id, idempotency_key, cached_response, payload_hash=incoming_hash, principal_role=exec_role)
+                        if patient_scope and origin_ns:
+                            # Round-8 (owner P2, PR #3340): the response
+                            # snapshot and the scope-binding extension are
+                            # ONE atomic script for patient operations — the
+                            # binding can never expire before the outcome it
+                            # guards, and a Redis failure on the extension
+                            # now also means the response did not land (no
+                            # window where a live snapshot outlives its card
+                            # guard and a re-linked card could re-bind the
+                            # key). The extension RESTORES an absent binding
+                            # under this attempt's generation (a stale
+                            # attempt's in-between cleanup cannot orphan the
+                            # execution).
+                            stored_current, scope_extended = (
+                                claim.store_response_with_scope(
+                                    user_id,
+                                    idempotency_key,
+                                    cached_response,
+                                    payload_hash=incoming_hash,
+                                    principal_role=exec_role,
+                                    operation_scope=op_scope,
+                                    origin_ns=origin_ns,
+                                    patient_scope=patient_scope,
+                                    generation=attempt_generation,
+                                )
+                            )
+                        else:
+                            # Codex R1 #3092 (P1): snapshot for CROSS-WORKER replay.
+                            # Codex R2 #3092 (P1): the snapshot carries the payload
+                            # hash — changed data is never replayed as the
+                            # original success.
+                            stored_current = claim.store_response(user_id, idempotency_key, cached_response, payload_hash=incoming_hash, principal_role=exec_role, operation_scope=op_scope)
                         # Round-6 (owner P1): DUAL-WRITE the committed outcome to
                         # the LEGACY namespace WHILE the fence is still held — an
                         # old-version worker that acquires the legacy claim after
                         # the fence lease lapses must find this snapshot and
                         # replay it, never an empty namespace it would re-execute.
-                        if legacy_fence_ns is not None and legacy_fence_token is not None:
+                        # (Patient operations never hold the fence.) Round-8:
+                        # the legacy snapshot carries the operation_scope stamp.
+                        if (
+                            legacy_fence_ns is not None
+                            and legacy_fence_token is not None
+                        ):
                             stored_legacy = claim.store_response(
                                 legacy_fence_ns,
                                 idempotency_key,
                                 cached_response,
                                 payload_hash=incoming_hash,
                                 principal_role=exec_role,
-                            )
-                        if stored_current and stored_legacy and patient_scope and origin_ns:
-                            # Round-5 (owner P1): the snapshot now outlives the
-                            # binding's original write instant — refresh the
-                            # binding TTL so the key's card identity stays
-                            # resolvable for as long as the snapshot it guards.
-                            claim.extend_scope_binding(
-                                origin_ns, idempotency_key, patient_scope
+                                operation_scope=op_scope,
                             )
                     claim.release(user_id, idempotency_key, claim_token)
-                    outcome_durable = bool(stored_current and stored_legacy)
+                    # Round-8 (owner P2, PR #3340): the PATIENT outcome is
+                    # durable only when the scope binding extension was
+                    # CONFIRMED too — a binding that expired (or was never
+                    # confirmed) reopens the re-link window even though the
+                    # snapshot itself is stored.
+                    outcome_durable = bool(
+                        stored_current and stored_legacy and scope_extended
+                    )
                 if not outcome_durable:
                     # Round-7 (owner P1): Redis died AFTER the DB commit and
                     # BEFORE the snapshots were confirmed. The write IS
@@ -3046,23 +3409,34 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 if legacy_fence_ns is not None:
                     _clear_local_execution_intent(legacy_fence_ns, idempotency_key)
             if claim is not None and claim.try_available() and claim_acquired and claim_token is not None:
+                # Round-8 (owner P1 #2, PR #3340): the scope binding of a
+                # KNOWN non-2xx is dropped BEFORE the claim release — the
+                # old order (release first, delete last) opened a race in
+                # which a successor attempt with a corrected body acquired
+                # the freed claim and started executing while THIS attempt
+                # was still deleting "its" binding: A and B share the same
+                # patient scope, so the old scope-only guard could not tell
+                # the generations apart, B's in-flight binding was deleted
+                # and its completed outcome was left WITHOUT a binding (a
+                # later re-link could re-bind the key and execute a second
+                # write). The full-value compare-and-delete (scope AND this
+                # attempt's generation) is the second half of the guard.
+                if patient_scope and origin_ns:
+                    _local_scope_binding_drop(origin_ns, idempotency_key, patient_scope)
+                    claim.clear_scope_binding(
+                        origin_ns, idempotency_key, patient_scope, attempt_generation
+                    )
                 claim.release(user_id, idempotency_key, claim_token)
+            else:
+                # Degraded transport: the local twin is still dropped before
+                # the (skipped) release; the Redis compare-and-delete is
+                # retried by the same-key retry's own lifecycle.
+                if patient_scope and origin_ns:
+                    _local_scope_binding_drop(origin_ns, idempotency_key, patient_scope)
             # Round-6: a returned non-2xx is a KNOWN outcome (validation
             # refused, nothing committed) — the fence is released; an old
             # worker retry would re-run a request that provably did nothing.
             _release_legacy_fence()
-            if patient_scope and origin_ns:
-                # Round-7 (owner P1 #2, fix d): the pre-handler binding of a
-                # KNOWN non-2xx stores nothing durable — drop it (local + the
-                # value-guarded Redis twin) so a flood of invalid keyed
-                # requests cannot evict DURABLE successful bindings, the ones
-                # that guard live snapshots against a re-linked card. Reaching
-                # this line proves no response existed for the key (any
-                # stored snapshot would have replayed before execution), so
-                # the deletion can never orphan a live outcome.
-                _local_scope_binding_drop(origin_ns, idempotency_key, patient_scope)
-                if claim is not None and claim.try_available():
-                    claim.clear_scope_binding(origin_ns, idempotency_key, patient_scope)
             return response
         finally:
             if lease_task is not None:

@@ -150,6 +150,18 @@ class Settings(BaseSettings):
     # workers. None/Redis-down → per-process in-memory fallback.
     IDEMPOTENCY_REDIS_URL: str | None = Field(default=None)
 
+    # Round-8 (owner P2, PR #3340): rollout window of the user-only legacy
+    # idempotency bridge (migration fence + legacy replay + every-success
+    # dual-write), measured from the NEW worker's process start. The window
+    # must cover the old workers' drain plus the 24h TTL of the legacy
+    # response snapshots they may have left behind — the default is
+    # 24h + 90s lease + 1h drain margin. After it lapses the middleware
+    # consults ONLY the operation-scoped namespace, so one Idempotency-Key
+    # can no longer alias two different POST operations through the
+    # user-only hash. Set 0 to disable the bridge immediately (e.g. once no
+    # pre-#3340 workers remain AND their snapshots have expired).
+    IDEMPOTENCY_LEGACY_BRIDGE_MAX_AGE_SECONDS: float = Field(default=90_090.0)
+
     # --- Payment providers ---
     CLICK_ENABLED: bool = Field(default=False, description="Enable Click payments")
     CLICK_SERVICE_ID: str | None = Field(default=None, description="Click service id")
