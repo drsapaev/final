@@ -511,6 +511,105 @@ class NurseServingApiService:
             )
         return items, total
 
+    # N2-3 follow-up (the N2-5 §8 drain-recovery discovery): after a
+    # mid-flight assignment deactivation the READ plane collapses to
+    # "no workplace" (this list is empty) + 403 on the station board, yet
+    # the graceful drain keeps the terminal complete/incomplete mutations
+    # authorized for the STARTER. A reloaded tablet therefore had NO way
+    # to rediscover the execution id — this read-only, self-scope
+    # endpoint closes exactly that loop (no mutations, no new
+    # authorization surface, no client-side workaround).
+    def list_draining_executions(self, user_id: int) -> dict[str, Any]:
+        """The caller's OWN in_progress executions on drained stations.
+
+        An execution is a drain candidate when ALL hold:
+        - ``started_by_user_id == caller`` (self-scope: another nurse's
+          unfinished work is never surfaced here);
+        - ``status == 'in_progress'`` (terminal attempts are history);
+        - the station chain validates (``_execution_station_or_error``:
+          entry + queue + D3 routing — orphaned rows stay invisible,
+          exactly as before this endpoint);
+        - the caller holds NO active assignment on that station (with an
+          active assignment the station board already surfaces the
+          execution via ``in_progress_execution_id``).
+        """
+        rows = (
+            self.db.query(ServiceExecution)
+            .filter(
+                ServiceExecution.started_by_user_id == user_id,
+                ServiceExecution.status == "in_progress",
+            )
+            .order_by(ServiceExecution.id.asc())
+            .all()
+        )
+        items: list[dict[str, Any]] = []
+        for execution in rows:
+            try:
+                resource, entry = self._execution_station_or_error(execution)
+            except NurseServingApiDomainError:
+                # Orphaned/cross-station chains keep their pre-endpoint
+                # invisibility; admin tooling owns such rows.
+                continue
+            active = (
+                self.db.query(NurseWorkplaceAssignment)
+                .filter(
+                    NurseWorkplaceAssignment.user_id == user_id,
+                    NurseWorkplaceAssignment.queue_resource_id == resource.id,
+                    NurseWorkplaceAssignment.is_active.is_(True),
+                )
+                .first()
+            )
+            if active is not None:
+                # The board covers this one — no duplicate surface.
+                continue
+            items.append(self._draining_item_payload(execution, resource, entry))
+        return {"items": items, "total": len(items)}
+
+    def _draining_item_payload(
+        self,
+        execution: ServiceExecution,
+        resource: QueueResource,
+        entry: OnlineQueueEntry,
+    ) -> dict[str, Any]:
+        """Compose one drain candidate: execution + station/entry/service."""
+        visit_service = self.db.get(VisitService, execution.visit_service_id)
+        # Historical D2 cabinet: the deactivation leaves the (now
+        # inactive) assignment row readable, so the tablet can still show
+        # WHERE the unfinished work was being performed.
+        historical = (
+            self.db.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == execution.started_by_user_id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .order_by(NurseWorkplaceAssignment.id.desc())
+            .first()
+        )
+        return {
+            "execution": self._execution_payload(execution),
+            "station": {
+                "queue_resource_id": resource.id,
+                "resource_code": resource.code,
+                "resource_display_name": resource.display_name,
+                "effective_cabinet": (
+                    self._effective_cabinet(historical, resource)
+                    if historical is not None
+                    else resource.default_cabinet
+                ),
+            },
+            "entry": {
+                "entry_id": entry.id,
+                "number": entry.number,
+                "patient_name": entry.patient_name,
+            },
+            "service": {
+                "visit_service_id": execution.visit_service_id,
+                "code": visit_service.code if visit_service else None,
+                "name": visit_service.name if visit_service else None,
+                "qty": visit_service.qty if visit_service else 1,
+            },
+        }
+
     def get_station_state(self, user_id: int, queue_resource_id: int) -> dict[str, Any]:
         """The station board: waiting + active + my claim + late_pending.
 

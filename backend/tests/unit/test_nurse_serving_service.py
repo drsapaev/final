@@ -1684,3 +1684,199 @@ class TestCodexRound3BoardQueryBudget:
         # 6-row one (3 lookups + 3 entry lists + 2 enrichment batches).
         assert counts[0] == counts[1]
         assert counts[0] <= 12
+
+
+# ----------------------------------------------------------------------------
+# N2-3 follow-up (N2-5 §8): drain-recovery discovery
+# ----------------------------------------------------------------------------
+class TestDrainRecoveryDiscovery:
+    """The reload-discovery loop the graceful drain was missing.
+
+    Before this endpoint a mid-flight deactivation collapsed the read
+    plane to "no workplace" (empty workplaces list) + 403 board, so a
+    RELOADED tablet could not rediscover the in_progress execution the
+    drain still lets the starter finish — empirically proven on main
+    (the N2-5 §8 gate scenario).
+    """
+
+    def test_discovery_surfaces_own_execution_after_deactivation(self, db_session):
+        nurse = _nurse(db_session, "n2dr_a")
+        resource = _resource(db_session, "procedures_dr")
+        _assignment(db_session, nurse, resource, cabinet="7")
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Drain")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        execution = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        exec_id = execution["id"]
+
+        # mid-flight deactivation
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        # the read plane the reload has:
+        items, total = svc.list_workplaces(nurse.id)
+        assert total == 0
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            svc.get_station_state(nurse.id, resource.id)
+        _expect(exc, 403)
+
+        # the discovery closes the loop:
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        item = payload["items"][0]
+        assert item["execution"]["id"] == exec_id
+        assert item["execution"]["status"] == "in_progress"
+        assert item["execution"]["attempt_no"] == 1
+        assert item["station"]["queue_resource_id"] == resource.id
+        assert item["station"]["effective_cabinet"] == "7"
+        assert item["entry"]["entry_id"] == entry.id
+        assert item["entry"]["number"] == 1
+        assert item["entry"]["patient_name"] == "Drain"
+        assert item["service"]["visit_service_id"] == visit.services[0].id
+        assert item["service"]["name"] == f"Service {service.code}"
+
+        # and the drain is reachable end-to-end through the discovery id
+        result = svc.complete_execution(nurse.id, exec_id)
+        assert result["status"] == "completed"
+
+        # terminal work disappears from the discovery
+        assert svc.list_draining_executions(nurse.id)["total"] == 0
+
+    def test_discovery_is_empty_while_assignment_is_active(self, db_session):
+        nurse = _nurse(db_session, "n2dr_b")
+        resource = _resource(db_session, "procedures_dr2")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Active")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc2", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        # ACTIVE assignment: the board is the surface, no drain duplicate
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload == {"items": [], "total": 0}
+
+    def test_discovery_never_surfaces_another_nurses_work(self, db_session):
+        nurse_a = _nurse(db_session, "n2dr_starter")
+        nurse_b = _nurse(db_session, "n2dr_other")
+        resource = _resource(db_session, "procedures_dr3")
+        _assignment(db_session, nurse_a, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Cross")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc3", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse_a.id, resource.id, entry.id)
+        svc.create_execution(
+            nurse_a.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        # A's assignment deactivated mid-flight
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse_a.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        # B (never assigned here at all) must NOT discover A's execution
+        assert svc.list_draining_executions(nurse_b.id) == {"items": [], "total": 0}
+        # ...while A still can
+        assert svc.list_draining_executions(nurse_a.id)["total"] == 1
+
+    def test_discovery_tracks_only_the_latest_in_progress_attempt(
+        self,
+        db_session,
+    ):
+        nurse = _nurse(db_session, "n2dr_retry")
+        resource = _resource(db_session, "procedures_dr4")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Retry")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc4", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        first = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        # abort the first attempt, then re-claim (attempt 2)
+        svc.incomplete_execution(
+            nurse.id, first["id"], reason="пациент временно отложил"
+        )
+        second = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        assert second["attempt_no"] == 2
+
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        item = payload["items"][0]
+        assert item["execution"]["id"] == second["id"]
+        assert item["execution"]["attempt_no"] == 2
+        assert item["execution"]["status"] == "in_progress"

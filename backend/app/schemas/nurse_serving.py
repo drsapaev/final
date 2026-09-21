@@ -231,3 +231,61 @@ class NurseServingEntryActionResponse(BaseModel):
     entry_id: int
     new_status: str
     reason: str | None = None
+
+
+# N2-3 follow-up (N2-5 §8): the drain-recovery discovery read path. A
+# mid-flight assignment deactivation empties the workplaces list and 403s
+# the station board, so a RELOADED tablet had no way to rediscover the
+# in_progress execution the graceful drain still lets the starter finish.
+class NurseServingDrainingStationRef(BaseModel):
+    """The station a draining execution belongs to (display context)."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    queue_resource_id: int
+    resource_code: str | None = None
+    resource_display_name: str | None = None
+    # Historical D2 resolution (the now-inactive assignment override ??
+    # resource default) — display-only context, never an authorization.
+    effective_cabinet: str | None = None
+
+
+class NurseServingDrainingEntryRef(BaseModel):
+    """The queue entry context of a draining execution."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    entry_id: int
+    number: int
+    patient_name: str | None = None
+
+
+class NurseServingDrainingServiceRef(BaseModel):
+    """The VisitService a draining execution performs."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    visit_service_id: int
+    code: str | None = None
+    name: str | None = None
+    qty: int = 1
+
+
+class NurseServingDrainingExecutionItem(BaseModel):
+    """One discoverable drain candidate: the caller's own unfinished work."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    execution: NurseServingExecutionResponse
+    station: NurseServingDrainingStationRef
+    entry: NurseServingDrainingEntryRef
+    service: NurseServingDrainingServiceRef
+
+
+class NurseServingDrainingExecutionListResponse(BaseModel):
+    """The drain-recovery discovery payload (self-scope, read-only)."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    items: list[NurseServingDrainingExecutionItem] = Field(default_factory=list)
+    total: int = 0
