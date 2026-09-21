@@ -23498,6 +23498,10 @@ export type components = {
             patient_name?: string | null;
             /** Department Id */
             department_id?: number | null;
+            /** Department Key */
+            department_key?: string | null;
+            /** Department Name */
+            department_name?: string | null;
         };
         /**
          * AppointmentCancelRequest

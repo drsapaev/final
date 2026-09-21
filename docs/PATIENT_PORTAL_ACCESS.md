@@ -272,3 +272,65 @@ the idempotency middleware):
   carries the revoked card id as the audit subject. A refusal with no
   subject at all (no linked card) writes no row — the same SSOT boundary
   the Mini App applies to auth failures without a patient context.
+
+Round-4 hardening (review of PR #3340 @ `e8fec8f`, applies to the portal +
+the idempotency middleware + canonical Appointment reads):
+
+- Canonical Appointment reads survive a persisted department: the ORM
+  `Appointment.department` is the Department RELATIONSHIP while the read
+  DTO declared `department: str | None` under the same attribute name —
+  the first row with a non-NULL `department_id` (which the portal booking
+  now guarantees) made `Appointment.model_validate()` coerce a Department
+  OBJECT into a string and 500'd `GET /appointments/` (one poisoned row
+  killed the whole list) and `GET /appointments/{id}`. The read model now
+  maps the relationship explicitly (legacy `department` field → canonical
+  key, `str | null` contract preserved) and publishes typed
+  `department_key` / `department_name` fields backed by ORM accessors.
+- Stable key→card binding (idempotency): the round-3 namespace scoping
+  alone made a same-key retry look FRESH after a card re-link (the
+  namespace moved WITH the current card), so the lost-response retry
+  re-executed the booking for the NEW patient — two appointments for two
+  patients from one logical submit. The key is now bound to the card it
+  FIRST ran under, in the ORIGIN namespace (canonical user + operation,
+  no patient scope) — the identity that survives a re-link. A retry whose
+  current card differs from the bound one is refused non-executing with
+  `409 idempotency_scope_mismatch`; the re-linked card books with a NEW
+  key. Durable binding in Redis (`:pscope` key, 24h TTL) + per-process
+  mirror for the degraded path (same contract as execution intents).
+- Rollout-compatible namespace transition: pre-#3340 outcomes and
+  execution-intent markers live under the user-only namespace for up to
+  24h and were INVISIBLE to the operation-scoped namespace — a same-key
+  retry after deploy would re-execute a write whose outcome is already
+  committed or unknown. Before claiming, the middleware now reconciles
+  the LEGACY namespace (one raw read pass, `probe_legacy_artifacts`):
+  a stored legacy RESPONSE replays under the full replay contract
+  (payload hash, principal authorization, endpoint role policy) and
+  MIGRATES to the current namespace (bounded TTL extension); a legacy
+  INTENT without an outcome refuses conservatively
+  (`409 idempotency_uncertain_outcome`); a legacy in-flight claim refuses
+  as `409 idempotency_in_flight` until the pre-deploy worker completes.
+  Scoped to principals WITHOUT a patient scope: legacy snapshots cannot
+  be attributed to the CURRENT card, and every patient-facing keyed
+  endpoint is new in #3340 (no legacy keys exist for patients) — staff
+  endpoints (the legacy keyed traffic) reconcile fully. Redis is NOT
+  cleared: that would destroy the very outcomes and unknown-outcome
+  guards that protect against duplicates.
+- Deactivated-account audit trail: the composed dependency refused a
+  deactivated account BEFORE the endpoint body ran, so the linked card's
+  per-patient trail lost the attempt. The portal dependency is now a
+  factory (`_active_portal_user_audited(resource_type, action)`): resolve
+  the actor, write the `outcome="denied"` row (reason
+  `user_deactivated`, subject = linked card when one exists), THEN raise
+  the 403. Same defect class `require_active_roles` (PR #3333) fixed for
+  the control plane. The factory product publishes `required_roles` for
+  the idempotency middleware (Codex R6 #3092 convention) per endpoint.
+- Department normalization: the SSOT builder strips the draft department
+  while the portal resolver queried the RAW request string —
+  `" cardio "` passed the builder, then missed the exact `Department.key`
+  match and 400'd `department_unknown` for a department the preview had
+  already accepted. The resolver now strips internally and both booking
+  endpoints resolve the SSOT-NORMALIZED `preview.draft.department`.
+- Cabinet department label: `Department` has no `name` column (only
+  `key` / `name_ru` / `name_uz`), so the shared cabinet builder returned
+  `department: null` for every booked row. It now displays `name_ru`
+  (canonical `key` fallback) — Mini App and JWT portal both benefit.

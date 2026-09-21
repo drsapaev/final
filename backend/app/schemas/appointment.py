@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.schemas.base import ORMModel
 
@@ -102,3 +103,27 @@ class Appointment(AppointmentBase):
     # but readers (schedule, department-schedule, portal previews) still get
     # the canonical departments.id the row was booked under.
     department_id: int | None = None
+    # Round-4 (owner P1): explicit, correctly-typed department reads.
+    # `AppointmentBase.department` is a REQUEST-side display string, but the
+    # ORM attribute of the same name is the Department RELATIONSHIP — the
+    # first row with a non-NULL department_id (portal booking persists it)
+    # turned every canonical read into a response-validation 500. The read
+    # model now maps that attribute explicitly (below) and additionally
+    # publishes the typed fields backed by the ORM accessors.
+    department_key: str | None = None
+    department_name: str | None = None
+
+    @field_validator("department", mode="before")
+    @classmethod
+    def _department_relationship_to_key(cls, value: Any) -> Any:
+        """Explicit mapper for the ORM relationship under the legacy name.
+
+        Pydantic's from_attributes reads ``apt.department`` — a Department
+        OBJECT once department_id is set. Strings (request echoes, dicts
+        re-validated by FastAPI) and None pass through untouched; the
+        relationship object maps to its canonical ``Department.key`` so the
+        historical response field keeps its `str | null` contract.
+        """
+        if value is None or isinstance(value, str):
+            return value
+        return getattr(value, "key", None)

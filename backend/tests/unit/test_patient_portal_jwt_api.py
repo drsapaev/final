@@ -523,11 +523,18 @@ class TestOpenAPIContract:
 
 
 class TestReplayPatientPolicy:
-    """Round-3 owner P1: the idempotency replay must never outrun the
-    portal's card guards. A snapshot committed under card A cannot be
-    served for a soft-deleted or re-linked card: the middleware scopes the
-    namespace to the CURRENT active card id and bypasses replay entirely
-    when no active card exists (the endpoint answers 403/404 itself)."""
+    """Round-3 owner P1 + round-4 owner P1: the idempotency replay must
+    never outrun the portal's card guards.
+
+    - A snapshot committed under card A cannot be served for a soft-deleted
+      card (the namespace bypasses replay entirely — the endpoint 403s +
+      audits) — round-3.
+    - One Idempotency-Key means ONE booking attempt: the key is bound to
+      the card it FIRST ran under and never follows a re-link. The same key
+      replayed after the account was re-linked to card B is a 409
+      `idempotency_scope_mismatch` — NOT a fresh execution that would
+      create a second appointment for another patient. The re-linked card
+      books with a NEW key — round-4."""
 
     future_date = str(date.today() + timedelta(days=3))
 
@@ -563,14 +570,19 @@ class TestReplayPatientPolicy:
             == 1
         )
 
-    def test_replay_after_card_relink_executes_under_new_card(
+    def test_replay_after_card_relink_refused_with_scope_mismatch(
         self, client, linked_patient_headers, db_session, test_patient
     ):
+        """Round-4 owner P1: the round-3 namespace scoping alone made the
+        same key look FRESH after a re-link (the namespace moved with the
+        current card), so the retry re-executed the booking for the NEW
+        card — two appointments for two patients from one logical submit.
+        The stable key→card binding must refuse the retry instead."""
         user = (
             db_session.query(User).filter(User.username == "portal_patient").first()
         )
         assert user is not None
-        key = "replay-relink-1"
+        key = "replay-relink-2"
         body = {"appointmentDate": self.future_date}
         first = client.post(
             "/api/v1/patients/booking",
@@ -580,7 +592,9 @@ class TestReplayPatientPolicy:
         assert first.status_code == 201
         first_appointment_id = first.json()["appointment_id"]
 
-        # Re-link the SAME portal account to a DIFFERENT card.
+        # Re-link the SAME portal account to a DIFFERENT card after the
+        # committed booking (lost response + admin relink — the dangerous
+        # interleaving from the review).
         card_b = Patient(
             first_name="Пётр",
             last_name="Петров",
@@ -595,21 +609,33 @@ class TestReplayPatientPolicy:
         card_b.user_id = user.id
         db_session.commit()
 
+        # Same key + same body after the re-link: the key is still bound to
+        # card A — non-executing 409, never a fresh booking for card B.
         replay = client.post(
             "/api/v1/patients/booking",
             headers={**linked_patient_headers, "Idempotency-Key": key},
             json=body,
         )
-        assert replay.status_code == 201, (
-            "the re-linked account must execute fresh, never receive card A's snapshot"
-        )
-        second_appointment_id = replay.json()["appointment_id"]
-        assert second_appointment_id != first_appointment_id
-        row = db_session.get(Appointment, second_appointment_id)
+        assert replay.status_code == 409, replay.text
+        assert replay.json()["code"] == "idempotency_scope_mismatch"
+
+        # Exactly ONE appointment exists, and it belongs to card A.
+        assert db_session.query(Appointment).count() == 1
+        row = db_session.get(Appointment, first_appointment_id)
         assert row is not None
-        assert row.patient_id == card_b.id
-        # One real appointment per card — no snapshot replay across cards.
-        assert db_session.query(Appointment).count() == 2
+        assert row.patient_id == test_patient.id
+
+        # A NEW booking attempt for the re-linked card uses a NEW key —
+        # and works exactly like a first booking.
+        second = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "replay-relink-2-new-card"},
+            json=body,
+        )
+        assert second.status_code == 201, second.text
+        second_row = db_session.get(Appointment, second.json()["appointment_id"])
+        assert second_row is not None
+        assert second_row.patient_id == card_b.id
 
 
 class TestKeyOperationScoping:
@@ -807,3 +833,222 @@ class TestDeniedAuditRows:
         row = self._latest_denied(db_session, test_patient.id)
         assert row is not None
         assert row.extra_data["reason"] == "appointment_time_slot_occupied"
+
+
+class TestCanonicalReadAfterPortalBooking:
+    """Round-4 owner P1: the ORM `department` attribute is the Department
+    RELATIONSHIP while the read DTO declared `department: str | None` under
+    the same name — the first row with a persisted department_id (which the
+    portal booking now guarantees) turned every canonical Appointment read
+    into a response-validation 500. The regression reads the portal-created
+    row through BOTH canonical endpoints (registrar/admin surface)."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def test_list_and_detail_return_200_after_portal_booking(
+        self,
+        client,
+        linked_patient_headers,
+        admin_auth_headers,
+        db_session,
+        portal_department,
+    ):
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "canonical-read-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "department": portal_department.key,
+            },
+        )
+        assert created.status_code == 201, created.json()
+        appointment_id = created.json()["appointment_id"]
+
+        # GET /api/v1/appointments/ — one poisoned row used to 500 the WHOLE
+        # list (the model_validate ran per row).
+        listed = client.get("/api/v1/appointments/", headers=admin_auth_headers)
+        assert listed.status_code == 200, listed.text
+        items = [a for a in listed.json() if a["id"] == appointment_id]
+        assert len(items) == 1, "the portal-created row must appear in the list"
+        item = items[0]
+        assert item["department_id"] == portal_department.id
+        assert item["department"] == portal_department.key
+        assert item["department_key"] == portal_department.key
+        assert item["department_name"] == portal_department.name_ru
+
+        # GET /api/v1/appointments/{id} — the same ORM object is validated
+        # by response_model directly.
+        detail = client.get(
+            f"/api/v1/appointments/{appointment_id}", headers=admin_auth_headers
+        )
+        assert detail.status_code == 200, detail.text
+        payload = detail.json()
+        assert payload["department_id"] == portal_department.id
+        assert payload["department"] == portal_department.key
+        assert payload["department_key"] == portal_department.key
+        assert payload["department_name"] == portal_department.name_ru
+
+    def test_row_without_department_still_reads_null(
+        self, client, admin_auth_headers, db_session, test_patient, test_doctor
+    ):
+        # Legacy rows (department_id NULL) must keep serializing department
+        # as null — the mapper never invents a value.
+        legacy_row = Appointment(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="11:00",
+        )
+        db_session.add(legacy_row)
+        db_session.commit()
+        db_session.refresh(legacy_row)
+
+        detail = client.get(
+            f"/api/v1/appointments/{legacy_row.id}", headers=admin_auth_headers
+        )
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["department"] is None
+        assert detail.json()["department_key"] is None
+        assert detail.json()["department_name"] is None
+
+
+class TestDeactivatedUserAuditTrail:
+    """Round-4 owner P2: the composed dependency refused a deactivated
+    account BEFORE the endpoint body ran — the denied-audit writer never
+    executed and the linked card's trail lost the attempt. The audited
+    dependency resolves the actor, writes the row, THEN raises the 403."""
+
+    def test_deactivated_cabinet_attempt_writes_denied_row(
+        self, client, linked_patient_headers, db_session, test_patient
+    ):
+        user = db_session.query(User).filter(User.username == "portal_patient").first()
+        assert user is not None
+        user.is_active = False
+        db_session.commit()
+
+        response = client.get(
+            "/api/v1/patients/cabinet/summary", headers=linked_patient_headers
+        )
+        assert response.status_code == 403
+        assert response.json()["detail"]["reason"] == "user_deactivated"
+
+        row = (
+            db_session.query(PatientAccessAuditLog)
+            .filter(
+                PatientAccessAuditLog.subject_patient_id == test_patient.id,
+                PatientAccessAuditLog.outcome == "denied",
+            )
+            .order_by(PatientAccessAuditLog.id.desc())
+            .first()
+        )
+        assert row is not None, (
+            "the deactivated attempt must leave a row in the per-patient trail"
+        )
+        assert row.extra_data["reason"] == "user_deactivated"
+        assert row.extra_data["surface"] == "jwt_portal"
+        assert row.resource_type == "cabinet_summary"
+
+    def test_deactivated_forms_attempt_writes_denied_row(
+        self, client, linked_patient_headers, db_session, test_patient
+    ):
+        user = db_session.query(User).filter(User.username == "portal_patient").first()
+        assert user is not None
+        user.is_active = False
+        db_session.commit()
+
+        response = client.get("/api/v1/patients/forms", headers=linked_patient_headers)
+        assert response.status_code == 403
+        row = (
+            db_session.query(PatientAccessAuditLog)
+            .filter(
+                PatientAccessAuditLog.subject_patient_id == test_patient.id,
+                PatientAccessAuditLog.outcome == "denied",
+            )
+            .order_by(PatientAccessAuditLog.id.desc())
+            .first()
+        )
+        assert row is not None
+        assert row.extra_data["reason"] == "user_deactivated"
+        assert row.resource_type == "patient_form"
+
+
+class TestDepartmentNormalization:
+    """Round-4 owner P2: the SSOT builder strips the draft department while
+    the portal resolver queried the RAW request string — `" cardio "` passed
+    the builder, then missed the exact `Department.key` match and answered
+    400 for a department the preview had already accepted."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def test_padded_department_resolves_on_preview_and_create(
+        self, client, linked_patient_headers, db_session, portal_department
+    ):
+        preview = client.post(
+            "/api/v1/patients/booking/preview",
+            headers=linked_patient_headers,
+            json={
+                "appointmentDate": self.future_date,
+                "department": f"  {portal_department.key}  ",
+            },
+        )
+        assert preview.status_code == 200, preview.json()
+        payload = preview.json()
+        assert payload["appointment"]["department"] == portal_department.key
+        assert payload["appointment"]["department_id"] == portal_department.id
+
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "normalize-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "department": f"  {portal_department.key}  ",
+            },
+        )
+        assert created.status_code == 201, created.json()
+        row = db_session.get(Appointment, created.json()["appointment_id"])
+        assert row is not None
+        assert row.department_id == portal_department.id
+
+    def test_whitespace_only_department_stays_empty(self, client, linked_patient_headers):
+        # "   " normalizes to None — no department context, no 400.
+        response = client.post(
+            "/api/v1/patients/booking/preview",
+            headers=linked_patient_headers,
+            json={"appointmentDate": self.future_date, "department": "   "},
+        )
+        assert response.status_code == 200
+        assert response.json()["appointment"]["department"] is None
+
+
+class TestCabinetDepartmentLabel:
+    """Round-4 owner P2: `Department` has no `name` column (key/name_ru/
+    name_uz) — the cabinet summary showed `department: null` for every
+    booked row even after the portal started persisting department_id."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def test_cabinet_summary_shows_booked_department_name(
+        self, client, linked_patient_headers, db_session, portal_department
+    ):
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "cabinet-label-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "department": portal_department.key,
+            },
+        )
+        assert created.status_code == 201, created.json()
+        appointment_id = created.json()["appointment_id"]
+
+        summary = client.get(
+            "/api/v1/patients/cabinet/summary", headers=linked_patient_headers
+        )
+        assert summary.status_code == 200
+        booked = [
+            a
+            for a in summary.json()["appointments"]
+            if a["id"] == appointment_id
+        ]
+        assert len(booked) == 1
+        assert booked[0]["department"] == portal_department.name_ru

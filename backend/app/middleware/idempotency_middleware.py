@@ -540,8 +540,55 @@ def _local_execution_intent_exists(user_id: int | str, key: str) -> bool:
     return (str(user_id), key) in _local_execution_intents
 
 
+# ── Round-4 (owner P1, PR #3340): in-process mirror of the patient-scope ────
+# binding. The idempotency key's ORIGINAL patient card is bound the first
+# time the keyed operation runs and never follows a re-link. The durable
+# binding lives in the distributed claim (Redis); this mirror follows the
+# same pattern as the execution-intent markers for the Redis-degraded path.
+_local_scope_bindings: OrderedDict[tuple[str, str], tuple[float, str]] = OrderedDict()
+
+
+def _sweep_local_scope_bindings(now: float | None = None) -> None:
+    now = time.time() if now is None else now
+    stale = [k for k, entry in _local_scope_bindings.items() if entry[0] <= now]
+    for k in stale:
+        _local_scope_bindings.pop(k, None)
+
+
+def _local_scope_binding_get(origin_ns: str, key: str) -> str | None:
+    _sweep_local_scope_bindings()
+    entry = _local_scope_bindings.get((str(origin_ns), key))
+    return entry[1] if entry is not None else None
+
+
+def _local_scope_binding_set(origin_ns: str, key: str, patient_scope: str) -> None:
+    _sweep_local_scope_bindings()
+    _local_scope_bindings[(str(origin_ns), key)] = (
+        time.time() + _CACHE_TTL_SECONDS,
+        patient_scope,
+    )
+
+
 def get_idempotency_cache() -> IdempotencyResponseCache:
     return _idempotency_cache
+
+
+def _decode_response_snapshot(raw: Any) -> tuple[Response | None, str | None, str | None]:
+    """Decode a stored response snapshot (shared by load_response and the
+    round-4 legacy probe). Never raises: a corrupt snapshot degrades to a
+    miss instead of failing the request."""
+    try:
+        snapshot = json.loads(raw)
+        body = base64.b64decode(snapshot["body_b64"])
+        return Response(
+            content=body,
+            status_code=int(snapshot["status"]),
+            headers=dict(snapshot["headers"]),
+            media_type=snapshot.get("media_type"),
+        ), snapshot.get("payload_hash"), snapshot.get("principal_role")
+    except Exception as exc:
+        logger.warning("Idempotency snapshot decode failed: %s", exc)
+        return None, None, None
 
 
 class DistributedIdempotencyClaim:
@@ -744,18 +791,7 @@ class DistributedIdempotencyClaim:
         raw = self._run(self._client.get, self._resp_key(user_id, key))
         if not raw:
             return None, None, None
-        try:
-            snapshot = json.loads(raw)
-            body = base64.b64decode(snapshot["body_b64"])
-            return Response(
-                content=body,
-                status_code=int(snapshot["status"]),
-                headers=dict(snapshot["headers"]),
-                media_type=snapshot.get("media_type"),
-            ), snapshot.get("payload_hash"), snapshot.get("principal_role")
-        except Exception as exc:
-            logger.warning("Idempotency snapshot decode failed: %s", exc)
-            return None, None, None
+        return _decode_response_snapshot(raw)
 
     def store_response(self, user_id: int | str, key: str, response: Response, ttl: int | None = None, payload_hash: str = "", principal_role: str | None = None) -> None:
         if not self._ensure_available() or self._client is None:
@@ -791,6 +827,76 @@ class DistributedIdempotencyClaim:
         if not self._ensure_available() or self._client is None:
             return False
         return bool(self._run(self._client.get, self._claim_key(user_id, key)))
+
+    # ── Round-4 (owner P1, PR #3340): stable patient-scope binding ─────────
+    #
+    # The binding lives under the ORIGIN namespace (canonical user +
+    # operation, WITHOUT the patient scope) — the one identity that survives
+    # re-linking the account to another card. The value records the patient
+    # scope (``patient:{id}``) the key FIRST ran under; a retry whose CURRENT
+    # card differs is refused (409 idempotency_scope_mismatch) instead of
+    # executing the same booking attempt for a different patient.
+
+    @staticmethod
+    def _scope_key(user_id: int | str, key: str) -> str:
+        return f"idem:{user_id}:{key}:pscope"
+
+    def load_scope_binding(self, origin_ns: str, key: str) -> str | None:
+        """The patient scope this key was first bound to (None if unbound)."""
+        if not self._ensure_available() or self._client is None:
+            return None
+        stored = self._run(self._client.get, self._scope_key(origin_ns, key))
+        return str(stored) if stored else None
+
+    def bind_scope_if_absent(
+        self, origin_ns: str, key: str, patient_scope: str
+    ) -> str | None:
+        """Bind the key's FIRST patient scope; return the EFFECTIVE binding.
+
+        The existing binding always wins: GET before the SET NX, then a
+        re-read to resolve a lost-SET race (another attempt landed its NX
+        first). Returns None only when Redis is unavailable or the op
+        failed — the caller falls back to the per-process mirror."""
+        if not self._ensure_available() or self._client is None:
+            return None
+        stored = self._run(self._client.get, self._scope_key(origin_ns, key))
+        if stored:
+            return str(stored)
+        self._run(
+            self._client.set,
+            self._scope_key(origin_ns, key),
+            patient_scope,
+            nx=True,
+            ex=self._ttl,
+        )
+        stored = self._run(self._client.get, self._scope_key(origin_ns, key))
+        return str(stored) if stored else None
+
+    def probe_legacy_artifacts(
+        self, legacy_ns: str, key: str
+    ) -> tuple[tuple[Response | None, str | None, str | None], bool, bool]:
+        """Round-4 (owner P1): ONE read pass over the PRE-#3340 namespace.
+
+        Returns ``((response, payload_hash, principal_role), has_intent,
+        has_in_flight)`` for the artifacts the previous deployment wrote
+        under the user-only hash. Read-only by contract — the legacy
+        namespace belongs to the pre-deploy workers (only the explicit
+        stale-role ``forget_response`` in the dispatch legacy branch ever
+        clears anything there). Reads the raw keys directly: the production
+        methods wrap the same state, but the probe must stay a single
+        independent pass no other in-flight bookkeeping can re-order.
+        """
+        if not self._ensure_available() or self._client is None:
+            return (None, None, None), False, False
+        raw = self._run(self._client.get, self._resp_key(legacy_ns, key))
+        legacy = _decode_response_snapshot(raw) if raw else (None, None, None)
+        has_intent = bool(
+            self._run(self._client.get, self._intent_key(legacy_ns, key))
+        )
+        has_claim = bool(
+            self._run(self._client.get, self._claim_key(legacy_ns, key))
+        )
+        return legacy, has_intent, has_claim
 
     # ── Codex R9 #3092 (P1): durable pre-execution intent marker ──────────
     #
@@ -1165,6 +1271,42 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 media_type="application/json",
             )
 
+        # Round-4 (owner P1): bind the key to the patient card it FIRST ran
+        # under — the binding lives in the ORIGIN namespace (user + operation,
+        # no patient scope), the one identity that survives re-linking the
+        # account to another card. A retry whose CURRENT card differs from
+        # the bound one is refused WITHOUT executing: one logical booking
+        # attempt must never materialize a second appointment for a different
+        # patient (the round-3 namespace scoping alone made the retry look
+        # like a FRESH key after a re-link — the cached snapshot became
+        # invisible and the write re-ran for the new card). The re-linked
+        # card books with a NEW key, per the endpoint contract.
+        if patient_scope:
+            origin_ns = self._namespace(canonical_id, op_scope)
+            bound_scope: str | None = None
+            if claim is not None and claim.try_available():
+                bound_scope = claim.bind_scope_if_absent(
+                    origin_ns, idempotency_key, patient_scope
+                )
+            if bound_scope is None:
+                # Redis unavailable/op failed — per-process mirror (same
+                # best-effort contract as the execution-intent markers).
+                bound_scope = _local_scope_binding_get(origin_ns, idempotency_key)
+                if bound_scope is None:
+                    _local_scope_binding_set(origin_ns, idempotency_key, patient_scope)
+                    bound_scope = patient_scope
+            if bound_scope != patient_scope:
+                logger.warning(
+                    "Idempotency scope mismatch: key=%s bound to %s but current "
+                    "card scope is %s — refusing: user=%s path=%s",
+                    idempotency_key,
+                    bound_scope,
+                    patient_scope,
+                    canonical_id,
+                    request.url.path,
+                )
+                return self._scope_mismatch_response()
+
         # Check local (per-process) cache first — fastest path
         cached, local_mismatch, cached_role = _idempotency_cache.get(user_id, idempotency_key, incoming_hash)
         if local_mismatch:
@@ -1288,6 +1430,144 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 claim.forget_response(user_id, idempotency_key)
                 _idempotency_cache.invalidate(user_id, idempotency_key)
                 replayed = None
+
+            # Round-4 (owner P1): rollout compatibility for the namespace
+            # change. Pre-#3340 the namespace was the user-only hash; outcome
+            # snapshots and execution-intent markers written by the PREVIOUS
+            # deployment stay there for up to 24h and are INVISIBLE under the
+            # new operation-scoped namespace — a same-key retry after deploy
+            # would re-execute a write whose outcome is already committed or
+            # unknown (the duplicate the whole machinery exists to prevent).
+            # Reconcile against the LEGACY namespace before claiming:
+            #   - a stored legacy RESPONSE replays under the same replay
+            #     contract (payload hash, principal authorization, endpoint
+            #     role policy) and MIGRATES to the current namespace, so the
+            #     legacy read happens at most once per key;
+            #   - a legacy INTENT without a response is refused
+            #     conservatively (409 idempotency_uncertain_outcome) — the
+            #     pre-deploy attempt may have committed;
+            #   - a legacy in-flight CLAIM (rolling deploy: the old worker is
+            #     mid-execution) is refused as in-flight; its outcome lands
+            #     under the legacy namespace when the old worker completes.
+            # Scoped to principals WITHOUT a patient scope: pre-#3340
+            # endpoints carry no patient scoping, so a legacy snapshot cannot
+            # be attributed to the CURRENT card — replaying it across a card
+            # re-link would resurrect exactly the cross-card leak the
+            # patient-aware policy closed. Every patient-facing keyed
+            # endpoint is NEW in #3340 (no legacy keys exist for
+            # patient-scope principals); staff endpoints — the legacy keyed
+            # traffic — reconcile fully.
+            if not patient_scope and claim.try_available():
+                legacy_ns = self._namespace(canonical_id)
+                (
+                    (legacy_resp, legacy_hash, legacy_role),
+                    legacy_intent,
+                    legacy_claim,
+                ) = claim.probe_legacy_artifacts(legacy_ns, idempotency_key)
+                if legacy_resp is not None:
+                    if legacy_hash and legacy_hash != incoming_hash:
+                        logger.warning(
+                            "Idempotency payload mismatch (legacy namespace): "
+                            "user=%s key=%s path=%s",
+                            canonical_id,
+                            idempotency_key,
+                            request.url.path,
+                        )
+                        return self._payload_mismatch_response()
+                    authorized, current_role, current_superuser = (
+                        await self._principal_authorized(
+                            request, principal_payload, require_active_doctor_profile=True
+                        )
+                    )
+                    if not authorized:
+                        logger.warning(
+                            "Idempotency legacy replay refused (principal not authorized): "
+                            "user=%s key=%s path=%s",
+                            canonical_id,
+                            idempotency_key,
+                            request.url.path,
+                        )
+                        return _principal_refusal_response()
+                    permitted = self._role_permitted_for_replay(
+                        request,
+                        legacy_role,
+                        current_role,
+                        current_superuser,
+                    )
+                    if permitted is True or (
+                        permitted is None
+                        and (legacy_role is None or current_role == legacy_role)
+                    ):
+                        # Migrate the committed outcome to the current
+                        # namespace (bounded TTL extension) so subsequent
+                        # replays resolve without the legacy read.
+                        claim.store_response(
+                            user_id,
+                            idempotency_key,
+                            legacy_resp,
+                            payload_hash=legacy_hash or "",
+                            principal_role=legacy_role,
+                        )
+                        _idempotency_cache.set(
+                            user_id,
+                            idempotency_key,
+                            legacy_resp,
+                            incoming_hash,
+                            principal_role=legacy_role,
+                        )
+                        logger.info(
+                            "Idempotency legacy replay migrated to current namespace: "
+                            "user=%s key=%s path=%s",
+                            canonical_id,
+                            idempotency_key,
+                            request.url.path,
+                        )
+                        return legacy_resp
+                    if permitted is False:
+                        # Endpoint policy refuses the current role — the
+                        # endpoint's require_roles 403s exactly as for a
+                        # fresh request; the legacy snapshot is KEPT.
+                        logger.warning(
+                            "Idempotency legacy replay refused (endpoint policy): "
+                            "user=%s key=%s path=%s (stored=%s current=%s) — falling through",
+                            canonical_id,
+                            idempotency_key,
+                            request.url.path,
+                            legacy_role,
+                            current_role,
+                        )
+                        return await call_next(request)
+                    # permitted is None AND role changed: conservative R4
+                    # analog — drop the stale legacy binding so the
+                    # re-execution re-stores under the fresh role.
+                    claim.forget_response(legacy_ns, idempotency_key)
+                elif legacy_intent:
+                    logger.warning(
+                        "Idempotency legacy execution intent without outcome "
+                        "(pre-deploy attempt): user=%s key=%s path=%s — refusing",
+                        canonical_id,
+                        idempotency_key,
+                        request.url.path,
+                    )
+                    return self._uncertain_outcome_response()
+                elif legacy_claim:
+                    logger.warning(
+                        "Idempotency legacy claim still in flight (pre-deploy worker): "
+                        "user=%s key=%s path=%s — refusing",
+                        canonical_id,
+                        idempotency_key,
+                        request.url.path,
+                    )
+                    return Response(
+                        status_code=409,
+                        headers={"Retry-After": "1", "Cache-Control": "no-store"},
+                        content=(
+                            '{"code": "idempotency_in_flight", "detail": "Request with this Idempotency-Key is '
+                            'still being processed. Retry with the same key."}'
+                        ),
+                        media_type="application/json",
+                    )
+
             claim_token = claim.acquire(user_id, idempotency_key)
             claim_acquired = claim_token is not None
             if not claim_acquired:
@@ -1900,6 +2180,27 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 'завершилась корректно: результат неизвестен. Проверьте рабочий '
                 'список — запись могла сохраниться. Если изменений нет, '
                 'повторите операцию с НОВЫМ ключом Idempotency."}'
+            ),
+            media_type="application/json",
+        )
+
+    @staticmethod
+    def _scope_mismatch_response() -> Response:
+        """409 for a key replayed under a DIFFERENT patient card (round-4
+        owner P1). One Idempotency-Key means one booking attempt: the key is
+        bound to the card it first ran under and never follows a re-link, so
+        a retry after the account was re-linked cannot create a second
+        appointment for another patient. The re-linked card books with a NEW
+        key; the same-key retry is a non-executing refusal (the bound
+        snapshot, if any, is kept)."""
+        return Response(
+            status_code=409,
+            headers={"Cache-Control": "no-store"},
+            content=(
+                '{"code": "idempotency_scope_mismatch", "detail": "This Idempotency-Key belongs to a different '
+                'patient card. The original attempt may already be saved — do '
+                'not retry it for another card; verify the record state and '
+                'use a NEW key for a new booking."}'
             ),
             media_type="application/json",
         )

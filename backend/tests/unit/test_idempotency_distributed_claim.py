@@ -2730,3 +2730,176 @@ def test_failed_owned_cleanup_keeps_fast_retries_fail_closed(monkeypatch):
         idem_module._resolve_principal_id_sync = saved_resolve
         idem_module._local_execution_intents.clear()
         monkeypatch.undo()
+
+
+# ── Round-4 (owner P1, PR #3340): rollout compatibility + scope binding ────
+
+
+def _legacy_nkey(sub: str, key: str, kind: str, path: str = "/echo") -> str:
+    """Redis key under the PRE-#3340 user-only namespace (the hash form the
+    previous deployment used for claim/resp/intent markers)."""
+    ns = IdempotencyMiddleware._namespace(int(sub))
+    return f"idem:{ns}:{key}:{kind}"
+
+
+def test_pre_deploy_legacy_outcome_replays_and_migrates(two_workers):
+    """Rollout compatibility: the namespace became operation-scoped in
+    #3340, but outcomes committed by the PREVIOUS deployment live under the
+    user-only hash for up to 24h. A same-key retry after deploy must replay
+    that committed outcome (never re-execute the write) and migrate it to
+    the current namespace so later replays resolve without the legacy read."""
+    from starlette.responses import Response
+
+    client1, client2, counters, fake_redis = two_workers
+    key = "legacy-outcome-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+
+    # The pre-deploy worker committed and stored its outcome under the
+    # user-only namespace, then died before the client saw the response.
+    claim = idem_module._distributed_claim
+    legacy_body = b'{"ok": true, "committed": "pre-deploy"}'
+    claim.store_response(
+        IdempotencyMiddleware._namespace(1),
+        key,
+        Response(
+            content=legacy_body, status_code=200, media_type="application/json"
+        ),
+        payload_hash=idem_module.payload_hash(b""),
+        principal_role="Registrar",
+    )
+    assert _legacy_nkey("1", key, "resp") in fake_redis.store
+
+    # Post-deploy retry (fresh worker, cold local cache): the new namespace
+    # has nothing — the legacy reconciliation must supply the outcome.
+    replayed = client2.post("/echo", headers=headers)
+    assert replayed.status_code == 200
+    assert replayed.content == legacy_body, (
+        "the pre-deploy committed outcome must replay, not re-execute"
+    )
+    assert counters["w2"]["calls"] == 0
+
+    # Migration: the snapshot now lives under the CURRENT namespace too.
+    assert nkey("1", key, "resp") in fake_redis.store, (
+        "the legacy outcome must migrate so subsequent replays skip the legacy read"
+    )
+
+
+def test_pre_deploy_legacy_intent_refused_conservatively(two_workers):
+    """A pre-deploy attempt that reached execution and died leaves an intent
+    marker WITHOUT a stored outcome under the user-only namespace. The retry
+    must reconcile (409 uncertain outcome) instead of blindly re-executing
+    through the new namespace."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "legacy-intent-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+
+    claim = idem_module._distributed_claim
+    confirmed = claim.mark_execution_intent(
+        IdempotencyMiddleware._namespace(1), key
+    )
+    assert confirmed is True
+    assert _legacy_nkey("1", key, "intent") in fake_redis.store
+
+    retry = client2.post("/echo", headers=headers)
+    assert retry.status_code == 409
+    assert retry.json()["code"] == "idempotency_uncertain_outcome"
+    assert counters["w2"]["calls"] == 0, (
+        "the legacy unknown outcome must never re-execute the write"
+    )
+
+
+def test_pre_deploy_legacy_in_flight_claim_refused(two_workers):
+    """Rolling deploy: the OLD worker is mid-execution when the retry lands
+    on the NEW one. The legacy claim marker must refuse the retry (409
+    in-flight) — its outcome surfaces under the legacy namespace when the
+    old worker completes."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "legacy-inflight-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+
+    fake_redis.store[_legacy_nkey("1", key, "claim")] = uuid.uuid4().hex
+
+    retry = client2.post("/echo", headers=headers)
+    assert retry.status_code == 409
+    assert retry.json()["code"] == "idempotency_in_flight"
+    assert counters["w2"]["calls"] == 0
+
+
+def test_patient_scope_principal_skips_legacy_reconciliation(two_workers):
+    """Legacy snapshots carry no patient scope and cannot be attributed to
+    the CURRENT card — replaying one across a re-link would resurrect the
+    cross-card leak the patient-aware policy closed. Every patient-facing
+    keyed endpoint is NEW in #3340, so patient-scope principals skip the
+    legacy read entirely and execute fresh."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "legacy-patient-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+
+    # A hypothetical pre-deploy outcome under the user-only namespace.
+    from starlette.responses import Response
+
+    idem_module._distributed_claim.store_response(
+        IdempotencyMiddleware._namespace(1),
+        key,
+        Response(content=b'{"committed": "pre-deploy"}', status_code=200),
+        payload_hash=idem_module.payload_hash(b""),
+        principal_role="Patient",
+    )
+
+    # This worker resolves an ACTIVE patient card (round-3 policy hook).
+    saved_policy = idem_module._patient_replay_policy_sync
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+        "patient:5",
+        False,
+    )
+    try:
+        fresh = client2.post("/echo", headers=headers)
+    finally:
+        idem_module._patient_replay_policy_sync = saved_policy
+
+    assert fresh.status_code == 200
+    assert fresh.json()["calls"] == 1, (
+        "the legacy snapshot must NOT replay for a patient-scope principal"
+    )
+    assert counters["w2"]["calls"] == 1
+
+
+def test_scope_binding_refuses_relinked_card_across_workers(two_workers):
+    """Distributed scope binding: the key binds to the patient card it FIRST
+    ran under (origin namespace = user + operation, no patient scope). A
+    retry after the account was re-linked to another card is a 409
+    idempotency_scope_mismatch — on ANY worker — never a second execution
+    that would book the same attempt for a different patient."""
+    client1, client2, counters, fake_redis = two_workers
+    key = "scope-bind-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+
+    saved_policy = idem_module._patient_replay_policy_sync
+    try:
+        # Card A: the booking commits, binding written (patient:7).
+        idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+            "patient:7",
+            False,
+        )
+        first = client1.post("/echo", headers=headers)
+        assert first.status_code == 200
+        assert counters["w1"]["calls"] == 1
+        # The binding lives under the ORIGIN namespace (no patient scope).
+        origin_ns = IdempotencyMiddleware._namespace(1, "POST:/echo")
+        assert (
+            fake_redis.store.get(f"idem:{origin_ns}:{key}:pscope") == "patient:7"
+        )
+
+        # The account is re-linked to card B; the retry (same key + body)
+        # lands on ANOTHER worker — the binding refuses it there too.
+        idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+            "patient:8",
+            False,
+        )
+        replay = client2.post("/echo", headers=headers)
+        assert replay.status_code == 409, replay.text
+        assert replay.json()["code"] == "idempotency_scope_mismatch"
+        assert counters["w2"]["calls"] == 0
+    finally:
+        idem_module._patient_replay_policy_sync = saved_policy
+        idem_module._local_scope_bindings.clear()

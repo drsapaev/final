@@ -66,6 +66,7 @@ Review hardening (round 3, PR #3340):
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any
 
@@ -280,24 +281,59 @@ class PatientPortalFormsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _require_active_portal_user(
-    current_user: User = Depends(deps.get_current_active_user),
-    _role_guard: User = Depends(deps.require_roles("Patient")),
-) -> User:
-    """Portal principal: an ACTIVE user holding the Patient role.
+def _active_portal_user_audited(resource_type: str, action: str) -> Callable[..., User]:
+    """Portal principal factory: ACTIVE Patient user + denied audit rows.
 
-    P1 (round 2): `require_roles("Patient")` alone delegates to
-    `get_current_user`, which never checks `is_active` — an admin-deactivated
-    account would keep reading PHI and creating appointments until the JWT
-    expires. Activity is enforced here for ALL four portal endpoints.
+    Round-4 (owner P2): the previous composed dependency
+    (`get_current_active_user` + `require_roles("Patient")`) let FastAPI
+    refuse a DEACTIVATED account BEFORE the endpoint body ran — the
+    `_require_patient_audited` trail writer never executed, so the
+    deactivated-but-still-linked card's access attempt left NO row in the
+    per-patient PHI trail. Same defect class `require_active_roles`
+    (PR #3333) fixed for the control plane: resolve the actor FIRST, write
+    the denied row, THEN raise the 403.
+
+    The audit row carries the linked card as the subject when one exists
+    (the per-patient trail is keyed by patient) and names the machine
+    reason `user_deactivated` with `surface: jwt_portal`.
     """
-    return current_user
+    role_gate = deps.require_roles("Patient")
 
+    def _dep(
+        request: Request,
+        db: Session = Depends(deps.get_db),
+        current_user: User = Depends(deps.get_current_user),
+        _role_gated: User = Depends(role_gate),
+    ) -> User:
+        # The role gate dependency has already run (and audits its own
+        # denials) — everyone reaching this line carries the Patient role,
+        # active or not. The active check below closes the deactivated
+        # account WITH its audit row (403 fires only after the row lands;
+        # the audit writer is non-blocking and never breaks the refusal).
+        if not bool(getattr(current_user, "is_active", False)):
+            patient = getattr(current_user, "patient", None)
+            _log_portal_denied(
+                db,
+                request=request,
+                current_user=current_user,
+                resource_type=resource_type,
+                action=action,
+                reason="user_deactivated",
+                subject_patient_id=(
+                    int(patient.id) if patient is not None else None
+                ),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"reason": "user_deactivated"},
+            )
+        return current_user
 
-# Publish the RBAC policy for the idempotency middleware (Codex R6 #3092
-# convention: the middleware reads `required_roles` off the endpoint's
-# dependency callable — it never re-implements the check).
-_require_active_portal_user.required_roles = ("Patient",)  # type: ignore[attr-defined]
+    # Publish the RBAC policy for the idempotency middleware (Codex R6 #3092
+    # convention: the middleware reads `required_roles` off the endpoint's
+    # dependency callable — each factory product carries it).
+    _dep.required_roles = ("Patient",)  # type: ignore[attr-defined]
+    return _dep
 
 
 def _patient_portal_scope(patient_id: int) -> TelegramMiniAppSessionScope:
@@ -459,10 +495,20 @@ def _resolve_portal_department(
     departments are rejected with 400 BEFORE any appointment is created —
     a silently-dropped department produced `department_id = NULL` rows
     (routing context loss: preview echoed a department the row never got).
+
+    Round-4 (owner P2): the value is STRIPPED before the lookup. The SSOT
+    builder normalizes the draft (`str(value).strip()`) while this resolver
+    previously queried the RAW request string — a JSON body of
+    `" cardio "` passed the SSOT normalization, then missed the exact
+    `Department.key == " cardio "` match and answered 400
+    `department_unknown` for a department the preview had already accepted.
+    Normalizing here keeps the resolver safe for ANY caller, not just the
+    draft-fed path.
     """
     if department is None or not department.strip():
         return None
-    department_row = db.query(Department).filter(Department.key == department).first()
+    normalized_key = department.strip()
+    department_row = db.query(Department).filter(Department.key == normalized_key).first()
     if department_row is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -523,7 +569,9 @@ _PORTAL_409 = {
 def get_patient_cabinet_summary(
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(_require_active_portal_user),
+    current_user: User = Depends(
+        _active_portal_user_audited("cabinet_summary", "view")
+    ),
 ):
     """Home-screen summary for the JWT patient portal (own scope only)."""
     patient_id = _require_patient_audited(
@@ -554,7 +602,7 @@ def preview_patient_portal_booking(
     request_body: PatientPortalBookingRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(_require_active_portal_user),
+    current_user: User = Depends(_active_portal_user_audited("appointment", "preview")),
 ):
     """Non-mutating booking preview for the JWT patient portal."""
     patient_id = _require_patient_audited(
@@ -578,7 +626,10 @@ def preview_patient_portal_booking(
         # P1 (round 2): the department must resolve (canonical key, active) even
         # for a preview — PR-C2 submits what preview accepted, so a failure here
         # must surface BEFORE the create call.
-        department_row = _resolve_portal_department(db, request_body.department)
+        # Round-4 (owner P2): resolve the SSOT-NORMALIZED draft value — the
+        # builder stripped the raw request string, so resolving the raw one
+        # could 400 on " cardio " the preview had already accepted.
+        department_row = _resolve_portal_department(db, preview.draft.department)
     except HTTPException as exc:
         # Round-3 (owner P2): denial leaves a trail row (SSOT parity).
         _log_portal_denied(
@@ -634,7 +685,7 @@ def create_patient_portal_booking(
         ),
     ),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(_require_active_portal_user),
+    current_user: User = Depends(_active_portal_user_audited("appointment", "create")),
 ):
     """Create one trusted patient-portal appointment (own scope only).
 
@@ -675,7 +726,8 @@ def create_patient_portal_booking(
             raise _raise_scope_error(exc, _booking_scope_status_code(exc.reason)) from exc
         # P1 (round 2): resolve BEFORE any mutation — unknown/inactive keys are a
         # 400, never a silently-NULL routing context on the created row.
-        department_row = _resolve_portal_department(db, request_body.department)
+        # Round-4 (owner P2): SSOT-NORMALIZED draft value (see preview).
+        department_row = _resolve_portal_department(db, preview.draft.department)
 
         draft_payload = preview.draft.to_appointment_create_payload()
 
@@ -771,7 +823,7 @@ def create_patient_portal_booking(
 def get_patient_portal_forms(
     request: Request,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(_require_active_portal_user),
+    current_user: User = Depends(_active_portal_user_audited("patient_form", "view")),
 ):
     """Read-only protected forms metadata + saved answers for the JWT portal.
 
