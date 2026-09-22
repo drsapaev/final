@@ -34386,14 +34386,6 @@ export type components = {
              * @description Always True on this surface (the address is permanent)
              */
             permanent_address: boolean;
-            direction: components["schemas"]["PublicDirectionAddressInfo"];
-            /**
-             * Queue Info
-             * @description The same token-info shape the session-QR flow consumes, with selectable_specialists narrowed to this direction's eligible owners (RQ-09.b eligibility contract)
-             */
-            queue_info: {
-                [key: string]: unknown;
-            };
             /**
              * Target Date
              * @description Целевая дата очереди токена (YYYY-MM-DD)
@@ -34404,6 +34396,14 @@ export type components = {
              * @description Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки
              */
             attempt_expires_at?: string | null;
+            direction: components["schemas"]["PublicDirectionAddressInfo"];
+            /**
+             * Queue Info
+             * @description The same token-info shape the session-QR flow consumes, with selectable_specialists narrowed to this direction's eligible owners (RQ-09.b eligibility contract)
+             */
+            queue_info: {
+                [key: string]: unknown;
+            };
         };
         /**
          * PushDeviceErrorDetail

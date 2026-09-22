@@ -98010,15 +98010,6 @@
             "title": "Permanent Address",
             "description": "Always True on this surface (the address is permanent)"
           },
-          "direction": {
-            "$ref": "#/components/schemas/PublicDirectionAddressInfo"
-          },
-          "queue_info": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Queue Info",
-            "description": "The same token-info shape the session-QR flow consumes, with selectable_specialists narrowed to this direction's eligible owners (RQ-09.b eligibility contract)"
-          },
           "target_date": {
             "anyOf": [
               {
@@ -98042,6 +98033,15 @@
             ],
             "title": "Attempt Expires At",
             "description": "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/PublicDirectionAddressInfo"
+          },
+          "queue_info": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Queue Info",
+            "description": "The same token-info shape the session-QR flow consumes, with selectable_specialists narrowed to this direction's eligible owners (RQ-09.b eligibility contract)"
           }
         },
         "type": "object",
