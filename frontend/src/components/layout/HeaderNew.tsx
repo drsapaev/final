@@ -3,8 +3,9 @@ import type { CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
 import { ArrowRight, ChevronLeft, CreditCard, Plus, Stethoscope, User, Sun as LSun, Moon as LMoon, Monitor as LMonitor, Rainbow as LRainbow, Layers as LLayers, Sparkles as LSparkles, Bell as BellIcon, type LucideIcon } from 'lucide-react';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import auth, { setProfile } from '../../stores/auth';
+import { useGuardedLabNavigate } from '../laboratory/LabDirtyGuardContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import CompactConnectionStatus from '../pwa/CompactConnectionStatus';
 import { Button } from '../ui/macos';
@@ -46,7 +47,11 @@ export function isThemeMenuInteraction(event: { composedPath?: () => EventTarget
  * - Повторить функционал текущего Header.jsx, сохранив роли и роутинг
  */
 export default function HeaderNew() {
-  const navigate = useNavigate();
+  // PR 3351 (review round 2, P1): guarded navigate — уход с /lab при
+  // несохранённых черновиках проходит через dirty-guard вместо молчаливой
+  // потери данных. На остальных роутах ведёт себя как обычный useNavigate
+  // (guard активен только при dirty lab-источниках).
+  const navigate = useGuardedLabNavigate();
   const location = useLocation();
   const { t: rawT } = useTranslation();  // PR-UI-03b: language handled by LanguageSwitcher
   const t = rawT;
@@ -736,7 +741,13 @@ export default function HeaderNew() {
                   type="button"
                   role="menuitem"
                   id="logout-header-btn"
-                  onClick={() => { setShowProfileMenu(false); auth.clearToken(); setProfile(null); navigate(loginRoute); }}
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    // PR 3351 (review round 2, P1): clearToken выполняется
+                    // ТОЛЬКО после подтверждённого перехода — отмена guard-диалога
+                    // сохраняет и сессию, и несохранённые lab-черновики.
+                    navigate(loginRoute, { onLeave: () => { auth.clearToken(); setProfile(null); } });
+                  }}
                   style={{
                     width: '100%',
                     padding: '10px 16px',
