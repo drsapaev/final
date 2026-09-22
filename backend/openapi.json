@@ -85330,6 +85330,69 @@
         "title": "JoinSessionCompleteResponse",
         "description": "Ответ с результатом присоединения"
       },
+      "JoinSessionRefusalDetail": {
+        "properties": {
+          "specialist_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Id",
+            "description": "ID выбора (Doctor.id или QueueProfile.id); None для одиночного пути"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Человекочитаемое сообщение домена"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "JoinSessionRefusalDetail",
+        "description": "Один per-specialist отказ аллокатора (round-6, P2-1)."
+      },
+      "JoinSessionRefusalResponse": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Машиночитаемая причина отказа"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Человекочитаемое сообщение"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/JoinSessionRefusalDetail"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details",
+            "description": "Per-specialist ошибки (только для join_session_not_executed)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "message"
+        ],
+        "title": "JoinSessionRefusalResponse",
+        "description": "Структурированный отказ complete-попытки (round-6, P2-1/P2-2).\n\n400 — session-state / pre-execution refusals (incl. the\nrollback-proven ``join_session_not_executed``); 409 — immutable\npayload mismatch. ``reason`` vocabulary:\njoin_session_not_found | join_session_expired | join_session_processing |\njoin_session_used | join_session_payload_mismatch | join_session_not_executed."
+      },
       "JoinSessionStartRequest": {
         "properties": {
           "token": {
@@ -115304,69 +115367,6 @@
         ],
         "title": "UserProfileResponse",
         "description": "Схема ответа профиля пользователя"
-      },
-      "JoinSessionRefusalDetail": {
-        "properties": {
-          "specialist_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Specialist Id",
-            "description": "ID выбора (Doctor.id или QueueProfile.id); None для одиночного пути"
-          },
-          "error": {
-            "type": "string",
-            "title": "Error",
-            "description": "Человекочитаемое сообщение домена"
-          }
-        },
-        "type": "object",
-        "required": [
-          "error"
-        ],
-        "title": "JoinSessionRefusalDetail",
-        "description": "Один per-specialist отказ аллокатора (round-6, P2-1)."
-      },
-      "JoinSessionRefusalResponse": {
-        "properties": {
-          "reason": {
-            "type": "string",
-            "title": "Reason",
-            "description": "Машиночитаемая причина отказа"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message",
-            "description": "Человекочитаемое сообщение"
-          },
-          "details": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/JoinSessionRefusalDetail"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Details",
-            "description": "Per-specialist ошибки (только для join_session_not_executed)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "reason",
-          "message"
-        ],
-        "title": "JoinSessionRefusalResponse",
-        "description": "Структурированный отказ complete-попытки (round-6, P2-1/P2-2).\n\n400 — session-state / pre-execution refusals (incl. the\nrollback-proven ``join_session_not_executed``); 409 — immutable\npayload mismatch. ``reason`` vocabulary:\njoin_session_not_found | join_session_expired | join_session_processing |\njoin_session_used | join_session_payload_mismatch | join_session_not_executed."
       }
     },
     "securitySchemes": {
