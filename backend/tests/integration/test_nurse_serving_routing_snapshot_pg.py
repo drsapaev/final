@@ -138,7 +138,7 @@ def _started_attempt(engine, *, with_assignment_deactivation: bool):
             user_id=nurse.id,
             queue_resource_id=resource_a.id,
             cabinet_override="pg-rt-A",
-            is_active=not with_assignment_deactivation,
+            is_active=True,
         )
         db.add(assignment)
         queue = DailyQueue(
@@ -196,6 +196,11 @@ def _started_attempt(engine, *, with_assignment_deactivation: bool):
 
         # The admin's VALID mid-flight action: canonical re-tag A -> B.
         svc.queue_tag = resource_b.queue_tag
+        if with_assignment_deactivation:
+            # The §8 drain scenario: the deactivation lands MID-FLIGHT
+            # (after the start) — the drained nurse keeps only the
+            # bounded terminal/drain surface.
+            assignment.is_active = False
         db.commit()
 
         return nurse.id, resource_a.id, entry.id, vs.id, execution_id, svc.id
