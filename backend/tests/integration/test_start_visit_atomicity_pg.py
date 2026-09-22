@@ -160,7 +160,7 @@ def _inject_start_boundary_commit_failure(db):
 
 
 def _seed_called_entry(engine, *, resource: bool):
-    """Seed patient + queue + `called` entry; return ids + caller user."""
+    """Seed patient + queue + `called` entry; return ids + the caller's user id."""
     token = uuid.uuid4().hex[:8]
     with Session(engine) as db:
         patient = Patient(
@@ -246,7 +246,7 @@ def _run_failing_start(engine, entry_id, caller_id):
 def test_pg_existing_visit_start_not_durable_when_boundary_commit_fails(
     sa_pg_engine,
 ) -> None:
-    entry_id, patient_id, caller = _seed_called_entry(sa_pg_engine, resource=False)
+    entry_id, patient_id, caller_id = _seed_called_entry(sa_pg_engine, resource=False)
     with Session(sa_pg_engine) as db:
         entry = db.get(OnlineQueueEntry, entry_id)
         queue_day = entry.queue.day
@@ -279,7 +279,7 @@ def test_pg_existing_visit_start_not_durable_when_boundary_commit_fails(
 def test_pg_created_visit_start_not_durable_when_boundary_commit_fails(
     sa_pg_engine,
 ) -> None:
-    entry_id, patient_id, caller = _seed_called_entry(sa_pg_engine, resource=False)
+    entry_id, patient_id, caller_id = _seed_called_entry(sa_pg_engine, resource=False)
 
     _run_failing_start(sa_pg_engine, entry_id, caller_id)
 
@@ -295,7 +295,7 @@ def test_pg_created_visit_start_not_durable_when_boundary_commit_fails(
 def test_pg_resource_branch_created_visit_start_not_durable_when_boundary_commit_fails(
     sa_pg_engine,
 ) -> None:
-    entry_id, patient_id, caller = _seed_called_entry(sa_pg_engine, resource=True)
+    entry_id, patient_id, caller_id = _seed_called_entry(sa_pg_engine, resource=True)
 
     _run_failing_start(sa_pg_engine, entry_id, caller_id)
 
