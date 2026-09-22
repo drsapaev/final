@@ -7135,18 +7135,13 @@ const en = {
     qj_direction_unavailable: 'This direction is unavailable',
     // RQ-18 follow-up round-2 (P1): draft-owner confirmation — the prompt
     // reveals no PHI (no name/phone) on the shared permanent route.
-    qj_draft_found: 'This device has an unfinished registration draft. Restore it?',
-    qj_draft_restore: 'Restore',
-    qj_draft_discard: 'Discard and start fresh',
-    qj_draft_challenge_title: 'A registration draft was found. To restore it, enter the last 4 digits of the phone number saved in the draft.',
-    qj_draft_challenge_label: 'Last 4 digits of the draft phone number',
-    qj_draft_challenge_placeholder: '••••',
-    qj_draft_challenge_mismatch: 'Wrong digits. Attempts left: {left}. The draft is erased after three wrong attempts.',
-    qj_draft_challenge_failed: 'The draft was erased after three wrong attempts. Please fill the form again.',
     qj_reconcile_title: 'The result of the previous submission is unknown.',
-    qj_reconcile_hint: 'Re-check the attempt with its original session token, or start over — no new session was created.',
+    qj_reconcile_hint: 'Re-enter the same name and phone you used in the first attempt and press «Check attempt». While the result is unknown, no new session is created.',
     qj_reconcile_check: 'Check the attempt',
     qj_reconcile_start_over: 'Start over',
+    // Round-5 (PR #3362 review, P1-3): the decisive payload-bound
+    // replay conflict — 409 join_session_payload_mismatch.
+    qj_payload_mismatch: 'This attempt belongs to a different set of details — its result cannot be re-served. You may start over if needed.',
     qj_preexec_refusal: 'The session expired before the submission — no ticket was created. Start over?',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',

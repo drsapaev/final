@@ -7135,18 +7135,13 @@ const uzLatn = {
     qj_home_btn: 'Bosh sahifa',
     qj_direction_unavailable: 'Yo‘nalish mavjud emas',
     // RQ-18 follow-up round-2 (P1)
-    qj_draft_found: 'Bu qurilmada to‘ldirilmagan ariza saqlangan. Tiklash kerakmi?',
-    qj_draft_restore: 'Tiklash',
-    qj_draft_discard: 'O‘chirib, qaytadan to‘ldirish',
-    qj_draft_challenge_title: 'Ariza topildi. Uni tiklash uchun saqlangan telefon raqamining oxirgi 4 raqamini kiriting.',
-    qj_draft_challenge_label: 'Chernovik telefonining oxirgi 4 raqami',
-    qj_draft_challenge_placeholder: '••••',
-    qj_draft_challenge_mismatch: 'Raqamlar xato. Qolgan urinlar: {left}. Uchta xato urindan keyin saqlangan ariza o‘chiriladi.',
-    qj_draft_challenge_failed: 'Uchta xato urindan keyin saqlangan ariza o‘chirildi. Shaklni qaytadan to‘ldiring.',
     qj_reconcile_title: 'Oldingi yuborish natijasi noma’lum.',
-    qj_reconcile_hint: 'Urinishni asl sessiya tokeni bilan tekshiring yoki qaytadan boshlang — yangi sessiya yaratilmadi.',
+    qj_reconcile_hint: 'Birinchi yuborishdagi o‘sha F.I.O. va telefon raqamini kiritib, «Urinishni tekshirish» tugmasini bosing. Natija noma’lum bo‘lganda yangi sessiya yaratilmaydi.',
     qj_reconcile_check: 'Urinishni tekshirish',
     qj_reconcile_start_over: 'Qaytadan boshlash',
+    // Round-5 (PR #3362 review, P1-3): the decisive payload-bound
+    // replay conflict — 409 join_session_payload_mismatch.
+    qj_payload_mismatch: 'Bu urinish boshqa ma’lumotlar to‘plamiga tegishli — uning natijasi qayta berilmaydi. Kerak bo‘lsa qaytadan boshlang.',
     qj_preexec_refusal: 'Sessiya yuborishidan oldin tugadi — yozuv yaratilmadi. Qaytadan boshlash kerakmi?',
     qj_waiting_title: 'Navbat tez orada ochiladi',
     qj_waiting_will_open_at: 'Navbatga yozilish {time} da ochiladi',

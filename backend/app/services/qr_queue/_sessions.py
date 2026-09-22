@@ -4,9 +4,14 @@ Split from qr_queue_service.py.
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import re
+
 from app.services.qr_queue._base import *  # noqa: F401, F403
 from app.services.qr_queue._base import (
     JOIN_SESSION_PROCESSING_STATUS,
+    JOIN_SESSION_REASON_PAYLOAD_MISMATCH,
     JoinSessionStateRefusal,
     QRQueueServiceMixinBase,
 )
@@ -17,6 +22,47 @@ JOIN_SESSION_REASON_NOT_FOUND = "join_session_not_found"
 JOIN_SESSION_REASON_EXPIRED = "join_session_expired"
 JOIN_SESSION_REASON_PROCESSING = "join_session_processing"
 JOIN_SESSION_REASON_USED = "join_session_used"
+
+
+def canonical_join_payload_fingerprint(
+    patient_name: str,
+    phone: str,
+    telegram_id: int | None,
+    specialist_ids: list[int] | None = None,
+    specialist_entity_types: list[str] | None = None,
+) -> str:
+    """Round-5 (PR #3362 review, P1-3): the immutable payload identity of a
+    complete attempt — one session token = one immutable payload.
+
+    Canonicalization mirrors the identity rules the business operation
+    itself applies (``_find_or_create_patient``: case- and
+    whitespace-insensitive name, digits-only phone), so a retry that only
+    reformats the SAME identity still matches, while any change of person,
+    telegram id or specialist selection produces a different fingerprint.
+    Untyped specialist selections canonicalize to ``doctor`` — the same
+    semantics the allocator applies to a missing entity type.
+    """
+    from app.services.qr_queue._patients import _normalize_person_name
+
+    canonical: dict[str, Any] = {
+        "patient_name": _normalize_person_name(patient_name),
+        "phone": re.sub(r"\D", "", phone or ""),
+        "telegram_id": int(telegram_id) if telegram_id is not None else None,
+        "specialists": None,
+    }
+    if specialist_ids:
+        types = list(specialist_entity_types or [])
+        canonical["specialists"] = [
+            "{}:{}".format(
+                (types[index] if index < len(types) else None) or "doctor",
+                specialist_id,
+            )
+            for index, specialist_id in enumerate(specialist_ids)
+        ]
+    raw = json.dumps(
+        canonical, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 class SessionsMixin(QRQueueServiceMixinBase):
@@ -91,151 +137,31 @@ class SessionsMixin(QRQueueServiceMixinBase):
         # claim (same ambiguity class as ``processing``).
         return JOIN_SESSION_REASON_PROCESSING
 
-    def _resolve_entry_specialist_name(self, entry: OnlineQueueEntry | None) -> str:
-        """Best-effort owner name for a replayed ticket (registry axis
-        first — the same precedence the join metadata uses)."""
-        if entry is None:
-            return ""
-        queue: DailyQueue | None = entry.queue
-        if queue is not None and queue.queue_resource_id is not None:
-            resource = queue.queue_resource
-            return (resource.display_name if resource is not None else "") or "Ресурс очереди"
-        if queue is not None and queue.specialist_id:
-            doctor = (
-                self.db.query(Doctor)
-                .filter(Doctor.id == queue.specialist_id)
-                .first()
-            )
-            if doctor is not None and doctor.user is not None and doctor.user.full_name:
-                return doctor.user.full_name
-        return ""
-
-    def _replay_active_queue_metrics(self, entry: OnlineQueueEntry) -> tuple[int, int]:
-        """Current (waiting|called) length and the matching wait estimate
-        for a replayed ticket — the same filters the fresh join uses for
-        ``queue_length_before``."""
-        active_length = (
-            self.db.query(func.count(OnlineQueueEntry.id))
-            .filter(
-                OnlineQueueEntry.queue_id == entry.queue_id,
-                OnlineQueueEntry.status.in_(["waiting", "called"]),
-            )
-            .scalar()
-            or 0
-        )
-        try:
-            from app.crud.clinic import get_queue_settings
-
-            avg_minutes = int(
-                (get_queue_settings(self.db) or {}).get("estimated_wait_minutes", 15)
-            )
-        except Exception:  # pragma: no cover — settings are advisory here
-            avg_minutes = 15
-        return active_length, active_length * avg_minutes
-
-    def _replay_joined_session_single(
-        self,
-        session: QueueJoinSession,
-        qr_token: QueueToken | None,
-    ) -> dict[str, Any]:
-        """Idempotent re-serve of a joined session's saved ticket result.
-
-        Round-4 (P1-2, server-side hardening): after a lost complete
-        response the patient's retry re-uses the ORIGINAL attempt identity
-        (the same session token). A joined session replays its saved
-        result instead of refusing — the retry becomes decisive in both
-        directions (replayed ticket OR proven expired) and can never
-        mint a second business attempt.
-        """
-        entry: OnlineQueueEntry | None = None
-        if session.queue_entry_id:
-            entry = (
-                self.db.query(OnlineQueueEntry)
-                .filter(OnlineQueueEntry.id == session.queue_entry_id)
-                .first()
-            )
-        active_length, estimated_wait = (
-            self._replay_active_queue_metrics(entry)
-            if entry is not None
-            else (0, 0)
-        )
-        return {
-            "success": True,
-            "queue_number": entry.number if entry is not None else session.queue_number,
-            "queue_length": active_length,
-            "estimated_wait_time": estimated_wait,
-            "specialist_name": self._resolve_entry_specialist_name(entry),
-            "department": (qr_token.department if qr_token is not None else "") or "",
-            "replayed": True,
-        }
-
-    def _replay_joined_session_multiple(
-        self,
-        session: QueueJoinSession,
-        qr_token: QueueToken | None,
-        specialist_ids: list[int] | None,
-    ) -> dict[str, Any]:
-        """Replay for the multi-specialist complete surface.
-
-        A direction-scoped session (the permanent /q/<code> route) joins
-        EXACTLY ONE profile — its replay is exact from the saved entry.
-        A legacy clinic-wide join of N specialists is NOT exactly
-        reconstructible from the session row (only the first entry is
-        saved), so it refuses with the honest ``join_session_used``
-        reason instead of guessing.
-        """
-        direction_scoped = bool(
-            qr_token is not None
-            and qr_token.is_clinic_wide
-            and (qr_token.department or "").startswith(queue_service.PUBLIC_ADDRESS_DEPARTMENT_PREFIX)
-        )
-        if not direction_scoped:
-            raise JoinSessionStateRefusal(
-                JOIN_SESSION_REASON_USED,
-                "Сессия уже использована: результат первой попытки уже выдан",
-            )
-
-        entry: OnlineQueueEntry | None = None
-        if session.queue_entry_id:
-            entry = (
-                self.db.query(OnlineQueueEntry)
-                .filter(OnlineQueueEntry.id == session.queue_entry_id)
-                .first()
-            )
-        if entry is None:
-            # The saved ticket no longer exists — nothing honest to replay.
-            raise JoinSessionStateRefusal(
-                JOIN_SESSION_REASON_USED,
-                "Сессия уже использована: результат первой попытки уже выдан",
-            )
-        active_length, estimated_wait = self._replay_active_queue_metrics(entry)
-        replayed_entry = {
-            "specialist_id": (specialist_ids or [None])[0],
-            "queue_entry_id": entry.id,
-            "queue_number": entry.number,
-            "duplicate": True,
-            "queue_length": active_length,
-            "estimated_wait_time": estimated_wait,
-            "specialist_name": self._resolve_entry_specialist_name(entry),
-            "department": (qr_token.department if qr_token is not None else "") or "",
-        }
-        return {
-            "success": True,
-            "queue_time": (entry.queue_time or datetime.now(UTC)).isoformat(),
-            "entries": [replayed_entry],
-            "errors": None,
-            "message": "Повторный запрос: результат первой попытки",
-            "replayed": True,
-        }
-
     def _replay_joined_session(
         self,
         session_token: str,
+        patient_name: str,
+        phone: str,
+        telegram_id: int | None = None,
         specialist_ids: list[int] | None = None,
+        specialist_entity_types: list[str] | None = None,
     ) -> dict[str, Any] | None:
-        """Return a replayable saved result for a joined session, or None
-        when the token is not a joined session at all (the caller then
-        raises the classified refusal)."""
+        """Payload-bound replay of a joined session's saved result.
+
+        Round-5 (PR #3362 review, P1-3): the joined session is bound to the
+        payload of its FIRST successful complete. The retry must present
+        the SAME identity (normalization-insensitive); a different payload
+        is refused decisively with ``join_session_payload_mismatch`` — the
+        attempt is never re-served to (or executed for) another identity.
+
+        Round-5 (PR #3362 review, P2-1): the served numbers are the EXACT
+        original response (the saved ``response_snapshot``), never a
+        recomputed live queue picture — «результат первой попытки» means
+        the numbers the patient originally received.
+
+        Returns None when the token is not a joined session at all (the
+        caller then raises the classified refusal).
+        """
         row = (
             self.db.query(QueueJoinSession)
             .filter(
@@ -246,14 +172,40 @@ class SessionsMixin(QRQueueServiceMixinBase):
         )
         if row is None:
             return None
-        qr_token = (
-            self.db.query(QueueToken)
-            .filter(QueueToken.token == row.qr_token)
-            .first()
+
+        used_refusal = JoinSessionStateRefusal(
+            JOIN_SESSION_REASON_USED,
+            "Сессия уже использована: результат первой попытки уже выдан",
         )
-        if specialist_ids:
-            return self._replay_joined_session_multiple(row, qr_token, specialist_ids)
-        return self._replay_joined_session_single(row, qr_token)
+        # Legacy row joined before the payload binding existed — ownership
+        # cannot be proven, so the result is never re-served (fail-closed).
+        expected = row.payload_fingerprint
+        if not expected:
+            raise used_refusal
+        actual = canonical_join_payload_fingerprint(
+            patient_name,
+            phone,
+            telegram_id,
+            specialist_ids,
+            specialist_entity_types,
+        )
+        if expected != actual:
+            raise JoinSessionStateRefusal(
+                JOIN_SESSION_REASON_PAYLOAD_MISMATCH,
+                "Попытка принадлежит другому набору данных",
+            )
+        if not row.response_snapshot:
+            raise used_refusal
+        try:
+            snapshot = json.loads(row.response_snapshot)
+        except (TypeError, ValueError):
+            raise used_refusal
+        if not isinstance(snapshot, dict):
+            raise used_refusal
+
+        replayed = dict(snapshot)
+        replayed["replayed"] = True
+        return replayed
 
 
     def start_join_session(
@@ -374,12 +326,18 @@ class SessionsMixin(QRQueueServiceMixinBase):
         session = self._claim_pending_join_session(session_token)
 
         if not session:
-            # Round-4 (P1-2/P2-1): an unclaimable token is either a
+            # Round-4/5 (P1-2/P1-3): an unclaimable token is either a
             # REPLAYABLE joined session (the retry after a lost response
-            # re-uses the original attempt identity) or a PROVEN
+            # re-uses the original attempt identity AND the original
+            # payload — anything else is refused) or a PROVEN
             # pre-execution refusal — classified with a machine-readable
             # reason, never a masked generic 400.
-            replay = self._replay_joined_session(session_token)
+            replay = self._replay_joined_session(
+                session_token,
+                patient_name=patient_name,
+                phone=phone,
+                telegram_id=telegram_id,
+            )
             if replay is not None:
                 return replay
             raise JoinSessionStateRefusal(
@@ -408,6 +366,12 @@ class SessionsMixin(QRQueueServiceMixinBase):
             )
 
         try:
+            # Round-5 (PR #3362 review, P1-2): the allocator runs WITHOUT
+            # its own commit. Claim, patient resolution, the талон and the
+            # joined outcome share ONE transaction boundary: a crash after
+            # the entry is created no longer strands a committed ticket
+            # under a permanently-``joining`` session — either the whole
+            # attempt commits, or nothing did and the same token re-runs.
             join_result = self.queue_domain_service.allocate_ticket(
                 allocation_mode="join_with_token",
                 token_str=qr_token.token,
@@ -416,6 +380,7 @@ class SessionsMixin(QRQueueServiceMixinBase):
                 telegram_id=telegram_id,
                 patient_id=patient_id,  # ⭐ Теперь ВСЕГДА заполнен
                 source="online",
+                commit=False,
             )
         except (QueueValidationError, QueueConflictError, QueueNotFoundError) as exc:
             self.db.rollback()
@@ -425,6 +390,20 @@ class SessionsMixin(QRQueueServiceMixinBase):
         queue_length_before = join_result["queue_length_before"]
         estimated_wait = join_result["estimated_wait_minutes"]
 
+        # ✅ Получаем имя врача правильно (из User)
+        specialist_name = join_result.get("specialist_name")
+        if not specialist_name:
+            specialist_name = f"Врач ID {qr_token.specialist_id}"
+
+        response = {
+            "success": True,
+            "queue_number": queue_entry.number,
+            "queue_length": queue_length_before,  # ✅ Значение ДО добавления
+            "estimated_wait_time": estimated_wait,
+            "specialist_name": specialist_name,
+            "department": qr_token.department,
+        }
+
         # Обновляем сессию
         session.status = "joined"
         session.patient_name = patient_name
@@ -433,11 +412,31 @@ class SessionsMixin(QRQueueServiceMixinBase):
         session.queue_entry_id = queue_entry.id
         session.queue_number = queue_entry.number
         session.joined_at = datetime.now(UTC)
+        # Round-5 (P1-3/P2-1): the immutable payload binding and the exact
+        # response snapshot are written in the SAME transaction as the
+        # joined status — one commit, one atomic outcome.
+        session.payload_fingerprint = canonical_join_payload_fingerprint(
+            patient_name, phone, telegram_id
+        )
+        session.response_snapshot = json.dumps(
+            response, ensure_ascii=False, default=str
+        )
 
         self.db.commit()
 
+        # Round-5 (P1-4): post-commit side effects are best-effort. The
+        # business operation is already durably committed — a statistics
+        # or broadcast failure must never surface a 500 the client would
+        # (mis)classify as «rolled back».
         if not join_result["duplicate"]:
-            self._update_queue_statistics(queue_entry.queue_id, "online_joins")
+            try:
+                self._update_queue_statistics(queue_entry.queue_id, "online_joins")
+            except Exception as exc:
+                self.db.rollback()
+                logger.warning(
+                    "[complete_join_session] Failed to update statistics: %s",
+                    exc,
+                )
             try:
                 from app.services.display_websocket import (
                     dispatch_async,
@@ -457,19 +456,7 @@ class SessionsMixin(QRQueueServiceMixinBase):
                     exc,
                 )
 
-        # ✅ Получаем имя врача правильно (из User)
-        specialist_name = join_result.get("specialist_name")
-        if not specialist_name:
-            specialist_name = f"Врач ID {qr_token.specialist_id}"
-
-        return {
-            "success": True,
-            "queue_number": queue_entry.number,
-            "queue_length": queue_length_before,  # ✅ Используем сохраненное значение ДО добавления
-            "estimated_wait_time": estimated_wait,
-            "specialist_name": specialist_name,
-            "department": qr_token.department,
-        }
+        return response
 
 
     def complete_join_session_multiple(
@@ -517,10 +504,18 @@ class SessionsMixin(QRQueueServiceMixinBase):
         session = self._claim_pending_join_session(session_token)
 
         if not session:
-            # Round-4 (P1-2/P2-1): same contract as the single path — a
-            # joined direction session replays its saved ticket; everything
-            # else refuses with a PROVEN machine-readable reason.
-            replay = self._replay_joined_session(session_token, specialist_ids)
+            # Round-4/5 (P1-2/P1-3): same contract as the single path — a
+            # joined session replays its saved ticket ONLY to the payload
+            # that created it; everything else refuses with a PROVEN
+            # machine-readable reason.
+            replay = self._replay_joined_session(
+                session_token,
+                patient_name=patient_name,
+                phone=phone,
+                telegram_id=telegram_id,
+                specialist_ids=specialist_ids,
+                specialist_entity_types=normalized_entity_types,
+            )
             if replay is not None:
                 return replay
             raise JoinSessionStateRefusal(
@@ -557,6 +552,12 @@ class SessionsMixin(QRQueueServiceMixinBase):
                 else None
             )
             try:
+                # Round-5 (PR #3362 review, P1-2): no allocator commit and
+                # no mid-loop statistics commit — every allocation of the
+                # batch and the joined outcome share ONE final transaction
+                # boundary. A mid-batch failure rolls the whole attempt
+                # back instead of stranding committed entries under a
+                # ``joining`` session.
                 join_result = self.queue_domain_service.allocate_ticket(
                     allocation_mode="join_with_token",
                     token_str=qr_token.token,
@@ -567,6 +568,7 @@ class SessionsMixin(QRQueueServiceMixinBase):
                     specialist_id_override=specialist_id,
                     specialist_type=specialist_type,
                     source="online",
+                    commit=False,
                 )
                 entry = join_result["entry"]
                 entries.append(
@@ -582,7 +584,6 @@ class SessionsMixin(QRQueueServiceMixinBase):
                     }
                 )
                 if not join_result["duplicate"]:
-                    self._update_queue_statistics(entry.queue_id, "online_joins")
                     created_entries.append(entry)
             except (
                 QueueValidationError,
@@ -600,6 +601,14 @@ class SessionsMixin(QRQueueServiceMixinBase):
             self.db.rollback()
             raise ValueError(errors[0]["error"])
 
+        response = {
+            "success": len(entries) > 0,
+            "queue_time": datetime.now(UTC).isoformat(),
+            "entries": entries,
+            "errors": errors or None,
+            "message": f"Создано {len(entries)} записей, ошибок: {len(errors)}",
+        }
+
         session.status = "joined"
         session.patient_name = patient_name
         session.phone = phone
@@ -607,9 +616,36 @@ class SessionsMixin(QRQueueServiceMixinBase):
         session.queue_entry_id = entries[0]["queue_entry_id"] if entries else None
         session.queue_number = entries[0]["queue_number"] if entries else None
         session.joined_at = datetime.now(UTC)
+        # Round-5 (P1-3/P2-1): the payload binding + exact response
+        # snapshot — same single transaction as the joined status.
+        session.payload_fingerprint = canonical_join_payload_fingerprint(
+            patient_name,
+            phone,
+            telegram_id,
+            specialist_ids,
+            normalized_entity_types,
+        )
+        session.response_snapshot = json.dumps(
+            response, ensure_ascii=False, default=str
+        )
         self.db.commit()
 
+        # Round-5 (P1-4): post-commit side effects are best-effort —
+        # previously the per-entry statistics commits ran BEFORE the
+        # outcome commit and could both strand the ``joining`` mid-state
+        # and 500 the client after the business operation had landed.
         if created_entries:
+            for created_entry in created_entries:
+                try:
+                    self._update_queue_statistics(
+                        created_entry.queue_id, "online_joins"
+                    )
+                except Exception as exc:
+                    self.db.rollback()
+                    logger.warning(
+                        "[complete_join_session_multiple] Failed to update statistics: %s",
+                        exc,
+                    )
             try:
                 from app.services.display_websocket import (
                     dispatch_async,
@@ -630,12 +666,6 @@ class SessionsMixin(QRQueueServiceMixinBase):
                     exc,
                 )
 
-        return {
-            "success": len(entries) > 0,
-            "queue_time": datetime.now(UTC).isoformat(),
-            "entries": entries,
-            "errors": errors or None,
-            "message": f"Создано {len(entries)} записей, ошибок: {len(errors)}",
-        }
+        return response
 
 

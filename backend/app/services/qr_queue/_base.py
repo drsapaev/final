@@ -61,6 +61,13 @@ class JoinSessionStateRefusal(ValueError):
         self.reason = reason
 
 
+# Round-5 (PR #3362 review, P1-3): a joined session is bound to the payload
+# of its FIRST successful complete. A replay whose payload does not match
+# the stored fingerprint is refused decisively — the attempt can never be
+# re-served to (or executed for) a different identity.
+JOIN_SESSION_REASON_PAYLOAD_MISMATCH = "join_session_payload_mismatch"
+
+
 def _now(tz=None) -> datetime:
     """Return the current datetime, honoring test monkeypatches.
 

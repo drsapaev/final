@@ -7145,18 +7145,13 @@ const uzCyrl = {
     qj_home_btn: 'Главная страница',
     qj_direction_unavailable: 'Йўналиш мавжуд эмас',
     // RQ-18 follow-up round-2 (P1)
-    qj_draft_found: 'Бу қурилмада тўлдирилмаган аризa сақланган. Тиклаш керакми?',
-    qj_draft_restore: 'Тиклаш',
-    qj_draft_discard: 'Ўчириб, қайтадан тўлдириш',
-    qj_draft_challenge_title: 'Аризa топилди. Уни тиклаш учун сақланган телефон рақамининг охирги 4 рақамини киритинг.',
-    qj_draft_challenge_label: 'Черновик телефонынинг охирги 4 рақами',
-    qj_draft_challenge_placeholder: '••••',
-    qj_draft_challenge_mismatch: 'Рақамлар хато. Қолган уринлар: {left}. Учта хато уриндан кейин сақланган аризa ўчирилади.',
-    qj_draft_challenge_failed: 'Учта хато уриндан кейин сақланган аризa ўчирилди. Шаклни қайтадан тўлдиринг.',
     qj_reconcile_title: 'Олдинги юбориш натижаси номаълум.',
-    qj_reconcile_hint: 'Уринишни асл сессия токени билан текширинг ёки қайтадан бошланг — янги сессия яратилмади.',
+    qj_reconcile_hint: 'Биринчи юборишдаги ўша ФИО ва телефон рақамини киритиб, «Уринишни текшириш» тугмасини босинг. Натижа номаълум бўлганда янги сессия яратилмайди.',
     qj_reconcile_check: 'Уринишни текшириш',
     qj_reconcile_start_over: 'Қайтадан бошлаш',
+    // Round-5 (PR #3362 review, P1-3): the decisive payload-bound
+    // replay conflict — 409 join_session_payload_mismatch.
+    qj_payload_mismatch: 'Бу уриниш бошқа маълумотлар тўпламига тегишли — унинг натижаси қайта берилмайди. Керак бўлса қайтадан бошланг.',
     qj_preexec_refusal: 'Сессия юборишидан олдин тугади — ёзув яратилмади. Қайтадан бошлаш керакми?',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',

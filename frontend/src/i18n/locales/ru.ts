@@ -7264,18 +7264,13 @@ const ru = {
     qj_direction_unavailable: 'Направление недоступно',
     // RQ-18 follow-up round-2 (P1): draft-owner confirmation — the prompt
     // reveals no PHI (no name/phone) on the shared permanent route.
-    qj_draft_found: 'На этом устройстве есть незавершённый черновик заявки. Восстановить его?',
-    qj_draft_restore: 'Восстановить',
-    qj_draft_discard: 'Стереть и заполнить заново',
-    qj_draft_challenge_title: 'Найден черновик заявки. Чтобы восстановить его, введите последние 4 цифры номера телефона, указанного в черновике.',
-    qj_draft_challenge_label: 'Последние 4 цифры телефона из черновика',
-    qj_draft_challenge_placeholder: '••••',
-    qj_draft_challenge_mismatch: 'Неверные цифры. Осталось попыток: {left}. После трёх неверных попыток черновик будет удалён.',
-    qj_draft_challenge_failed: 'Черновик удалён после трёх неверных попыток. Заполните форму заново.',
     qj_reconcile_title: 'Результат предыдущей отправки неизвестен.',
-    qj_reconcile_hint: 'Проверьте попытку с исходным токеном сессии или начните заново — новая сессия не создавалась.',
+    qj_reconcile_hint: 'Введите те же ФИО и телефон, что при первой отправке, и нажмите «Проверить попытку». Пока результат неизвестен, новая сессия не создаётся.',
     qj_reconcile_check: 'Проверить попытку',
     qj_reconcile_start_over: 'Начать заново',
+    // Round-5 (PR #3362 review, P1-3): the decisive payload-bound
+    // replay conflict — 409 join_session_payload_mismatch.
+    qj_payload_mismatch: 'Эта попытка принадлежит другому набору данных — её результат не может быть выдан повторно. При необходимости начните заново.',
     qj_preexec_refusal: 'Сессия истекла до отправки — запись не создана. Начать заново?',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',

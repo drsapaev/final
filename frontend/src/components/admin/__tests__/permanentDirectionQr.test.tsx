@@ -63,6 +63,7 @@ vi.mock('qrcode.react', () => ({
 }));
 
 import AdminSetupDirections from '../AdminSetupDirections';
+import PermanentDirectionQr from '../PermanentDirectionQr';
 
 const SERVICE_ROW = {
     id: 1,
@@ -457,5 +458,83 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
         await React.act(async () => {});
         expect(row().querySelector('.admin-sdx-status-ok')).toBeNull();
         expect(row().querySelector('.admin-sdx-status-err')).toBeTruthy();
+    });
+
+    it('PIN 37 (round-5 P2-2): a LATE provision response never paints the block-local unknown over a fresher full read', async () => {
+        // The exact round-5 review race, driven on the CHILD contract
+        // directly (a full-page refresh unmounts the block, so the
+        // parent-composition test cannot reach this window):
+        //   R1 provision starts at generation 1 → a newer full read lands
+        //   (generation 2, supported=false) → R1's provision resolves LATE
+        //   → the pre-fix child unconditionally set its local override to
+        //   null (unknown) and the stale recheck's early return never
+        //   cleaned it up — the block stayed on «статус неизвестен» until
+        //   the next Refresh. The generation-tagged override makes the
+        //   stale local state inert.
+        let resolveRecheck: (value: unknown) => void = () => {};
+        const pendingRecheck = new Promise((resolve) => {
+            resolveRecheck = resolve;
+        });
+        directionMocks.fetchDirectionEntryMethods.mockReturnValue(pendingRecheck as never);
+        let resolveProvision: (value: unknown) => void = () => {};
+        const pendingProvision = new Promise((resolve) => {
+            resolveProvision = resolve;
+        });
+        directionMocks.provisionPublicAddress.mockReturnValue(pendingProvision as never);
+
+        const view = render(
+            <ThemeProvider>
+                <MemoryRouter>
+                    <PermanentDirectionQr
+                        profileKey="lab-key"
+                        tag="lab"
+                        supported={false}
+                        supportGeneration={1}
+                    />
+                </MemoryRouter>
+            </ThemeProvider>,
+        );
+
+        // R1 provision starts (generation 1) and hangs
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await waitFor(() => {
+            expect(screen.getByTestId('setup-qr-provision-lab').hasAttribute('disabled')).toBe(
+                true,
+            );
+        });
+
+        // THE NEWER FULL READ: generation 2 lands with supported=false
+        view.rerender(
+            <ThemeProvider>
+                <MemoryRouter>
+                    <PermanentDirectionQr
+                        profileKey="lab-key"
+                        tag="lab"
+                        supported={false}
+                        supportGeneration={2}
+                    />
+                </MemoryRouter>
+            </ThemeProvider>,
+        );
+        await React.act(async () => {});
+
+        // R1's provision resolves LATE — after the fresh generation landed
+        await React.act(async () => {
+            resolveProvision(PROVISION_RESPONSE);
+        });
+        await screen.findByTestId('setup-qr-image-lab');
+        // pre-fix: the block painted its own unknown banner here and kept
+        // it until the next Refresh. Round-5: the gen-1 override is inert —
+        // the fresh gen-2 answer (false) owns the block.
+        expect(screen.queryByTestId('setup-qr-unknown-lab')).toBeNull();
+        expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
+
+        // the STALE recheck also resolves — still no lingering unknown
+        await React.act(async () => {
+            resolveRecheck(methodsPayload(true));
+        });
+        await React.act(async () => {});
+        expect(screen.queryByTestId('setup-qr-unknown-lab')).toBeNull();
+        expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
     });
 });

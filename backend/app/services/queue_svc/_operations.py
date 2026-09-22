@@ -1189,9 +1189,16 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         specialist_type: str | None = None,
         patient_id: int | None = None,
         source: str = "online",
+        commit: bool = True,
     ) -> dict[str, Any]:
         """
         Единая точка входа для присоединения к очереди через QR-токен.
+
+        Round-5 (PR #3362 review, P1-2): ``commit=False`` lets the
+        join-session complete flow run the allocation INSIDE its own
+        single transaction boundary (claim → patient → entry → outcome →
+        joined status → one commit). Default stays True — every other
+        caller keeps the historical commit-on-return semantics.
 
         Returns:
             dict с полями entry, duplicate, specialist_name и т.д.
@@ -1692,8 +1699,14 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         )
 
         self._increment_token_usage(token_obj)
-        db.commit()
-        db.refresh(entry)
+        if commit:
+            db.commit()
+            db.refresh(entry)
+        else:
+            # Round-5 (P1-2): the caller owns the transaction boundary —
+            # the entry stays uncommitted until the single outer commit.
+            db.flush()
+            db.refresh(entry)
 
         return {
             "entry": entry,

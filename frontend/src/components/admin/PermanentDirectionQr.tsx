@@ -26,7 +26,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  *
  * Styles live in admin.css (RQ-18 section) — no inline styles (UI ratchet).
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Download, QrCode } from 'lucide-react';
 import { Button } from '../ui/macos';
@@ -80,13 +80,19 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
     const { t } = useTranslation();
     const [state, setState] = useState<BlockState>('idle');
     const [provisioned, setProvisioned] = useState<PublicAddressProvisionResponse | null>(null);
-    // RQ-18 follow-up (P2-3): undefined = no post-provision recheck yet
-    // (the parent flag is authoritative); boolean/null = the fresh answer
-    // from the post-provision entry-methods re-read (null = recheck
-    // failed → honest unknown, never a confident note).
-    const [postProvisionSupported, setPostProvisionSupported] = useState<
-        boolean | null | undefined
-    >(undefined);
+    // RQ-18 follow-up round-5 (P2-2): the in-block post-provision override
+    // CARRIES THE GENERATION it was issued in. The round-4 guard protected
+    // only the parent checklist row — the child's own local state could
+    // still be painted by a LATE provision response (an unconditional
+    // `null` after the await) and then never cleaned up by the stale
+    // recheck's early return, leaving the block stuck on «статус
+    // неизвестен» until the next Refresh. A generation-tagged override is
+    // simply IGNORED when a newer full read has landed: no lingering
+    // unknown, the fresh parent flag owns the block again.
+    const [postProvisionOverride, setPostProvisionOverride] = useState<{
+        generation: number;
+        value: boolean | null;
+    } | null>(null);
     const [copied, setCopied] = useState(false);
     const qrWrapRef = useRef<HTMLDivElement | null>(null);
     // RQ-18 follow-up round-4 (P2-2): latest-generation ref — the provision
@@ -96,17 +102,15 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
     const supportGenerationRef = useRef(supportGeneration ?? 0);
     supportGenerationRef.current = supportGeneration ?? supportGenerationRef.current;
 
-    // RQ-18 follow-up round-4 (P2-2): a new full read is the source of
-    // truth — any in-block post-provision recheck state from the previous
-    // generation is stale and must stop overriding the fresh prop.
-    useEffect(() => {
-        setPostProvisionSupported(undefined);
-    }, [supportGeneration]);
-
-    // The parent flag was read BEFORE the provision — once a recheck has
-    // answered, the fresh answer wins.
-    const effectiveSupported =
-        postProvisionSupported === undefined ? supported : postProvisionSupported;
+    // The parent flag was read BEFORE the provision — a recheck answer from
+    // the CURRENT generation wins; an override from an older generation is
+    // stale and silently ignored.
+    const overrideApplies =
+        postProvisionOverride !== null &&
+        postProvisionOverride.generation === supportGenerationRef.current;
+    const effectiveSupported = overrideApplies
+        ? postProvisionOverride.value
+        : supported;
 
     const provision = useCallback(async () => {
         try {
@@ -124,22 +128,24 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
             // construction after a provision (it was read before).
             // RQ-18 follow-up round-2 (P2): the post-provision status is
             // ATOMIC — until the re-read answers, the state is UNKNOWN
-            // (both here and in the parent checklist row): a freshly
-            // provisioned healthy direction must not keep the stale
-            // «запись недоступна» note even while the recheck request is
-            // still pending, and a direction deactivated mid-provision
-            // must not keep claiming ready.
-            setPostProvisionSupported(null);
+            // (both here and in the parent checklist row).
+            // RQ-18 follow-up round-5 (P2-2): the unknown is generation-
+            // tagged — if a newer full read already landed while the
+            // provision was in flight, this override is inert locally
+            // (the tagged comparison) exactly as it is dropped by the
+            // generation-guarded parent.
+            setPostProvisionOverride({ generation: recheckGeneration, value: null });
             onSupportedChange?.(profileKey, null, recheckGeneration);
             try {
                 const methods = await fetchDirectionEntryMethods(profileKey);
                 if (supportGenerationRef.current > recheckGeneration) {
                     // A newer full read already landed — this recheck is
                     // stale for the fresh generation; drop it entirely.
+                    // The tagged local override is already inert.
                     return;
                 }
                 const fresh = readPermanentAddressSupported(methods);
-                setPostProvisionSupported(fresh);
+                setPostProvisionOverride({ generation: recheckGeneration, value: fresh });
                 onSupportedChange?.(profileKey, fresh, recheckGeneration);
             } catch (err) {
                 logger.warn(`entry-methods re-read failed for ${profileKey}`, err);
@@ -147,7 +153,7 @@ export default function PermanentDirectionQr({ profileKey, tag, supported, onSup
                     return;
                 }
                 // stays unknown — honest, never a confident claim
-                setPostProvisionSupported(null);
+                setPostProvisionOverride({ generation: recheckGeneration, value: null });
             }
         } catch (err) {
             logger.warn(`permanent QR provision failed for ${profileKey}`, err);

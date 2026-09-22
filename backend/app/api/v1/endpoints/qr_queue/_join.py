@@ -120,12 +120,19 @@ def complete_join_session(
         # recovery path (an explicit start-over for a pre-execution
         # refusal; the reconcile/replay contract for a used session)
         # instead of the blind «Internal server error» dead-end.
+        # Round-5 (P1-3): a payload-bound replay refusal is a CONFLICT
+        # with the attempt's immutable identity — 409, not a generic 400.
+        refusal_status = (
+            status.HTTP_409_CONFLICT
+            if e.reason == "join_session_payload_mismatch"
+            else status.HTTP_400_BAD_REQUEST
+        )
         logger.warning(
             "[complete_join_session] Сессионный отказ: reason=%s",
             e.reason,
         )
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=refusal_status,
             detail={"reason": e.reason, "message": str(e)},
         ) from e
     except ValueError as e:
