@@ -12,6 +12,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StrictMode } from 'react';
 
 import type { NurseStationBoard, NurseWorkplace } from '@/api/nurseServing';
 
@@ -1191,6 +1192,189 @@ describe('NURSE-V2 N2-5 tablet — draining read errors (owner review round 2)',
     ).toBeInTheDocument();
     // §9 stale-state contract: the last rendered drain list survives.
     expect(screen.getByText('Анна Тестова')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Выполнено' }).length).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// owner-review re-review — the dialog subject boundary (P1) + reader
+// symmetry (P2) + updater purity (P2) + the routine-switch draining
+// discovery (P2)
+// ---------------------------------------------------------------------------
+
+describe('NURSE-V2 N2-5 tablet — re-review: dialog subject boundary (P1)', () => {
+  it('the draining incomplete-reason dialog OPENS on the zero-workplace screen (§8 drain recovery)', async () => {
+    const user = userEvent.setup();
+    // THE drain-recovery world: the assignment was deactivated
+    // mid-flight — zero workplaces, only the started execution is left.
+    setup({
+      workplaces: [],
+      board: null,
+      draining: { items: [DRAINING_ITEM], total: 1 },
+    });
+    expect(
+      await screen.findByText(/Незавершённая работа после смены рабочего места/),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Не завершено' }));
+    // The dialog STAYS OPEN — the blanket stationBoard==null close used
+    // to kill it the instant it opened on a stationless surface.
+    const textarea = await screen.findByLabelText(/Причина \(обязательно\)/);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(textarea).toBeInTheDocument();
+    await user.click(textarea);
+    await user.type(textarea, 'пациентка ушла');
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() =>
+      expect(incompleteExecutionMock).toHaveBeenCalledWith(55, {
+        reason: 'пациентка ушла',
+      }),
+    );
+  });
+
+  it('an entry dialog closes when its entry leaves the station board (the original close intent, refined)', async () => {
+    const user = userEvent.setup();
+    setup({ board: CALLED_BOARD });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'Завершить без выполнения' }),
+    );
+    expect(
+      await screen.findByLabelText(/Причина \(обязательно\)/),
+    ).toBeInTheDocument();
+    // A colleague terminal-served the entry: the fresh board carries no
+    // active rows — the dialog's SUBJECT is gone (the board itself stays).
+    boardMock.mockResolvedValue(WAITING_BOARD);
+    fireEvent(window, new Event('focus'));
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText(/Причина \(обязательно\)/),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it('an execution dialog STAYS OPEN while its execution renders in the draining card only', async () => {
+    const user = userEvent.setup();
+    // Station present (waiting) + a draining execution with id 55.
+    setup({
+      board: WAITING_BOARD,
+      draining: { items: [DRAINING_ITEM], total: 1 },
+    });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Не завершено' }));
+    const textarea = await screen.findByLabelText(/Причина \(обязательно\)/);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // The subject renders in the draining card — the dialog survives
+    // even though no station service carries execution 55.
+    expect(textarea).toBeInTheDocument();
+    await user.click(textarea);
+    await user.type(textarea, 'реагент закончился');
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() =>
+      expect(incompleteExecutionMock).toHaveBeenCalledWith(55, {
+        reason: 'реагент закончился',
+      }),
+    );
+  });
+});
+
+describe('NURSE-V2 N2-5 tablet — re-review: reader symmetry (P2)', () => {
+  it('a successful silent poll CLEARS the stale board error (the honest label cuts both ways)', async () => {
+    setup({ board: WAITING_BOARD });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+    // The foreground refresh fails on the network: §9 keeps the rendered
+    // board and shows the visible error.
+    boardMock.mockRejectedValueOnce(new Error('Network Error'));
+    fireEvent.click(screen.getByRole('button', { name: 'Обновить' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText('Анна Тестова')).toBeInTheDocument();
+    // The silent poll then succeeds: the fresh board lands and the
+    // "possibly outdated" banner must NOT outlive the fresh data.
+    fireEvent(window, new Event('focus'));
+    await waitFor(() =>
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText('Анна Тестова')).toBeInTheDocument();
+  });
+
+  it('a 404 board clears the station surface but KEEPS the draining card (§8: role-scoped, station-independent)', async () => {
+    setup({
+      board: WAITING_BOARD,
+      draining: { items: [DRAINING_ITEM], total: 1 },
+    });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+    expect(screen.getByText(/Старая станция/)).toBeInTheDocument();
+    boardMock.mockRejectedValue({
+      response: { status: 404, data: { detail: 'очередь не активна' } },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Обновить' }));
+    // The station surface clears...
+    await waitFor(() =>
+      expect(screen.queryByText('Анна Тестова')).not.toBeInTheDocument(),
+    );
+    expect(
+      await screen.findByText(/Рабочее место недоступно/),
+    ).toBeInTheDocument();
+    // ...but the nurse's OWN started work (the drain card) SURVIVES the
+    // station 404 — the foreground reader now matches the silent one.
+    expect(screen.getByText(/Старая станция/)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Выполнено' }).length).toBe(1);
+  });
+});
+
+describe('NURSE-V2 N2-5 tablet — re-review: updater purity (P2)', () => {
+  it('submitting the reason dialog fires the terminal mutation EXACTLY ONCE under StrictMode', async () => {
+    const user = userEvent.setup();
+    workplacesMock.mockResolvedValue({ items: [WORKPLACE_A], total: 1 });
+    boardMock.mockResolvedValue(IN_PROGRESS_BOARD);
+    drainingMock.mockResolvedValue({ items: [], total: 0 });
+    window.localStorage.clear();
+    // StrictMode double-invokes state updaters in development — the
+    // dispatch must live OUTSIDE the updater or the terminal mutation
+    // fires twice.
+    renderWithProviders(
+      <StrictMode>
+        <NurseTabletPage />
+      </StrictMode>,
+      { routerProps: { initialEntries: ['/nurse'] } },
+    );
+    const buttons = await screen.findAllByRole('button', {
+      name: 'Не завершено',
+    });
+    await user.click(buttons[0]);
+    const textarea = await screen.findByLabelText(/Причина \(обязательно\)/);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    await user.click(textarea);
+    await user.type(textarea, 'тошнота');
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() =>
+      expect(incompleteExecutionMock).toHaveBeenCalledTimes(1),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(incompleteExecutionMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('NURSE-V2 N2-5 tablet — re-review: routine station change keeps the draining card (P2)', () => {
+  it('the «Сменить» button returns the picker WITHOUT hiding the drain card', async () => {
+    const user = userEvent.setup();
+    setup({
+      workplaces: [WORKPLACE_A, WORKPLACE_B],
+      board: WAITING_BOARD,
+      draining: { items: [DRAINING_ITEM], total: 1 },
+    });
+    // The stored preference primes the restored selection (a UI HINT —
+    // §4): set AFTER setup (which clears storage) but synchronously,
+    // before the initial-load effect's post-await read.
+    window.localStorage.setItem('nurse.serving.workplace', '10');
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+    expect(screen.getByText(/Старая станция/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Сменить' }));
+    // The picker is back...
+    expect(
+      await screen.findByRole('button', { name: /Перевязочная/ }),
+    ).toBeInTheDocument();
+    // ...and the drain card (the nurse's own started work) never left.
+    expect(screen.getByText(/Старая станция/)).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Выполнено' }).length).toBe(1);
   });
 });

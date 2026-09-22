@@ -15,7 +15,7 @@
  * workplaces read is a visible error, never a "no assignments" claim.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { NurseReasonForm } from './NurseReasonForm';
@@ -117,33 +117,71 @@ export default function NurseTabletPage() {
       (dialog.entryId != null && isPending(`entry-incomplete:${dialog.entryId}`)));
 
   /**
-   * Owner review round (P1): a revocation or a station switch closes
-   * any open PHI dialog — the entry it was invoked for no longer
-   * renders on this surface.
+   * Owner review round (P1) + re-review (P1): a dialog closes ONLY when
+   * its SUBJECT stops rendering — an entry dialog when its entry left
+   * the station board; an execution dialog when the execution renders
+   * in NEITHER the station services NOR the draining card. The earlier
+   * blanket `stationBoard == null` close made the §8 drain-recovery
+   * incomplete flow unreachable: on a stationless surface (the picker,
+   * the zero-workplace screen — exactly the mid-flight-deactivation
+   * scenario the draining card exists for) the dialog was killed the
+   * instant it opened.
    */
   useEffect(() => {
-    if (dialog != null && stationBoard == null) {
+    if (dialog == null) {
+      return;
+    }
+    if (dialog.mode === 'entry') {
+      const entryLive =
+        stationBoard != null &&
+        (stationBoard.active ?? []).some((entry) => entry.id === dialog.entryId);
+      if (!entryLive) {
+        setDialog(null);
+      }
+      return;
+    }
+    const executionId = dialog.executionId;
+    const executionLive =
+      executionId != null &&
+      (board.draining.some(
+        (item) => item.execution.id === executionId,
+      ) ||
+        (stationBoard != null &&
+          (stationBoard.active ?? []).some((entry) =>
+            (entry.services ?? []).some(
+              (service) => service.in_progress_execution_id === executionId,
+            ),
+          )));
+    if (!executionLive) {
       setDialog(null);
     }
-  }, [dialog, stationBoard]);
+  }, [dialog, stationBoard, board.draining]);
+
+  // The latest dialog subject, readable from stable callbacks (the
+  // render-time mirror of the state — the workplacesRef pattern).
+  const dialogRef = useRef(dialog);
+  dialogRef.current = dialog;
 
   // Stable dialog callbacks: the Modal kit re-runs its focus effect when
   // `onClose` changes identity — an inline arrow would restart it on every
   // keystroke and steal the focus mid-typing.
   const handleDialogCancel = useCallback(() => setDialog(null), []);
+  // Owner review re-review (P2): the mutation dispatch lives OUTSIDE the
+  // state updater — updaters must stay pure. React StrictMode (the app
+  // root wraps in it) double-invokes updaters in development: the
+  // terminal incomplete mutation used to fire TWICE per submit.
   const handleDialogSubmit = useCallback(
     (reason: string) => {
-      setDialog((current) => {
-        if (current == null) {
-          return null;
-        }
-        if (current.mode === 'execution' && current.executionId != null) {
-          void board.incompleteExecution(current.executionId, reason);
-        } else if (current.mode === 'entry' && current.entryId != null) {
-          void board.entryIncomplete(current.entryId, reason);
-        }
-        return null;
-      });
+      const current = dialogRef.current;
+      if (current == null) {
+        return;
+      }
+      if (current.mode === 'execution' && current.executionId != null) {
+        void board.incompleteExecution(current.executionId, reason);
+      } else if (current.mode === 'entry' && current.entryId != null) {
+        void board.entryIncomplete(current.entryId, reason);
+      }
+      setDialog(null);
     },
     [board],
   );
@@ -158,7 +196,7 @@ export default function NurseTabletPage() {
               <button
                 type="button"
                 className="nurse-btn nurse-btn--small"
-                onClick={() => void board.resetWorkplace()}
+                onClick={() => void board.changeWorkplace()}
               >
                 {t('nurse.workplace_change')}
               </button>

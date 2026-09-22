@@ -330,7 +330,11 @@ export function useNurseServingBoard() {
           return null;
         }
         boardResourceIdRef.current = queueResourceId;
-        patch({ board, boardLoading: false });
+        // Owner review re-review (P2): a SUCCESS clears a previous read
+        // error — the "possibly outdated" label must never outlive the
+        // fresh data it warned about (the request-start clear used to be
+        // the only wipe, which the silent poll path bypassed).
+        patch({ board, boardLoading: false, boardError: null });
         return board;
       } catch (err) {
         if (
@@ -350,25 +354,45 @@ export function useNurseServingBoard() {
           // rendered state. The selection decision belongs to the caller
           // (initial load / picker / silent poll reset) — never to a
           // load->403->reset loop.
+          //
+          // Owner review re-review (P2): a station-surface 404 proves
+          // NOTHING about the draining discovery — it is role-scoped, not
+          // station-scoped (the §8 contract keeps the starter's terminal
+          // access even with NO assignment on that station). Only the 403
+          // (the world that guards draining changed) runs the
+          // conservative draining clear; the silent poll's 404 already
+          // behaved this way — the two readers now agree.
           boardResourceIdRef.current = null;
-          drainingEpochRef.current += 1;
-          patch({
-            board: null,
-            boardLoading: false,
-            draining: [],
-            drainingError: null,
-            boardError: {
-              status,
-              message: api.nurseServingErrorText(
-                err,
-                'errors.nurse.board_unavailable',
-              ),
-            },
-          });
           if (status === 403) {
+            drainingEpochRef.current += 1;
+            patch({
+              board: null,
+              boardLoading: false,
+              draining: [],
+              drainingError: null,
+              boardError: {
+                status,
+                message: api.nurseServingErrorText(
+                  err,
+                  'errors.nurse.board_unavailable',
+                ),
+              },
+            });
             // Fire-and-forget list refresh — its own 403 would run the
             // full synchronous revocation clear.
             void loadWorkplaces();
+          } else {
+            patch({
+              board: null,
+              boardLoading: false,
+              boardError: {
+                status,
+                message: api.nurseServingErrorText(
+                  err,
+                  'errors.nurse.board_unavailable',
+                ),
+              },
+            });
           }
           return null;
         }
@@ -457,6 +481,31 @@ export function useNurseServingBoard() {
       return items;
     },
     [applySelection, clearAllPhi, loadBoardRef, loadWorkplaces],
+  );
+
+  /**
+   * Routine station change (the «Сменить» button) — owner review
+   * re-review (P2): clears ONLY the station plane (board + selection);
+   * the draining discovery is the nurse's OWN role-scoped work and
+   * STAYS on screen through the switch. The assignment world is still
+   * re-read (§4) — a revoked station still drops out here. The
+   * revocation paths (resetWorkplace / clearAllPhi) keep the full
+   * synchronous PHI clear.
+   */
+  const changeWorkplace = useCallback(
+    async (): Promise<void> => {
+      boardEpochRef.current += 1;
+      boardResourceIdRef.current = null;
+      applySelection(null);
+      patch({ board: null, boardError: null, boardLoading: false, notice: null });
+      const result = await loadWorkplaces();
+      const items = result.ok ? result.items : [];
+      if (items.length === 1) {
+        applySelection(items[0].queue_resource_id);
+        await loadBoardRef.current(items[0].queue_resource_id);
+      }
+    },
+    [applySelection, loadBoardRef, loadWorkplaces, patch],
   );
 
   const selectWorkplace = useCallback(
@@ -711,7 +760,12 @@ export function useNurseServingBoard() {
             mountedRef.current
           ) {
             boardResourceIdRef.current = selected;
-            patch({ board });
+            // Owner review re-review (P2): the silent success clears a
+            // stale read error — the draining plane already did this
+            // (drainingError: null); the "possibly outdated" board label
+            // must not linger beside fresh data until the next
+            // foreground reload.
+            patch({ board, boardError: null });
           }
         } catch (err) {
           // Owner review round (P2): a stale FAILURE is discarded exactly
@@ -828,6 +882,7 @@ export function useNurseServingBoard() {
     ...state,
     selectWorkplace,
     resetWorkplace,
+    changeWorkplace,
     refresh,
     callNext,
     start,
