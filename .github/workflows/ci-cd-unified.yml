@@ -937,7 +937,11 @@ jobs:
   backend-tests:
     name: 🐍 Backend тесты
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Round-5 (PR #3362): the suite fits in ~9 min on a warm runner, but
+    # shared-hosted variance (uniform 2x slowdown observed on a contended
+    # run) cancels the job at 20 and fails the required gate. Other heavy
+    # jobs in this workflow already run at 30/35.
+    timeout-minutes: 30
     needs: [ci-scope]
     if: |
       always() &&
