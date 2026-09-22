@@ -944,25 +944,37 @@ def complete_patient_visit(
                 db, queue_entry, doctor, department_hint
             )
 
+            # Codex round-2 P2: the lifecycle completion ALSO runs BEFORE
+            # the served-commit — resolution + lifecycle + the served flip
+            # are one atomic unit. A lifecycle failure (terminal-state
+            # conflict, lease conflict) propagates with NOTHING committed:
+            # the entry stays in_progress and the retry re-enters cleanly
+            # (the resolution is same-day-idempotent). Committing the
+            # visit-day move before a failing lifecycle used to leave the
+            # visit+appointment permanently moved while the broad handler
+            # rolled the rest back. The genuinely tolerable tail (payment
+            # markers, appointment status, medical data) stays below the
+            # swallow by the pre-existing design: «не блокируем основной
+            # флоу очереди».
+            from app.services.visit_lifecycle_service import VisitLifecycleService
+
+            resolved_visit = VisitLifecycleService(db).complete_visit(
+                visit_id=resolved_visit.id,
+                current_user=current_user,
+            )
+            resolved_visit.updated_at = changed_at
+
             db.commit()
             db.refresh(queue_entry)
 
             # Создаем или обновляем визит на сегодня и помечаем как завершенный,
             # чтобы это отразилось в registrar/queues/today, который читает Visit/Appointment
             try:
-                # QD-2C (Codex round-34 P2) + Codex round-43 P2: департамент и
-                # сам визит РАЗРЕШЕНЫ ДО served-коммита выше (см. комментарий
-                # у resolved_visit): здесь остаётся только lifecycle и
-                # медицинские/платёжные данные.
+                # QD-2C (Codex round-34 P2) + Codex round-43 P2: департамент,
+                # сам визит и lifecycle РАЗРЕШЕНЫ ДО served-коммита выше (см.
+                # комментарий у resolved_visit): здесь остаётся только
+                # платёжная/медицинская запись и статус appointment.
                 visit = resolved_visit
-                # ✅ Issue #06 Phase 3: delegate to VisitLifecycleService
-                # for state machine validation + row lock.
-                from app.services.visit_lifecycle_service import VisitLifecycleService
-
-                visit = VisitLifecycleService(db).complete_visit(
-                    visit_id=visit.id,
-                    current_user=current_user,
-                )
                 visit.updated_at = changed_at
 
                 # ✅ ИСПРАВЛЕНО: Проверяем и сохраняем информацию об оплате, создаем платеж через SSOT

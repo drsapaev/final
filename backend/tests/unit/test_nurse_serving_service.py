@@ -2737,6 +2737,80 @@ class TestOwnerFollowupRoutingSnapshot:
         assert row.status == "in_progress"
         assert row.queue_resource_id == resource_a.id  # still bound to A
 
+    def test_legacy_cross_station_reclaim_is_not_a_noop(self, db_session: Session):
+        """codex round-2 P1: a LEGACY (pre-0073, NULL-snapshot) attempt is
+        station-bound through its own queue entry's queue — attempts load
+        by visit_service_id and the entry gate only scopes the REQUEST,
+        so an unconditional same-starter no-op handed station A's legacy
+        attempt to a station B POST. The legacy resolution axis closes
+        it: the attempt's entry resolves to another station -> NOT a
+        no-op -> the catalog D3 gate answers 400."""
+        nurse, resource_a, svc, entry_a, visit, vs_a, _execution = (
+            self._started_execution(db_session, suffix="cfu_rt_lg")
+        )
+        assert visit is not None and vs_a is not None
+        # Strip the snapshot: simulate the pre-0073 row.
+        db_session.query(ServiceExecution).filter(
+            ServiceExecution.visit_service_id == vs_a.id
+        ).update(
+            {
+                "queue_resource_id": None,
+                "routing_queue_tag_snapshot": None,
+                "routing_service_id": None,
+            }
+        )
+        db_session.commit()
+        resource_b = _resource(db_session, "cfu_rt_lg_station_b", tag="tag_cfu_rt_lg_b")
+        _assignment(db_session, nurse, resource_b)
+        queue_b = _station_queue(db_session, resource_b)
+        entry_b = _entry(
+            db_session,
+            queue_b,
+            1,
+            patient=db_session.get(Patient, entry_a.patient_id),
+            visit=visit,
+        )
+        entry_b.status = "in_progress"
+        db_session.commit()
+
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            NurseServingApiService(db_session).create_execution(
+                nurse.id,
+                resource_b.id,
+                queue_entry_id=entry_b.id,
+                visit_service_id=vs_a.id,
+            )
+        _expect(exc, 400)  # D3: the service still routes only to station A
+        legacy_row = (
+            db_session.query(ServiceExecution)
+            .filter(ServiceExecution.visit_service_id == vs_a.id)
+            .one()
+        )
+        assert legacy_row.status == "in_progress"  # untouched
+
+    def test_legacy_same_station_reclaim_stays_a_noop(self, db_session: Session):
+        """The legacy binding must not over-tighten: a pre-0073 attempt of
+        THIS station's queue (via its entry's queue) still re-claims."""
+        nurse, resource_a, svc, entry_a, visit, vs_a, execution = (
+            self._started_execution(db_session, suffix="cfu_rt_ls")
+        )
+        assert visit is not None and vs_a is not None
+        db_session.query(ServiceExecution).filter(
+            ServiceExecution.visit_service_id == vs_a.id
+        ).update(
+            {
+                "queue_resource_id": None,
+                "routing_queue_tag_snapshot": None,
+                "routing_service_id": None,
+            }
+        )
+        db_session.commit()
+        result = NurseServingApiService(db_session).create_execution(
+            nurse.id, resource_a.id, queue_entry_id=entry_a.id, visit_service_id=vs_a.id
+        )
+        assert result["created"] is False
+        assert result["id"] == execution["id"]
+
 
 # ----------------------------------------------------------------------------
 # Corrective follow-up (owner verdict on the merged runtime):

@@ -1510,27 +1510,33 @@ class NurseServingApiService:
             .all()
         )
         in_progress = next((a for a in attempts if a.status == "in_progress"), None)
-        if (
-            in_progress is not None
-            and in_progress.started_by_user_id == user_id
-            and (
-                # Station-bound idempotency (codex round-1 P1): the no-op
-                # re-claims the attempt ONLY on the station it was started
-                # on. A snapshot row of ANOTHER station falls through to
-                # the D3 gate below — a B-station tablet must never be
-                # handed A's execution as if it had started work there
-                # (the entry gate scopes the request, the snapshot binds
-                # the attempt). Legacy NULL-snapshot rows keep the
-                # unconditional no-op: they predate 0073 and their station
-                # context is only the entry-queue axis they were validated
-                # against.
-                in_progress.queue_resource_id is None
-                or in_progress.queue_resource_id == resource.id
-            )
-        ):
-            # Same-nurse repeat POST = no-op (the tablet contract); the
-            # endpoint answers 200 instead of 201 via `created`.
-            return {**self._execution_payload(in_progress), "created": False}
+        if in_progress is not None and in_progress.started_by_user_id == user_id:
+            # Station-bound idempotency (codex round-1 P1 + round-2 P1):
+            # the no-op re-claims the attempt ONLY on the station it was
+            # started on — a B-station tablet must never be handed A's
+            # execution as if it had started work there.
+            if in_progress.queue_resource_id is not None:
+                # Snapshot rows (0073+): the snapshot IS the station.
+                station_bound = in_progress.queue_resource_id == resource.id
+            else:
+                # Legacy rows: no snapshot — the ONLY reconstructable
+                # station context is the attempt's own queue entry's
+                # queue (owner axis or the bridged tag axis). The entry
+                # gate above scopes the REQUEST to this station's queue;
+                # the attempt must resolve to the SAME station for the
+                # no-op to hold (codex round-2 P1: attempts load by
+                # visit_service_id, so a legacy attempt of another
+                # station's entry must not be re-claimed here).
+                attempt_resource, _attempt_entry = self._execution_station_resource(
+                    in_progress
+                )
+                station_bound = (
+                    attempt_resource is not None and attempt_resource.id == resource.id
+                )
+            if station_bound:
+                # Same-nurse repeat POST = no-op (the tablet contract);
+                # the endpoint answers 200 instead of 201 via `created`.
+                return {**self._execution_payload(in_progress), "created": False}
 
         service = (
             self.db.query(Service)

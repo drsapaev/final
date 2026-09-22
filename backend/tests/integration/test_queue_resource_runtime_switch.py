@@ -7888,3 +7888,96 @@ def test_ambiguous_pairing_blocks_complete_before_the_served_commit(
             synchronize_session=False
         )
         db_session.commit()
+
+
+def test_lifecycle_failure_leaves_nothing_moved(db_session: Session) -> None:
+    """codex round-2 P2: resolution + lifecycle + the served flip are ONE
+    atomic unit. A lifecycle 409 (here: the linked visit is cancelled —
+    an invalid source status for completion) propagates with NOTHING
+    committed: the entry stays in_progress, the visit and its single
+    eligible appointment stay on the old day. The round-1 head committed
+    the visit-day move before the failing lifecycle, leaving them
+    permanently moved while the broad handler rolled the rest back."""
+    from fastapi import HTTPException
+
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        complete_patient_visit,
+    )
+    from app.crud import visit as crud_visit
+    from app.models.appointment import Appointment
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+
+    patient = Patient(
+        last_name="Ресурсный16",
+        first_name="Пациент",
+        phone="+998901234549",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        original_day = _dt_now_tashkent_day()
+        doc_user = _make_user(db_session, username="doc_ac3", role="Doctor")
+        therapist = _make_doctor(db_session, user_id=doc_user.id, specialty="therapy")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=original_day, specialist_id=therapist.id
+        )
+
+        visit = crud_visit.create_visit(
+            db=db_session,
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            visit_date=original_day,
+            visit_time="10:00",
+            department="therapy",
+        )
+        # A terminal source status the completion state machine refuses.
+        visit.status = "cancelled"
+        appointment = Appointment(
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            appointment_date=original_day,
+            appointment_time="10:00",
+            status="scheduled",
+        )
+        db_session.add(appointment)
+        tomorrow_queue = queue_service.get_or_create_daily_queue(
+            db_session,
+            day=original_day + timedelta(days=1),
+            specialist_id=therapist.id,
+        )
+        entry = _make_waiting_entry(db_session, tomorrow_queue, number=116)
+        entry.patient_id = patient.id
+        entry.visit_id = visit.id
+        entry.status = "in_progress"
+        db_session.commit()
+
+        admin = _make_user(db_session, username="adm_ac3", role="Admin")
+
+        db_session.rollback()
+        with pytest.raises(HTTPException) as exc:
+            complete_patient_visit(entry_id=entry.id, db=db_session, current_user=admin)
+        assert exc.value.status_code == 409  # invalid_source_status
+
+        db_session.rollback()
+        db_session.refresh(entry)
+        db_session.refresh(visit)
+        db_session.refresh(appointment)
+        assert entry.status == "in_progress"  # the served flip never committed
+        assert entry.served_by_user_id is None
+        assert visit.visit_date == original_day  # nothing moved
+        assert appointment.appointment_date == original_day
+    finally:
+        _durable_cleanup(db_session, "doc_ac3", "adm_ac3")
+        db_session.query(Appointment).filter(
+            Appointment.patient_id == patient.id
+        ).delete(synchronize_session=False)
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
