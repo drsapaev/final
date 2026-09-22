@@ -7981,3 +7981,259 @@ def test_lifecycle_failure_leaves_nothing_moved(db_session: Session) -> None:
             synchronize_session=False
         )
         db_session.commit()
+
+
+def _atomicity_scratch_world():
+    """Run-unique SQLite scratch engine with REAL commits.
+
+    Owner round-3 P2 (PR #3367): the suite's ``db_session`` fixture
+    wraps every ``commit()`` in a restarted savepoint inside an
+    uncommitted outer transaction — nothing is ever file-durable there,
+    so no fresh connection can observe what the code under test
+    committed. The boundary-commit defect is precisely ABOUT durability
+    (the premature ``create_visit`` commit could not be undone by the
+    post-failure rollback), so the regression runs against a plain
+    engine where ``db.commit()`` is a real commit — the owner's
+    controlled SQLAlchemy/SQLite repro semantics (the 27e78111b
+    run-unique scratch discipline, applied to SQLite: mkstemp name,
+    create without pre-drop, teardown limited to this run's own file).
+
+    Returns ``(engine, db_path)``; the caller owns disposal/unlink.
+    """
+    import os
+    import tempfile
+
+    from sqlalchemy import create_engine
+
+    from app.db import base  # noqa: F401 — registers all models
+    from app.db.base_class import Base
+    from app.services.medical_specialty_seed import seed_medical_specialties
+
+    db_fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(db_fd)
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        echo=False,
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(bind=engine)
+    with engine.connect() as catalog_conn:
+        seed_medical_specialties(catalog_conn)
+        catalog_conn.commit()
+    return engine, db_path
+
+
+def _inject_boundary_commit_failure(db):
+    """Fail ONLY the boundary commit; let every other site commit.
+
+    The wrapper raises when ``db.commit()`` is called directly from
+    ``complete_patient_visit``'s body — the composition's single
+    transaction boundary (resolution + lifecycle + the served flip).
+    Any OTHER commit site runs for real: on the broken head the
+    premature commit inside ``crud_visit.create_visit`` (the CRUD
+    default ``commit=True``) fires FIRST and must succeed, exactly like
+    the owner's controlled-failure repro — the intermediate commit
+    succeeds, the final one fails. On the fixed head the boundary
+    commit is the first and only commit of the flow.
+
+    Returns the real bound ``commit`` for restoration in a ``finally``.
+    """
+    import sys
+
+    real_commit = db.commit
+
+    def _failing_commit() -> None:
+        if sys._getframe(1).f_code.co_name == "complete_patient_visit":
+            raise RuntimeError("simulated boundary-commit failure")
+        real_commit()
+
+    db.commit = _failing_commit
+    return real_commit
+
+
+def test_doctor_branch_created_visit_not_durable_when_boundary_commit_fails() -> None:
+    """Owner round-3 P2 (PR #3367): a visit created by the completion
+    resolution must join the CALLER's transaction, not commit itself.
+
+    ``_resolve_entry_visit`` runs AFTER the entry is staged served
+    (status + served_by_user_id + served_at) and BEFORE the single
+    boundary commit. With the CRUD default (``commit=True``) the
+    internal ``db.commit()`` of ``create_visit`` persisted the staged
+    served flip + attribution + the new open visit mid-flow; a failure
+    of the boundary commit then left a durable served entry (retry
+    rejected: ``complete`` is unavailable for ``served``) with an
+    orphaned open visit and no visit link — the residual atomicity
+    hole of the ``6a12190f4`` fix, which only covered the lifecycle
+    call.
+
+    This test forces the DOCTOR-branch creation (in_progress entry, no
+    visit link, no matching open visit), fails the boundary commit,
+    rolls back and verifies through a FRESH session: neither served,
+    nor the completion attribution, nor the new visit may be durable."""
+    import os
+
+    from fastapi import HTTPException
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        complete_patient_visit,
+    )
+    from app.models.online_queue import OnlineQueueEntry
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+
+    engine, db_path = _atomicity_scratch_world()
+    try:
+        maker = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+        db = maker()
+
+        patient = Patient(
+            last_name="Ресурсный17",
+            first_name="Пациент",
+            phone="+998901234550",
+            is_deleted=False,
+        )
+        db.add(patient)
+        db.commit()
+
+        queue_day = _dt_now_tashkent_day()
+        doc_user = _make_user(db, username="doc_ac4", role="Doctor")
+        therapist = _make_doctor(db, user_id=doc_user.id, specialty="therapy")
+        queue = queue_service.get_or_create_daily_queue(
+            db, day=queue_day, specialist_id=therapist.id
+        )
+
+        entry = _make_waiting_entry(db, queue, number=117)
+        entry.patient_id = patient.id
+        entry.status = "in_progress"
+        db.commit()
+
+        admin = _make_user(db, username="adm_ac4", role="Admin")
+
+        # plain ids survive the session close below
+        entry_id, patient_id = entry.id, patient.id
+
+        db.rollback()
+        real_commit = _inject_boundary_commit_failure(db)
+        try:
+            with pytest.raises(HTTPException) as exc:
+                complete_patient_visit(entry_id=entry_id, db=db, current_user=admin)
+            assert exc.value.status_code == 500
+        finally:
+            db.commit = real_commit
+        db.rollback()
+        db.close()
+
+        # The authoritative check runs through a FRESH session on its
+        # own connection — only durable rows survive the rollback.
+        with engine.connect() as check_conn:
+            check = Session(bind=check_conn)
+            try:
+                row = check.get(OnlineQueueEntry, entry_id)
+                assert row is not None
+                assert row.status == "in_progress"  # NOT served
+                assert row.served_by_user_id is None  # attribution not durable
+                assert row.served_at is None
+                assert row.visit_id is None  # the link never persisted
+                assert (
+                    check.query(Visit).filter(Visit.patient_id == patient_id).count()
+                    == 0
+                )  # the created visit did not survive
+            finally:
+                check.close()
+    finally:
+        engine.dispose()
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
+
+def test_resource_branch_created_visit_not_durable_when_boundary_commit_fails() -> None:
+    """Owner round-3 P2 (PR #3367), resource branch: the same atomicity
+    contract for the resource-queue resolution. The resource surface
+    resolves the visit with ``doctor=None`` and the queue's tag as the
+    department; the visit created there must join the caller's
+    transaction too. With the CRUD default the internal commit
+    persisted the staged served flip mid-flow; the boundary-commit
+    failure then left the entry durably served with an orphaned open
+    visit. Fresh-session verification after the rollback: neither
+    served, nor the attribution, nor the new visit may be durable."""
+    import os
+
+    from fastapi import HTTPException
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        complete_patient_visit,
+    )
+    from app.models.online_queue import OnlineQueueEntry
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+
+    engine, db_path = _atomicity_scratch_world()
+    try:
+        maker = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+        db = maker()
+
+        patient = Patient(
+            last_name="Ресурсный18",
+            first_name="Пациент",
+            phone="+998901234551",
+            is_deleted=False,
+        )
+        db.add(patient)
+        db.commit()
+
+        queue_day = _dt_now_tashkent_day()
+        _make_resource(db, code="prcbnd", queue_tag="prcbnd")
+        queue = queue_service.get_or_create_daily_queue(
+            db, day=queue_day, specialist_id=None, queue_tag="prcbnd"
+        )
+        assert queue.specialist_id is None  # the resource-owned shape
+        assert queue.queue_resource_id is not None
+
+        entry = _make_waiting_entry(db, queue, number=118)
+        entry.patient_id = patient.id
+        entry.status = "in_progress"
+        db.commit()
+
+        admin = _make_user(db, username="adm_ac5", role="Admin")
+
+        # plain ids survive the session close below
+        entry_id, patient_id = entry.id, patient.id
+
+        db.rollback()
+        real_commit = _inject_boundary_commit_failure(db)
+        try:
+            with pytest.raises(HTTPException) as exc:
+                complete_patient_visit(entry_id=entry_id, db=db, current_user=admin)
+            assert exc.value.status_code == 500
+        finally:
+            db.commit = real_commit
+        db.rollback()
+        db.close()
+
+        # The authoritative check runs through a FRESH session on its
+        # own connection — only durable rows survive the rollback.
+        with engine.connect() as check_conn:
+            check = Session(bind=check_conn)
+            try:
+                row = check.get(OnlineQueueEntry, entry_id)
+                assert row is not None
+                assert row.status == "in_progress"  # NOT served
+                assert row.served_by_user_id is None  # attribution not durable
+                assert row.served_at is None
+                assert row.visit_id is None  # the link never persisted
+                assert (
+                    check.query(Visit).filter(Visit.patient_id == patient_id).count()
+                    == 0
+                )  # the created visit did not survive
+            finally:
+                check.close()
+    finally:
+        engine.dispose()
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass

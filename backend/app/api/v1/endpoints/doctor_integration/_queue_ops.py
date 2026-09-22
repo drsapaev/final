@@ -371,6 +371,21 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             .first()
         )
         if visit is None:
+            # Owner round-3 P2 (PR #3367): commit=False — the visit
+            # INSERT joins the CALLER's transaction. Both callers of
+            # this helper (start/complete) stage queue mutations BEFORE
+            # the resolution (in_progress / served + attribution) and
+            # commit AFTER it; with the CRUD default (commit=True) the
+            # internal db.commit() prematurely persisted the staged
+            # served flip + attribution + the new open visit mid-flow,
+            # and a failure of the trailing boundary commit left a
+            # durable served entry (retry rejected: complete is
+            # unavailable for served) with an orphaned open visit and
+            # a lost visit link. create_visit only needs flush() for
+            # the ID (the Fix C contract); the nurse surface
+            # (nurse_serving_api_service._resolve_entry_visit) already
+            # passes commit=False — the N2-2 single-transaction
+            # discipline this aligns the doctor surface with.
             visit = crud_visit.create_visit(
                 db=db,
                 patient_id=queue_entry.patient_id,
@@ -379,6 +394,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 # Codex round-37 P2: время визита — клиник-локальные часы
                 visit_time=_clinic_now(db).strftime("%H:%M"),
                 department=department,
+                commit=False,
             )
     else:
         # Codex round-42 P2: врачебная поверхность резолвит свежий визит
@@ -410,6 +426,11 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             .first()
         )
         if visit is None:
+            # Owner round-3 P2 (PR #3367): commit=False here too — the
+            # doctor-branch creation is the same mid-composition INSERT
+            # as the resource branch above (see the comment there): the
+            # staged served flip + attribution must not become durable
+            # before the caller's single boundary commit.
             visit = crud_visit.create_visit(
                 db=db,
                 patient_id=queue_entry.patient_id,
@@ -418,6 +439,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 # Codex round-37 P2: время визита — клиник-локальные часы
                 visit_time=_clinic_now(db).strftime("%H:%M"),
                 department=department,
+                commit=False,
             )
 
     if queue_entry.visit_id != visit.id:
