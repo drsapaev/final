@@ -33,6 +33,13 @@ outcome is pinned:
 
 SQLite is never a substitute here: the alembic chain and the partial
 unique index live only on PostgreSQL.
+
+Scratch-database isolation: the scratch name is run-unique (prefix + a
+uuid suffix), created WITHOUT a pre-drop and dropped only in teardown,
+only if this run actually created it. Two concurrent pytest processes
+(or two agents) against one PostgreSQL server therefore never see each
+other's scratch database, and a foreign database that happens to carry
+the historical fixed name ``n23_0073_backfill`` is never touched.
 """
 
 from __future__ import annotations
@@ -40,6 +47,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -59,7 +67,9 @@ from app.models.visit import Visit, VisitService
 pytestmark = pytest.mark.integration
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-SCRATCH_DB = "n23_0073_backfill"
+# Run-unique scratch names: the fixed historical name lives on only as
+# the prefix, so parallel runs never collide and never pre-drop.
+SCRATCH_DB_PREFIX = "n23_0073_backfill_"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -82,7 +92,7 @@ def _candidate_admin_urls() -> list[str]:
     return [u.replace("postgresql+psycopg://", "postgresql://", 1) for u in urls]
 
 
-def _scratch_urls(admin_url: str) -> tuple[str, str]:
+def _scratch_urls(admin_url: str, scratch_db: str) -> tuple[str, str]:
     """(psycopg DSN, SQLAlchemy URL) for the scratch database.
 
     Derived from the admin URL by swapping the database name — host,
@@ -90,12 +100,29 @@ def _scratch_urls(admin_url: str) -> tuple[str, str]:
     """
     url = make_url(admin_url)
     psycopg_scratch = url.set(
-        drivername="postgresql", database=SCRATCH_DB
+        drivername="postgresql", database=scratch_db
     ).render_as_string(hide_password=False)
     sa_scratch = url.set(
-        drivername="postgresql+psycopg", database=SCRATCH_DB
+        drivername="postgresql+psycopg", database=scratch_db
     ).render_as_string(hide_password=False)
     return psycopg_scratch, sa_scratch
+
+
+def _drop_scratch_db(admin_url: str, scratch_db: str) -> None:
+    """Teardown drop through the same verified admin channel.
+
+    The name is run-unique, so neither the connection termination nor
+    the DROP can ever reach a foreign database; the termination is
+    belt-and-braces for a pooled connection that outlived the engine's
+    ``dispose()``.
+    """
+    with psycopg.connect(admin_url, connect_timeout=5, autocommit=True) as c:
+        c.execute(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+            "WHERE datname = %s AND pid <> pg_backend_pid()",
+            (scratch_db,),
+        )
+        c.execute(f'DROP DATABASE IF EXISTS "{scratch_db}"')
 
 
 def _run_alembic(sa_url: str, *args: str) -> None:
@@ -128,25 +155,35 @@ def backfill_world():
             f"(last error: {last_error})"
         )
 
-    psycopg_dsn, sa_url = _scratch_urls(admin_url)
-    with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
-        c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
+    # Run-unique: never a pre-drop, never a collision with a foreign
+    # database or a parallel run (see the module docstring).
+    scratch_db = f"{SCRATCH_DB_PREFIX}{uuid.uuid4().hex[:12]}"
+    psycopg_dsn, sa_url = _scratch_urls(admin_url, scratch_db)
+    created = False
+    engine = None
+    try:
+        with psycopg.connect(admin_url, autocommit=True) as c:
+            c.execute(f'CREATE DATABASE "{scratch_db}"')
+        created = True
 
-    # The pre-0073 schema: everything up to AND INCLUDING 0072.
-    _run_alembic(sa_url, "0072_service_executions")
+        # The pre-0073 schema: everything up to AND INCLUDING 0072.
+        _run_alembic(sa_url, "0072_service_executions")
 
-    engine = create_engine(sa_url, future=True)
-    world = _seed_pre_0073_world(engine)
+        engine = create_engine(sa_url, future=True)
+        world = _seed_pre_0073_world(engine)
 
-    # The verdict's unit under test: 0073 (columns + the backfill).
-    _run_alembic(sa_url, "0073_execution_routing_snapshot")
+        # The verdict's unit under test: 0073 (columns + the backfill).
+        _run_alembic(sa_url, "0073_execution_routing_snapshot")
 
-    yield {"engine": engine, **world}
-
-    engine.dispose()
-    with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        yield {"engine": engine, **world}
+    finally:
+        if engine is not None:
+            engine.dispose()
+        if created:
+            try:
+                _drop_scratch_db(admin_url, scratch_db)
+            except Exception:  # noqa: BLE001 - a leaked run-unique name
+                pass  # is inert and can never collide
 
 
 def _seed_pre_0073_world(engine) -> dict:
