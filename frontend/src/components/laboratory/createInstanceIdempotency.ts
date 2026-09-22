@@ -44,13 +44,16 @@
  * crypto.subtle — http-контексты без secure context). CodeQL
  * js/clear-text-storage-of-sensitive-data (#1315, round 10): сериализованный
  * payload создания содержит ФЛИ (patient_id, appointment_id, клинические
- * поля) и в raw-виде в storage не хранится НИКОГДА — equality-контракт
- * proceed/rotate полностью сохраняется на digest-сравнении: тот же payload
- * → тот же digest → тот же ключ; изменившийся payload → другой digest →
- * rotate. Серверная привязка ключа к body не меняется: middleware хеширует
- * сырой body запроса, digest здесь — только локальная память «того же
- * логического клика». Формат слота меняется до первого попадания в main
- * (PR ещё draft), миграция raw-слотов не нужна.
+ * поля) и в raw-виде в storage не хранится НИКОГДА — оба digest-пути
+ * прогоняют его через TextEncoder().encode() (канонический барьер
+ * ProtectCall запроса), raw-значение до sessionStorage не доходит.
+ * Equality-контракт proceed/rotate полностью сохраняется на
+ * digest-сравнении: тот же payload → тот же digest → тот же ключ;
+ * изменившийся payload → другой digest → rotate. Серверная привязка
+ * ключа к body не меняется: middleware хеширует сырой body запроса,
+ * digest здесь — только локальная память «того же логического клика».
+ * Формат слота меняется до первого попадания в main (PR ещё draft),
+ * миграция raw-слотов не нужна.
  */
 
 const STORAGE_PREFIX = 'lab:report-create:idempotency';
@@ -106,33 +109,40 @@ export function serializeCreateInstancePayload(payload: Record<string, unknown>)
 
 /**
  * Детерминированный не-криптографический digest для окружений без
- * crypto.subtle (http без secure context): два прохода FNV-1a с разными
- * seed (64-битное пространство коллизий) + длина входа. Равенство
- * digest-ов = равенство payload с практической точностью для локального
- * proceed/rotate-решения; даже коллизия безопасна — серверная привязка
- * ключа к body отвергнет несовпадающий payload кодом 409 (Codex R2 #3092),
- * а не создаст дубликат.
+ * crypto.subtle (http без secure context — продакшн-деплой ops/vps/nginx
+ * слушает 80-й порт без TLS): два прохода FNV-1a с разными seed (64-битное
+ * пространство коллизий) + длина, по UTF-8 байтам. Вход проходит через
+ * TextEncoder().encode() — тот же барьер clear-text-storage
+ * (CodeQL ProtectCall), что и в SHA-256-пути: sensitive строка не доходит
+ * до storage ни на одном пути. Равенство digest-ов = равенство payload с
+ * практической точностью для локального proceed/rotate-решения; даже
+ * коллизия безопасна — серверная привязка ключа к body отвергнет
+ * несовпадающий payload кодом 409 (Codex R2 #3092), а не создаст дубликат.
  */
-function fnv1aDigest(input: string): string {
+function fnv1aDigest(bytes: Uint8Array): string {
   const passes = [0x811c9dc5, 0x01000193];
   const parts = passes.map((seed) => {
     let hash = seed >>> 0;
-    for (let i = 0; i < input.length; i += 1) {
-      hash ^= input.charCodeAt(i);
+    for (let i = 0; i < bytes.length; i += 1) {
+      hash ^= bytes[i];
       hash = Math.imul(hash, 0x01000193) >>> 0;
     }
     return hash.toString(16).padStart(8, '0');
   });
-  return `fnv1a:${parts[0]}${parts[1]}:${input.length.toString(16)}`;
+  return `fnv1a:${parts[0]}${parts[1]}:${bytes.length.toString(16)}`;
 }
 
 /**
  * Односторонний digest сериализованного payload (CodeQL #1315, round 10):
- * primary — SHA-256 через WebCrypto (канонический барьер для
- * clear-text-storage), fallback — FNV-1a для не-secure контекстов.
- * Raw payload в storage не попадает ни на одном пути.
+ * primary — SHA-256 через WebCrypto, fallback — FNV-1a по UTF-8 байтам для
+ * не-secure контекстов. ОБА пути прогоняют sensitive строку через
+ * TextEncoder().encode() — канонический барьер
+ * js/clear-text-storage-of-sensitive-data (ProtectCall): raw payload в
+ * storage не попадает ни на одном пути. null = digest-пути недоступны
+ * (неподдерживаемый браузер без TextEncoder) — деградация к ключу на один
+ * клик без записи слота.
  */
-async function computePayloadDigest(serializedPayload: string): Promise<string> {
+async function computePayloadDigest(serializedPayload: string): Promise<string | null> {
   if (typeof crypto !== 'undefined' && crypto.subtle && typeof crypto.subtle.digest === 'function') {
     try {
       const bytes = new TextEncoder().encode(serializedPayload);
@@ -143,7 +153,11 @@ async function computePayloadDigest(serializedPayload: string): Promise<string> 
       // Деградация к FNV-1a (см. fnv1aDigest) — digest-контракт сохраняется.
     }
   }
-  return fnv1aDigest(serializedPayload);
+  if (typeof TextEncoder === 'undefined') {
+    // Digest-пути недоступны: ключ на один клик, слот не пишется вовсе.
+    return null;
+  }
+  return fnv1aDigest(new TextEncoder().encode(serializedPayload));
 }
 
 /**
@@ -188,7 +202,9 @@ export async function resolveCreateInstanceIdempotencyKey(
   const slot = storageSlotId(buildCreateInstanceSlotKey(payload));
   const snapshot = serializeCreateInstancePayload(payload);
   const payloadDigest = await computePayloadDigest(snapshot);
-  const stored = readStoredKey(slot);
+  // Digest недоступен (неподдерживаемый браузер без TextEncoder) —
+  // деградация к ключу на один клик: слот не читается и не пишется.
+  const stored = payloadDigest === null ? null : readStoredKey(slot);
   // proceed: тот же payload (тот же digest), исход прошлой попытки неизвестен
   // — тот же ключ, backend вернёт закоммиченный бланк вместо второго INSERT.
   if (stored && stored.payloadDigest === payloadDigest) {
@@ -197,7 +213,9 @@ export async function resolveCreateInstanceIdempotencyKey(
   // bind (слота нет) / rotate (payload изменился — другая логическая
   // операция): свежий ключ и свежий digest.
   const key = generateCreateInstanceOperationId();
-  writeStoredKey(slot, { key, payloadDigest });
+  if (payloadDigest !== null) {
+    writeStoredKey(slot, { key, payloadDigest });
+  }
   return key;
 }
 

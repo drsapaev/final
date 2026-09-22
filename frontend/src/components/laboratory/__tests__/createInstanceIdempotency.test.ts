@@ -155,4 +155,23 @@ describe('createInstanceIdempotency (PR 3351 review round 9, P1)', () => {
     expect(raw).not.toContain('CBC');
     expect(raw).not.toContain(serializeCreateInstancePayload(APPOINTMENT_PAYLOAD));
   });
+
+  it('degrades to one-click keys when no digest path is available (no TextEncoder, review round 10)', async () => {
+    // Неподдерживаемый браузер без TextEncoder: оба digest-пути недоступны
+    // (SHA-256 падает на encode, FNV требует байты) — слот не пишется вовсе,
+    // каждая попытка получает свежий ключ (та же деградация, что у
+    // повреждённого storage: идемпотентность внутри попытки сохраняется
+    // double-submit-блокировкой, reload-ретрай получает новый ключ).
+    vi.stubGlobal('TextEncoder', undefined);
+    try {
+      const first = await resolveCreateInstanceIdempotencyKey(APPOINTMENT_PAYLOAD);
+      const second = await resolveCreateInstanceIdempotencyKey(SAME_LOGICAL_PAYLOAD);
+
+      expect(first).toMatch(/^[0-9a-f-]{36}$/i);
+      expect(second).not.toBe(first);
+      expect(peekCreateInstanceIdempotencyKey(APPOINTMENT_PAYLOAD)).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
