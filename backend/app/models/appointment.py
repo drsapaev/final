@@ -83,3 +83,31 @@ class Appointment(Base):
     # GQL-AUDIT-28 follow-up: patient relationship for the GraphQL layer
     # (mirrors the doctor relationship above; no back_populates needed).
     patient: Mapped[Patient | None] = relationship("Patient", foreign_keys=[patient_id])
+
+    # ── Round-4 (owner P1, PR #3340): read-side department accessors ──────
+    #
+    # `department` is the RELATIONSHIP (a Department row), while the
+    # historical read DTO declared `department: str | None` under the SAME
+    # attribute name — the moment a row got a non-NULL department_id (which
+    # the portal booking now persists), `Appointment.model_validate(apt)`
+    # tried to coerce a Department OBJECT into a string and every canonical
+    # read (`GET /appointments/`, `GET /appointments/{id}`) answered 500.
+    # These explicit accessors give the read DTO stable, correctly-typed
+    # fields (`department_key`, `department_name`) that never collide with
+    # the relationship attribute.
+
+    @property
+    def department_key(self) -> str | None:
+        """Canonical `Department.key` of the booked department (None when unset)."""
+        return getattr(self.department, "key", None)
+
+    @property
+    def department_name(self) -> str | None:
+        """Display label for the booked department (`name_ru`, `key` fallback).
+
+        `Department` has NO `name` column (only `key` / `name_ru` / `name_uz`),
+        so a bare `getattr(department, "name")` silently produced None in the
+        cabinet summaries even after the routing FK was persisted."""
+        return getattr(self.department, "name_ru", None) or getattr(
+            self.department, "key", None
+        )
