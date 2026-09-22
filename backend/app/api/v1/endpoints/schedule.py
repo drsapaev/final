@@ -81,6 +81,16 @@ async def create_template(
             status_code=400,
             detail={"reason": "department_unknown"},
         )
+    # Round-10 (owner P2, PR #3340): the mutation is only real when it
+    # SURVIVES the request. The CRUD helper stops at `flush()` (a nested
+    # savepoint inside the request transaction), and `get_db` only CLOSES
+    # the session after the response — the uncommitted INSERT was rolled
+    # back in production, so the endpoint answered a ScheduleRowOut (with
+    # a generated id) for a row that never existed. COMMIT here, after the
+    # unknown-key gate above (a refused create must not persist), then
+    # refresh so the serialized row reflects the committed state.
+    db.commit()
+    db.refresh(row)
     # Round-9 (codex P2): the DTO maps `department` through the KEY
     # accessor — the raw ORM row would validate a Department OBJECT into
     # the `str | None` field (500-class response mismatch).

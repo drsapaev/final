@@ -591,6 +591,85 @@ def _audit_keyed_patient_refusal(
         )
 
 
+def _audit_patient_replay(request: Any, patient_scope: str) -> None:
+    """Round-10 (owner P2, PR #3340): PHI-audit row for a patient-scope REPLAY.
+
+    The idempotency dispatch answers a same-key retry with the stored
+    snapshot and the ENDPOINT never runs — so the endpoint's audited
+    dependency (`_require_patient_audited` / the audited principal
+    factory) never executes and the replay attempt was invisible to the
+    per-patient access trail. Every patient-scope replay now writes its
+    OWN row through the shared audit SSOT, in the same non-blocking
+    contract as ``_audit_keyed_patient_refusal`` above (an audit failure
+    never changes the replay itself):
+
+        surface   = jwt_portal          (extra_data)
+        outcome   = success             (the committed outcome IS served)
+        replayed  = true                (extra_data — distinguishes the
+                                          replay row from the original
+                                          execution's endpoint-written row)
+        resource  = appointment/create | appointment/preview for the
+                    keyed portal booking surfaces, generic
+                    patient_portal/access fallback for any future
+                    patient-scope operation
+        subject   = the bound patient scope's card
+
+    Called on BOTH replay sources — the local per-process snapshot and
+    the distributed Redis snapshot — so one logical attempt is audited
+    exactly once per HTTP request no matter which worker served it.
+    """
+    path = getattr(getattr(request, "url", None), "path", "") or ""
+    normalized = path.rstrip("/")
+    if normalized.endswith("booking"):
+        resource_type, action = "appointment", "create"
+    elif normalized.endswith("preview"):
+        resource_type, action = "appointment", "preview"
+    else:
+        resource_type, action = "patient_portal", "access"
+    try:
+        patient_id = int(str(patient_scope).rsplit(":", 1)[-1])
+    except ValueError:
+        patient_id = None
+    if patient_id is None:
+        return
+    try:
+        generator = _resolve_request_db(request)
+        try:
+            db = next(generator)
+            from app.services.patient_access_audit import log_patient_access
+            from app.services.telegram_mini_app_init_data import (
+                TelegramMiniAppSessionScope,
+            )
+
+            log_patient_access(
+                db,
+                scope=TelegramMiniAppSessionScope(
+                    scope_type="patient",
+                    telegram_user_id=None,
+                    telegram_chat_id=None,
+                    patient_id=patient_id,
+                ),
+                resource_type=resource_type,
+                action=action,
+                outcome="success",
+                request=request,
+                extra_data={"surface": "jwt_portal", "replayed": True},
+            )
+        finally:
+            try:
+                next(generator)
+            except StopIteration:
+                pass
+            except Exception:  # pragma: no cover - generator teardown
+                pass
+    except Exception:
+        logger.warning(
+            "Idempotency replay-audit write failed for a patient-scope "
+            "replay; replaying without an audit row",
+            exc_info=True,
+        )
+
+
 def _patient_replay_policy_sync(
     request: Any, canonical_user_id: int
 ) -> tuple[str, bool, bool | None]:
@@ -896,24 +975,30 @@ def _local_scope_binding_set(
     inherits a foreign outcome). An explicit ``snapshot=None`` REMOVES a
     stored snapshot (role-changed re-execution path)."""
     cache_key = (str(origin_ns), key)
-    expires_at = time.time() + _CACHE_TTL_SECONDS
+    now = time.time()
+    expires_at = now + _CACHE_TTL_SECONDS
+    existing = _local_scope_bindings.get(cache_key)
     if snapshot is _SNAPSHOT_UNCHANGED:
-        existing = _local_scope_bindings.get(cache_key)
-        if existing is not None and existing[1] == patient_scope:
+        # Round-10 (owner P2, PR #3340): a scope-only rebind preserves the
+        # stored snapshot ONLY when the existing entry is still LIVE. The
+        # round-9 TTL guard fixed the sliding window but read the snapshot
+        # BEFORE the liveness check: an entry whose fixed 24 h window had
+        # ALREADY lapsed was rewritten as (now + 24 h, scope, OLD snapshot)
+        # — the mirror resurrected a dead local replay source. In dispatch
+        # order (Redis scope GET → mirror → local outcome lookup) that
+        # resurrected snapshot answered the next degraded retry with a
+        # stale response Redis no longer holds: worker A replayed a
+        # long-expired 201 while worker B treated the key as fresh and
+        # re-executed the write. An expired entry is now re-bound with its
+        # snapshot DROPPED (a live BINDING after concurrent eviction is
+        # still restored — only the dead OUTCOME is not).
+        if (
+            existing is not None
+            and existing[1] == patient_scope
+            and existing[0] > now
+        ):
+            expires_at = existing[0]
             snapshot = existing[2]
-            # Round-9 (owner P2, PR #3340): a scope-only rebind — the
-            # Redis→local mirror runs on EVERY same-key retry whose scope
-            # GET answers — must NOT slide the local window. The previous
-            # unconditional fresh TTL turned the fixed 24 h contract into
-            # a sliding one: one replay at hour 23 re-armed the local
-            # snapshot to hour 47 while the Redis response and binding had
-            # already expired, so worker A replayed a stale 201 while
-            # worker B treated the key as fresh and re-executed the write.
-            # The entry keeps its ORIGINAL expiry (a live one — an already
-            # expired entry is rewritten with a fresh TTL, restoring a
-            # binding after concurrent eviction).
-            if existing[0] > time.time():
-                expires_at = existing[0]
         else:
             snapshot = None
     _local_scope_bindings[cache_key] = (expires_at, patient_scope, snapshot)
@@ -2177,6 +2262,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     "Idempotency hit: user=%s key=%s method=%s path=%s — returning cached response",
                     user_id, idempotency_key, request.method, request.url.path,
                 )
+                # Round-10 (owner P2, PR #3340): the endpoint never runs on a
+                # replay — the per-patient trail records THIS attempt here
+                # (local per-process snapshot source).
+                if patient_scope:
+                    _audit_patient_replay(request, patient_scope)
                 return cached
             if permitted is False:
                 # Endpoint policy refuses the current role — the endpoint's
@@ -2242,6 +2332,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                         "Idempotency distributed replay: user=%s key=%s path=%s",
                         user_id, idempotency_key, request.url.path,
                     )
+                    # Round-10 (owner P2, PR #3340): same audit contract for
+                    # the cross-worker snapshot — every patient-scope replay
+                    # is one audited HTTP attempt, whichever worker serves it.
+                    if patient_scope:
+                        _audit_patient_replay(request, patient_scope)
                     return replayed
                 if permitted is False:
                     # Endpoint policy refuses the current role — fall through

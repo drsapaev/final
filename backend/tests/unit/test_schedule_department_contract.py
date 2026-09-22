@@ -281,3 +281,140 @@ class TestScheduleDepartmentKeyContract:
         )
         assert unknown.status_code == 400, unknown.text
         assert unknown.json()["detail"]["reason"] == "department_unknown"
+
+
+class TestCreateSchedulePersistence:
+    """Round-10 owner P2 (PR #3340): `create_schedule` stopped at `flush()`
+    and the endpoint never COMMITTED — `get_db` only closes the session
+    after the response, so production rolled the INSERT back: POST
+    /api/v1/schedule answered a serialized ScheduleRowOut (with a generated
+    id) for a row that NEVER EXISTED.
+
+    The default harness override shares ONE savepoint session across the
+    request and the assertions, which masks exactly this defect — so this
+    test wires a PRODUCTION-LIKE get_db (every request opens its own
+    session and transaction) and reads the row back through an INDEPENDENT
+    session (a fresh connection) after the request dependency has closed
+    its session. The unknown-key refusal must stay a rollback (no row)."""
+
+    def test_created_template_survives_the_request_session(
+        self, client, db_session, test_db
+    ):
+        import uuid
+
+        from sqlalchemy.orm import sessionmaker
+
+        from app.api.deps import get_db as canonical_get_db
+        from app.main import app
+
+        IndependentSession = sessionmaker(
+            autocommit=False, autoflush=False, bind=test_db
+        )
+
+        # The committed world the request's OWN session will see.
+        setup = IndependentSession()
+        suffix = uuid.uuid4().hex[:8]
+        dept = Department(
+            key=f"cardio-persist-{suffix}",
+            name_ru="Кардиология (persistence)",
+            name_uz="Kardiologiya",
+            active=True,
+        )
+        admin = User(
+            username=f"admin_persist_{suffix}",
+            email=f"admin_persist_{suffix}@test.com",
+            full_name="Admin Persistence",
+            hashed_password=get_password_hash("persist123"),
+            role="Admin",
+            is_active=True,
+            is_superuser=False,
+        )
+        setup.add(dept)
+        setup.add(admin)
+        setup.commit()
+        setup.refresh(dept)
+        setup.refresh(admin)
+        dept_id, admin_row = dept.id, admin
+        dept_key = dept.key
+        admin_id = admin_row.id
+        admin_username, admin_role = admin_row.username, admin_row.role
+        setup.close()
+
+        from tests.conftest import mint_access_token
+
+        class _AdminRef:
+            """Minimal shape mint_access_token reads (id/username/role)."""
+
+            id = admin_id
+            username = admin_username
+            role = admin_role
+            is_active = True
+            is_superuser = False
+
+        headers = {"Authorization": f"Bearer {mint_access_token(_AdminRef())}"}
+
+        # Production-like dependency: a REAL per-request session (own
+        # transaction), closed — not shared — when the request ends.
+        def prod_like_get_db():
+            session = IndependentSession()
+            try:
+                yield session
+            finally:
+                session.close()
+
+        app.dependency_overrides[canonical_get_db] = prod_like_get_db
+        try:
+            payload = {
+                "department": dept_key,
+                "weekday": 3,
+                "start_time": "09:00",
+                "end_time": "11:00",
+                "active": True,
+            }
+            created = client.post("/api/v1/schedule", headers=headers, json=payload)
+            assert created.status_code == 200, created.text
+            row_id = created.json()["id"]
+            assert created.json()["department"] == dept_key
+
+            # The INDEPENDENT session sees ONLY committed rows — this is
+            # the read the production deploy would run after the request.
+            check = IndependentSession()
+            try:
+                row = check.get(ScheduleTemplate, row_id)
+                assert row is not None, (
+                    "the created template must survive the request's "
+                    "session close (a real COMMIT, not a flushed INSERT)"
+                )
+                assert row.department_id == dept_id
+                assert row.weekday == 3
+                assert row.start_time == "09:00"
+            finally:
+                check.close()
+
+            # The unknown-key refusal is still a ROLLBACK: no row.
+            refused = client.post(
+                "/api/v1/schedule",
+                headers=headers,
+                json={**payload, "department": f"no-such-{suffix}"},
+            )
+            assert refused.status_code == 400, refused.text
+            assert refused.json()["detail"]["reason"] == "department_unknown"
+
+            check = IndependentSession()
+            try:
+                from sqlalchemy import select
+
+                orphans = check.execute(
+                    select(ScheduleTemplate).where(
+                        ScheduleTemplate.weekday == 3,
+                        ScheduleTemplate.department_id.is_(None),
+                    )
+                ).scalars().all()
+                assert orphans == [], (
+                    "a refused create persists nothing (the 400 keeps its "
+                    "rollback semantics)"
+                )
+            finally:
+                check.close()
+        finally:
+            app.dependency_overrides.pop(canonical_get_db, None)

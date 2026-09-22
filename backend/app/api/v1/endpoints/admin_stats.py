@@ -14,6 +14,7 @@ from app.models.patient import Patient
 from app.models.payment_webhook import PaymentWebhook
 from app.models.user import User
 from app.models.visit import Visit
+from app.services.analytics import department_ids_for_filter
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -552,9 +553,17 @@ def get_analytics_overview(
 
         # Применяем фильтры
         if department and department != "all":
-            appointments_query = appointments_query.filter(
-                Appointment.department == department
-            )
+            # Round-10 (owner P2, PR #3340): the canonical KEY resolves to FK
+            # ids (department_ids_for_filter) — the old
+            # `Appointment.department == department` compared the ORM
+            # RELATIONSHIP to the string (ArgumentError → 500 on the first
+            # keyed overview). An unknown key answers an EMPTY overview
+            # (exact-key semantics).
+            department_ids = department_ids_for_filter(db, department)
+            if department_ids is not None:
+                appointments_query = appointments_query.filter(
+                    Appointment.department_id.in_(department_ids)
+                )
 
         if doctor_id and doctor_id != 0:
             appointments_query = appointments_query.filter(
@@ -612,15 +621,22 @@ def get_analytics_overview(
                 doctor_appointments = [
                     apt for apt in appointments_all if apt.doctor_id == doctor_id
                 ]
-                department = (
-                    doctor_appointments[0].department
-                    if doctor_appointments and doctor_appointments[0].department
+                # Round-10 (owner P2, PR #3340): the JSON contract is the
+                # STRING canonical department — `doctor_appointments[0].department`
+                # is the ORM RELATIONSHIP, and a Department OBJECT went into
+                # the JSON payload (TypeError → 500 for every doctor whose
+                # first appointment carried a non-NULL department_id). The
+                # `department_key` accessor publishes the same `cardio`-style
+                # string every other read surface shows.
+                doctor_department = (
+                    doctor_appointments[0].department_key
+                    if doctor_appointments and doctor_appointments[0].department_key
                     else "Неизвестно"
                 )
                 top_doctors.append(
                     {
                         "name": doctor_name,
-                        "department": department,
+                        "department": doctor_department,
                         "patients": stats["appointments"],
                         "revenue": f"{stats['revenue']:.0f} UZS",
                     }
@@ -702,9 +718,13 @@ def get_analytics_charts(
                 )
             )
             if department and department != "all":
-                appointments_query = appointments_query.filter(
-                    Appointment.department == department
-                )
+                # Round-10 (owner P2, PR #3340): FK-id filter, see
+                # department_ids_for_filter (relationship-vs-string → 500).
+                department_ids = department_ids_for_filter(db, department)
+                if department_ids is not None:
+                    appointments_query = appointments_query.filter(
+                        Appointment.department_id.in_(department_ids)
+                    )
             appointments_count = appointments_query.count()
 
             # Доходы за день

@@ -563,6 +563,17 @@ def _resolve_doctor_routing_department(
 
     * ``doctor_department_missing`` — the doctor has no canonical
       department (an explicit refusal, not a NULL routing context);
+    * ``department_inactive`` — the doctor's CANONICAL department exists
+      but is DEACTIVATED (round-10 owner P1): the routing helper returned
+      the relationship unconditionally, so an active doctor bound to an
+      inactive department still booked — the preview even echoed the
+      inactive department_id the create then persisted. Every OTHER
+      department path (`_resolve_portal_department`) refuses inactive
+      keys with this SAME reason; the canonical path now refuses with
+      the identical 400 (it is already part of the published booking
+      error contract `_PORTAL_BOOKING_REQUEST_ERROR_REASONS`), so
+      preview and create answer BEFORE any mutation and the persisted
+      routing context can never point at a deactivated department;
     * ``doctor_department_mismatch`` — the submitted department is not
       the doctor's own. Compared by the resolved department's id, which
       is key-equivalent: the submitted row was looked up BY key.
@@ -572,6 +583,12 @@ def _resolve_doctor_routing_department(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"reason": "doctor_department_missing"},
         )
+    department = doctor_row.department
+    if not getattr(department, "active", True):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "department_inactive"},
+        )
     if submitted_department_row is not None and int(submitted_department_row.id) != int(
         doctor_row.department_id
     ):
@@ -579,7 +596,7 @@ def _resolve_doctor_routing_department(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"reason": "doctor_department_mismatch"},
         )
-    return doctor_row.department
+    return department
 
 
 # Shared OpenAPI error responses (P2: documented error surface).

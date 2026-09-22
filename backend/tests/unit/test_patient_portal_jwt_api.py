@@ -1592,3 +1592,398 @@ class TestClinicCalendarDateValidation:
             },
         )
         assert created.status_code == 201, created.json()
+
+
+class TestInactiveCanonicalDepartmentRouting:
+    """Round-10 owner P1 (PR #3340): `_resolve_doctor_routing_department`
+    returned the doctor's canonical department WITHOUT an `active` check —
+    an active Doctor (active User) bound to a DEACTIVATED department still
+    booked, and the preview even echoed the inactive department_id the
+    create then persisted. The canonical path must refuse with the SAME
+    published 400 `department_inactive` reason every other department path
+    uses, BEFORE any mutation, on BOTH booking surfaces."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def test_inactive_canonical_department_refused_on_both_surfaces(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_doctor,
+        portal_department,
+        test_patient,
+    ):
+        # Active doctor, active user, canonical department DEACTIVATED.
+        test_doctor.department_id = portal_department.id
+        portal_department.active = False
+        db_session.commit()
+        db_session.refresh(test_doctor)
+        db_session.refresh(portal_department)
+
+        body = {"appointmentDate": self.future_date, "doctorId": test_doctor.id}
+
+        preview = client.post(
+            "/api/v1/patients/booking/preview",
+            headers={**linked_patient_headers, "Idempotency-Key": "inactive-pv-1"},
+            json=body,
+        )
+        assert preview.status_code == 400, preview.json()
+        assert preview.json()["detail"]["reason"] == "department_inactive"
+
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "inactive-cr-1"},
+            json=body,
+        )
+        assert created.status_code == 400, created.json()
+        assert created.json()["detail"]["reason"] == "department_inactive"
+        assert db_session.query(Appointment).count() == 0, (
+            "a booking routed to an inactive canonical department never "
+            "materializes an appointment"
+        )
+
+        # The refusals leave the portal's denied audit trail (SSOT parity
+        # with every other booking refusal).
+        denied = (
+            db_session.query(PatientAccessAuditLog)
+            .filter(
+                PatientAccessAuditLog.subject_patient_id == test_patient.id,
+                PatientAccessAuditLog.outcome == "denied",
+            )
+            .order_by(PatientAccessAuditLog.id.desc())
+            .all()
+        )
+        reasons = [
+            (row.extra_data or {}).get("reason")
+            for row in denied
+            if (row.extra_data or {}).get("reason") == "department_inactive"
+        ]
+        assert len(reasons) >= 2, (
+            "both the preview and the create refusal are audited"
+        )
+
+    def test_reactivated_canonical_department_books_again(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        test_doctor,
+        portal_department,
+    ):
+        # Control: the SAME doctor + department books the moment the
+        # canonical department is ACTIVE — the refusal above is caused by
+        # the inactivity, not by the routing resolution itself.
+        test_doctor.department_id = portal_department.id
+        portal_department.active = False
+        db_session.commit()
+
+        body = {"appointmentDate": self.future_date, "doctorId": test_doctor.id}
+        refused = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "react-cr-a"},
+            json=body,
+        )
+        assert refused.status_code == 400, refused.json()
+
+        portal_department.active = True
+        db_session.commit()
+
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "react-cr-b"},
+            json=body,
+        )
+        assert created.status_code == 201, created.json()
+        row = db_session.get(Appointment, created.json()["appointment_id"])
+        assert row is not None and row.department_id == portal_department.id
+
+
+class TestReplayAuditTrail:
+    """Round-10 owner P2 (PR #3340): a patient-scope REPLAY never ran the
+    endpoint, so the endpoint's audited dependency never executed and the
+    per-patient PHI trail lost the attempt. The middleware now writes its
+    OWN `patient_access_audit` row (surface=jwt_portal, replayed=true,
+    outcome=success) before serving the stored snapshot — local and
+    distributed sources alike. Contract for two HTTP requests of one
+    logical booking: handler executed ONCE (exactly one Appointment), the
+    trail carries TWO success rows (the original execution's endpoint row
+    + the replay's middleware row)."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def _booking_body(self, portal_department):
+        return {
+            "appointmentDate": self.future_date,
+            "department": portal_department.key,
+        }
+
+    def _success_create_rows(self, db_session, test_patient):
+        return (
+            db_session.query(PatientAccessAuditLog)
+            .filter(
+                PatientAccessAuditLog.subject_patient_id == test_patient.id,
+                PatientAccessAuditLog.resource_type == "appointment",
+                PatientAccessAuditLog.action == "create",
+                PatientAccessAuditLog.outcome == "success",
+            )
+            .all()
+        )
+
+    def test_local_replay_writes_own_audit_row(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        portal_department,
+        test_patient,
+    ):
+        body = self._booking_body(portal_department)
+        key = "replay-audit-local-1"
+        headers = {**linked_patient_headers, "Idempotency-Key": key}
+
+        first = client.post("/api/v1/patients/booking", headers=headers, json=body)
+        assert first.status_code == 201, first.json()
+
+        rows_after_first = self._success_create_rows(db_session, test_patient)
+        assert len(rows_after_first) == 1, "the execution attempt is audited"
+        assert all(
+            not (row.extra_data or {}).get("replayed") for row in rows_after_first
+        ), "the original execution is NOT marked as a replay"
+
+        # Same worker (same TestClient/process): the LOCAL snapshot answers.
+        replay = client.post("/api/v1/patients/booking", headers=headers, json=body)
+        assert replay.status_code == 201, replay.json()
+        assert replay.json() == first.json(), "the committed response is replayed"
+
+        assert db_session.query(Appointment).count() == 1, (
+            "the replay never re-executes the handler"
+        )
+
+        rows_after_replay = self._success_create_rows(db_session, test_patient)
+        assert len(rows_after_replay) == 2, (
+            "two HTTP attempts = two audited rows (execution + replay)"
+        )
+        replay_rows = [
+            row for row in rows_after_replay if (row.extra_data or {}).get("replayed")
+        ]
+        assert len(replay_rows) == 1, "exactly the replay attempt is marked"
+        assert replay_rows[0].extra_data.get("surface") == "jwt_portal"
+        assert replay_rows[0].resource_type == "appointment"
+        assert replay_rows[0].action == "create"
+        assert replay_rows[0].subject_patient_id == test_patient.id
+
+    def test_preview_replay_writes_preview_audit_row(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        portal_department,
+        test_patient,
+    ):
+        body = self._booking_body(portal_department)
+        key = "replay-audit-preview-1"
+        headers = {**linked_patient_headers, "Idempotency-Key": key}
+
+        first = client.post("/api/v1/patients/booking/preview", headers=headers, json=body)
+        assert first.status_code == 200, first.json()
+        replay = client.post("/api/v1/patients/booking/preview", headers=headers, json=body)
+        assert replay.status_code == 200, replay.json()
+        assert replay.json() == first.json()
+
+        replay_rows = (
+            db_session.query(PatientAccessAuditLog)
+            .filter(
+                PatientAccessAuditLog.subject_patient_id == test_patient.id,
+                PatientAccessAuditLog.outcome == "success",
+            )
+            .all()
+        )
+        marked = [
+            row
+            for row in replay_rows
+            if (row.extra_data or {}).get("replayed")
+            and row.action == "preview"
+            and row.resource_type == "appointment"
+        ]
+        assert len(marked) == 1, (
+            "the keyed preview replay is audited under its own action"
+        )
+
+
+class TestAnalyticsDepartmentContractE2E:
+    """Round-10 owner P2 (PR #3340): the appointment analytics surfaces kept
+    comparing the ORM RELATIONSHIP to the request string
+    (`Appointment.department == department`) and fed Department OBJECTS
+    into string fields — the E2E chain "portal booking department=cardio →
+    appointment-flow?department=cardio → advanced analytics (department=
+    cardio) → admin stats" must return the STRING canonical department
+    contract everywhere, with no ORM object and no 500.
+
+    The shared SSOT (`department_ids_for_filter`) resolves the key ONCE and
+    every surface filters on `Appointment.department_id`; labels come from
+    the `department_key` accessor. An unknown key answers an EMPTY result
+    (exact-key semantics, the round-9 schedule-readers contract)."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def _book(self, client, linked_patient_headers, portal_department, doctor, key):
+        body = {
+            "appointmentDate": self.future_date,
+            "department": portal_department.key,
+        }
+        if doctor is not None:
+            body["doctorId"] = doctor.id
+        created = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": key},
+            json=body,
+        )
+        assert created.status_code == 201, created.json()
+        return created.json()["appointment_id"]
+
+    def test_portal_booking_flows_through_analytics_surfaces(
+        self,
+        client,
+        linked_patient_headers,
+        admin_auth_headers,
+        db_session,
+        portal_department,
+        test_doctor,
+    ):
+        test_doctor.department_id = portal_department.id
+        db_session.commit()
+        appointment_id = self._book(
+            client, linked_patient_headers, portal_department, test_doctor, "analytics-e2e-1"
+        )
+
+        # 1. appointment-flow analytics — the flagged relationship-vs-string
+        #    filter answered ArgumentError (500) on the first keyed query;
+        #    the grouping fell into Department's numeric id fallback.
+        flow = client.get(
+            "/api/v1/analytics/appointment-flow",
+            headers=admin_auth_headers,
+            params={
+                "start_date": str(date.today()),
+                "end_date": str(date.today() + timedelta(days=7)),
+                "department": portal_department.key,
+            },
+        )
+        assert flow.status_code == 200, flow.text
+        flow_payload = flow.json()
+        assert flow_payload["summary"]["total_appointments"] >= 1
+        assert portal_department.key in flow_payload.get(
+            "department_performance", {}
+        ), "the department breakdown is keyed by the canonical KEY string"
+        assert str(portal_department.id) not in flow_payload.get(
+            "department_performance", {}
+        ), "no surrogate-PK grouping keys leak into the contract"
+
+        # 2. advanced analytics (doctor performance — the reachable flagged
+        #    AdvancedAnalyticsService surface) — same key, same FK filter.
+        perf = client.get(
+            "/api/v1/analytics/advanced/doctors/performance",
+            headers=admin_auth_headers,
+            params={
+                "start_date": str(date.today()),
+                "end_date": str(date.today() + timedelta(days=7)),
+                "department": portal_department.key,
+            },
+        )
+        assert perf.status_code == 200, perf.text
+        perf_payload = perf.json()
+        assert "error" not in perf_payload, perf_payload.get("error")
+        assert any(
+            entry.get("total_appointments", 0) >= 1
+            for entry in perf_payload.get("doctor_performance", [])
+        ), "the portal booking is attributed under the FK filter"
+
+        # 3. admin stats overview — the flagged topDoctors serialization fed
+        #    a Department OBJECT into the JSON payload (500 for every doctor
+        #    whose first appointment carried a non-NULL department_id).
+        overview = client.get(
+            "/api/v1/admin/analytics/overview",
+            headers=admin_auth_headers,
+            params={
+                "period": "month",
+                "department": portal_department.key,
+            },
+        )
+        assert overview.status_code == 200, overview.text
+        overview_payload = overview.json()
+        top = overview_payload.get("topDoctors", [])
+        assert top, "the booked doctor appears in the filtered overview"
+        assert all(
+            isinstance(entry.get("department"), str) for entry in top
+        ), "the topDoctors department contract is a STRING (canonical key)"
+        assert any(
+            entry["department"] == portal_department.key for entry in top
+        ), "the canonical key string, not the ORM object, is published"
+
+        # 4. Exact-key control: an UNKNOWN key answers an EMPTY analytics
+        #    result (never the unfiltered payload, never a 500).
+        unknown = client.get(
+            "/api/v1/analytics/appointment-flow",
+            headers=admin_auth_headers,
+            params={
+                "start_date": str(date.today()),
+                "end_date": str(date.today() + timedelta(days=7)),
+                "department": "definitely-not-a-department-key",
+            },
+        )
+        assert unknown.status_code == 200, unknown.text
+        assert unknown.json()["summary"]["total_appointments"] == 0
+
+        # 5. The unfiltered surface keeps its "all departments" behavior.
+        unfiltered = client.get(
+            "/api/v1/analytics/appointment-flow",
+            headers=admin_auth_headers,
+            params={
+                "start_date": str(date.today()),
+                "end_date": str(date.today() + timedelta(days=7)),
+            },
+        )
+        assert unfiltered.status_code == 200, unfiltered.text
+        assert unfiltered.json()["summary"]["total_appointments"] >= 1
+
+    def test_advanced_service_filters_by_department_fk(
+        self,
+        client,
+        linked_patient_headers,
+        db_session,
+        portal_department,
+        test_doctor,
+    ):
+        """Service-level pin for the AdvancedAnalyticsService sites the E2E
+        cannot reach through HTTP (get_kpi_metrics / get_revenue_analytics
+        have no endpoint): the flagged `filters.append(...)` lines resolve
+        through the SAME SSOT — a known key filters by the FK, an unknown
+        key matches NOTHING (get_doctor_performance is the one service that
+        still composes end-to-end, so it carries the assertion)."""
+        from datetime import datetime
+
+        from app.services.advanced_analytics import AdvancedAnalyticsService
+
+        test_doctor.department_id = portal_department.id
+        db_session.commit()
+        self._book(client, linked_patient_headers, portal_department, test_doctor, "analytics-svc-1")
+
+        start = datetime.combine(date.today(), datetime.min.time())
+        end = datetime.combine(date.today() + timedelta(days=7), datetime.min.time())
+
+        known = AdvancedAnalyticsService.get_doctor_performance(
+            db_session, start, end, department=portal_department.key
+        )
+        assert "error" not in known, known.get("error")
+        assert any(
+            entry.get("total_appointments", 0) >= 1
+            for entry in known.get("doctor_performance", [])
+        )
+
+        unknown = AdvancedAnalyticsService.get_doctor_performance(
+            db_session, start, end, department="definitely-not-a-key"
+        )
+        assert "error" not in unknown, unknown.get("error")
+        assert unknown.get("doctor_performance") == [], (
+            "an unknown key answers an EMPTY result (exact-key semantics)"
+        )

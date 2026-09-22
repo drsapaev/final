@@ -4798,3 +4798,231 @@ def test_legacy_bridge_anchor_is_shared_across_workers(monkeypatch):
         idem_module._BRIDGE_ANCHOR_CACHE = saved_cache
         idem_module._LEGACY_BRIDGE_EPOCH = saved_epoch
         monkeypatch.undo()
+
+# ---------------------------------------------------------------------------
+# Round-10 (owner review, PR #3340): replay PHI-audit + expired-snapshot guard
+# ---------------------------------------------------------------------------
+
+
+def test_patient_replay_writes_audit_row_on_distributed_replay(
+    two_workers, monkeypatch, tmp_path
+):
+    """Round-10 owner P2 (PR #3340): a patient-scope replay answers from the
+    stored snapshot and the ENDPOINT never runs — the per-patient trail lost
+    the attempt. The middleware now writes its OWN `patient_access_audit`
+    row (outcome=success, surface=jwt_portal, replayed=true) before serving
+    the cross-worker snapshot. Two HTTP requests on two workers: handler
+    calls = 1 (worker 2 never executes), the distributed replay carries its
+    own audited row; the FIRST execution writes no middleware row (its trail
+    row is the endpoint's business)."""
+    import tempfile
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.models.patient_access_audit import PatientAccessAuditLog
+
+    client1, client2, counters, fake_redis = two_workers
+
+    # A disposable SQLite world for the audit table, resolved through the
+    # SAME hook the middleware uses in production (_resolve_request_db).
+    engine = create_engine(f"sqlite:///{tmp_path / 'audit.db'}")
+    PatientAccessAuditLog.__table__.create(bind=engine)
+    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    def _fake_resolve_db(request):
+        session = TestingSession()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    monkeypatch.setattr(idem_module, "_resolve_request_db", _fake_resolve_db)
+    # The harness fixture stubs the policy WITHOUT a patient scope; this
+    # contract needs the patient-scoped dispatch.
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+        "patient:7",
+        False,
+        True,
+    )
+    idem_module._local_scope_bindings.clear()
+    idem_module._local_scope_bindings_expiry.clear()
+
+    key = "replay-audit-dist-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+
+    def _rows():
+        session = TestingSession()
+        try:
+            return (
+                session.query(PatientAccessAuditLog)
+                .filter(
+                    PatientAccessAuditLog.subject_patient_id == 7,
+                    PatientAccessAuditLog.outcome == "success",
+                )
+                .all()
+            )
+        finally:
+            session.close()
+
+    try:
+        first = client1.post("/echo", headers=headers)
+        assert first.status_code == 200
+        assert counters["w1"]["calls"] == 1
+        assert _rows() == [], (
+            "the first EXECUTION writes no middleware audit row (the "
+            "endpoint's own audited dependency owns that trail entry)"
+        )
+
+        # Same key, OTHER worker: the DISTRIBUTED snapshot answers — the
+        # handler must not run and the replay must be audited.
+        replay = client2.post("/echo", headers=headers)
+        assert replay.status_code == 200
+        assert replay.json() == first.json(), "the stored snapshot is replayed"
+        assert counters["w1"]["calls"] == 1 and counters["w2"]["calls"] == 0, (
+            "the distributed replay never re-executes the handler"
+        )
+
+        rows = _rows()
+        assert len(rows) == 1, "exactly one row: THIS replay attempt"
+        extra = rows[0].extra_data or {}
+        assert extra.get("replayed") is True
+        assert extra.get("surface") == "jwt_portal"
+        assert rows[0].outcome == "success"
+        assert rows[0].subject_patient_id == 7
+        # /echo maps to the honest generic fallback (only the keyed portal
+        # booking surfaces carry appointment/create|preview labels).
+        assert rows[0].resource_type == "patient_portal"
+        assert rows[0].action == "access"
+
+        # A third attempt on worker 1 (LOCAL snapshot this time) is audited
+        # just the same — the contract covers both replay sources.
+        second_replay = client1.post("/echo", headers=headers)
+        assert second_replay.status_code == 200
+        assert counters["w1"]["calls"] == 1
+        assert len(_rows()) == 2
+    finally:
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
+
+
+def test_expired_local_binding_snapshot_is_not_resurrected_by_mirror(monkeypatch):
+    """Round-10 owner P2 (PR #3340): `_local_scope_binding_set` read the
+    stored snapshot BEFORE its liveness check — a scope-only rebind over an
+    entry whose fixed 24 h window had ALREADY lapsed rewrote it as
+    (now + 24 h, scope, OLD snapshot): the Redis→local mirror RESURRECTED a
+    dead local replay source. In dispatch order (Redis scope GET → mirror →
+    local outcome lookup) that resurrected snapshot answered the next
+    degraded retry with a response the durable Redis layer no longer holds.
+
+    Production dispatch order, unit-pinned: expired local binding WITH a
+    snapshot → mirror (the binding-resolution step) → the entry is re-bound
+    LIVE but with its snapshot DROPPED → the local outcome lookup MISSES →
+    the handler runs as a new attempt."""
+    import time as _time
+
+    try:
+        key = "expired-snapshot-1"
+        snapshot = (201, {"x": "1"}, b"{}", "application/json", "hash1", "Patient")
+        # The entry was born 24 h ago and its window has ALREADY lapsed —
+        # with the snapshot still attached (the pre-fix store state: the
+        # lazy expiry purge has not touched it yet).
+        expired = (_time.time() - 1, "patient:7", snapshot)
+        idem_module._local_scope_bindings[("ns1", key)] = expired
+        import heapq
+
+        heapq.heappush(
+            idem_module._local_scope_bindings_expiry,
+            (expired[0], ("ns1", key)),
+        )
+
+        # The dispatch's Redis-resolved-binding mirror step.
+        idem_module._local_scope_binding_mirror("ns1", key, "patient:7")
+
+        mirrored = idem_module._local_scope_bindings[("ns1", key)]
+        assert mirrored[0] > _time.time(), (
+            "the BINDING is restored after the concurrent-eviction window"
+        )
+        assert mirrored[2] is None, (
+            "an EXPIRED entry's snapshot is never carried into a fresh window"
+        )
+
+        # The local outcome lookup that follows in dispatch: a MISS.
+        response, mismatch, role = idem_module._local_patient_outcome_get(
+            "ns1", key, "hash1"
+        )
+        assert response is None, (
+            "the dead outcome is not replayable — the handler executes as a "
+            "new attempt"
+        )
+    finally:
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
+
+
+def test_expired_local_snapshot_does_not_replay_in_dispatch(two_workers):
+    """Round-10 owner P2 (PR #3340) — the FULL production dispatch order:
+    after the local window and the Redis response have BOTH lapsed, the
+    same-key retry must RE-EXECUTE (a new attempt) instead of replaying the
+    long-expired local snapshot the pre-fix mirror resurrected. The durable
+    Redis BINDING survives (same card, same scope), so the mirror step runs
+    exactly as in production; the dropped snapshot makes the local lookup
+    miss; the handler executes."""
+    import time as _time
+
+    client1, client2, counters, fake_redis = two_workers
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+        "patient:7",
+        False,
+        True,
+    )
+    idem_module._local_scope_bindings.clear()
+    idem_module._local_scope_bindings_expiry.clear()
+
+    key = "expired-dispatch-1"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+    origin_ns = IdempotencyMiddleware._namespace(1, "POST:/echo")
+
+    try:
+        first = client1.post("/echo", headers=headers)
+        assert first.status_code == 200
+        assert counters["w1"]["calls"] == 1
+
+        # The Redis RESPONSE windows lapse (the binding STAYS — it is the
+        # durable card identity); the LOCAL entry expires with its snapshot
+        # still attached (the pre-fix store state before the purge).
+        # Both durable response copies are dropped: the operation-scoped
+        # namespace AND the legacy dual-write copy (the round-6 fence).
+        claim = idem_module._distributed_claim
+        claim.forget_response(
+            IdempotencyMiddleware._namespace(1, "POST:/echo", "patient:7"), key
+        )
+        claim.forget_response(IdempotencyMiddleware._namespace(1), key)
+        cache_key = (origin_ns, key)
+        entry = idem_module._local_scope_bindings[cache_key]
+        assert entry[2] is not None, "harness sanity: a snapshot was stored"
+        idem_module._local_scope_bindings[cache_key] = (
+            _time.time() - 1,
+            entry[1],
+            entry[2],
+        )
+
+        # Same worker retry, production dispatch order: Redis scope GET
+        # resolves the binding → mirror (post-fix: snapshot dropped) →
+        # distributed response GET misses → local outcome lookup misses →
+        # the handler runs as a NEW attempt.
+        retry = client1.post("/echo", headers=headers)
+        assert retry.status_code == 200, retry.json()
+        assert counters["w1"]["calls"] == 2, (
+            "a lapsed local window never replays — the retry executes"
+        )
+        assert retry.json()["calls"] == 2, (
+            "the response is the NEW attempt's body, not the stale snapshot"
+        )
+
+        # The new attempt re-stores its OWN outcome (fresh window).
+        re_stored = idem_module._local_scope_bindings[cache_key]
+        assert re_stored[2] is not None and re_stored[0] > _time.time()
+    finally:
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
