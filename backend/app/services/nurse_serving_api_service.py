@@ -755,10 +755,28 @@ class NurseServingApiService:
 
         items: list[dict[str, Any]] = []
         for execution, resource, entry, visit_service in chains:
+            # Owner verdict round-2 P1 (PR #3367): the board surfaces
+            # ``in_progress_execution_id`` ONLY through the current-catalog
+            # fold (``_fold_station_service_items``) — a mid-flight Service
+            # re-tag (or a deleted Service row) drops the whole line, the
+            # id included, from the board. "Board covers" therefore ALSO
+            # requires the CURRENT catalog to still route the line here:
+            # the assignment + today-queue + active-entry triple alone
+            # excluded the execution from the drain while the board had
+            # already dropped the re-tagged line — the id vanished from
+            # BOTH read surfaces at once. For legacy NULL-snapshot rows
+            # this conjunct is exactly the chain check that admitted them
+            # above (no behavior change); for snapshot rows it is the
+            # honest board-visibility proof the triple was missing.
+            line_service = services.get(visit_service.service_id)
+            board_still_routes = line_service is not None and (
+                _service_routed_to_station(line_service, resource)
+            )
             board_covers = (
                 resource.id in active_resource_ids
                 and today_queue_id_by_tag.get(resource.queue_tag) == entry.queue_id
                 and entry.status in _ENTRY_ACTIVE_STATES
+                and board_still_routes
             )
             if board_covers:
                 # Provably surfaced by the caller's board (the active
@@ -880,6 +898,17 @@ class NurseServingApiService:
         service prescribed, E2 re-issued -> E1 must disappear from
         late_pending IMMEDIATELY, not after the late service completes).
 
+        (c) visit dedup (owner verdict round-2 P2 on #3367): EVERY
+        terminal entry of the visit matched the pending predicate, so a
+        visit with several terminal tickets (E1 served -> late service
+        -> E2 rejoin -> E2 no_show -> E3 rejoin -> ...) produced one
+        late_pending card per terminal ticket — the board's card list
+        grew with every rejoin while signalling the same single pending
+        service. The query now returns ONE representative terminal
+        entry per visit_id — the LATEST ticket (max id), the one the
+        registrar's re-ticket chain actually left behind — via a
+        ``row_number()`` window (SQLite >= 3.25 and PostgreSQL both).
+
         The pending predicate mirrors ``_fold_station_service_items``
         exactly (``pending = not (completed_any or latest_cancelled)``);
         the routing predicate consults the CURRENT catalog on purpose —
@@ -924,16 +953,33 @@ class NurseServingApiService:
             )
             .exists()
         )
-        return (
-            self.db.query(OnlineQueueEntry)
-            .filter(
+        # (c) one representative terminal entry per visit: newest ticket
+        # wins (rn == 1 over visit_id partitions ordered by id DESC).
+        latest_per_visit_rn = (
+            func.row_number()
+            .over(
+                partition_by=OnlineQueueEntry.visit_id,
+                order_by=OnlineQueueEntry.id.desc(),
+            )
+            .label("late_pending_rn")
+        )
+        candidates = (
+            select(OnlineQueueEntry)
+            .where(
                 OnlineQueueEntry.queue_id == queue.id,
                 OnlineQueueEntry.status.in_(_ENTRY_TERMINAL_STATES),
                 OnlineQueueEntry.visit_id.isnot(None),
                 pending_station_service,
                 ~live_rejoin,
             )
-            .order_by(OnlineQueueEntry.id.asc())
+            .add_columns(latest_per_visit_rn)
+            .subquery()
+        )
+        representative = aliased(OnlineQueueEntry, candidates)
+        return (
+            self.db.query(representative)
+            .filter(candidates.c.late_pending_rn == 1)
+            .order_by(representative.id.asc())
             .all()
         )
 
@@ -1445,6 +1491,13 @@ class NurseServingApiService:
         the attempt is still legally hers to finish. The D3 gate itself
         still consults the CURRENT catalog for every NEW attempt — new
         work must be correctly routed NOW.
+
+        Owner verdict round-2 P1 (PR #3367): the no-op is additionally
+        ENTRY-bound — a re-claim through a NEW queue entry of the same
+        visit (no_show deliberately leaves ServiceExecutions untouched,
+        so a rejoin ticket E2 can coexist with an in_progress attempt
+        of E1) fails closed with 409 instead of adopting the old
+        attempt.
         """
         resource = self._resource_or_error(queue_resource_id)
         self._active_assignment_or_error(user_id, queue_resource_id)
@@ -1511,10 +1564,10 @@ class NurseServingApiService:
         )
         in_progress = next((a for a in attempts if a.status == "in_progress"), None)
         if in_progress is not None and in_progress.started_by_user_id == user_id:
-            # Station-bound idempotency (codex round-1 P1 + round-2 P1):
-            # the no-op re-claims the attempt ONLY on the station it was
-            # started on — a B-station tablet must never be handed A's
-            # execution as if it had started work there.
+            # Station- AND entry-bound idempotency (codex round-1 P1 +
+            # round-2 P1 + owner verdict round-2 P1 on #3367): the no-op
+            # re-claims the attempt ONLY on the station it was started on
+            # AND only through the queue entry it was started for.
             if in_progress.queue_resource_id is not None:
                 # Snapshot rows (0073+): the snapshot IS the station.
                 station_bound = in_progress.queue_resource_id == resource.id
@@ -1533,10 +1586,40 @@ class NurseServingApiService:
                 station_bound = (
                     attempt_resource is not None and attempt_resource.id == resource.id
                 )
-            if station_bound:
-                # Same-nurse repeat POST = no-op (the tablet contract);
-                # the endpoint answers 200 instead of 201 via `created`.
+            # Entry binding (owner verdict round-2 P1 on #3367): no_show
+            # is a QUEUE-level transition that deliberately leaves
+            # ServiceExecutions untouched, so a restored / re-ticketed
+            # visit can carry a NEW active entry E2 while the old
+            # in_progress attempt is still bound to E1 — and attempts
+            # load by visit_service_id, not by entry. Without this
+            # binding the same nurse's POST through E2 adopted E1's
+            # attempt as an idempotent no-op, and the subsequent
+            # completion acted on E1 while E2 stayed active.
+            entry_bound = in_progress.queue_entry_id == entry.id
+            if station_bound and entry_bound:
+                # Same-nurse repeat POST on the SAME entry = no-op (the
+                # tablet contract); the endpoint answers 200 instead of
+                # 201 via `created`.
                 return {**self._execution_payload(in_progress), "created": False}
+            if station_bound:
+                # Same nurse, same station, ANOTHER entry: fail closed
+                # BEFORE the catalog gate — the live attempt belongs to
+                # the entry it was started on, and adopting it through a
+                # rejoin ticket would let one completion silently act on
+                # the old attempt while the new entry stayed active.
+                # Finish the existing attempt first (the terminal
+                # execution endpoints address it by execution id; its
+                # own entry may already be terminal — the drain surface
+                # keeps the id discoverable).
+                raise NurseServingApiDomainError(
+                    409,
+                    "Попытка услуги уже исполняется по другой записи "
+                    f"очереди (execution id={in_progress.id}, её "
+                    f"queue_entry_id={in_progress.queue_entry_id}, "
+                    f"текущая запись id={entry.id}) — завершите или "
+                    "отмените существующую попытку сначала; повторный "
+                    "POST по новой записи не продолжает чужую попытку",
+                )
 
         service = (
             self.db.query(Service)

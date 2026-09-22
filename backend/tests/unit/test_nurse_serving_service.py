@@ -2811,6 +2811,103 @@ class TestOwnerFollowupRoutingSnapshot:
         assert result["created"] is False
         assert result["id"] == execution["id"]
 
+    # ------------------------------------------------------------------
+    # owner verdict round-2 (PR #3367): the drain's board-coverage proof
+    # and the entry-bound re-claim
+    # ------------------------------------------------------------------
+    def test_retag_with_live_assignment_keeps_one_discoverable_surface(
+        self, db_session: Session
+    ):
+        """Owner verdict round-2 P1 (PR #3367): the re-tag scenario WITHOUT
+        the deactivation. The assignment stays active, the entry stays on
+        today's queue in an active status — the drain's board-cover triple
+        held while the board's current-catalog fold had ALREADY dropped
+        the re-tagged line: the execution id vanished from BOTH read
+        surfaces at once. The board genuinely hides the line (the re-tag
+        moved the work), and the drain — the recovery surface — must
+        surface the id: exactly one discoverable surface, and the starter
+        can still finish the attempt."""
+        nurse, resource, svc, entry, visit, vs, execution = self._started_execution(
+            db_session, suffix="cfu_rt_bc"
+        )
+        assert visit is not None and vs is not None
+        self._retag(db_session, svc, "tag_elsewhere_bc")
+
+        service = NurseServingApiService(db_session)
+        # The board: the active entry's fold carries NO station line
+        # anymore (the re-tagged service is another station's concern).
+        state = service.get_station_state(nurse.id, resource.id)
+        assert state["counts"]["in_progress"] == 1
+        assert state["active"][0]["services"] == []
+        # The drain: the honest board-visibility proof keeps the id
+        # discoverable (pre-fix the triple alone excluded it here).
+        payload = service.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        assert payload["items"][0]["execution"]["id"] == execution["id"]
+        assert payload["items"][0]["station"]["queue_resource_id"] == resource.id
+        # ...and the starter can still finish it.
+        result = service.complete_execution(nurse.id, execution["id"])
+        assert result["status"] == "completed"
+        db_session.refresh(entry)
+        assert entry.status == "served"
+
+    def test_same_station_reclaim_through_new_entry_is_409(
+        self, db_session: Session
+    ):
+        """Owner verdict round-2 P1 (PR #3367): no_show is a QUEUE-level
+        transition — it deliberately leaves ServiceExecutions untouched —
+        so a restored / re-ticketed visit carries a NEW entry E2 while
+        the old in_progress attempt is still bound to E1. Attempts load
+        by visit_service_id, so the same nurse's POST through E2 used to
+        adopt E1's attempt as an idempotent no-op; the subsequent
+        completion acted on E1 while E2 stayed active. The no-op is
+        ENTRY-bound: the cross-entry re-claim fails closed with 409
+        (before the catalog gate), the old attempt stays untouched, and
+        the recovery is finishing the old attempt by its own id."""
+        nurse, resource, svc, entry_e1, visit, vs, execution = (
+            self._started_execution(db_session, suffix="cfu_rt_eb")
+        )
+        assert visit is not None and vs is not None
+        # The cross-surface reality: E1 goes terminal (an admin restore /
+        # another surface's queue-level transition) while its execution
+        # stays in_progress — no_show semantics, executions untouched.
+        entry_e1.status = "no_show"
+        db_session.commit()
+        # The rejoin: a NEW active ticket of the same visit, same station.
+        queue = db_session.get(DailyQueue, entry_e1.queue_id)
+        entry_e2 = _entry(
+            db_session,
+            queue,
+            2,
+            patient=db_session.get(Patient, entry_e1.patient_id),
+            visit=visit,
+            status="in_progress",
+        )
+
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            NurseServingApiService(db_session).create_execution(
+                nurse.id,
+                resource.id,
+                queue_entry_id=entry_e2.id,
+                visit_service_id=vs.id,
+            )
+        _expect(exc, 409)
+        assert str(execution["id"]) in exc.value.detail
+        # Nothing was adopted: the old attempt keeps its binding.
+        row = db_session.get(ServiceExecution, execution["id"])
+        assert row.status == "in_progress"
+        assert row.queue_entry_id == entry_e1.id
+        # The recovery: the old attempt is finished by its own id; the
+        # terminal entry's flip guard no-ops and E2 is untouched.
+        result = NurseServingApiService(db_session).complete_execution(
+            nurse.id, execution["id"]
+        )
+        assert result["status"] == "completed"
+        db_session.refresh(entry_e1)
+        assert entry_e1.status == "no_show"
+        db_session.refresh(entry_e2)
+        assert entry_e2.status == "in_progress"
+
 
 # ----------------------------------------------------------------------------
 # Corrective follow-up (owner verdict on the merged runtime):
@@ -2910,3 +3007,38 @@ class TestOwnerFollowupLatePendingRejoin:
         state = service.get_station_state(nurse.id, resource.id)
         assert state["counts"]["late_pending"] == 0
         assert state["active"] == []
+
+    def test_multiple_terminal_tickets_yield_one_late_pending_card(
+        self, db_session: Session
+    ):
+        """Owner verdict round-2 P2 (PR #3367): EVERY terminal entry of the
+        visit matched the pending predicate, so E1 served -> late service
+        -> E2 rejoin -> E2 no_show left BOTH terminal entries in
+        late_pending (no live rejoin, one pending service) — one card per
+        terminal ticket, and the card list grew with every rejoin cycle.
+        ONE representative per visit_id: the LATEST ticket (max id), the
+        one the registrar's re-ticket chain actually left behind."""
+        nurse, resource, queue, visit, entry_e1, late_vs, service = (
+            self._served_with_late_service(db_session, suffix="cfu_lpd")
+        )
+        patient = db_session.get(Patient, entry_e1.patient_id)
+
+        # First rejoin cycle: E2 called -> no_show (queue-level; the
+        # pending late service is deliberately untouched).
+        entry_e2 = _entry(db_session, queue, 2, patient=patient, visit=visit)
+        service.call_next(nurse.id, resource.id)
+        service.mark_entry_no_show(nurse.id, resource.id, entry_e2.id)
+
+        state = service.get_station_state(nurse.id, resource.id)
+        assert state["counts"]["late_pending"] == 1
+        assert [item["id"] for item in state["late_pending"]] == [entry_e2.id]
+
+        # Second rejoin cycle: E3 -> no_show too. Still ONE card — the
+        # latest terminal ticket, never a growing stack.
+        entry_e3 = _entry(db_session, queue, 3, patient=patient, visit=visit)
+        service.call_next(nurse.id, resource.id)
+        service.mark_entry_no_show(nurse.id, resource.id, entry_e3.id)
+
+        state = service.get_station_state(nurse.id, resource.id)
+        assert state["counts"]["late_pending"] == 1
+        assert [item["id"] for item in state["late_pending"]] == [entry_e3.id]

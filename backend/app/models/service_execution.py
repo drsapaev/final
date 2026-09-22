@@ -65,8 +65,15 @@ integrity, NOT the CURRENT catalog: ``Service.queue_tag`` is a штатно
 mutable field (canonical/batch update re-tag), and a mid-flight re-tag
 used to make the attempt unfinishable (terminal 403 + invisible to
 drain discovery + the 0072 partial unique one-active index blocking
-every retry). Rows written before migration 0073 have NULL snapshots and
-keep the legacy current-catalog D3 re-check (transitional, documented).
+every retry). Migration 0073 BACKFILLS every ``in_progress`` row whose
+chain still corroborates the D3 routing at upgrade time (rows whose
+chain does not resolve, or whose current catalog contradicts the
+routing, stay NULL — no widening of authorization); such remaining NULL
+rows keep the legacy current-catalog D3 re-check. Rollout discipline:
+the backfill covers rows existing at upgrade time only — rows written
+by pre-upgrade workers during a rolling deployment stay NULL until
+their first legacy-consistent touch, so catalog re-tags stay frozen
+until the old version is fully replaced (the formal rollout barrier).
 """
 
 from __future__ import annotations
@@ -164,9 +171,11 @@ class ServiceExecution(Base):
 
     # Corrective follow-up (owner verdict P1 — immutable execution-to-
     # station routing): creation-time routing snapshot. Nullable: rows
-    # written before migration 0073 have no snapshot and keep the legacy
-    # current-catalog D3 re-check on their terminal paths. See the module
-    # docstring for why these are plain values, not live FKs.
+    # written before migration 0073 get the upgrade-time backfill when
+    # their chain corroborates the routing (see the module docstring);
+    # unresolvable rows keep the legacy current-catalog D3 re-check on
+    # their terminal paths. See the module docstring for why these are
+    # plain values, not live FKs.
     queue_resource_id: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
