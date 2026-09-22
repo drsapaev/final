@@ -20,18 +20,30 @@ doctor-integration queue surface — the round-43 mirror pair):
   CanonicalVisitRepository vocabulary: patient / old visit_date /
   non-terminal status / doctor equality incl. the NULL axis / time with
   both spellings);
-- the filters are NARROWED by the department axis first:
-  ``Visit.department_id`` when present, else the canonical FK resolved
-  from the ``Visit.department`` string (``Department.key == tag``, the
-  queue-tag = department-key convention). A visit with NEITHER axis
-  keeps the un-narrowed filter — the ambiguity guard below still
-  protects it;
-- candidates are locked FOR UPDATE and the move applies to EXACTLY ONE
-  row (``appointment_date = new_day``);
-- zero candidates -> nothing moves (the pre-existing no-op);
-- MORE than one candidate -> :class:`AmbiguousAppointmentPairingError`
-  — the caller FAILS CLOSED (its transaction rolls back, nothing moves).
-  Bulk-moving every match is precisely the defect being fixed.
+- candidate eligibility is STAGED by the department axis (codex round-1
+  P1/P2 hardening):
+  1. when the visit's department resolves (``Visit.department_id`` FK,
+     else ``Department.key == Visit.department`` — the queue-tag =
+     department-key convention): the EXACT set is the canonical filters +
+     ``Appointment.department_id == visit department``;
+  2. the UNSCOPED fallback set is ALWAYS the canonical filters +
+     ``Appointment.department_id IS NULL`` — it serves (a) the resolvable
+     case whose uniquely-matching appointment predates the department
+     axis (codex round-1 P2: a single NULL-department row must still
+     follow its visit instead of stranding on the old day), and (b) the
+     LEGACY case where the visit's department resolves to nothing (codex
+     round-1 P1: a SCOPED appointment — non-NULL department_id — then
+     belongs to a KNOWN department and is provably NOT this visit's
+     pair; the un-narrowed broad set is never used, so a lone
+     foreign-department appointment can no longer be silently moved);
+- each staged query locks its candidates FOR UPDATE and the move applies
+  to EXACTLY ONE row (``appointment_date = new_day``);
+- zero candidates in BOTH stages -> nothing moves (the pre-existing
+  no-op — an absent appointment was always a legal state);
+- MORE than one candidate in EITHER stage ->
+  :class:`AmbiguousAppointmentPairingError` — the caller FAILS CLOSED
+  (its transaction rolls back, nothing moves). Bulk-moving every match
+  is precisely the defect being fixed.
 
 The explicit ``Visit.appointment_id`` link (the owner's preferred
 long-term shape) stays future work: it needs its own migration and a
@@ -54,12 +66,21 @@ _NON_TERMINAL_APPOINTMENT_STATUSES = ("cancelled", "completed", "no_show")
 
 
 class AmbiguousAppointmentPairingError(Exception):
-    """More than one live appointment matches the narrowed pairing.
+    """More than one live appointment matches a pairing stage.
 
     Raised instead of moving foreign rows: the caller must fail closed
     (rollback the transfer) — an ambiguous pairing is a data state a
     human must resolve, not something a queue transfer may guess about.
     """
+
+    def __init__(self, stage: str, count: int, context: str) -> None:
+        self.stage = stage
+        self.count = count
+        super().__init__(
+            f"{context}: стадия «{stage}» дала {count} подходящих "
+            "незакрытых appointment — перенос отклонён (fail closed), "
+            "сопоставление неоднозначно"
+        )
 
 
 def resolve_visit_department_id(db: Session, visit: Visit) -> int | None:
@@ -69,8 +90,8 @@ def resolve_visit_department_id(db: Session, visit: Visit) -> int | None:
     ``Visit.department`` string (the queue tag) is resolved through
     ``Department.key`` — the canonical FK resolution the owner verdict
     names as the minimum narrowing. Returns ``None`` when neither axis
-    resolves (legacy visits): the caller then relies on the ambiguity
-    guard alone.
+    resolves (legacy visits): the caller then has only the UNSCOPED
+    (NULL-department) eligibility stage — never the broad set.
     """
     if visit.department_id is not None:
         return visit.department_id
@@ -82,17 +103,8 @@ def resolve_visit_department_id(db: Session, visit: Visit) -> int | None:
     return row[0] if row is not None else None
 
 
-def move_paired_appointment_to_day(
-    db: Session, *, visit: Visit, new_day: date
-) -> Appointment | None:
-    """Move the ONE appointment paired with ``visit`` to ``new_day``.
-
-    Returns the moved row, or ``None`` when no live appointment matches
-    the (narrowed) canonical pairing. Raises
-    :class:`AmbiguousAppointmentPairingError` when more than one row
-    matches — the fail-closed contract; NOTHING is moved in that case
-    (the caller's transaction rolls back).
-    """
+def _canonical_filters(visit: Visit) -> list[Any]:
+    """The CanonicalVisitRepository pairing vocabulary (unchanged)."""
     filters: list[Any] = [
         Appointment.patient_id == visit.patient_id,
         Appointment.appointment_date == visit.visit_date,
@@ -107,26 +119,66 @@ def move_paired_appointment_to_day(
         filters.append(Appointment.appointment_time.in_((hhmm, f"{hhmm}:00")))
     else:
         filters.append(Appointment.appointment_time.is_(None))
+    return filters
+
+
+def _locked_candidates(
+    db: Session, filters: list[Any], *, stage: str, context: str
+) -> list[Appointment]:
+    rows = db.query(Appointment).filter(*filters).with_for_update().all()
+    if len(rows) > 1:
+        raise AmbiguousAppointmentPairingError(stage, len(rows), context)
+    return rows
+
+
+def move_paired_appointment_to_day(
+    db: Session, *, visit: Visit, new_day: date
+) -> Appointment | None:
+    """Move the ONE appointment paired with ``visit`` to ``new_day``.
+
+    Returns the moved row, or ``None`` when no live appointment is
+    eligible in either stage (an absent appointment is a legal no-op).
+    Raises :class:`AmbiguousAppointmentPairingError` when a stage yields
+    more than one row — the fail-closed contract; NOTHING is moved in
+    that case (the caller's transaction rolls back).
+    """
+    context = (
+        f"визит id={visit.id} (patient_id={visit.patient_id}, "
+        f"visit_date={visit.visit_date}, department={visit.department!r}, "
+        f"department_id={visit.department_id!r})"
+    )
+    canonical = _canonical_filters(visit)
 
     department_id = resolve_visit_department_id(db, visit)
     if department_id is not None:
-        # The owner-verdict narrowing: a resource-queue visit only ever
-        # pairs with the appointment of ITS department — the sibling
-        # laboratory appointment of the same patient/day must stay on
-        # its own day.
-        filters.append(Appointment.department_id == department_id)
-
-    candidates = db.query(Appointment).filter(*filters).with_for_update().all()
-    if not candidates:
-        return None
-    if len(candidates) > 1:
-        raise AmbiguousAppointmentPairingError(
-            f"визит id={visit.id} (patient_id={visit.patient_id}, "
-            f"visit_date={visit.visit_date}, department="
-            f"{visit.department!r}, department_id={visit.department_id!r}) "
-            f"имеет {len(candidates)} подходящих незакрытых appointment — "
-            "перенос отклонён (fail closed), сопоставление неоднозначно"
+        # Stage 1 — the EXACT set: the owner-verdict narrowing. A
+        # resource-queue visit only ever pairs with the appointment of
+        # ITS department; the sibling laboratory appointment of the same
+        # patient/day stays on its own day.
+        exact = _locked_candidates(
+            db,
+            [*canonical, Appointment.department_id == department_id],
+            stage="точный департамент",
+            context=context,
         )
-    appointment = candidates[0]
-    appointment.appointment_date = new_day
-    return appointment
+        if exact:
+            appointment = exact[0]
+            appointment.appointment_date = new_day
+            return appointment
+
+    # Stage 2 — the UNSCOPED fallback: appointments that predate the
+    # department axis. NEVER the un-narrowed broad set: a scoped
+    # appointment of another department is provably not this visit's
+    # pair (codex round-1 P1), while a single unscoped row remains the
+    # legitimate legacy pair (codex round-1 P2) and follows its visit.
+    unscoped = _locked_candidates(
+        db,
+        [*canonical, Appointment.department_id.is_(None)],
+        stage="legacy без департамента",
+        context=context,
+    )
+    if unscoped:
+        appointment = unscoped[0]
+        appointment.appointment_date = new_day
+        return appointment
+    return None

@@ -906,39 +906,55 @@ def complete_patient_visit(
             # the user keeps the history row with NULL attribution.
             queue_entry.served_by_user_id = current_user.id
             queue_entry.served_at = changed_at
+
+            # Codex round-1 P1 (corrective follow-up): resolve + pair the
+            # visit BEFORE the served-commit. The pairing may FAIL CLOSED
+            # (409 on an ambiguous appointment set), and the broad
+            # ``except Exception`` below the commit deliberately swallows
+            # visit-update errors — an ambiguous pairing swallowed THERE
+            # left the entry committed served while the visit and its
+            # appointment stayed on the old day, exactly the inconsistency
+            # the fail-closed contract forbids. Everything up to this point
+            # is read-only; the resolution's own mutations (visit link /
+            # re-date / appointment move) flush with the served-commit
+            # below, and a 409 propagates through the outer
+            # ``except HTTPException`` with NOTHING committed.
+            resource_department = None
+            if daily_queue is not None and (
+                getattr(daily_queue, "queue_resource_id", None) is not None
+            ):
+                resource = daily_queue.queue_resource
+                resource_department = daily_queue.queue_tag or (
+                    resource.code if resource is not None else None
+                )
+            # QD-2C (Codex round-35 P1): департамент визита записи —
+            # visit_id-first и департаментный поиск у ресурсной
+            # поверхности (см. хелпер): завершение мутирует тот же визит,
+            # что старт.
+            # Codex round-43 P2: департамент завершения врач-очереди —
+            # тот же канонический маппинг, что у старта (тег или
+            # «general»), а не легаси-«cardiology»: с департаментным
+            # lookup резолва (round-43) рассинхрон департаментов
+            # заставлял завершение создавать второй визит и
+            # оставлять исходный открытым.
+            department_hint = resource_department or (
+                getattr(daily_queue, "queue_tag", None) or "general"
+            )
+            resolved_visit = _resolve_entry_visit(
+                db, queue_entry, doctor, department_hint
+            )
+
             db.commit()
             db.refresh(queue_entry)
 
             # Создаем или обновляем визит на сегодня и помечаем как завершенный,
             # чтобы это отразилось в registrar/queues/today, который читает Visit/Appointment
             try:
-                # QD-2C (Codex round-34 P2): департамент визита — из оси
-                # ресурсной очереди (тег/реестр): у DailyQueue нет
-                # department-атрибута, и легаси-fallback писал «cardiology»
-                # — лабораторный/ЭКГ визит (specialist NULL) попадал в чужое
-                # отделение. Врач-очереди без ресурса сохраняют прежний
-                # fallback байт-идентично.
-                resource_department = None
-                if daily_queue is not None and (
-                    getattr(daily_queue, "queue_resource_id", None) is not None
-                ):
-                    resource = daily_queue.queue_resource
-                    resource_department = daily_queue.queue_tag or (
-                        resource.code if resource is not None else None
-                    )
-                # QD-2C (Codex round-35 P1): визит записи — visit_id-first
-                # и департаментный поиск у ресурсной поверхности (см.
-                # хелпер): завершение мутирует тот же визит, что старт
-                # Codex round-43 P2: департамент завершения врач-очереди —
-                # тот же канонический маппинг, что у старта (тег или
-                # «general»), а не легаси-«cardiology»: с департаментным
-                # lookup резолва (round-43) рассинхрон департаментов
-                # заставлял завершение создавать второй визит и
-                # оставлять исходный открытым
-                department_hint = resource_department or (
-                    getattr(daily_queue, "queue_tag", None) or "general"
-                )
-                visit = _resolve_entry_visit(db, queue_entry, doctor, department_hint)
+                # QD-2C (Codex round-34 P2) + Codex round-43 P2: департамент и
+                # сам визит РАЗРЕШЕНЫ ДО served-коммита выше (см. комментарий
+                # у resolved_visit): здесь остаётся только lifecycle и
+                # медицинские/платёжные данные.
+                visit = resolved_visit
                 # ✅ Issue #06 Phase 3: delegate to VisitLifecycleService
                 # for state machine validation + row lock.
                 from app.services.visit_lifecycle_service import VisitLifecycleService

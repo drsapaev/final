@@ -2403,6 +2403,76 @@ class TestOwnerFollowupAppointmentPairing:
         assert a_one.appointment_date == yesterday  # nothing moved
         assert a_two.appointment_date == yesterday
 
+    # ------------------------------------------------------------------
+    # codex round-1 (PR #3367): the staged eligibility contract
+    # ------------------------------------------------------------------
+    def test_null_department_appointment_still_follows_its_visit(
+        self, db_session: Session
+    ):
+        """codex round-1 P2: a uniquely-matching appointment that predates
+        the department axis (department_id NULL) must still follow its
+        visit — a strict FK-only predicate would strand it on the old
+        day and recreate the round-43 duplicate-visit risk."""
+        from datetime import timedelta
+
+        _lab, procedures = self._departments(db_session)
+        today = clinic_today(db_session)
+        nurse, resource, patient, visit, entry, service = self._world(
+            db_session, visit_department_id=procedures.id, day=today - timedelta(days=1)
+        )
+        legacy_appointment = Appointment(
+            patient_id=patient.id,
+            appointment_date=visit.visit_date,
+            appointment_time=None,
+            doctor_id=None,
+            status="confirmed",
+            department_id=None,  # the pre-department-axis pairing row
+        )
+        db_session.add(legacy_appointment)
+        db_session.commit()
+
+        result = service.start_entry(nurse.id, resource.id, entry.id)
+        assert result["visit_id"] == visit.id
+        db_session.refresh(legacy_appointment)
+        assert legacy_appointment.appointment_date == today  # it followed
+
+    def test_unresolvable_visit_never_moves_a_scoped_foreign_appointment(
+        self, db_session: Session
+    ):
+        """codex round-1 P1: a legacy visit whose department resolves to
+        NOTHING must never fall back to the broad set — a lone SCOPED
+        appointment of a known department is provably not this visit's
+        pair, and moving it is exactly the cross-department corruption
+        the verdict forbids."""
+        from datetime import timedelta
+
+        lab, _procedures = self._departments(db_session)
+        today = clinic_today(db_session)
+        # department string that maps to no Department row: unresolvable.
+        nurse, resource, patient, visit, entry, service = self._world(
+            db_session, visit_department_id=None, day=today - timedelta(days=1)
+        )
+        visit.department = "tag_unknown_queue"
+        db_session.commit()
+        foreign_scoped = Appointment(
+            patient_id=patient.id,
+            appointment_date=visit.visit_date,
+            appointment_time=None,
+            doctor_id=None,
+            status="confirmed",
+            department_id=lab.id,  # provably the lab department's pair
+        )
+        db_session.add(foreign_scoped)
+        db_session.commit()
+
+        result = service.start_entry(nurse.id, resource.id, entry.id)
+        assert result["visit_id"] == visit.id
+        db_session.refresh(visit)
+        assert visit.visit_date == today  # the visit itself still moves
+        db_session.refresh(foreign_scoped)
+        # ...but the lab appointment NEVER follows an unresolvable visit.
+        assert foreign_scoped.appointment_date == today - timedelta(days=1)
+
 
 # ----------------------------------------------------------------------------
 # Corrective follow-up (owner verdict on the merged runtime):
@@ -2588,6 +2658,84 @@ class TestOwnerFollowupRoutingSnapshot:
         _expect(exc, 403)
         db_session.refresh(entry)
         assert entry.status == "in_progress"  # no empty-station flip
+
+    # ------------------------------------------------------------------
+    # codex round-1 (PR #3367): the idempotent re-claim is station-bound
+    # ------------------------------------------------------------------
+    def test_cross_station_reclaim_is_not_a_noop(self, db_session: Session):
+        """codex round-1 P1: a nurse assigned to BOTH stations must not be
+        handed station A's in-progress execution by a station B POST —
+        the no-op is bound to the attempt's snapshot station, so the
+        cross-station request falls to the catalog D3 gate (400 while
+        the service still routes only to A)."""
+        nurse, resource_a, svc, entry_a, visit, vs_a, execution = (
+            self._started_execution(db_session, suffix="cfu_rt_cs")
+        )
+        assert visit is not None and vs_a is not None
+        resource_b = _resource(db_session, "cfu_rt_cs_station_b", tag="tag_cfu_rt_cs_b")
+        _assignment(db_session, nurse, resource_b)
+        queue_b = _station_queue(db_session, resource_b)
+        entry_b = _entry(
+            db_session,
+            queue_b,
+            1,
+            patient=db_session.get(Patient, entry_a.patient_id),
+            visit=visit,
+        )
+        entry_b.status = "in_progress"
+        db_session.commit()
+
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            NurseServingApiService(db_session).create_execution(
+                nurse.id,
+                resource_b.id,
+                queue_entry_id=entry_b.id,
+                visit_service_id=vs_a.id,
+            )
+        _expect(exc, 400)  # D3: the service still routes only to station A
+        row = db_session.get(ServiceExecution, execution["id"])
+        assert row.status == "in_progress"  # A's attempt untouched
+        assert row.queue_resource_id == resource_a.id
+
+    def test_cross_station_reclaim_after_retag_is_409_with_station_context(
+        self, db_session: Session
+    ):
+        """The re-tagged variant: the service NOW routes to B, so the
+        station-B request passes the catalog gate — but the live attempt
+        is bound to A by its snapshot. The answer is a 409 carrying the
+        station context, never a silent adoption of A's work."""
+        nurse, resource_a, svc, entry_a, visit, vs_a, execution = (
+            self._started_execution(db_session, suffix="cfu_rt_cr")
+        )
+        assert visit is not None and vs_a is not None
+        resource_b = _resource(
+            db_session, "cfu_rt_cr_station_b", tag="tag_elsewhere_cr"
+        )
+        _assignment(db_session, nurse, resource_b)
+        queue_b = _station_queue(db_session, resource_b)
+        entry_b = _entry(
+            db_session,
+            queue_b,
+            1,
+            patient=db_session.get(Patient, entry_a.patient_id),
+            visit=visit,
+        )
+        entry_b.status = "in_progress"
+        # re-tag the service onto station B's tag mid-flight
+        self._retag(db_session, svc, resource_b.queue_tag)
+
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            NurseServingApiService(db_session).create_execution(
+                nurse.id,
+                resource_b.id,
+                queue_entry_id=entry_b.id,
+                visit_service_id=vs_a.id,
+            )
+        _expect(exc, 409)
+        assert "другом рабочем месте" in exc.value.detail
+        row = db_session.get(ServiceExecution, execution["id"])
+        assert row.status == "in_progress"
+        assert row.queue_resource_id == resource_a.id  # still bound to A
 
 
 # ----------------------------------------------------------------------------

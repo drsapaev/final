@@ -7662,3 +7662,229 @@ def test_force_majeure_transfer_numbers_from_day_snapshot_resource_queue(
         )
     finally:
         _durable_cleanup(db_session, "fm_snap_res1")
+
+
+# ===================== AC. Corrective follow-up (PR #3367) pins =====================
+
+
+def test_ambiguous_pairing_blocks_start_before_anything_moves(
+    db_session: Session,
+) -> None:
+    """Corrective follow-up P1 (owner verdict) + codex round-1: the
+    doctor-surface day-transfer pairing is narrowed by the visit's
+    department axis and FAILS CLOSED on ambiguity — two live
+    appointments matching the canonical (patient/day/doctor/time) set
+    block the START with 409 while the entry, the visit and BOTH
+    appointments stay exactly where they were."""
+    from fastapi import HTTPException
+
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        call_patient,
+        start_patient_visit,
+    )
+    from app.crud import visit as crud_visit
+    from app.models.appointment import Appointment
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+    from app.services.force_majeure_service import ForceMajeureService
+
+    patient = Patient(
+        last_name="Ресурсный14",
+        first_name="Пациент",
+        phone="+998901234547",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        original_day = _dt_now_tashkent_day()
+        doc_user = _make_user(db_session, username="doc_ac1", role="Doctor")
+        therapist = _make_doctor(db_session, user_id=doc_user.id, specialty="therapy")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=original_day, specialist_id=therapist.id
+        )
+
+        visit = crud_visit.create_visit(
+            db=db_session,
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            visit_date=original_day,
+            visit_time="10:00",
+            department="therapy",
+        )
+        # TWO live appointments match the canonical pairing (the
+        # department axis cannot separate them: 'therapy' resolves to no
+        # Department row here, and both rows predate the axis).
+        appointment_one = Appointment(
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            appointment_date=original_day,
+            appointment_time="10:00",
+            status="scheduled",
+        )
+        appointment_two = Appointment(
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            appointment_date=original_day,
+            appointment_time="10:00",
+            status="confirmed",
+        )
+        db_session.add_all([appointment_one, appointment_two])
+        entry = _make_waiting_entry(db_session, queue, number=114)
+        entry.patient_id = patient.id
+        entry.visit_id = visit.id
+        db_session.commit()
+
+        result = ForceMajeureService(db_session).transfer_entries_to_tomorrow(
+            entries=[entry],
+            specialist_id=therapist.id,
+            reason="corrective follow-up pin",
+            performed_by_id=1,
+            send_notifications=False,
+        )
+        assert result["success"] is True
+        new_day = date.fromisoformat(result["new_date"])
+
+        moved = (
+            db_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.source == "force_majeure_transfer")
+            .one()
+        )
+        admin = _make_user(db_session, username="adm_ac1", role="Admin")
+        assert call_patient(entry_id=moved.id, db=db_session, current_user=admin)[
+            "success"
+        ]
+
+        db_session.rollback()  # drop any stale identity-map state
+        with pytest.raises(HTTPException) as exc:
+            start_patient_visit(entry_id=moved.id, db=db_session, current_user=admin)
+        assert exc.value.status_code == 409
+
+        db_session.rollback()
+        db_session.refresh(moved)
+        db_session.refresh(visit)
+        db_session.refresh(appointment_one)
+        db_session.refresh(appointment_two)
+        assert moved.status == "called"  # NOT in_progress — start refused
+        assert visit.visit_date == original_day  # the visit did not move
+        assert appointment_one.appointment_date == original_day
+        assert appointment_two.appointment_date == original_day
+        assert new_day == original_day + timedelta(days=1)
+    finally:
+        _durable_cleanup(db_session, "doc_ac1", "adm_ac1")
+        db_session.query(Appointment).filter(
+            Appointment.patient_id == patient.id
+        ).delete(synchronize_session=False)
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()
+
+
+def test_ambiguous_pairing_blocks_complete_before_the_served_commit(
+    db_session: Session,
+) -> None:
+    """codex round-1 P1 (PR #3367): the pairing 409 must not be
+    swallowed below the served-commit. An in_progress entry whose linked
+    visit still sits on the queue's previous day (the force-majeure
+    copy semantics, start interrupted) completes through the pairing
+    path: with TWO ambiguous appointments the endpoint answers 409 and
+    the entry stays in_progress — previously the broad ``except
+    Exception`` logged+rolled back AFTER the served-commit, answering
+    success with the entry served and the visit/appointments stranded
+    on the old day."""
+    from fastapi import HTTPException
+
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        complete_patient_visit,
+    )
+    from app.crud import visit as crud_visit
+    from app.models.appointment import Appointment
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+
+    patient = Patient(
+        last_name="Ресурсный15",
+        first_name="Пациент",
+        phone="+998901234548",
+        is_deleted=False,
+    )
+    try:
+        db_session.add(patient)
+        db_session.commit()
+
+        original_day = _dt_now_tashkent_day()
+        doc_user = _make_user(db_session, username="doc_ac2", role="Doctor")
+        therapist = _make_doctor(db_session, user_id=doc_user.id, specialty="therapy")
+        queue = queue_service.get_or_create_daily_queue(
+            db_session, day=original_day, specialist_id=therapist.id
+        )
+
+        visit = crud_visit.create_visit(
+            db=db_session,
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            visit_date=original_day,
+            visit_time="10:00",
+            department="therapy",
+        )
+        appointment_one = Appointment(
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            appointment_date=original_day,
+            appointment_time="10:00",
+            status="scheduled",
+        )
+        appointment_two = Appointment(
+            patient_id=patient.id,
+            doctor_id=therapist.id,
+            appointment_date=original_day,
+            appointment_time="10:00",
+            status="confirmed",
+        )
+        db_session.add_all([appointment_one, appointment_two])
+        # The interrupted-transfer state: tomorrow's queue entry, visit
+        # still on the old day, entry already in_progress (the hand
+        # state the complete-path pairing exists for).
+        tomorrow_queue = queue_service.get_or_create_daily_queue(
+            db_session, day=original_day + timedelta(days=1), specialist_id=therapist.id
+        )
+        entry = _make_waiting_entry(db_session, tomorrow_queue, number=115)
+        entry.patient_id = patient.id
+        entry.visit_id = visit.id
+        entry.status = "in_progress"
+        db_session.commit()
+
+        admin = _make_user(db_session, username="adm_ac2", role="Admin")
+
+        db_session.rollback()
+        with pytest.raises(HTTPException) as exc:
+            complete_patient_visit(entry_id=entry.id, db=db_session, current_user=admin)
+        assert exc.value.status_code == 409
+
+        db_session.rollback()
+        db_session.refresh(entry)
+        db_session.refresh(visit)
+        db_session.refresh(appointment_one)
+        db_session.refresh(appointment_two)
+        assert entry.status == "in_progress"  # NOT served — the commit never ran
+        assert entry.served_by_user_id is None
+        assert visit.visit_date == original_day
+        assert appointment_one.appointment_date == original_day
+        assert appointment_two.appointment_date == original_day
+    finally:
+        _durable_cleanup(db_session, "doc_ac2", "adm_ac2")
+        db_session.query(Appointment).filter(
+            Appointment.patient_id == patient.id
+        ).delete(synchronize_session=False)
+        db_session.query(Visit).filter(Visit.patient_id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.query(Patient).filter(Patient.id == patient.id).delete(
+            synchronize_session=False
+        )
+        db_session.commit()

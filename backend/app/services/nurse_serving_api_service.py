@@ -1510,7 +1510,24 @@ class NurseServingApiService:
             .all()
         )
         in_progress = next((a for a in attempts if a.status == "in_progress"), None)
-        if in_progress is not None and in_progress.started_by_user_id == user_id:
+        if (
+            in_progress is not None
+            and in_progress.started_by_user_id == user_id
+            and (
+                # Station-bound idempotency (codex round-1 P1): the no-op
+                # re-claims the attempt ONLY on the station it was started
+                # on. A snapshot row of ANOTHER station falls through to
+                # the D3 gate below — a B-station tablet must never be
+                # handed A's execution as if it had started work there
+                # (the entry gate scopes the request, the snapshot binds
+                # the attempt). Legacy NULL-snapshot rows keep the
+                # unconditional no-op: they predate 0073 and their station
+                # context is only the entry-queue axis they were validated
+                # against.
+                in_progress.queue_resource_id is None
+                or in_progress.queue_resource_id == resource.id
+            )
+        ):
             # Same-nurse repeat POST = no-op (the tablet contract); the
             # endpoint answers 200 instead of 201 via `created`.
             return {**self._execution_payload(in_progress), "created": False}
@@ -1529,11 +1546,26 @@ class NurseServingApiService:
             )
 
         if in_progress is not None:
+            if in_progress.started_by_user_id != user_id:
+                raise NurseServingApiDomainError(
+                    409,
+                    "Услуга уже исполняется другой медсестрой "
+                    f"(execution id={in_progress.id}, "
+                    f"started_by_user_id={in_progress.started_by_user_id})",
+                )
+            # Same starter, ANOTHER station's attempt (the snapshot binds
+            # it there — codex round-1 P1): the idempotent no-op above is
+            # station-scoped, so this request reached the catalog gate and
+            # passed it (e.g. the service was re-tagged HERE mid-flight)
+            # yet the live attempt belongs to the station it started on.
+            # Fail closed with the station context instead of handing the
+            # attempt to this station's tablet.
             raise NurseServingApiDomainError(
                 409,
-                "Услуга уже исполняется другой медсестрой "
-                f"(execution id={in_progress.id}, "
-                f"started_by_user_id={in_progress.started_by_user_id})",
+                "Услуга уже исполняется на другом рабочем месте "
+                f"(execution id={in_progress.id}, queue_resource_id="
+                f"{in_progress.queue_resource_id}) — повторный POST со "
+                "своей станции отвечает no-op",
             )
         latest = attempts[-1] if attempts else None
         if latest is not None and latest.status == "completed":
