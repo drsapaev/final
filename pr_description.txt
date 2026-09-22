@@ -5,7 +5,7 @@
 Added `aria-hidden="true"` to the purely visual placeholder/skeleton `<div>` elements inside `StatCard.tsx`'s loading state.
 
 **🎯 Why:**
-When a container has `aria-busy="true"` and `role="status"`, screen readers will automatically announce the loading state. However, they can still try to interpret the inner empty `div` tags used for visual styling (skeleton loader). Explicitly hiding them prevents screen reader "noise" or confusion.
+When a container has `aria-busy="true"`, screen readers might still try to interpret the inner empty `div` tags used for visual styling (the skeleton loader bars). Explicitly hiding them prevents screen reader "noise" or confusion.
 
 **📸 Before/After:**
 Visual changes: None.
@@ -14,22 +14,47 @@ Visual changes: None.
 Improves screen reader experience by eliminating noise from empty DOM nodes inside the loading skeleton of the `MacOSStatCard` component.
 
 ## Cyclic Execution Evidence
-Not applicable. Simple UI change.
+- Fresh main sync: branch created from current origin/main
+- Clean workspace: inspected before edits
+- Branch: fix/statcard-a11y
+- Scope gate: only changed StatCard.tsx
+- Red-check handling: none
 
 ## Contract Impact
-Not applicable. No API changes.
+- Canonical surface: Not applicable - pure UI change.
+- Request shape: Not applicable - pure UI change.
+- Response shape: Not applicable - pure UI change.
+- Status codes: Not applicable - pure UI change.
+- Frontend consumer: Not applicable - pure UI change.
+- Compatibility path or alias: Not applicable - pure UI change.
+- Contract proof: Not applicable - pure UI change.
 
 ## RBAC / Permissions
-Not applicable. No role changes.
+- Roles allowed: Not applicable - no role changes.
+- Roles denied: Not applicable - no role changes.
+- Positive auth proof: Not applicable - no role changes.
+- Negative auth proof: Not applicable - no role changes.
 
 ## Notification / Realtime
-Not applicable.
+- Event type or websocket channel: Not applicable - no notification logic.
+- Payload version / ack behavior: Not applicable - no notification logic.
+- Read/unread or delivery semantics: Not applicable - no notification logic.
+- Reconnect/resync proof: Not applicable - no notification logic.
 
 ## Frontend Resilience
-Not applicable.
+- Empty data proof: Not applicable - pure visual skeleton change.
+- Partial data proof: Not applicable - pure visual skeleton change.
+- Forbidden secondary path behavior: Not applicable - pure visual skeleton change.
+- Missing draft/resource behavior: Not applicable - pure visual skeleton change.
+- Stale route/deep-link behavior: Not applicable - pure visual skeleton change.
 
 ## Scope Gate
-Not applicable.
+- Allowed paths: frontend/src/components/ui/macos/StatCard.tsx
+- Denied paths: Everything else.
+- Migration/docs/test impact: none.
+- Rollback note: Revert StatCard.tsx change.
 
 ## Validation
-Passed `pnpm lint:check` and `vitest run src/components/ui/macos/__tests__/`.
+- Targeted tests or smoke run: Passed pnpm lint:check and vitest run src/components/ui/macos/__tests__/
+- Result: success
+- Not checked: browser smoke
