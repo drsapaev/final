@@ -186,9 +186,11 @@
 }
 
 /* PR 3351 (review round 9, P2): явная ошибка неудачного продления сессии —
-   предупреждение остаётся открытым, действие не «притворяется» успешным. */
+   предупреждение остаётся открытым, действие не «притворяется» успешным.
+   Цвет — токен без hex-fallback (ratchet cssHexOutsideTokens, паттерн
+   остальных --mac-accent-правил этого файла). */
 .lab-session-extend-error {
-  color: var(--mac-accent, #dc2626);
+  color: var(--mac-accent, var(--mac-accent-blue, inherit));
   font-weight: 600;
 }
 
