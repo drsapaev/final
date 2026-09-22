@@ -29489,12 +29489,12 @@ export type components = {
              * Target Date
              * @description Целевая дата очереди токена (YYYY-MM-DD)
              */
-            target_date?: string;
+            target_date?: string | null;
             /**
              * Attempt Expires At
              * @description Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace
              */
-            attempt_expires_at?: string;
+            attempt_expires_at?: string | null;
         };
         /** LabCatalogAnalyteOut */
         LabCatalogAnalyteOut: {
@@ -34355,12 +34355,12 @@ export type components = {
              * Target Date
              * @description Целевая дата очереди токена (YYYY-MM-DD)
              */
-            target_date?: string;
+            target_date?: string | null;
             /**
              * Attempt Expires At
-             * @description Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace
+             * @description Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки
              */
-            attempt_expires_at?: string;
+            attempt_expires_at?: string | null;
         };
         /**
          * PushDeviceErrorDetail
@@ -40702,7 +40702,13 @@ export type components = {
         };
         /**
          * JoinSessionRefusalResponse
-         * @description Структурированный отказ complete-попытки (round-6, P2-1/P2-2). 400 — session-state / pre-execution refusals (incl. the rollback-proven join_session_not_executed); 409 — immutable payload mismatch. reason vocabulary: join_session_not_found | join_session_expired | join_session_processing | join_session_used | join_session_payload_mismatch | join_session_not_executed.
+         * @description Структурированный отказ complete-попытки (round-6, P2-1/P2-2).
+         *
+         *     400 — session-state / pre-execution refusals (incl. the
+         *     rollback-proven ``join_session_not_executed``); 409 — immutable
+         *     payload mismatch. ``reason`` vocabulary:
+         *     join_session_not_found | join_session_expired | join_session_processing |
+         *     join_session_used | join_session_payload_mismatch | join_session_not_executed.
          */
         JoinSessionRefusalResponse: {
             /**

@@ -8129,16 +8129,6 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -8155,6 +8145,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JoinSessionRefusalResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -85361,12 +85361,26 @@
             "title": "Queue Info"
           },
           "target_date": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Target Date",
             "description": "Целевая дата очереди токена (YYYY-MM-DD)"
           },
           "attempt_expires_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Attempt Expires At",
             "description": "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace"
           }
@@ -97943,14 +97957,28 @@
             "description": "The same token-info shape the session-QR flow consumes, with selectable_specialists narrowed to this direction's eligible owners (RQ-09.b eligibility contract)"
           },
           "target_date": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Target Date",
             "description": "Целевая дата очереди токена (YYYY-MM-DD)"
           },
           "attempt_expires_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Attempt Expires At",
-            "description": "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace"
+            "description": "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки"
           }
         },
         "type": "object",
@@ -115338,7 +115366,7 @@
           "message"
         ],
         "title": "JoinSessionRefusalResponse",
-        "description": "Структурированный отказ complete-попытки (round-6, P2-1/P2-2). 400 — session-state / pre-execution refusals (incl. the rollback-proven join_session_not_executed); 409 — immutable payload mismatch. reason vocabulary: join_session_not_found | join_session_expired | join_session_processing | join_session_used | join_session_payload_mismatch | join_session_not_executed."
+        "description": "Структурированный отказ complete-попытки (round-6, P2-1/P2-2).\n\n400 — session-state / pre-execution refusals (incl. the\nrollback-proven ``join_session_not_executed``); 409 — immutable\npayload mismatch. ``reason`` vocabulary:\njoin_session_not_found | join_session_expired | join_session_processing |\njoin_session_used | join_session_payload_mismatch | join_session_not_executed."
       }
     },
     "securitySchemes": {
