@@ -1071,7 +1071,12 @@ def test_alembic_chain_single_head_0069() -> None:
     assert graph["0072_service_executions"] == (
         "0071_nurse_workplace_assignments",
     )
-    assert heads == ["0072_service_executions"]
+    # Corrective follow-up (owner verdict on the merged runtime): the
+    # chain head moved to 0073 (service_executions routing snapshot).
+    assert graph["0073_execution_routing_snapshot"] == (
+        "0072_service_executions",
+    )
+    assert heads == ["0073_execution_routing_snapshot"]
 
 
 # ===================== C. PostgreSQL FK introspection =====================
@@ -1565,9 +1570,9 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar()
                 # The chain grew past the retirement (0070 lineage; now
-                # NURSE-V2 0071/0072); the retirement end-state (no
+                # NURSE-V2 0071/0072/0073); the retirement end-state (no
                 # synthetic usernames/doctors) is a head-agnostic invariant.
-                assert version == "0072_service_executions"
+                assert version == "0073_execution_routing_snapshot"
 
                 usernames = {
                     row[0]
