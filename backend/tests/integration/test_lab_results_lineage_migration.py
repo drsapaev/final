@@ -167,8 +167,9 @@ def test_single_alembic_head(fresh_head_url):
     head_lines = [line for line in r.stdout.splitlines() if "(head)" in line]
     assert len(head_lines) == 1, f"multi-head detected: {r.stdout!r}"
     # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved to
-    # 0072; this file still proves 0070's own links via the graph pins below.
-    assert "0072_service_executions" in head_lines[0]
+    # 0072; RQ-18 follow-up round-5 extends it with 0073 (payload binding).
+    # This file still proves 0070's own links via the graph pins below.
+    assert "0073_join_payload_binding" in head_lines[0]
 
 
 @pytest.mark.integration
