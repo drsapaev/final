@@ -811,8 +811,9 @@ def test_alembic_chain_single_head_0063() -> None:
     # single head: RQ-15.d retires the synthetic pairs after the
     # public-address registry
     # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved
-    # to 0072 (nurse workplace assignments 0071 + service executions 0072).
-    assert heads == ["0072_service_executions"]
+    # to 0072 (nurse workplace assignments 0071 + service executions 0072);
+    # RQ-18 follow-up round-5 extends it with 0073 (payload binding).
+    assert heads == ["0073_join_payload_binding"]
 
 
 # ===================== D. parity + ADR =====================
