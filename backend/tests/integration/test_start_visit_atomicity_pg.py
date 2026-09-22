@@ -139,17 +139,24 @@ def _inject_start_boundary_commit_failure(db):
     The lifecycle service's internal commit (``transition_status`` with
     the default ``commit=True`` — the defect under test on the broken
     head) runs for real; only the endpoint's own boundary commit fails.
-    Returns the real bound ``commit`` for restoration in a ``finally``.
+
+    Returns ``(real_commit, fired)``: ``fired`` is a mutable flag set
+    when the injected failure actually fired — the non-vacuousity guard
+    proving the flow REACHED the endpoint's boundary commit (RBAC
+    passed, the resolution and the lifecycle call ran) rather than
+    dying earlier inside the endpoint's broad ``except``.
     """
     real_commit = db.commit
+    fired = [False]
 
     def _failing_commit() -> None:
         if sys._getframe(1).f_code.co_name == "start_patient_visit":
+            fired[0] = True
             raise RuntimeError("simulated boundary-commit failure")
         real_commit()
 
     db.commit = _failing_commit
-    return real_commit
+    return real_commit, fired
 
 
 def _seed_called_entry(engine, *, resource: bool):
@@ -199,10 +206,16 @@ def _seed_called_entry(engine, *, resource: bool):
         db.add(entry)
         db.commit()
         db.refresh(entry)
-        return entry.id, patient.id, caller
+        # caller_id, NOT the User instance: the trailing ``db.commit()``
+        # expires every instance of the seeding session, so a returned
+        # User would be detached-with-expired-attributes — the endpoint's
+        # ``current_user.role`` access would then raise
+        # DetachedInstanceError (a VACUOUS 500 before any lifecycle
+        # work). Each test re-fetches the caller inside its RUN session.
+        return entry.id, patient.id, caller.id
 
 
-def _run_failing_start(engine, entry_id, caller):
+def _run_failing_start(engine, entry_id, caller_id):
     from fastapi import HTTPException
 
     from app.api.v1.endpoints.doctor_integration._queue_ops import (
@@ -212,13 +225,19 @@ def _run_failing_start(engine, entry_id, caller):
     maker = sessionmaker(bind=engine, autocommit=False, autoflush=False)
     db = maker()
     try:
-        real_commit = _inject_start_boundary_commit_failure(db)
+        caller = db.get(User, caller_id)  # bound to the RUN session
+        real_commit, fired = _inject_start_boundary_commit_failure(db)
         try:
             with pytest.raises(HTTPException) as exc:
                 start_patient_visit(entry_id=entry_id, db=db, current_user=caller)
             assert exc.value.status_code == 500
         finally:
             db.commit = real_commit
+        assert fired[0], (
+            "non-vacuousity guard: the 500 must come from the injected "
+            "BOUNDARY-commit failure — the flow reached the endpoint's "
+            "own db.commit() (RBAC passed, resolution + lifecycle ran)"
+        )
         db.rollback()
     finally:
         db.close()
@@ -246,7 +265,7 @@ def test_pg_existing_visit_start_not_durable_when_boundary_commit_fails(
         db.commit()
         visit_id = visit.id
 
-    _run_failing_start(sa_pg_engine, entry_id, caller)
+    _run_failing_start(sa_pg_engine, entry_id, caller_id)
 
     with Session(sa_pg_engine) as check:
         row = check.get(OnlineQueueEntry, entry_id)
@@ -262,7 +281,7 @@ def test_pg_created_visit_start_not_durable_when_boundary_commit_fails(
 ) -> None:
     entry_id, patient_id, caller = _seed_called_entry(sa_pg_engine, resource=False)
 
-    _run_failing_start(sa_pg_engine, entry_id, caller)
+    _run_failing_start(sa_pg_engine, entry_id, caller_id)
 
     with Session(sa_pg_engine) as check:
         row = check.get(OnlineQueueEntry, entry_id)
@@ -278,7 +297,7 @@ def test_pg_resource_branch_created_visit_start_not_durable_when_boundary_commit
 ) -> None:
     entry_id, patient_id, caller = _seed_called_entry(sa_pg_engine, resource=True)
 
-    _run_failing_start(sa_pg_engine, entry_id, caller)
+    _run_failing_start(sa_pg_engine, entry_id, caller_id)
 
     with Session(sa_pg_engine) as check:
         row = check.get(OnlineQueueEntry, entry_id)
@@ -294,9 +313,10 @@ def test_pg_resource_branch_start_success_persists_created_visit_unit(
         start_patient_visit,
     )
 
-    entry_id, _patient_id, caller = _seed_called_entry(sa_pg_engine, resource=True)
+    entry_id, _patient_id, caller_id = _seed_called_entry(sa_pg_engine, resource=True)
 
     with Session(sa_pg_engine) as run_db:
+        caller = run_db.get(User, caller_id)  # bound to the RUN session
         result = start_patient_visit(entry_id=entry_id, db=run_db, current_user=caller)
         assert result["success"] is True
 
