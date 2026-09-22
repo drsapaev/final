@@ -1,0 +1,35 @@
+## Summary
+🎨 Palette: Add aria-hidden to StatCard loading skeletons
+
+**💡 What:**
+Added `aria-hidden="true"` to the purely visual placeholder/skeleton `<div>` elements inside `StatCard.tsx`'s loading state.
+
+**🎯 Why:**
+When a container has `aria-busy="true"` and `role="status"`, screen readers will automatically announce the loading state. However, they can still try to interpret the inner empty `div` tags used for visual styling (skeleton loader). Explicitly hiding them prevents screen reader "noise" or confusion.
+
+**📸 Before/After:**
+Visual changes: None.
+
+**♿ Accessibility:**
+Improves screen reader experience by eliminating noise from empty DOM nodes inside the loading skeleton of the `MacOSStatCard` component.
+
+## Cyclic Execution Evidence
+Not applicable. Simple UI change.
+
+## Contract Impact
+Not applicable. No API changes.
+
+## RBAC / Permissions
+Not applicable. No role changes.
+
+## Notification / Realtime
+Not applicable.
+
+## Frontend Resilience
+Not applicable.
+
+## Scope Gate
+Not applicable.
+
+## Validation
+Passed `pnpm lint:check` and `vitest run src/components/ui/macos/__tests__/`.
