@@ -20,6 +20,20 @@ single transaction that flips the session to ``joined``.
 Revision ID: 0073_join_payload_binding
 Revises: 0072_service_executions
 Create Date: 2026-09-22
+
+MERGE-ORDER PROTOCOL (round-6, P1-4): PR #3367 carries a PARALLEL
+``0073_execution_routing_snapshot`` with the SAME ``down_revision``
+(``0072_service_executions``). Merging both unchanged forks the Alembic
+graph into two heads and blocks the single-head guards plus the normal
+production upgrade. The agreed order:
+
+  1. merge THIS PR (#3362) first;
+  2. rebase #3367 onto the new main and RENUMBER its migration:
+     revision = "0074_execution_routing_snapshot",
+     down_revision = "0073_join_payload_binding";
+  3. the pinned chain-head asserts (advanced to this revision by
+     333cdeab/a7c7aaff/6a984b78) FAIL on #3367's branch until step 2 —
+     that is the intended gate, not a flake.
 """
 
 import sqlalchemy as sa

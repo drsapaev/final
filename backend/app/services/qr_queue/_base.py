@@ -43,6 +43,44 @@ logger = logging.getLogger(__name__)
 
 JOIN_SESSION_PROCESSING_STATUS = "joining"
 
+# Round-6 (PR #3362 review, P1-1): the joined marker is VERSIONED. The
+# legacy ``joined`` value is what the pre-round-5 workers replay on sight
+# (their ``_replay_joined_session`` checks exactly ``status == "joined"``
+# and knows nothing about the payload fingerprint) — during a rolling
+# deployment that let a retry carrying payload B be served patient A's
+# saved ticket (wrong-patient disclosure). New workers write
+# ``joined_v2``: an old worker does NOT recognize it as replayable and
+# classifies the row through its fallback (expires_at long past →
+# ``join_session_expired``) — a decisive, no-business-action refusal,
+# never a replay of a foreign payload. New workers accept BOTH values:
+# legacy rows replay fail-closed (no fingerprint ⇒ used refusal).
+JOIN_SESSION_JOINED_STATUS = "joined"
+JOIN_SESSION_JOINED_STATUS_V2 = "joined_v2"
+
+# Round-6 (PR #3362 review, P2-1): a complete attempt whose allocator
+# batch produced ZERO tickets and was ALREADY rolled back is a PROVEN
+# no-business-action outcome. The backend says so explicitly instead of
+# masking the domain refusal behind «Internal server error» — the client
+# may offer the honest start-over instead of looping on UNKNOWN until
+# the session TTL expires.
+JOIN_SESSION_REASON_NOT_EXECUTED = "join_session_not_executed"
+
+
+class JoinSessionNotExecutedRefusal(ValueError):
+    """A domain refusal AFTER a confirmed rollback of the whole batch.
+
+    Round-6 (PR #3362 review, P2-1): raised only when the service has
+    already executed ``db.rollback()`` — the transaction provably left no
+    ticket behind — so the refusal is decisive evidence that nothing was
+    created. ``details`` carries the per-specialist allocator errors for
+    the structured 400 body.
+    """
+
+    def __init__(self, message: str, details: list[dict[str, Any]] | None = None):
+        super().__init__(message)
+        self.reason = JOIN_SESSION_REASON_NOT_EXECUTED
+        self.details = details or []
+
 
 class JoinSessionStateRefusal(ValueError):
     """A complete-time refusal that is PROVEN from the join-session row.

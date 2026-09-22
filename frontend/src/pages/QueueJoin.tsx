@@ -102,12 +102,15 @@ const isNetworkClassSubmitError = (err: unknown): boolean => {
 // attempt-state below stays (it carries no PHI and its replay is
 // payload-bound server-side).
 
-// RQ-18 follow-up round-5 (P1-4): the attempt identity must live at least
-// until the queue-day is over (the review's minimum), not auto-drop after
-// 15 minutes — an UNKNOWN attempt that silently loses its identity would
-// invite exactly the fresh-session re-submit the guard exists to prevent.
-// 24h >= any queue-day remainder in any clinic timezone; the state holds
-// no PHI (session token + direction metadata only) and dies with the tab.
+// RQ-18 follow-up round-6 (P1-3): the attempt identity must live until the
+// END of the TARGET queue-day, not a fixed 24h — a permanent-address session
+// started after the cutoff targets TOMORROW, so a fixed 24h TTL expired
+// while the target queue-day was still running (the reconcile identity
+// disappears → a fresh start can mint a second талон for the next day).
+// The server now returns the honest absolute horizon per session
+// (``attempt_expires_at`` = end of the target day in the clinic timezone
+// + safety grace); the fixed TTL below remains ONLY the fallback for an
+// older backend that does not send the horizon.
 const ATTEMPT_STATE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const draftPhoneDigits = (phone: unknown): string =>
@@ -129,18 +132,66 @@ interface QueueJoinAttemptState {
   directionTitle: string | null;
   completeAttempted: boolean;
   outcomeUnknown: boolean;
+  // Round-6 (P1-3): the server-computed absolute horizon (ISO-8601) of
+  // this attempt's identity — end of the TARGET queue-day + grace. The
+  // fixed TTL applies only when an older backend sent nothing.
+  attemptExpiresAt: string | null;
 }
 
+// Round-6 (P1-3): the attempt envelope moved from sessionStorage to
+// localStorage. It carries NO PHI (session token + direction metadata
+// only — the round-5 review explicitly blessed longer storage for this
+// shape), and sessionStorage silently destroyed the UNKNOWN-outcome
+// identity on a simple TAB CLOSE — the reconcile panel vanished and a
+// fresh start could duplicate the attempt. localStorage survives the
+// tab; the horizon decides when the identity finally expires.
+const attemptStateStorageGet = (key: string): string | null => {
+  try {
+    return window.localStorage.getItem(key) ?? window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const attemptStateStorageSet = (key: string, value: string): void => {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* storage full/unavailable — the attempt-state is best-effort */
+  }
+};
+const attemptStateStorageRemove = (key: string): void => {
+  try {
+    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key); // legacy round-5 entries
+  } catch {
+    /* noop */
+  }
+};
+
+const attemptStateHorizonValid = (state: {
+  ts: number;
+  attemptExpiresAt: string | null;
+}): boolean => {
+  if (state.attemptExpiresAt) {
+    const horizon = Date.parse(state.attemptExpiresAt);
+    if (!Number.isNaN(horizon)) {
+      return Date.now() <= horizon;
+    }
+  }
+  return Date.now() - state.ts <= ATTEMPT_STATE_TTL_MS;
+};
+
 // RQ-18 follow-up round-4 (P1-2): the complete-attempt state survives a
-// reload AT LEAST within the current tab (sessionStorage, same TTL as the
-// draft). React refs alone reset on remount — a reload would silently
+// reload (round-6: localStorage — it also survives a TAB close; the
+// envelope carries no PHI and its replay is payload-bound server-side).
+// React refs alone reset on remount — a reload would silently
 // mint a NEW session while the previous attempt's business outcome was
 // still unknown, and the lowercase/uppercase URL alias of the same
 // permanent address would reset the guard too.
 const attemptStateRead = (key: string | null): QueueJoinAttemptState | null => {
   if (!key) return null;
   try {
-    const raw = window.sessionStorage.getItem(key);
+    const raw = attemptStateStorageGet(key);
     if (!raw) return null;
     const parsed = safeJsonParse(raw) as Partial<QueueJoinAttemptState> | null;
     if (
@@ -149,7 +200,11 @@ const attemptStateRead = (key: string | null): QueueJoinAttemptState | null => {
       typeof parsed.ts === 'number' &&
       typeof parsed.publicCode === 'string' &&
       typeof parsed.sessionToken === 'string' &&
-      Date.now() - parsed.ts <= ATTEMPT_STATE_TTL_MS
+      attemptStateHorizonValid({
+        ts: parsed.ts,
+        attemptExpiresAt:
+          typeof parsed.attemptExpiresAt === 'string' ? parsed.attemptExpiresAt : null,
+      })
     ) {
       return {
         ts: parsed.ts,
@@ -160,9 +215,11 @@ const attemptStateRead = (key: string | null): QueueJoinAttemptState | null => {
           typeof parsed.directionTitle === 'string' ? parsed.directionTitle : null,
         completeAttempted: parsed.completeAttempted === true,
         outcomeUnknown: parsed.outcomeUnknown === true,
+        attemptExpiresAt:
+          typeof parsed.attemptExpiresAt === 'string' ? parsed.attemptExpiresAt : null,
       };
     }
-    window.sessionStorage.removeItem(key);
+    attemptStateStorageRemove(key);
     return null;
   } catch {
     return null;
@@ -170,19 +227,11 @@ const attemptStateRead = (key: string | null): QueueJoinAttemptState | null => {
 };
 const attemptStateWrite = (key: string | null, state: QueueJoinAttemptState): void => {
   if (!key) return;
-  try {
-    window.sessionStorage.setItem(key, JSON.stringify(state));
-  } catch {
-    /* storage full/unavailable — the attempt-state is best-effort */
-  }
+  attemptStateStorageSet(key, JSON.stringify(state));
 };
 const attemptStateRemove = (key: string | null): void => {
   if (!key) return;
-  try {
-    window.sessionStorage.removeItem(key);
-  } catch {
-    /* noop */
-  }
+  attemptStateStorageRemove(key);
 };
 
 // RQ-18 follow-up round-4 (P2-1): the backend now refuses an unclaimable
@@ -193,6 +242,9 @@ const attemptStateRemove = (key: string | null): void => {
 const JOIN_PRE_EXECUTION_REASONS = new Set([
   'join_session_not_found',
   'join_session_expired',
+  // Round-6 (P2-1): the backend PROVED the rollback — zero tickets were
+  // created. The honest start-over replaces the UNKNOWN loop.
+  'join_session_not_executed',
 ]);
 
 const getJoinRefusalReason = (err: unknown): string | null => {
@@ -372,6 +424,10 @@ const QueueJoin = () => {
   // action; the RQ-10 result-unknown honesty for a lost complete-response
   // stays fully in force (no renewal after a complete attempt).
   const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
+  // Round-6 (P1-3): the server-computed horizon of the CURRENT session's
+  // attempt identity (end of the target queue-day + grace). Captured from
+  // every start/renewal response and persisted with the attempt envelope.
+  const [attemptExpiresAt, setAttemptExpiresAt] = useState<string | null>(null);
   // RQ-18 (§10): EXACTLY ONE public start-session per mount — the ref
   // survives the StrictMode dev double-invoke of effects.
   // RQ-18 follow-up (P2-2): the guard holds the LAST STARTED public code,
@@ -668,6 +724,7 @@ const QueueJoin = () => {
       setQueueInfo(null);
       setDirectionInfo(null);
       setSessionExpiresAt(null);
+      setAttemptExpiresAt(null);
       setResult(null);
       setSubmitResultUnknown(false);
       setShowSessionConsumedAdvisory(false);
@@ -705,6 +762,10 @@ const QueueJoin = () => {
 
       setSessionToken(res.session_token);
       setSessionExpiresAt(res.expires_at ?? null);
+      // Round-6 (P1-3): the honest attempt-identity horizon of THIS
+      // session (end of the target queue-day + grace) travels with the
+      // start response and is persisted with the attempt envelope.
+      setAttemptExpiresAt(res.attempt_expires_at ?? null);
       setQueueInfo(nextQueueInfo);
       setAvailableSpecialists(selectableSpecialists);
       setDirectionInfo(res.direction);
@@ -892,6 +953,9 @@ const QueueJoin = () => {
         currentSessionToken = res.session_token;
         setSessionToken(res.session_token);
         setSessionExpiresAt(res.expires_at ?? null);
+        // Round-6 (P1-3): the renewal's own horizon replaces the previous
+        // one — the envelope written at submit below carries it.
+        setAttemptExpiresAt(res.attempt_expires_at ?? null);
         setQueueInfo((res.queue_info ?? {}) as QueueJoinPageInfo);
         setDirectionInfo(res.direction);
         // The renewal is transparent: the patient stays on the form step
@@ -1027,11 +1091,12 @@ const QueueJoin = () => {
       // RQ-18 follow-up round-3 (P1): the attempt flag goes up BEFORE the
       // request — from this moment the result is unknown, whatever happens
       // to the response (a lost answer must never trigger a renewal).
-      // RQ-18 follow-up round-4 (P1-2): the attempt state ALSO persists to
-      // sessionStorage (per canonical code) — a reload must not reset the
-      // guard and silently mint a new session while this attempt's
+      // RQ-18 follow-up round-4 (P1-2): the attempt state ALSO persists
+      // (per canonical code) — a reload or a closed tab must not reset
+      // the guard and silently mint a new session while this attempt's
       // business outcome is still unknown. Round-5 (P1-4): no 15-minute
-      // auto-drop — the identity outlives the queue day.
+      // auto-drop. Round-6 (P1-3): localStorage + the server horizon —
+      // the identity lives until the end of the TARGET queue-day.
       completeAttemptedRef.current = true;
       if (directionMode && attemptStorageKey && directionCode) {
         attemptStateWrite(attemptStorageKey, {
@@ -1042,6 +1107,11 @@ const QueueJoin = () => {
           directionTitle: directionInfo?.title ?? null,
           completeAttempted: true,
           outcomeUnknown: true,
+          // Round-6 (P1-3): the server-computed horizon — the envelope
+          // survives the tab (localStorage) and never expires before the
+          // end of the TARGET queue-day (the 24h TTL is only the fallback
+          // for an older backend without the horizon).
+          attemptExpiresAt: attemptExpiresAt,
         });
       }
       const joinResult = await completeQueueJoinSession(requestBody);

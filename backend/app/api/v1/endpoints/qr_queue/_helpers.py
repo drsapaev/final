@@ -204,6 +204,48 @@ class JoinSessionStartResponse(BaseModel):
     session_token: str
     expires_at: str
     queue_info: dict[str, Any]
+    # Round-6 (PR #3362 review, P1-3): the server-computed attempt-identity
+    # horizon. ``target_date`` is the queue-day the token is bound to
+    # (tomorrow when the start happened after the cutoff);
+    # ``attempt_expires_at`` is the end of THAT day in the clinic timezone
+    # plus a safety grace — the earliest instant the client may drop the
+    # attempt envelope. Both optional/nullable for older token shapes.
+    target_date: str | None = Field(
+        None, description="Целевая дата очереди токена (YYYY-MM-DD)"
+    )
+    attempt_expires_at: str | None = Field(
+        None,
+        description=(
+            "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: "
+            "конец целевого queue-day в timezone клиники + safety grace"
+        ),
+    )
+
+
+class JoinSessionRefusalDetail(BaseModel):
+    """Один per-specialist отказ аллокатора (round-6, P2-1)."""
+
+    specialist_id: int | None = Field(
+        None, description="ID выбора (Doctor.id или QueueProfile.id); None для одиночного пути"
+    )
+    error: str = Field(..., description="Человекочитаемое сообщение домена")
+
+
+class JoinSessionRefusalResponse(BaseModel):
+    """Структурированный отказ complete-попытки (round-6, P2-1/P2-2).
+
+    400 — session-state / pre-execution refusals (incl. the
+    rollback-proven ``join_session_not_executed``); 409 — immutable
+    payload mismatch. ``reason`` vocabulary:
+    join_session_not_found | join_session_expired | join_session_processing |
+    join_session_used | join_session_payload_mismatch | join_session_not_executed.
+    """
+
+    reason: str = Field(..., description="Машиночитаемая причина отказа")
+    message: str = Field(..., description="Человекочитаемое сообщение")
+    details: list[JoinSessionRefusalDetail] | None = Field(
+        None, description="Per-specialist ошибки (только для join_session_not_executed)"
+    )
 
 
 class JoinSessionCompleteRequest(BaseModel):

@@ -158,6 +158,20 @@ class PublicDirectionStartResponse(BaseModel):
     permanent_address: bool = Field(
         ..., description="Always True on this surface (the address is permanent)"
     )
+    # Round-6 (PR #3362 review, P1-3): the attempt-identity horizon (see
+    # JoinSessionStartResponse) — a permanent-address session started
+    # after the cutoff targets TOMORROW, so the client must NOT drop the
+    # attempt envelope after a fixed 24h while the target queue-day is
+    # still running.
+    target_date: str | None = Field(
+        None, description="Целевая дата очереди токена (YYYY-MM-DD)"
+    )
+    attempt_expires_at: str | None = Field(
+        None,
+        description=(
+            "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки"
+        ),
+    )
     direction: PublicDirectionAddressInfo
     queue_info: dict[str, Any] = Field(
         ...,
@@ -455,6 +469,8 @@ def start_public_direction_session(
         session_token=result["session_token"],
         expires_at=result["expires_at"],
         permanent_address=True,
+        target_date=result.get("target_date"),
+        attempt_expires_at=result.get("attempt_expires_at"),
         direction=PublicDirectionAddressInfo(
             profile_id=profile.id,
             key=profile.key,

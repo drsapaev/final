@@ -115,7 +115,7 @@ def test_complete_join_session_uses_queue_domain_boundary(monkeypatch):
     assert result["success"] is True
     assert result["queue_number"] == 5
     assert result["queue_length"] == 2
-    assert session.status == "joined"
+    assert session.status == "joined_v2"  # Round-6 (P1-1): versioned joined marker
     assert session.queue_entry_id == 88
     assert session.queue_number == 5
     db.commit.assert_called_once()
@@ -189,7 +189,7 @@ def test_complete_join_session_multiple_uses_queue_domain_boundary(monkeypatch):
     assert len(result["entries"]) == 2
     assert result["entries"][0]["queue_number"] == 4
     assert result["entries"][1]["queue_number"] == 9
-    assert session.status == "joined"
+    assert session.status == "joined_v2"  # Round-6 (P1-1): versioned joined marker
     assert session.queue_entry_id == 101
     assert session.queue_number == 4
     db.commit.assert_called_once()
@@ -262,7 +262,7 @@ def test_complete_join_session_claim_replays_joined_before_allocator(monkeypatch
     assert replay["success"] is True
     assert replay["replayed"] is True
     assert replay["queue_number"] == 5
-    assert session.status == "joined"
+    assert session.status == "joined_v2"  # Round-6 (P1-1): versioned joined marker
     assert domain_service.allocate_ticket.call_count == 1
 
 

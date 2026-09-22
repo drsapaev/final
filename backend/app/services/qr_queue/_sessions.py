@@ -7,11 +7,15 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from zoneinfo import ZoneInfo
 
 from app.services.qr_queue._base import *  # noqa: F401, F403
 from app.services.qr_queue._base import (
+    JOIN_SESSION_JOINED_STATUS,
+    JOIN_SESSION_JOINED_STATUS_V2,
     JOIN_SESSION_PROCESSING_STATUS,
     JOIN_SESSION_REASON_PAYLOAD_MISMATCH,
+    JoinSessionNotExecutedRefusal,
     JoinSessionStateRefusal,
     QRQueueServiceMixinBase,
 )
@@ -22,6 +26,15 @@ JOIN_SESSION_REASON_NOT_FOUND = "join_session_not_found"
 JOIN_SESSION_REASON_EXPIRED = "join_session_expired"
 JOIN_SESSION_REASON_PROCESSING = "join_session_processing"
 JOIN_SESSION_REASON_USED = "join_session_used"
+
+# Round-6 (P1-1): the joined statuses the REPLAY accepts. Legacy rows
+# joined by pre-round-5 workers replay fail-closed (no fingerprint ⇒ the
+# used refusal); rows written by this version carry the versioned marker
+# so an old worker can never mistake them for its own replayable rows.
+_REPLAYABLE_JOIN_STATUSES = [
+    JOIN_SESSION_JOINED_STATUS,
+    JOIN_SESSION_JOINED_STATUS_V2,
+]
 
 
 def canonical_join_payload_fingerprint(
@@ -67,6 +80,54 @@ def canonical_join_payload_fingerprint(
 
 class SessionsMixin(QRQueueServiceMixinBase):
     """Sessions methods for QRQueueService."""
+
+    # Round-6 (PR #3362 review, P1-3): how long past the target queue-day's
+    # END the attempt identity stays recoverable. Two hours cover the
+    # late-evening reconcile of a still-open desk and any client clock
+    # skew; the envelope carries no PHI, so a bounded overshoot is safe.
+    ATTEMPT_HORIZON_GRACE_HOURS = 2
+
+    def _resolve_attempt_horizon(self, token: str) -> dict[str, Any]:
+        """Server-computed honest horizon of a join attempt identity.
+
+        Returns the TARGET queue-day (the QR token's own day — the same
+        day ``assign_queue_token`` fixed at mint time, tomorrow when the
+        start happened after the cutoff) and the absolute instant the
+        attempt may finally be dropped: the end of that day in the
+        clinic timezone plus the safety grace. Best-effort: an unknown
+        token or an undated token yields ``None`` fields and the client
+        falls back to its conservative fixed TTL.
+        """
+        horizon: dict[str, Any] = {
+            "target_date": None,
+            "attempt_expires_at": None,
+        }
+        try:
+            token_row = (
+                self.db.query(QueueToken).filter(QueueToken.token == token).first()
+            )
+            if token_row is None or token_row.day is None:
+                return horizon
+            from app.crud.clinic import get_queue_settings
+
+            queue_settings = get_queue_settings(self.db)
+            timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+            target_day = token_row.day
+            # End of the target queue-day in the clinic timezone, then the
+            # grace window; returned as an absolute tz-aware UTC instant.
+            day_end_local = (
+                datetime(target_day.year, target_day.month, target_day.day, 23, 59, 59)
+                .replace(tzinfo=timezone)
+                + timedelta(hours=self.ATTEMPT_HORIZON_GRACE_HOURS)
+                + timedelta(seconds=1)
+            )
+            horizon["target_date"] = target_day
+            horizon["attempt_expires_at"] = day_end_local.astimezone(UTC)
+        except Exception as exc:  # noqa: BLE001 — best-effort metadata
+            logger.warning(
+                "[start_join_session] attempt horizon resolution failed: %s", exc
+            )
+        return horizon
 
     def _claim_pending_join_session(self, session_token: str) -> QueueJoinSession | None:
         now_utc = datetime.now(UTC)
@@ -121,7 +182,12 @@ class SessionsMixin(QRQueueServiceMixinBase):
         )
         if row is None:
             return JOIN_SESSION_REASON_NOT_FOUND
-        if row.status == "joined":
+        if row.status in (JOIN_SESSION_JOINED_STATUS, JOIN_SESSION_JOINED_STATUS_V2):
+            # Legacy ``joined`` and versioned ``joined_v2`` both mean the
+            # attempt was consumed. The replay decides between the honest
+            # snapshot re-serve (matching fingerprint) and the fail-closed
+            # used refusal; this branch is the classifier safety net for
+            # paths that reach it without a replay round-trip.
             return JOIN_SESSION_REASON_USED
         if row.status == JOIN_SESSION_PROCESSING_STATUS:
             return JOIN_SESSION_REASON_PROCESSING
@@ -166,7 +232,7 @@ class SessionsMixin(QRQueueServiceMixinBase):
             self.db.query(QueueJoinSession)
             .filter(
                 QueueJoinSession.session_token == session_token,
-                QueueJoinSession.status == "joined",
+                QueueJoinSession.status.in_(_REPLAYABLE_JOIN_STATUSES),
             )
             .first()
         )
@@ -286,10 +352,32 @@ class SessionsMixin(QRQueueServiceMixinBase):
             # Добавляем информацию о времени в ответ
             token_info.update(time_check)
 
+            # Round-6 (PR #3362 review, P1-3): the attempt identity must
+            # live until the END of the TARGET queue-day, not a fixed 24h
+            # — a permanent-address session started after the cutoff
+            # targets TOMORROW, so 24h expires while the target queue-day
+            # is still running (the patient's reconcile identity would
+            # disappear and a fresh start could mint a second талон for
+            # the next day). The server computes the honest horizon from
+            # the token's own queue day in the CLINIC timezone plus a
+            # safety grace; the client stores it in the attempt envelope
+            # and never auto-drops the attempt before it.
+            attempt_horizon = self._resolve_attempt_horizon(token)
+
             return {
                 "session_token": session_token,
                 "expires_at": session.expires_at.isoformat(),
                 "queue_info": token_info,
+                "target_date": (
+                    attempt_horizon["target_date"].isoformat()
+                    if attempt_horizon["target_date"]
+                    else None
+                ),
+                "attempt_expires_at": (
+                    attempt_horizon["attempt_expires_at"].isoformat()
+                    if attempt_horizon["attempt_expires_at"]
+                    else None
+                ),
             }
 
         except ValueError:
@@ -384,7 +472,13 @@ class SessionsMixin(QRQueueServiceMixinBase):
             )
         except (QueueValidationError, QueueConflictError, QueueNotFoundError) as exc:
             self.db.rollback()
-            raise ValueError(str(exc)) from exc
+            # Round-6 (P2-1): the rollback is CONFIRMED — nothing reached
+            # the database. The refusal says so explicitly instead of
+            # being masked behind «Internal server error».
+            raise JoinSessionNotExecutedRefusal(
+                str(exc),
+                details=[{"specialist_id": None, "error": str(exc)}],
+            ) from exc
 
         queue_entry = join_result["entry"]
         queue_length_before = join_result["queue_length_before"]
@@ -405,7 +499,10 @@ class SessionsMixin(QRQueueServiceMixinBase):
         }
 
         # Обновляем сессию
-        session.status = "joined"
+        # Round-6 (P1-1): the versioned joined marker — an old worker
+        # never treats this row as ITS replayable state (mixed-version
+        # wrong-patient replay barrier; see _base.py).
+        session.status = JOIN_SESSION_JOINED_STATUS_V2
         session.patient_name = patient_name
         session.phone = phone
         session.telegram_id = telegram_id
@@ -532,6 +629,61 @@ class SessionsMixin(QRQueueServiceMixinBase):
             self.db.rollback()
             raise ValueError("QR токен не найден")
 
+        # Round-6 (PR #3362 review, P1-2): canonical multi-tag lock order.
+        # Every allocation of the batch now holds its transaction-scoped
+        # tag-claim scope until the ONE final commit, so two concurrent
+        # multi-joins with the same directions in INVERTED input order
+        # used to acquire the ``daily_queue:tag:<tag>:<day>`` advisory
+        # scopes in opposite orders — the exact AB-BA deadlock the
+        # QD-2E canon (lock_queue_tag_claim_scope) forbids. The batch
+        # pre-resolves every selection's claim scope READ-ONLY and
+        # pre-acquires all scopes in sorted ``(day, queue_tag)`` order
+        # BEFORE the first write (the same restore-of-order the
+        # registrar cart's prelock_cart_tag_claim_scopes performs), then
+        # allocates in the same sorted order. Unresolvable selections are
+        # skipped here — the allocation loop reports their real error.
+        try:
+            resolved_targets = (
+                self.queue_domain_service.allocator_service
+                .resolve_join_batch_tag_targets(
+                    self.db,
+                    token_str=qr_token.token,
+                    specialist_ids=specialist_ids,
+                    specialist_entity_types=normalized_entity_types,
+                )
+            )
+            # Defensive shape check: the resolver must return an
+            # index->tag mapping; anything else disables the canonical
+            # order but never the attempt itself.
+            batch_lock_targets = (
+                resolved_targets
+                if isinstance(resolved_targets, dict)
+                and all(
+                    isinstance(k, int) and isinstance(v, str)
+                    for k, v in resolved_targets.items()
+                )
+                else {}
+            )
+            self.queue_domain_service.allocator_service.prelock_join_batch_tag_scopes(
+                self.db,
+                lock_targets=batch_lock_targets,
+                token_str=qr_token.token,
+            )
+        except Exception as exc:  # noqa: BLE001 — pre-lock is best-effort
+            logger.warning(
+                "[complete_join_session_multiple] tag scope pre-lock skipped: %s",
+                exc,
+            )
+            batch_lock_targets = {}
+
+        def _batch_lock_key(index: int) -> tuple[str, int]:
+            # Canonical acquisition order: sorted tag first (the same key
+            # the pre-locks used), original input order as the stable
+            # tie-break. Unresolvable targets sort last but keep their
+            # relative input order.
+            tag = batch_lock_targets.get(index)
+            return (tag or "\uffff", index)
+
         # ⭐ FIX: Создаём или находим пациента (patient_id ВСЕГДА заполняется)
         patient = self._find_or_create_patient(patient_name, phone)
         patient_id = patient.id if patient else None
@@ -544,8 +696,14 @@ class SessionsMixin(QRQueueServiceMixinBase):
         entries: list[dict[str, Any]] = []
         errors: list[dict[str, Any]] = []
         created_entries: list[OnlineQueueEntry] = []
+        # Round-6 (P1-2): allocations run in the canonical lock order, but
+        # the response/fingerprint keep the USER's original selection
+        # order — results are reassembled by index after the loop.
+        entries_by_index: dict[int, dict[str, Any]] = {}
+        errors_by_index: dict[int, dict[str, Any]] = {}
 
-        for index, specialist_id in enumerate(specialist_ids):
+        for index in sorted(range(len(specialist_ids)), key=_batch_lock_key):
+            specialist_id = specialist_ids[index]
             specialist_type = (
                 normalized_entity_types[index]
                 if normalized_entity_types is not None
@@ -571,18 +729,16 @@ class SessionsMixin(QRQueueServiceMixinBase):
                     commit=False,
                 )
                 entry = join_result["entry"]
-                entries.append(
-                    {
-                        "specialist_id": specialist_id,
-                        "queue_entry_id": entry.id,
-                        "queue_number": entry.number,
-                        "duplicate": join_result["duplicate"],
-                        "queue_length": join_result["queue_length_before"],
-                        "estimated_wait_time": join_result["estimated_wait_minutes"],
-                        "specialist_name": join_result.get("specialist_name"),
-                        "department": qr_token.department,
-                    }
-                )
+                entries_by_index[index] = {
+                    "specialist_id": specialist_id,
+                    "queue_entry_id": entry.id,
+                    "queue_number": entry.number,
+                    "duplicate": join_result["duplicate"],
+                    "queue_length": join_result["queue_length_before"],
+                    "estimated_wait_time": join_result["estimated_wait_minutes"],
+                    "specialist_name": join_result.get("specialist_name"),
+                    "department": qr_token.department,
+                }
                 if not join_result["duplicate"]:
                     created_entries.append(entry)
             except (
@@ -590,16 +746,28 @@ class SessionsMixin(QRQueueServiceMixinBase):
                 QueueConflictError,
                 QueueNotFoundError,
             ) as exc:
-                errors.append(
-                    {
-                        "specialist_id": specialist_id,
-                        "error": str(exc),
-                    }
-                )
+                errors_by_index[index] = {
+                    "specialist_id": specialist_id,
+                    "error": str(exc),
+                }
+
+        # Restore the USER's original order (input-index ascending) for
+        # both the response entries and the per-specialist error list.
+        entries = [
+            entries_by_index[i] for i in sorted(entries_by_index)
+        ]
+        errors = [errors_by_index[i] for i in sorted(errors_by_index)]
 
         if errors and not entries:
             self.db.rollback()
-            raise ValueError(errors[0]["error"])
+            # Round-6 (PR #3362 review, P2-1): the rollback is CONFIRMED —
+            # the batch provably created NO ticket. A structured, typed
+            # refusal replaces the masked «Internal server error» 400:
+            # the client may offer the honest start-over immediately
+            # instead of looping on UNKNOWN until the session TTL.
+            raise JoinSessionNotExecutedRefusal(
+                errors[0]["error"], details=errors
+            )
 
         response = {
             "success": len(entries) > 0,
@@ -609,7 +777,11 @@ class SessionsMixin(QRQueueServiceMixinBase):
             "message": f"Создано {len(entries)} записей, ошибок: {len(errors)}",
         }
 
-        session.status = "joined"
+        # Round-6 (P1-1): the versioned joined marker (see the single
+        # path) — an old worker never treats this row as ITS replayable
+        # state; the response restores the USER's original selection
+        # order regardless of the canonical lock/allocation order.
+        session.status = JOIN_SESSION_JOINED_STATUS_V2
         session.patient_name = patient_name
         session.phone = phone
         session.telegram_id = telegram_id

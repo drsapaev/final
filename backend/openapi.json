@@ -8138,6 +8138,26 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinSessionRefusalResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinSessionRefusalResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -85339,6 +85359,16 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Queue Info"
+          },
+          "target_date": {
+            "type": "string",
+            "title": "Target Date",
+            "description": "Целевая дата очереди токена (YYYY-MM-DD)"
+          },
+          "attempt_expires_at": {
+            "type": "string",
+            "title": "Attempt Expires At",
+            "description": "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace"
           }
         },
         "type": "object",
@@ -97911,6 +97941,16 @@
             "type": "object",
             "title": "Queue Info",
             "description": "The same token-info shape the session-QR flow consumes, with selectable_specialists narrowed to this direction's eligible owners (RQ-09.b eligibility contract)"
+          },
+          "target_date": {
+            "type": "string",
+            "title": "Target Date",
+            "description": "Целевая дата очереди токена (YYYY-MM-DD)"
+          },
+          "attempt_expires_at": {
+            "type": "string",
+            "title": "Attempt Expires At",
+            "description": "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace"
           }
         },
         "type": "object",
@@ -115236,6 +115276,69 @@
         ],
         "title": "UserProfileResponse",
         "description": "Схема ответа профиля пользователя"
+      },
+      "JoinSessionRefusalDetail": {
+        "properties": {
+          "specialist_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Id",
+            "description": "ID выбора (Doctor.id или QueueProfile.id); None для одиночного пути"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Человекочитаемое сообщение домена"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "JoinSessionRefusalDetail",
+        "description": "Один per-specialist отказ аллокатора (round-6, P2-1)."
+      },
+      "JoinSessionRefusalResponse": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Машиночитаемая причина отказа"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Человекочитаемое сообщение"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/JoinSessionRefusalDetail"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details",
+            "description": "Per-specialist ошибки (только для join_session_not_executed)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "message"
+        ],
+        "title": "JoinSessionRefusalResponse",
+        "description": "Структурированный отказ complete-попытки (round-6, P2-1/P2-2). 400 — session-state / pre-execution refusals (incl. the rollback-proven join_session_not_executed); 409 — immutable payload mismatch. reason vocabulary: join_session_not_found | join_session_expired | join_session_processing | join_session_used | join_session_payload_mismatch | join_session_not_executed."
       }
     },
     "securitySchemes": {

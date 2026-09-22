@@ -123,6 +123,10 @@ const DIRECTION_START_RESPONSE = {
     session_token: 'dir-session-token',
     expires_at: '2099-09-20T00:15:00Z',
     permanent_address: true,
+    // Round-6 (P1-3): the server-computed attempt-identity horizon —
+    // end of the target queue-day in the clinic timezone + grace.
+    target_date: '2026-09-20',
+    attempt_expires_at: '2099-09-20T21:59:59Z',
     direction: {
         profile_id: 7,
         key: 'lab-key',
@@ -194,7 +198,8 @@ beforeEach(() => {
     // leaked exactly that way when PIN 33 failed mid-flow.
     vi.resetAllMocks();
     window.localStorage.clear();
-    // round-4: the attempt-state and the draft both live in sessionStorage —
+    // round-6: the attempt-state lives in localStorage (survives the tab),
+    // the PHI draft stays sessionStorage-only —
     // full isolation between pins.
     window.sessionStorage.clear();
     lastQjPath = '';
@@ -1090,7 +1095,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
             expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
         });
         expect(
-            window.sessionStorage.getItem('queue_join_attempt_qdir_abcd1234efgh'),
+            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh'),
         ).toBeTruthy();
         first.unmount();
 
@@ -1131,7 +1136,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         });
         // the attempt envelope is consumed
         expect(
-            window.sessionStorage.getItem('queue_join_attempt_qdir_abcd1234efgh'),
+            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh'),
         ).toBeNull();
     });
 
@@ -1147,7 +1152,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
     });
 
     it('PIN 34b (round-4 P1-2): an unknown attempt survives the case-alias navigation — no new session for /q/ABCD after /q/abcd', async () => {
-        window.sessionStorage.setItem(
+        window.localStorage.setItem(
             `queue_join_attempt_qdir_${CANONICAL_CODE}`,
             JSON.stringify({
                 ts: Date.now(),
@@ -1193,7 +1198,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         // the machine-reason refusal updated the persisted attempt outcome —
         // a reload boots a FRESH session safely (nothing was created)
         const attemptState = JSON.parse(
-            window.sessionStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
+            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
         );
         expect(attemptState.outcomeUnknown).toBe(false);
 
@@ -1247,7 +1252,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         expect(screen.queryByTestId('qj-reconcile-start-over')).toBeNull();
         // the persisted attempt state stays UNKNOWN
         const attemptState = JSON.parse(
-            window.sessionStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
+            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
         );
         expect(attemptState.outcomeUnknown).toBe(true);
     });
@@ -1268,7 +1273,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         });
         await screen.findByText(/результат отправки неизвестен/i);
         const attemptState = JSON.parse(
-            window.sessionStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
+            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
         );
         expect(attemptState.outcomeUnknown).toBe(true);
         // no start-over escape anywhere in the unknown state
@@ -1284,7 +1289,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         // available (decisive verdict) and mints a fresh session only on
         // the deliberate click.
         // Pre-seed the UNKNOWN attempt (as a lost response would).
-        window.sessionStorage.setItem(
+        window.localStorage.setItem(
             `queue_join_attempt_qdir_${CANONICAL_CODE}`,
             JSON.stringify({
                 ts: Date.now(),
@@ -1326,7 +1331,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         await screen.findByTestId('qj-payload-mismatch');
         // decisive → the attempt state is consumed (a reload boots fresh)
         expect(
-            window.sessionStorage.getItem('queue_join_attempt_qdir_abcd1234efgh'),
+            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh'),
         ).toBeNull();
         // the deliberate start-over mints a NEW session (a different token)
         queueApiMocks.completeQueueJoinSession.mockResolvedValue(COMPLETE_MULTI_RESPONSE);
@@ -1350,4 +1355,106 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         };
         expect(secondPayload.session_token).toBe('dir-session-token-2');
     });
+    // ── Round-6 (PR #3362 review, P1-3 + P2-1) ───────────────────────────
+
+    it('PIN 40 (round-6 P1-3): the attempt horizon outruns the fixed 24h TTL — a tomorrow-targeting attempt stays recoverable past submit+24h', async () => {
+        // The review scenario: the session started after the cutoff targets
+        // TOMORROW; a fixed 24h TTL dropped the reconcile identity while the
+        // target queue-day was still running. The server horizon decides now.
+        const ts = Date.now() - 25 * 60 * 60 * 1000; // older than the fixed TTL
+        const horizon = new Date(Date.now() + 30 * 60 * 60 * 1000).toISOString();
+        window.localStorage.setItem(
+            `queue_join_attempt_qdir_${CANONICAL_CODE}`,
+            JSON.stringify({
+                ts,
+                publicCode: CANONICAL_CODE,
+                sessionToken: 'dir-session-token',
+                profileId: 7,
+                directionTitle: 'Лаборатория',
+                completeAttempted: true,
+                outcomeUnknown: true,
+                attemptExpiresAt: horizon,
+            }),
+        );
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        renderDirectionRoute();
+        // the attempt is STILL hydratable — the reconcile panel comes up,
+        // no fresh session is minted behind the patient's back
+        await screen.findByTestId('qj-reconcile-banner');
+        expect(directionApiMocks.startPublicDirectionSession).not.toHaveBeenCalled();
+    });
+
+    it('PIN 40b (round-6 P1-3): an attempt past its horizon is dropped — a fresh start becomes possible again', async () => {
+        window.localStorage.setItem(
+            `queue_join_attempt_qdir_${CANONICAL_CODE}`,
+            JSON.stringify({
+                ts: Date.now(),
+                publicCode: CANONICAL_CODE,
+                sessionToken: 'dir-session-token',
+                profileId: 7,
+                directionTitle: 'Лаборатория',
+                completeAttempted: true,
+                outcomeUnknown: true,
+                attemptExpiresAt: new Date(Date.now() - 60 * 1000).toISOString(),
+            }),
+        );
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        renderDirectionRoute();
+        // the horizon is over → the identity is gone → the normal start runs
+        await screen.findByText(/заполните форму/i);
+        expect(directionApiMocks.startPublicDirectionSession).toHaveBeenCalledTimes(1);
+        expect(
+            window.localStorage.getItem(`queue_join_attempt_qdir_${CANONICAL_CODE}`),
+        ).toBeNull();
+    });
+
+    it('PIN 41 (round-6 P2-1): a rollback-proven join_session_not_executed refusal offers the honest start-over instead of the UNKNOWN loop', async () => {
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        queueApiMocks.completeQueueJoinSession.mockRejectedValue({
+            response: {
+                status: 400,
+                data: {
+                    detail: {
+                        reason: 'join_session_not_executed',
+                        message: 'Очередь заполнена',
+                        details: [{ specialist_id: 7, error: 'Очередь заполнена' }],
+                    },
+                },
+            },
+        });
+        renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        await fillAndSubmit();
+        // the PROVEN refusal (rollback confirmed) → the explicit start-over
+        await screen.findByTestId('qj-preexec-refusal');
+        expect(screen.getByTestId('qj-start-over')).toBeTruthy();
+        // the outcome is KNOWN — no UNKNOWN reconcile loop on reload
+        const attemptState = JSON.parse(
+            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
+        );
+        expect(attemptState.outcomeUnknown).toBe(false);
+    });
+
+    it('PIN 42 (round-6 P1-3): the attempt envelope is written to localStorage and survives a tab close', async () => {
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        queueApiMocks.completeQueueJoinSession.mockRejectedValue({
+            response: { status: 0 },
+        });
+        renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        await fillAndSubmit();
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
+        });
+        // written to localStorage (tab-close proof)…
+        const stored = window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh');
+        expect(stored).not.toBeNull();
+        const envelope = JSON.parse(stored as string);
+        expect(envelope.outcomeUnknown).toBe(true);
+        // …carries the server horizon when the start provided one…
+        expect(envelope.attemptExpiresAt).toBeTruthy();
+        // …and nothing PHI-shaped ever entered the envelope.
+        expect(JSON.stringify(envelope)).not.toMatch(/пациент|patient_name|phone.*\d{3}/i);
+    });
 });
+

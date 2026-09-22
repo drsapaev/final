@@ -29485,6 +29485,16 @@ export type components = {
             queue_info: {
                 [key: string]: unknown;
             };
+            /**
+             * Target Date
+             * @description Целевая дата очереди токена (YYYY-MM-DD)
+             */
+            target_date?: string;
+            /**
+             * Attempt Expires At
+             * @description Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace
+             */
+            attempt_expires_at?: string;
         };
         /** LabCatalogAnalyteOut */
         LabCatalogAnalyteOut: {
@@ -34341,6 +34351,16 @@ export type components = {
             queue_info: {
                 [key: string]: unknown;
             };
+            /**
+             * Target Date
+             * @description Целевая дата очереди токена (YYYY-MM-DD)
+             */
+            target_date?: string;
+            /**
+             * Attempt Expires At
+             * @description Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace
+             */
+            attempt_expires_at?: string;
         };
         /**
          * PushDeviceErrorDetail
@@ -40664,6 +40684,43 @@ export type components = {
              */
             updated_at: string;
         };
+        /**
+         * JoinSessionRefusalDetail
+         * @description Один per-specialist отказ аллокатора (round-6, P2-1).
+         */
+        JoinSessionRefusalDetail: {
+            /**
+             * Specialist Id
+             * @description ID выбора (Doctor.id или QueueProfile.id); None для одиночного пути
+             */
+            specialist_id?: number | null;
+            /**
+             * Error
+             * @description Человекочитаемое сообщение домена
+             */
+            error: string;
+        };
+        /**
+         * JoinSessionRefusalResponse
+         * @description Структурированный отказ complete-попытки (round-6, P2-1/P2-2). 400 — session-state / pre-execution refusals (incl. the rollback-proven join_session_not_executed); 409 — immutable payload mismatch. reason vocabulary: join_session_not_found | join_session_expired | join_session_processing | join_session_used | join_session_payload_mismatch | join_session_not_executed.
+         */
+        JoinSessionRefusalResponse: {
+            /**
+             * Reason
+             * @description Машиночитаемая причина отказа
+             */
+            reason: string;
+            /**
+             * Message
+             * @description Человекочитаемое сообщение
+             */
+            message: string;
+            /**
+             * Details
+             * @description Per-specialist ошибки (только для join_session_not_executed)
+             */
+            details?: components["schemas"]["JoinSessionRefusalDetail"][] | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -45738,6 +45795,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JoinSessionCompleteResponse"] | components["schemas"]["JoinSessionCompleteMultipleResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinSessionRefusalResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinSessionRefusalResponse"];
                 };
             };
             /** @description Validation Error */

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.qr_queue._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.qr_queue._helpers import router
-from app.services.qr_queue._base import JoinSessionStateRefusal
+from app.services.qr_queue._base import (
+    JoinSessionNotExecutedRefusal,
+    JoinSessionStateRefusal,
+)
 
 
 @router.post("/join/start", response_model=JoinSessionStartResponse)
@@ -64,7 +67,19 @@ def start_join_session(
         )
 
 
-@router.post("/join/complete", response_model=JoinSessionCompleteResponse | JoinSessionCompleteMultipleResponse)
+@router.post(
+    "/join/complete",
+    response_model=JoinSessionCompleteResponse | JoinSessionCompleteMultipleResponse,
+    # Round-6 (PR #3362 review, P2-2): the recovery protocol the client
+    # depends on is now PART OF THE CONTRACT — 400 carries the structured
+    # state/pre-execution refusal (incl. the rollback-proven
+    # ``join_session_not_executed``), 409 carries the immutable payload
+    # mismatch. Regenerated into openapi.json + the generated TS types.
+    responses={
+        400: {"model": JoinSessionRefusalResponse},
+        409: {"model": JoinSessionRefusalResponse},
+    },
+)
 def complete_join_session(
     request: JoinSessionCompleteRequest, db: Session = Depends(get_db)
 ):
@@ -134,6 +149,24 @@ def complete_join_session(
         raise HTTPException(
             status_code=refusal_status,
             detail={"reason": e.reason, "message": str(e)},
+        ) from e
+    except JoinSessionNotExecutedRefusal as e:
+        # Round-6 (PR #3362 review, P2-1): the batch was ALREADY rolled
+        # back — zero tickets exist. The structured refusal lets the
+        # client show the real domain message and offer the honest
+        # start-over immediately instead of looping on UNKNOWN until the
+        # session TTL.
+        logger.warning(
+            "[complete_join_session] Отказ после подтверждённого rollback: %s",
+            str(e),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "reason": e.reason,
+                "message": str(e),
+                "details": e.details,
+            },
         ) from e
     except ValueError as e:
         logger.warning(

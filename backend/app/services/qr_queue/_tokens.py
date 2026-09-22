@@ -526,7 +526,11 @@ class TokensMixin(QRQueueServiceMixinBase):
                 self.db.query(QueueJoinSession)
                 .filter(
                     QueueJoinSession.qr_token == token.token,
-                    QueueJoinSession.status == "joined",
+                    # Round-6 (P1-1): joined rows now carry the versioned
+                    # ``joined_v2`` marker; legacy ``joined`` rows count too.
+                    QueueJoinSession.status.in_(
+                        ("joined", "joined_v2")
+                    ),
                 )
                 .count()
             )
