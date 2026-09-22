@@ -944,15 +944,18 @@ def complete_patient_visit(
                 db, queue_entry, doctor, department_hint
             )
 
-            # Codex round-2 P2: the lifecycle completion ALSO runs BEFORE
-            # the served-commit — resolution + lifecycle + the served flip
-            # are one atomic unit. A lifecycle failure (terminal-state
-            # conflict, lease conflict) propagates with NOTHING committed:
-            # the entry stays in_progress and the retry re-enters cleanly
-            # (the resolution is same-day-idempotent). Committing the
-            # visit-day move before a failing lifecycle used to leave the
-            # visit+appointment permanently moved while the broad handler
-            # rolled the rest back. The genuinely tolerable tail (payment
+            # Codex round-2 P2 + round-3 P2: the lifecycle completion ALSO
+            # runs BEFORE the served-commit — resolution + lifecycle + the
+            # served flip are one atomic unit. A lifecycle failure
+            # (terminal-state conflict, lease conflict) propagates with
+            # NOTHING committed: the entry stays in_progress and the retry
+            # re-enters cleanly (the resolution is same-day-idempotent).
+            # ``commit=False`` keeps the explicit ``db.commit()`` below as
+            # the SINGLE transaction boundary — the service's own default
+            # would commit the visit/appointment move and the served flip
+            # mid-flow, and a failure of the trailing commit would 500 on
+            # an already-durable completion whose retry then hits a
+            # terminal queue entry. The genuinely tolerable tail (payment
             # markers, appointment status, medical data) stays below the
             # swallow by the pre-existing design: «не блокируем основной
             # флоу очереди».
@@ -961,6 +964,7 @@ def complete_patient_visit(
             resolved_visit = VisitLifecycleService(db).complete_visit(
                 visit_id=resolved_visit.id,
                 current_user=current_user,
+                commit=False,
             )
             resolved_visit.updated_at = changed_at
 
