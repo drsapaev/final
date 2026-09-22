@@ -630,9 +630,15 @@ def test_alembic_chain_single_head_0062() -> None:
     assert graph["0072_service_executions"] == (
         "0071_nurse_workplace_assignments",
     )
+    # RQ-18 follow-up round-5 (PR #3362 review): the chain head moved to
+    # 0073 (join-session payload binding + response snapshot).
+    assert graph["0073_join_payload_binding"] == (
+        "0072_service_executions",
+    )
     assert len("0071_nurse_workplace_assignments") <= 32
     assert len("0072_service_executions") <= 32
-    assert heads == ["0072_service_executions"]
+    assert len("0073_join_payload_binding") <= 32
+    assert heads == ["0073_join_payload_binding"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

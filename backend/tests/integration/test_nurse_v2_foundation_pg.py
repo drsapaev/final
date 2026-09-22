@@ -210,7 +210,8 @@ def test_single_alembic_head(head_url):
     assert r.returncode == 0, r.stderr[-800:]
     head_lines = [line for line in r.stdout.splitlines() if "(head)" in line]
     assert len(head_lines) == 1, f"multi-head detected: {r.stdout!r}"
-    assert "0072_service_executions" in head_lines[0]
+    # RQ-18 follow-up round-5: the head moved to 0073 (payload binding).
+    assert "0073_join_payload_binding" in head_lines[0]
 
 
 @pytest.mark.integration
