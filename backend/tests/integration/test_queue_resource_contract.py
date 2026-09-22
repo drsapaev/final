@@ -812,7 +812,13 @@ def test_alembic_chain_single_head_0063() -> None:
     # public-address registry
     # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved
     # to 0072 (nurse workplace assignments 0071 + service executions 0072).
-    assert heads == ["0072_service_executions"]
+    # Corrective follow-up (owner verdict on the merged runtime): the
+    # chain head moved to 0073 (service_executions routing snapshot).
+    assert graph["0073_execution_routing_snapshot"] == (
+        "0072_service_executions",
+    )
+    assert len("0073_execution_routing_snapshot") <= 32
+    assert heads == ["0073_execution_routing_snapshot"]
 
 
 # ===================== D. parity + ADR =====================

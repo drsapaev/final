@@ -632,7 +632,13 @@ def test_alembic_chain_single_head_0062() -> None:
     )
     assert len("0071_nurse_workplace_assignments") <= 32
     assert len("0072_service_executions") <= 32
-    assert heads == ["0072_service_executions"]
+    # Corrective follow-up (owner verdict on the merged runtime): the
+    # chain head moved to 0073 (service_executions routing snapshot).
+    assert graph["0073_execution_routing_snapshot"] == (
+        "0072_service_executions",
+    )
+    assert len("0073_execution_routing_snapshot") <= 32
+    assert heads == ["0073_execution_routing_snapshot"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

@@ -102,14 +102,17 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from typing import Any
 
-from sqlalchemy import func, update
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select, update
+from sqlalchemy.orm import Session, aliased
 
 from app.core.audit import log_audit_event
 from app.crud import visit as crud_visit
 from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import find_active_tag_queue
-from app.models.appointment import Appointment
+from app.crud.visit_appointment_pairing import (
+    AmbiguousAppointmentPairingError,
+    move_paired_appointment_to_day,
+)
 from app.models.nurse_workplace import NurseWorkplaceAssignment
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.service import Service
@@ -547,6 +550,15 @@ class NurseServingApiService:
         30 seconds, so entries/queues/resources/visit services/
         services/assignments/today-queues each load in ONE IN-batch
         query and every per-execution decision folds in memory.
+
+        Corrective follow-up (owner verdict P1 — immutable routing):
+        the station resolves SNAPSHOT-FIRST (the creation-time
+        ``queue_resource_id``), and a snapshot-proven attempt needs NO
+        current-catalog D3 — a mid-flight Service re-tag used to drop
+        the execution from this recovery surface entirely (the chain
+        re-check consulted the retagged catalog and ``continue``-d the
+        row away), the exact stranding the verdict forbids. Legacy
+        NULL-snapshot rows keep the current-catalog chain check.
         """
         rows = (
             self.db.query(ServiceExecution)
@@ -590,13 +602,20 @@ class NurseServingApiService:
             for queue in queues.values()
             if queue.queue_resource_id is None and queue.queue_tag is not None
         }
+        # Corrective follow-up P1: creation-time station snapshots —
+        # resolved FIRST below (before the entry-queue axes); batched
+        # into the same ONE IN-query as the owner-axis resources.
+        snapshot_resource_ids = {
+            row.queue_resource_id for row in rows if row.queue_resource_id is not None
+        }
         resource_by_id: dict[int, QueueResource] = {}
         resource_by_tag: dict[str, QueueResource] = {}
-        if owner_resource_ids:
+        owner_or_snapshot_ids = owner_resource_ids | snapshot_resource_ids
+        if owner_or_snapshot_ids:
             resource_by_id = {
                 resource.id: resource
                 for resource in self.db.query(QueueResource).filter(
-                    QueueResource.id.in_(owner_resource_ids)
+                    QueueResource.id.in_(owner_or_snapshot_ids)
                 )
             }
         if tag_axis_tags:
@@ -634,32 +653,51 @@ class NurseServingApiService:
             )
             if entry is None:
                 continue
-            queue = queues.get(entry.queue_id)
-            if queue is None:
-                continue
+            # Snapshot-first station resolution (corrective follow-up
+            # P1): the creation-time station IS the station; the
+            # entry-queue axes below stay the fallback for legacy rows
+            # and unresolvable snapshots (deleted registry row).
             resource = (
-                resource_by_id.get(queue.queue_resource_id)
-                if queue.queue_resource_id is not None
-                else resource_by_tag.get(queue.queue_tag)
+                resource_by_id.get(execution.queue_resource_id)
+                if execution.queue_resource_id is not None
+                else None
             )
+            if resource is None:
+                queue = queues.get(entry.queue_id)
+                if queue is None:
+                    continue
+                resource = (
+                    resource_by_id.get(queue.queue_resource_id)
+                    if queue.queue_resource_id is not None
+                    else resource_by_tag.get(queue.queue_tag)
+                )
             if resource is None:
                 continue
             visit_service = visit_services.get(execution.visit_service_id)
-            service = (
-                services.get(visit_service.service_id)
-                if visit_service is not None
-                else None
-            )
             if (
                 visit_service is None
                 or entry.visit_id is None
                 or visit_service.visit_id != entry.visit_id
-                or service is None
-                or not _service_routed_to_station(service, resource)
             ):
-                # Orphaned/cross-station chains keep their pre-endpoint
+                # Orphaned/inconsistent chains keep their pre-endpoint
                 # invisibility; admin tooling owns such rows.
                 continue
+            if self._execution_routing_snapshot_proven(execution, resource):
+                # Snapshot row: the line binding is the routing proof
+                # (the current catalog is deliberately not consulted —
+                # a re-tag must not erase the recovery surface).
+                if visit_service.service_id != execution.routing_service_id:
+                    continue
+            else:
+                service = (
+                    services.get(visit_service.service_id)
+                    if visit_service is not None
+                    else None
+                )
+                if service is None or not _service_routed_to_station(service, resource):
+                    # Legacy NULL-snapshot chain: the pre-0073
+                    # current-catalog D3 check, unchanged.
+                    continue
             chains.append((execution, resource, entry, visit_service))
 
         involved_resource_ids = {resource.id for _r, resource, _e, _vs in chains}
@@ -811,6 +849,94 @@ class NurseServingApiService:
             },
         }
 
+    def _late_work_candidates(
+        self, queue: DailyQueue, resource: QueueResource
+    ) -> list[OnlineQueueEntry]:
+        """Terminal entries that REALLY are late work — ONE SQL query.
+
+        Corrective follow-up (owner verdict, P2 ×2 — the board must not
+        scan the whole day):
+
+        (a) volume: the old path loaded EVERY terminal entry of the day
+        (plus every VisitService of their visits and every execution of
+        those services) and folded them in Python — a constant SQL query
+        count, but rows/ORM objects/CPU/JSON payload grew linearly all
+        day, re-scanned by every polling tablet. The candidate query
+        below pushes the whole predicate into SQL and the board only
+        ever materializes real late-work rows:
+
+            terminal entry of this queue
+            AND its visit has a station-routed VisitService
+                with NO completed attempt
+                AND latest attempt not cancelled
+            AND no waiting/active rejoin entry for the same visit
+                on THIS queue
+
+        (b) rejoin suppression: a terminal entry whose visit is already
+        covered by a NEW waiting/called/in_progress ticket of this
+        station queue is NOT late work — the rejoin has happened and
+        showing the old ticket kept signalling "re-ticket the patient"
+        long after E2 existed (the exact P2 scenario: E1 served, late
+        service prescribed, E2 re-issued -> E1 must disappear from
+        late_pending IMMEDIATELY, not after the late service completes).
+
+        The pending predicate mirrors ``_fold_station_service_items``
+        exactly (``pending = not (completed_any or latest_cancelled)``);
+        the routing predicate consults the CURRENT catalog on purpose —
+        the board answers "what needs doing at this station NOW".
+        """
+        rejoin_entry = aliased(OnlineQueueEntry)
+        latest_attempt_no = (
+            select(func.max(ServiceExecution.attempt_no))
+            .where(ServiceExecution.visit_service_id == VisitService.id)
+            .correlate(VisitService)
+            .scalar_subquery()
+        )
+        pending_station_service = (
+            select(VisitService.id)
+            .join(Service, VisitService.service_id == Service.id)
+            .where(
+                VisitService.visit_id == OnlineQueueEntry.visit_id,
+                Service.queue_tag == resource.queue_tag,
+                Service.requires_doctor.is_(False),
+                ~select(ServiceExecution.id)
+                .where(
+                    ServiceExecution.visit_service_id == VisitService.id,
+                    ServiceExecution.status == "completed",
+                )
+                .exists(),
+                ~select(ServiceExecution.id)
+                .where(
+                    ServiceExecution.visit_service_id == VisitService.id,
+                    ServiceExecution.status == "cancelled",
+                    ServiceExecution.attempt_no == latest_attempt_no,
+                )
+                .exists(),
+            )
+            .exists()
+        )
+        live_rejoin = (
+            select(rejoin_entry.id)
+            .where(
+                rejoin_entry.queue_id == queue.id,
+                rejoin_entry.visit_id == OnlineQueueEntry.visit_id,
+                rejoin_entry.status.in_(("waiting", *_ENTRY_ACTIVE_STATES)),
+            )
+            .exists()
+        )
+        return (
+            self.db.query(OnlineQueueEntry)
+            .filter(
+                OnlineQueueEntry.queue_id == queue.id,
+                OnlineQueueEntry.status.in_(_ENTRY_TERMINAL_STATES),
+                OnlineQueueEntry.visit_id.isnot(None),
+                pending_station_service,
+                ~live_rejoin,
+            )
+            .order_by(OnlineQueueEntry.id.asc())
+            .all()
+        )
+
     def get_station_state(self, user_id: int, queue_resource_id: int) -> dict[str, Any]:
         """The station board: waiting + active + my claim + late_pending.
 
@@ -818,7 +944,11 @@ class NurseServingApiService:
         still has PENDING station-routed services (a procedure prescribed
         after the last-completer flip) — surfaced so nothing prescribed
         is silently stranded; the servable path is the existing rejoin
-        flow (a new ticket for the same visit).
+        flow (a new ticket for the same visit). Since the corrective
+        follow-up the candidates come from ONE SQL-level query
+        (``_late_work_candidates``): bounded volume — no full-day
+        terminal scan — and already-re-ticketed visits are suppressed
+        the moment their rejoin entry exists.
         """
         resource = self._resource_or_error(queue_resource_id)
         assignment = self._active_assignment_or_error(user_id, queue_resource_id)
@@ -849,36 +979,23 @@ class NurseServingApiService:
             .order_by(OnlineQueueEntry.id.asc())
             .all()
         )
-        # Codex round-2 P1 (late services are never SILENTLY stranded):
-        # terminal entries of today's station queue whose visit still has
-        # PENDING station-routed services — e.g. a procedure the doctor
-        # prescribed AFTER the last-completer flip (the add-service paths
-        # append VisitServices without touching queue entries). The
-        # serving plane deliberately does NOT reopen terminal entries
-        # (the patient is no longer at the station); the servable path is
-        # the EXISTING rejoin flow — a new ticket for the same visit (the
-        # next entry's serving sees ALL pending station services of the
-        # visit, including the late one). The board surfaces the state so
-        # the desk can re-ticket: nothing prescribed is invisible.
-        terminal_rows = (
-            self.db.query(OnlineQueueEntry)
-            .filter(
-                OnlineQueueEntry.queue_id == queue.id,
-                OnlineQueueEntry.status.in_(_ENTRY_TERMINAL_STATES),
-                OnlineQueueEntry.visit_id.isnot(None),
-            )
-            .order_by(OnlineQueueEntry.id.asc())
-            .all()
-        )
+        # Codex round-2 P1 (late services are never SILENTLY stranded) +
+        # corrective follow-up P2 ×2: the late-work candidates come from
+        # ONE SQL-level query — the day's terminal history is no longer
+        # fully loaded and folded in Python (bounded volume), and a
+        # terminal entry whose visit already has a live waiting/active
+        # rejoin ticket on this queue is suppressed immediately (the
+        # re-ticket signal must not outlive the re-ticket itself).
+        late_candidate_rows = self._late_work_candidates(queue, resource)
 
         waiting = [self._entry_payload(e, my_user_id=user_id) for e in waiting_rows]
-        # Codex round-3 P2 (batched enrichment): ALL active + terminal
+        # Codex round-3 P2 (batched enrichment): ALL active + late-candidate
         # rows' station services load in TWO IN-batch queries, and the
         # late_pending pass REUSES the already-folded items — the board
         # keeps a constant query budget under tablet polling (the
         # terminal list grows during the working day).
         enriched = self._station_services_batch(
-            [*active_rows, *terminal_rows], resource
+            [*active_rows, *late_candidate_rows], resource
         )
         active = [
             self._entry_payload(e, my_user_id=user_id, services=enriched[e.id])
@@ -886,17 +1003,14 @@ class NurseServingApiService:
         ]
         my_entry = next((item for item in active if item["is_my_claim"]), None)
 
-        late_pending = []
-        for terminal_entry in terminal_rows:
-            services = enriched[terminal_entry.id]
-            if any(item["pending"] for item in services):
-                late_pending.append(
-                    self._entry_payload(
-                        terminal_entry,
-                        my_user_id=user_id,
-                        services=services,
-                    )
-                )
+        late_pending = [
+            self._entry_payload(
+                terminal_entry,
+                my_user_id=user_id,
+                services=enriched[terminal_entry.id],
+            )
+            for terminal_entry in late_candidate_rows
+        ]
         return {
             "queue_resource_id": queue_resource_id,
             "resource_queue_tag": resource.queue_tag,
@@ -1245,31 +1359,25 @@ class NurseServingApiService:
                     # pairing (patient/date/time/doctor) would otherwise
                     # keep the appointment on the old day and could spawn
                     # a second visit for it later.
-                    appointment_filters = [
-                        Appointment.patient_id == visit.patient_id,
-                        Appointment.appointment_date == visit.visit_date,
-                        Appointment.status.not_in(
-                            ["cancelled", "completed", "no_show"]
-                        ),
-                    ]
-                    if visit.doctor_id is None:
-                        appointment_filters.append(Appointment.doctor_id.is_(None))
-                    else:
-                        appointment_filters.append(
-                            Appointment.doctor_id == visit.doctor_id
+                    # Corrective follow-up (owner verdict on the merged
+                    # runtime, P1): the pairing is narrowed by the visit's
+                    # department axis, locked FOR UPDATE, moves EXACTLY
+                    # ONE row and FAILS CLOSED on ambiguity — the old
+                    # bulk UPDATE matched BOTH doctorless same-day
+                    # appointments of the patient (laboratory AND
+                    # procedures) and moved the lab row together with
+                    # the procedures transfer.
+                    try:
+                        move_paired_appointment_to_day(
+                            self.db, visit=visit, new_day=queue_day
                         )
-                    if visit.visit_time:
-                        _hhmm = visit.visit_time[:5]
-                        appointment_filters.append(
-                            Appointment.appointment_time.in_((_hhmm, f"{_hhmm}:00"))
-                        )
-                    else:
-                        appointment_filters.append(
-                            Appointment.appointment_time.is_(None)
-                        )
-                    self.db.query(Appointment).filter(*appointment_filters).update(
-                        {"appointment_date": queue_day}, synchronize_session=False
-                    )
+                    except AmbiguousAppointmentPairingError as exc:
+                        raise NurseServingApiDomainError(
+                            409,
+                            "Перенос визита отклонён: неоднозначное "
+                            "сопоставление с appointment ("
+                            f"visit_id={visit.id}) — {exc}",
+                        ) from exc
                     visit.visit_date = queue_day
                     return visit
                 # Shared by live same-day tickets: fall through to the
@@ -1328,6 +1436,15 @@ class NurseServingApiService:
         deterministically under that lock (same starter -> 200 no-op,
         another nurse -> 409) and enforced on PG by the 0072 partial
         unique index.
+
+        Corrective follow-up (owner verdict P1 — immutable routing):
+        the attempt PERSISTS the routing snapshot (station id + tag +
+        the validated service line), and the same-starter idempotent
+        re-claim runs BEFORE the catalog D3 gate: a mid-flight Service
+        re-tag must not turn the tablet's repeat POST into a 400 while
+        the attempt is still legally hers to finish. The D3 gate itself
+        still consults the CURRENT catalog for every NEW attempt — new
+        work must be correctly routed NOW.
         """
         resource = self._resource_or_error(queue_resource_id)
         self._active_assignment_or_error(user_id, queue_resource_id)
@@ -1379,6 +1496,25 @@ class NurseServingApiService:
                 f"id={visit_service.visit_id}, а не визиту записи "
                 f"(visit_id={entry.visit_id})",
             )
+
+        # Attempt serialization under the VisitService row lock. Loaded
+        # BEFORE the catalog D3 gate: the same-starter re-claim below is
+        # the idempotent tablet contract and must survive a mid-flight
+        # Service re-tag (corrective follow-up P1 — an attempt the nurse
+        # already holds is re-claimed as-is, the CURRENT catalog only
+        # gates attempts that do not exist yet).
+        attempts = (
+            self.db.query(ServiceExecution)
+            .filter(ServiceExecution.visit_service_id == visit_service_id)
+            .order_by(ServiceExecution.attempt_no.asc())
+            .all()
+        )
+        in_progress = next((a for a in attempts if a.status == "in_progress"), None)
+        if in_progress is not None and in_progress.started_by_user_id == user_id:
+            # Same-nurse repeat POST = no-op (the tablet contract); the
+            # endpoint answers 200 instead of 201 via `created`.
+            return {**self._execution_payload(in_progress), "created": False}
+
         service = (
             self.db.query(Service)
             .filter(Service.id == visit_service.service_id)
@@ -1392,19 +1528,7 @@ class NurseServingApiService:
                 "requires_doctor=false требуется)",
             )
 
-        # Attempt serialization under the VisitService row lock.
-        attempts = (
-            self.db.query(ServiceExecution)
-            .filter(ServiceExecution.visit_service_id == visit_service_id)
-            .order_by(ServiceExecution.attempt_no.asc())
-            .all()
-        )
-        in_progress = next((a for a in attempts if a.status == "in_progress"), None)
         if in_progress is not None:
-            if in_progress.started_by_user_id == user_id:
-                # Same-nurse repeat POST = no-op (the tablet contract);
-                # the endpoint answers 200 instead of 201 via `created`.
-                return {**self._execution_payload(in_progress), "created": False}
             raise NurseServingApiDomainError(
                 409,
                 "Услуга уже исполняется другой медсестрой "
@@ -1426,6 +1550,14 @@ class NurseServingApiService:
             status="in_progress",
             started_by_user_id=user_id,
             started_at=_now(),
+            # Corrective follow-up P1 — the immutable routing snapshot:
+            # the station + the service line this attempt's D3 gate
+            # passed for. Terminal authorization and drain discovery
+            # check THIS, not the mutable catalog (see
+            # _execution_station_or_error).
+            queue_resource_id=resource.id,
+            routing_queue_tag_snapshot=resource.queue_tag,
+            routing_service_id=visit_service.service_id,
         )
         self.db.add(execution)
         self.db.flush()
@@ -1472,26 +1604,68 @@ class NurseServingApiService:
     def _execution_station_resource(
         self, execution: ServiceExecution
     ) -> tuple[QueueResource | None, OnlineQueueEntry | None]:
-        """The station (resource + entry) an execution belongs to."""
+        """The station (resource + entry) an execution belongs to.
+
+        Corrective follow-up (owner verdict P1 — immutable routing):
+        SNAPSHOT-FIRST. When the attempt carries the creation-time
+        routing snapshot (migration 0073+), the snapshot's station IS
+        the station — the entry-queue chain below remains the fallback
+        for pre-0073 rows and for snapshots whose registry row no
+        longer resolves (a deleted QueueResource downgrades the row to
+        the legacy resolution + legacy D3 re-check below, never to a
+        wider authorization).
+        """
         entry = None
         if execution.queue_entry_id is not None:
             entry = self.db.get(OnlineQueueEntry, execution.queue_entry_id)
-            if entry is not None and entry.queue is not None:
-                queue = entry.queue
-                if queue.queue_resource_id is not None:
-                    resource = self.db.get(QueueResource, queue.queue_resource_id)
-                    if resource is not None:
-                        return resource, entry
-                if queue.queue_tag is not None:
-                    # Bridged/legacy surface: resolve via the tag axis.
-                    resource = (
-                        self.db.query(QueueResource)
-                        .filter(QueueResource.queue_tag == queue.queue_tag)
-                        .first()
-                    )
-                    if resource is not None:
-                        return resource, entry
+        if execution.queue_resource_id is not None:
+            resource = self.db.get(QueueResource, execution.queue_resource_id)
+            if resource is not None:
+                return resource, entry
+            # Snapshot id no longer resolves (registry row deleted):
+            # fall through to the entry-queue axes — the caller's D3
+            # re-check then runs against the fallback station (the
+            # snapshot stops proving anything about a deleted row).
+        if entry is not None and entry.queue is not None:
+            queue = entry.queue
+            if queue.queue_resource_id is not None:
+                resource = self.db.get(QueueResource, queue.queue_resource_id)
+                if resource is not None:
+                    return resource, entry
+            if queue.queue_tag is not None:
+                # Bridged/legacy surface: resolve via the tag axis.
+                resource = (
+                    self.db.query(QueueResource)
+                    .filter(QueueResource.queue_tag == queue.queue_tag)
+                    .first()
+                )
+                if resource is not None:
+                    return resource, entry
         return None, entry
+
+    @staticmethod
+    def _execution_routing_snapshot_proven(
+        execution: ServiceExecution, resource: QueueResource | None
+    ) -> bool:
+        """True when the attempt's routing proof needs NO catalog lookup.
+
+        The snapshot proves: this attempt was created (D3-validated) on
+        station ``queue_resource_id`` for the service line
+        ``routing_service_id``. The current ``Service.queue_tag`` / the
+        current ``routing`` of the line are deliberately NOT consulted —
+        a штатный mid-flight re-tag must not make the attempt
+        unfinishable (owner verdict P1). The line-binding column keeps
+        the codex round-1 cross-station guard intact: a hand-repointed
+        ``visit_service_id`` fails the equality in
+        ``_execution_station_or_error`` instead of silently authorizing
+        B-routed work through station A.
+        """
+        return (
+            execution.routing_queue_tag_snapshot is not None
+            and execution.routing_service_id is not None
+            and resource is not None
+            and execution.queue_resource_id == resource.id
+        )
 
     def _execution_station_or_error(
         self, execution: ServiceExecution
@@ -1503,15 +1677,25 @@ class NurseServingApiService:
         - the entry must exist (``queue_entry_id`` is nullable — an entry
           purge SET NULLs it; an orphaned execution has no servable
           station context, only the ledger keeps its history);
-        - the resource must resolve from the entry's queue (owner axis or
-          the bridged tag axis);
+        - the resource must resolve — snapshot-first (the creation-time
+          station), else the entry's queue (owner axis or the bridged
+          tag axis);
         - the CHAIN must be consistent: the execution's VisitService
-          belongs to the entry's visit AND routes to that resource (D3:
-          queue_tag match + requires_doctor=false). Without this a
-          hand-applied cross-station row (station-A entry, station-B
-          service) let an A-assigned starter complete B-routed work and
-          the last-completer check — seeing NO station-A services — flip
+          belongs to the entry's visit AND (snapshot rows) still IS the
+          service line the attempt was validated for, or (legacy rows)
+          routes to that resource (D3: queue_tag match +
+          requires_doctor=false). Without this a hand-applied
+          cross-station row (station-A entry, station-B service) let an
+          A-assigned starter complete B-routed work and the
+          last-completer check — seeing NO station-A services — flip
           the entry to served on the empty-station predicate.
+
+        Corrective follow-up (owner verdict P1): for snapshot rows the
+        D3 routing proof is the SNAPSHOT (the current catalog is not
+        consulted — ``Service.queue_tag`` is штатно mutable and a
+        mid-flight re-tag used to strand the attempt in_progress with
+        terminal 403 + drain invisibility). Legacy NULL-snapshot rows
+        keep the exact pre-0073 current-catalog D3 re-check.
         """
         resource, entry = self._execution_station_resource(execution)
         if resource is None or entry is None:
@@ -1523,6 +1707,26 @@ class NurseServingApiService:
                 "недоступна с обслуживающей поверхности",
             )
         visit_service = self.db.get(VisitService, execution.visit_service_id)
+        if self._execution_routing_snapshot_proven(execution, resource):
+            # Snapshot rows: entry<->visit_service integrity + the line
+            # binding. The routing itself was proven at creation and is
+            # immutable on the row — the current catalog is irrelevant.
+            if (
+                visit_service is None
+                or entry.visit_id is None
+                or visit_service.visit_id != entry.visit_id
+                or visit_service.service_id != execution.routing_service_id
+            ):
+                raise NurseServingApiDomainError(
+                    403,
+                    "Исполнение id="
+                    f"{execution.id} не согласовано со станцией "
+                    f"(queue_resource_id={resource.id}): услуга не "
+                    "принадлежит визиту записи или отличается от "
+                    "зафиксированной при старте (routing_service_id) — "
+                    "операция недоступна",
+                )
+            return resource, entry
         service = (
             self.db.get(Service, visit_service.service_id)
             if visit_service is not None

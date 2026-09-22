@@ -64,7 +64,8 @@ SCRATCH_DB = "rq16c_check"
 # 0068 registry revision — owner directive trace 1a0aef280204950d).
 # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved
 # to 0072 (nurse workplace assignments 0071 + service executions 0072).
-EXPECTED_HEAD = "0072_service_executions"
+# Corrective follow-up: chain head moved to 0073 (routing snapshot).
+EXPECTED_HEAD = "0073_execution_routing_snapshot"
 
 sys.path.insert(0, str(BACKEND_DIR))
 

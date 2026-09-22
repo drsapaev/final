@@ -14,7 +14,9 @@ by ``alembic upgrade`` (SQLite is never a substitute):
    - FKs reference users / queue_resources / visit_services /
      queue_entries;
    - RLS is ENABLED on both new public tables (0051 convention);
-   - alembic has exactly ONE head.
+   - alembic has exactly ONE head;
+   - corrective follow-up 0073: the execution routing-snapshot columns
+     exist and the 0073 downgrade reverses them in isolation.
 2. D2 invariant on data: a second ACTIVE assignment of the same
    (user_id, queue_resource_id) pair is rejected; after deactivation a
    new active row for the same pair is legal (history preserved);
@@ -210,7 +212,7 @@ def test_single_alembic_head(head_url):
     assert r.returncode == 0, r.stderr[-800:]
     head_lines = [line for line in r.stdout.splitlines() if "(head)" in line]
     assert len(head_lines) == 1, f"multi-head detected: {r.stdout!r}"
-    assert "0072_service_executions" in head_lines[0]
+    assert "0073_execution_routing_snapshot" in head_lines[0]
 
 
 @pytest.mark.integration
@@ -258,6 +260,10 @@ def test_fresh_install_schema_shape(head_url):
                 "performed_by_user_id",
                 "completed_at",
                 "incomplete_reason",
+                # corrective follow-up 0073 — the routing snapshot
+                "queue_resource_id",
+                "routing_queue_tag_snapshot",
+                "routing_service_id",
                 "created_at",
                 "updated_at",
             } <= execution_columns
@@ -529,6 +535,62 @@ def test_d1_execution_invariants(head_url):
         assert rows[0][2] == other_nurse, "history must not be overwritten"
     finally:
         engine.dispose()
+
+
+@pytest.mark.integration
+def test_0073_routing_snapshot_downgrade_reverses_in_isolation():
+    """head -> 0072: the three snapshot columns drop cleanly (the table
+    and every 0072 invariant stay); head again: the columns return.
+    The corrective follow-up's own downgrade surface, pinned on real
+    PostgreSQL."""
+    db_name = f"n2v2_rt_{uuid.uuid4().hex[:8]}"
+    sa_url = _provision(db_name, "head")
+    try:
+        r = _run_alembic(sa_url, "downgrade", "0072_service_executions")
+        assert r.returncode == 0, r.stderr[-1500:]
+        engine = create_engine(sa_url, future=True)
+        try:
+            with engine.connect() as conn:
+                columns = set(
+                    conn.execute(
+                        text(
+                            "SELECT column_name FROM information_schema.columns "
+                            "WHERE table_name = 'service_executions'"
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                assert "queue_resource_id" not in columns
+                assert "routing_queue_tag_snapshot" not in columns
+                assert "routing_service_id" not in columns
+                assert "visit_service_id" in columns  # 0072 shape intact
+        finally:
+            engine.dispose()
+        r = _run_alembic(sa_url, "upgrade", "head")
+        assert r.returncode == 0, r.stderr[-1500:]
+        engine = create_engine(sa_url, future=True)
+        try:
+            with engine.connect() as conn:
+                columns = set(
+                    conn.execute(
+                        text(
+                            "SELECT column_name FROM information_schema.columns "
+                            "WHERE table_name = 'service_executions'"
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                assert {
+                    "queue_resource_id",
+                    "routing_queue_tag_snapshot",
+                    "routing_service_id",
+                } <= columns
+        finally:
+            engine.dispose()
+    finally:
+        _drop(db_name)
 
 
 @pytest.mark.integration

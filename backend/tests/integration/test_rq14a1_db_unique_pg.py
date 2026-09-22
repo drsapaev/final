@@ -154,7 +154,8 @@ def _assert_pg_head(engine) -> None:
     # 0070 extends the chain; the 0065 objects are the invariant here.
     # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved
     # to 0072 (nurse workplace assignments 0071 + service executions 0072).
-    assert version == "0072_service_executions", version
+    # Corrective follow-up: chain head moved to 0073 (routing snapshot).
+    assert version == "0073_execution_routing_snapshot", version
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:

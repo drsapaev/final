@@ -24,6 +24,10 @@ from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     _visit_filter_doctor_id,
     router,
 )
+from app.crud.visit_appointment_pairing import (
+    AmbiguousAppointmentPairingError,
+    move_paired_appointment_to_day,
+)
 
 
 @router.get("/doctor/{specialty}/queue/today", response_model=dict[str, Any])
@@ -324,25 +328,24 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 # старом дне (и канонический резолв может родить под
                 # него второй визит). Паринг — тот же, что у
                 # CanonicalVisitRepository (время — оба написания).
-                appointment_filters = [
-                    Appointment.patient_id == visit.patient_id,
-                    Appointment.appointment_date == visit.visit_date,
-                    Appointment.status.not_in(["cancelled", "completed", "no_show"]),
-                ]
-                if visit.doctor_id is None:
-                    appointment_filters.append(Appointment.doctor_id.is_(None))
-                else:
-                    appointment_filters.append(Appointment.doctor_id == visit.doctor_id)
-                if visit.visit_time:
-                    _hhmm = visit.visit_time[:5]
-                    appointment_filters.append(
-                        Appointment.appointment_time.in_((_hhmm, f"{_hhmm}:00"))
-                    )
-                else:
-                    appointment_filters.append(Appointment.appointment_time.is_(None))
-                db.query(Appointment).filter(*appointment_filters).update(
-                    {"appointment_date": queue_day}, synchronize_session=False
-                )
+                # Corrective follow-up (вердикт владельца по смерженному
+                # рантайму, P1): паринг сужается департаментом визита,
+                # берётся под lock, переносится РОВНО ОДНА строка, при
+                # неоднозначности — fail closed (409): старый bulk
+                # UPDATE сдвигал ОБА doctorless-аппойнтмента пациента
+                # того же дня (лабораторию вместе с процедурным
+                # переносом).
+                try:
+                    move_paired_appointment_to_day(db, visit=visit, new_day=queue_day)
+                except AmbiguousAppointmentPairingError as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=(
+                            "Перенос визита отклонён: неоднозначное "
+                            f"сопоставление с appointment (visit_id={visit.id}) "
+                            f"— {exc}"
+                        ),
+                    ) from exc
                 visit.visit_date = queue_day
                 return visit
             # shared by live same-day tickets: fall through to the
