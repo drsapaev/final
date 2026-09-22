@@ -712,11 +712,25 @@ def start_patient_visit(
         # the visit. Without this, visit stays in "open" and complete_visit()
         # fails because open→completed is not allowed by the state machine
         # (only open→in_progress is). This was found by Codex review.
+        # Start-atomicity follow-up (PR after #3367): commit=False —
+        # the lifecycle commit joins the CALLER's transaction, exactly
+        # like the completion unit after d5ac9441e. start_patient_visit
+        # stages the queue mutations BEFORE the resolution
+        # (queue_entry.status="in_progress" + updated_at) and writes the
+        # visit annotations (visit_time/notes) AFTER the lifecycle call;
+        # with the service default (commit=True) the internal
+        # db.commit() prematurely persisted the staged flip + the
+        # in_progress transition (+ the created visit and its link on
+        # the resolution path), and a failure of the trailing boundary
+        # commit left a durable partial start: entry in_progress with
+        # visit_time/notes lost. The explicit db.commit() below stays
+        # the SINGLE transaction boundary of the start unit.
         from app.services.visit_lifecycle_service import VisitLifecycleService
         if visit.status == "open":
             visit = VisitLifecycleService(db).start_visit(
                 visit_id=visit.id,
                 current_user=current_user,
+                commit=False,
             )
 
         # Обновляем время начала приема
