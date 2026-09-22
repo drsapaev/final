@@ -292,23 +292,34 @@ class TestCreateSchedulePersistence:
 
     The default harness override shares ONE savepoint session across the
     request and the assertions, which masks exactly this defect — so this
-    test wires a PRODUCTION-LIKE get_db (every request opens its own
-    session and transaction) and reads the row back through an INDEPENDENT
-    session (a fresh connection) after the request dependency has closed
-    its session. The unknown-key refusal must stay a rollback (no row)."""
+    test runs against its OWN disposable engine (tmp file, isolated from
+    the shared harness database: every seeded row is COMMITTED) with a
+    PRODUCTION-LIKE get_db (each request opens its own session and
+    transaction), then reads the row back through an INDEPENDENT session
+    (a fresh connection) after the request dependency has closed its
+    session. The unknown-key refusal must stay a rollback (no row)."""
 
     def test_created_template_survives_the_request_session(
-        self, client, db_session, test_db
+        self, client, tmp_path
     ):
         import uuid
 
+        from sqlalchemy import create_engine, select
         from sqlalchemy.orm import sessionmaker
 
+        import app.db.base  # noqa: F401 — register every model
         from app.api.deps import get_db as canonical_get_db
+        from app.db.base_class import Base
         from app.main import app
 
+        engine = create_engine(
+            f"sqlite:///{tmp_path / 'persist.db'}",
+            echo=False,
+            connect_args={"check_same_thread": False},
+        )
+        Base.metadata.create_all(bind=engine)
         IndependentSession = sessionmaker(
-            autocommit=False, autoflush=False, bind=test_db
+            autocommit=False, autoflush=False, bind=engine
         )
 
         # The committed world the request's OWN session will see.
@@ -334,24 +345,13 @@ class TestCreateSchedulePersistence:
         setup.commit()
         setup.refresh(dept)
         setup.refresh(admin)
-        dept_id, admin_row = dept.id, admin
+        dept_id = dept.id
         dept_key = dept.key
-        admin_id = admin_row.id
-        admin_username, admin_role = admin_row.username, admin_row.role
-        setup.close()
 
         from tests.conftest import mint_access_token
 
-        class _AdminRef:
-            """Minimal shape mint_access_token reads (id/username/role)."""
-
-            id = admin_id
-            username = admin_username
-            role = admin_role
-            is_active = True
-            is_superuser = False
-
-        headers = {"Authorization": f"Bearer {mint_access_token(_AdminRef())}"}
+        headers = {"Authorization": f"Bearer {mint_access_token(admin)}"}
+        setup.close()
 
         # Production-like dependency: a REAL per-request session (own
         # transaction), closed — not shared — when the request ends.
@@ -402,14 +402,15 @@ class TestCreateSchedulePersistence:
 
             check = IndependentSession()
             try:
-                from sqlalchemy import select
-
-                orphans = check.execute(
-                    select(ScheduleTemplate).where(
-                        ScheduleTemplate.weekday == 3,
-                        ScheduleTemplate.department_id.is_(None),
+                orphans = (
+                    check.execute(
+                        select(ScheduleTemplate).where(
+                            ScheduleTemplate.department_id.is_(None)
+                        )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 assert orphans == [], (
                     "a refused create persists nothing (the 400 keeps its "
                     "rollback semantics)"
@@ -418,3 +419,4 @@ class TestCreateSchedulePersistence:
                 check.close()
         finally:
             app.dependency_overrides.pop(canonical_get_db, None)
+            engine.dispose()
