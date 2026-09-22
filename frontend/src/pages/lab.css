@@ -185,6 +185,38 @@
   font-size: 14px;
 }
 
+/* PR 3351 (review round 9, P2): явная ошибка неудачного продления сессии —
+   предупреждение остаётся открытым, действие не «притворяется» успешным.
+   Round 10: цвет — dual-theme danger TEXT ink (--mac-danger-ink, паттерн
+   --mac-link-ink): базовый --mac-accent (#007aff) как текст не проходит
+   WCAG AA ни в одной теме (3.6:1 на #eef3fa / 4.24:1 на #1c1c1e при
+   норме 4.5:1 для 14px); ни одно одиночное значение danger-семейства
+   обе темы не закрывает. Вложенный токен-fallback — ratchet
+   cssHexOutsideTokens/varUsagesNoFallback. */
+.lab-session-extend-error {
+  color: var(--mac-danger-ink, var(--mac-danger, inherit));
+  font-weight: 600;
+}
+
+/* PR 3351 (review round 6, P1): не-dismissable диалог «сессия истекла,
+   операция завершается» — переход на /login отложен до снятия последнего
+   pending-источника (hard navigation обрывала неидемпотентный POST). */
+.lab-session-redirect-spinner {
+  width: 22px;
+  height: 22px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 3px solid var(--mac-border, #d8dde8);
+  border-top-color: var(--mac-accent, #dc2626);
+  animation: lab-session-redirect-spin 0.9s linear infinite;
+}
+
+@keyframes lab-session-redirect-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────────────
  * L-H-4 fix: LabQueueWorkbench — миграция inline-стилей в CSS.
  * Аналогичная миграция уже выполнена для Cashier/Registrar/Admin/Doctor.

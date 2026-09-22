@@ -1,7 +1,16 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import NotificationInbox from '../NotificationInbox';
+import { LabDirtyGuardProvider, useLabDirtyGuard } from '../../laboratory/LabDirtyGuardContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import i18n from '@/i18n';
+
+// PR 3351 (review round 3, P1): центр уведомлений переведён на единый
+// guarded navigator — тесты гоняют переходы через реальный роутер
+// (LocationProbe), а не через шпион window.history.pushState, которого
+// MemoryRouter не использует.
 
 const {
   store,
@@ -34,7 +43,9 @@ vi.mock('../../../contexts/NotificationCenterContext', () => ({
 
 vi.mock('../../../utils/logger', () => ({
   default: {
+    info: vi.fn(),
     warn: vi.fn(),
+    error: vi.fn(),
   },
 }));
 
@@ -54,17 +65,80 @@ function createNotification(overrides = {}) {
   };
 }
 
-describe('NotificationInbox routing', () => {
-  let pushStateSpy: ReturnType<typeof vi.spyOn>;
+/** Постоянный индикатор текущего пути: guarded navigate виден через роутер. */
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname + location.search}</div>;
+}
 
-  beforeEach(() => {
+/** Держит ссылку на регистрацию dirty-источника (паттерн LabDirtyGuardContext.test). */
+function DirtySourceBridge({
+  registration,
+}: {
+  registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] };
+}) {
+  const guard = useLabDirtyGuard();
+  // Рендер-присваивание: тест читает registration.current после render().
+  registration.current = (source) => (
+    guard.registerDirtySource({ ...source, discard: () => { source.discard?.(); } })
+  );
+  return null;
+}
+
+type RenderOptions = {
+  userRole?: string;
+  initialEntries?: string[];
+  registration?: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] };
+};
+
+function renderInbox({
+  userRole = 'admin',
+  initialEntries = ['/'],
+  registration,
+}: RenderOptions = {}) {
+  const inbox = (
+    <NotificationInbox userRole={userRole} onClose={() => {}} />
+  );
+  return render(
+    <ThemeProvider>
+      <MemoryRouter initialEntries={initialEntries}>
+        <LabDirtyGuardProvider>
+          {registration ? (
+            <DirtySourceBridge registration={registration} />
+          ) : null}
+          <LocationProbe />
+          <Routes>
+            <Route path="/lab" element={<div>lab page</div>} />
+            <Route path="/messages" element={<div>messages page</div>} />
+            <Route path="/admin/all-free-requests" element={<div>all free page</div>} />
+            <Route path="/custom-target" element={<div>custom page</div>} />
+            <Route path="/queue" element={<div>queue page</div>} />
+            <Route path="/registrar/patients" element={<div>registrar patients</div>} />
+            <Route path="/registrar" element={<div>registrar page</div>} />
+            <Route path="/admin" element={<div>admin page</div>} />
+            <Route path="/patient" element={<div>patient page</div>} />
+            <Route path="*" element={<div>fallback</div>} />
+          </Routes>
+          {inbox}
+        </LabDirtyGuardProvider>
+      </MemoryRouter>
+    </ThemeProvider>,
+  );
+}
+
+describe('NotificationInbox routing', () => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     store.notifications = [];
-    pushStateSpy = vi.spyOn(window.history, 'pushState');
+    await act(async () => {
+      await i18n.changeLanguage('ru');
+    });
   });
 
-  afterEach(() => {
-    pushStateSpy.mockRestore();
+  afterEach(async () => {
+    await act(async () => {
+      await i18n.changeLanguage('ru');
+    });
   });
 
   it.each([
@@ -83,11 +157,11 @@ describe('NotificationInbox routing', () => {
     { role: 'admin', type: 'system_alert', expectedTarget: '/admin' },
     { role: 'registrar', type: 'system_alert', expectedTarget: '/registrar' },
   ])(
-    'navigates $type to $expectedTarget',
+    'navigates $type to $expectedTarget via the guarded navigator',
     async ({ role, type, expectedTarget, payloadSnapshot, deepLink }) => {
       store.notifications = [
         createNotification({
-          id: `notification-${type}-${role}`,
+          id: `notification-${type}`,
           type,
           eventType: type,
           payloadSnapshot,
@@ -95,11 +169,11 @@ describe('NotificationInbox routing', () => {
         }),
       ];
 
-      render(<NotificationInbox userRole={role} onClose={() => {}} />);
+      renderInbox({ userRole: role });
       fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
 
       await waitFor(() => {
-        expect(pushStateSpy).toHaveBeenCalledWith({}, '', expectedTarget);
+        expect(screen.getByTestId('location')).toHaveTextContent(expectedTarget);
       });
 
       expect(markAsSeen).toHaveBeenCalledTimes(1);
@@ -117,11 +191,11 @@ describe('NotificationInbox routing', () => {
       }),
     ];
 
-    render(<NotificationInbox userRole="admin" onClose={() => {}} />);
+    renderInbox();
     fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
 
     await waitFor(() => {
-      expect(pushStateSpy).toHaveBeenCalledWith({}, '', '/custom-target');
+      expect(screen.getByTestId('location')).toHaveTextContent('/custom-target');
     });
   });
 
@@ -135,13 +209,88 @@ describe('NotificationInbox routing', () => {
       }),
     ];
 
-    render(<NotificationInbox userRole="admin" onClose={() => {}} />);
+    renderInbox({ initialEntries: ['/start-page'] });
     fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
 
     await waitFor(() => {
       expect(markAsSeen).toHaveBeenCalledTimes(1);
       expect(markAsRead).toHaveBeenCalledTimes(1);
     });
-    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('location')).toHaveTextContent('/start-page');
+  });
+
+  it('does not push a duplicate entry when the target equals the current URL', async () => {
+    store.notifications = [
+      createNotification({
+        id: 'notification-same-url',
+        type: 'message_received',
+        eventType: 'message_received',
+        payloadSnapshot: { metadata: { conversation_id: 'conv-42' } },
+      }),
+    ];
+
+    renderInbox({ initialEntries: ['/messages?conversation=conv-42'] });
+    fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
+
+    await waitFor(() => {
+      expect(markAsSeen).toHaveBeenCalledTimes(1);
+    });
+    // Тот же URL: короткое замыкание без перехода и без новой записи истории.
+    expect(screen.getByTestId('location')).toHaveTextContent('/messages?conversation=conv-42');
+  });
+
+  // PR 3351 (review round 3, P1): центр уведомлений больше не обходит
+  // route-level leave guard прямым pushState — клик по уведомлению при
+  // dirty-черновике лаборатории открывает guard-диалог, а не молча
+  // размонтирует LabPanel.
+  it('keeps a dirty lab draft behind the guard dialog instead of silently leaving /lab', async () => {
+    let reportDirty = true;
+    const registration: { current?: ReturnType<typeof useLabDirtyGuard>['registerDirtySource'] } = {};
+    store.notifications = [
+      createNotification({
+        id: 'notification-guarded',
+        type: 'message_received',
+        eventType: 'message_received',
+        payloadSnapshot: { metadata: { conversation_id: 'conv-42' } },
+      }),
+    ];
+
+    renderInbox({
+      initialEntries: ['/lab'],
+      registration,
+    });
+    await act(async () => {
+      registration.current?.({
+        id: 'report',
+        isDirty: () => reportDirty,
+        save: vi.fn().mockResolvedValue(undefined),
+        discard: () => { reportDirty = false; },
+      });
+    });
+
+    fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
+
+    // Guard-диалог открыт (кнопка «Выйти без сохранения» уникальна для него;
+    // сам inbox-дропдаун тоже role=dialog, но без этих кнопок), переход НЕ
+    // выполнен.
+    const discardButton = await screen.findByRole('button', { name: 'Выйти без сохранения' });
+    expect(discardButton).toBeVisible();
+    expect(screen.getByTestId('location')).toHaveTextContent('/lab');
+
+    // Отмена: пользователь остаётся на /lab.
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Выйти без сохранения' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId('location')).toHaveTextContent('/lab');
+
+    // Подтверждённый уход (discard) выполняет переход по цели уведомления.
+    fireEvent.click(screen.getByLabelText(/Открыть уведомление:/i));
+    await screen.findByRole('button', { name: 'Выйти без сохранения' });
+    fireEvent.click(screen.getByRole('button', { name: 'Выйти без сохранения' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent('/messages?conversation=conv-42');
+    });
+    expect(screen.queryByRole('button', { name: 'Выйти без сохранения' })).not.toBeInTheDocument();
   });
 });

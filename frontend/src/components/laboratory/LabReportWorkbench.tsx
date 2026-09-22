@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { toast } from 'react-toastify';  // STRAT#2: retained for backward-compat;
 // новые callers должны использовать useLabToast.interactive* вместо прямого toast.
@@ -14,6 +14,13 @@ import {
   getLabStatusVariant,
   signerFieldLabels
 } from './labUiLabels';
+// PR 3351 (review round 7, P1): split-уровни pending-защиты (см. operationPending.ts).
+import type { LabOperationPendingState } from './operationPending';
+// PR 3351 (review round 9, P1): устойчивый Idempotency-Key операции CREATE.
+import {
+  clearCreateInstanceIdempotencyKey,
+  resolveCreateInstanceIdempotencyKey,
+} from './createInstanceIdempotency';
 
 // WF-08 fix: confirmation dialog для irreversible actions (Finalize, Revise).
 import { useConfirm } from '../common/ConfirmDialog';
@@ -50,6 +57,40 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { getErrorMessage } from '../../utils/type-guards';
 import { FileText, FolderPlus } from 'lucide-react';
 
+export interface LabInstanceChangeContext {
+  kind: 'update' | 'transition';
+  expectedInstanceId: string | number | null;
+  operation: LabReportOperationContext;
+}
+
+export interface LabReportOperationContext {
+  epoch: number;
+  selectionKey: string | null;
+  patientId: string | number | null;
+}
+
+interface PersistDraftResult {
+  instance: Record<string, unknown> | null;
+  accepted: boolean;
+}
+
+class StaleLabReportContextError extends Error {}
+
+const EMPTY_OPERATION_CONTEXT: LabReportOperationContext = {
+  epoch: 0,
+  selectionKey: null,
+  patientId: null,
+};
+
+function operationContextsMatch(
+  left: LabReportOperationContext,
+  right: LabReportOperationContext,
+) {
+  return left.epoch === right.epoch
+    && left.selectionKey === right.selectionKey
+    && String(left.patientId ?? '') === String(right.patientId ?? '');
+}
+
 export default function LabReportWorkbench({
   selectedAppointment = null,
   templates,
@@ -58,12 +99,17 @@ export default function LabReportWorkbench({
   reportHistory = [],
   recentReports = [],
   activeInstance = null,
+  instanceTransitionPending = false,
+  pauseAutoSave = false,
+  getOperationContext = undefined,
   onInstanceChange,
   onOpenInstance,
   onRefreshHistory,
   onRefreshRecentReports = undefined,
   onQueueChanged = undefined,
   registerDirtySource = undefined,
+  onDirtyStateChange = undefined,
+  onOperationPendingChange = undefined,
   notify
 }: {
   selectedAppointment?: Record<string, unknown> | null;
@@ -73,13 +119,34 @@ export default function LabReportWorkbench({
   reportHistory?: Array<Record<string, unknown>>;
   recentReports?: Array<Record<string, unknown>>;
   activeInstance?: Record<string, unknown> | null;
-  onInstanceChange?: (instance: Record<string, unknown>) => void;
-  onOpenInstance?: (instance: Record<string, unknown>) => void;
+  instanceTransitionPending?: boolean;
+  pauseAutoSave?: boolean;
+  getOperationContext?: () => LabReportOperationContext;
+  onInstanceChange?: (
+    instance: Record<string, unknown>,
+    change: LabInstanceChangeContext,
+  ) => boolean | void;
+  onOpenInstance?: (instanceId: string | number) => void;
   onRefreshHistory?: (patientId: string | number) => Promise<void>;
   onRefreshRecentReports?: () => Promise<void>;
   onQueueChanged?: () => Promise<void>;
   notify?: (type: string, message: string) => void;
-  registerDirtySource?: (source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => void;
+  registerDirtySource?: (source: {
+    id: string;
+    isDirty: () => boolean;
+    save: () => Promise<void>;
+    discard?: () => void;
+  }) => () => void;
+  /** PR 3351: вызывается при каждом изменении dirty-состояния (sentinel route-guard). */
+  onDirtyStateChange?: () => void;
+  /**
+   * PR 3351 (review round 7, P1): split-уровни pending-защиты.
+   * blocksContextTransition — контекстные переходы report-области;
+   * blocksDocumentLeave — полный уход с /lab (beforeunload/route-leave/
+   * sentinel/session-expiry). null (cleanup) снимает источник с обоих
+   * уровней.
+   */
+  onOperationPendingChange?: (state: LabOperationPendingState | null) => void;
   [k: string]: unknown;
 }) {
   const { t: rawT } = useTranslation();
@@ -91,6 +158,25 @@ export default function LabReportWorkbench({
   const confirm = confirmRaw;
   // ADR-0015: lab reporting API accessed via hook.
   const labReportingApi = useLabReporting();
+  const partialDraftCommitRef = useRef<{
+    instanceId: string | number;
+    baseUpdatedAt: string | null;
+    updatedAt: string;
+    signerSnapshot: Record<string, unknown>;
+  } | null>(null);
+  const printAttemptRef = useRef(0);
+  const printFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const captureOperationContext = useCallback(
+    () => getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT,
+    [getOperationContext],
+  );
+  const isOperationCurrent = useCallback(
+    (operation: LabReportOperationContext) => operationContextsMatch(
+      operation,
+      getOperationContext?.() ?? EMPTY_OPERATION_CONTEXT,
+    ),
+    [getOperationContext],
+  );
 
   // STRAT#2: единый канал нотификаций.
   const labToast = useLabToast(notify as (type: string, message: string) => void);
@@ -132,6 +218,7 @@ export default function LabReportWorkbench({
     autoSaveTimerRef,
     handleSaveDraftRef,
     isDirty,
+    isInstanceHydrated,
     publishedTemplates,
     serviceContextItems,
     resolvedTemplates,
@@ -155,27 +242,87 @@ export default function LabReportWorkbench({
     templateResolution: templateResolution as never,
     activeInstance: activeInstance as never,
   });
+  const canEditVisibleInstance = canEditActiveInstance
+    && isInstanceHydrated
+    && !instanceTransitionPending
+    && !saving
+    && !autoSaving;
 
-  // Navigation guard: предотвращает потерю данных при refresh/close.
-  // Используем beforeunload напрямую (без useNavigationGuard) —
-  // useNavigationGuard требует <Router> context, что ломает unit-тесты.
-  // Переключение табов внутри SPA не теряет state (LabPanel хранит
-  // selectedAppointment/activeInstance в useState).
-  useEffect(() => {
-    if (!isDirty) return;
-    const handler = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
+  // PR 3351 pending-контракт (review round 7, P1; уточнение round 8, P1):
+  // ДВА уровня pending-защиты, и CREATE блокирует ОБА.
+  //
+  // Round 7 держал CREATE вне контекстного уровня (latest-wins: поздний
+  // ответ отбрасывается по operation-context в handleInstanceChange).
+  // Round 8 закрывает это как небезопасное для неидемпотентного POST
+  // /lab/report-instances: серверный side effect коммитится ДО любого
+  // решения UI, а смена пациента/отчёта в полёте заставляла обработчик
+  // молча выбросить ответ — без onRefreshHistory/onRefreshRecentReports/
+  // onQueueChanged и уведомления. Оператор не видел созданный бланк и
+  // повторял CREATE — второй бланк. Поэтому CREATE, как и save/autosave/
+  // finalize/revise/print, блокирует и контекстные переходы, и полный
+  // уход с /lab (beforeunload провайдера, guardRouteLeave, sentinel и
+  // session-expiry redirect).
+  //
+  // URL-контракт sentinel-а при этом не страдает: пока sentinel вооружён,
+  // WF-15 эффект LabPanel откладывает замену ?instance в адресе (см.
+  // historyGuardEngaged в LabDirtyGuardContext) — collapse sentinel-а
+  // приземляется на twin с ДО-create URL без расхождения, а отложенная
+  // запись выполняется на уже свёрнутую запись после settle.
+  const reportBlocksContextTransition = saving || autoSaving;
+  const reportBlocksDocumentLeave = saving || autoSaving;
+  useLayoutEffect(() => {
+    onOperationPendingChange?.({
+      blocksContextTransition: reportBlocksContextTransition,
+      blocksDocumentLeave: reportBlocksDocumentLeave,
+    });
+    return () => {
+      if (reportBlocksContextTransition || reportBlocksDocumentLeave) {
+        onOperationPendingChange?.(null);
+      }
     };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [isDirty]);
+  }, [onOperationPendingChange, reportBlocksContextTransition, reportBlocksDocumentLeave]);
+
+  useEffect(() => {
+    const partial = partialDraftCommitRef.current;
+    if (!partial) return;
+    const activeId = activeInstance?.id as string | number | null | undefined;
+    const activeUpdatedAt = activeInstance?.updated_at == null
+      ? null
+      : String(activeInstance.updated_at);
+    if (
+      String(activeId ?? '') !== String(partial.instanceId)
+      || activeUpdatedAt !== partial.baseUpdatedAt
+    ) {
+      partialDraftCommitRef.current = null;
+    }
+  }, [activeInstance?.id, activeInstance?.updated_at]);
+
+  useEffect(() => {
+    if (printFeedbackTimerRef.current) {
+      clearTimeout(printFeedbackTimerRef.current);
+      printFeedbackTimerRef.current = null;
+    }
+    return () => {
+      if (printFeedbackTimerRef.current) {
+        clearTimeout(printFeedbackTimerRef.current);
+        printFeedbackTimerRef.current = null;
+      }
+    };
+  }, [activeInstance?.id]);
+
+  // PR 3351 (review round 6, P1): beforeunload для полного документа
+  // (refresh/закрытие вкладки) больше не ставится здесь. Единственный
+  // владелец — LabDirtyGuardProvider: он видит ОБЩЕЕ состояние
+  // (dirty-источники ИЛИ незавершённые операции), поэтому pending-only
+  // мутация (finalize/print чистого отчёта) тоже блокирует unload.
+  // Workbench-хук на одном isDirty этот сценарий пропускал. Внутренние
+  // SPA-переходы по-прежнему идут через guardTransition (scope-контракт).
 
   // WF-22 fix: keyboard shortcuts для efficiency.
   // Ctrl+S (Cmd+S на Mac) → save draft (preventDefault — браузер не показывает Save Dialog)
   // Доступно только когда canSaveDraft (editable state).
   useEffect(() => {
-    if (!canSaveDraft) return;
+    if (!canSaveDraft || instanceTransitionPending) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
@@ -190,23 +337,29 @@ export default function LabReportWorkbench({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [canSaveDraft, saving]);
+  }, [canSaveDraft, instanceTransitionPending, saving]);
 
   // PR-58: autosave — 30-second debounce when dirty + canSaveDraft
   // L-L-6 fix: добавлен autoSaving state — отображается в индикаторе
   // во время сохранения (а не только после успешного завершения).
   useEffect(() => {
-    if (!isDirty || !canSaveDraft || saving) return;
+    if (!isDirty || !canSaveDraft || saving || instanceTransitionPending || pauseAutoSave) return;
+    const scheduledOperation = captureOperationContext();
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(async () => {
       if (handleSaveDraftRef.current && !saving) {
+        if (!isOperationCurrent(scheduledOperation)) return;
         try {
           setAutoSaving(true);
-          await handleSaveDraftRef.current();
-          setLastAutoSave(new Date());
+          const accepted = await handleSaveDraftRef.current();
+          if (accepted) {
+            setLastAutoSave(new Date());
+          }
         } catch (e) {
           // Autosave failure is non-fatal — manual save is still available
-          logger.warn('Lab autosave failed:', e);
+          if (!(e instanceof StaleLabReportContextError)) {
+            logger.warn('Lab autosave failed:', e);
+          }
         } finally {
           setAutoSaving(false);
         }
@@ -215,9 +368,21 @@ export default function LabReportWorkbench({
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [isDirty, canSaveDraft, saving, draftValues]);
+  }, [
+    isDirty,
+    canSaveDraft,
+    saving,
+    draftValues,
+    instanceTransitionPending,
+    pauseAutoSave,
+    captureOperationContext,
+    isOperationCurrent,
+  ]);
 
   const handleCreateInstance = useCallback(async (templateIdOverride: string | number | null = null, options: Record<string, unknown> = {}) => {
+    if (instanceTransitionPending) return;
+    const operation = captureOperationContext();
+    const expectedInstanceId = (activeInstance?.id as string | number | null | undefined) ?? null;
     const templateId = templateIdOverride || selectedTemplateId;
     if (!selectedAppointment?.patient_id || !templateId) {
       notify?.('error', t('errors.select_patient_template'));
@@ -230,7 +395,7 @@ export default function LabReportWorkbench({
     setSaving(true);
     setBusyAction('create');
     try {
-      const instance = await labReportingApi.createInstance({
+      const createPayload = {
         patient_id: selectedAppointment.patient_id as string | number,
         appointment_id: (selectedAppointment.appointment_id as string | number) || null,
         visit_id: (templateResolution?.visit_id as string | number) || (selectedAppointment.visit_id as string | number) || null,
@@ -243,19 +408,71 @@ export default function LabReportWorkbench({
           code: item.code || null,
           name: item.name || null
         }))
-      });
-      onInstanceChange?.(instance as Record<string, unknown>);
+      };
+      // PR 3351 (review round 9, P1): POST /lab/report-instances без
+      // Idempotency-Key неидемпотентен: транспортный разрыв ПОСЛЕ
+      // серверного commit (502 reverse proxy, crash вкладки, retry после
+      // reload) терял ID созданного бланка — повторный клик коммитил
+      // второй бланк. Ключ операции устойчив: генерируется на первой
+      // попытке, переживает неопределённый исход в sessionStorage и
+      // переиспользуется повтором (backend возвращает закоммиченный ответ
+      // ровно для того же payload — слот хранит только односторонний
+      // digest тела запроса, CodeQL alert 1315, round 10). Ответ 2xx получен —
+      // исход известен, слот освобождается: следующее создание = новая
+      // операция = новый легитимный бланк.
+      const idempotencyKey = await resolveCreateInstanceIdempotencyKey(createPayload);
+      const instance = await labReportingApi.createInstance(createPayload, { idempotencyKey });
+      clearCreateInstanceIdempotencyKey(createPayload);
+      const accepted = onInstanceChange?.(instance as Record<string, unknown>, {
+        kind: 'transition',
+        expectedInstanceId,
+        operation,
+      }) !== false;
+      if (!accepted) {
+        // PR 3351 (review round 8, P1): серверный side effect уже НЕОБРАТИМ —
+        // create_instance() закоммитил бланк ДО любого решения UI. Round 7
+        // здесь просто возвращался: поздний (по operation-context) ответ
+        // молча выбрасывался — без onRefreshHistory/onRefreshRecentReports/
+        // onQueueChanged и уведомления, оператор не видел созданный бланк и
+        // повторял CREATE — второй бланк. Round 8 закрывает сам вход в эту
+        // ветку (CREATE блокирует контекстные переходы — смена пациента/
+        // отчёта в полёте больше не допускается), но server outcome обязан
+        // пережить ЛЮБОЙ сценарий: обновляем canonical read-model (история
+        // пациента — no-op при уже сменившемся контексте: loadReportHistory
+        // гвардится belongsToCurrentContext) и сообщаем оператору, КАКОМУ
+        // пациенту создан бланк — не применяя его к текущему UI-контексту.
+        await onRefreshHistory?.(selectedAppointment.patient_id as string | number);
+        await onRefreshRecentReports?.();
+        await onQueueChanged?.();
+        notify?.('success', t('success.report_created_for_patient', {
+          patient: String(
+            selectedAppointment.patient_fio
+            ?? selectedAppointment.patient_id
+            ?? '',
+          ),
+        }));
+        return;
+      }
+      const transitionedOperation = captureOperationContext();
       await onRefreshHistory?.(selectedAppointment.patient_id as string | number);
+      if (!isOperationCurrent(transitionedOperation)) return;
       await onRefreshRecentReports?.();
+      if (!isOperationCurrent(transitionedOperation)) return;
       await onQueueChanged?.();
+      if (!isOperationCurrent(transitionedOperation)) return;
       notify?.('success', (options.successMessage as string) || t('success.report_created'));
     } catch (error) {
+      if (!isOperationCurrent(operation)) return;
       notify?.('error', (error instanceof Error ? error.message : String(error)));
     } finally {
       setSaving(false);
       setBusyAction(null);
     }
   }, [
+    activeInstance,
+    captureOperationContext,
+    isOperationCurrent,
+    instanceTransitionPending,
     notify,
     onInstanceChange,
     onRefreshHistory,
@@ -277,16 +494,27 @@ export default function LabReportWorkbench({
     setDraftValues((prev) => ({ ...prev, [fieldKey]: value }));
   }
 
-  async function persistDraft(): Promise<Record<string, unknown> | null> {
+  async function persistDraft(operation: LabReportOperationContext): Promise<PersistDraftResult> {
     if (!activeInstance) {
-      return null;
+      return { instance: null, accepted: false };
     }
+    const expectedInstanceId = activeInstance.id as string | number;
     // WF-06 fix: передаём updated_at для optimistic locking.
     // Если backend обнаружит, что бланк был изменён другим пользователем
     // после этого timestamp — вернёт 409, persistDraft выбросит exception.
-    let expectedUpdatedAt = activeInstance.updated_at
+    const activeUpdatedAt = activeInstance.updated_at
       ? activeInstance.updated_at as string
       : null;
+    const cachedPartial = partialDraftCommitRef.current;
+    const reusablePartial = cachedPartial
+      && String(cachedPartial.instanceId) === String(expectedInstanceId)
+      && cachedPartial.baseUpdatedAt === activeUpdatedAt
+      ? cachedPartial
+      : null;
+    if (!reusablePartial && cachedPartial) {
+      partialDraftCommitRef.current = null;
+    }
+    let expectedUpdatedAt = reusablePartial?.updatedAt ?? activeUpdatedAt;
 
     const payload: Array<Record<string, unknown>> = [];
     (activeInstance.sections as Array<Record<string, unknown>>).forEach((section: Record<string, unknown>) => {
@@ -305,8 +533,17 @@ export default function LabReportWorkbench({
       });
     });
 
-    let latestInstance: Record<string, unknown> | null = activeInstance;
-    if (JSON.stringify(activeInstance.signer_snapshot || {}) !== JSON.stringify(signerSnapshot || {})) {
+    let latestInstance: Record<string, unknown> | null = reusablePartial
+      ? {
+        ...activeInstance,
+        updated_at: reusablePartial.updatedAt,
+        signer_snapshot: reusablePartial.signerSnapshot,
+      }
+      : activeInstance;
+    const persistedSignerSnapshot = reusablePartial?.signerSnapshot
+      ?? (activeInstance.signer_snapshot as Record<string, unknown> | undefined)
+      ?? {};
+    if (JSON.stringify(persistedSignerSnapshot) !== JSON.stringify(signerSnapshot || {})) {
       latestInstance = await labReportingApi.updateInstance(activeInstance.id as string | number, {
         signer_snapshot: signerSnapshot
       }, expectedUpdatedAt) as Record<string, unknown>;
@@ -316,32 +553,68 @@ export default function LabReportWorkbench({
       const signerUpdatedAt = latestInstance?.updated_at as string | undefined;
       if (signerUpdatedAt) {
         expectedUpdatedAt = signerUpdatedAt;
+        partialDraftCommitRef.current = {
+          instanceId: expectedInstanceId,
+          baseUpdatedAt: reusablePartial?.baseUpdatedAt ?? activeUpdatedAt,
+          updatedAt: signerUpdatedAt,
+          signerSnapshot: { ...(signerSnapshot || {}) },
+        };
       }
+      if (!isOperationCurrent(operation)) throw new StaleLabReportContextError();
     }
     if (payload.length > 0) {
       const response = (await labReportingApi.bulkSaveValues(activeInstance.id as string | number, payload, expectedUpdatedAt)) as Record<string, unknown>;
       latestInstance = response.instance as Record<string, unknown>;
+      // The server commit is authoritative even if navigation changed while
+      // the request was in flight. Cache its advanced token before rejecting
+      // stale UI work so a failed target transition can safely retry the still
+      // visible report instead of conflicting with our own completed write.
+      const committedUpdatedAt = latestInstance?.updated_at as string | undefined;
+      if (committedUpdatedAt) {
+        partialDraftCommitRef.current = {
+          instanceId: expectedInstanceId,
+          baseUpdatedAt: reusablePartial?.baseUpdatedAt ?? activeUpdatedAt,
+          updatedAt: committedUpdatedAt,
+          signerSnapshot: { ...(signerSnapshot || {}) },
+        };
+      }
+      if (!isOperationCurrent(operation)) throw new StaleLabReportContextError();
     }
-    onInstanceChange?.(latestInstance as Record<string, unknown>);
-    return latestInstance;
+    const accepted = onInstanceChange?.(latestInstance as Record<string, unknown>, {
+      kind: 'update',
+      expectedInstanceId,
+      operation,
+    }) !== false;
+    if (accepted && isOperationCurrent(operation)) {
+      partialDraftCommitRef.current = null;
+    }
+    return {
+      instance: latestInstance,
+      accepted: accepted && isOperationCurrent(operation),
+    };
   }
 
   // PR3: ядро сохранения — бросает исключение при неудаче, чтобы autosave
   // (и любой другой вызывающий) мог достоверно отличить успех от провала
   // и не выставлял lastAutoSave после неуспешного запроса.
-  async function attemptSaveDraft() {
-    if (!activeInstance) {
+  async function attemptSaveDraft(): Promise<boolean> {
+    if (!activeInstance || instanceTransitionPending) {
+      if (instanceTransitionPending) return false;
       throw new Error(t('errors.open_or_create_first'));
     }
+    const operation = captureOperationContext();
     // WF-07 fix: запоминаем статус до save, чтобы обнаружить auto-transition.
     const previousStatus = activeInstance.status;
     setSaving(true);
     setBusyAction('save');
     try {
-      const latest = await persistDraft();
+      const { instance: latest, accepted } = await persistDraft(operation);
+      if (!accepted) return false;
       await onRefreshHistory?.(activeInstance.patient_id as string | number);
+      if (!isOperationCurrent(operation)) return false;
       // Dirty state: после успешного save сбрасываем dirty flag.
       initialValuesRef.current = {
+        instanceId: activeInstance.id as string | number,
         values: { ...draftValues },
         signer: { ...signerSnapshot },
       };
@@ -355,6 +628,12 @@ export default function LabReportWorkbench({
       } else {
         notify?.('success', t('success.draft_saved'));
       }
+      return true;
+    } catch (error) {
+      if (!isOperationCurrent(operation)) {
+        throw new StaleLabReportContextError();
+      }
+      throw error;
     } finally {
       setSaving(false);
       setBusyAction('');
@@ -365,6 +644,7 @@ export default function LabReportWorkbench({
   // «Обновить актуальную версию». Введённый draft НЕ перезаписываем
   // автоматически — актуальная версия открывается только явным кликом.
   function notifySaveError(error: unknown) {
+    if (error instanceof StaleLabReportContextError) return;
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('другим пользователем') && activeInstance) {
       labToast.interactiveError(
@@ -373,8 +653,14 @@ export default function LabReportWorkbench({
           autoClose: 10000,
           onClick: () => {
             void (async () => {
+              const operation = captureOperationContext();
               const fresh = await labReportingApi.getInstance(activeInstance.id as string | number);
-              onInstanceChange?.(fresh as Record<string, unknown>);
+              if (!isOperationCurrent(operation)) return;
+              onInstanceChange?.(fresh as Record<string, unknown>, {
+                kind: 'update',
+                expectedInstanceId: activeInstance.id as string | number,
+                operation,
+              });
             })();
           },
         }
@@ -383,12 +669,17 @@ export default function LabReportWorkbench({
     }
     notify?.('error', message);
   }
+  const notifySaveErrorRef = useRef(notifySaveError);
+  useEffect(() => {
+    notifySaveErrorRef.current = notifySaveError;
+  });
 
-  async function handleSaveDraft() {
+  async function handleSaveDraft(): Promise<boolean> {
     try {
-      await attemptSaveDraft();
+      return await attemptSaveDraft();
     } catch (error) {
       notifySaveError(error);
+      return false;
     }
   }
   // WF-22 fix: обновляем ref для keyboard shortcut.
@@ -404,8 +695,15 @@ export default function LabReportWorkbench({
   // PR5: регистрация dirty-состояния отчёта в панели — guard переходов
   // решает (сохранить / выйти без сохранения / отмена) по этому источнику.
   const isDirtyRef = useRef(isDirty);
+  // PR 3351 (route-level leave guard): обновляемый ref + notify на каждом
+  // рендере — route-guard перевзвешивает sentinel при флипе dirty.
+  const onDirtyStateChangeRef = useRef(onDirtyStateChange);
+  useEffect(() => {
+    onDirtyStateChangeRef.current = onDirtyStateChange;
+  });
   useEffect(() => {
     isDirtyRef.current = isDirty;
+    onDirtyStateChangeRef.current?.();
   });
   const registerDirtySourceRef = useRef(registerDirtySource);
   useEffect(() => {
@@ -413,7 +711,30 @@ export default function LabReportWorkbench({
     return registerDirtySourceRef.current({
       id: 'report',
       isDirty: () => isDirtyRef.current,
-      save: () => Promise.resolve(handleSaveDraftRef.current?.()).then(() => undefined),
+      save: async () => {
+        try {
+          const accepted = await handleSaveDraftRef.current?.();
+          if (accepted === false) {
+            throw new StaleLabReportContextError();
+          }
+        } catch (error) {
+          // Dirty-transition guard intentionally swallows save failures so the
+          // source must surface the error before rethrowing to block navigation.
+          if (!(error instanceof StaleLabReportContextError)) {
+            notifySaveErrorRef.current(error);
+          }
+          throw error;
+        }
+      },
+      // PR 3351: Discard сбрасывает черновик к baseline активного
+      // instance. Выбор необратим: если переход упадёт (загрузка новой
+      // цели завершилась ошибкой), сброшенный draft не останется dirty и
+      // не будет закоммичен autosave от старого контекста.
+      discard: () => {
+        const baseline = initialValuesRef.current;
+        setDraftValues({ ...baseline.values });
+        setSignerSnapshot({ ...baseline.signer });
+      },
     });
   }, []);
 
@@ -421,7 +742,9 @@ export default function LabReportWorkbench({
   // операцией (backend разрешал одинаковые действия для DRAFT/IN_PROGRESS/READY).
 
   async function handleFinalize() {
-    if (!activeInstance) return;
+    if (!activeInstance || instanceTransitionPending) return;
+    const expectedInstanceId = activeInstance.id as string | number;
+    const operation = captureOperationContext();
     // WF-08 fix: Finalize — необратимое действие. Бланк становится immutable,
     // единственный путь правки — revise (создание нового instance).
     // Показываем confirmation dialog с объяснением последствий.
@@ -435,17 +758,28 @@ export default function LabReportWorkbench({
       intent: 'primary',
     });
     if (!ok) return;
+    if (!isOperationCurrent(operation)) return;
     setSaving(true);
     setBusyAction('finalize');
     try {
-      const latest = await persistDraft();
+      const { instance: latest, accepted: draftAccepted } = await persistDraft(operation);
+      if (!draftAccepted || !isOperationCurrent(operation)) return;
       const finalized = await labReportingApi.finalize(((latest || activeInstance) as Record<string, unknown>).id as string | number) as Record<string, unknown>;
-      onInstanceChange?.(finalized);
+      const accepted = onInstanceChange?.(finalized, {
+        kind: 'update',
+        expectedInstanceId,
+        operation,
+      }) !== false;
+      if (!accepted || !isOperationCurrent(operation)) return;
       await onRefreshHistory?.(finalized.patient_id as string | number);
+      if (!isOperationCurrent(operation)) return;
       await onRefreshRecentReports?.();
+      if (!isOperationCurrent(operation)) return;
       await onQueueChanged?.();
+      if (!isOperationCurrent(operation)) return;
       notify?.('success', t('success.finalized'));
     } catch (error) {
+      if (!isOperationCurrent(operation)) return;
       // PR3: конфликт 409 при финализации показывает действие
       // «Обновить актуальную версию» вместо сырой ошибки.
       notifySaveError(error);
@@ -456,7 +790,9 @@ export default function LabReportWorkbench({
   }
 
   async function handleRevise() {
-    if (!activeInstance) return;
+    if (!activeInstance || instanceTransitionPending) return;
+    const expectedInstanceId = activeInstance.id as string | number;
+    const operation = captureOperationContext();
     // M-1 fix: Revise creates a new instance (old one preserved as FINALIZED),
     // but it changes which instance is "active" and creates audit-trail entries.
     // The comment at L52-55 promised a guard — now delivered.
@@ -470,15 +806,25 @@ export default function LabReportWorkbench({
       intent: 'warning',
     });
     if (!ok) return;
+    if (!isOperationCurrent(operation)) return;
     setSaving(true);
     setBusyAction('revise');
     try {
       const revised = (await labReportingApi.revise(activeInstance.id as string | number)) as Record<string, unknown>;
-      onInstanceChange?.(revised);
+      const accepted = onInstanceChange?.(revised, {
+        kind: 'transition',
+        expectedInstanceId,
+        operation,
+      }) !== false;
+      if (!accepted) return;
+      const transitionedOperation = captureOperationContext();
       await onRefreshHistory?.(revised.patient_id as string | number);
+      if (!isOperationCurrent(transitionedOperation)) return;
       await onRefreshRecentReports?.();
+      if (!isOperationCurrent(transitionedOperation)) return;
       notify?.('success', t('success.revised'));
     } catch (error) {
+      if (!isOperationCurrent(operation)) return;
       // PR3: конфликт 409 при revise показывает действие
       // «Обновить актуальную версию» вместо сырой ошибки.
       notifySaveError(error);
@@ -489,7 +835,17 @@ export default function LabReportWorkbench({
   }
 
   async function handlePrint() {
-    if (!activeInstance) return;
+    if (!activeInstance || instanceTransitionPending) return;
+    const printAttempt = ++printAttemptRef.current;
+    if (printFeedbackTimerRef.current) {
+      clearTimeout(printFeedbackTimerRef.current);
+      printFeedbackTimerRef.current = null;
+    }
+    const clearOwnedPrintFeedback = () => {
+      if (printAttemptRef.current === printAttempt) setPrintFeedback(null);
+    };
+    const operation = captureOperationContext();
+    const expectedInstanceId = activeInstance.id as string | number;
     setSaving(true);
     setBusyAction('print');
     // L-5 fix: use setPrintFeedback (inline Alert) as the single feedback
@@ -505,17 +861,64 @@ export default function LabReportWorkbench({
       ) as Record<string, unknown>;
 
       if (printResult.success) {
-        const printed = (await labReportingApi.markPrinted(activeInstance.id as string | number)) as Record<string, unknown>;
-        onInstanceChange?.(printed);
+        let printed: Record<string, unknown>;
+        try {
+          printed = (await labReportingApi.markPrinted(expectedInstanceId)) as Record<string, unknown>;
+        } catch (markError) {
+          logger.error('[LabReportWorkbench] printed document status update failed', markError);
+          if (isOperationCurrent(operation) && printAttemptRef.current === printAttempt) {
+            setPrintFeedback({ severity: 'error', text: t('workbench.print_status_failed') });
+          }
+          notify?.('error', t('workbench.print_status_failed'));
+          return;
+        }
+        // The physical print already happened, so persist its audit/status even
+        // if the operator navigated away while the printer request was pending.
+        // Only the old screen's UI follow-ups are suppressed.
+        if (!isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
+        const accepted = onInstanceChange?.(printed, {
+          kind: 'update',
+          expectedInstanceId,
+          operation,
+        }) !== false;
+        if (!accepted || !isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
         await onRefreshHistory?.(printed.patient_id as string | number);
+        if (!isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
         await onRefreshRecentReports?.();
+        if (!isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
         await onQueueChanged?.();
+        if (!isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
         setPrintFeedback({
           severity: 'success',
           text: `${t('workbench.print_sent')}${(printResult as { data?: { printer?: string } })?.data?.printer ? ` (${(printResult as { data?: { printer?: string } })?.data?.printer})` : ''}.`
         });
         // PR-59: auto-dismiss success feedback after 5 seconds
-        setTimeout(() => setPrintFeedback(null), 5000);
+        printFeedbackTimerRef.current = setTimeout(() => {
+          if (printAttemptRef.current === printAttempt) {
+            setPrintFeedback(null);
+            printFeedbackTimerRef.current = null;
+          }
+        }, 5000);
+        return;
+      }
+
+      if (!isOperationCurrent(operation)) {
+        clearOwnedPrintFeedback();
         return;
       }
 
@@ -529,14 +932,22 @@ export default function LabReportWorkbench({
       // URL.createObjectURL(undefined) выбросит, и labourant увидит белый экран.
       let blob: Blob | unknown;
       try {
-        blob = await labReportingApi.downloadPdf(activeInstance.id as string | number);
+        blob = await labReportingApi.downloadPdf(expectedInstanceId);
       } catch (downloadError) {
+        if (!isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
         logger.error('[LabReportWorkbench] PDF download failed', downloadError);
         setPrintFeedback({
           severity: 'error',
           text: t('workbench.print_pdf_failed')
         });
         notify?.('error', getErrorMessage(downloadError) || t('errors.print_failed'));
+        return;
+      }
+      if (!isOperationCurrent(operation)) {
+        clearOwnedPrintFeedback();
         return;
       }
       if (!blob || !(blob instanceof Blob)) {
@@ -548,34 +959,76 @@ export default function LabReportWorkbench({
         return;
       }
       const url = URL.createObjectURL(blob);
+      if (!isOperationCurrent(operation)) {
+        URL.revokeObjectURL(url);
+        clearOwnedPrintFeedback();
+        return;
+      }
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
       // WF-05 fix: не помечаем как PRINTED при неудаче popup.
       if (popup) {
-        const printed = (await labReportingApi.markPrinted(activeInstance.id as string | number)) as Record<string, unknown>;
-        onInstanceChange?.(printed);
+        let printed: Record<string, unknown>;
+        try {
+          printed = (await labReportingApi.markPrinted(expectedInstanceId)) as Record<string, unknown>;
+        } catch (markError) {
+          logger.error('[LabReportWorkbench] opened PDF status update failed', markError);
+          if (isOperationCurrent(operation) && printAttemptRef.current === printAttempt) {
+            setPrintFeedback({ severity: 'error', text: t('workbench.print_status_failed') });
+          }
+          notify?.('error', t('workbench.print_status_failed'));
+          return;
+        }
+        const accepted = onInstanceChange?.(printed, {
+          kind: 'update',
+          expectedInstanceId,
+          operation,
+        }) !== false;
+        if (!accepted || !isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
         await onRefreshHistory?.(printed.patient_id as string | number);
+        if (!isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
         await onRefreshRecentReports?.();
+        if (!isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
         await onQueueChanged?.();
+        if (!isOperationCurrent(operation)) {
+          clearOwnedPrintFeedback();
+          return;
+        }
         setPrintFeedback({
           severity: 'success',
           text: t('workbench.print_pdf_opened')
         });
       } else {
+        if (!isOperationCurrent(operation)) return;
         setPrintFeedback({
           severity: 'warning',
           text: t('workbench.print_pdf_blocked')
         });
       }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
+      if (!isOperationCurrent(operation)) {
+        clearOwnedPrintFeedback();
+        return;
+      }
       setPrintFeedback({
         severity: 'error',
         text: (error instanceof Error ? error.message : String(error))
       });
       notify?.('error', getErrorMessage(error));
     } finally {
-      setSaving(false);
-      setBusyAction('');
+      if (printAttemptRef.current === printAttempt) {
+        setSaving(false);
+        setBusyAction('');
+      }
     }
   }
 
@@ -587,7 +1040,10 @@ export default function LabReportWorkbench({
   // (Error Prevention) и консистентность с handleFinalize/handleRevise,
   // которые уже используют useConfirm() для необратимых действий.
   async function handleNotifyPatient() {
-    if (!activeInstance) return;
+    if (!activeInstance || instanceTransitionPending) return;
+    const operation = captureOperationContext();
+    const patientId = activeInstance.patient_id;
+    const instanceId = activeInstance.id;
     // STRAT#9: строки мигрированы на t() из labTranslations.
     const ok = await confirm({
       title: t('confirm.notify_title'),
@@ -598,16 +1054,18 @@ export default function LabReportWorkbench({
       intent: 'warning',
     });
     if (!ok) return;
+    if (!isOperationCurrent(operation)) return;
     setSaving(true);
     setBusyAction('notify');
     try {
-      const patientId = activeInstance.patient_id;
       await api.post('/telegram/send-lab-results', {
         patient_id: patientId,
-        instance_id: activeInstance.id,
+        instance_id: instanceId,
       });
+      if (!isOperationCurrent(operation)) return;
       notify?.('success', t('success.notified'));
     } catch (error) {
+      if (!isOperationCurrent(operation)) return;
       const msg = getErrorMessage(error) || 'Не удалось отправить результаты пациенту.';
       notify?.('error', typeof msg === 'string' ? msg : t('errors.notify_failed'));
     } finally {
@@ -675,6 +1133,7 @@ export default function LabReportWorkbench({
                       size="small"
                       variant="outline"
                       onClick={() => setEscapeHatchActive(true)}
+                      disabled={instanceTransitionPending}
                     >
                       {t('workbench.show_all_templates')}
                     </Button>
@@ -700,7 +1159,7 @@ export default function LabReportWorkbench({
                     className="macos-input"
                     value={selectedTemplateId}
                     onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSelectedTemplateId(event.target.value)}
-                    disabled={templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive)}
+                    disabled={instanceTransitionPending || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive)}
                   >
                     <option value="">Выберите шаблон</option>
                     {effectiveTemplateOptions.map((template) => (
@@ -713,7 +1172,7 @@ export default function LabReportWorkbench({
                 <Button
                   variant="primary"
                   onClick={() => handleCreateInstance()}
-                  disabled={saving || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive) || !selectedTemplateId}
+                  disabled={saving || instanceTransitionPending || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive) || !selectedTemplateId}
                 >
                   <FolderPlus size={16} aria-hidden="true" />
                   {busyAction === 'create' ? t('workbench.creating_report') : t('workbench.create_report')}
@@ -741,11 +1200,14 @@ export default function LabReportWorkbench({
                       <button
                         type="button"
                         onClick={() => {
-                          // PR-60 / Low-31: navigate to the superseded instance
-                          if (onInstanceChange && activeInstance.supersedes_instance_id) {
-                            labReportingApi.getInstance(activeInstance.supersedes_instance_id as string | number)
-                              .then((instance: unknown) => onInstanceChange?.(instance as Record<string, unknown>))
-                              .catch((e: unknown) => logger.warn('Failed to load superseded instance:', e));
+                          // PR5: every report switch must pass through the panel's
+                          // dirty-transition guard exposed by onOpenInstance.
+                          const instanceId = activeInstance.supersedes_instance_id;
+                          if (
+                            onOpenInstance
+                            && (typeof instanceId === 'string' || typeof instanceId === 'number')
+                          ) {
+                            onOpenInstance(instanceId);
                           }
                         }}
                         style={{
@@ -780,6 +1242,7 @@ export default function LabReportWorkbench({
                         aria-label="Шаблон дополнительного бланка"
                         value={addBlankTemplateIdValue}
                         onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAddBlankTemplateId(event.target.value)}
+                        disabled={instanceTransitionPending}
                       >
                         {allowedTemplates.map((template) => (
                           <option key={String(template.id)} value={String(template.id)}>
@@ -790,7 +1253,7 @@ export default function LabReportWorkbench({
                       <Button
                         variant="outline"
                         size="small"
-                        disabled={saving || isDirty || busyAction === 'create' || !addBlankTemplateIdValue}
+                        disabled={saving || isDirty || instanceTransitionPending || busyAction === 'create' || !addBlankTemplateIdValue}
                         title={isDirty ? 'Сначала сохраните несохранённые изменения черновика' : undefined}
                         onClick={() => handleCreateInstance(addBlankTemplateIdValue)}
                       >
@@ -805,7 +1268,7 @@ export default function LabReportWorkbench({
                 {/* P-04 fix: панель действий вынесена в LabReportActionsBar */}
                 <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap', alignItems: 'center' }}>
                   <LabReportActionsBar
-                    saving={saving}
+                    saving={saving || instanceTransitionPending}
                     busyAction={busyAction ?? undefined}
                     canSaveDraft={canSaveDraft}
                     // WF-10 fix: Finalize disabled пока есть missing required fields.
@@ -908,7 +1371,7 @@ export default function LabReportWorkbench({
                         onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSignerSnapshot((prev) => ({ ...prev, [key]: event.target.value }))}
                         // WF-09 fix: signer fields должны блокироваться на FINALIZED/PRINTED,
                         // иначе persistDraft вызовет updateInstance → 409 Conflict (silent failure).
-                        disabled={!canEditActiveInstance}
+                        disabled={!canEditVisibleInstance}
                       />
                     </label>
                   ))}
@@ -969,7 +1432,7 @@ export default function LabReportWorkbench({
                   });
                 }}
                 onUpdateField={updateField}
-                canEditActiveInstance={canEditActiveInstance}
+                canEditActiveInstance={canEditVisibleInstance}
                 reportHistory={reportHistory}
                 notify={notify}
               />
@@ -987,7 +1450,7 @@ export default function LabReportWorkbench({
         reportHistory={reportHistory as never}
         historySeverityFilter={historySeverityFilter}
         onSeverityFilterChange={setHistorySeverityFilter}
-        onOpenInstance={onOpenInstance as unknown as (instanceId: string | number) => void}
+        onOpenInstance={onOpenInstance}
       />
       {/* WF-08 fix: portal-mounted ConfirmDialog для irreversible actions */}
       {confirmDialog}

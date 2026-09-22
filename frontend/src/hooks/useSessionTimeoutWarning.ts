@@ -32,8 +32,14 @@ const DEFAULT_POLL_INTERVAL = 30 * 1000; // 30 seconds
  * Parse the `exp` claim from a JWT without verifying the signature.
  * Returns the expiration time in milliseconds (epoch), or null if the
  * token is not a JWT or has no exp claim.
+ *
+ * PR 3351 (review round 7, P2): экспортируется для usePendingAwareSessionExpiry —
+ * перед отложенным (за pending-операциями) redirect нужно повторно
+ * проверить актуальный токен: single-flight refresh в API-клиенте мог
+ * уже обновить его, и принудительный logout прерывал бы восстановленную
+ * сессию.
  */
-function getTokenExpiryMs(token: string) {
+export function getTokenExpiryMs(token: string) {
   if (!token) return null;
   try {
     const parts = token.split('.');
@@ -49,6 +55,16 @@ function getTokenExpiryMs(token: string) {
 export interface UseSessionTimeoutWarningOptions {
   onWarning?: (expiresAt: Date) => void;
   onExpired?: () => void;
+  /**
+   * PR 3351 (review round 8, P2): смена ПОКОЛЕНИЯ токена — в sessionStorage
+   * появился ДРУГОЙ непустой access token (single-flight refresh в API-клиенте
+   * заменил истёкший JWT новым). Сбрасывает warningFired/expiredFired (новый
+   * токен — новый жизненный цикл предупреждения) и оповещает владельца
+   * (usePendingAwareSessionExpiry → onSessionRecovered: висящее предупреждение
+   * «Сессия скоро истечёт» обязано уйти — оно лгало бы уже восстановленной
+   * сессии). Снятие токена (logout) коллбек не вызывает — восстановления нет.
+   */
+  onTokenChanged?: () => void;
   warningThresholdMs?: number;
   pollIntervalMs?: number;
   enabled?: boolean;
@@ -57,12 +73,17 @@ export interface UseSessionTimeoutWarningOptions {
 export function useSessionTimeoutWarning({
   onWarning,
   onExpired,
+  onTokenChanged,
   warningThresholdMs = DEFAULT_WARNING_THRESHOLD,
   pollIntervalMs = DEFAULT_POLL_INTERVAL,
   enabled = true,
 }: UseSessionTimeoutWarningOptions = {}) {
   const warningFiredRef = useRef(false);
   const expiredFiredRef = useRef(false);
+  // PR 3351 (review round 8, P2): последнее увиденное ПОКОЛЕНИЕ токена
+  // (сырое значение). Смена значения = refresh: у нового токена — свой
+  // жизненный цикл, fired-флаги сбрасываются независимо от его exp.
+  const lastTokenRef = useRef<string | null>(null);
 
   // audit/phase-4, BS-21: keep latest callbacks in refs so the polling
   // interval always invokes the CURRENT closure. Previously `check` captured
@@ -79,6 +100,8 @@ export function useSessionTimeoutWarning({
   const onExpiredRef = useRef(onExpired);
   onWarningRef.current = onWarning;
   onExpiredRef.current = onExpired;
+  const onTokenChangedRef = useRef(onTokenChanged);
+  onTokenChangedRef.current = onTokenChanged;
 
   useEffect(() => {
     if (!enabled) return;
@@ -93,6 +116,26 @@ export function useSessionTimeoutWarning({
       try {
         // PR-39 / P0-2: read token from sessionStorage (tokenManager migration)
         const token = window.sessionStorage.getItem('auth_token');
+        // PR 3351 (review round 8, P2): отслеживаем ПОКОЛЕНИЕ токена по его
+        // ЗНАЧЕНИЮ, а не только по exp. Прежний сброс fired-флагов жил в
+        // else-ветке (remaining > threshold) и пропускал короткоживущие
+        // обновления: gen N истёк (expiredFired=true) → refresh → gen N+1 с
+        // remaining ≤ threshold → warningFired остаётся true → предупреждение
+        // для N+1 НЕ срабатывает, а его истечение НЕ вызывает onExpired —
+        // сессия умирает молча, без предупреждения и без redirect. Любая
+        // смена значения сбрасывает оба флага; живая смена (обе непустые,
+        // разные) дополнительно оповещает onTokenChanged — восстановление
+        // сессии ещё до истечения порога.
+        if (lastTokenRef.current !== token) {
+          const previousToken = lastTokenRef.current;
+          lastTokenRef.current = token;
+          warningFiredRef.current = false;
+          expiredFiredRef.current = false;
+          if (previousToken && token) {
+            const fn = onTokenChangedRef.current;
+            if (typeof fn === 'function') fn();
+          }
+        }
         if (!token) {
           // No token at all — the auth guard will handle redirect.
           return;
@@ -136,6 +179,9 @@ export function useSessionTimeoutWarning({
             expiredFiredRef.current = false;
           }
         }
+        // PR 3351 (review round 8, P2): поколение уже отслеживается выше по
+        // значению токена — else-ветка сброса остаётся как дешёвая подстраховка
+        // (экспирация без смены значения здесь недостижима).
       } catch (err) {
         logger.warn('[useSessionTimeoutWarning] check failed', err);
       }

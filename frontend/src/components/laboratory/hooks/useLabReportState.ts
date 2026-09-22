@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { hasLabReportAction } from '../utils/labReportActions';
 import { extractFieldValue, getServiceContextItems } from '../utils/labReportNormalize';
 
@@ -103,15 +103,22 @@ export function useLabReportState({
   const [autoSaving, setAutoSaving] = useState<boolean>(false);
 
   // Dirty state tracking: snapshot значений при загрузке instance.
-  const initialValuesRef = useRef<{ values: Record<string, unknown>; signer: Record<string, unknown> }>({ values: {}, signer: {} });
+  const initialValuesRef = useRef<{
+    instanceId: string | number | null;
+    values: Record<string, unknown>;
+    signer: Record<string, unknown>;
+  }>({ instanceId: null, values: {}, signer: {} });
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // L-L-4 fix: ref для handleSaveDraft, чтобы autosave/keydown могли
   // вызывать последнюю версию без пересоздания listener-ов.
-  const handleSaveDraftRef = useRef<(() => void | Promise<void>) | null>(null);
+  const handleSaveDraftRef = useRef<(() => Promise<boolean>) | null>(null);
 
   // ─── Derived: isDirty ────────────────────────────────────────────────────
   const isDirty = useMemo(() => {
     if (!activeInstance) return false;
+    if (String(initialValuesRef.current.instanceId ?? '') !== String(activeInstance.id ?? '')) {
+      return false;
+    }
     const initial = initialValuesRef.current.values;
     const draftKeys = new Set([...Object.keys(draftValues), ...Object.keys(initial)]);
     for (const key of draftKeys) {
@@ -124,6 +131,8 @@ export function useLabReportState({
     }
     return false;
   }, [activeInstance, draftValues, signerSnapshot]);
+  const isInstanceHydrated = activeInstance == null
+    || String(initialValuesRef.current.instanceId ?? '') === String(activeInstance.id ?? '');
 
   // ─── Derived: template collections ───────────────────────────────────────
   const publishedTemplates = useMemo(
@@ -174,12 +183,12 @@ export function useLabReportState({
   const canFinalizeWithValidation = canFinalize && !hasMissingRequired;
 
   // ─── Init effect: load values from activeInstance on instance change ─────
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!activeInstance) {
       setDraftValues({});
       setSignerSnapshot({});
       setPrintFeedback(null);
-      initialValuesRef.current = { values: {}, signer: {} };
+      initialValuesRef.current = { instanceId: null, values: {}, signer: {} };
       setEscapeHatchActive(false);
       return;
     }
@@ -200,6 +209,7 @@ export function useLabReportState({
     setSignerSnapshot(activeInstance.signer_snapshot || {});
     setSelectedTemplateId(String(activeInstance.template_id));
     initialValuesRef.current = {
+      instanceId: activeInstance.id as string | number | null,
       values: { ...values },
       signer: { ...(activeInstance.signer_snapshot || {}) },
     };
@@ -258,6 +268,7 @@ export function useLabReportState({
     handleSaveDraftRef,
     // Derived
     isDirty,
+    isInstanceHydrated,
     publishedTemplates,
     serviceContextItems,
     resolvedTemplates,
