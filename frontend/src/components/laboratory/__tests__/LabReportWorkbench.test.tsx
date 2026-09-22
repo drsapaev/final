@@ -7,6 +7,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbenchRaw from '../LabReportWorkbench';
+import { peekCreateInstanceIdempotencyKey } from '../createInstanceIdempotency';
 import { labReportingApi } from '@/api/labReporting';
 import { printService } from '@/services/print';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -1184,6 +1185,9 @@ describe('LabReportWorkbench add-blank action (PR6)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // PR 3351 (review round 9, P1): слоты Idempotency-Key живут в
+    // sessionStorage — изоляция тестов этого describe (общие fixture-приёмы).
+    sessionStorage.clear();
   });
 
 
@@ -1315,6 +1319,55 @@ describe('LabReportWorkbench add-blank action (PR6)', () => {
     expect(onQueueChanged).toHaveBeenCalledTimes(1);
     // Уведомление называет пациента созданного бланка (fixture: Test Patient).
     expect(notify).toHaveBeenCalledWith('success', expect.stringContaining('Test Patient'));
+  });
+
+  it('sends a persistent operation Idempotency-Key: a lost-response retry reuses it, a confirmed outcome rotates it (review round 9)', async () => {
+    // PR 3351 (review round 9, P1): POST /lab/report-instances без ключа
+    // неидемпотентен — транспортный разрыв после серверного commit терял
+    // ID бланка, повторный клик коммитил второй бланк. Ключ операции:
+    // попытка 1 (сетевая ошибка — «ответ потерян») → ключ K сохранён;
+    // попытка 2 (retry) → ТОТ ЖЕ ключ K (backend возвращает закоммиченный
+    // бланк — exactly-once); успех → слот освобождён; попытка 3 (новая
+    // операция) → новый ключ K2 (новый легитимный бланк).
+    const onInstanceChange = vi.fn();
+    mockedApi.createInstance
+      .mockRejectedValueOnce(new Error('Failed to fetch'))
+      .mockResolvedValueOnce({ ...openInstance, id: 94, template_id: 3 })
+      .mockResolvedValueOnce({ ...openInstance, id: 95, template_id: 3 });
+
+    renderAddBlank({ onInstanceChange });
+    const addButton = screen.getByRole('button', { name: /Добавить бланк/ });
+
+    // Попытка 1: ответ «потерян» (сетевая ошибка) — исход неизвестен.
+    fireEvent.click(addButton);
+    await waitFor(() => expect(mockedApi.createInstance).toHaveBeenCalledTimes(1));
+    const firstPayload = mockedApi.createInstance.mock.calls[0][0] as Record<string, unknown>;
+    const firstOptions = mockedApi.createInstance.mock.calls[0][1] as { idempotencyKey?: string };
+    expect(typeof firstOptions?.idempotencyKey).toBe('string');
+    expect(firstOptions.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/i);
+    // Слот переживает неопределённый исход (sessionStorage — reload-safe).
+    expect(peekCreateInstanceIdempotencyKey(firstPayload)?.key).toBe(firstOptions.idempotencyKey);
+
+    // Попытка 2: повтор того же логического клика — ТОТ ЖЕ ключ и тот же
+    // payload (снимок ключа побайтово совпадает с телом запроса).
+    await waitFor(() => expect(addButton).toBeEnabled());
+    fireEvent.click(addButton);
+    await waitFor(() => expect(mockedApi.createInstance).toHaveBeenCalledTimes(2));
+    const secondPayload = mockedApi.createInstance.mock.calls[1][0] as Record<string, unknown>;
+    const secondOptions = mockedApi.createInstance.mock.calls[1][1] as { idempotencyKey?: string };
+    expect(secondOptions?.idempotencyKey).toBe(firstOptions.idempotencyKey);
+    expect(JSON.stringify(secondPayload)).toBe(JSON.stringify(firstPayload));
+    await waitFor(() => expect(onInstanceChange).toHaveBeenCalledTimes(1));
+
+    // Исход известен (2xx обработан) — слот освобождён: следующее создание
+    // это НОВАЯ операция с новым ключом (новый легитимный бланк).
+    expect(peekCreateInstanceIdempotencyKey(firstPayload)).toBeNull();
+    await waitFor(() => expect(addButton).toBeEnabled());
+    fireEvent.click(addButton);
+    await waitFor(() => expect(mockedApi.createInstance).toHaveBeenCalledTimes(3));
+    const thirdOptions = mockedApi.createInstance.mock.calls[2][1] as { idempotencyKey?: string };
+    expect(thirdOptions?.idempotencyKey).not.toBe(firstOptions.idempotencyKey);
+    await waitFor(() => expect(onInstanceChange).toHaveBeenCalledTimes(2));
   });
 
   it('disables the add-blank action while the open draft is dirty', async () => {

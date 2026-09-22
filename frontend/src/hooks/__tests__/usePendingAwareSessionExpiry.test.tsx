@@ -237,15 +237,18 @@ describe('usePendingAwareSessionExpiry (PR 3351, review round 8 — token genera
     vi.restoreAllMocks();
   });
 
-  it('notifies onSessionRecovered when the poll sees a NEW token generation while operations are still pending', async () => {
+  it('notifies onSessionRecovered and immediately clears redirectPending when the poll sees a NEW valid token generation while operations are still pending (review round 9)', async () => {
     // PR 3351 (review round 8, P2): gen N истёк поверх pending-операции →
     // redirectPending=true; API-клиент выполнил single-flight refresh →
     // gen N+1 в sessionStorage. Следующий тик опроса видит смену ЗНАЧЕНИЯ
     // токена: warningFired/expiredFired сбрасываются, onSessionRecovered
     // снимает висящее предупреждение НЕ ДОЖИДАЯСЬ завершения операций —
     // диалог «Сессия скоро истечёт» лгал бы уже восстановленной сессии.
-    // redirectPending при этом живёт до фактического завершения операций
-    // (его семантика — операция, а не токен).
+    // PR 3351 (review round 9, P2): валидное поколение снимает и
+    // redirectPending НЕМЕДЛЕННО — overlay «сессия истекла, ожидаем
+    // операцию» лгал бы живой сессии, а зависший без ответа POST держал
+    // бы его бессрочно. Pending-операция остаётся защищённой pending-
+    // реестрами провайдера — ложный session-expiry overlay не нужен.
     vi.useFakeTimers();
     installToken(Date.now() - 60_000);
     const onExpired = vi.fn();
@@ -274,18 +277,20 @@ describe('usePendingAwareSessionExpiry (PR 3351, review round 8 — token genera
     });
 
     // Смена поколения оповещена; logout НЕ выполнен; redirectPending
-    // продолжает ждать операцию.
+    // снят НЕМЕДЛЕННО — операция ещё висит, но overlay об истечении
+    // больше не лжёт восстановленной сессии.
     expect(onSessionRecovered).toHaveBeenCalledTimes(1);
     expect(onExpired).not.toHaveBeenCalled();
-    expect(result.current).toBe(true);
+    expect(result.current).toBe(false);
 
-    // Операция завершена (сигнал сменился): повторная проверка находит
-    // валидный gen N+1 — redirect отменён, восстановление подтверждено.
+    // Операция завершена (сигнал сменился): redirect уже отменён —
+    // ожидающий эффект не активен, второго восстановления нет, ложного
+    // logout тоже нет.
     pending = false;
     await act(async () => {
       rerender({ signal: 1 });
     });
-    expect(onSessionRecovered).toHaveBeenCalledTimes(2);
+    expect(onSessionRecovered).toHaveBeenCalledTimes(1);
     expect(onExpired).not.toHaveBeenCalled();
     expect(result.current).toBe(false);
   });

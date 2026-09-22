@@ -710,6 +710,11 @@ export {
   login,
   ensureCSRFToken,
   isCSRFRejection,
+  // PR 3351 (review round 9, P2): канонический single-flight refresh для
+  // UI-контролов продления сессии (кнопка «Продлить сессию» в LabPanel).
+  // Тот же мьютекс, что и у 401-recovery: клик по кнопке не порождает
+  // параллельный /authentication/refresh поверх уже идущего.
+  forceRefreshToken,
 };
 
 export default apiClient;

@@ -674,11 +674,14 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     // по onSessionRecovered — восстановленная сессия не лжёт пользователю.
     expect(source).toContain('onSessionRecovered: () => setSessionWarning(null),');
 
-    // Обёртка: (1) смена поколения токена из опроса → onSessionRecovered
-    // ещё до завершения операций; (2) ветка завершения операций при
-    // валидном токене → onSessionRecovered (+ отмена redirectPending).
+    // Обёртка: (1) смена поколения токена из опроса → НЕМЕДЛЕННОЕ снятие
+    // redirectPending + onSessionRecovered ещё до завершения операций
+    // (round 9); (2) ветка завершения операций при валидном токене →
+    // onSessionRecovered (+ отмена redirectPending).
     expect(wrapperSource).toContain('onSessionRecovered?: () => void;');
-    expect(wrapperSource).toContain('onTokenChanged: () => onSessionRecoveredRef.current?.(),');
+    expect(wrapperSource).toContain('onTokenChanged: () => {');
+    expect(wrapperSource).toContain('if (!hasValidAccessTokenNow()) return;');
+    expect(wrapperSource).toContain('setRedirectPending(false);');
     expect(wrapperSource).toContain('onSessionRecoveredRef.current?.();');
 
     // Опрос: отслеживание ПОКОЛЕНИЯ токена по значению — сброс
@@ -765,5 +768,85 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
       'if (!urlBelongsToThisTransition) return;',
     );
     expect(catchBlock).toContain('instanceIdsMatch(currentUrlInstanceId, transitionSourceUrlId)');
+  });
+
+  it('sends a persistent Idempotency-Key for report CREATE: bind/proceed on retry, clear on confirmed outcome (review round 9)', () => {
+    const workbenchSource = fs.readFileSync(
+      path.resolve(__dirname, '../../components/laboratory/LabReportWorkbench.tsx'),
+      'utf8',
+    );
+    const apiSource = fs.readFileSync(
+      path.resolve(__dirname, '../../api/labReporting.ts'),
+      'utf8',
+    );
+    const idempotencySource = fs.readFileSync(
+      path.resolve(__dirname, '../../components/laboratory/createInstanceIdempotency.ts'),
+      'utf8',
+    );
+
+    // PR 3351 (review round 9, P1): POST без ключа неидемпотентен — потерянный
+    // после commit ответ заставлял оператора повторять CREATE (второй бланк).
+    // Workbench: ключ резолвится ДО запроса, слот освобождается ПОСЛЕ 2xx.
+    expect(workbenchSource).toContain('const idempotencyKey = resolveCreateInstanceIdempotencyKey(createPayload);');
+    expect(workbenchSource).toContain('await labReportingApi.createInstance(createPayload, { idempotencyKey });');
+    expect(workbenchSource).toContain('clearCreateInstanceIdempotencyKey(createPayload);');
+    // api-клиент: Idempotency-Key — opt-in заголовок (middleware без него
+    // пропускает POST без координации).
+    expect(apiSource).toContain('options.idempotencyKey\n        ? { headers: { \'Idempotency-Key\': options.idempotencyKey } }');
+    // Модуль: proceed (тот же payload → тот же ключ), rotate (изменённый
+    // payload → новая операция), reload-safe sessionStorage-слоты.
+    expect(idempotencySource).toContain('if (stored && stored.payload === snapshot) {');
+    expect(idempotencySource).toContain('window.sessionStorage.getItem(slot)');
+    expect(idempotencySource).toContain('export function clearCreateInstanceIdempotencyKey(');
+  });
+
+  it('canonical null-intent lands on the URL-owned tab: /lab stays strictly /lab on Queue (review round 9)', () => {
+    const source = readLabPanelSource();
+    // Блок подтверждённого null-intent: от входа в ветку до перехода к
+    // instance-намерению (включает закрывающую запись pre-intent памяти).
+    const nullIntentBlock = extractBlock(
+      source,
+      'if (instanceId == null) {',
+      'void applyInstanceTransition(instanceId, { urlIntent: options.urlIntent });',
+    );
+
+    // PR 3351 (review round 9, P2): вкладкой владеет URL — безусловный
+    // switchTab(\'reports\') дописывал ?tab=reports поверх canonical /lab.
+    expect(nullIntentBlock).toContain('const urlOwnsValidTab = (LAB_TAB_IDS as readonly string[]).includes(urlTabParam ?? \'\');');
+    expect(nullIntentBlock).toContain('resolveLabTabId(urlTabParam)');
+    // Canonical /lab (tab-less): контекст пациента очищается (reload-parity,
+    // иначе WF-15 дописал бы ?patient в «домашний» адрес), вкладка — queue
+    // БЕЗ URL-записи, эпоха инвалидирует in-flight операции.
+    expect(nullIntentBlock).toContain('labOperationEpochRef.current += 1;');
+    expect(nullIntentBlock).toContain('setSelectedAppointment(null);');
+    expect(nullIntentBlock).toContain('if (activeTabRef.current !== \'queue\') {');
+    expect(nullIntentBlock).toContain('setActiveTab(\'queue\');');
+    // Память pre-intent вкладки закрывается (WF-15 не воскрешает reports).
+    expect(nullIntentBlock).toContain('preUrlIntentTabRef.current = null;');
+    // Безусловного ухода на reports в подтверждённом null-intent больше нет.
+    expect(nullIntentBlock).not.toContain('switchTab(\'reports\');');
+  });
+
+  it('«Продлить сессию» is a real single-flight refresh: closes the warning only after a NEW valid token lands (review round 9)', () => {
+    const source = readLabPanelSource();
+    const clientSource = fs.readFileSync(
+      path.resolve(__dirname, '../../api/client.ts'),
+      'utf8',
+    );
+
+    // PR 3351 (review round 9, P2): прежняя кнопка только прятала overlay —
+    // JWT не ротировался. Теперь: канонический refresh + проверка, что в
+    // хранилище появилось НОВОЕ значение с будущим exp.
+    expect(clientSource).toContain('async function forceRefreshToken(): Promise<string | null> {');
+    expect(clientSource).toContain('  forceRefreshToken,');
+    expect(source).toContain('const handleExtendSession = useCallback(async () => {');
+    expect(source).toContain('const newToken = await forceRefreshToken();');
+    expect(source).toContain('tokenAfter !== tokenBefore');
+    expect(source).toContain('(getTokenExpiryMs(tokenAfter) ?? 0) > Date.now()');
+    // Неудача: предупреждение остаётся открытым с явной ошибкой (не
+    // «притворяется» успешным), кнопка блокируется в полёте.
+    expect(source).toContain('setSessionExtendError(t(\'misc.lp_session_extend_failed\'));');
+    expect(source).toContain('disabled={sessionExtending}');
+    expect(source).toContain('role="alert"');
   });
 });

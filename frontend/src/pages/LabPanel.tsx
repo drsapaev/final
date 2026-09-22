@@ -15,6 +15,8 @@ import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import { usePendingAwareSessionExpiry } from '../hooks/usePendingAwareSessionExpiry';
+import { getTokenExpiryMs } from '../hooks/useSessionTimeoutWarning';
+import { forceRefreshToken } from '../api/client';
 import { useLabHotkeys } from '../hooks/useLabHotkeys';
 import notifyService from '../services/notify';
 import './lab.css';
@@ -334,6 +336,48 @@ export default function LabPanel() {
   // a lab technician is mid-fill on a long report. Mirrors the pattern
   // used in CardiologistPanel/DentistPanel/DermatologistPanel.
   const [sessionWarning, setSessionWarning] = useState<Record<string, unknown> | null>(null);
+  // PR 3351 (review round 9, P2): «Продлить сессию» — РЕАЛЬНЫЙ refresh, а
+  // не сокрытие предупреждения. Пока refresh в полёте, кнопка заблокирована;
+  // неудача оставляет предупреждение ОТКРЫТЫМ с явной ошибкой.
+  const [sessionExtending, setSessionExtending] = useState(false);
+  const [sessionExtendError, setSessionExtendError] = useState<string | null>(null);
+
+  // PR 3351 (review round 9, P2): «Продлить сессию» — реальная операция
+  // обновления, а не декоративное сокрытие предупреждения. Прежняя кнопка
+  // только прятала overlay и показывала тост «продлеваем» — JWT оставался
+  // прежним, повторное предупреждение для того же поколения больше не
+  // срабатывало (warningFired), и через несколько минут сессия всё равно
+  // истекала: контроль сообщал об успехе действия, которого не было.
+  // Контракт: канонический single-flight refresh (forceRefreshToken — тот
+  // же мьютекс, что у 401-recovery); предупреждение закрывается ТОЛЬКО
+  // когда в sessionStorage появилось НОВОЕ значение access token с будущим
+  // exp; при неудаче предупреждение остаётся открытым с явной ошибкой и
+  // рекомендацией сохранить черновик и войти заново.
+  const handleExtendSession = useCallback(async () => {
+    if (sessionExtending) return;
+    const tokenBefore = window.sessionStorage.getItem('auth_token');
+    setSessionExtending(true);
+    setSessionExtendError(null);
+    try {
+      const newToken = await forceRefreshToken();
+      const tokenAfter = window.sessionStorage.getItem('auth_token');
+      const renewed = Boolean(newToken)
+        && tokenAfter !== null
+        && tokenAfter !== tokenBefore
+        && (getTokenExpiryMs(tokenAfter) ?? 0) > Date.now();
+      if (renewed) {
+        setSessionWarning(null);
+        setSessionExtendError(null);
+        notifyService.info(t('misc.lp_session_extended'));
+      } else {
+        setSessionExtendError(t('misc.lp_session_extend_failed'));
+      }
+    } catch {
+      setSessionExtendError(t('misc.lp_session_extend_failed'));
+    } finally {
+      setSessionExtending(false);
+    }
+  }, [sessionExtending, t]);
 
   // L-M-2 fix: ref-guard для дедупликации loadReportHistory.
   // Раньше loadReportHistory вызывался дважды: один раз из loadInstance
@@ -1144,12 +1188,52 @@ export default function LabPanel() {
         }
         if (instanceId == null) {
           clearActiveInstance();
-          const patientId = selectedAppointmentRef.current?.patient_id as string | number | undefined;
-          if (patientId != null) {
-            loadedHistoryForPatientRef.current = patientId;
-            void loadReportHistory(patientId);
+          // PR 3351 (review round 9, P2): внешний urlIntent с targetId=null —
+          // «canonical home» (Header brand / Command Palette → /lab). Вкладкой
+          // владеет сам URL: ?tab=reports → очистить отчёт и остаться в
+          // Reports; tab-less /lab → Queue (нормализация tab-sync эффекта, БЕЗ
+          // URL-записи — canonical /lab не получает ?tab=). Прежний
+          // безусловный switchTab('reports') дописывал ?tab=reports поверх
+          // canonical /lab: brand-«дом» не был домом — экран оставался на
+          // Reports, адрес нельзя было ни скопировать, ни восстановить.
+          const urlTabParam = currentSearchParams().get('tab');
+          const urlOwnsValidTab = (LAB_TAB_IDS as readonly string[]).includes(urlTabParam ?? '');
+          if (urlOwnsValidTab) {
+            // Явная вкладка адреса: контекст пациента сохраняется, история
+            // перезагружается (reports-список без активного бланка).
+            const patientId = selectedAppointmentRef.current?.patient_id as string | number | undefined;
+            if (patientId != null) {
+              loadedHistoryForPatientRef.current = patientId;
+              void loadReportHistory(patientId);
+            }
+            const resolvedUrlTab = resolveLabTabId(urlTabParam);
+            if (resolvedUrlTab !== activeTabRef.current) {
+              switchTab(resolvedUrlTab);
+            }
+          } else {
+            // Canonical /lab: reload-parity — после перезагрузки /lab
+            // открывает Queue БЕЗ выбранного пациента и бланка. Контекст
+            // пациента очищается и здесь, иначе WF-15 дописал бы ?patient
+            // в «домашний» адрес (URL обязан оставаться строго /lab).
+            // Эпоха инвалидирует in-flight операции старого контекста
+            // (тот же контракт, что hotkey clearSelection).
+            labOperationEpochRef.current += 1;
+            selectedAppointmentRef.current = null;
+            selectedAppointmentPatientIdRef.current = null;
+            setSelectedAppointment(null);
+            loadedHistoryForPatientRef.current = null;
+            // tab-sync эффект (объявлен выше) уже нормализовал «нет tab →
+            // queue» на этом же коммите; defensive-синк без URL-записи.
+            if (activeTabRef.current !== 'queue') {
+              setActiveTab('queue');
+            }
           }
-          switchTab('reports');
+          // Память pre-intent вкладки закрывается: она служит только
+          // cancel-rollback-у, а подтверждённое canonical-приземление не
+          // откатывается. Без этого WF-15 воскрешал бы «reports» поверх
+          // tab-less /lab (round 6: память закрывается только когда URL
+          // владеет ВАЛИДНЫМ tab — tab-less canonical не закрывал её).
+          preUrlIntentTabRef.current = null;
           return;
         }
         void applyInstanceTransition(instanceId, { urlIntent: options.urlIntent });
@@ -1190,6 +1274,7 @@ export default function LabPanel() {
     guardTransition,
     applyInstanceTransition,
     clearActiveInstance,
+    currentSearchParams,
     loadReportHistory,
     syncUrlToCurrentContext,
     switchTab,
@@ -1739,12 +1824,24 @@ export default function LabPanel() {
                 Ваша сессия истекает. Несохранённые данные могут быть потеряны.
                 Сохраните текущий отчёт или продлите сессию.
               </p>
+              {/* PR 3351 (review round 9, P2): явная ошибка неудачного
+                  продления — предупреждение НЕ закрывается, действие не
+                  «притворяется» успешным. */}
+              {sessionExtendError && (
+                <p className="lab-session-warning-text lab-session-extend-error" role="alert">
+                  {sessionExtendError}
+                </p>
+              )}
               <div className="lab-session-warning-actions">
                 <button onClick={() => setSessionWarning(null)} className="lab-session-warning-btn-later">
                   Позже
                 </button>
-                <button onClick={() => { setSessionWarning(null); notifyService.info(t('misc.lp_prodlevaem_sessiyu')); }} className="lab-session-warning-btn-extend">
-                  Продлить сессию
+                <button
+                  onClick={() => { void handleExtendSession(); }}
+                  disabled={sessionExtending}
+                  className="lab-session-warning-btn-extend"
+                >
+                  {sessionExtending ? t('misc.lp_session_extending') : 'Продлить сессию'}
                 </button>
               </div>
             </div>

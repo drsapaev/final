@@ -138,6 +138,17 @@ let templateDraftUpdateCount = 0;
 let reportInstanceCreateResponseGate: Promise<void> | null = null;
 let releaseReportInstanceCreateResponse: (() => void) | null = null;
 let lastReportInstanceCreatePayload: Record<string, unknown> | null = null;
+// PR 3351 (review round 9, P1): Idempotency-Key-контракт создания бланка.
+// Мок воспроизводит IdempotencyMiddleware: повторный POST с тем же ключом
+// получает СОХРАНЁННЫЙ ответ (replay вместо повторного INSERT); первый
+// ответ по ключу может «теряться» (502 ПОСЛЕ серверного commit — reverse
+// proxy / crash вкладки); каждый НОВЫЙ ключ — новая операция и новый
+// легитимный бланк (id из отдельной последовательности).
+let reportInstanceCreateIdempotencyKeys: string[] = [];
+let reportInstanceCreateReplayBodies = new Map<string, Record<string, unknown>>();
+let reportInstanceCreateLostResponseKeys = new Set<string>();
+let reportInstanceCreateLoseFirstResponseForKey = false;
+let reportInstanceCreateNextInstanceId = 90;
 let templateResolutionDelayByPatient = new Map<string, number>();
 let bulkSaveResponseGate: Promise<void> | null = null;
 let releaseBulkSaveResponse: (() => void) | null = null;
@@ -280,19 +291,49 @@ async function installApiMocks(page: Page) {
       reportInstanceCreatePostCount += 1;
       const payload = route.request().postDataJSON() as Record<string, unknown>;
       lastReportInstanceCreatePayload = payload;
+      const idempotencyKey = route.request().headers()['idempotency-key'] || null;
+      if (idempotencyKey) {
+        reportInstanceCreateIdempotencyKeys.push(idempotencyKey);
+      }
       if (reportInstanceCreateResponseGate) {
         await reportInstanceCreateResponseGate;
       }
       const patientId = Number(payload.patient_id);
-      return json(route, {
+      // PR 3351 (review round 9, P1): replay-контракт IdempotencyMiddleware —
+      // ключ УЖЕ закоммитил бланк: повтор с тем же ключом возвращает
+      // сохранённый ответ, хендлер не исполняется (нет второго INSERT).
+      if (idempotencyKey && reportInstanceCreateReplayBodies.has(idempotencyKey)) {
+        return json(route, reportInstanceCreateReplayBodies.get(idempotencyKey));
+      }
+      const body = {
         ...INSTANCE_CREATED,
+        id: reportInstanceCreateNextInstanceId,
         patient_id: patientId,
         visit_id: payload.visit_id,
         patient_snapshot: {
           patient_id: patientId,
           full_name: patientId === 102 ? 'Пациент Два' : 'Пациент Один',
         },
-      });
+      };
+      if (idempotencyKey) {
+        // Хендлер отработал и middleware закэшировал 2xx-ответ по ключу...
+        reportInstanceCreateReplayBodies.set(idempotencyKey, body);
+        reportInstanceCreateNextInstanceId += 1;
+        // ...но транспорт может потерять ПЕРВЫЙ ответ этого ключа (502
+        // после commit): клиент не знает ID созданного бланка.
+        if (
+          reportInstanceCreateLoseFirstResponseForKey
+          && !reportInstanceCreateLostResponseKeys.has(idempotencyKey)
+        ) {
+          reportInstanceCreateLostResponseKeys.add(idempotencyKey);
+          return route.fulfill({
+            status: 502,
+            contentType: 'application/json',
+            body: '{"detail":"upstream response lost after commit"}',
+          });
+        }
+      }
+      return json(route, body);
     }
     return json(route, []);
   });
@@ -365,6 +406,11 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     reportInstanceCreateResponseGate = null;
     releaseReportInstanceCreateResponse = null;
     lastReportInstanceCreatePayload = null;
+    reportInstanceCreateIdempotencyKeys = [];
+    reportInstanceCreateReplayBodies = new Map();
+    reportInstanceCreateLostResponseKeys = new Set();
+    reportInstanceCreateLoseFirstResponseForKey = false;
+    reportInstanceCreateNextInstanceId = 90;
     templateResolutionDelayByPatient = new Map();
     bulkSaveResponseGate = null;
     releaseBulkSaveResponse = null;
@@ -719,7 +765,13 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect(page.getByRole('dialog').filter({ hasText: 'Несохранённые изменения' })).toHaveCount(0);
   });
 
-  test('removing the report from the URL is guarded and Discard clears the active report', async ({ page }) => {
+  // PR 3351 (review round 9, P2): внешний urlIntent с targetId=null и без
+  // ?tab= — canonical home (тот же контракт, что Header brand). Подтверждён-
+  // ный Discard очищает и отчёт, и контекст пациента (reload-parity: /lab
+  // после перезагрузки — Queue без выбранного пациента), адрес остаётся
+  // СТРОГО /lab. Прежний тест закреплял уход на reports с create-режимом —
+  // round 9 явно переопределяет: вкладкой владеет URL.
+  test('removing the report from the URL is guarded and Discard lands on canonical /lab with the Queue tab (review round 9)', async ({ page }) => {
     await page.goto('/lab');
     await page.getByRole('button', { name: /Пациент Один/ }).first().click();
     const fieldInput = page.getByLabel('Результат: Лейкоциты');
@@ -735,11 +787,16 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: 'Выйти без сохранения' }).click();
 
+    // Отчёт и контекст пациента очищены, редактор закрыт.
     await expect(page.getByText('Отчёт #88')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Создать отчёт' })).toBeVisible();
-    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBeNull();
-    await expect.poll(() => reportHistoryPatientRequests.length).toBeGreaterThan(historyRequestsBeforeClear);
-    expect(reportHistoryPatientRequests.at(-1)).toBe('101');
+    await expect(fieldInput).toHaveCount(0);
+    // Canonical home: Queue, адрес строго /lab.
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await expect(panelTabs.getByRole('tab').nth(0)).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe('/lab');
+    // Пациент не выбран — история не перезагружается (канонический home =
+    // то, что открылось бы после reload).
+    expect(reportHistoryPatientRequests.length).toBe(historyRequestsBeforeClear);
   });
 
   test('returning the URL to the active report dismisses the stale pending transition', async ({ page }) => {
@@ -1972,6 +2029,177 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect(footerInput).toHaveValue('Несохранённый подвал');
   });
 
+  // PR 3351 (review round 9, P2): canonical /lab при ОТКРЫТОМ ЧИСТОМ отчёте.
+  // URL-restore видит instanceId=null при activeInstanceId=88 — подтверждённый
+  // callback безусловно делал switchTab('reports') и дописывал ?tab=reports
+  // поверх canonical /lab: brand-«дом» не был домом (экран Reports, отчёт
+  // очищен). Round 9: вкладкой владеет сам URL — tab-less /lab = Queue,
+  // адрес остаётся СТРОГО /lab (reload-parity: без пациента и бланка).
+  test('Header brand from a clean open report lands on canonical /lab with the Queue tab (review round 9)', async ({ page }) => {
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    // Чистый (не dirty) отчёт #88 пациента 101 на вкладке reports.
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await expect(panelTabs.getByRole('tab').nth(2)).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
+
+    // Header brand → canonical /lab: replace, guard чистый — диалога нет.
+    await page.getByTitle('На главную').click();
+
+    // URL строго /lab: ни ?tab=reports (round-9 регрессия), ни ?patient=101
+    // (canonical = reload-parity), ни ?instance.
+    await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe('/lab');
+
+    // Экран: Queue выбрана, редактор отчёта закрыт (activeInstance=null),
+    // контекст пациента очищен.
+    await expect(panelTabs.getByRole('tab').nth(0)).toHaveAttribute('aria-selected', 'true');
+    await expect(panelTabs.getByRole('tab').nth(2)).toHaveAttribute('aria-selected', 'false');
+    await expect(page.getByText('Отчёт #88').first()).toHaveCount(0);
+    await expect(fieldInput).toHaveCount(0);
+
+    // History не выросла (in-lab replace), а после reload открылась бы та
+    // же вкладка Queue (адрес = экран).
+    const historyLengthAfterBrand = await page.evaluate(() => window.history.length);
+    await page.reload();
+    await page.waitForTimeout(700);
+    await expect(panelTabs.getByRole('tab').nth(0)).toHaveAttribute('aria-selected', 'true');
+    expect(await page.evaluate(() => window.history.length)).toBe(historyLengthAfterBrand);
+  });
+
+  // PR 3351 (review round 9, P2): тот же pin для Command Palette → Lab
+  // Panel (второй shell-писатель canonical /lab).
+  test('Command Palette to Lab Panel from a clean open report lands on canonical /lab with the Queue tab (review round 9)', async ({ page }) => {
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    const fieldInput = page.getByLabel('Результат: Лейкоциты');
+    await expect(fieldInput).toBeVisible();
+    await page.waitForTimeout(700);
+
+    // Command Palette (Ctrl+K) → маршрут «Лаборатория» (canonical /lab).
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await expect(palette).toBeVisible();
+    await palette.getByLabel('Search commands').fill('Лаборатория');
+    await palette.getByRole('option', { name: /Лаборатория/ }).first().click();
+    await expect(palette).toHaveCount(0);
+
+    // Чистый отчёт: guard без диалога — сразу canonical-приземление.
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe('/lab');
+    await expect(panelTabs.getByRole('tab').nth(0)).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByText('Отчёт #88').first()).toHaveCount(0);
+    await expect(fieldInput).toHaveCount(0);
+  });
+
+  // PR 3351 (review round 9, P2): внешний urlIntent с targetId=null и ЯВНОЙ
+  // вкладкой адреса — вкладкой владеет URL: /lab?tab=reports очищает бланк,
+  // но ОСТАВЛЯЕТ вкладку Reports (не уводит на Queue).
+  test('an external tab-holding null intent keeps the URL-owned tab when clearing the report (review round 9)', async ({ page }) => {
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByLabel('Результат: Лейкоциты')).toBeVisible();
+    await page.waitForTimeout(700);
+
+    // Внешний intent: /lab?tab=reports без instance (brand-подобный переход
+    // с явной вкладкой).
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab?tab=reports');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await page.waitForTimeout(400);
+
+    // Бланк очищен, но вкладка — Reports (её выбрал URL), контекст пациента
+    // сохранён, адрес явно владеет tab.
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await expect(panelTabs.getByRole('tab').nth(2)).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByText('Отчёт #88').first()).toHaveCount(0);
+    await expect.poll(() => new URL(page.url()).searchParams.get('tab')).toBe('reports');
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBeNull();
+  });
+
+  // PR 3351 (review round 9, P2): «Продлить сессию» — реальный refresh.
+  // Прежняя кнопка только прятала предупреждение и показывала тост «про-
+  // длеваем»: JWT оставался прежним, повторное предупреждение того же
+  // поколения молчало (warningFired), сессия истекала. Теперь клик вызыва-
+  // ет канонический single-flight /authentication/refresh; предупреждение
+  // закрывается ТОЛЬКО после нового значения access token с будущим exp;
+  // неудача оставляет его открытым с явной ошибкой.
+  test('the extend-session button performs a real refresh: failure keeps the warning open, success lands a new token (review round 9)', async ({ page }) => {
+    // Токен внутри 5-минутного порога: предупреждение срабатывает на
+    // mount-проверке опроса. Собирается в рантайме (как installToken в
+    // компонентных тестах) — единый JWT-литерал в исходнике триггерит
+    // secret-сканер CI.
+    const nearExpiryToken = [
+      'eyJhbGciOiJIUzI1NiJ9',
+      Buffer.from(JSON.stringify({
+        sub: '7',
+        role: 'Lab',
+        exp: Math.floor((Date.now() + 4 * 60_000) / 1000),
+      })).toString('base64'),
+      'sig',
+    ].join('.');
+    const freshToken = [
+      'eyJhbGciOiJIUzI1NiJ9',
+      Buffer.from(JSON.stringify({
+        sub: '7',
+        role: 'Lab',
+        exp: Math.floor((Date.now() + 60 * 60_000) / 1000),
+      })).toString('base64'),
+      'sig',
+    ].join('.');
+    await page.addInitScript((token) => {
+      window.sessionStorage.setItem('auth_token', token);
+      window.sessionStorage.setItem('refresh_token', token);
+    }, nearExpiryToken);
+
+    let refreshPostCount = 0;
+    let refreshShouldFail = true;
+    await page.route('**/api/v1/authentication/refresh', async (route) => {
+      refreshPostCount += 1;
+      if (refreshShouldFail) {
+        return route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: '{"detail":"refresh token expired"}',
+        });
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ access_token: freshToken, refresh_token: freshToken }),
+      });
+    });
+
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    const warning = page.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' });
+    await expect(warning).toBeVisible();
+    const refreshTokenBefore = await page.evaluate(() => window.sessionStorage.getItem('auth_token'));
+    expect(refreshTokenBefore).toBe(nearExpiryToken);
+
+    // Попытка 1: refresh отклонён (refresh token истёк) — предупреждение
+    // НЕ закрыто, явная ошибка, кнопка доступна для повтора.
+    await warning.getByRole('button', { name: 'Продлить сессию' }).click();
+    await expect.poll(() => refreshPostCount).toBeGreaterThanOrEqual(1);
+    await expect(page.getByText(/Не удалось продлить сессию/).first()).toBeVisible();
+    await expect(warning).toBeVisible();
+    expect(await page.evaluate(() => window.sessionStorage.getItem('auth_token'))).toBe(nearExpiryToken);
+
+    // Попытка 2: refresh успешен — в хранилище НОВОЕ значение с будущим
+    // exp, предупреждение закрывается только теперь.
+    refreshShouldFail = false;
+    await warning.getByRole('button', { name: 'Продлить сессию' }).click();
+    await expect.poll(() => refreshPostCount).toBeGreaterThanOrEqual(2);
+    await expect(warning).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('auth_token'))).toBe(freshToken);
+  });
+
   // PR 3351 (review round 7, P1): report CREATE больше не обходит защиту
   // документа. POST /lab/report-instances неидемпотентен и без
   // Idempotency-Key: refresh/закрытие вкладки/Profile-уход поверх летящего
@@ -2088,6 +2316,68 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await page.evaluate(() => window.history.back());
     await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
     expect(reportInstanceCreatePostCount).toBe(1);
+  });
+
+  // PR 3351 (review round 9, P1): exactly-once для report CREATE по
+  // операции. Навигационные блокировки round 7/8 не покрывают транспортный
+  // разрыв ПОСЛЕ серверного commit: 502 reverse proxy / crash вкладки
+  // оставляли frontend без ID созданного бланка — оператор повторял клик и
+  // получал ВТОРОЙ бланк. Round 9: каждый клик создания несёт устойчивый
+  // Idempotency-Key (sessionStorage, reload-safe); повтор потерянного
+  // ответа отправляет ТОТ ЖЕ ключ — backend возвращает закоммиченный бланк
+  // вместо второго INSERT; подтверждённый исход освобождает ключ —
+  // следующее создание это новая операция (новый легитимный бланк).
+  test('a lost HTTP response after commit is retried with the same Idempotency-Key and creates exactly one blank (review round 9)', async ({ page }) => {
+    // Мок-режим: первый ответ КАЖДОГО нового ключа «теряется» после commit.
+    reportInstanceCreateLoseFirstResponseForKey = true;
+
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const addButton = page.getByRole('button', { name: 'Добавить бланк' });
+
+    // Попытка 1: backend закоммитил бланк #90, но ответ потерян (502) —
+    // клиент не знает ID и видит ошибку сети.
+    await addButton.click();
+    await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
+    // Потерян только ПЕРВЫЙ ответ (первый ключ): дальнейшие попытки
+    // доходят до клиента штатно.
+    reportInstanceCreateLoseFirstResponseForKey = false;
+    await expect(addButton).toBeEnabled();
+    expect(reportInstanceCreateIdempotencyKeys).toHaveLength(1);
+    const operationKey = reportInstanceCreateIdempotencyKeys[0];
+    expect(operationKey).toBeTruthy();
+    // Ни один бланк ещё не открыт: исход неизвестен.
+    await expect(page.getByText('Отчёт #90').first()).toHaveCount(0);
+
+    // Попытка 2: оператор повторяет тот же логический клик — ТОТ ЖЕ
+    // Idempotency-Key (слот пережил неопределённый исход), backend
+    // возвращает закоммиченный #90 (replay), второй INSERT нет.
+    await addButton.click();
+    await expect.poll(() => reportInstanceCreatePostCount).toBe(2);
+    expect(reportInstanceCreateIdempotencyKeys[1]).toBe(operationKey);
+    await waitForReactToSettle(page);
+    await expect(page.getByText('Отчёт #90').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('90');
+    // Бланка #91 не существует — ровно один закоммиченный бланк.
+    await expect(page.getByText('Отчёт #91').first()).toHaveCount(0);
+    expect(reportInstanceCreateNextInstanceId).toBe(91);
+
+    // Исход подтверждён — ключ отработал: следующее создание это НОВАЯ
+    // операция (новый ключ → новый легитимный отдельный бланк #91).
+    await expect(addButton).toBeEnabled();
+    await addButton.click();
+    await expect.poll(() => reportInstanceCreatePostCount).toBe(3);
+    expect(reportInstanceCreateIdempotencyKeys[2]).not.toBe(operationKey);
+    await waitForReactToSettle(page);
+    await expect(page.getByText('Отчёт #91').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('91');
+    // Итог: 3 POST (1 потерян + 1 replay + 1 новый) = 2 закоммиченных
+    // бланка (#90, #91) — дубля от потерянного ответа нет.
+    expect(reportInstanceCreateNextInstanceId).toBe(92);
   });
 
   // PR 3351 (review round 7, P2): вкладка-база отката фиксируется один раз

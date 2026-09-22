@@ -20,8 +20,9 @@ const LabPanel = LabPanelRaw as unknown as React.ComponentType<Record<string, un
  * и исчезать как ЕДИНАЯ машина на живом рендере панели.
  *
  * Сценарий ревью: warning открыт → токен истёк и pending=true → токен
- * обновлён (gen N+1) → pending=false → ОБЕ накладки исчезают → с новым
- * поколением токена предупреждение срабатывает СНОВА.
+ * обновлён (gen N+1) → ОБЕ накладки исчезают НЕМЕДЛЕННО, ещё ДО
+ * завершения операции (round 9) → pending=false без ложного logout →
+ * с новым поколением токена предупреждение срабатывает СНОВА.
  *
  * Fake-таймеры: опрос токена (30 c) и все дебаунсы управляются вручную;
  * UI-цепочки (клик пациента → GET instance → резолв шаблона → CREATE)
@@ -88,6 +89,18 @@ const QUEUE_ENTRIES = [
 ];
 
 const createInstanceMock = vi.hoisted(() => vi.fn());
+// PR 3351 (review round 9, P2): граница мока — канонический single-flight
+// refresh. Реальный api/client импортируется целиком (workbench берёт из
+// него axios-инстанс api), подменяется только forceRefreshToken.
+const forceRefreshTokenMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../api/client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../api/client')>();
+  return {
+    ...actual,
+    forceRefreshToken: forceRefreshTokenMock,
+  };
+});
 
 vi.mock('../../api/labReporting', () => ({
   labReportingApi: {
@@ -257,8 +270,10 @@ describe('LabPanel session-expiry overlays (PR 3351, review round 8, P2 — comp
     ).toBeInTheDocument();
 
     // (3) single-flight refresh: gen N+1 (другое значение, валидный exp).
-    // Следующий тик опроса видит смену поколения → onSessionRecovered →
-    // warning-overlay исчез; redirect-overlay ждёт операцию.
+    // Следующий тик опроса видит смену поколения → onSessionRecovered +
+    // НЕМЕДЛЕННОЕ снятие redirectPending (review round 9): ОБЕ накладки
+    // исчезают, пока CREATE ещё висит — overlay «сессия истекла» лгал бы
+    // восстановленной сессии, а зависший POST держал бы его бессрочно.
     installToken(Date.now() + 30 * 60_000, '7-refreshed');
     await act(async () => {
       vi.advanceTimersByTime(30_000);
@@ -267,12 +282,12 @@ describe('LabPanel session-expiry overlays (PR 3351, review round 8, P2 — comp
       screen.queryByRole('alertdialog', { name: 'Предупреждение об истечении сессии' }),
     ).toBeNull();
     expect(
-      screen.getByRole('alertdialog', { name: 'Переход после завершения операции' }),
-    ).toBeInTheDocument();
+      screen.queryByRole('alertdialog', { name: 'Переход после завершения операции' }),
+    ).toBeNull();
 
-    // (4) CREATE завершён: pending снят, отложенный redirect отменён
-    // валидным gen N+1 — ВТОРАЯ накладка исчезает, logout НЕ выполняется
-    // (location.href не тронут — SPA жива, бланк #90 открыт).
+    // (4) CREATE завершён: pending снят; отложенного redirect уже нет —
+    // logout НЕ выполняется (location.href не тронут — SPA жива, бланк
+    // #90 открыт), ни одной накладки.
     await act(async () => {
       releaseCreate?.(INSTANCE_CREATED);
     });
@@ -295,5 +310,90 @@ describe('LabPanel session-expiry overlays (PR 3351, review round 8, P2 — comp
     expect(
       screen.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' }),
     ).toBeInTheDocument();
+  });
+
+  it('"Продлить сессию" performs a real single-flight refresh: closes the warning only after a NEW valid token lands (review round 9)', async () => {
+    // PR 3351 (review round 9, P2): прежняя кнопка только прятала overlay и
+    // показывала тост «продлеваем» — JWT оставался прежним. Теперь:
+    // клик → forceRefreshToken → в хранилище появилось НОВОЕ значение с
+    // будущим exp → предупреждение закрыто. Кнопка блокируется в полёте.
+    vi.useFakeTimers();
+    installToken(Date.now() + 4 * 60_000, '7');
+
+    let releaseRefresh: ((token: string) => void) | null = null;
+    forceRefreshTokenMock.mockImplementation(() => new Promise<string>((resolve) => {
+      releaseRefresh = resolve;
+    }));
+
+    render(
+      <MemoryRouter initialEntries={['/lab?tab=queue']}>
+        <ThemeProvider>
+          <LabDirtyGuardProvider>
+            <LabPanel />
+          </LabDirtyGuardProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
+    );
+    await settle();
+
+    const warningDialog = screen.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' });
+    expect(warningDialog).toBeInTheDocument();
+
+    // Клик: refresh в полёте — кнопка заблокирована, overlay НЕ закрыт
+    // (успех ещё не подтверждён новым значением токена).
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Продлить сессию' }));
+    });
+    expect(forceRefreshTokenMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Продлеваем сессию...' })).toBeDisabled();
+    expect(
+      screen.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' }),
+    ).toBeInTheDocument();
+
+    // Refresh завершён: в хранилище НОВОЕ значение с будущим exp —
+    // предупреждение закрывается только теперь.
+    await act(async () => {
+      releaseRefresh?.('fresh-token-value');
+      installToken(Date.now() + 30 * 60_000, '7-refreshed');
+    });
+    await settle();
+    expect(
+      screen.queryByRole('alertdialog', { name: 'Предупреждение об истечении сессии' }),
+    ).toBeNull();
+  });
+
+  it('"Продлить сессию" keeps the warning OPEN with an explicit error when the refresh fails (review round 9)', async () => {
+    // PR 3351 (review round 9, P2): при невозможности refresh контроль не
+    // «притворяется» успешным: предупреждение остаётся открытым, ошибка
+    // явная, рекомендуется сохранить черновик и войти заново.
+    vi.useFakeTimers();
+    installToken(Date.now() + 4 * 60_000, '7');
+
+    forceRefreshTokenMock.mockResolvedValue(null);
+
+    render(
+      <MemoryRouter initialEntries={['/lab?tab=queue']}>
+        <ThemeProvider>
+          <LabDirtyGuardProvider>
+            <LabPanel />
+          </LabDirtyGuardProvider>
+        </ThemeProvider>
+      </MemoryRouter>,
+    );
+    await settle();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Продлить сессию' }));
+    });
+    await settle();
+
+    // Неудача: предупреждение ОТКРЫТО, ошибка видима, кнопка доступна для
+    // повторной попытки.
+    const warningDialog = screen.getByRole('alertdialog', { name: 'Предупреждение об истечении сессии' });
+    expect(warningDialog).toBeInTheDocument();
+    expect(screen.getByText(/Не удалось продлить сессию/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Продлить сессию' })).toBeEnabled();
+    // Токен не ротирован — значение прежнее.
+    expect(window.sessionStorage.getItem('auth_token')).not.toBeNull();
   });
 });

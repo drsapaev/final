@@ -16,6 +16,11 @@ import {
 } from './labUiLabels';
 // PR 3351 (review round 7, P1): split-уровни pending-защиты (см. operationPending.ts).
 import type { LabOperationPendingState } from './operationPending';
+// PR 3351 (review round 9, P1): устойчивый Idempotency-Key операции CREATE.
+import {
+  clearCreateInstanceIdempotencyKey,
+  resolveCreateInstanceIdempotencyKey,
+} from './createInstanceIdempotency';
 
 // WF-08 fix: confirmation dialog для irreversible actions (Finalize, Revise).
 import { useConfirm } from '../common/ConfirmDialog';
@@ -390,7 +395,7 @@ export default function LabReportWorkbench({
     setSaving(true);
     setBusyAction('create');
     try {
-      const instance = await labReportingApi.createInstance({
+      const createPayload = {
         patient_id: selectedAppointment.patient_id as string | number,
         appointment_id: (selectedAppointment.appointment_id as string | number) || null,
         visit_id: (templateResolution?.visit_id as string | number) || (selectedAppointment.visit_id as string | number) || null,
@@ -403,7 +408,21 @@ export default function LabReportWorkbench({
           code: item.code || null,
           name: item.name || null
         }))
-      });
+      };
+      // PR 3351 (review round 9, P1): POST /lab/report-instances без
+      // Idempotency-Key неидемпотентен: транспортный разрыв ПОСЛЕ
+      // серверного commit (502 reverse proxy, crash вкладки, retry после
+      // reload) терял ID созданного бланка — повторный клик коммитил
+      // второй бланк. Ключ операции устойчив: генерируется на первой
+      // попытке, переживает неопределённый исход в sessionStorage и
+      // переиспользуется повтором (backend возвращает закоммиченный ответ
+      // ровно для того же payload — снимок ключа побайтово совпадает с
+      // телом запроса). Ответ 2xx получен — исход известен, слот
+      // освобождается: следующее создание = новая операция = новый
+      // легитимный бланк.
+      const idempotencyKey = resolveCreateInstanceIdempotencyKey(createPayload);
+      const instance = await labReportingApi.createInstance(createPayload, { idempotencyKey });
+      clearCreateInstanceIdempotencyKey(createPayload);
       const accepted = onInstanceChange?.(instance as Record<string, unknown>, {
         kind: 'transition',
         expectedInstanceId,
