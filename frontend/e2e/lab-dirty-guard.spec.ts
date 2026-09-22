@@ -2353,6 +2353,31 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     // Ни один бланк ещё не открыт: исход неизвестен.
     await expect(page.getByText('Отчёт #90').first()).toHaveCount(0);
 
+    // Round 10 (CodeQL #1315): в окне неопределённого исхода слот
+    // sessionStorage хранит ТОЛЬКО { key, payloadDigest } — ни raw payload
+    // (ФЛИ: patient_id/appointment_id/клинические поля), ни его подстрок:
+    // digest-hex/префиксы/UUID не содержат подчёркиваний и кириллицы.
+    const slotEntries = await page.evaluate(() => {
+      const out: Record<string, string> = {};
+      for (let i = 0; i < window.sessionStorage.length; i += 1) {
+        const k = window.sessionStorage.key(i);
+        if (k && k.startsWith('lab:report-create:idempotency:')) {
+          out[k] = window.sessionStorage.getItem(k) as string;
+        }
+      }
+      return out;
+    });
+    expect(Object.keys(slotEntries)).toHaveLength(1);
+    const slotRaw = Object.values(slotEntries)[0];
+    const slotRecord = JSON.parse(slotRaw) as Record<string, unknown>;
+    expect(Object.keys(slotRecord).sort()).toEqual(['key', 'payloadDigest']);
+    expect(slotRecord.key).toBe(operationKey);
+    expect(String(slotRecord.payloadDigest)).toMatch(/^(sha256|fnv1a):/);
+    expect(slotRaw).not.toContain('patient_id');
+    expect(slotRaw).not.toContain('appointment_id');
+    expect(slotRaw).not.toContain('visit_id');
+    expect(slotRaw).not.toContain('service_codes');
+
     // Попытка 2: оператор повторяет тот же логический клик — ТОТ ЖЕ
     // Idempotency-Key (слот пережил неопределённый исход), backend
     // возвращает закоммиченный #90 (replay), второй INSERT нет.

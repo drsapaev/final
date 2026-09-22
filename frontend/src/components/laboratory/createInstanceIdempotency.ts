@@ -18,12 +18,12 @@
  *
  * Ключ здесь живёт ровно один «логический клик» создания:
  *  - bind:    первой попытке генерируется UUID операции и пара
- *             (ключ, снимок payload) сохраняется в sessionStorage;
+ *             (ключ, digest payload) сохраняется в sessionStorage;
  *  - proceed: попытка с неопределённым исходом (сетевая ошибка / потерянный
  *             ответ / reload до обработки ответа) НЕ очищает слот —
  *             повторный клик отправляет ТОТ ЖЕ ключ и тот же payload,
  *             backend отвечает закоммиченным бланком (exactly-once);
- *  - rotate:  снимок payload изменился (пересчитался visit_id/resolution) —
+ *  - rotate:  digest payload изменился (пересчитался visit_id/resolution) —
  *             это ДРУГАЯ логическая операция: новый ключ, новый легитимный
  *             бланк (контракт ревью: «для нового ключа создаётся новый,
  *             легитимно отдельный бланк»);
@@ -39,16 +39,25 @@
  * пользователей не нужна: кэш middleware namespaced по каноническому
  * user id — чужой ключ в чужом namespace просто исполняется заново.
  *
- * Payload-привязка зеркалит серверную: middleware хеширует сырой body,
- * а serializeCreateInstancePayload() — это тот же JSON.stringify, которым
- * api-клиент строит body (стабильный порядок ключей объектного литерала).
+ * Payload-привязка — ОДНОСТОРОННИЙ digest (SHA-256 через WebCrypto,
+ * детерминированный не-криптографический fallback для окружений без
+ * crypto.subtle — http-контексты без secure context). CodeQL
+ * js/clear-text-storage-of-sensitive-data (#1315, round 10): сериализованный
+ * payload создания содержит ФЛИ (patient_id, appointment_id, клинические
+ * поля) и в raw-виде в storage не хранится НИКОГДА — equality-контракт
+ * proceed/rotate полностью сохраняется на digest-сравнении: тот же payload
+ * → тот же digest → тот же ключ; изменившийся payload → другой digest →
+ * rotate. Серверная привязка ключа к body не меняется: middleware хеширует
+ * сырой body запроса, digest здесь — только локальная память «того же
+ * логического клика». Формат слота меняется до первого попадания в main
+ * (PR ещё draft), миграция raw-слотов не нужна.
  */
 
 const STORAGE_PREFIX = 'lab:report-create:idempotency';
 
 interface StoredCreateInstanceKey {
   key: string;
-  payload: string;
+  payloadDigest: string;
 }
 
 function storageSlotId(appointmentKey: string): string {
@@ -61,8 +70,8 @@ function readStoredKey(slot: string): StoredCreateInstanceKey | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<StoredCreateInstanceKey> | null;
     if (typeof parsed?.key !== 'string' || !parsed.key) return null;
-    if (typeof parsed?.payload !== 'string') return null;
-    return { key: parsed.key, payload: parsed.payload };
+    if (typeof parsed?.payloadDigest !== 'string' || !parsed.payloadDigest) return null;
+    return { key: parsed.key, payloadDigest: parsed.payloadDigest };
   } catch {
     // Недоступный/повреждённый storage (private mode, quota) — деградация
     // к ключу на один клик: идемпотентность внутри попытки сохраняется
@@ -88,11 +97,53 @@ function removeStoredKey(slot: string): void {
 }
 
 /**
- * Тот же сериализатор, которым api-клиент строит тело запроса: снимок
- * payload побайтово совпадает с тем, что хеширует IdempotencyMiddleware.
+ * Тот же сериализатор, которым api-клиент строит тело запроса: вход digest
+ * побайтово совпадает с тем, что хеширует IdempotencyMiddleware.
  */
 export function serializeCreateInstancePayload(payload: Record<string, unknown>): string {
   return JSON.stringify(payload);
+}
+
+/**
+ * Детерминированный не-криптографический digest для окружений без
+ * crypto.subtle (http без secure context): два прохода FNV-1a с разными
+ * seed (64-битное пространство коллизий) + длина входа. Равенство
+ * digest-ов = равенство payload с практической точностью для локального
+ * proceed/rotate-решения; даже коллизия безопасна — серверная привязка
+ * ключа к body отвергнет несовпадающий payload кодом 409 (Codex R2 #3092),
+ * а не создаст дубликат.
+ */
+function fnv1aDigest(input: string): string {
+  const passes = [0x811c9dc5, 0x01000193];
+  const parts = passes.map((seed) => {
+    let hash = seed >>> 0;
+    for (let i = 0; i < input.length; i += 1) {
+      hash ^= input.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+  });
+  return `fnv1a:${parts[0]}${parts[1]}:${input.length.toString(16)}`;
+}
+
+/**
+ * Односторонний digest сериализованного payload (CodeQL #1315, round 10):
+ * primary — SHA-256 через WebCrypto (канонический барьер для
+ * clear-text-storage), fallback — FNV-1a для не-secure контекстов.
+ * Raw payload в storage не попадает ни на одном пути.
+ */
+async function computePayloadDigest(serializedPayload: string): Promise<string> {
+  if (typeof crypto !== 'undefined' && crypto.subtle && typeof crypto.subtle.digest === 'function') {
+    try {
+      const bytes = new TextEncoder().encode(serializedPayload);
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+      return `sha256:${hex}`;
+    } catch {
+      // Деградация к FNV-1a (см. fnv1aDigest) — digest-контракт сохраняется.
+    }
+  }
+  return fnv1aDigest(serializedPayload);
 }
 
 /**
@@ -127,21 +178,26 @@ export function generateCreateInstanceOperationId(): string {
  * Ключ для ОТПРАВКИ текущей попытки создания (bind / proceed / rotate —
  * см. контракт модуля). Побочный эффект: слот sessionStorage обновляется
  * под выбранную ветку, поэтому вызывать ровно один раз на попытку, ПОСЛЕ
- * сборки payload и ДО labReportingApi.createInstance().
+ * сборки payload и ДО labReportingApi.createInstance(). Асинхронность —
+ * SHA-256 digest через WebCrypto (crypto.subtle.digest асинхронен по
+ * спецификации); все точки вызова уже в async-контексте.
  */
-export function resolveCreateInstanceIdempotencyKey(payload: Record<string, unknown>): string {
+export async function resolveCreateInstanceIdempotencyKey(
+  payload: Record<string, unknown>,
+): Promise<string> {
   const slot = storageSlotId(buildCreateInstanceSlotKey(payload));
   const snapshot = serializeCreateInstancePayload(payload);
+  const payloadDigest = await computePayloadDigest(snapshot);
   const stored = readStoredKey(slot);
-  // proceed: тот же payload, исход прошлой попытки неизвестен — тот же ключ,
-  // backend вернёт закоммиченный бланк вместо второго INSERT.
-  if (stored && stored.payload === snapshot) {
+  // proceed: тот же payload (тот же digest), исход прошлой попытки неизвестен
+  // — тот же ключ, backend вернёт закоммиченный бланк вместо второго INSERT.
+  if (stored && stored.payloadDigest === payloadDigest) {
     return stored.key;
   }
   // bind (слота нет) / rotate (payload изменился — другая логическая
-  // операция): свежий ключ и свежий снимок.
+  // операция): свежий ключ и свежий digest.
   const key = generateCreateInstanceOperationId();
-  writeStoredKey(slot, { key, payload: snapshot });
+  writeStoredKey(slot, { key, payloadDigest });
   return key;
 }
 
@@ -158,7 +214,8 @@ export function clearCreateInstanceIdempotencyKey(payload: Record<string, unknow
 
 /**
  * Интроспекция для тестов/диагностики: сохранён ли по этому контексту
- * ключ с неопределённым исходом (и каким payload-снимком он связан).
+ * ключ с неопределённым исходом (и каким payload-digest-ом он связан —
+ * raw payload в слоте не хранится, CodeQL #1315).
  */
 export function peekCreateInstanceIdempotencyKey(
   payload: Record<string, unknown>,

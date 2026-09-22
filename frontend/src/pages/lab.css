@@ -187,10 +187,14 @@
 
 /* PR 3351 (review round 9, P2): явная ошибка неудачного продления сессии —
    предупреждение остаётся открытым, действие не «притворяется» успешным.
-   Цвет — токен без hex-fallback (ratchet cssHexOutsideTokens, паттерн
-   остальных --mac-accent-правил этого файла). */
+   Round 10: цвет — dual-theme danger TEXT ink (--mac-danger-ink, паттерн
+   --mac-link-ink): базовый --mac-accent (#007aff) как текст не проходит
+   WCAG AA ни в одной теме (3.6:1 на #eef3fa / 4.24:1 на #1c1c1e при
+   норме 4.5:1 для 14px); ни одно одиночное значение danger-семейства
+   обе темы не закрывает. Вложенный токен-fallback — ratchet
+   cssHexOutsideTokens/varUsagesNoFallback. */
 .lab-session-extend-error {
-  color: var(--mac-accent, var(--mac-accent-blue, inherit));
+  color: var(--mac-danger-ink, var(--mac-danger, inherit));
   font-weight: 600;
 }
 

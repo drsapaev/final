@@ -786,16 +786,22 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
 
     // PR 3351 (review round 9, P1): POST без ключа неидемпотентен — потерянный
     // после commit ответ заставлял оператора повторять CREATE (второй бланк).
-    // Workbench: ключ резолвится ДО запроса, слот освобождается ПОСЛЕ 2xx.
-    expect(workbenchSource).toContain('const idempotencyKey = resolveCreateInstanceIdempotencyKey(createPayload);');
+    // Workbench: ключ резолвится ДО запроса (async — SHA-256 digest через
+    // WebCrypto), слот освобождается ПОСЛЕ 2xx.
+    expect(workbenchSource).toContain('const idempotencyKey = await resolveCreateInstanceIdempotencyKey(createPayload);');
     expect(workbenchSource).toContain('await labReportingApi.createInstance(createPayload, { idempotencyKey });');
     expect(workbenchSource).toContain('clearCreateInstanceIdempotencyKey(createPayload);');
     // api-клиент: Idempotency-Key — opt-in заголовок (middleware без него
     // пропускает POST без координации).
     expect(apiSource).toContain('options.idempotencyKey\n        ? { headers: { \'Idempotency-Key\': options.idempotencyKey } }');
-    // Модуль: proceed (тот же payload → тот же ключ), rotate (изменённый
-    // payload → новая операция), reload-safe sessionStorage-слоты.
-    expect(idempotencySource).toContain('if (stored && stored.payload === snapshot) {');
+    // Модуль: proceed (тот же payload digest → тот же ключ), rotate (изменённый
+    // payload → новая операция), reload-safe sessionStorage-слоты; raw payload
+    // в storage не пишется (CodeQL #1315, round 10) — только односторонний
+    // digest (SHA-256 primary, FNV-1a fallback).
+    expect(idempotencySource).toContain('if (stored && stored.payloadDigest === payloadDigest) {');
+    expect(idempotencySource).toContain('await crypto.subtle.digest(\'SHA-256\', bytes)');
+    expect(idempotencySource).toContain('writeStoredKey(slot, { key, payloadDigest });');
+    expect(idempotencySource).not.toContain('writeStoredKey(slot, { key, payload: snapshot });');
     expect(idempotencySource).toContain('window.sessionStorage.getItem(slot)');
     expect(idempotencySource).toContain('export function clearCreateInstanceIdempotencyKey(');
   });

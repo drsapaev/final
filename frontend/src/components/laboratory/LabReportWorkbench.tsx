@@ -416,11 +416,11 @@ export default function LabReportWorkbench({
       // второй бланк. Ключ операции устойчив: генерируется на первой
       // попытке, переживает неопределённый исход в sessionStorage и
       // переиспользуется повтором (backend возвращает закоммиченный ответ
-      // ровно для того же payload — снимок ключа побайтово совпадает с
-      // телом запроса). Ответ 2xx получен — исход известен, слот
-      // освобождается: следующее создание = новая операция = новый
-      // легитимный бланк.
-      const idempotencyKey = resolveCreateInstanceIdempotencyKey(createPayload);
+      // ровно для того же payload — слот хранит только односторонний
+      // digest тела запроса, CodeQL alert 1315, round 10). Ответ 2xx получен —
+      // исход известен, слот освобождается: следующее создание = новая
+      // операция = новый легитимный бланк.
+      const idempotencyKey = await resolveCreateInstanceIdempotencyKey(createPayload);
       const instance = await labReportingApi.createInstance(createPayload, { idempotencyKey });
       clearCreateInstanceIdempotencyKey(createPayload);
       const accepted = onInstanceChange?.(instance as Record<string, unknown>, {
