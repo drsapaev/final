@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { usePendingAwareSessionExpiry } from '../usePendingAwareSessionExpiry';
@@ -226,6 +226,178 @@ describe('usePendingAwareSessionExpiry (PR 3351, review round 7 — JWT refresh 
     rerender({ signal: 1 });
 
     expect(onExpired).toHaveBeenCalledTimes(1);
+    expect(result.current).toBe(false);
+  });
+});
+
+describe('usePendingAwareSessionExpiry (PR 3351, review round 8 — token generation recovery)', () => {
+  afterEach(() => {
+    window.sessionStorage.removeItem('auth_token');
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('notifies onSessionRecovered when the poll sees a NEW token generation while operations are still pending', async () => {
+    // PR 3351 (review round 8, P2): gen N истёк поверх pending-операции →
+    // redirectPending=true; API-клиент выполнил single-flight refresh →
+    // gen N+1 в sessionStorage. Следующий тик опроса видит смену ЗНАЧЕНИЯ
+    // токена: warningFired/expiredFired сбрасываются, onSessionRecovered
+    // снимает висящее предупреждение НЕ ДОЖИДАЯСЬ завершения операций —
+    // диалог «Сессия скоро истечёт» лгал бы уже восстановленной сессии.
+    // redirectPending при этом живёт до фактического завершения операций
+    // (его семантика — операция, а не токен).
+    vi.useFakeTimers();
+    installToken(Date.now() - 60_000);
+    const onExpired = vi.fn();
+    const onSessionRecovered = vi.fn();
+    let pending = true;
+
+    const { result, rerender } = renderHook(
+      ({ signal }: { signal: number }) => usePendingAwareSessionExpiry({
+        hasPendingOperations: () => pending,
+        pendingOperationsSignal: signal,
+        onWarning: () => {},
+        onExpired,
+        onSessionRecovered,
+      }),
+      { initialProps: { signal: 0 } },
+    );
+
+    // Истечение поверх pending: redirect отложен, восстановления ещё нет.
+    expect(result.current).toBe(true);
+    expect(onSessionRecovered).not.toHaveBeenCalled();
+
+    // Refresh: gen N+1 (другое значение, валидный exp) — в хранилище.
+    installToken(Date.now() + 60 * 60_000);
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+    });
+
+    // Смена поколения оповещена; logout НЕ выполнен; redirectPending
+    // продолжает ждать операцию.
+    expect(onSessionRecovered).toHaveBeenCalledTimes(1);
+    expect(onExpired).not.toHaveBeenCalled();
+    expect(result.current).toBe(true);
+
+    // Операция завершена (сигнал сменился): повторная проверка находит
+    // валидный gen N+1 — redirect отменён, восстановление подтверждено.
+    pending = false;
+    await act(async () => {
+      rerender({ signal: 1 });
+    });
+    expect(onSessionRecovered).toHaveBeenCalledTimes(2);
+    expect(onExpired).not.toHaveBeenCalled();
+    expect(result.current).toBe(false);
+  });
+
+  it('recovers when the refresh lands between polls: the pending-completion branch re-checks the token', () => {
+    // PR 3351 (review round 8, P2): refresh произошёл за мгновение ДО
+    // завершения операций — тик опроса ещё не видел gen N+1. Отложенный
+    // redirect всё равно отменён: ветка завершения перечитывает токен и
+    // оповещает onSessionRecovered (без ложного logout).
+    installToken(Date.now() - 60_000);
+    const onExpired = vi.fn();
+    const onSessionRecovered = vi.fn();
+    let pending = true;
+
+    const { result, rerender } = renderHook(
+      ({ signal }: { signal: number }) => usePendingAwareSessionExpiry({
+        hasPendingOperations: () => pending,
+        pendingOperationsSignal: signal,
+        onWarning: () => {},
+        onExpired,
+        onSessionRecovered,
+      }),
+      { initialProps: { signal: 0 } },
+    );
+
+    expect(result.current).toBe(true);
+
+    // Refresh есть в хранилище, но опрос его ещё НЕ тикал.
+    installToken(Date.now() + 60 * 60_000);
+    pending = false;
+    rerender({ signal: 1 });
+
+    expect(onSessionRecovered).toHaveBeenCalledTimes(1);
+    expect(onExpired).not.toHaveBeenCalled();
+    expect(result.current).toBe(false);
+  });
+
+  it('warns again for a short-lived refreshed token: the generation change resets the fired flags', async () => {
+    // PR 3351 (review round 8, P2): прежний сброс fired-флагов жил только в
+    // else-ветке (remaining > threshold) и пропускал короткоживущие
+    // обновления: gen N истёк (expiredFired=true) → refresh → gen N+1 с
+    // remaining ≤ 5-мин порога → warningFired оставался true —
+    // предупреждение для N+1 не срабатывало, а его истечение молча не
+    // вызывало onExpired. Смена ЗНАЧЕНИЯ сбрасывает оба флага: новый токен
+    // получает собственный жизненный цикл предупреждения.
+    vi.useFakeTimers();
+    installToken(Date.now() - 60_000);
+    const onWarning = vi.fn();
+    const onExpired = vi.fn();
+    const onSessionRecovered = vi.fn();
+    // В этом сценарии состав операций не меняется — сигнал не дергается.
+    const pending = true;
+
+    renderHook(
+      ({ signal }: { signal: number }) => usePendingAwareSessionExpiry({
+        hasPendingOperations: () => pending,
+        pendingOperationsSignal: signal,
+        onWarning,
+        onExpired,
+        onSessionRecovered,
+      }),
+      { initialProps: { signal: 0 } },
+    );
+
+    // gen N+1: короткоживущий — 60 секунд (внутри warning-порога).
+    installToken(Date.now() + 60_000);
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+    });
+
+    // Поколение сменилось → флаги сброшены → предупреждение для gen N+1
+    // срабатывает (раньше молчало), восстановление оповещено.
+    expect(onWarning).toHaveBeenCalledTimes(1);
+    expect(onSessionRecovered).toHaveBeenCalledTimes(1);
+    expect(onExpired).not.toHaveBeenCalled();
+  });
+
+  it('does not report recovery when the token was removed (logout in another tab)', async () => {
+    // Снятие токена — не восстановление: onTokenChanged не вызывается,
+    // ложного onSessionRecovered нет; после завершения операций —
+    // штатный onExpired (комплемент round-7 «token disappeared»).
+    vi.useFakeTimers();
+    installToken(Date.now() - 60_000);
+    const onExpired = vi.fn();
+    const onSessionRecovered = vi.fn();
+    let pending = true;
+
+    const { result, rerender } = renderHook(
+      ({ signal }: { signal: number }) => usePendingAwareSessionExpiry({
+        hasPendingOperations: () => pending,
+        pendingOperationsSignal: signal,
+        onWarning: () => {},
+        onExpired,
+        onSessionRecovered,
+      }),
+      { initialProps: { signal: 0 } },
+    );
+
+    expect(result.current).toBe(true);
+
+    window.sessionStorage.removeItem('auth_token');
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(onSessionRecovered).not.toHaveBeenCalled();
+
+    pending = false;
+    await act(async () => {
+      rerender({ signal: 1 });
+    });
+    expect(onExpired).toHaveBeenCalledTimes(1);
+    expect(onSessionRecovered).not.toHaveBeenCalled();
     expect(result.current).toBe(false);
   });
 });

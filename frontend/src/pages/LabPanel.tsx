@@ -275,6 +275,13 @@ export default function LabPanel() {
     sourceUrlId: string | number | null;
   } | null>(null);
   const pendingUrlIntentRef = useRef<{ targetId: string | number | null } | null>(null);
+  // PR 3351 (review round 8, P1): внешний urlIntent, ОТЛОЖЕННЫЙ pending-
+  // блоком (незавершённая операция в report-области). Отличает «намерение
+  // ждёт завершения операций» (retry-эффект переподнимет его) от
+  // «намерение ждёт решения пользователя в dirty-диалоге» (retry не
+  // выполняется — диалогом владеет пользователь). Флаг ставится
+  // onPendingBlock-ом guardTransition и снимается retry-эффектом.
+  const urlIntentDeferredByPendingRef = useRef(false);
   const getReportOperationContext = useCallback((): LabReportOperationContext => {
     const appointment = selectedAppointmentRef.current;
     const instanceId = activeInstanceIdRef.current;
@@ -639,14 +646,26 @@ export default function LabPanel() {
     setHistoryGuardPendingSources,
     notifyDirtyStateChange,
     hasPendingOperations,
+    // PR 3351 (review round 8, P1): реактивный «sentinel вооружён или
+    // сворачивается». Пока true, WF-15 эффект ниже откладывает замену
+    // ?instance в адресе: replace разошёлся бы с twin-записью под
+    // sentinel-ом, и collapse после завершения операции (например, report
+    // CREATE) уводил бы history.back()-ом на устаревший адрес — URL и
+    // активный отчёт откатывались на предыдущий бланк (stale restore,
+    // round 7). Флип в false (collapse приземлился) перезапускает эффект,
+    // и отложенная запись выполняется уже на свёрнутую реальную запись.
+    historyGuardEngaged,
   } = useLabDirtyGuard();
   const pendingOperationSourcesRef = useRef(new Set<string>());
   // PR 3351 (review round 7, P1): второй реестр — операции, блокирующие
-  // полный уход с /lab. Report CREATE не блокирует контекстные переходы
-  // (latest-wins), но его неидемпотентный POST обязан пережить refresh/
-  // закрытие вкладки/SPA-уход/истечение сессии — поэтому route-level guard
-  // (guardRouteLeave/sentinel/beforeunload/session-expiry через
-  // setPendingOperationSources) видит именно этот реестр.
+  // полный уход с /lab (route-level guard/beforeunload/session-expiry
+  // через setPendingOperationSources). PR 3351 (review round 8, P1):
+  // report CREATE блокирует ОБА уровня (контекстные переходы тоже —
+  // latest-wins для неидемпотентного POST небезопасен: серверный side
+  // effect уже закоммичен, а отброшенный по operation-context ответ
+  // терял и созданный бланк, и обновление read-model). Оба реестра
+  // получают 'report' на время CREATE — sentinel вооружается, а
+  // расходящийся с twin URL не пишется (historyGuardEngaged, WF-15).
   const documentLeavePendingSourcesRef = useRef(new Set<string>());
   const setOperationSourcePending = useCallback((
     source: string,
@@ -658,11 +677,11 @@ export default function LabPanel() {
     else documentLeavePendingSourcesRef.current.delete(source);
     // PR 3351: SSOT pending-источников на уровне App — ДВА сигнала (review
     // round 7). Документ-уровень (guardRouteLeave/beforeunload/session-
-    // expiry) видит реестр полного ухода — включая latest-wins report CREATE.
-    // Sentinel (browser Back) вооружается только контекстно-блокирующими
-    // операциями: для CREATE in-lab Back — легитимная навигация, а collapse
-    // вооружённого sentinel-а после in-lab replace (create применил новый
-    // ?instance) откатывал бы URL/отчёт на до-create twin-запись.
+    // expiry) видит реестр полного ухода; sentinel (browser Back)
+    // вооружается контекстно-блокирующими операциями. PR 3351 (review
+    // round 8, P1): CREATE входит в ОБА реестра — Back при его полёте
+    // блокируется, а URL-контракт sentinel-а держит отложенная запись
+    // WF-15 (historyGuardEngaged), а не исключение из реестра.
     setPendingOperationSources([...documentLeavePendingSourcesRef.current]);
     setHistoryGuardPendingSources([...pendingOperationSourcesRef.current]);
   }, [setPendingOperationSources, setHistoryGuardPendingSources]);
@@ -698,20 +717,18 @@ export default function LabPanel() {
         window.location.href = '/login';
       }
     },
+    // PR 3351 (review round 8, P2): сессия восстановлена ПОСЛЕ истечения
+    // (refresh токена в полёте) — отложенный redirect отменён, и висящее
+    // предупреждение «Сессия скоро истечёт» обязано уйти вместе с ним:
+    // новый JWT уже действует, сообщение лгало бы пользователю.
+    onSessionRecovered: () => setSessionWarning(null),
   });
-  // Контракт блокирующих операций (PR 3351, review round 7 — split-уровни):
-  // - report/template SAVE (draft, finalize, revise, print, autosave)
-  //   блокирует КОНТЕКСТНЫЕ переходы затрагиваемого источника — переход
-  //   посреди записи мог бы создать повторную запись или разрушительный
-  //   откат состояния — И полный уход с /lab (beforeunload/route-leave/
-  //   sentinel/session-expiry);
-  // - report CREATE — latest-wins ТОЛЬКО для контекстных переходов
-  //   (sourceIds-скоуп): поздний ответ отбрасывается по operation-context
-  //   (epoch/selectionKey/patientId) в handleInstanceChange; но его
-  //   неидемпотентный POST блокирует полный уход с /lab наравне с
-  //   остальными операциями (documentLeavePendingSourcesRef);
+  // Контракт блокирующих операций (PR 3351, review round 7/8 — split-уровни):
+  // - report/template операции (draft save, CREATE, finalize, revise, print,
+  //   autosave, шаблонные create/save/clone/archive) блокируют и КОНТЕКСТНЫЕ
+  //   переходы затрагиваемого источника, и полный уход с /lab;
   // - route-level уход с /lab (guardRouteLeave) блокируется при ЛЮБОМ
-  //   документ-уровневом pending-источнике (см. LabDirtyGuardContext).
+  //   документ-уровневом pending-источнике (см. LabDirtyGuardContext);
   const guardTransition = useCallback((
     transition: () => void | Promise<void>,
     options?: DirtyGuardTransitionOptions,
@@ -721,6 +738,17 @@ export default function LabPanel() {
       : [...pendingOperationSourcesRef.current];
     if (blockedBy.length > 0) {
       notify('info', t('workbench.saving'));
+      // PR 3351 (review round 8, P1): urlIntent-переходы ОТЛАГАЮТСЯ, а не
+      // отменяются: коллбек onPendingBlock удерживает намерение до
+      // завершения операций (см. retry-эффект ниже). Откат (onCancel)
+      // здесь был бы ошибочен: он переписывал бы URL текущей (sentinel)
+      // записи, оставляя под ней неоткаченную внешнюю запись — collapse
+      // после завершения операции приземлялся бы на неё и «воскрешал»
+      // заблокированный intent через supersede restore-эффекта.
+      if (options?.onPendingBlock) {
+        options.onPendingBlock();
+        return false;
+      }
       void options?.onCancel?.();
       return false;
     }
@@ -1082,6 +1110,13 @@ export default function LabPanel() {
     instanceId: string | number | null,
     options: { urlIntent?: boolean } = {},
   ) => {
+    // PR 3351 (review round 8, P1): намерение из внешнего URL,
+    // заблокированное pending-операцией, ОТЛАДЫВАЕТСЯ (адресная строка
+    // остаётся за intent-ом — тот же контракт, что у dirty-диалога) и
+    // повторяется после завершения последней операции (retry-эффект
+    // ниже). Откат отменял бы намерение, но внешняя запись под sentinel-
+    // ом осталась бы — collapse «воскрешал» его произвольным supersede.
+    const deferUrlIntentOnPending = options.urlIntent === true;
     if (options.urlIntent) {
       // PR 3351 (review round 7, P2): вкладка-база отката фиксируется
       // ОДИН раз на всю цепочку намерений. Superseding intent, пришедший
@@ -1121,6 +1156,11 @@ export default function LabPanel() {
       },
       {
         sourceIds: ['report'],
+        // PR 3351 (review round 8, P1): pending-блок ОТЛАГАЕТ намерение
+        // (флаг для retry-эффекта), откат не выполняется.
+        onPendingBlock: deferUrlIntentOnPending
+          ? () => { urlIntentDeferredByPendingRef.current = true; }
+          : undefined,
         onCancel: options.urlIntent ? () => {
           // Keep a rollback contract while React Router is still exposing the
           // cancelled external URL. Otherwise the restore effect observes it
@@ -1155,6 +1195,30 @@ export default function LabPanel() {
     switchTab,
   ]);
 
+  // PR 3351 (review round 8, P1): RETRY отложенного pending-блоком
+  // urlIntent-а. Флаг urlIntentDeferredByPendingRef ставится
+  // onPendingBlock-ом guardTransition, когда внешний URL-переход пришёл
+  // поверх незавершённой report-операции (round 8: включая CREATE).
+  // Намерение удерживается (pendingUrlIntentRef + адресная строка — тот же
+  // контракт, что у dirty-диалога), а когда последняя операция завершается
+  // (реактивный флип hasPendingOperations), restore-эффект намерения
+  // повторяется: guardTransition уже чист — либо выполняет переход, либо,
+  // если за время полёта появился dirty-черновик, честно открывает диалог.
+  // Без retry откат наPendingBlock не выполнялся бы вовсе, а внешний
+  // intent зависал до перезагрузки; с немедленным откатом (round 7)
+  // неоткаченная внешняя запись ПОД sentinel-ом «воскрешалась» бы collapse
+  // через произвольный supersede restore-эффекта.
+  useEffect(() => {
+    if (hasPendingOperations) return;
+    if (!urlIntentDeferredByPendingRef.current) return;
+    const heldIntent = pendingUrlIntentRef.current;
+    urlIntentDeferredByPendingRef.current = false;
+    if (heldIntent == null) return;
+    loadInstance(heldIntent.targetId, { urlIntent: true });
+    // hasPendingOperations — реактивный сигнал провайдера (флипы 0↔n);
+    // loadInstance стабилен (useCallback).
+  }, [hasPendingOperations, loadInstance]);
+
   // WF-15 fix: URL sync для patient/instance — shareable + back-button friendly.
   // При смене selectedAppointment или activeInstance обновляем URL params.
   useEffect(() => {
@@ -1162,6 +1226,19 @@ export default function LabPanel() {
     // until the user decides. A late report mutation may update local state,
     // but must not erase that newer navigation request or dismiss its dialog.
     if (pendingUrlIntentRef.current) return;
+    // PR 3351 (review round 8, P1): sentinel занят (armed || collapsing) —
+    // запись ?instance в адрес ОТКЛАДЫВАЕТСЯ. Вооружённый sentinel пушил копию
+    // текущей записи (twin) ПОД себя: replace нового ?instance действовал бы
+    // на саму sentinel-запись, twin ниже хранил бы до-create URL, и collapse
+    // после завершения операции приземлял бы history.back()-ом на устаревший
+    // адрес — URL и активный отчёт молча откатывались на предыдущий бланк
+    // (stale restore, находка round-7). Пока engaged=true, адрес не пишется:
+    // collapse приземляется на twin БЕЗ расхождения, а отложенная запись
+    // выполняется уже на свёрнутую РЕАЛЬНУЮ запись — флип engaged=false
+    // (finishCollapse в popstate-обработчике) перезапускает этот эффект.
+    // pendingSync-контракт при этом не расходится: restore-эффект ниже видит
+    // twin-URL == sourceUrlId и не грузит устаревший отчёт.
+    if (historyGuardEngaged) return;
     // Внешняя URL-навигация (pushState + popstate), которую React Router ещё
     // не отрендерил, владеет адресной строкой: window.location.search в этом
     // окне не совпадает НИ с последним запросом, написанным приложением, НИ
@@ -1232,7 +1309,7 @@ export default function LabPanel() {
     if (params.toString() !== current.toString()) {
       navigateReplace(params.toString());
     }
-  }, [activeInstanceId, currentSearchParams, instanceParamId, selectedAppointment, location.search, navigateReplace]);
+  }, [activeInstanceId, currentSearchParams, historyGuardEngaged, instanceParamId, selectedAppointment, location.search, navigateReplace]);
 
   // Initial data loaders are independent of URL changes. Keeping them in the
   // URL-restore effect re-fetched templates on every tab/query update and

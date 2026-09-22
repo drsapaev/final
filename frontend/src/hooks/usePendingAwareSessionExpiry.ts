@@ -60,6 +60,17 @@ export interface UsePendingAwareSessionExpiryOptions {
    * и выполняет logout/redirect.
    */
   onExpired: () => void;
+  /**
+   * PR 3351 (review round 8, P2): сессия ВОССТАНОВЛЕНА после истечения —
+   * single-flight refresh в API-клиенте заменил истёкший JWT новым
+   * поколением. Вызывается в двух точках: (1) смена поколения токена в
+   * опросе (восстановление ещё ДО завершения pending-операций — висящее
+   * предупреждение «Сессия скоро истечёт» обязано уйти немедленно); (2)
+   * отложенный redirect отменён валидным токеном на завершении операций.
+   * Вызывающий код снимает warning-overlay: сообщение об истечении лгало
+   * бы уже восстановленной сессии.
+   */
+  onSessionRecovered?: () => void;
 }
 
 /**
@@ -97,6 +108,7 @@ export function usePendingAwareSessionExpiry({
   pendingOperationsSignal,
   onWarning,
   onExpired,
+  onSessionRecovered,
 }: UsePendingAwareSessionExpiryOptions): boolean {
   const [redirectPending, setRedirectPending] = useState(false);
 
@@ -108,6 +120,8 @@ export function usePendingAwareSessionExpiry({
   onWarningRef.current = onWarning;
   const onExpiredRef = useRef(onExpired);
   onExpiredRef.current = onExpired;
+  const onSessionRecoveredRef = useRef(onSessionRecovered);
+  onSessionRecoveredRef.current = onSessionRecovered;
 
   useSessionTimeoutWarning({
     onWarning: () => onWarningRef.current(),
@@ -120,6 +134,12 @@ export function usePendingAwareSessionExpiry({
       }
       onExpiredRef.current();
     },
+    // PR 3351 (review round 8, P2): смена ПОКОЛЕНИЯ токена (истёкший JWT
+    // заменён refresh-ом) — восстановление сессии. warningFired/expiredFired
+    // опроса сбрасываются самим хуком, а владелец (LabPanel) получает
+    // onSessionRecovered и снимает висящее предупреждение — не дожидаясь
+    // завершения pending-операций: диалог лгал бы уже живой сессии.
+    onTokenChanged: () => onSessionRecoveredRef.current?.(),
   });
 
   // Ожидание завершения: реактивный сигнал перевыволняет эффект, состав
@@ -133,11 +153,17 @@ export function usePendingAwareSessionExpiry({
   // снимается БЕЗ onExpired: сессия восстановлена, ложный logout не
   // выполняется. Токен по-прежнему истёк — прежнее поведение: переход
   // ровно один раз после завершения последней операции.
+  // PR 3351 (review round 8, P2): восстановление также оповещает
+  // onSessionRecovered — вместе с redirectPending-диалогом обязан уйти и
+  // warning-overlay (обе накладки исчезают, LabPanel снимает sessionWarning).
   useEffect(() => {
     if (!redirectPending) return;
     if (hasPendingRef.current()) return;
     setRedirectPending(false);
-    if (hasValidAccessTokenNow()) return;
+    if (hasValidAccessTokenNow()) {
+      onSessionRecoveredRef.current?.();
+      return;
+    }
     onExpiredRef.current();
   }, [redirectPending, pendingOperationsSignal]);
 

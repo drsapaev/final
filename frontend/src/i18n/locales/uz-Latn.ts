@@ -331,6 +331,7 @@ const uzLatn = {
     template_created: 'Shablon yaratildi.',
     draft_restored: 'Qoralama server versiyasidan tiklandi.',
     report_created: 'Yangi laboratoriya hisoboti yaratildi.',
+    report_created_for_patient: 'Laboratoriya blanki {patient} bemori uchun yaratildi.',
     template_draft_saved: 'Shablon qoralamasi saqlandi.',
     template_published: 'Shablon versiyasi chop etildi.',
     template_archived: 'Shablon versiyasi arxivlandi.',

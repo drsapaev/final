@@ -119,18 +119,19 @@ import { useTranslation } from '../../i18n/useTranslation';
  *
  *    PR 3351 (review round 7, P1): pending-защита разделена на ДВА сигнала.
  *    Полный уход (beforeunload/guardRouteLeave/session-expiry) блокируется
- *    при ЛЮБОЙ незавершённой операции — включая report CREATE (review
- *    round 7: неидемпотентный POST /lab/report-instances). Но sentinel
- *    (browser Back) вооружается только операциями, блокирующими и
- *    КОНТЕКСТНЫЕ переходы (save/finalize/print/autosave/шаблонные операции):
- *    для latest-wins CREATE in-lab Back — легитимный контекстный переход,
- *    а вооружение sentinel-а рвало бы URL-контракт: in-lab replace (create
- *    применил новый ?instance) меняет запись sentinel-а, twin ниже неё
- *    хранит до-create URL, и collapse после завершения операции уводил бы
- *    history.back()-ом на устаревший twin — URL и активный отчёт молча
- *    откатывались на предыдущий бланк (stale restore). Поэтому сигналы
- *    разнесены: hasPendingOperations (документ/маршрут/сессия) и
- *    hasHistoryGuardPending (sentinel/popstate).
+ *    при ЛЮБОЙ незавершённой операции. Sentinel (browser Back) вооружается
+ *    операциями, блокирующими и КОНТЕКСТНЫЕ переходы.
+ *
+ *    PR 3351 (review round 8, P1): report CREATE больше НЕ исключается из
+ *    sentinel-а: контракт blocksDocumentLeave включает browser Back, а
+ *    потеря ответа неидемпотентного POST /lab/report-instances заставляет
+ *    оператора повторять создание (дубли бланков). Расхождение с twin-
+ *    записью (round 7: collapse после in-lab replace откатывал URL/отчёт
+ *    на до-create адрес — stale restore) закрыто реактивным сигналом
+ *    historyGuardEngaged (armed || collapsing): пока он true, WF-15 эффект
+ *    LabPanel откладывает замену ?instance в адресе, collapse приземляется
+ *    на twin без расхождения, а отложенная запись выполняется на уже
+ *    свёрнутую реальную запись после settle (флип в false).
  *
  * Инвариант sentinel: запись ПОД sentinel никогда не мутирует после arm
  * (replaceState действует на текущую запись, т.е. на сам sentinel). Вытесненный
@@ -424,16 +425,27 @@ export interface LabDirtyGuardContextValue {
   hasPendingOperations: boolean;
   /**
    * PR 3351 (review round 7, P1): pending-источники, вооружающие sentinel
-   * (browser Back) — операции, блокирующие и контекстные переходы
-   * (save/finalize/print/autosave/шаблонные операции), БЕЗ latest-wins
-   * report CREATE. Для create in-lab Back — легитимная навигация
-   * (latest-wins по operation-context), а вооружение sentinel-а ломало бы
-   * URL-контракт: collapse после завершения уходит history.back()-ом на
-   * twin-запись с до-create URL и молча откатывает активный отчёт.
+   * (browser Back) — операции, блокирующие и контекстные переходы.
+   * PR 3351 (review round 8, P1): report CREATE больше НЕ исключается:
+   * контракт blocksDocumentLeave включает browser Back, а расхождение
+   * twin-записи при завершении CREATE закрыто отложенной записью ?instance
+   * в LabPanel по historyGuardEngaged (см. ниже).
    */
   setHistoryGuardPendingSources: (sources: string[]) => void;
   /** Реактивный агрегат history-guard-источников (флипы 0↔n). */
   hasHistoryGuardPending: boolean;
+  /**
+   * PR 3351 (review round 8, P1): реактивное «sentinel вооружён или
+   * сворачивается» (armed || collapsing). Публикуется провайдером на
+   * каждом переходе sentinel-а (arm/collapse — layout-эффект хоста;
+   * finishCollapse/disarm — popstate-обработчик). Пока true, WF-15 эффект
+   * LabPanel откладывает замену ?instance в URL: in-lab replace разошёлся
+   * бы с twin-записью под sentinel-ом, и collapse ушёл бы history.back()-ом
+   * на устаревший адрес — stale restore активного отчёта (round 7).
+   * Флип в false перезапускает отложенный эффект — запись выполняется уже
+   * на свёрнутую (реальную) запись истории.
+   */
+  historyGuardEngaged: boolean;
   /**
    * Route-level leave guard: pending-блок (любая незавершённая операция) +
    * dirty-диалог по ВСЕМ источникам (уход с /lab уничтожает каждый draft).
@@ -480,6 +492,18 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
     ));
   }, []);
   const hasHistoryGuardPending = historyGuardPendingSources.length > 0;
+
+  // PR 3351 (review round 8, P1): реактивное «sentinel занят» (armed ||
+  // collapsing). Обновляется хостом sentinel-а (LabLeaveRouteGuard) в
+  // каждой точке перехода: arm/collapse (layout-эффект) и
+  // finishCollapse/disarm (popstate-обработчик). Сеттер guarded по
+  // значению — повторные синк-и с тем же состоянием не перерисовывают
+  // дерево; consumers видят только флипы, на которых WF-15 эффект
+  // LabPanel и строит отложенную запись ?instance.
+  const [historyGuardEngaged, setHistoryGuardEngaged] = useState(false);
+  const notifyHistoryGuardEngaged = useCallback((engaged: boolean) => {
+    setHistoryGuardEngaged((previous) => (previous === engaged ? previous : engaged));
+  }, []);
 
   // Уход с /lab блокируется при любой незавершённой операции (save/finalize/
   // print/autosave любого источника) — переход посреди записи мог бы создать
@@ -534,6 +558,7 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
     hasPendingOperations,
     setHistoryGuardPendingSources,
     hasHistoryGuardPending,
+    historyGuardEngaged,
     guardRouteLeave,
     notifyDirtyStateChange: guard.notifyDirtyStateChange,
   }), [
@@ -547,6 +572,7 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
     hasPendingOperations,
     setHistoryGuardPendingSources,
     hasHistoryGuardPending,
+    historyGuardEngaged,
     guardRouteLeave,
   ]);
 
@@ -557,6 +583,7 @@ export function LabDirtyGuardProvider({ children }: { children: ReactNode }) {
         hasDirtySources={guard.hasDirtySources}
         hasPendingOperations={hasPendingOperations}
         hasHistoryGuardPending={hasHistoryGuardPending}
+        onEngagedChange={notifyHistoryGuardEngaged}
         guardRouteLeave={guardRouteLeave}
       />
       {guard.guardDialog}
@@ -570,16 +597,32 @@ function LabLeaveRouteGuard({
   hasDirtySources,
   hasPendingOperations,
   hasHistoryGuardPending,
+  onEngagedChange,
   guardRouteLeave,
 }: {
   hasDirtySources: () => boolean;
   /** ДОКУМЕНТ-уровень (beforeunload): dirty ИЛИ любая операция, включая report CREATE. */
   hasPendingOperations: boolean;
-  /** Sentinel (browser Back): dirty ИЛИ операции, блокирующие контекстные переходы (без CREATE). */
+  /** Sentinel (browser Back): dirty ИЛИ контекстно-блокирующие операции (round 8: включая CREATE). */
   hasHistoryGuardPending: boolean;
+  /** PR 3351 (review round 8, P1): публикация armed||collapsing для WF-15 LabPanel. */
+  onEngagedChange: (engaged: boolean) => void;
   guardRouteLeave: (leave: () => void) => boolean;
 }) {
   const navigate = useNavigate();
+  // PR 3351 (review round 8, P1): публикация «sentinel занят» на каждой
+  // точке перехода (arm/collapse в layout-эффекте ниже; finishCollapse и
+  // disarm-ветки в popstate-обработчике). Родительский сеттер guarded по
+  // значению, поэтому повторные синк-и с тем же состоянием не вызывают
+  // перерисовок. Ref-аксессор — тот же паттерн, что hasDirtyRef: коллбек
+  // всегда актуален без пересборки слушателей.
+  const onEngagedChangeRef = useRef(onEngagedChange);
+  onEngagedChangeRef.current = onEngagedChange;
+  const syncHistoryGuardEngaged = () => {
+    onEngagedChangeRef.current(
+      labLeaveSentinel.isArmed() || labLeaveSentinel.isCollapsing(),
+    );
+  };
   // render-time присваивание (тот же паттерн, что cancelRef в guard-хуке):
   // popstate-listener всегда видит актуальные коллбеки без пересборки.
   const hasDirtyRef = useRef(hasDirtySources);
@@ -589,13 +632,14 @@ function LabLeaveRouteGuard({
   const hasPendingRef = useRef(hasPendingOperations);
   hasPendingRef.current = hasPendingOperations;
   // PR 3351 (review round 7, P1): sentinel-arming сигнал — dirty ИЛИ
-  // контекстно-блокирующие операции (save/finalize/print/autosave/шаблонные),
-  // БЕЗ latest-wins report CREATE: для create in-lab Back — легитимная
-  // навигация, а collapse вооружённого sentinel-а после in-lab replace
-  // (create применил новый ?instance) уводил бы history.back()-ом на
-  // twin-запись с до-create URL — URL и активный отчёт молча откатывались
-  // (stale restore предыдущего бланка). Документ-уровень (refresh/close,
-  // route-leave, session-expiry) при этом CREATE блокирует.
+  // контекстно-блокирующие операции (save/finalize/print/autosave/шаблонные).
+  // PR 3351 (review round 8, P1): report CREATE больше НЕ исключается —
+  // browser Back обязан блокироваться и в его полёте (контракт
+  // blocksDocumentLeave). Stale-twin collapse (round 7) закрыт НЕ
+  // исключением CREATE, а отложенной записью ?instance в WF-15 LabPanel
+  // по historyGuardEngaged: пока sentinel занят, замена instance в адресе
+  // не пишется, collapse приземляется на twin без расхождения, запись
+  // догоняет реальную запись истории после settle (флип engaged=false).
   const hasHistoryPendingRef = useRef(hasHistoryGuardPending);
   hasHistoryPendingRef.current = hasHistoryGuardPending;
   const guardRouteLeaveRef = useRef(guardRouteLeave);
@@ -649,6 +693,9 @@ function LabLeaveRouteGuard({
       // PR 3351 (review round 5, P2): lab-заезд завершён — предшественник
       // следующего заезда будет вычислен заново.
       labLeaveSentinel.resetStayPredecessor();
+      // PR 3351 (review round 8, P1): уходим с /lab — sentinel больше не
+      // занимается, отложенные URL-записи не нужны (панель размонтируется).
+      syncHistoryGuardEngaged();
       return;
     }
     // PR 3351 (review round 3, P2): пока route-leave решение в полёте
@@ -661,12 +708,18 @@ function LabLeaveRouteGuard({
     if (labLeaveSentinel.isLeaveIntent()) return;
     // PR 3351 (review round 3, P1): sentinel активен при dirty ИЛИ pending.
     // PR 3351 (review round 7, P1): pending здесь — history-guard сигнал
-    // (контекстно-блокирующие операции, БЕЗ latest-wins report CREATE):
-    // см. комментарий к hasHistoryPendingRef выше.
+    // (контекстно-блокирующие операции). PR 3351 (review round 8, P1):
+    // report CREATE тоже входит — см. комментарий к hasHistoryPendingRef.
     if (!hasDirtyRef.current() && !hasHistoryPendingRef.current) {
       // Блокирующее состояние исчезло: не просто disarm — убираем фантомную
       // запись, иначе первый browser Back молча приземлится на дубликат /lab.
       if (labLeaveSentinel.isArmed()) labLeaveSentinel.collapse();
+      // PR 3351 (review round 8, P1): collapse запущен (collapsing=true) —
+      // сигнал остаётся true до фактического приземления (finishCollapse в
+      // popstate-обработчике). Флип в false перезапустит WF-15 эффект
+      // LabPanel — отложенная ?instance-запись выполнится на свёрнутую
+      // реальную запись.
+      syncHistoryGuardEngaged();
       return;
     }
     if (
@@ -715,6 +768,9 @@ function LabLeaveRouteGuard({
       }
     }
     labLeaveSentinel.arm(window.location.href);
+    // PR 3351 (review round 8, P1): вооружён (или перевзвешен) — WF-15
+    // LabPanel должен откладывать расходящиеся ?instance-записи.
+    syncHistoryGuardEngaged();
     // location в deps не нужен: эффект идемпотентен и выполняется на каждом
     // рендере, включая рендеры после смены location.
   });
@@ -754,6 +810,12 @@ function LabLeaveRouteGuard({
       // не меняется, роутер обрабатывает POP с нулевой дельтой.
       if (labLeaveSentinel.isCollapsing()) {
         labLeaveSentinel.finishCollapse();
+        // PR 3351 (review round 8, P1): collapse фактически приземлился —
+        // sentinel полностью свободен. Флип engaged=false перезапускает
+        // WF-15 эффект LabPanel: отложенная на время armed-окна запись
+        // ?instance применяется к свёрнутой реальной записи истории —
+        // twin-запись не расходилась, stale restore невозможен.
+        syncHistoryGuardEngaged();
         return;
       }
       if (!labLeaveSentinel.isArmed()) return;
@@ -767,15 +829,17 @@ function LabLeaveRouteGuard({
         // Защитная ветка: при вооружённом sentinel недостижима (pop
         // абсорбируется на /lab). Разоружаем и отдаём поп роутеру.
         labLeaveSentinel.disarm();
+        syncHistoryGuardEngaged();
         return;
       }
       // PR 3351 (review round 3, P1): pending-only тоже блокирует уход —
       // sentinel вооружён при dirty||pending, решение через guardRouteLeave.
-      // PR 3351 (review round 7, P1): тот же сигнал, что вооружал sentinel
-      // (history-guard: контекстно-блокирующие операции, без CREATE) —
+      // PR 3351 (review round 7/8, P1): тот же сигнал, что вооружал sentinel
+      // (history-guard: контекстно-блокирующие операции, включая CREATE) —
       // чем вооружились, тем и разоружаемся.
       if (!hasDirtyRef.current() && !hasHistoryPendingRef.current) {
         labLeaveSentinel.disarm();
+        syncHistoryGuardEngaged();
         return;
       }
       if (labLeaveSentinel.isDisplacedTwin()) {
@@ -844,6 +908,9 @@ export function useLabDirtyGuard(): LabDirtyGuardContextValue {
     hasPendingOperations: false,
     setHistoryGuardPendingSources: () => {},
     hasHistoryGuardPending: false,
+    // PR 3351 (review round 8, P1): standalone-режим без провайдера не
+    // вооружает sentinel — URL-записи WF-15 не откладываются (no-op false).
+    historyGuardEngaged: false,
     guardRouteLeave: (leave: () => void) => standalone.guardTransition(leave),
     notifyDirtyStateChange: standalone.notifyDirtyStateChange,
   }), [ctx, standalone]);

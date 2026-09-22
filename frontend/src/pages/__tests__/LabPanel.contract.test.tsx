@@ -548,22 +548,37 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(labPanelSource).toContain('preUrlIntentTabRef.current = null;');
   });
 
-  it('keeps report CREATE latest-wins for context transitions while blocking document/route leave (review round 7)', () => {
+  it('blocks BOTH guard levels while report CREATE is in flight: context transitions and document/route leave (review round 8)', () => {
     const workbenchSource = fs.readFileSync(
       path.resolve(__dirname, '../../components/laboratory/LabReportWorkbench.tsx'),
       'utf8',
     );
-    // PR #3351 (review round 7, P1): create — latest-wins ТОЛЬКО для
-    // контекстных переходов (поздний ответ отбрасывается по
-    // operation-context), но его неидемпотентный POST
-    // /lab/report-instances блокирует полный уход с /lab (refresh/close/
-    // route-leave/session-expiry) — иначе потеря ответа заставляла
-    // оператора повторять создание и плодить дубли бланков.
+    // PR #3351 (review round 7→8, P1): round 7 держал CREATE вне
+    // контекстного уровня (latest-wins: поздний ответ отбрасывается по
+    // operation-context). Round 8 признаёт это небезопасным для
+    // неидемпотентного POST /lab/report-instances: серверный side effect
+    // коммитится ДО решения UI, а отброшенный ответ терял и созданный
+    // бланк, и обновление read-model — оператор повторял CREATE и получал
+    // дубль. Теперь CREATE блокирует ОБА уровня наравне с save/autosave/
+    // finalize/revise/print.
     expect(workbenchSource)
-      .toContain('const reportBlocksContextTransition = (saving && busyAction !== \'create\') || autoSaving;');
+      .toContain('const reportBlocksContextTransition = saving || autoSaving;');
     expect(workbenchSource).toContain('const reportBlocksDocumentLeave = saving || autoSaving;');
     expect(workbenchSource).toContain('blocksContextTransition: reportBlocksContextTransition,');
     expect(workbenchSource).toContain('blocksDocumentLeave: reportBlocksDocumentLeave,');
+    // Stale-ветка (onInstanceChange отклонил поздний ответ) не теряет
+    // server outcome: фоновая reconcile read-model + уведомление с
+    // пациентом созданного бланка (defense-in-depth — вход в ветку
+    // закрыт блокировкой контекстных переходов).
+    const createHandler = extractBlock(
+      workbenchSource,
+      'const handleCreateInstance = useCallback',
+      '  // STRAT#1: init-instance effect',
+    );
+    expect(createHandler).toContain('if (!accepted) {');
+    expect(createHandler)
+      .toContain('await onRefreshHistory?.(selectedAppointment.patient_id as string | number);');
+    expect(createHandler).toContain('t(\'success.report_created_for_patient\'');
   });
 
   it('splits pending protection into two registries: context transitions vs full document/route leave (review round 7)', () => {
@@ -573,8 +588,7 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(source).toContain('const pendingOperationSourcesRef = useRef(new Set<string>());');
     // Документ-уровневый реестр — то, что видит провайдер
     // (guardRouteLeave/sentinel/beforeunload/session-expiry через
-    // setPendingOperationSources): report CREATE попадает сюда, не
-    // блокируя контекстные переходы.
+    // setPendingOperationSources).
     expect(source).toContain('const documentLeavePendingSourcesRef = useRef(new Set<string>());');
     expect(source).toContain('if (state?.blocksContextTransition) pendingOperationSourcesRef.current.add(source);');
     expect(source).toContain('if (state?.blocksDocumentLeave) documentLeavePendingSourcesRef.current.add(source);');
@@ -584,12 +598,11 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(source).toContain('(state: LabOperationPendingState | null) => setOperationSourcePending(\'report\', state)');
     expect(source).toContain('(state: LabOperationPendingState | null) => setOperationSourcePending(\'template\', state)');
 
-    // PR 3351 (review round 7, P1): ДВА сигнала на уровне провайдера.
-    // Документ-уровень (beforeunload/guardRouteLeave/session-expiry) —
-    // полный уход, включая CREATE; sentinel (browser Back) — только
-    // контекстно-блокирующие операции: вооружение sentinel-а для CREATE
-    // ломало URL-контракт (collapse после in-lab replace откатывал бы URL
-    // и активный отчёт на до-create twin-запись — stale restore).
+    // PR 3351 (review round 7→8, P1): ДВА сигнала на уровне провайдера.
+    // Round 8: CREATE входит в ОБА — sentinel (browser Back) вооружается
+    // и в его полёте; URL-контракт collapse (stale twin) держит
+    // отложенная запись WF-15 по historyGuardEngaged, а не исключение
+    // CREATE из реестра.
     expect(source).toContain('setHistoryGuardPendingSources([...pendingOperationSourcesRef.current]);');
 
     const guardSource = fs.readFileSync(
@@ -600,7 +613,8 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     // beforeunload (dirty ИЛИ любая операция, включая CREATE)...
     expect(guardSource).toContain('hasPendingOperations={hasPendingOperations}');
     expect(guardSource).toContain('hasHistoryGuardPending={hasHistoryGuardPending}');
-    // ...history-guard — для arm/ disarm sentinel-а и popstate-решений.
+    // ...history-guard — для arm/ disarm sentinel-а и popstate-решений
+    // (round 8: включая CREATE).
     expect(guardSource).toContain('if (!hasDirtyRef.current() && !hasHistoryPendingRef.current) {');
     expect(guardSource).toContain('if (labLeaveSentinel.isArmed()) labLeaveSentinel.collapse();');
     expect(guardSource).toContain('const hasHistoryPendingRef = useRef(hasHistoryGuardPending);');
@@ -608,14 +622,73 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     expect(guardSource).toContain('const hasHistoryGuardPending = historyGuardPendingSources.length > 0;');
     expect(guardSource).toContain('setHistoryGuardPendingSources: (sources: string[]) => void;');
 
-    // Оба workbench-а публикуют split-состояние: шаблон — оба уровня
-    // (все операции меняют список/неидемпотентны), отчёт — split
-    // (create: документ-да, контекст-нет).
+    // Оба workbench-а блокируют оба уровня на все операции.
     const templateSource = fs.readFileSync(
       path.resolve(__dirname, '../../components/laboratory/LabTemplateWorkbench.tsx'),
       'utf8',
     );
     expect(templateSource).toContain('saving ? LAB_OPERATION_PENDING_ALL : LAB_OPERATION_PENDING_NONE');
+  });
+
+  it('defers the ?instance URL write while the history guard is engaged and replays it after the collapse lands (review round 8)', () => {
+    const source = readLabPanelSource();
+    const guardSource = fs.readFileSync(
+      path.resolve(__dirname, '../../components/laboratory/LabDirtyGuardContext.tsx'),
+      'utf8',
+    );
+
+    // PR 3351 (review round 8, P1): провайдер публикует реактивный
+    // «sentinel занят» (armed || collapsing) на каждой точке перехода.
+    expect(guardSource).toContain('historyGuardEngaged: boolean;');
+    expect(guardSource).toContain(
+      'labLeaveSentinel.isArmed() || labLeaveSentinel.isCollapsing()',
+    );
+    // Публикация во ВСЕХ точках перехода: arm/collapse (layout-эффект),
+    // finishCollapse/disarm (popstate-обработчик), уход с /lab.
+    const syncSites = guardSource.split('syncHistoryGuardEngaged();').length - 1;
+    expect(syncSites).toBeGreaterThanOrEqual(5);
+    // Standalone-режим без провайдера — no-op false (URL не откладывается).
+    expect(guardSource).toContain('historyGuardEngaged: false,');
+
+    // WF-15 LabPanel: отложенная запись — ранний return по engaged +
+    // деп для перезапуска после settle (флип в false приземлившегося
+    // collapse). Отсутствие early-return/divergence — stale twin restore.
+    expect(source).toContain('if (historyGuardEngaged) return;');
+    expect(source).toContain(
+      '}, [activeInstanceId, currentSearchParams, historyGuardEngaged, instanceParamId, selectedAppointment, location.search, navigateReplace]);',
+    );
+  });
+
+  it('recovers the session-expiry UI after a token refresh: onSessionRecovered clears the stuck warning (review round 8)', () => {
+    const source = readLabPanelSource();
+    const wrapperSource = fs.readFileSync(
+      path.resolve(__dirname, '../../hooks/usePendingAwareSessionExpiry.ts'),
+      'utf8',
+    );
+    const pollSource = fs.readFileSync(
+      path.resolve(__dirname, '../../hooks/useSessionTimeoutWarning.ts'),
+      'utf8',
+    );
+
+    // PR 3351 (review round 8, P2): LabPanel снимает висящее предупреждение
+    // по onSessionRecovered — восстановленная сессия не лжёт пользователю.
+    expect(source).toContain('onSessionRecovered: () => setSessionWarning(null),');
+
+    // Обёртка: (1) смена поколения токена из опроса → onSessionRecovered
+    // ещё до завершения операций; (2) ветка завершения операций при
+    // валидном токене → onSessionRecovered (+ отмена redirectPending).
+    expect(wrapperSource).toContain('onSessionRecovered?: () => void;');
+    expect(wrapperSource).toContain('onTokenChanged: () => onSessionRecoveredRef.current?.(),');
+    expect(wrapperSource).toContain('onSessionRecoveredRef.current?.();');
+
+    // Опрос: отслеживание ПОКОЛЕНИЯ токена по значению — сброс
+    // fired-флагов на смене (короткоживущий gen N+1 получает собственный
+    // жизненный цикл предупреждения), коллбек только живой смене.
+    expect(pollSource).toContain('onTokenChanged?: () => void;');
+    expect(pollSource).toContain('const lastTokenRef = useRef<string | null>(null);');
+    expect(pollSource).toContain('warningFiredRef.current = false;');
+    expect(pollSource).toContain('expiredFiredRef.current = false;');
+    expect(pollSource).toContain('if (previousToken && token) {');
   });
 
   it('captures the pre-intent rollback tab once per intent chain so a superseding intent cannot overwrite it (review round 7)', () => {
@@ -648,14 +721,17 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     // токен мог быть обновлён (single-flight refresh в API-клиенте) —
     // валидный JWT отменяет отложенный logout.
     expect(hookSource).toContain('function hasValidAccessTokenNow()');
-    expect(hookSource).toContain('if (hasValidAccessTokenNow()) return;');
+    // PR 3351 (review round 8, P2): валидный токен отменяет redirect И оповещает
+    // восстановление (onSessionRecovered снимает висящее предупреждение).
+    expect(hookSource).toContain('if (hasValidAccessTokenNow()) {');
+    expect(hookSource).toContain('onSessionRecoveredRef.current?.();');
     // Переход выполняется только при НЕВАЛИДНОМ токене.
     const waitBlock = extractBlock(
       hookSource,
       'useEffect(() => {',
       '}, [redirectPending, pendingOperationsSignal]);',
     );
-    const tokenCheckIndex = waitBlock.indexOf('if (hasValidAccessTokenNow()) return;');
+    const tokenCheckIndex = waitBlock.indexOf('if (hasValidAccessTokenNow()) {');
     const onExpiredIndex = waitBlock.indexOf('onExpiredRef.current();');
     expect(tokenCheckIndex).toBeGreaterThan(-1);
     expect(onExpiredIndex).toBeGreaterThan(tokenCheckIndex);

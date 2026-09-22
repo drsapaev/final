@@ -387,6 +387,7 @@ const ru = {
     template_created: 'Шаблон создан.',
     draft_restored: 'Черновик восстановлен из серверной версии.',
     report_created: 'Новый лабораторный отчёт создан.',
+    report_created_for_patient: 'Лабораторный бланк создан для пациента {patient}.',
     template_draft_saved: 'Черновик шаблона сохранён.',
     template_published: 'Версия шаблона опубликована.',
     template_archived: 'Версия шаблона архивирована.',

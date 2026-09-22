@@ -243,16 +243,27 @@ export default function LabReportWorkbench({
     && !saving
     && !autoSaving;
 
-  // PR 3351 pending-контракт (review round 7, P1): два независимых уровня.
-  // CREATE остаётся latest-wins для КОНТЕКСТНЫХ переходов (поздний ответ
-  // отбрасывается по operation-context в handleInstanceChange — смена
-  // пациента/отчёта не ждёт POST), но POST /lab/report-instances
-  // неидемпотентен: refresh/закрытие вкладки/уход с /lab/истечение сессии
-  // поверх летящего create теряли ответ, и оператор после повторного входа
-  // создавал второй бланк. Поэтому CREATE (как и save/autosave/finalize/
-  // revise/print/notify) блокирует ДОКУМЕНТ/маршрут: beforeunload
-  // провайдера, guardRouteLeave, sentinel и session-expiry redirect.
-  const reportBlocksContextTransition = (saving && busyAction !== 'create') || autoSaving;
+  // PR 3351 pending-контракт (review round 7, P1; уточнение round 8, P1):
+  // ДВА уровня pending-защиты, и CREATE блокирует ОБА.
+  //
+  // Round 7 держал CREATE вне контекстного уровня (latest-wins: поздний
+  // ответ отбрасывается по operation-context в handleInstanceChange).
+  // Round 8 закрывает это как небезопасное для неидемпотентного POST
+  // /lab/report-instances: серверный side effect коммитится ДО любого
+  // решения UI, а смена пациента/отчёта в полёте заставляла обработчик
+  // молча выбросить ответ — без onRefreshHistory/onRefreshRecentReports/
+  // onQueueChanged и уведомления. Оператор не видел созданный бланк и
+  // повторял CREATE — второй бланк. Поэтому CREATE, как и save/autosave/
+  // finalize/revise/print, блокирует и контекстные переходы, и полный
+  // уход с /lab (beforeunload провайдера, guardRouteLeave, sentinel и
+  // session-expiry redirect).
+  //
+  // URL-контракт sentinel-а при этом не страдает: пока sentinel вооружён,
+  // WF-15 эффект LabPanel откладывает замену ?instance в адресе (см.
+  // historyGuardEngaged в LabDirtyGuardContext) — collapse sentinel-а
+  // приземляется на twin с ДО-create URL без расхождения, а отложенная
+  // запись выполняется на уже свёрнутую запись после settle.
+  const reportBlocksContextTransition = saving || autoSaving;
   const reportBlocksDocumentLeave = saving || autoSaving;
   useLayoutEffect(() => {
     onOperationPendingChange?.({
@@ -398,7 +409,31 @@ export default function LabReportWorkbench({
         expectedInstanceId,
         operation,
       }) !== false;
-      if (!accepted) return;
+      if (!accepted) {
+        // PR 3351 (review round 8, P1): серверный side effect уже НЕОБРАТИМ —
+        // create_instance() закоммитил бланк ДО любого решения UI. Round 7
+        // здесь просто возвращался: поздний (по operation-context) ответ
+        // молча выбрасывался — без onRefreshHistory/onRefreshRecentReports/
+        // onQueueChanged и уведомления, оператор не видел созданный бланк и
+        // повторял CREATE — второй бланк. Round 8 закрывает сам вход в эту
+        // ветку (CREATE блокирует контекстные переходы — смена пациента/
+        // отчёта в полёте больше не допускается), но server outcome обязан
+        // пережить ЛЮБОЙ сценарий: обновляем canonical read-model (история
+        // пациента — no-op при уже сменившемся контексте: loadReportHistory
+        // гвардится belongsToCurrentContext) и сообщаем оператору, КАКОМУ
+        // пациенту создан бланк — не применяя его к текущему UI-контексту.
+        await onRefreshHistory?.(selectedAppointment.patient_id as string | number);
+        await onRefreshRecentReports?.();
+        await onQueueChanged?.();
+        notify?.('success', t('success.report_created_for_patient', {
+          patient: String(
+            selectedAppointment.patient_fio
+            ?? selectedAppointment.patient_id
+            ?? '',
+          ),
+        }));
+        return;
+      }
       const transitionedOperation = captureOperationContext();
       await onRefreshHistory?.(selectedAppointment.patient_id as string | number);
       if (!isOperationCurrent(transitionedOperation)) return;

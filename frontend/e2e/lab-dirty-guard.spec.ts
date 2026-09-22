@@ -802,7 +802,13 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('90');
   });
 
-  test('late create response cannot replace a newer patient report', async ({ page }) => {
+  test('a patient switch during a pending report CREATE is blocked; the committed blank opens for the original patient exactly once (review round 8)', async ({ page }) => {
+    // PR 3351 (review round 8, P1): round 7 держал CREATE latest-wins для
+    // контекстных переходов — смена пациента в полёте отбрасывала ПОЗДНИЙ
+    // ответ по operation-context: серверный бланк уже создан, а оператор
+    // не видел ни его, ни обновления read-model и повторял CREATE (дубль).
+    // Round 8: CREATE блокирует и контекстные переходы — переключение на
+    // пациента B в полёте запрещено, server outcome не теряется.
     reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
       releaseReportInstanceCreateResponse = resolve;
     });
@@ -810,27 +816,49 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await page.getByRole('button', { name: /Пациент Один/ }).first().click();
     await expect(page.getByText('Отчёт #88').first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'Добавить бланк' }).click();
+    const addButton = page.getByRole('button', { name: 'Добавить бланк' });
+    await addButton.click();
     await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
+    await expect(addButton).toBeDisabled();
+
+    // Смена пациента в полёте неидемпотентного POST: pending-блок без
+    // destructive-диалога — контекст пациента A жив, отчёт #88 открыт.
+    await page.getByRole('tab').first().click();
+    await page.getByRole('button', { name: /Пациент Два/ }).first().click();
+    await expect(page.getByText('сохраняется…').first()).toBeVisible();
+    await expect(page.getByText('Отчёт #89').first()).toHaveCount(0);
+    // Отчёт #88 жив (hidden-секция reports при активной вкладке очереди) —
+    // контекст не сменился: URL по-прежнему владеет пациентом 101 / #88.
+    await expect(page.getByText('Отчёт #88').first()).toHaveCount(1);
+    await expect.poll(() => new URL(page.url()).searchParams.get('patient')).toBe('101');
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
+
+    // CREATE завершён в исходном контексте: ответ ПРИНЯТ — бланк #90
+    // открывается пациенту Один, отложенная (round 8) запись канонизирует
+    // URL, POST выполнен ровно один раз (дублей нет).
+    releaseReportInstanceCreateResponse?.();
+    await waitForReactToSettle(page);
+    await expect(page.getByText('Отчёт #90').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('90');
+    await expect.poll(() => reportHistoryPatientRequests.at(-1)).toBe('101');
+    expect(reportInstanceCreatePostCount).toBe(1);
+
+    // Canonical read-model целостен: переход к пациенту B теперь разрешён
+    // (pending снят, черновики чисты) и открывает его отчёт #89.
     await page.getByRole('tab').first().click();
     await page.getByRole('button', { name: /Пациент Два/ }).first().click();
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
-
-    const createResponse = page.waitForResponse((response) => (
-      response.request().method() === 'POST'
-      && response.url().endsWith('/api/v1/lab/report-instances')
-    ));
-    releaseReportInstanceCreateResponse?.();
-    await createResponse;
-    await waitForReactToSettle(page);
-    await expect.poll(() => reportHistoryPatientRequests.at(-1)).toBe('102');
-    await expect(page.getByText('Отчёт #90')).toHaveCount(0);
-    await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
-    expect(reportHistoryPatientRequests.at(-1)).toBe('102');
+    expect(reportInstanceCreatePostCount).toBe(1);
   });
 
-  test('a URL instance change under a dirty template loads the report without a dialog and keeps the template draft', async ({ page }) => {
+  test('an external URL instance intent during a pending report CREATE is blocked and rolled back; after completion the intent opens (review round 8)', async ({ page }) => {
+    // PR 3351 (review round 8, P1): внешний ?instance=89 — контекстный
+    // переход report-области; в полёте неидемпотентного CREATE он
+    // блокируется pending-блоком (toast) и откатывается к текущему
+    // контексту. Round 7 позволял переход и отбрасывал поздний create по
+    // operation-context — теряя server outcome. Dirty-template аспект
+    // перехода (report-скоуп, без диалога) покрыт отдельным тестом ниже.
     reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
       releaseReportInstanceCreateResponse = resolve;
     });
@@ -841,40 +869,30 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await page.getByRole('button', { name: 'Добавить бланк' }).click();
     await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
 
-    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
-    await panelTabs.getByRole('tab').nth(1).click();
-    await page.getByRole('tab', { name: 'Оформление' }).click();
-    const footerInput = page.getByLabel('Подвал шаблона');
-    await footerInput.fill('Несохранённый подвал');
-    // У шаблонного workbench нет видимого dirty-бейджа (в отличие от отчёта) —
-    // даём notify-эффекту зафиксировать dirty в реестре guard-а.
-    await waitForReactToSettle(page);
-
-    // PR 3351 (review round 2, P1): смена report instance из внешнего URL —
-    // report-скоуп: dirty template-draft не спрашивается и не сбрасывается.
     await page.evaluate(() => {
       window.history.pushState({}, '', '/lab?instance=89');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
+    await expect(page.getByText('сохраняется…').first()).toBeVisible();
+    await expect(page.getByText('Отчёт #89').first()).toHaveCount(0);
+    // Намерение ОТЛОЖЕНО (round 8): адресная строка остаётся за intent-ом
+    // (тот же контракт, что у dirty-диалога), отчёт не переключается до
+    // завершения операции.
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
+    expect(reportInstanceCreatePostCount).toBe(1);
 
-    // Диалога нет: report-draft чист, template-draft вне области перехода.
+    // CREATE завершён: бланк #90 создан (POST ровно один, история
+    // пациента обновлена), отложенное намерение выполняется retry-ом —
+    // отчёт #89 открывается без диалога (черновики чисты).
+    releaseReportInstanceCreateResponse?.();
+    await waitForReactToSettle(page);
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByText('Отчёт #89').first()).toBeVisible();
     await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
-
-    const createResponse = page.waitForResponse((response) => (
-      response.request().method() === 'POST'
-      && response.url().endsWith('/api/v1/lab/report-instances')
-    ));
-    releaseReportInstanceCreateResponse?.();
-    await createResponse;
-    await waitForReactToSettle(page);
-
-    // Поздний create не может затереть URL intent (latest-wins по
-    // operation-context), а template-draft пережил смену отчёта.
-    await expect(page.getByText('Отчёт #89').first()).toBeVisible();
-    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('89');
-    await expect(footerInput).toHaveValue('Несохранённый подвал');
+    // Read-model пациента A (создателя бланка) обновлён до открытия #89
+    // (последним запросом будет история пациента B — сам #89).
+    expect(reportHistoryPatientRequests).toContain('101');
+    expect(reportInstanceCreatePostCount).toBe(1);
   });
 
   test('a dirty template survives a URL instance change without a guard dialog', async ({ page }) => {
@@ -1434,7 +1452,12 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
   });
 
-  test('late create from another appointment of the same patient is rejected', async ({ page }) => {
+  test('a same-patient appointment switch during a pending report CREATE is blocked; the blank commits to the original appointment (review round 8)', async ({ page }) => {
+    // PR 3351 (review round 8, P1): повторный визит того же пациента —
+    // тоже контекстный переход (appointment_id меняет payload): round 7
+    // пропускал смену и затем отбрасывал ответ (rejected), теряя
+    // созданный бланк. Round 8 блокирует переход — контекст a-3 жив,
+    // ответ принимается, бланк #90 открывается.
     reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
       releaseReportInstanceCreateResponse = resolve;
     });
@@ -1445,23 +1468,24 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await page.getByRole('button', { name: 'Создать отчёт' }).click();
     await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
 
+    // Смена приёма в полёте заблокирована: pending-блок, контекст a-3.
     await page.getByRole('tab').first().click();
-    await page.getByRole('button', { name: /Пациент Без Бланка Повтор/ }).click();
-    // The workbench keeps the in-flight create disabled until its response
-    // settles, even after the appointment context changes.
-    await expect(page.getByRole('button', { name: 'Создаю...' })).toBeDisabled();
-    const createResponse = page.waitForResponse((response) => (
-      response.request().method() === 'POST'
-      && response.url().endsWith('/api/v1/lab/report-instances')
-    ));
-    releaseReportInstanceCreateResponse?.();
-    await createResponse;
-    await waitForReactToSettle(page);
-    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBeNull();
+    await page.getByRole('button', { name: /Пациент Без Бланка Повтор/ }).first().click();
+    await expect(page.getByText('сохраняется…').first()).toBeVisible();
+    // Кнопка CREATE жива и заблокирована в hidden-секции reports (getByRole
+    // исключает скрытые узлы из a11y-дерева — DOM-локатор).
+    const creatingButton = page.locator('#lab-panel-tabpanel-reports button', { hasText: 'Создаю...' });
+    await expect(creatingButton).toHaveCount(1);
+    await expect(creatingButton).toBeDisabled();
 
-    await expect(page.getByText('Отчёт #90')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Создать отчёт' })).toBeVisible();
+    // Ответ принят в неизменном контексте: бланк #90 открывается,
+    // payload принадлежит исходному приёму a-3, POST ровно один.
+    releaseReportInstanceCreateResponse?.();
+    await waitForReactToSettle(page);
+    await expect(page.getByText('Отчёт #90').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('90');
     expect(lastReportInstanceCreatePayload).toMatchObject({ appointment_id: 'a-3' });
+    expect(reportInstanceCreatePostCount).toBe(1);
   });
 
   test('late template resolution cannot contaminate the next patient create payload', async ({ page }) => {
@@ -2012,6 +2036,57 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await page.getByRole('menuitem', { name: 'Профиль' }).click();
     await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).not.toBe('/lab');
     expect(dialogs).toHaveLength(0);
+    expect(reportInstanceCreatePostCount).toBe(1);
+  });
+
+  // PR 3351 (review round 8, P1): browser Back в полёте неидемпотентного
+  // report CREATE. Round 7 исключал CREATE из sentinel-а (latest-wins):
+  // Back посреди POST уходил с /lab, ответ терялся, оператор повторял
+  // создание — второй бланк. Round 8: sentinel вооружен и в полёте CREATE
+  // (контракт blocksDocumentLeave), Back абсорбируется pending-блоком,
+  // операция завершается на месте, POST ровно один, а СЛЕДУЮЩИЙ Back
+  // уходит на /health — без фантомной записи и без stale twin restore
+  // (отложенная запись ?instance по historyGuardEngaged).
+  test('browser Back during a pending report CREATE is absorbed; the POST executes exactly once and the next Back leaves to /health (review round 8)', async ({ page }) => {
+    reportInstanceCreateResponseGate = new Promise<void>((resolve) => {
+      releaseReportInstanceCreateResponse = resolve;
+    });
+    // Реальная история: /health -> /lab (под twin-записью — предшественник).
+    await page.goto('/health');
+    await page.goto('/lab');
+    await page.waitForTimeout(700);
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const addButton = page.getByRole('button', { name: 'Добавить бланк' });
+    await addButton.click();
+    await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
+    await expect(addButton).toBeDisabled();
+
+    // Back в полёте: вытеснение twin-записи абсорбируется pending-блоком —
+    // без destructive-диалога, панель жива, операция не оборвана.
+    await page.evaluate(() => window.history.back());
+    await expect(page.getByRole('button', { name: 'Выйти без сохранения' })).toHaveCount(0);
+    await expect(page.getByText('сохраняется…').first()).toBeVisible();
+    await page.waitForTimeout(400);
+    expect(new URL(page.url()).pathname).toBe('/lab');
+    await expect(addButton).toBeDisabled();
+    expect(reportInstanceCreatePostCount).toBe(1);
+
+    // Операция завершена: бланк #90 открыт, sentinel свёрнут, отложенная
+    // запись ?instance=90 легла на реальную запись истории.
+    releaseReportInstanceCreateResponse?.();
+    await expect(addButton).toBeEnabled();
+    await waitForReactToSettle(page);
+    await expect(page.getByText('Отчёт #90').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('90');
+    expect(reportInstanceCreatePostCount).toBe(1);
+
+    // ОДИН Back уходит на реальную предыдущую страницу — без фантома и
+    // без отката URL/отчёта на до-create twin (stale restore).
+    await page.evaluate(() => window.history.back());
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 4000 }).toBe('/health');
     expect(reportInstanceCreatePostCount).toBe(1);
   });
 

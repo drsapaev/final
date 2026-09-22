@@ -1278,7 +1278,13 @@ describe('LabReportWorkbench add-blank action (PR6)', () => {
     });
   });
 
-  it('stops refreshes and success feedback when the parent rejects a late create result', async () => {
+  it('reconciles the committed blank in the background when the parent rejects a late create result (review round 8)', async () => {
+    // PR 3351 (review round 8, P1): серверный бланк уже создан — потеря
+    // ответа при смене контекста заставляла оператора повторять CREATE и
+    // плодить дубли. Даже если onInstanceChange отклонил ответ (контекст
+    // сменился — защита round 8 блокирует такие переходы, ветка остаётся
+    // defense-in-depth), canonical read-model обновляется, а оператор
+    // получает уведомление, КАКОМУ пациенту создан бланк.
     const onInstanceChange = vi.fn(() => false);
     const onRefreshHistory = vi.fn(async () => {});
     const onRefreshRecentReports = vi.fn(async () => {});
@@ -1303,10 +1309,12 @@ describe('LabReportWorkbench add-blank action (PR6)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Добавить бланк/ }));
 
     await waitFor(() => expect(onInstanceChange).toHaveBeenCalledTimes(1));
-    expect(onRefreshHistory).not.toHaveBeenCalled();
-    expect(onRefreshRecentReports).not.toHaveBeenCalled();
-    expect(onQueueChanged).not.toHaveBeenCalled();
-    expect(notify).not.toHaveBeenCalledWith('success', expect.any(String));
+    // Фоновая reconcile: серверный side effect не теряется.
+    await waitFor(() => expect(onRefreshHistory).toHaveBeenCalledTimes(1));
+    expect(onRefreshRecentReports).toHaveBeenCalledTimes(1);
+    expect(onQueueChanged).toHaveBeenCalledTimes(1);
+    // Уведомление называет пациента созданного бланка (fixture: Test Patient).
+    expect(notify).toHaveBeenCalledWith('success', expect.stringContaining('Test Patient'));
   });
 
   it('disables the add-blank action while the open draft is dirty', async () => {
