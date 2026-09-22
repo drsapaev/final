@@ -5,6 +5,20 @@
  */
 
 /* ─── Layout ─── */
+
+/*
+ * PR 3351: interaction-lock wrapper around the whole template editor.
+ * <fieldset disabled> blocks all nested form controls while an operation
+ * is pending; this reset keeps it visually neutral (no fieldset chrome).
+ */
+.ltw-fieldset-reset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  width: 100%;
+}
+
 .ltw-root {
   display: grid;
   grid-template-columns: 320px 1fr;

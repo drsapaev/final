@@ -16,7 +16,12 @@ router = APIRouter(prefix="/schedule", tags=["schedule"])
 def _to_out(r) -> ScheduleRowOut:
     return ScheduleRowOut(
         id=r.id,
-        department=r.department,
+        # Round-9 (codex P2, PR #3340): the DTO declares `department: str | None`
+        # — the canonical KEY string. `r.department` is the RELATIONSHIP
+        # attribute: a department-backed row coerced a Department OBJECT into
+        # the str field (500-class mismatch, the round-4 appointment reads
+        # already fixed).
+        department=getattr(r.department, "key", None),
         doctor_id=r.doctor_id,
         weekday=int(r.weekday),
         start_time=str(r.start_time),
@@ -67,7 +72,29 @@ async def create_template(
         capacity_per_hour=payload.capacity_per_hour,
         active=payload.active,
     )
-    return row
+    if payload.department and row.department_id is None:
+        # Round-9 (codex P2): the create payload carries the canonical KEY —
+        # an unknown key must be a controlled refusal, not a silently-NULL
+        # template the reads can never group under a department again.
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail={"reason": "department_unknown"},
+        )
+    # Round-10 (owner P2, PR #3340): the mutation is only real when it
+    # SURVIVES the request. The CRUD helper stops at `flush()` (a nested
+    # savepoint inside the request transaction), and `get_db` only CLOSES
+    # the session after the response — the uncommitted INSERT was rolled
+    # back in production, so the endpoint answered a ScheduleRowOut (with
+    # a generated id) for a row that never existed. COMMIT here, after the
+    # unknown-key gate above (a refused create must not persist), then
+    # refresh so the serialized row reflects the committed state.
+    db.commit()
+    db.refresh(row)
+    # Round-9 (codex P2): the DTO maps `department` through the KEY
+    # accessor — the raw ORM row would validate a Department OBJECT into
+    # the `str | None` field (500-class response mismatch).
+    return _to_out(row)
 
 
 @router.delete("/{id}", summary="Удалить расписание", response_model=dict[str, Any])
@@ -85,7 +112,9 @@ async def delete_template(
 # Новые endpoints для интеграции с панелью регистратора
 
 
-@router.get("/weekly", summary="Расписание на неделю", response_model=dict[str, Any])
+@router.get(
+    "/weekly", summary="Расписание на неделю", response_model=list[dict[str, Any]]
+)
 async def get_weekly_schedule(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
@@ -140,7 +169,11 @@ async def get_daily_schedule(
     return daily_schedule
 
 
-@router.get("/available-slots", summary="Доступные слоты для записи", response_model=dict[str, Any])
+@router.get(
+    "/available-slots",
+    summary="Доступные слоты для записи",
+    response_model=list[dict[str, Any]],
+)
 async def get_available_slots(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),

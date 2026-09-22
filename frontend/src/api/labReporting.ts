@@ -200,10 +200,21 @@ export const labReportingApi = {
     return request(`/lab/report-instances/${instanceId}`);
   },
 
-  createInstance(payload: Record<string, unknown>) {
+  createInstance(
+    payload: Record<string, unknown>,
+    options: { idempotencyKey?: string } = {},
+  ) {
+    // PR 3351 (review round 9, P1): устойчивый Idempotency-Key операции
+    // создания. IdempotencyMiddleware — opt-in: без заголовка POST просто
+    // проходит в хендлер и каждый ретрай коммитит НОВЫЙ бланк. С ключом
+    // потерянный ответ (502 proxy / crash вкладки / retry после reload)
+    // безопасен: повтор с тем же ключом получает закоммиченный ответ.
     return request('/lab/report-instances', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      ...(options.idempotencyKey
+        ? { headers: { 'Idempotency-Key': options.idempotencyKey } }
+        : {}),
     });
   },
 

@@ -18,6 +18,7 @@ from app.models.payment import Payment
 
 # from app.models.queue import QueueTicket  # Временно отключено
 from app.models.user import User
+from app.services.analytics import department_ids_for_filter
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,14 @@ class AdvancedAnalyticsService:
                 Appointment.appointment_date <= end_date.date(),
             ]
 
-            if department:
-                filters.append(Appointment.department == department)
+            # Round-10 (owner P2, PR #3340): resolve the canonical KEY to FK
+            # ids (see department_ids_for_filter) — the old
+            # `Appointment.department == department` compared the ORM
+            # RELATIONSHIP to the string (ArgumentError → 500); an unknown
+            # key answers an EMPTY result (exact-key semantics).
+            department_ids = department_ids_for_filter(db, department)
+            if department_ids is not None:
+                filters.append(Appointment.department_id.in_(department_ids))
 
             # Общее количество записей
             total_appointments = db.query(Appointment).filter(and_(*filters)).count()
@@ -191,8 +198,11 @@ class AdvancedAnalyticsService:
                 Appointment.appointment_date <= end_date.date(),
             ]
 
-            if department:
-                filters.append(Appointment.department == department)
+            # Round-10 (owner P2, PR #3340): FK-id filter, see
+            # department_ids_for_filter (relationship-vs-string → 500).
+            department_ids = department_ids_for_filter(db, department)
+            if department_ids is not None:
+                filters.append(Appointment.department_id.in_(department_ids))
 
             # Статистика по врачам
             # appointments.doctor_id -> doctors.id (FK), имя и specialty живут
@@ -427,8 +437,11 @@ class AdvancedAnalyticsService:
                 Payment.status == "completed",
             ]
 
-            if department:
-                filters.append(Appointment.department == department)
+            # Round-10 (owner P2, PR #3340): FK-id filter, see
+            # department_ids_for_filter (relationship-vs-string → 500).
+            department_ids = department_ids_for_filter(db, department)
+            if department_ids is not None:
+                filters.append(Appointment.department_id.in_(department_ids))
 
             # Общий доход
             total_revenue = (
