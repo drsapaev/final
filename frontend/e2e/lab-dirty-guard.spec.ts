@@ -1,6 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
-import type { Page, Route } from '@playwright/test';
+import type { Page, Response, Route } from '@playwright/test';
 
 /**
  * PR5 (lab workflow hardening plan): mocked workflow spec.
@@ -168,6 +168,7 @@ let releaseHistory102Response: (() => void) | null = null;
 // обязаны отбрасываться по request epoch (latest-wins).
 let recentReportsListRequestCount = 0;
 let holdRecentResponses = false;
+let heldRecentReportsRequests = 0;
 let recentReportsHoldGate: Promise<void> | null = null;
 let releaseRecentReportsHold: (() => void) | null = null;
 
@@ -184,10 +185,11 @@ function queuePatientButton(page: Page, name: string) {
 // Follow-up PR: общий JSON-ответчик для тестовых route-оверрайдов — они
 // регистрируются ПОСЛЕ installApiMocks и потому имеют приоритет над
 // базовыми моками (последний зарегистрированный route обрабатывает запрос).
-function apiJson(route: Route, payload: unknown) {
+function apiJson(route: Route, payload: unknown, headers: Record<string, string> = {}) {
   return route.fulfill({
     status: 200,
     contentType: 'application/json',
+    headers,
     body: JSON.stringify(payload),
   });
 }
@@ -445,6 +447,7 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     releaseHistory102Response = null;
     recentReportsListRequestCount = 0;
     holdRecentResponses = false;
+    heldRecentReportsRequests = 0;
     recentReportsHoldGate = null;
     releaseRecentReportsHold = null;
     await installSession(page);
@@ -2559,12 +2562,17 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect.poll(() => templateResolutionPatientRequests.includes('101')).toBe(true);
     await expect.poll(() => new URL(page.url()).searchParams.get('patient')).toBe('101');
 
-    const queueRefresh = page.waitForRequest((request) => request.url().includes('/api/v1/lab/queue/today'));
+    // Delivery-гейт refresh-ответа (review P2): canonical-переход перезагружает
+    // очередь; утверждение «refresh не воскресил selection» обязано
+    // проверяться ПОСЛЕ фактической доставки и применения ответа.
+    // waitForRequest доказывает только отправку запроса — ответ мог бы
+    // примениться уже после ассертов, и воскрешение осталось бы незамеченным.
+    const queueRefreshed = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
     await page.evaluate(() => {
       window.history.pushState({}, '', '/lab');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    await queueRefresh;
+    await queueRefreshed;
     await waitForReactToSettle(page);
 
     // Одновременное освобождение: адрес строго /lab (воскрешение привязки
@@ -2681,13 +2689,28 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     recentReportsHoldGate = new Promise<void>((resolve) => {
       releaseRecentReportsHold = resolve;
     });
+    // Delivery-квитанции (review P2): marker-заголовок различает STALE и FRESH
+    // ответы одного и того же URL; page.on('response') фиксирует момент, когда
+    // ответ реально дошёл до браузера (Network.responseReceived).
+    // waitForReactToSettle (2×RAF) сам по себе НЕ является барьером доставки
+    // HTTP-ответа: без этого гейта ассерты «stale отсутствует» могли бы
+    // пройти до фактической доставки stale-ответа и не увидеть перезапись.
+    const freshDeliveries: string[] = [];
+    const staleDeliveries: string[] = [];
+    page.on('response', (response: Response) => {
+      const marker = response.headers()['x-test-recent-reports'];
+      if (marker === 'fresh') freshDeliveries.push(marker);
+      else if (marker === 'stale') staleDeliveries.push(marker);
+    });
     await page.route('**/api/v1/lab/report-instances?limit=50', async (route) => {
       recentReportsListRequestCount += 1;
       if (holdRecentResponses) {
+        heldRecentReportsRequests += 1;
         await recentReportsHoldGate;
-        return apiJson(route, STALE_RECENT_REPORTS);
+        await apiJson(route, STALE_RECENT_REPORTS, { 'x-test-recent-reports': 'stale' });
+        return;
       }
-      return apiJson(route, FRESH_RECENT_REPORTS);
+      await apiJson(route, FRESH_RECENT_REPORTS, { 'x-test-recent-reports': 'fresh' });
     });
 
     // Cold mount на вкладке reports: mount-запросы недавних удержаны гейтом.
@@ -2706,8 +2729,20 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect(page.getByText('Отчёт #90').first()).toBeVisible();
     await expect.poll(() => recentReportsListRequestCount).toBeGreaterThanOrEqual(2);
 
-    // Отпускаем отложенные STALE-ответы — они приходят ПОСЛЕ свежего списка.
+    // FRESH delivery-гейт (review P2): CREATE-refresh ответ обязан дойти до
+    // браузера и примениться ДО отпускания STALE — только тогда порядок
+    // «fresh применён, stale приходит позже» детерминирован. Без гейта в
+    // runtime без epoch-guard STALE мог бы примениться раньше FRESH —
+    // финальное состояние осталось бы свежим, и сломанный код прошёл бы тест.
+    await expect.poll(() => freshDeliveries.length).toBeGreaterThanOrEqual(1);
+    await waitForReactToSettle(page);
+
+    // STALE delivery-гейт (review P2): отпускаем удержанные ответы и ждём,
+    // что КАЖДЫЙ из них реально доставлен браузеру (Network.responseReceived)
+    // и обработан React (2×RAF поверх доставки) ДО финальных ассертов.
+    const expectedStaleDeliveries = heldRecentReportsRequests;
     releaseRecentReportsHold?.();
+    await expect.poll(() => staleDeliveries.length).toBe(expectedStaleDeliveries);
     await waitForReactToSettle(page);
 
     // Гейт полного успокоения CREATE-механики: отложенная (round 8) WF-15
