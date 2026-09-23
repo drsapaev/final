@@ -11,14 +11,22 @@
 """
 
 import asyncio
+import threading
 from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
+from anyio import CancelScope
 from fastapi import HTTPException
 from sqlalchemy import event
+from starlette.concurrency import run_in_threadpool
 
-from app.api.deps import create_access_token, get_current_user
+from app.api.deps import (
+    _auth_db_thread_limiter,
+    _get_user_with_blacklist,
+    create_access_token,
+    get_current_user,
+)
 from app.core.config import settings
 from app.models.authentication import TokenBlacklist
 from app.models.user import User
@@ -54,6 +62,187 @@ def _engine_of(session):
 
 def _call_get_current_user(db_session, token: str) -> User:
     return asyncio.run(get_current_user(token=token, db=db_session))
+
+
+def test_sync_auth_query_releases_event_loop_while_waiting():
+    started = threading.Event()
+    release = threading.Event()
+    expected_user = object()
+
+    class FakeResult:
+        def first(self):
+            return expected_user, False, True
+
+    class FakeSyncSession:
+        calls = 0
+
+        def execute(self, _statement):
+            self.calls += 1
+            started.set()
+            if not release.wait(timeout=5):
+                raise AssertionError("fake database call was not released")
+            return FakeResult()
+
+    db = FakeSyncSession()
+
+    async def check():
+        auth_task = asyncio.create_task(
+            _get_user_with_blacklist(db, jti="test-jti", user_id=1)
+        )
+        try:
+            assert await asyncio.wait_for(asyncio.to_thread(started.wait, 3), 4)
+            event_loop_was_free = not auth_task.done()
+        finally:
+            release.set()
+        result = await auth_task
+        assert event_loop_was_free
+        return result
+
+    user, blacklisted = asyncio.run(check())
+    assert user is expected_user
+    assert blacklisted is True
+    assert db.calls == 1
+
+
+def test_async_auth_query_still_uses_single_execute():
+    expected_user = object()
+
+    class FakeResult:
+        def first(self):
+            return expected_user, False, False
+
+    class FakeAsyncSession:
+        calls = 0
+
+        async def execute(self, _statement):
+            self.calls += 1
+            return FakeResult()
+
+    db = FakeAsyncSession()
+    user, blacklisted = asyncio.run(
+        _get_user_with_blacklist(db, jti="test-jti", username="test-user")
+    )
+    assert user is expected_user
+    assert blacklisted is False
+    assert db.calls == 1
+
+
+def test_auth_worker_limiter_is_scoped_to_each_event_loop():
+    async def limiter_for_this_loop():
+        limiter = _auth_db_thread_limiter()
+        assert limiter is _auth_db_thread_limiter()
+        return limiter
+
+    first = asyncio.run(limiter_for_this_loop())
+    second = asyncio.run(limiter_for_this_loop())
+    assert first is not second
+
+
+def test_auth_burst_keeps_shared_worker_available():
+    started_eight = threading.Event()
+    release = threading.Event()
+    calls_lock = threading.Lock()
+
+    class FakeResult:
+        def first(self):
+            return None
+
+    class BlockingSyncSession:
+        calls = 0
+
+        def execute(self, _statement):
+            with calls_lock:
+                self.calls += 1
+                if self.calls == 8:
+                    started_eight.set()
+            if not release.wait(timeout=10):
+                raise AssertionError("fake database call was not released")
+            return FakeResult()
+
+    db = BlockingSyncSession()
+
+    async def check():
+        auth_tasks = [
+            asyncio.create_task(
+                _get_user_with_blacklist(db, jti=f"test-jti-{index}", user_id=1)
+            )
+            for index in range(40)
+        ]
+        try:
+            assert await asyncio.wait_for(asyncio.to_thread(started_eight.wait, 5), 6)
+            assert db.calls == 8
+            assert (
+                await asyncio.wait_for(run_in_threadpool(lambda: "free"), 2) == "free"
+            )
+            assert db.calls == 8
+        finally:
+            release.set()
+            results = await asyncio.gather(*auth_tasks)
+        return results
+
+    results = asyncio.run(check())
+    assert results == [(None, False)] * 40
+    assert db.calls == 40
+
+
+@pytest.mark.parametrize("cancellation", ["direct_twice", "anyio_scope"])
+def test_cancelled_auth_waits_for_sync_lookup_before_session_teardown(cancellation):
+    started = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    scopes = []
+
+    class FakeResult:
+        def first(self):
+            return None
+
+    class BlockingSyncSession:
+        def execute(self, _statement):
+            started.set()
+            try:
+                if not release.wait(timeout=5):
+                    raise AssertionError("fake database call was not released")
+                return FakeResult()
+            finally:
+                finished.set()
+
+    async def check():
+        async def lookup():
+            if cancellation == "anyio_scope":
+                with CancelScope() as scope:
+                    scopes.append(scope)
+                    await _get_user_with_blacklist(
+                        BlockingSyncSession(), jti="test-jti", user_id=1
+                    )
+                return "cancelled"
+            return await _get_user_with_blacklist(
+                BlockingSyncSession(), jti="test-jti", user_id=1
+            )
+
+        auth_task = asyncio.create_task(lookup())
+        try:
+            assert await asyncio.wait_for(asyncio.to_thread(started.wait, 2), 3)
+            if cancellation == "anyio_scope":
+                scopes[0].cancel()
+            else:
+                auth_task.cancel()
+            await asyncio.sleep(0)
+            assert not auth_task.done()
+            if cancellation == "direct_twice":
+                auth_task.cancel()  # A second cancellation must not abandon the worker.
+                await asyncio.sleep(0)
+                assert not auth_task.done()
+            assert not finished.is_set()
+        finally:
+            release.set()
+        if cancellation == "anyio_scope":
+            assert await asyncio.wait_for(auth_task, 3) == "cancelled"
+        else:
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(auth_task, 3)
+        assert finished.is_set()
+
+    asyncio.run(check())
 
 
 @pytest.fixture
@@ -209,18 +398,27 @@ def test_service_jti_and_sentinel_hits(db_session, auth_user):
         reason="logout",
     )
     assert ok is True
-    assert TokenBlacklistService.is_token_blacklisted(
-        db_session, "fixed-jti-abc", user_id=auth_user.id
-    ) is True
+    assert (
+        TokenBlacklistService.is_token_blacklisted(
+            db_session, "fixed-jti-abc", user_id=auth_user.id
+        )
+        is True
+    )
 
     TokenBlacklistService.blacklist_all_user_tokens(
         db_session, auth_user.id, reason="security"
     )
     # Свежий (не отозванный) jti того же пользователя блокируется sentinel-записью
-    assert TokenBlacklistService.is_token_blacklisted(
-        db_session, "brand-new-jti", user_id=auth_user.id
-    ) is True
+    assert (
+        TokenBlacklistService.is_token_blacklisted(
+            db_session, "brand-new-jti", user_id=auth_user.id
+        )
+        is True
+    )
     # Другой пользователь не затронут
-    assert TokenBlacklistService.is_token_blacklisted(
-        db_session, "brand-new-jti", user_id=auth_user.id + 1
-    ) is False
+    assert (
+        TokenBlacklistService.is_token_blacklisted(
+            db_session, "brand-new-jti", user_id=auth_user.id + 1
+        )
+        is False
+    )
