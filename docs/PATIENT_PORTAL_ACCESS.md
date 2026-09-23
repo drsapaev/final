@@ -376,3 +376,41 @@ middleware + the published OpenAPI surface):
   middleware already processed keyed previews (the operation-scoping
   contract exercises it), so the generated TypeScript now describes the
   real outcomes.
+
+Round-11 parity (follow-up after PR #3340 merged, applies to the Telegram
+Mini App booking endpoints):
+
+- Canonical doctor-department routing on the Mini App surface: the shared
+  booking helper (`_build_mini_app_appointment_booking_preview_from_request`,
+  used by BOTH `POST /telegram/mini-app/appointments/preview` and
+  `POST /telegram/mini-app/appointments`) now resolves the SAME routing
+  context the portal got in rounds 9-10. The routing resolvers moved to
+  the shared SSOT service `app/services/appointment_booking_routing.py`
+  (`resolve_booking_department`, `resolve_doctor_routing_department`,
+  `attach_department_id`); the portal keeps behavior-identical aliases.
+  Contract (identical 400 reasons on both surfaces, BEFORE any mutation):
+  `department_unknown` / `department_inactive` (submitted key),
+  `doctor_department_missing` (doctor without a canonical department — an
+  explicit refusal, never a NULL routing context),
+  `doctor_department_mismatch` (submitted department is not the doctor's
+  own), `department_inactive` on the CANONICAL path (round-10 owner P1
+  parity). Create re-resolves on the LOCKED doctor row AFTER eligibility
+  and BEFORE the slot check, and persists `department_id` through the
+  internal `PatientPortalAppointmentCreate` schema — a Mini App
+  doctor-booking no longer stores `department_id = NULL` (the
+  department-pop follow-up flagged in round 2).
+- Preview/create routing agreement: the preview response echoes the
+  resolved `appointment.department_id` (additive field,
+  `response_model=dict[str, Any]` — no OpenAPI/api.ts churn), and the
+  create response's `preview` payload carries the same value, so a
+  patient always sees the routing context the row actually got.
+- Clinic-local calendar on the Mini App surface: the booking past-day
+  check receives `today=clinic_today(db)` (Asia/Tashkent queue-settings
+  SSOT) — the round-9 owner P2 fix now covers BOTH patient-facing
+  surfaces. On a UTC host between 00:00 and 04:59 Tashkent time the
+  previous clinic day is refused (`400 appointment_date_in_past`) instead
+  of being accepted by the host's `date.today()`.
+- Denial audit parity: routing refusals on the Mini App surface write
+  `outcome="denied"` `patient_access_audit` rows with the failing reason
+  (same SSOT pattern as the portal's round-3 denied rows); success rows
+  carry the resolved `department_id`.

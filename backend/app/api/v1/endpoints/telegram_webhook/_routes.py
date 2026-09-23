@@ -46,6 +46,10 @@ from app.schemas.notifications import (
     SendMessageRequest,
     TelegramWebhookUpdateRequest,
 )
+from app.services.appointment_booking_routing import (
+    attach_department_id,
+    resolve_doctor_routing_department,
+)
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
 from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 # PR-3: referenced via module namespace (not from-imported) so tests can
@@ -525,13 +529,15 @@ def preview_mini_app_appointment_booking(
 ):
     """Return a trusted Mini App appointment preview without creating it."""
 
-    preview = _build_mini_app_appointment_booking_preview_from_request(
+    preview, department_row = _build_mini_app_appointment_booking_preview_from_request(
         request_body,
         db,
         allow_entry_token=True,
         request=request,  # M4-P0-1: pass request for audit logging
     )
-    return preview.to_response_payload()
+    # Round-11 (PR #3340 parity): the preview echoes the SAME resolved
+    # routing context (department_id) the create will persist.
+    return attach_department_id(preview.to_response_payload(), department_row)
 
 
 @router.post(
@@ -644,7 +650,10 @@ def create_mini_app_appointment_booking(
 ):
     """Create one trusted Mini App appointment for a linked patient."""
 
-    preview = _build_mini_app_appointment_booking_preview_from_request(
+    (
+        preview,
+        department_row,
+    ) = _build_mini_app_appointment_booking_preview_from_request(
         request_body,
         db,
         allow_entry_token=True,
@@ -658,7 +667,7 @@ def create_mini_app_appointment_booking(
         # concurrent deactivation must commit first and the eligibility read
         # below sees the post-commit state) — concurrent same-slot writers
         # (web/mobile/telegram) serialize on the doctor row.
-        lock_doctor_for_slot_reservation(db, preview.draft.doctor_id)
+        doctor_row = lock_doctor_for_slot_reservation(db, preview.draft.doctor_id)
 
         # Lifecycle eligibility (Codex round-2 P1): every live appointment
         # writer must reject inactive/incomplete doctors — the Telegram Mini
@@ -676,22 +685,43 @@ def create_mini_app_appointment_booking(
                 },
             ) from exc
 
-    if preview.draft.doctor_id is not None and preview.draft.appointment_time:
-        slot_occupied = appointment_crud.is_time_slot_occupied(
-            db,
-            doctor_id=preview.draft.doctor_id,
-            appointment_date=preview.draft.appointment_date,
-            appointment_time=preview.draft.appointment_time,
-        )
-        if slot_occupied:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={"reason": "appointment_time_slot_occupied"},
+        if doctor_row is not None:
+            # Round-11 (owner P1 parity, PR #3340): the persisted routing
+            # context is the doctor's CANONICAL department — re-resolved on
+            # the LOCKED doctor row AFTER eligibility (the established
+            # doctor_not_eligible contract is unchanged) and BEFORE the slot
+            # check (a routing refusal never creates anything). Mirrors the
+            # portal create flow exactly.
+            department_row = resolve_doctor_routing_department(
+                doctor_row, department_row
             )
+
+        if preview.draft.appointment_time:
+            slot_occupied = appointment_crud.is_time_slot_occupied(
+                db,
+                doctor_id=preview.draft.doctor_id,
+                appointment_date=preview.draft.appointment_date,
+                appointment_time=preview.draft.appointment_time,
+            )
+            if slot_occupied:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"reason": "appointment_time_slot_occupied"},
+                )
 
     appointment_create_payload = dict(draft_payload)
     appointment_create_payload.pop("department", None)
-    appointment_in = appointment_schemas.AppointmentCreate(**appointment_create_payload)
+    if department_row is not None:
+        # Round-11 (PR #3340 parity): persist the server-resolved routing
+        # FK — a Mini App doctor-booking no longer stores department_id
+        # NULL, and a contradictory doctor/department pair is refused with
+        # the SAME 400 reasons the portal publishes.
+        appointment_create_payload["department_id"] = int(department_row.id)
+    # Round-11: portal-INTERNAL creation schema (server-resolved FK only) —
+    # the shared `AppointmentCreate` keeps no client-owned routing FK.
+    appointment_in = appointment_schemas.PatientPortalAppointmentCreate(
+        **appointment_create_payload
+    )
     appointment = appointment_crud.create(db=db, obj_in=appointment_in)
 
     # M4-P0-1: PHI audit trail — log appointment creation
@@ -709,13 +739,16 @@ def create_mini_app_appointment_booking(
             "appointment_date": str(preview.draft.appointment_date),
             "appointment_time": preview.draft.appointment_time,
             "department": preview.draft.department,
+            "department_id": int(department_row.id) if department_row else None,
         },
     )
 
     return {
         "created": True,
         "appointment_id": int(appointment.id),
-        "preview": preview.to_response_payload(),
+        "preview": attach_department_id(
+            preview.to_response_payload(), department_row
+        ),
     }
 
 
