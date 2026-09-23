@@ -86,14 +86,26 @@ class ClinicTelegramBot:
     @property
     def bot(self) -> Any | None:
         """Return the configured client, initializing it on its first use."""
-        self._initialize_client()
+        if self._bot is None:
+            self._initialize_client()
         return self._bot
+
+    @bot.setter
+    def bot(self, value: Any | None) -> None:
+        """Support existing test and integration code that injects a client."""
+        self._bot = value
 
     @property
     def dp(self) -> Any | None:
         """Return the configured dispatcher, initializing it on its first use."""
-        self._initialize_client()
+        if self._dp is None:
+            self._initialize_client()
         return self._dp
+
+    @dp.setter
+    def dp(self, value: Any | None) -> None:
+        """Support existing test and integration code that injects a dispatcher."""
+        self._dp = value
 
     @property
     def queue_service(self) -> Any | None:

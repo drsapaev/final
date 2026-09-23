@@ -72,3 +72,14 @@ def test_disabled_telegram_bot_does_not_import_sdk() -> None:
         "assert telegram_bot.bot is None; "
         "assert 'aiogram' not in sys.modules"
     )
+
+
+def test_injected_telegram_test_doubles_do_not_load_sdk() -> None:
+    _run_import_probe(
+        "import sys; "
+        "from app.services.telegram.bot import telegram_bot; "
+        "client = object(); dispatcher = object(); "
+        "telegram_bot.bot = client; telegram_bot.dp = dispatcher; "
+        "assert telegram_bot.bot is client; assert telegram_bot.dp is dispatcher; "
+        "assert 'aiogram' not in sys.modules"
+    )
