@@ -8,18 +8,30 @@
 ## Cyclic Execution Evidence
 - Fresh main sync: branch created from current origin/main
 - Clean workspace: inspected before edits; only scoped component, locales, and tests changed
-- Branch: palette-ux-input-clear-i18n-13129844999803548978
+- Branch: palette-ux-input-clear-i18n
 - Scope gate: allowed frontend UI component, locales, and targeted regression tests; denied unrelated backend, admin panels, migrations, and generated output
 - Red-check handling: fix failed targeted tests or CI checks in this same PR before merge
 
 ## Contract Impact
-not applicable - UI text localization only, no API, websocket, event, or consumer contract changed.
+- Canonical surface: not applicable, UI text localization only
+- Request shape: not applicable, UI text localization only
+- Response shape: not applicable, UI text localization only
+- Status codes: not applicable, UI text localization only
+- Frontend consumer: not applicable, UI text localization only
+- Compatibility path or alias: not applicable, UI text localization only
+- Contract proof: not applicable, UI text localization only
 
 ## RBAC / Permissions
-not applicable - UI text localization only, no route, endpoint, guard, role helper, or auth-sensitive behavior changed.
+- Roles allowed: not applicable, UI text localization only
+- Roles denied: not applicable, UI text localization only
+- Positive auth proof: not applicable, UI text localization only
+- Negative auth proof: not applicable, UI text localization only
 
 ## Notification / Realtime
-not applicable - UI text localization only, no notification, websocket, chat, or realtime behavior changed.
+- Event type or websocket channel: not applicable, UI text localization only
+- Payload version / ack behavior: not applicable, UI text localization only
+- Read/unread or delivery semantics: not applicable, UI text localization only
+- Reconnect/resync proof: not applicable, UI text localization only
 
 ## Frontend Resilience
 - Empty data proof: not applicable, standard UI component
