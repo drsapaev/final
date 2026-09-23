@@ -48,7 +48,7 @@ interface BookingDepartmentOption {
  * Форма записи на приём через Telegram Mini App identity.
  * Поток: preview → review summary → create booking.
  *
- * Round-12 (PR #3386 review): отделение выбирается из справочника
+ * Round-12 (PR 3386 review): отделение выбирается из справочника
  * активных отделений (POST /telegram/mini-app/booking/departments), а не
  * свободным текстом — селектор отправляет канонический `Department.key`
  * (например `cardio`), который резолвит routing-контракт. Свободный ввод
