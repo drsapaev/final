@@ -184,3 +184,49 @@ def complete_join_session(
     # (exception_handlers.py)
 
 
+@router.post("/join/probe", response_model=JoinSessionProbeResponse)
+def probe_join_session(
+    request: JoinSessionProbeRequest, db: Session = Depends(get_db)
+):
+    """
+    Round-11 (PR #3362 review, P1-2): read-only oracle состояния попытки
+    присоединения (публичный эндпоинт).
+
+    Ownerless-ambiguity recovery НЕ ДОЛЖЕН вызывать ``/join/complete`` как
+    «проверку»: для ещё не claims-нутой (``pending``) сессии complete — это
+    само исполнение бизнес-операции с введённым payload'ом (второй заход
+    для пациента, чья настоящая попытка уже может быть закоммичена).
+    Этот оракул возвращает класс состояния attempt'а относительно введённых
+    данных, не мутируя ни одной строки; для совпавшей закоммиченной попытки
+    повторно отдаёт СОХРАНЁННЫЙ ответ первой попытки (без записи).
+    """
+    service = QRQueueService(db)
+
+    logger.info(
+        "[probe_join_session] Read-only probe: session_token_present=%s, phone_present=%s",
+        bool(request.session_token),
+        bool(request.phone),
+    )
+    try:
+        result = service.probe_join_session(
+            session_token=request.session_token,
+            patient_name=request.patient_name,
+            phone=request.phone,
+            telegram_id=request.telegram_id,
+            specialist_ids=request.specialist_ids,
+            specialist_entity_types=request.specialist_entity_types,
+        )
+        return JoinSessionProbeResponse(**result)
+    except ValueError as e:
+        # The oracle is total for unknown/expired/foreign sessions — they
+        # are OUTCOMES, not errors. Anything reaching this handler is an
+        # unexpected domain error; keep it honest in the logs.
+        logger.warning(
+            "[probe_join_session] ValueError: %s",
+            str(e),
+        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Internal server error")
+    # Остальные исключения обрабатываются централизованными обработчиками
+    # (exception_handlers.py)
+
+

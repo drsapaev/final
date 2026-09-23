@@ -8537,6 +8537,48 @@
         }
       }
     },
+    "/api/v1/queue/join/probe": {
+      "post": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Probe Join Session",
+        "description": "Round-11 (PR #3362 review, P1-2): read-only oracle состояния попытки\nприсоединения (публичный эндпоинт).\n\nOwnerless-ambiguity recovery НЕ ДОЛЖЕН вызывать ``/join/complete`` как\n«проверку»: для ещё не claims-нутой (``pending``) сессии complete — это\nсамо исполнение бизнес-операции с введённым payload'ом (второй заход\nдля пациента, чья настоящая попытка уже может быть закоммичена).\nЭтот оракул возвращает класс состояния attempt'а относительно введённых\nданных, не мутируя ни одной строки; для совпавшей закоммиченной попытки\nповторно отдаёт СОХРАНЁННЫЙ ответ первой попытки (без записи).",
+        "operationId": "probe_join_session_api_v1_queue_join_probe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinSessionProbeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinSessionProbeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/queue/online-entry/{entry_id}/update": {
       "put": {
         "tags": [
@@ -85743,6 +85785,107 @@
         ],
         "title": "JoinSessionCompleteResponse",
         "description": "Ответ с результатом присоединения"
+      },
+      "JoinSessionProbeRequest": {
+        "properties": {
+          "session_token": {
+            "type": "string",
+            "title": "Session Token",
+            "description": "Токен сессии"
+          },
+          "patient_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Patient Name",
+            "description": "ФИО пациента"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 5,
+            "title": "Phone",
+            "description": "Номер телефона"
+          },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id",
+            "description": "Telegram ID"
+          },
+          "specialist_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Ids",
+            "description": "Список ID специалистов (для общего QR)"
+          },
+          "specialist_entity_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Entity Types",
+            "description": "Типы сущностей specialist_ids, выровненные по индексам ('doctor' | 'profile')"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_token",
+          "patient_name",
+          "phone"
+        ],
+        "title": "JoinSessionProbeRequest",
+        "description": "Round-11 (PR #3362 review, P1-2): запрос read-only oracle'а.\n\nПоля идентичны ``JoinSessionCompleteRequest`` — оракул сравнивает\nканонизированный отпечаток ТЕМ ЖЕ алгоритмом, которым complete\nсвязывает попытку с payload'ом. Никаких бизнес-эффектов запрос не\nимеет: ни claim, ни создание пациента, ни выдача талона."
+      },
+      "JoinSessionProbeResponse": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "description": "joined_match | joined_mismatch | joined_owner_unknown | pending_unbound | processing | expired | not_found"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result",
+            "description": "Сохранённый ответ первой попытки (только для joined_match); иначе null"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "title": "JoinSessionProbeResponse",
+        "description": "Round-11 (PR #3362 review, P1-2): классификация попытки БЕЗ мутаций.\n\n``outcome``:\n  joined_match         — typed payload владеет уже совершённой попыткой;\n                         ``result`` несёт СОХРАНЁННЫЙ ответ первой попытки\n                         (read-only re-serve, эквивалент replay-ветки);\n  joined_mismatch      — попытка совершена с другим payload'ом (чужая);\n  joined_owner_unknown — устаревшая строка без отпечатка — владение\n                         недоказуемо, ведёт себя как UNKNOWN;\n  pending_unbound      — сессия жива, но под ней НЕ выполнено ни одного\n                         бизнес-действия — конверт можно безопасно удалить;\n  processing           — claim в полёте — UNKNOWN, повторить позже;\n  expired / not_found  — попытка мертва, ничего не создано."
       },
       "JoinSessionRefusalDetail": {
         "properties": {

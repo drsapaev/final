@@ -7154,10 +7154,13 @@ const uzLatn = {
     // Round-10 (PR #3362 review, P1): fail-closed ambiguity — several
     // outstanding attempts on this device, no live owner marker.
     qj_attempt_ambiguity_title: 'Bu qurilmada navbatga yozilishning tugallanmagan bir necha urinishi bor.',
-    qj_attempt_ambiguity_hint: 'Takrorlanishning oldini olish uchun har bir urinishni o‘sha urinish yuborilganda kiritilgan F.I.Sh. va telefon bilan tekshiring. Urinishlar o‘chirilmaydi; hech biri ma’lumotlaringizga mos kelmasa, yangi yozuv imkoni ochiladi.',
+    qj_attempt_ambiguity_hint: 'Takrorlanishning oldini olish uchun har bir urinishni o‘sha urinish yuborilganda kiritilgan F.I.Sh. va telefon bilan tekshiring. Tekshirish hech narsani bajarmaydi; urinish faqat server yozuv yaratilmaganligini isbotlaganda o‘chiriladi.',
     qj_attempt_ambiguity_item: '{time} dagi urinish',
     qj_attempt_ambiguity_not_mine: 'Tekshirildi: ma’lumotlar mos kelmadi',
     qj_attempt_ambiguity_resolved_hint: 'Tugallanmagan urinishlarning hech biri ma’lumotlaringizga mos kelmadi. Yangi yozuvni boshlash mumkin.',
+    qj_attempt_probe_unbound: 'Tugallanmagan: yozuv yo‘q',
+    qj_attempt_probe_unbound_discard: 'Urinishni o‘chirish',
+    qj_attempt_probe_unknown: 'Bu urinish holati hozircha noma’lum — so‘rov hali qayta ishlanayotgan bo‘lishi mumkin. Keyinroq qayta tekshirib ko‘ring.',
     qj_waiting_title: 'Navbat tez orada ochiladi',
     qj_waiting_will_open_at: 'Navbatga yozilish {time} da ochiladi',
     qj_waiting_until_open: 'yozilish ochilishigacha',

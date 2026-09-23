@@ -312,6 +312,65 @@ class JoinSessionCompleteResponse(BaseModel):
     replayed: bool = False
 
 
+class JoinSessionProbeRequest(BaseModel):
+    """Round-11 (PR #3362 review, P1-2): запрос read-only oracle'а.
+
+    Поля идентичны ``JoinSessionCompleteRequest`` — оракул сравнивает
+    канонизированный отпечаток ТЕМ ЖЕ алгоритмом, которым complete
+    связывает попытку с payload'ом. Никаких бизнес-эффектов запрос не
+    имеет: ни claim, ни создание пациента, ни выдача талона.
+    """
+
+    session_token: str = Field(..., description="Токен сессии")
+    patient_name: str = Field(
+        ..., min_length=2, max_length=200, description="ФИО пациента"
+    )
+    phone: str = Field(..., min_length=5, max_length=20, description="Номер телефона")
+    telegram_id: int | None = Field(None, description="Telegram ID")
+    specialist_ids: list[int] | None = Field(
+        None, description="Список ID специалистов (для общего QR)"
+    )
+    specialist_entity_types: list[str] | None = Field(
+        None,
+        description=(
+            "Типы сущностей specialist_ids, выровненные по индексам "
+            "('doctor' | 'profile')"
+        ),
+    )
+
+
+class JoinSessionProbeResponse(BaseModel):
+    """Round-11 (PR #3362 review, P1-2): классификация попытки БЕЗ мутаций.
+
+    ``outcome``:
+      joined_match         — typed payload владеет уже совершённой попыткой;
+                             ``result`` несёт СОХРАНЁННЫЙ ответ первой попытки
+                             (read-only re-serve, эквивалент replay-ветки);
+      joined_mismatch      — попытка совершена с другим payload'ом (чужая);
+      joined_owner_unknown — устаревшая строка без отпечатка — владение
+                             недоказуемо, ведёт себя как UNKNOWN;
+      pending_unbound      — сессия жива, но под ней НЕ выполнено ни одного
+                             бизнес-действия — конверт можно безопасно удалить;
+      processing           — claim в полёте — UNKNOWN, повторить позже;
+      expired / not_found  — попытка мертва, ничего не создано.
+    """
+
+    outcome: str = Field(
+        ...,
+        description=(
+            "joined_match | joined_mismatch | joined_owner_unknown | "
+            "pending_unbound | processing | expired | not_found"
+        ),
+    )
+    result: dict[str, Any] | None = Field(
+        None,
+        description=(
+            "Сохранённый ответ первой попытки (только для joined_match); "
+            "иначе null"
+        ),
+    )
+
+
 class QueueStatusResponse(BaseModel):
     """Статус очереди"""
 

@@ -7157,10 +7157,13 @@ const en = {
     // their own identity; the fresh start unlocks only when all are
     // proven foreign.
     qj_attempt_ambiguity_title: 'This device has several unfinished queue attempts.',
-    qj_attempt_ambiguity_hint: 'To rule out a duplicate, check each attempt by entering the same name and phone you used for it. Attempts are not deleted; a new registration becomes available once none of them matches your details.',
+    qj_attempt_ambiguity_hint: 'To rule out a duplicate, check each attempt by entering the same name and phone you used for it. Checking executes nothing; an attempt is removed only once the server proves it created no registration.',
     qj_attempt_ambiguity_item: 'Attempt from {time}',
     qj_attempt_ambiguity_not_mine: 'Checked: details did not match',
     qj_attempt_ambiguity_resolved_hint: 'None of the unfinished attempts matched your details. You can start a new registration.',
+    qj_attempt_probe_unbound: 'Never finished: no registration',
+    qj_attempt_probe_unbound_discard: 'Remove attempt',
+    qj_attempt_probe_unknown: 'This attempt’s status is currently unknown — the request may still be processing. Try checking it again later.',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',
     qj_waiting_until_open: 'до открытия записи',

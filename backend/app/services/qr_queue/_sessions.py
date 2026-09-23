@@ -27,6 +27,32 @@ JOIN_SESSION_REASON_EXPIRED = "join_session_expired"
 JOIN_SESSION_REASON_PROCESSING = "join_session_processing"
 JOIN_SESSION_REASON_USED = "join_session_used"
 
+# Round-11 (PR #3362 review, P1-2): the READ-ONLY recovery oracle's outcome
+# vocabulary. ``/join/complete`` is a MUTATING endpoint — for a still-
+# ``pending`` session its first claim EXECUTES the business join, so the
+# ownerless-ambiguity resolution must never use it as an ownership probe.
+# The probe answers the same "what is this attempt's state" question
+# WITHOUT touching a single row:
+#   joined_match          -> the typed payload OWNS this committed attempt
+#                            (the saved result is re-served, read-only)
+#   joined_mismatch       -> the attempt committed with ANOTHER payload
+#                            (foreign; envelope must survive)
+#   joined_owner_unknown  -> legacy committed row without a fingerprint —
+#                            ownership is UNPROVABLE, fail-closed UNKNOWN
+#   pending_unbound       -> the session is alive but NOTHING was ever
+#                            bound/executed under it (a committed business
+#                            operation would have flipped the status
+#                            atomically) — provably safe to discard
+#   processing            -> a claim is in flight — UNKNOWN, keep gating
+#   expired / not_found   -> proven dead — the envelope guards nothing
+JOIN_PROBE_OUTCOME_JOINED_MATCH = "joined_match"
+JOIN_PROBE_OUTCOME_JOINED_MISMATCH = "joined_mismatch"
+JOIN_PROBE_OUTCOME_JOINED_OWNER_UNKNOWN = "joined_owner_unknown"
+JOIN_PROBE_OUTCOME_PENDING_UNBOUND = "pending_unbound"
+JOIN_PROBE_OUTCOME_PROCESSING = "processing"
+JOIN_PROBE_OUTCOME_EXPIRED = "expired"
+JOIN_PROBE_OUTCOME_NOT_FOUND = "not_found"
+
 # Round-6 (P1-1): the joined statuses the REPLAY accepts. Legacy rows
 # joined by pre-round-5 workers replay fail-closed (no fingerprint ⇒ the
 # used refusal); rows written by this version carry the versioned marker
@@ -907,5 +933,121 @@ class SessionsMixin(QRQueueServiceMixinBase):
                 )
 
         return response
+
+    def probe_join_session(
+        self,
+        session_token: str,
+        patient_name: str,
+        phone: str,
+        telegram_id: int | None = None,
+        specialist_ids: list[int] | None = None,
+        specialist_entity_types: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Round-11 (PR #3362 review, P1-2): READ-ONLY recovery oracle.
+
+        The ownerless-ambiguity resolution (round-10) asks the patient to
+        «check» each outstanding attempt with their typed identity. With
+        ``/join/complete`` that check was the MUTATION itself: for a still
+        ``pending`` session (the original request may never have reached
+        the server) the probe-complete claimed the row and EXECUTED the
+        business join with the typed payload — a second бизнес-заход for a
+        patient whose real attempt may already be committed elsewhere.
+
+        This oracle answers the ownership question WITHOUT any mutation:
+        no claim, no patient resolution, no талон allocation, no status or
+        expiry write. It classifies the row against the typed payload and
+        (for a matching committed attempt) re-serves the EXACT saved
+        response snapshot — the same bytes a payload-bound replay would
+        return, minus the write path.
+
+        The classification decision table lives in the module docstring of
+        the ``JOIN_PROBE_OUTCOME_*`` constants above.
+        """
+        row = (
+            self.db.query(QueueJoinSession)
+            .filter(QueueJoinSession.session_token == session_token)
+            .first()
+        )
+        if row is None:
+            return {
+                "outcome": JOIN_PROBE_OUTCOME_NOT_FOUND,
+                "result": None,
+            }
+
+        if row.status in (JOIN_SESSION_JOINED_STATUS, JOIN_SESSION_JOINED_STATUS_V2):
+            # Legacy row joined before the payload binding existed —
+            # ownership cannot be proven, so NOTHING is re-served
+            # (fail-closed, the same decision the replay makes).
+            expected = row.payload_fingerprint
+            if not expected:
+                return {
+                    "outcome": JOIN_PROBE_OUTCOME_JOINED_OWNER_UNKNOWN,
+                    "result": None,
+                }
+            actual = canonical_join_payload_fingerprint(
+                patient_name,
+                phone,
+                telegram_id,
+                specialist_ids,
+                specialist_entity_types,
+            )
+            if expected != actual:
+                return {
+                    "outcome": JOIN_PROBE_OUTCOME_JOINED_MISMATCH,
+                    "result": None,
+                }
+            if not row.response_snapshot:
+                # A committed attempt whose snapshot was lost cannot prove
+                # WHAT was served — fail closed rather than re-serving a
+                # fabricated picture.
+                return {
+                    "outcome": JOIN_PROBE_OUTCOME_JOINED_OWNER_UNKNOWN,
+                    "result": None,
+                }
+            try:
+                snapshot = json.loads(row.response_snapshot)
+            except (TypeError, ValueError):
+                return {
+                    "outcome": JOIN_PROBE_OUTCOME_JOINED_OWNER_UNKNOWN,
+                    "result": None,
+                }
+            if not isinstance(snapshot, dict):
+                return {
+                    "outcome": JOIN_PROBE_OUTCOME_JOINED_OWNER_UNKNOWN,
+                    "result": None,
+                }
+            replayed = dict(snapshot)
+            replayed["replayed"] = True
+            return {
+                "outcome": JOIN_PROBE_OUTCOME_JOINED_MATCH,
+                "result": replayed,
+            }
+
+        if row.status == JOIN_SESSION_PROCESSING_STATUS:
+            return {
+                "outcome": JOIN_PROBE_OUTCOME_PROCESSING,
+                "result": None,
+            }
+
+        if row.expires_at is not None:
+            # SQLite test sessions store naive UTC datetimes; PostgreSQL
+            # stores tz-aware ones — normalize before comparing.
+            expires_cmp = row.expires_at
+            if expires_cmp.tzinfo is None:
+                expires_cmp = expires_cmp.replace(tzinfo=UTC)
+            if expires_cmp <= datetime.now(UTC):
+                return {
+                    "outcome": JOIN_PROBE_OUTCOME_EXPIRED,
+                    "result": None,
+                }
+
+        # ``pending`` and unexpired: nothing was ever bound under this
+        # session (the fingerprint is written atomically WITH the joined
+        # status), so no business operation has committed here — provably
+        # safe to discard the envelope and start fresh.
+        return {
+            "outcome": JOIN_PROBE_OUTCOME_PENDING_UNBOUND,
+            "result": None,
+        }
 
 

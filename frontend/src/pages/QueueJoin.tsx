@@ -17,6 +17,7 @@ import {
   fetchQrTokenInfo,
   startQueueJoinSession,
   completeQueueJoinSession,
+  probeQueueJoinSession,
 } from '../api/queue';
 import { startPublicDirectionSession } from '../api/queueDirections';
 import type { PublicDirectionStartResponse } from '../api/queueDirections';
@@ -342,11 +343,20 @@ const attemptStateScan = (code: string): QueueJoinAttemptState[] => {
   };
   try {
     const storage = window.localStorage;
-    for (let index = 0; index < storage.length; index += 1) {
-      const key = storage.key(index);
-      if (key && (key.startsWith(prefix) || key === legacyKey)) {
-        collect(storage, key);
-      }
+    // Round-11 (review P1-1): enumerate the keys FIRST — collect()
+    // removes invalid entries, and removing DURING an index-based
+    // forward walk shifts the live key positions (delete index 0 and
+    // the index++ skips the next key entirely). The skipped envelope
+    // then shrank a genuinely-ambiguous multi-attempt store to a
+    // «safe» single candidate and re-opened the arbitrary adoption.
+    const keys = Array.from({ length: storage.length }, (_, index) =>
+      storage.key(index),
+    ).filter(
+      (key): key is string =>
+        key !== null && (key.startsWith(prefix) || key === legacyKey),
+    );
+    for (const key of keys) {
+      collect(storage, key);
     }
     // round-5 fallback slot (sessionStorage, single-slot shape)
     collect(window.sessionStorage, legacyKey);
@@ -537,10 +547,13 @@ const QueueJoin = () => {
   const [ambiguousCheckedTokens, setAmbiguousCheckedTokens] = useState<
     string[]
   >([]);
-  // Round-10 (review P1): the ambiguity list while ONE claimed candidate
-  // is being checked — a mismatch restores the list from here without a
-  // re-scan (the claimed envelope must survive the check untouched).
-  const ambiguityCandidatesRef = useRef<QueueJoinAttemptState[] | null>(null);
+  // Round-11 (review P1-2): candidates whose PROBE verdict was
+  // ``pending_unbound`` — the session is alive on the server but NOTHING
+  // was ever bound/executed under it, so the envelope guards nothing and
+  // the patient may explicitly discard THAT attempt (its own key only).
+  const [ambiguityUnboundTokens, setAmbiguityUnboundTokens] = useState<
+    string[]
+  >([]);
   // Round-9 (review P2-2): the recovery text is chosen BY REASON — the
   // expired/not_found class keeps the «сессия истекла» wording, while
   // join_session_not_executed shows the server's own safe domain
@@ -945,9 +958,9 @@ const QueueJoin = () => {
     setPayloadMismatch(false);
     // Round-10 (review P1): the ambiguity panel and its checked marks
     // belong to the PREVIOUS lifecycle too.
-    ambiguityCandidatesRef.current = null;
     setAttemptAmbiguity(null);
     setAmbiguousCheckedTokens([]);
+    setAmbiguityUnboundTokens([]);
     // RQ-18 follow-up round-3 (P1): a NEW direction is the explicit
     // start-over — the previous code's complete attempt must not
     // forbid B's fresh session lifecycle, and its in-flight/late
@@ -1086,6 +1099,7 @@ const QueueJoin = () => {
       setError(null);
       setAttemptAmbiguity(candidates);
       setAmbiguousCheckedTokens([]);
+      setAmbiguityUnboundTokens([]);
       setStep('form');
       return;
     }
@@ -1155,9 +1169,9 @@ const QueueJoin = () => {
       }
       attemptStateOwnerClear(directionCode);
     }
-    ambiguityCandidatesRef.current = null;
     setAttemptAmbiguity(null);
     setAmbiguousCheckedTokens([]);
+    setAmbiguityUnboundTokens([]);
     completeAttemptedRef.current = false;
     setReconcile(null);
     setPreExecRefusal(false);
@@ -1174,34 +1188,177 @@ const QueueJoin = () => {
 
   // Round-10 (review P1): the EXPLICIT resolution of the ownerless
   // ambiguity — the patient picks ONE outstanding attempt and checks it
-  // with their own identity (the same server-verdict check as the
-  // reconcile retry). The claimed candidate becomes this tab's reconcile
-  // identity; the OTHER envelopes stay untouched. The verdict routes the
-  // flow: a mismatch returns to the list with the candidate marked (its
-  // envelope survives), a proven-dead/used verdict removes only THAT
-  // envelope, a success consumes the claimed attempt normally — and the
-  // fresh start unlocks only when every candidate is resolved.
-  const handleAmbiguityCheck = (candidate: QueueJoinAttemptState) => {
+  // with their own identity. The OTHER envelopes stay untouched.
+  // Round-11 (review P1-2): the check is the READ-ONLY recovery oracle
+  // (`/join/probe`), NEVER the mutating `/join/complete`. For a still
+  // `pending` session (the original request may never have reached the
+  // server) complete's first claim EXECUTES the business join with the
+  // typed payload — the «check» of another patient's attempt became a
+  // real second бизнес-заход. The probe answers the ownership question
+  // without touching anything: a matched committed attempt re-serves its
+  // saved result, a mismatch marks the candidate foreign (envelope
+  // survives), a proven-unbound/dead attempt unlocks an explicit
+  // per-attempt discard, and an in-flight/unknown verdict keeps the
+  // fail-closed gate exactly as before.
+  const handleAmbiguityCheck = async (candidate: QueueJoinAttemptState) => {
     if (!directionCode || !attemptAmbiguity || submitAttemptRef.current) {
       return;
     }
-    ambiguityCandidatesRef.current = attemptAmbiguity;
-    setAttemptAmbiguity(null);
-    // Claim the candidate as this tab's identity — a reload continues
-    // the same check instead of re-gating the ambiguity.
-    attemptStateOwnerSet(directionCode, candidate.sessionToken);
-    setReconcile({
-      sessionToken: candidate.sessionToken,
-      profileId: candidate.profileId,
-      directionTitle: candidate.directionTitle,
-    });
-    setReconcileDirectionTitle(candidate.directionTitle);
-    setPreExecRefusal(false);
-    setPreExecRefusalReason(null);
-    setPreExecRefusalMessage(null);
-    setPayloadMismatch(false);
-    setSubmitResultUnknown(false);
-    setShowSessionConsumedAdvisory(false);
+    // The probe compares the TYPED identity — the same validation the
+    // reconcile retry applies before touching the server.
+    const trimmedPatientName = String(formData.patientName ?? '').trim();
+    const trimmedPhone = String(formData.phone ?? '').trim();
+    const cleanPhone = draftPhoneDigits(trimmedPhone);
+    if (trimmedPatientName.length < 2 || trimmedPatientName.length > 200) {
+      setError(
+        trimmedPatientName.length < 2
+          ? QUEUE_JOIN_MESSAGES.nameTooShort
+          : QUEUE_JOIN_MESSAGES.nameTooLong,
+      );
+      return;
+    }
+    if (cleanPhone.length !== 12) {
+      setError(QUEUE_JOIN_MESSAGES.phoneTooShort);
+      return;
+    }
+    const attempt = {
+      epoch: directionEpochRef.current,
+      code: directionCode,
+    };
+    submitAttemptRef.current = attempt;
+    setLoading(true);
+    setError(null);
+    const requestBody: Record<string, unknown> = {
+      session_token: candidate.sessionToken,
+      patient_name: trimmedPatientName,
+      phone: cleanPhone,
+      telegram_id: formData.telegramId ? parseInt(String(formData.telegramId ?? '')) : null,
+    };
+    if (candidate.profileId != null) {
+      requestBody.specialist_ids = [candidate.profileId];
+      requestBody.specialist_entity_types = ['profile'];
+    }
+    const relistAfter = (rest: QueueJoinAttemptState[]) => {
+      // Keep the list state-driven: resolved-dead candidates disappear,
+      // the survivors stay gated. Checked/unbound marks follow the
+      // surviving envelopes only.
+      setAttemptAmbiguity(rest);
+      setAmbiguousCheckedTokens((prev) =>
+        prev.filter((token) => rest.some((item) => item.sessionToken === token)),
+      );
+      setAmbiguityUnboundTokens((prev) =>
+        prev.filter((token) => rest.some((item) => item.sessionToken === token)),
+      );
+    };
+    try {
+      const probe = await probeQueueJoinSession(requestBody);
+      if (
+        directionMode &&
+        (attempt.epoch !== directionEpochRef.current ||
+          attempt.code !== directionCode)
+      ) {
+        return;
+      }
+      if (probe.outcome === 'joined_match' && probe.result) {
+        // The attempt IS this patient's — serve the saved first-attempt
+        // result. Read-only: the талон was committed by the ORIGINAL
+        // complete; nothing is executed here.
+        setResult(probe.result as unknown as QueueJoinResultLocal);
+        if (directionCode) {
+          attemptStateRemoveFor(directionCode, candidate.sessionToken);
+          attemptStateOwnerClear(directionCode);
+        }
+            setAttemptAmbiguity(null);
+        setAmbiguousCheckedTokens([]);
+        setAmbiguityUnboundTokens([]);
+        setReconcile(null);
+        if (formStorageKey) {
+          draftRemove(formStorageKey);
+          setPendingDraft(null);
+        }
+        setSubmitResultUnknown(false);
+        setShowSessionConsumedAdvisory(false);
+        setPayloadMismatch(false);
+        setStep('success');
+        return;
+      }
+      if (probe.outcome === 'joined_mismatch') {
+        // Proven foreign — mark it, keep the envelope (it likely belongs
+        // to ANOTHER patient of this shared device).
+        setAmbiguousCheckedTokens((prev) =>
+          prev.includes(candidate.sessionToken)
+            ? prev
+            : [...prev, candidate.sessionToken],
+        );
+        setAmbiguityUnboundTokens((prev) =>
+          prev.filter((token) => token !== candidate.sessionToken),
+        );
+        setError(null);
+        return;
+      }
+      if (probe.outcome === 'pending_unbound') {
+        // The session exists but NOTHING was ever executed under it —
+        // the envelope guards nothing. Offer the explicit per-attempt
+        // discard; the fresh start still unlocks only when EVERY
+        // outstanding candidate is resolved.
+        setAmbiguityUnboundTokens((prev) =>
+          prev.includes(candidate.sessionToken)
+            ? prev
+            : [...prev, candidate.sessionToken],
+        );
+        setError(null);
+        return;
+      }
+      if (probe.outcome === 'expired' || probe.outcome === 'not_found') {
+        // Proven dead — nothing was created under this attempt. Drop ONLY
+        // that envelope and re-list the survivors.
+        attemptStateRemoveFor(directionCode, candidate.sessionToken);
+        relistAfter(attemptStateScan(directionCode));
+        setError(null);
+        return;
+      }
+      // 'processing' | 'joined_owner_unknown' | anything unrecognized —
+      // UNKNOWN: nothing is resolved, the fail-closed gate stays.
+      setError(t('misc.qj_attempt_probe_unknown'));
+    } catch (err: unknown) {
+      if (
+        directionMode &&
+        (attempt.epoch !== directionEpochRef.current ||
+          attempt.code !== directionCode)
+      ) {
+        return;
+      }
+      // Network-class failures prove nothing — the candidate stays
+      // unresolved and the envelopes stay intact.
+      setError(getApiErrorMessage(err, QUEUE_JOIN_MESSAGES.joinFailed));
+    } finally {
+      if (
+        submitAttemptRef.current &&
+        submitAttemptRef.current.epoch === attempt.epoch &&
+        submitAttemptRef.current.code === attempt.code
+      ) {
+        submitAttemptRef.current = null;
+      }
+      setLoading(false);
+    }
+  };
+
+  // Round-11 (review P1-2): the explicit per-attempt discard for a
+  // PROVEN ``pending_unbound`` candidate — nothing was ever executed
+  // under that session, so removing ITS OWN envelope duplicates nothing.
+  const handleAmbiguityDiscard = (candidate: QueueJoinAttemptState) => {
+    if (!directionCode || !attemptAmbiguity || submitAttemptRef.current) {
+      return;
+    }
+    attemptStateRemoveFor(directionCode, candidate.sessionToken);
+    const rest = attemptStateScan(directionCode);
+    setAttemptAmbiguity(rest);
+    setAmbiguousCheckedTokens((prev) =>
+      prev.filter((token) => rest.some((item) => item.sessionToken === token)),
+    );
+    setAmbiguityUnboundTokens((prev) =>
+      prev.filter((token) => rest.some((item) => item.sessionToken === token)),
+    );
     setError(null);
   };
 
@@ -1753,8 +1910,7 @@ const QueueJoin = () => {
       }
       // Round-10 (review P1): a claimed ambiguity candidate resolved
       // successfully — the ambiguity lifecycle is over for this mount.
-      ambiguityCandidatesRef.current = null;
-      setAttemptAmbiguity(null);
+        setAttemptAmbiguity(null);
       setAmbiguousCheckedTokens([]);
       setReconcile(null);
       if (formStorageKey) {
@@ -1787,36 +1943,10 @@ const QueueJoin = () => {
           attemptStateRemoveFor(directionCode, reconcile.sessionToken);
           attemptStateOwnerClear(directionCode);
         }
-        // Round-10 (review P1): a proven-dead candidate checked from the
-        // ambiguity list — its envelope guards nothing anymore (the
-        // backend proved nothing was created), so ONLY that envelope is
-        // dropped. The remaining outstanding ones still gate the fresh
-        // start — the start-over panel is replaced by the ambiguity list
-        // until every candidate is resolved.
-        if (directionCode && ambiguityCandidatesRef.current !== null) {
-          ambiguityCandidatesRef.current = null;
-          setPreExecRefusal(false);
-          setPreExecRefusalReason(null);
-          setPreExecRefusalMessage(null);
-          const rest = attemptStateScan(directionCode);
-          setAmbiguousCheckedTokens([]);
-          if (rest.length > 1) {
-            setReconcile(null);
-            setAttemptAmbiguity(rest);
-          } else if (rest.length === 1) {
-            // The last remaining outstanding attempt re-adopts exactly
-            // like the boot's single-candidate case.
-            attemptStateOwnerSet(directionCode, rest[0].sessionToken);
-            setReconcile({
-              sessionToken: rest[0].sessionToken,
-              profileId: rest[0].profileId,
-              directionTitle: rest[0].directionTitle,
-            });
-            setReconcileDirectionTitle(rest[0].directionTitle);
-          } else {
-            setReconcile(null);
-          }
-        }
+        // Round-11 (review P1-2): the ambiguity resolution no longer
+        // routes through the reconcile submit — «Проверить» in the
+        // ambiguity panel is the READ-ONLY probe, so a proven-dead
+        // verdict here can only be this tab's OWN adopted attempt.
       } else if (refusalReason === 'join_session_payload_mismatch') {
         // Round-5 (P1-3): decisive conflict — the attempt is bound to a
         // DIFFERENT immutable payload (the review's wrong-patient hole:
@@ -1832,36 +1962,9 @@ const QueueJoin = () => {
         // needs the envelope alive. Deleting it also unlocked an
         // UNCHECKED fresh start while the patient's own outstanding
         // attempt was never looked at.
-        if (
-          directionCode &&
-          ambiguityCandidatesRef.current !== null &&
-          ambiguityCandidatesRef.current.some(
-            (candidate) => candidate.sessionToken === reconcile.sessionToken,
-          )
-        ) {
-          // A claimed ambiguity candidate is proven not ours — back to
-          // the list, marked; NO envelope is destroyed; the fresh start
-          // stays locked until every outstanding attempt is resolved.
-          const list = ambiguityCandidatesRef.current;
-          ambiguityCandidatesRef.current = null;
-          attemptStateOwnerClear(directionCode);
-          setReconcile(null);
-          setPayloadMismatch(false);
-          setSubmitResultUnknown(false);
-          setShowSessionConsumedAdvisory(false);
-          setAttemptAmbiguity(list);
-          setAmbiguousCheckedTokens((prev) =>
-            prev.includes(reconcile.sessionToken)
-              ? prev
-              : [...prev, reconcile.sessionToken],
-          );
-        } else {
-          setPayloadMismatch(true);
-          // Round-10 (review P1): the envelope and the owner marker
-          // survive in the single-candidate flow too — a reload re-adopts
-          // THIS attempt and the patient can retry with the exact
-          // original identity (the old code deleted the envelope here).
-        }
+        // Round-11 (review P1-2): the ambiguity panel probes read-only —
+        // this conflict can only be this tab's OWN adopted attempt.
+        setPayloadMismatch(true);
       } else if (refusalReason === 'join_session_used') {
         setShowSessionConsumedAdvisory(true);
         if (directionCode) {
@@ -1870,31 +1973,10 @@ const QueueJoin = () => {
         }
         // Round-10 (review P1): the used verdict means the attempt's
         // outcome is KNOWN (committed) — its envelope guards nothing
-        // further, so ONLY that envelope is dropped; the remaining
-        // outstanding ones keep gating the fresh start.
-        if (directionCode && ambiguityCandidatesRef.current !== null) {
-          ambiguityCandidatesRef.current = null;
-          const rest = attemptStateScan(directionCode);
-          setAmbiguousCheckedTokens([]);
-          if (rest.length > 1) {
-            setReconcile(null);
-            setShowSessionConsumedAdvisory(false);
-            setAttemptAmbiguity(rest);
-          } else if (rest.length === 1) {
-            setShowSessionConsumedAdvisory(false);
-            attemptStateOwnerSet(directionCode, rest[0].sessionToken);
-            setReconcile({
-              sessionToken: rest[0].sessionToken,
-              profileId: rest[0].profileId,
-              directionTitle: rest[0].directionTitle,
-            });
-            setReconcileDirectionTitle(rest[0].directionTitle);
-          } else {
-            setReconcile(null);
-          }
-        } else {
-          setReconcile(null);
-        }
+        // further, so ONLY that envelope is dropped.
+        // Round-11 (review P1-2): the ambiguity resolution no longer
+        // routes through the reconcile submit (the read-only probe does
+        // its own classification), so no re-listing is needed here.
       } else {
         // Round-5 (P1-4) fail-closed: network-class, an in-flight
         // processing claim, a 5xx after the business commit, or ANY
@@ -2894,7 +2976,10 @@ const QueueJoin = () => {
                    auto-adopted or destroyed; the patient resolves the
                    ambiguity by checking each attempt with their own
                    identity; the fresh start unlocks only when every
-                   outstanding envelope is proven foreign. */
+                   outstanding envelope is resolved.
+                   Round-11 (review P1-2): the check is the READ-ONLY
+                   probe — it NEVER executes the join. A proven-unbound
+                   candidate offers an explicit per-attempt discard. */
                 <div className="qj-reconcile" data-testid="qj-attempt-ambiguity" role="alert">
                   <p className="qj-reconcile-text" data-testid="qj-attempt-ambiguity-text">
                     {t('misc.qj_attempt_ambiguity_title')}
@@ -2903,6 +2988,7 @@ const QueueJoin = () => {
                   <ul className="qj-ambiguity-list">
                     {attemptAmbiguity.map((candidate) => {
                       const checked = ambiguousCheckedTokens.includes(candidate.sessionToken);
+                      const unbound = ambiguityUnboundTokens.includes(candidate.sessionToken);
                       return (
                         <li key={candidate.sessionToken} className="qj-ambiguity-item">
                           <span className="qj-ambiguity-item-label">
@@ -2918,13 +3004,37 @@ const QueueJoin = () => {
                             >
                               {t('misc.qj_attempt_ambiguity_not_mine')}
                             </span>
+                          ) : unbound ? (
+                            /* Round-11 (review P1-2): the probe PROVED the
+                               session was never executed — the envelope
+                               guards nothing, so the patient may discard
+                               THIS attempt explicitly (its own key only). */
+                            <span className="qj-ambiguity-item-unbound">
+                              <span
+                                className="qj-ambiguity-item-checked"
+                                data-testid={`qj-ambiguity-unbound-${candidate.sessionToken}`}
+                              >
+                                {t('misc.qj_attempt_probe_unbound')}
+                              </span>
+                              <button
+                                type="button"
+                                className="qj-draft-btn qj-draft-btn-primary"
+                                data-testid={`qj-ambiguity-discard-${candidate.sessionToken}`}
+                                disabled={loading}
+                                onClick={() => handleAmbiguityDiscard(candidate)}
+                              >
+                                {t('misc.qj_attempt_probe_unbound_discard')}
+                              </button>
+                            </span>
                           ) : (
                             <button
                               type="button"
                               className="qj-draft-btn qj-draft-btn-primary"
                               data-testid={`qj-ambiguity-check-${candidate.sessionToken}`}
                               disabled={loading}
-                              onClick={() => handleAmbiguityCheck(candidate)}
+                              onClick={() => {
+                                void handleAmbiguityCheck(candidate);
+                              }}
                             >
                               {t('misc.qj_reconcile_check')}
                             </button>
@@ -2933,10 +3043,10 @@ const QueueJoin = () => {
                       );
                     })}
                   </ul>
-                  {attemptAmbiguity.length > 0 &&
+                  {(attemptAmbiguity.length === 0 ||
                     attemptAmbiguity.every((candidate) =>
                       ambiguousCheckedTokens.includes(candidate.sessionToken),
-                    ) && (
+                    )) && (
                       <div className="qj-reconcile-actions">
                         <p className="qj-reconcile-hint">
                           {t('misc.qj_attempt_ambiguity_resolved_hint')}

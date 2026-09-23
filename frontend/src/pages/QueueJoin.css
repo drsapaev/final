@@ -860,6 +860,14 @@
   white-space: nowrap;
 }
 
+/* Round-11 (review P1-2): the proven ``pending_unbound`` candidate —
+   the read-only probe verdict plus its explicit per-attempt discard. */
+.qj-ambiguity-item-unbound {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2, 8px);
+}
+
 .qj-reconcile-actions {
   display: flex;
   gap: var(--mac-spacing-3, 12px);

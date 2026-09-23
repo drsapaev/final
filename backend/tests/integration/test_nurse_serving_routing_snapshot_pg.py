@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import date
 
 import pytest
 from sqlalchemy import create_engine
@@ -35,6 +34,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.db.base_class import Base
+from app.crud.clinic import clinic_today
 from app.models.nurse_workplace import NurseWorkplaceAssignment
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
@@ -141,8 +141,9 @@ def _started_attempt(engine, *, with_assignment_deactivation: bool):
             is_active=True,
         )
         db.add(assignment)
+        # Round-11: clinic-calendar day (see the concurrency fixture).
         queue = DailyQueue(
-            day=date.today(),
+            day=clinic_today(db),
             specialist_id=None,
             queue_resource_id=resource_a.id,
             queue_tag=resource_a.queue_tag,

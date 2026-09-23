@@ -39,6 +39,7 @@ const queueApiMocks = vi.hoisted(() => ({
     fetchQrTokenInfo: vi.fn(),
     startQueueJoinSession: vi.fn(),
     completeQueueJoinSession: vi.fn(),
+    probeQueueJoinSession: vi.fn(),
 }));
 
 vi.mock('../../api/queue', () => queueApiMocks);
@@ -1796,17 +1797,6 @@ describe('RQ-18 — /q/:publicCode public route', () => {
     }
     const envelopeKey = (token: string) =>
         `queue_join_attempt_qdir_${CANONICAL_CODE}__${token}`;
-    const MISMATCH_REFUSAL = {
-        response: {
-            status: 409,
-            data: {
-                detail: {
-                    reason: 'join_session_payload_mismatch',
-                    message: 'Попытка принадлежит другому набору данных',
-                },
-            },
-        },
-    };
 
     it('PIN 46 (round-10 P1): ownerless MULTIPLE outstanding attempts fail CLOSED — nothing auto-adopted, nothing destroyed, no fresh start', async () => {
         // The review repro: tab A (patient A) and tab B (patient B) both
@@ -1837,60 +1827,56 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         expect(screen.queryByRole('button', { name: /присоединиться/i })).toBeNull();
     });
 
-    it('PIN 46b (round-10 P1): the ambiguity resolves by CHECKING each attempt — a foreign mismatch keeps its envelope, the fresh start unlocks only when all are proven foreign', async () => {
+    it('PIN 46b (round-11 P1-2): the ambiguity resolves by PROBING each attempt — the check is READ-ONLY, a foreign mismatch keeps its envelope, the fresh start unlocks only when all are proven foreign', async () => {
         seedUnknownEnvelope('attempt-A', Date.now() - 5000);
         seedUnknownEnvelope('attempt-B', Date.now());
         directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
-        queueApiMocks.completeQueueJoinSession.mockRejectedValue(MISMATCH_REFUSAL);
+        // Round-11 (review P1-2): the probe classifies — these candidates
+        // are joined with ANOTHER payload (foreign), nothing more.
+        queueApiMocks.probeQueueJoinSession.mockResolvedValue({
+            outcome: 'joined_mismatch',
+            result: null,
+        });
         renderDirectionRoute();
         await screen.findByTestId('qj-attempt-ambiguity');
-
-        // The patient checks the NEWEST attempt first — the exact envelope
-        // the old boot auto-picked and then destroyed on this verdict.
-        fireEvent.click(screen.getByTestId('qj-ambiguity-check-attempt-B'));
-        await screen.findByTestId('qj-reconcile-banner');
+        // The typed identity is the probe's payload — fill the form first.
         fireEvent.change(await screen.findByLabelText(/фио пациента/i), {
             target: { value: 'Пациент А' },
         });
         fireEvent.change(screen.getByLabelText(/номер телефона/i), {
             target: { value: '+998 (90) 123-45-67' },
         });
-        fireEvent.click(screen.getByTestId('qj-reconcile-check'));
+
+        // The patient checks the NEWEST attempt first — the exact envelope
+        // the round-9 boot auto-picked and then destroyed on this verdict.
+        fireEvent.click(screen.getByTestId('qj-ambiguity-check-attempt-B'));
         await waitFor(() => {
-            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
+            expect(queueApiMocks.probeQueueJoinSession).toHaveBeenCalledTimes(1);
         });
-        const firstCheck = queueApiMocks.completeQueueJoinSession.mock.calls[0][0] as {
+        const firstProbe = queueApiMocks.probeQueueJoinSession.mock.calls[0][0] as {
             session_token?: string;
         };
-        expect(firstCheck.session_token).toBe('attempt-B');
+        expect(firstProbe.session_token).toBe('attempt-B');
+        // THE PIN: the check must NOT execute the mutating complete —
+        // for a pending candidate that call was the business join itself.
+        expect(queueApiMocks.completeQueueJoinSession).not.toHaveBeenCalled();
 
-        // The mismatch sends the patient back to the list — and B's
-        // envelope SURVIVES (it belongs to patient B; the round-9 code
-        // deleted it right here).
-        await screen.findByTestId('qj-attempt-ambiguity');
+        // The mismatch marks the candidate in the list — its envelope
+        // SURVIVES (it belongs to patient B).
+        await screen.findByTestId('qj-ambiguity-checked-attempt-B');
         expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeTruthy();
-        expect(screen.getByTestId('qj-ambiguity-checked-attempt-B')).toBeTruthy();
         // still locked: one candidate is unresolved
         expect(screen.queryByTestId('qj-ambiguity-start-over')).toBeNull();
 
         // The last candidate mismatches too → every outstanding attempt is
         // proven foreign → the explicit fresh start unlocks.
         fireEvent.click(screen.getByTestId('qj-ambiguity-check-attempt-A'));
-        await screen.findByTestId('qj-reconcile-banner');
-        fireEvent.change(await screen.findByLabelText(/фио пациента/i), {
-            target: { value: 'Пациент А' },
-        });
-        fireEvent.change(screen.getByLabelText(/номер телефона/i), {
-            target: { value: '+998 (90) 123-45-67' },
-        });
-        fireEvent.click(screen.getByTestId('qj-reconcile-check'));
-        await waitFor(() => {
-            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(2);
-        });
+        await screen.findByTestId('qj-ambiguity-checked-attempt-A');
         await screen.findByTestId('qj-ambiguity-start-over');
         // both envelopes are still intact
         expect(window.localStorage.getItem(envelopeKey('attempt-A'))).toBeTruthy();
         expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeTruthy();
+        expect(queueApiMocks.completeQueueJoinSession).not.toHaveBeenCalled();
 
         // The deliberate fresh start mints a NEW session and destroys NOTHING.
         directionApiMocks.startPublicDirectionSession.mockResolvedValue({
@@ -1902,6 +1888,148 @@ describe('RQ-18 — /q/:publicCode public route', () => {
             expect(directionApiMocks.startPublicDirectionSession).toHaveBeenCalledTimes(1);
         });
         await screen.findByText(/заполните форму/i);
+        expect(window.localStorage.getItem(envelopeKey('attempt-A'))).toBeTruthy();
+        expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeTruthy();
+    });
+
+    it('PIN 46d (round-11 P1-2): a PROVEN pending_unbound candidate never executes the join — it is discardable, and a joined_match probe serves the saved result read-only', async () => {
+        // The review's core repro: patient A checks candidate B. The old
+        // code called the mutating /join/complete — for a session whose
+        // original request never reached the server (pending, unbound)
+        // that call CLAIMED it and executed a business join with A's
+        // payload. The read-only probe must classify instead.
+        seedUnknownEnvelope('attempt-A', Date.now() - 5000);
+        seedUnknownEnvelope('attempt-B', Date.now());
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        renderDirectionRoute();
+        await screen.findByTestId('qj-attempt-ambiguity');
+
+        // Fill the form once — the typed identity is the probe's payload.
+        fireEvent.change(await screen.findByLabelText(/фио пациента/i), {
+            target: { value: 'Пациент А' },
+        });
+        fireEvent.change(screen.getByLabelText(/номер телефона/i), {
+            target: { value: '+998 (90) 123-45-67' },
+        });
+
+        // Candidate B: the session is alive on the server but NOTHING was
+        // ever bound/executed under it (the original request never landed).
+        queueApiMocks.probeQueueJoinSession.mockResolvedValueOnce({
+            outcome: 'pending_unbound',
+            result: null,
+        });
+        fireEvent.click(screen.getByTestId('qj-ambiguity-check-attempt-B'));
+        await waitFor(() => {
+            expect(queueApiMocks.probeQueueJoinSession).toHaveBeenCalledTimes(1);
+        });
+        const probeCall = queueApiMocks.probeQueueJoinSession.mock.calls[0][0] as {
+            session_token?: string;
+            patient_name?: string;
+        };
+        expect(probeCall.session_token).toBe('attempt-B');
+        expect(probeCall.patient_name).toBe('Пациент А');
+        // no business join — the «check» never claimed the pending session
+        expect(queueApiMocks.completeQueueJoinSession).not.toHaveBeenCalled();
+        expect(directionApiMocks.startPublicDirectionSession).not.toHaveBeenCalled();
+
+        // The proven-unbound candidate offers the explicit per-attempt
+        // discard — still gated until it is resolved.
+        await screen.findByTestId('qj-ambiguity-unbound-attempt-B');
+        expect(screen.queryByTestId('qj-ambiguity-start-over')).toBeNull();
+        expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeTruthy();
+
+        // Discard B: ONLY B's own envelope goes.
+        fireEvent.click(screen.getByTestId('qj-ambiguity-discard-attempt-B'));
+        await waitFor(() => {
+            expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeNull();
+        });
+        expect(window.localStorage.getItem(envelopeKey('attempt-A'))).toBeTruthy();
+        expect(screen.queryByTestId('qj-ambiguity-start-over')).toBeNull();
+
+        // Candidate A: the patient's OWN committed attempt — the probe
+        // re-serves the SAVED first-attempt result. Read-only: still no
+        // complete, no session start.
+        queueApiMocks.probeQueueJoinSession.mockResolvedValueOnce({
+            outcome: 'joined_match',
+            result: { ...COMPLETE_MULTI_RESPONSE, replayed: true },
+        });
+        fireEvent.click(screen.getByTestId('qj-ambiguity-check-attempt-A'));
+        // The saved single-entry result is served — the success view.
+        await screen.findByText(/Вы в очереди!/i);
+        expect(queueApiMocks.probeQueueJoinSession).toHaveBeenCalledTimes(2);
+        expect(queueApiMocks.completeQueueJoinSession).not.toHaveBeenCalled();
+        expect(directionApiMocks.startPublicDirectionSession).not.toHaveBeenCalled();
+        // A's envelope was consumed by the served result; B's is gone.
+        expect(window.localStorage.getItem(envelopeKey('attempt-A'))).toBeNull();
+        expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeNull();
+    });
+
+    it('PIN 46e (round-11 P1-2): an in-flight (processing) probe verdict stays UNKNOWN — nothing resolved, nothing destroyed, the gate holds', async () => {
+        seedUnknownEnvelope('attempt-A', Date.now() - 5000);
+        seedUnknownEnvelope('attempt-B', Date.now());
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        queueApiMocks.probeQueueJoinSession.mockResolvedValue({
+            outcome: 'processing',
+            result: null,
+        });
+        renderDirectionRoute();
+        await screen.findByTestId('qj-attempt-ambiguity');
+        fireEvent.change(await screen.findByLabelText(/фио пациента/i), {
+            target: { value: 'Пациент А' },
+        });
+        fireEvent.change(screen.getByLabelText(/номер телефона/i), {
+            target: { value: '+998 (90) 123-45-67' },
+        });
+        fireEvent.click(screen.getByTestId('qj-ambiguity-check-attempt-B'));
+        await waitFor(() => {
+            expect(queueApiMocks.probeQueueJoinSession).toHaveBeenCalledTimes(1);
+        });
+        // UNKNOWN: no marks, no discards, no start-over, envelopes intact.
+        expect(screen.queryByTestId('qj-ambiguity-checked-attempt-B')).toBeNull();
+        expect(screen.queryByTestId('qj-ambiguity-unbound-attempt-B')).toBeNull();
+        expect(screen.queryByTestId('qj-ambiguity-start-over')).toBeNull();
+        expect(window.localStorage.getItem(envelopeKey('attempt-A'))).toBeTruthy();
+        expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeTruthy();
+        expect(queueApiMocks.completeQueueJoinSession).not.toHaveBeenCalled();
+    });
+
+    it('PIN 47 (round-11 P1-1): the scan snapshots keys BEFORE self-heal — an expired envelope next to TWO UNKNOWN ones cannot shrink the store to a «safe» single candidate', async () => {
+        // The review repro: the old scanner enumerated the LIVE storage by
+        // index while collect() removed the expired entry — the removal
+        // shifted the keys and the index++ skipped attempt-A entirely.
+        // Two genuine candidates became one «safe» single-ownerless case
+        // and the boot auto-adopted B (another patient's attempt).
+        // Insertion order matters: expired FIRST, then A, then B.
+        window.localStorage.setItem(
+            envelopeKey('expired-old'),
+            JSON.stringify({
+                ts: Date.now() - 1000,
+                publicCode: CANONICAL_CODE,
+                sessionToken: 'expired-old',
+                profileId: 7,
+                directionTitle: 'Лаборатория',
+                completeAttempted: true,
+                outcomeUnknown: true,
+                attemptExpiresAt: '2000-01-01T00:00:00Z',
+            }),
+        );
+        seedUnknownEnvelope('attempt-A', Date.now() - 5000);
+        seedUnknownEnvelope('attempt-B', Date.now());
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        renderDirectionRoute();
+        // the expired envelope self-heals away…
+        await waitFor(() => {
+            expect(window.localStorage.getItem(envelopeKey('expired-old'))).toBeNull();
+        });
+        // …and BOTH outstanding attempts are still detected — the
+        // fail-closed ambiguity panel, never the arbitrary adoption.
+        await screen.findByTestId('qj-attempt-ambiguity');
+        expect(screen.getByTestId('qj-ambiguity-check-attempt-A')).toBeTruthy();
+        expect(screen.getByTestId('qj-ambiguity-check-attempt-B')).toBeTruthy();
+        expect(screen.queryByTestId('qj-reconcile-banner')).toBeNull();
+        expect(directionApiMocks.startPublicDirectionSession).not.toHaveBeenCalled();
+        expect(queueApiMocks.completeQueueJoinSession).not.toHaveBeenCalled();
+        expect(queueApiMocks.probeQueueJoinSession).not.toHaveBeenCalled();
         expect(window.localStorage.getItem(envelopeKey('attempt-A'))).toBeTruthy();
         expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeTruthy();
     });

@@ -3022,6 +3022,35 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/join/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Probe Join Session
+         * @description Round-11 (PR #3362 review, P1-2): read-only oracle состояния попытки
+         *     присоединения (публичный эндпоинт).
+         *
+         *     Ownerless-ambiguity recovery НЕ ДОЛЖЕН вызывать ``/join/complete`` как
+         *     «проверку»: для ещё не claims-нутой (``pending``) сессии complete — это
+         *     само исполнение бизнес-операции с введённым payload'ом (второй заход
+         *     для пациента, чья настоящая попытка уже может быть закоммичена).
+         *     Этот оракул возвращает класс состояния attempt'а относительно введённых
+         *     данных, не мутируя ни одной строки; для совпавшей закоммиченной попытки
+         *     повторно отдаёт СОХРАНЁННЫЙ ответ первой попытки (без записи).
+         */
+        post: operations["probe_join_session_api_v1_queue_join_probe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/online-entry/{entry_id}/update": {
         parameters: {
             query?: never;
@@ -29572,6 +29601,77 @@ export type components = {
             replayed: boolean;
         };
         /**
+         * JoinSessionProbeRequest
+         * @description Round-11 (PR #3362 review, P1-2): запрос read-only oracle'а.
+         *
+         *     Поля идентичны ``JoinSessionCompleteRequest`` — оракул сравнивает
+         *     канонизированный отпечаток ТЕМ ЖЕ алгоритмом, которым complete
+         *     связывает попытку с payload'ом. Никаких бизнес-эффектов запрос не
+         *     имеет: ни claim, ни создание пациента, ни выдача талона.
+         */
+        JoinSessionProbeRequest: {
+            /**
+             * Session Token
+             * @description Токен сессии
+             */
+            session_token: string;
+            /**
+             * Patient Name
+             * @description ФИО пациента
+             */
+            patient_name: string;
+            /**
+             * Phone
+             * @description Номер телефона
+             */
+            phone: string;
+            /**
+             * Telegram Id
+             * @description Telegram ID
+             */
+            telegram_id?: number | null;
+            /**
+             * Specialist Ids
+             * @description Список ID специалистов (для общего QR)
+             */
+            specialist_ids?: number[] | null;
+            /**
+             * Specialist Entity Types
+             * @description Типы сущностей specialist_ids, выровненные по индексам ('doctor' | 'profile')
+             */
+            specialist_entity_types?: string[] | null;
+        };
+        /**
+         * JoinSessionProbeResponse
+         * @description Round-11 (PR #3362 review, P1-2): классификация попытки БЕЗ мутаций.
+         *
+         *     ``outcome``:
+         *       joined_match         — typed payload владеет уже совершённой попыткой;
+         *                              ``result`` несёт СОХРАНЁННЫЙ ответ первой попытки
+         *                              (read-only re-serve, эквивалент replay-ветки);
+         *       joined_mismatch      — попытка совершена с другим payload'ом (чужая);
+         *       joined_owner_unknown — устаревшая строка без отпечатка — владение
+         *                              недоказуемо, ведёт себя как UNKNOWN;
+         *       pending_unbound      — сессия жива, но под ней НЕ выполнено ни одного
+         *                              бизнес-действия — конверт можно безопасно удалить;
+         *       processing           — claim в полёте — UNKNOWN, повторить позже;
+         *       expired / not_found  — попытка мертва, ничего не создано.
+         */
+        JoinSessionProbeResponse: {
+            /**
+             * Outcome
+             * @description joined_match | joined_mismatch | joined_owner_unknown | pending_unbound | processing | expired | not_found
+             */
+            outcome: string;
+            /**
+             * Result
+             * @description Сохранённый ответ первой попытки (только для joined_match); иначе null
+             */
+            result?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
          * JoinSessionRefusalDetail
          * @description Один per-specialist отказ аллокатора (round-6, P2-1).
          */
@@ -46497,6 +46597,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JoinSessionRefusalErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    probe_join_session_api_v1_queue_join_probe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinSessionProbeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinSessionProbeResponse"];
                 };
             };
             /** @description Validation Error */
