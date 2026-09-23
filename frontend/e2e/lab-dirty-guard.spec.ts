@@ -209,6 +209,86 @@ async function waitForReactToSettle(page: Page) {
   }));
 }
 
+// Follow-up PR, review round 2 (P2): событийный зонд завершения КЛИЕНТСКОЙ
+// обработки recent-reports ответов. Доставка ответа до браузера
+// (Network.responseReceived — то, что фиксирует page.on('response')) — это
+// только статус+заголовки: тело может ещё не получено, а обработчик
+// приложения (гвард request-epoch + setRecentReports) исполняется ПОЗЖЕ
+// любых кадровых ожиданий. Зонд ставится ДО старта приложения
+// (addInitScript) и оборачивает window.fetch: для ответов с
+// marker-заголовком оборачивается json() — «consumed» фиксирует, что
+// приложение РАЗОБРАЛО тело ответа; «settled» планируется макрозадачей
+// (setTimeout 0) ПОСЛЕ полного дрейна микрозадач — то есть ПОСЛЕ
+// исполнения синхронного продолжения loadRecentReports через всю цепочку
+// await-ов (request() → listInstances → гвард + setRecentReports).
+// Это событийный барьер завершения обработки, а не ожидание кадров.
+async function installRecentReportsProcessingProbe(page: Page) {
+  await page.addInitScript(() => {
+    const log: Array<{ marker: string; phase: string }> = [];
+    (window as unknown as { __rrProcessing: typeof log }).__rrProcessing = log;
+    const origFetch = window.fetch.bind(window);
+    window.fetch = async (...args: Parameters<typeof fetch>) => {
+      const response = await origFetch(...args);
+      try {
+        const marker = response.headers.get('x-test-recent-reports');
+        if (marker === 'fresh' || marker === 'stale') {
+          const origJson = response.json.bind(response);
+          response.json = async () => {
+            const body = await origJson();
+            log.push({ marker, phase: 'consumed' });
+            // Макрозадача: срабатывает только после дрейна ВСЕХ ожидающих
+            // микрозадач — включая продолжение обработчика приложения.
+            setTimeout(() => { log.push({ marker, phase: 'settled' }); }, 0);
+            return body;
+          };
+        }
+      } catch {
+        // Зонд не имеет права ломать приложение.
+      }
+      return response;
+    };
+  });
+}
+
+async function recentReportsPhaseCount(
+  page: Page,
+  marker: 'fresh' | 'stale',
+  phase: 'consumed' | 'settled',
+) {
+  return page.evaluate(({ marker, phase }) => {
+    const log = (window as unknown as {
+      __rrProcessing?: Array<{ marker: string; phase: string }>;
+    }).__rrProcessing || [];
+    return log.filter((entry) => entry.marker === marker && entry.phase === phase).length;
+  }, { marker, phase });
+}
+
+// Follow-up PR, review round 2 (P2): отрицательный ассерт («stale НЕ
+// применён») принципиально не имеет события — рабочий epoch-guard
+// отбрасывает ответ МОЛЧА, без какого-либо наблюдаемого эффекта.
+// Наблюдатель мутаций под вкладкой reports даёт «окно тишины»: bounded-
+// гарантия, что после последней мутации список не менялся quietMs.
+// Размер окна покрывает класс «обработчик завершается заметно позже
+// барьера» (вердикт→применение) и валидирован негативной мутацией с
+// контролируемой задержкой 300 мс перед setRecentReports (см. PR body).
+async function armReportsPanelQuietProbe(page: Page) {
+  await page.evaluate(() => {
+    const state = { last: performance.now() };
+    (window as unknown as { __rrQuiet: typeof state }).__rrQuiet = state;
+    const panel = document.getElementById('lab-panel-tabpanel-reports');
+    if (!panel) return;
+    new MutationObserver(() => { state.last = performance.now(); })
+      .observe(panel, { childList: true, subtree: true, characterData: true });
+  });
+}
+
+async function awaitReportsPanelQuiet(page: Page, quietMs: number) {
+  await page.waitForFunction((quietMs: number) => {
+    const state = (window as unknown as { __rrQuiet?: { last: number } }).__rrQuiet;
+    return state !== undefined && performance.now() - state.last >= quietMs;
+  }, quietMs, { timeout: quietMs + 10000 });
+}
+
 async function installApiMocks(page: Page) {
   // Generic fallback: any other API call succeeds empty instead of erroring.
   await page.route('**/api/v1/**', (route) => {
@@ -2689,18 +2769,21 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     recentReportsHoldGate = new Promise<void>((resolve) => {
       releaseRecentReportsHold = resolve;
     });
-    // Delivery-квитанции (review P2): marker-заголовок различает STALE и FRESH
-    // ответы одного и того же URL; page.on('response') фиксирует момент, когда
-    // ответ реально дошёл до браузера (Network.responseReceived).
-    // waitForReactToSettle (2×RAF) сам по себе НЕ является барьером доставки
-    // HTTP-ответа: без этого гейта ассерты «stale отсутствует» могли бы
-    // пройти до фактической доставки stale-ответа и не увидеть перезапись.
-    const freshDeliveries: string[] = [];
-    const staleDeliveries: string[] = [];
+    // Зонд клиентской обработки (review round 2, P2): page.on('response')
+    // (Network.responseReceived) — только статус+заголовки; тело и обработка
+    // завершаются позже. Зонд даёт событийные фазы consumed/settled
+    // (см. installRecentReportsProcessingProbe) — явный барьер завершения
+    // клиентской обработки, а не ожидание кадров.
+    await installRecentReportsProcessingProbe(page);
+    // Конкретные объекты ответов (review round 2, P2): сохраняются Response-
+    // объекты, а не только счётчики доставки — response.finished() закрывает
+    // сетевую фазу (тело получено браузером ЦЕЛИКОМ) до любых ассертов.
+    const freshResponses: Response[] = [];
+    const staleResponses: Response[] = [];
     page.on('response', (response: Response) => {
       const marker = response.headers()['x-test-recent-reports'];
-      if (marker === 'fresh') freshDeliveries.push(marker);
-      else if (marker === 'stale') staleDeliveries.push(marker);
+      if (marker === 'fresh') freshResponses.push(response);
+      else if (marker === 'stale') staleResponses.push(response);
     });
     await page.route('**/api/v1/lab/report-instances?limit=50', async (route) => {
       recentReportsListRequestCount += 1;
@@ -2729,21 +2812,16 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect(page.getByText('Отчёт #90').first()).toBeVisible();
     await expect.poll(() => recentReportsListRequestCount).toBeGreaterThanOrEqual(2);
 
-    // FRESH delivery-гейт (review P2): CREATE-refresh ответ обязан дойти до
-    // браузера и примениться ДО отпускания STALE — только тогда порядок
-    // «fresh применён, stale приходит позже» детерминирован. Без гейта в
+    // FRESH-барьер (review round 2, P2): сетевая фаза закрыта — тело свежего
+    // ответа получено браузером ЦЕЛИКОМ (response.finished()), приложение
+    // разобрало его (consumed) и вердикт обработки исполнен (settled: гвард
+    // request-epoch прошёл, setRecentReports вызван). Без этого гейта в
     // runtime без epoch-guard STALE мог бы примениться раньше FRESH —
     // финальное состояние осталось бы свежим, и сломанный код прошёл бы тест.
-    await expect.poll(() => freshDeliveries.length).toBeGreaterThanOrEqual(1);
-    await waitForReactToSettle(page);
-
-    // STALE delivery-гейт (review P2): отпускаем удержанные ответы и ждём,
-    // что КАЖДЫЙ из них реально доставлен браузеру (Network.responseReceived)
-    // и обработан React (2×RAF поверх доставки) ДО финальных ассертов.
-    const expectedStaleDeliveries = heldRecentReportsRequests;
-    releaseRecentReportsHold?.();
-    await expect.poll(() => staleDeliveries.length).toBe(expectedStaleDeliveries);
-    await waitForReactToSettle(page);
+    await expect.poll(() => freshResponses.length).toBeGreaterThanOrEqual(1);
+    await Promise.all([...freshResponses].map((response) => response.finished()));
+    await expect.poll(() => recentReportsPhaseCount(page, 'fresh', 'consumed')).toBeGreaterThanOrEqual(1);
+    await expect.poll(() => recentReportsPhaseCount(page, 'fresh', 'settled')).toBeGreaterThanOrEqual(1);
 
     // Гейт полного успокоения CREATE-механики: отложенная (round 8) WF-15
     // запись ?instance=90 приземляется ТОЛЬКО после снятия pending-реестров и
@@ -2763,8 +2841,43 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
     await expect(panelTabs.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByText('Отчёт #90')).toHaveCount(0);
+
+    // FRESH применён ДО отпускания STALE (review round 2, P2): вкладка
+    // reports рендерит список недавних — «Свежий бланк» ВИДЕН в DOM ещё ДО
+    // релиза STALE. Клик по вкладке НЕ пере-запрашивает список
+    // (loadRecentReports вызывается только mount-эффектом и
+    // onRefreshRecentReports после CREATE) — эта видимость доказывает, что
+    // применён именно CREATE-refresh список, и делает порядок «fresh
+    // применён → stale приходит позже» наблюдаемым, а не предполагаемым.
     await panelTabs.getByRole('tab').nth(2).click();
     const recentPanel = page.locator('#lab-panel-tabpanel-reports');
+    await expect(recentPanel.getByText('Свежий бланк').first()).toBeVisible();
+
+    // Зонд тишины DOM (review round 2, P2): дискард STALE — принципиально НЕ
+    // событие (рабочий гвард отбрасывает ответ молча). Наблюдатель мутаций
+    // под вкладкой reports даст окно тишины ПОСЛЕ барьеров ниже —
+    // ограниченная гарантия для отрицательного ассерта.
+    await armReportsPanelQuietProbe(page);
+
+    // STALE-барьер (review round 2, P2): отпускаем удержанные ответы; КАЖДЫЙ
+    // доставлен до конца (response.finished() — тело ЦЕЛИКОМ), КАЖДЫЙ
+    // разобран приложением (consumed) и обработан (settled — вердикт гварда
+    // исполнен) ДО финальных ассертов.
+    const expectedStaleDeliveries = heldRecentReportsRequests;
+    releaseRecentReportsHold?.();
+    await expect.poll(() => staleResponses.length).toBe(expectedStaleDeliveries);
+    await Promise.all([...staleResponses].map((response) => response.finished()));
+    await expect.poll(() => recentReportsPhaseCount(page, 'stale', 'consumed')).toBe(expectedStaleDeliveries);
+    await expect.poll(() => recentReportsPhaseCount(page, 'stale', 'settled')).toBe(expectedStaleDeliveries);
+    // Флаш коммита React (НЕ барьер обработки — барьер выше): 2×RAF даёт
+    // планировщику React завершить commit, запланированный макрозадачей.
+    await waitForReactToSettle(page);
+    // Окно тишины: 500 мс без мутаций списка недавних — покрывает класс
+    // «обработчик завершается позже барьера» (вердикт→применение);
+    // валидировано негативной мутацией (гвард off + 300 мс перед применением).
+    await awaitReportsPanelQuiet(page, 500);
+
+    // Только СВЕЖИЙ бланк: stale отброшен epoch-guard-ом.
     await expect(recentPanel.getByText('Свежий бланк').first()).toBeVisible();
     await expect(recentPanel.getByText('Устаревший бланк')).toHaveCount(0);
   });
