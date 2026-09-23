@@ -29,6 +29,16 @@ inside the booking transaction, so an admin deactivate/delete that races
 the appointment INSERT either commits first (the locked re-read refuses
 with the SAME 400 reasons) or commits after the booking — the persisted
 routing context can never point at a row that is no longer active.
+
+Round-13 (owner P1, PR #3386 review round-2): the locked re-read is only
+as strong as the ORM refresh. SQLAlchemy's identity map returns the
+ALREADY-LOADED instance for a PK without refreshing its attributes, so
+``with_for_update()`` alone can observe a stale ``active`` even though
+PostgreSQL delivered the new row version. Every locked read here also
+passes ``populate_existing()`` — the same correctness-sensitive locking
+pattern the repo already uses in payment/Nurse/queue guards — and the
+real two-session PostgreSQL pin lives in
+``tests/integration/test_booking_department_lock_pg.py``.
 """
 
 from __future__ import annotations
@@ -66,13 +76,20 @@ def resolve_booking_department(
     re-reads the latest committed row version BEFORE the ``active`` check
     below, making the check atomic with the appointment INSERT. Previews
     keep the default (a non-mutating read must not take row locks).
+
+    Round-13 (owner P1, PR #3386 review round-2): the locked read also
+    carries ``populate_existing()`` — the earlier routing reads (and the
+    canonical ``doctor_row.department`` load) put the same PK into the
+    Session's identity map, and without the refresh flag SQLAlchemy is
+    not obliged to overwrite attributes it already holds, so the
+    ``active`` check could answer a PRE-deactivation value.
     """
     if department is None or not department.strip():
         return None
     normalized_key = department.strip()
     department_query = db.query(Department).filter(Department.key == normalized_key)
     if for_update:
-        department_query = department_query.with_for_update()
+        department_query = department_query.populate_existing().with_for_update()
     department_row = department_query.first()
     if department_row is None:
         raise HTTPException(
@@ -159,6 +176,12 @@ def lock_department_for_booking(
       transaction — a concurrent admin UPDATE/DELETE on the department
       blocks until the booking commits, and the lock acquisition itself
       re-reads the latest committed row version (READ COMMITTED);
+    * ``populate_existing()`` (round-13 owner P1) forces the ORM to
+      overwrite the attributes it already cached for this PK — the
+      Session usually loaded the same department during the earlier
+      routing reads, and without the refresh the ``active`` check below
+      could answer a stale PRE-deactivation value even though the
+      SELECT ... FOR UPDATE delivered the new row version;
     * a row that is no longer active answers the SAME 400
       ``department_inactive`` the routing contract already publishes;
     * a row deleted outright answers 400 ``department_unknown`` (the FK
@@ -173,6 +196,7 @@ def lock_department_for_booking(
     locked_row = (
         db.query(Department)
         .filter(Department.id == department_row.id)
+        .populate_existing()
         .with_for_update()
         .first()
     )

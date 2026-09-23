@@ -1614,10 +1614,15 @@ class TestPortalBookingRound12:
         portal_department,
         monkeypatch,
     ):
-        # P1: an admin deactivation commits AFTER the plain routing read but
-        # BEFORE the INSERT — the FOR UPDATE re-validation refuses with the
-        # SAME department_inactive contract instead of persisting a stale
-        # routing context.
+        # P1: the create path calls the lock_department_for_booking
+        # re-validation and answers the SAME department_inactive contract
+        # instead of persisting a stale routing context. NOTE: this
+        # sqlite harness runs the "admin" mutation on the SAME session —
+        # commit() expires the identity map, so this pin proves the
+        # WIRING, not the two-session race. The real cross-transaction
+        # identity-map proof (stale active=True surviving FOR UPDATE
+        # without populate_existing) lives in
+        # tests/integration/test_booking_department_lock_pg.py.
         import app.api.v1.endpoints.patient_portal as portal_module
 
         test_doctor.department_id = portal_department.id
