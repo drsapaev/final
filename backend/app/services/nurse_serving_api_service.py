@@ -312,7 +312,7 @@ class NurseServingApiService:
     def _eligible_claim_owners(
         self, claim_owner_ids: set[int], resource: QueueResource
     ) -> set[int]:
-        """N2-5 owner review round 3 (P1): which claim owners are ELIGIBLE.
+        """N2-5 owner review round 3 (P1) + round 4 (P2): eligible owners.
 
         An ACTIVE assignment row alone no longer proves a working owner:
         the user lifecycle (``update_user``) deactivates or demotes an
@@ -322,11 +322,22 @@ class NurseServingApiService:
         — keeping her entry read-only would strand the patient: the owner
         can no longer continue, and the colleagues may not take over.
 
+        Round 4 (P2) — the predicate must mirror the gate EXACTLY:
+        ``require_roles()`` admits an ACTIVE superuser regardless of the
+        stored role (the staff bypass pinned by
+        ``test_no_assignment_is_403_even_for_superuser`` — the superuser
+        passes the role gate and is then stopped only by the missing
+        assignment row). ``UserUpdateRequest`` can produce exactly that
+        reachable world: a Nurse with an active assignment is updated to
+        ``role=Admin, is_superuser=true`` — she KEEPS serving access, so
+        the board must keep counting her as a working owner; a role-only
+        predicate would offer her colleagues a takeover on her live claim.
         The eligible-owner predicate is therefore read-side
-        defense-in-depth: an ACTIVE assignment AND an active account AND
-        the canonical Nurse role (normalized) — exactly the world the
-        endpoint gate would admit for the owner herself. Still ONE
-        batched query (the join) for the whole board — the constant
+        defense-in-depth mirroring the endpoint authorization: an ACTIVE
+        assignment AND an active account AND (the canonical Nurse role
+        (normalized) OR the superuser bypass) — exactly the world the
+        gate would admit for the owner herself. Still ONE batched query
+        (the join, one column wider) for the whole board — the constant
         query-budget pin keeps holding.
         """
         if not claim_owner_ids:
@@ -335,6 +346,7 @@ class NurseServingApiService:
             self.db.query(
                 NurseWorkplaceAssignment.user_id,
                 User.is_active,
+                User.is_superuser,
                 User.role,
             )
             .join(User, User.id == NurseWorkplaceAssignment.user_id)
@@ -347,8 +359,12 @@ class NurseServingApiService:
         )
         return {
             user_id
-            for user_id, is_active, role in owner_rows
-            if is_active and normalize_role_value(role) == _NURSE_ROLE_NORMALIZED
+            for user_id, is_active, is_superuser, role in owner_rows
+            if is_active
+            and (
+                bool(is_superuser)
+                or normalize_role_value(role) == _NURSE_ROLE_NORMALIZED
+            )
         }
 
     def _station_services_batch(

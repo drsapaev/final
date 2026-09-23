@@ -1179,6 +1179,59 @@ describe('NURSE-V2 N2-5 tablet — workplaces epoch (owner review round 3 P2)', 
 });
 
 // ---------------------------------------------------------------------------
+// owner review round 4 — P2: a superseded resetWorkplace re-read must not
+// erase the workflow a newer generation restored
+// ---------------------------------------------------------------------------
+describe('NURSE-V2 N2-5 tablet — stale resetWorkplace (owner review round 4 P2)', () => {
+  it('a LATE superseded resetWorkplace re-read never erases the restored workflow', async () => {
+    const user = userEvent.setup();
+    setup({ board: CALLED_BOARD });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+
+    // The mutation 403 runs resetWorkplace: the PHI clears synchronously,
+    // then the dead world's listWorkplaces re-read (R1) HANGS.
+    let resolveStale: (value: { items: NurseWorkplace[]; total: number }) => void =
+      () => {};
+    workplacesMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveStale = resolve;
+        }),
+    );
+    startMock.mockRejectedValue({
+      response: { status: 403, data: { detail: 'назначение отозвано' } },
+    });
+    await user.click(screen.getByRole('button', { name: 'Начать приём' }));
+    await waitFor(() => {
+      expect(screen.queryByText('Анна Тестова')).not.toBeInTheDocument();
+    });
+    expect(
+      await screen.findByText(/Нет доступа к этому рабочему месту/),
+    ).toBeInTheDocument();
+
+    // A NEWER generation re-reads the world while R1 hangs: the lone
+    // station re-selects and its fresh board renders.
+    workplacesMock.mockResolvedValue({ items: [WORKPLACE_A], total: 1 });
+    await user.click(await screen.findByRole('button', { name: 'Обновить' }));
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+
+    // R1 finally lands LATE — the epoch already rejected it (superseded).
+    // The stale resetWorkplace round must NOT null the restored selection:
+    // the pre-fix code mapped the superseded result to [] and ran
+    // applySelection(null), wiping the fresh workflow.
+    resolveStale({ items: [WORKPLACE_A], total: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(screen.getByText('Анна Тестова')).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Нет назначенного рабочего места/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Нет доступа к этому рабочему месту/),
+    ).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // owner-review round 2 — P2: a stale silent-poll FAILURE is discarded
 // ---------------------------------------------------------------------------
 describe('NURSE-V2 N2-5 tablet — stale silent failures (owner review round 2 P2)', () => {

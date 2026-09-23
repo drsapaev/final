@@ -1407,6 +1407,78 @@ class TestHandoverPredicate:
         assert foreign["claim_owner_assignment_active"] is True
         assert foreign["actionable_by_current_user"] is False
 
+    def test_superuser_owner_with_active_assignment_stays_read_only(
+        self, db_session: Session
+    ):
+        # Review round 4 (P2): the staff superuser bypass. require_roles()
+        # admits an ACTIVE superuser regardless of the stored role — the
+        # serving endpoint would let this owner keep working her entry
+        # (the same bypass test_no_assignment_is_403_even_for_superuser
+        # documents: the superuser passes the role gate, the assignment
+        # ROW is the only thing that stops her). UserUpdateRequest can
+        # produce the world: role=Admin + is_superuser=true over an
+        # untouched ACTIVE Nurse assignment. The board predicate must
+        # mirror that authorization — the entry stays read-only, NOT a
+        # takeover offer on a live claim.
+        owner = _user(db_session, "n25_hand_owner_superuser", "Admin")
+        owner.is_superuser = True
+        db_session.commit()
+        colleague = _nurse(db_session, "n25_hand_colleague_superuser")
+        resource = _resource(db_session, "handover11")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Иван Привилегированный"),
+            status="in_progress",
+            called_by=owner.id,
+        )
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = state["active"][0]
+        assert foreign["claim_owner_assignment_active"] is True
+        assert foreign["actionable_by_current_user"] is False
+
+    def test_deactivated_superuser_owner_leaves_entry_actionable(
+        self, db_session: Session
+    ):
+        # Review round 4 (P2), the negative edge of the same predicate:
+        # the superuser bypass lives INSIDE require_roles — composing it
+        # with the active check is what require_active_roles does, and a
+        # deactivated account is locked out regardless of the flag. The
+        # predicate keeps the is_active conjunct BEFORE the bypass: an
+        # inactive superuser owner is still stranding the patient — the
+        # colleague sees the takeover.
+        owner = _user(db_session, "n25_hand_owner_superuser_off", "Admin")
+        owner.is_superuser = True
+        owner.is_active = False
+        db_session.commit()
+        colleague = _nurse(db_session, "n25_hand_colleague_superuser_off")
+        resource = _resource(db_session, "handover12")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Ольга Отключённая"),
+            status="called",
+            called_by=owner.id,
+        )
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = state["active"][0]
+        assert foreign["claim_owner_assignment_active"] is False
+        assert foreign["actionable_by_current_user"] is True
+
 
 # ----------------------------------------------------------------------------
 # I. codex round-1 regressions (station chain / visit-day transfer / replay)

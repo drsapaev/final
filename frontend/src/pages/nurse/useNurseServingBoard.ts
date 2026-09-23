@@ -92,10 +92,19 @@ export type NurseBoardError = {
  * `{ok: false, status}` failed WITHOUT proving anything about the
  * assignments (network/5xx keep the current workflow; 401/403 is an
  * access loss and runs the synchronous revocation clear).
+ *
+ * Owner review round 4 (P2): `{ok: false, superseded: true}` is its OWN
+ * outcome — the reader's epoch rejected the answer as stale (a newer
+ * request, or the synchronous revocation clear, already owns the world).
+ * It proves NOTHING — neither a list nor an access loss — so a caller
+ * must not turn it into "no stations" (the pre-fix resetWorkplace mapped
+ * it to `[]` and nulled the selection of a freshly restored workflow).
+ * A superseded result is not an error either: no notice, no clear — the
+ * newer generation's state stands untouched.
  */
 export type NurseWorkplacesResult =
   | { ok: true; items: NurseWorkplace[] }
-  | { ok: false; status: number | null };
+  | { ok: false; status: number | null; superseded: boolean };
 
 export type NurseServingBoardState = {
   workplaces: NurseWorkplace[];
@@ -259,7 +268,7 @@ export function useNurseServingBoard() {
           // clear): applying this list would resurrect a revoked world's
           // stations. The newer generation owns the state — this answer
           // proves nothing current.
-          return { ok: false, status: null };
+          return { ok: false, status: null, superseded: true };
         }
         const items = data.items ?? [];
         patch({
@@ -273,7 +282,7 @@ export function useNurseServingBoard() {
           // A stale FAILURE is discarded exactly like a stale success —
           // a late 401/403 from before a re-granted assignment must
           // never wipe the freshly restored workflow.
-          return { ok: false, status: null };
+          return { ok: false, status: null, superseded: true };
         }
         const status = api.nurseServingErrorStatus(err);
         if (status === 401 || status === 403) {
@@ -281,7 +290,7 @@ export function useNurseServingBoard() {
           // list itself describes access, so it goes too.
           clearAllPhi('nurse.notice_workplace_access_lost');
           patch({ workplaces: [], workplacesLoading: false, workplacesError: null });
-          return { ok: false, status };
+          return { ok: false, status, superseded: false };
         }
         // Owner review round (P2): a network/5xx failure proves NOTHING
         // about the assignments — the previous list STAYS, the error is
@@ -293,7 +302,7 @@ export function useNurseServingBoard() {
             message: api.nurseServingErrorText(err, 'nurse.workplaces_unavailable'),
           },
         });
-        return { ok: false, status };
+        return { ok: false, status, superseded: false };
       }
     },
     [api, clearAllPhi, patch],
@@ -517,6 +526,16 @@ export function useNurseServingBoard() {
       // exactly this ordering).
       clearAllPhi(notice);
       const result = await loadWorkplaces();
+      if (!result.ok && result.superseded) {
+        // Owner review round 4 (P2): a superseded re-read must stop HERE.
+        // The epoch inside the reader already handed the world to a newer
+        // generation — a fresh refresh/focus may have re-selected a
+        // station and reloaded its board while THIS round hung. Mapping
+        // the stale answer to "[]" would null that fresh selection (the
+        // exact interleaving the round-4 pin reproduces): the stale round
+        // proves nothing — no selection write, no board read, no notice.
+        return [];
+      }
       const items = result.ok ? result.items : [];
       applySelection(items.length === 1 ? items[0].queue_resource_id : null);
       if (items.length === 1) {
