@@ -629,6 +629,31 @@ class SessionsMixin(QRQueueServiceMixinBase):
             self.db.rollback()
             raise ValueError("QR токен не найден")
 
+        # Round-8 (PR #3362 review, P2-3): the PATIENT phone lock moves
+        # BEFORE the batch tag-scope pre-lock — restoring the SINGLE
+        # canonical order phone → sorted tag scopes across BOTH paths.
+        # The single path already acquires the phone advisory lock here
+        # (via _find_or_create_patient) and only later takes the tag-claim
+        # scope inside the allocator; the round-6 multi pre-lock introduced
+        # the opposite order (sorted tags → phone), a live AB-BA cycle
+        # between a single and a multi join of the same phone/day (the
+        # transaction-scoped pg_advisory_xact_lock('qr_patient:{phone}')
+        # vs the daily_queue tag scopes). With the phone lock first, two
+        # multi joins serialize on the phone only when the phone matches
+        # and then proceed in the sorted-tag canon; a single vs a multi no
+        # longer close a cycle. Patient creation is unconditional before
+        # the allocation loop either way, so hoisting it across the
+        # best-effort pre-lock (which never aborts the attempt) changes no
+        # outcome contract — only the acquisition order of the same locks.
+        # ⭐ FIX: Создаём или находим пациента (patient_id ВСЕГДА заполняется)
+        patient = self._find_or_create_patient(patient_name, phone)
+        patient_id = patient.id if patient else None
+
+        if not patient_id:
+            logger.warning(
+                "[complete_join_session_multiple] ⚠️ Не удалось создать/найти пациента"
+            )
+
         # Round-6 (PR #3362 review, P1-2): canonical multi-tag lock order.
         # Every allocation of the batch now holds its transaction-scoped
         # tag-claim scope until the ONE final commit, so two concurrent
@@ -642,6 +667,8 @@ class SessionsMixin(QRQueueServiceMixinBase):
         # registrar cart's prelock_cart_tag_claim_scopes performs), then
         # allocates in the same sorted order. Unresolvable selections are
         # skipped here — the allocation loop reports their real error.
+        # Round-8 (P2-3): this whole block now runs AFTER the phone lock
+        # above — phone → sorted tags is the shared canon of both paths.
         try:
             resolved_targets = (
                 self.queue_domain_service.allocator_service
@@ -684,14 +711,8 @@ class SessionsMixin(QRQueueServiceMixinBase):
             tag = batch_lock_targets.get(index)
             return (tag or "\uffff", index)
 
-        # ⭐ FIX: Создаём или находим пациента (patient_id ВСЕГДА заполняется)
-        patient = self._find_or_create_patient(patient_name, phone)
-        patient_id = patient.id if patient else None
-
-        if not patient_id:
-            logger.warning(
-                "[complete_join_session_multiple] ⚠️ Не удалось создать/найти пациента"
-            )
+        # Round-8 (P2-3): the patient block moved ABOVE the tag-scope
+        # pre-lock (phone → sorted tags, the single-path order).
 
         entries: list[dict[str, Any]] = []
         errors: list[dict[str, Any]] = []

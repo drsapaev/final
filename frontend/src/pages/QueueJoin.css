@@ -777,7 +777,14 @@
 }
 
 .qj-draft-btn-primary {
-  background: var(--mac-accent-blue, #3478f6);
+  /* Round-8 (Regression Audit Gate): the fallback chain carries NO raw
+     hex (cssHexOutsideTokens ratchet: a fallback #hex here moved it
+     743 -> 744 and turned the gate red) and NO bare var()
+     (varUsagesNoFallback ratchet) — accent-blue falls back to the
+     accent-strong TOKEN, then to the CSS system keyword currentcolor.
+     Both tokens ship from design-system/tokens.css; the last link never
+     fires in a normal build. */
+  background: var(--mac-accent-blue, var(--mac-accent-blue-strong, currentcolor));
   color: var(--mac-text-on-accent, white);
 }
 

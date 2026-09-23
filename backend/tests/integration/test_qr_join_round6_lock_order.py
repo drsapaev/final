@@ -562,3 +562,210 @@ def test_r6_f_inverted_batches_prelock_full_scope_before_first_claim(
             )
             assert len(entries) == 2, (tag, len(entries))
             assert len({e.patient_name for e in entries}) == 2
+
+
+# ---------------------------------------------------------------------------
+# R8 — single vs multi phone↔tag AB-BA (round-8 P2-3)
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+def test_r8_a_multi_phone_lock_precedes_batch_tag_prelock(monkeypatch):
+    """PIN R8-A: in the multi path the patient phone advisory lock (inside
+    ``_find_or_create_patient``) is acquired BEFORE the batch tag-scope
+    prelock — the SAME phone → sorted-tags order the single path already
+    follows. The round-6 prelock put the tag scopes on the wrong side of
+    the phone lock: a single join (phone → tag) against a concurrent multi
+    join of the same phone/day (tags → phone) closed a live AB-BA cycle."""
+    session = _pending_session()
+    qr_token = SimpleNamespace(token="qr-token", department="common")
+    db = _ClaimDbStub(session, qr_token)
+
+    domain_service = MagicMock()
+    domain_service.allocate_ticket.side_effect = [
+        {
+            "entry": SimpleNamespace(id=101, number=1),
+            "duplicate": False,
+            "queue_length_before": 1,
+            "estimated_wait_minutes": 5,
+            "specialist_name": "Dr. 11",
+        },
+        {
+            "entry": SimpleNamespace(id=102, number=2),
+            "duplicate": False,
+            "queue_length_before": 2,
+            "estimated_wait_minutes": 10,
+            "specialist_name": "Dr. 22",
+        },
+    ]
+    allocator = domain_service.allocator_service
+    allocator.resolve_join_batch_tag_targets.side_effect = (
+        lambda db, **kw: {0: "derma_tag", 1: "cardio_tag"}
+    )
+
+    order: list[str] = []
+
+    def prelock(db, *, lock_targets, **kwargs):
+        order.append("prelock:sorted_tags")
+
+    allocator.prelock_join_batch_tag_scopes.side_effect = prelock
+
+    service = QRQueueService(db, queue_domain_service=domain_service)
+
+    def observed_patient(*args, **kwargs):
+        order.append("phone")
+        return SimpleNamespace(id=42)
+
+    monkeypatch.setattr(service, "_find_or_create_patient", observed_patient)
+    monkeypatch.setattr(
+        service,
+        "_update_queue_statistics",
+        lambda *a, **k: None,
+        raising=False,
+    )
+
+    service.complete_join_session_multiple(
+        session_token="session-token",
+        specialist_ids=[11, 22],
+        patient_name="Order Patient",
+        phone="+998900000604",
+        telegram_id=None,
+        specialist_entity_types=["profile", "profile"],
+    )
+
+    assert order[0] == "phone", (
+        f"the phone lock must precede the batch tag-scope prelock, got {order}"
+    )
+    assert order[1] == "prelock:sorted_tags"
+
+
+@pytest.mark.integration
+@pytest.mark.queue
+def test_r8_b_real_pg_phone_advisory_lock_precedes_every_prelock_scope(
+    r6_pg_engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PIN R8-B (real PostgreSQL): inside one live multi join the
+    ``qr_patient:<phone>`` advisory-lock statement executes BEFORE the first
+    batch tag-scope prelock acquisition — the single-path order, observed
+    on the actual connection (the unit pin R8-A proves the call order, this
+    pin proves it survives the real execution path)."""
+    session_factory = sessionmaker(
+        bind=r6_pg_engine, autocommit=False, autoflush=False
+    )
+    suffix = uuid.uuid4().hex[:8]
+    tag = f"cardio_{suffix}"
+
+    with session_factory() as seed:
+        seed.add_all(
+            [
+                ClinicSettings(key="timezone", value="UTC", category="queue"),
+                ClinicSettings(key="queue_start_hour", value=0, category="queue"),
+            ]
+        )
+        profile = QueueProfile(
+            key=f"p0_{tag}",
+            title=f"Profile {tag}",
+            title_ru=f"Профиль {tag}",
+            queue_tags=[tag],
+            is_active=True,
+            show_on_qr_page=True,
+            display_order=0,
+        )
+        resource = QueueResource(
+            code=f"res_{tag}",
+            queue_tag=tag,
+            display_name=f"Ресурс {tag}",
+            active=True,
+            start_number_online=1,
+            max_online_per_day=30,
+        )
+        seed.add_all([profile, resource])
+        seed.flush()
+        seed.add(
+            DailyQueue(
+                day=date.today(),
+                queue_resource_id=resource.id,
+                specialist_id=None,
+                queue_tag=tag,
+                active=True,
+            )
+        )
+        token = QueueToken(
+            token=f"r8-lock-{suffix}",
+            day=date.today(),
+            specialist_id=None,
+            department="common",
+            expires_at=_local_now() + timedelta(hours=4),
+            active=True,
+            is_clinic_wide=True,
+        )
+        seed.add(token)
+        seed.commit()
+        token_value = token.token
+
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", dt_time(0, 0))
+
+    seq_lock = threading.Lock()
+    seq = {"n": 0}
+    events: list[dict] = []
+
+    import app.crud.queue_resource_routing as routing_module
+    import app.services.queue_claim_service as claim_module
+    import app.services.queue_svc._operations as operations_module
+    import app.services.qr_queue._patients as patients_module
+
+    real_routing_lock = routing_module.lock_queue_tag_claim_scope
+    real_claim_lock = claim_module.lock_queue_tag_claim_scope
+
+    def _record(kind: str, tag_value) -> None:
+        with seq_lock:
+            seq["n"] += 1
+            events.append({"n": seq["n"], "kind": kind, "tag": str(tag_value)})
+
+    def observed_routing_lock(db, queue_tag, day):  # type: ignore[no-untyped-def]
+        _record("prelock-or-claim", queue_tag)
+        return real_routing_lock(db, queue_tag, day)
+
+    def observed_claim_lock(db, queue_tag, day):  # type: ignore[no-untyped-def]
+        _record("prelock-or-claim", queue_tag)
+        return real_claim_lock(db, queue_tag, day)
+
+    monkeypatch.setattr(routing_module, "lock_queue_tag_claim_scope", observed_routing_lock)
+    monkeypatch.setattr(claim_module, "lock_queue_tag_claim_scope", observed_claim_lock)
+    monkeypatch.setattr(
+        operations_module, "lock_queue_tag_claim_scope", observed_routing_lock
+    )
+
+    # The phone lock goes through _patients.text(...): observe the
+    # constructed advisory-lock statements.
+    real_text = patients_module.text
+
+    def observed_text(statement, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if "pg_advisory_xact_lock" in statement:
+            _record("phone", "qr_patient")
+        return real_text(statement, *args, **kwargs)
+
+    monkeypatch.setattr(patients_module, "text", observed_text)
+
+    with session_factory() as s:
+        start = QRQueueService(s).start_join_session(token=token_value)
+        session_token = start["session_token"]
+        pid = s.query(QueueProfile).filter(QueueProfile.key == f"p0_{tag}").one().id
+
+    with session_factory() as s:
+        service = QRQueueService(s)
+        result = service.complete_join_session_multiple(
+            session_token=session_token,
+            specialist_ids=[pid],
+            patient_name="R8 Single Phone",
+            phone="+9989300000099",
+            specialist_entity_types=["profile"],
+        )
+        assert [e["specialist_id"] for e in result["entries"]] == [pid]
+
+    phones = [e for e in events if e["kind"] == "phone"]
+    scopes = [e for e in events if e["kind"] == "prelock-or-claim"]
+    assert phones, "the phone advisory lock never executed on PostgreSQL"
+    assert scopes, "no tag-scope lock was observed"
+    assert max(e["n"] for e in phones) < min(e["n"] for e in scopes), (
+        f"the phone lock must precede EVERY tag-scope acquisition: {events}"
+    )

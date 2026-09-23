@@ -700,9 +700,18 @@ const QueueJoin = () => {
   // Forbidden (and pinned in tests): a second start-session from
   // StrictMode/rerender; the legacy startQueueJoinSession(session_token)
   // mis-call; any clinic-wide QR-token fallback.
-  const runDirectionStart = useCallback(async () => {
-    if (!directionCode) {
-      return;
+  // Round-8 (P1-2): the per-direction context claim (ref swap + epoch bump
+  // + full state reset on a code change) is EXTRACTED from
+  // runDirectionStart so the boot effect's UNKNOWN-recovery branch goes
+  // through the SAME swap before its early return. Previously that branch
+  // returned WITHOUT claiming: directionStartRef/epoch still belonged to
+  // the PREVIOUS direction, so a late in-flight complete of the old code
+  // passed BOTH stale guards (same epoch, same code ref) and rendered the
+  // OLD talon under the NEW URL — while the old hung submit lock kept
+  // blocking the new direction's reconcile check.
+  const claimDirectionContext = useCallback((code: string | null): boolean => {
+    if (!code) {
+      return false;
     }
     // RQ-18 follow-up (P2-2): a code CHANGE inside one route instance must
     // drop the PREVIOUS direction's whole client context — session, result
@@ -711,40 +720,58 @@ const QueueJoin = () => {
     // swaps in the new code's own draft — wiping here would race the load
     // effect and destroy a just-restored draft on remounts (pinned).
     // A same-code re-entry (StrictMode skip, error-screen retry) keeps the
-    // patient's context intact.
-    const isNewCode = directionStartRef.current !== directionCode;
-    directionStartRef.current = directionCode;
-    // RQ-18 follow-up round-2 (P1): this start is bound to its request
-    // epoch — a LATE response for a superseded code (/q/A answered after
-    // /q/B already booted) is dropped in try/catch/finally and can never
-    // overwrite the freshly booted direction.
-    const epoch = ++directionEpochRef.current;
-    if (isNewCode) {
-      setSessionToken(null);
-      setQueueInfo(null);
-      setDirectionInfo(null);
-      setSessionExpiresAt(null);
-      setAttemptExpiresAt(null);
-      setResult(null);
-      setSubmitResultUnknown(false);
-      setShowSessionConsumedAdvisory(false);
-      setSelectedSpecialists([]);
-      // RQ-18 follow-up round-4 (P1-2/P2-1): a NEW direction boot is the
-      // explicit start-over — the reconcile panel and the confirmed
-      // pre-execution refusal belong to the PREVIOUS lifecycle.
-      setReconcile(null);
-      setReconcileDirectionTitle(null);
-      setPreExecRefusal(false);
-      setPayloadMismatch(false);
-      // RQ-18 follow-up round-3 (P1): a NEW direction is the explicit
-      // start-over — the previous code's complete attempt must not
-      // forbid B's fresh session lifecycle, and its in-flight/late
-      // submit attempt must neither keep B's submit disabled (a hung A
-      // must not make B unusable) nor later release B's own lock.
-      completeAttemptedRef.current = false;
-      submitAttemptRef.current = null;
-      setLoading(false);
+    // patient's context intact — and re-claims nothing (no epoch bump).
+    const isNewCode = directionStartRef.current !== code;
+    if (!isNewCode) {
+      return false;
     }
+    directionStartRef.current = code;
+    // RQ-18 follow-up round-2 (P1): the claim takes a FRESH request epoch
+    // — a LATE response for a superseded code (/q/A answered after /q/B
+    // already booted) is dropped in try/catch/finally and can never
+    // overwrite the freshly claimed direction.
+    directionEpochRef.current += 1;
+    setSessionToken(null);
+    setQueueInfo(null);
+    setDirectionInfo(null);
+    setSessionExpiresAt(null);
+    setAttemptExpiresAt(null);
+    setResult(null);
+    setSubmitResultUnknown(false);
+    setShowSessionConsumedAdvisory(false);
+    setSelectedSpecialists([]);
+    // RQ-18 follow-up round-4 (P1-2/P2-1): a NEW direction boot is the
+    // explicit start-over — the reconcile panel and the confirmed
+    // pre-execution refusal belong to the PREVIOUS lifecycle.
+    setReconcile(null);
+    setReconcileDirectionTitle(null);
+    setPreExecRefusal(false);
+    setPayloadMismatch(false);
+    // RQ-18 follow-up round-3 (P1): a NEW direction is the explicit
+    // start-over — the previous code's complete attempt must not
+    // forbid B's fresh session lifecycle, and its in-flight/late
+    // submit attempt must neither keep B's submit disabled (a hung A
+    // must not make B unusable) nor later release B's own lock.
+    completeAttemptedRef.current = false;
+    submitAttemptRef.current = null;
+    setLoading(false);
+    return true;
+  }, []);
+
+  const runDirectionStart = useCallback(async () => {
+    if (!directionCode) {
+      return;
+    }
+    // Round-8 (P1-2): claim FIRST (reset-on-new-code + epoch bump) — the
+    // exact same swap the boot effect's recovery branch performs. A
+    // same-code re-entry (error retry, start-over) keeps the context but
+    // still gets a fresh epoch below, so the previous attempt's late
+    // response cannot land either. The claim already bumped the epoch for
+    // a new code; the increment below is the unconditional per-START bump
+    // (retry of the same code) — double-bumping a fresh claim is harmless:
+    // epochs are only ever COMPARED, never enumerated.
+    claimDirectionContext(directionCode);
+    const epoch = ++directionEpochRef.current;
     setIsSpecialistsLoading(true);
     setDirectionUnavailable(false);
     setError(null);
@@ -812,6 +839,13 @@ const QueueJoin = () => {
     // outcome (machine reason) is removed — a fresh session duplicates
     // nothing.
     const attempt = attemptStateRead(attemptStorageKey);
+    // Round-8 (P1-2): claim the direction context BEFORE any branching —
+    // the UNKNOWN-recovery branch below early-returns, and WITHOUT the
+    // claim its refs/epoch stayed those of the PREVIOUS direction (the
+    // stale-guard hole described at claimDirectionContext). The claim is
+    // a no-op (no epoch bump, no reset) when the code did not change, so
+    // same-code effect reruns stay inert.
+    const claimed = claimDirectionContext(directionCode);
     if (attempt && attempt.publicCode === directionCode) {
       if (attempt.completeAttempted && attempt.outcomeUnknown) {
         completeAttemptedRef.current = true;
@@ -828,16 +862,18 @@ const QueueJoin = () => {
         attemptStateRemove(attemptStorageKey);
       }
     }
-    // RQ-18 follow-up (P2-2): the guard compares CODES. StrictMode's dev
-    // double-invoke re-runs this effect with the SAME code → skipped; a
-    // changed :publicCode param inside the same route instance re-runs it
-    // with the NEW code → the previous direction's session is dropped and
-    // B's session starts (no stale A session under a B URL).
-    if (directionStartRef.current === directionCode) {
+    // RQ-18 follow-up (P2-2): only a FRESH claim (a new code inside this
+    // route instance) starts a session. StrictMode's dev double-invoke
+    // re-runs this effect with the SAME code → already claimed → skipped;
+    // a changed :publicCode param re-claims with the NEW code → the
+    // previous direction's whole context was dropped above and B's
+    // session starts (no stale A session under a B URL, no stale A
+    // guards for A's late responses to pass).
+    if (!claimed) {
       return;
     }
     void runDirectionStart();
-  }, [directionMode, directionCode, attemptStorageKey, runDirectionStart]);
+  }, [directionMode, directionCode, attemptStorageKey, runDirectionStart, claimDirectionContext]);
 
   // RQ-18 follow-up round-4 (P2-1): the EXPLICIT start-over — the only
   // action that may mint a new session after a complete attempt (a
@@ -910,6 +946,17 @@ const QueueJoin = () => {
 
     // ✅ Проверяем наличие session_token
     let currentSessionToken = sessionToken;
+    // Round-8 (P2-4): the attempt-identity horizon that the persist below
+    // writes must be the horizon of the session that ACTUALLY executes the
+    // complete. `attemptExpiresAt` here is a closure snapshot taken at
+    // render time: when the transparent renewal below mints a session for
+    // the NEXT queue-day (a post-09:00-cutoff renewal), the React setter
+    // updates the state but NOT this running closure — persisting the
+    // stale snapshot wrote a NEW token together with the OLD (already
+    // expired) horizon, so attemptStateHorizonValid deleted the UNKNOWN
+    // protection envelope while the new session was still live. This local
+    // travels with the renewal response into the same call's persist.
+    let currentAttemptExpiresAt = attemptExpiresAt;
 
     // RQ-18 follow-up (P1-2): client-known expiry — the direction session
     // lives 15 minutes; a token that is ALREADY expired at submit time is
@@ -955,7 +1002,11 @@ const QueueJoin = () => {
         setSessionExpiresAt(res.expires_at ?? null);
         // Round-6 (P1-3): the renewal's own horizon replaces the previous
         // one — the envelope written at submit below carries it.
+        // Round-8 (P2-4): the LOCAL mirror is updated too — the closure
+        // variable is what the persist below actually reads; the React
+        // state alone never reaches this running handler.
         setAttemptExpiresAt(res.attempt_expires_at ?? null);
+        currentAttemptExpiresAt = res.attempt_expires_at ?? null;
         setQueueInfo((res.queue_info ?? {}) as QueueJoinPageInfo);
         setDirectionInfo(res.direction);
         // The renewal is transparent: the patient stays on the form step
@@ -1111,7 +1162,11 @@ const QueueJoin = () => {
           // survives the tab (localStorage) and never expires before the
           // end of the TARGET queue-day (the 24h TTL is only the fallback
           // for an older backend without the horizon).
-          attemptExpiresAt: attemptExpiresAt,
+          // Round-8 (P2-4): the LOCAL renewal mirror, not the stale render
+          // closure — after a post-cutoff renewal the envelope must carry
+          // the NEW session's horizon, or the UNKNOWN protection dies
+          // while the new session is still live.
+          attemptExpiresAt: currentAttemptExpiresAt,
         });
       }
       const joinResult = await completeQueueJoinSession(requestBody);

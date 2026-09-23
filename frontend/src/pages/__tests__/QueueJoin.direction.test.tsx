@@ -349,6 +349,52 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         expect(queueApiMocks.startQueueJoinSession).not.toHaveBeenCalled();
     });
 
+    it('PIN 44 (round-8 P2-4): the UNKNOWN envelope written after a renewal carries the RENEWED session horizon — never the stale render-closure snapshot', async () => {
+        // Pre-fix: the renewal updated the React state but the persist read
+        // the render-time closure `attemptExpiresAt` — a post-cutoff renewal
+        // (new session targeting the NEXT queue-day) wrote the NEW token
+        // together with the OLD, already-expired horizon, and
+        // attemptStateHorizonValid then deleted the UNKNOWN-protection
+        // envelope while the renewed session was still live.
+        const STALE_HORIZON = '2026-01-01T09:59:59Z';
+        const FRESH_HORIZON = '2099-09-21T21:59:59Z';
+        directionApiMocks.startPublicDirectionSession
+            .mockResolvedValueOnce({
+                ...DIRECTION_START_RESPONSE,
+                session_token: 'session-expired',
+                expires_at: new Date(Date.now() - 60_000).toISOString(),
+                attempt_expires_at: STALE_HORIZON,
+            })
+            .mockResolvedValueOnce({
+                ...DIRECTION_START_RESPONSE,
+                session_token: 'session-renewed',
+                expires_at: new Date(Date.now() + 600_000).toISOString(),
+                attempt_expires_at: FRESH_HORIZON,
+            });
+        // the response is LOST — the outcome stays UNKNOWN and the envelope
+        // (with the horizon) is persisted at submit time
+        queueApiMocks.completeQueueJoinSession.mockRejectedValue({ response: { status: 0 } });
+        renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        await fillAndSubmit();
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
+        });
+        // the attempt ran under the RENEWED session (PIN 14 contract)…
+        expect(directionApiMocks.startPublicDirectionSession).toHaveBeenCalledTimes(2);
+        expect(queueApiMocks.completeQueueJoinSession.mock.calls[0][0].session_token).toBe('session-renewed');
+        // …and the persisted envelope carries the RENEWED session's token
+        // AND horizon — the identity protection must outlive exactly as
+        // long as the session that performed the attempt.
+        const envelope = JSON.parse(
+            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
+        );
+        expect(envelope.outcomeUnknown).toBe(true);
+        expect(envelope.sessionToken).toBe('session-renewed');
+        expect(envelope.attemptExpiresAt).toBe(FRESH_HORIZON);
+        expect(envelope.attemptExpiresAt).not.toBe(STALE_HORIZON);
+    });
+
     it('PIN 15 (RQ-10 regression guard): a complete-attempt rejection NEVER auto-renews the session', async () => {
         directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
         queueApiMocks.completeQueueJoinSession.mockRejectedValue({
@@ -1455,6 +1501,114 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         expect(envelope.attemptExpiresAt).toBeTruthy();
         // …and nothing PHI-shaped ever entered the envelope.
         expect(JSON.stringify(envelope)).not.toMatch(/пациент|patient_name|phone.*\d{3}/i);
+    });
+
+    it('PIN 43 (round-8 P1-2): the recovery boot CLAIMS the context — a late complete of /q/A can neither render under /q/B nor keep B\'s reconcile locked', async () => {
+        // Scenario (round-7 verdict): /q/A's complete is IN FLIGHT when the
+        // patient moves to /q/B, and B carries its OWN unknown-attempt
+        // envelope — so B's boot takes the UNKNOWN-recovery branch. Pre-fix
+        // that branch early-returned WITHOUT the context swap: the epoch and
+        // directionStartRef still belonged to A, A's late response passed
+        // BOTH stale guards and painted A's talon under /q/B, and A's hung
+        // submit lock blocked B's reconcile retry.
+        const CODE_A = 'aaaa1111bbbb';
+        const CODE_B = 'cccc2222dddd';
+        window.localStorage.setItem(
+            `queue_join_attempt_qdir_${CODE_B}`,
+            JSON.stringify({
+                ts: Date.now(),
+                publicCode: CODE_B,
+                sessionToken: 'session-B-attempt',
+                profileId: 7,
+                directionTitle: 'Направление Б',
+                completeAttempted: true,
+                outcomeUnknown: true,
+            }),
+        );
+        let resolveCompleteA: (value: unknown) => void = () => {};
+        const pendingCompleteA = new Promise((resolve) => {
+            resolveCompleteA = resolve;
+        });
+        directionApiMocks.startPublicDirectionSession.mockImplementation((code: string) =>
+            code === CODE_A
+                ? Promise.resolve({
+                      ...DIRECTION_START_RESPONSE,
+                      session_token: 'session-A',
+                      direction: { ...DIRECTION_START_RESPONSE.direction, title: 'Направление А', public_code: CODE_A },
+                  })
+                : Promise.reject(new Error('start(B) must never run — recovery panel instead')),
+        );
+        queueApiMocks.completeQueueJoinSession
+            .mockReturnValueOnce(pendingCompleteA as never)
+            .mockResolvedValueOnce(COMPLETE_MULTI_RESPONSE);
+
+        function NavigateToB() {
+            const navigate = useNavigate();
+            return (
+                <button type="button" data-testid="nav-to-b" onClick={() => navigate(`/q/${CODE_B}`)}>
+                    go-b
+                </button>
+            );
+        }
+
+        render(
+            <React.StrictMode>
+                <MemoryRouter initialEntries={[`/q/${CODE_A}`]}>
+                    <Routes>
+                        <Route
+                            path="/q/:publicCode"
+                            element={
+                                <>
+                                    <QueueJoin />
+                                    <NavigateToB />
+                                </>
+                            }
+                        />
+                    </Routes>
+                </MemoryRouter>
+            </React.StrictMode>,
+        );
+
+        await screen.findByText('Направление А');
+        await fillAndSubmit('Пациент А');
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
+        });
+
+        // SPA-move to B while A's complete hangs: the recovery panel must
+        // engage WITHOUT a start-session for B…
+        fireEvent.click(screen.getByTestId('nav-to-b'));
+        await screen.findByTestId('qj-reconcile-banner');
+        expect(directionApiMocks.startPublicDirectionSession).toHaveBeenCalledTimes(1);
+        expect(directionApiMocks.startPublicDirectionSession).toHaveBeenCalledWith(CODE_A);
+
+        // …A's LATE complete resolves success — the claim (fresh epoch +
+        // ref swap) done by the recovery branch must drop it; the panel
+        // stays and A's talon never renders under /q/B.
+        await React.act(async () => {
+            resolveCompleteA(COMPLETE_MULTI_RESPONSE);
+        });
+        await React.act(async () => {});
+        expect(screen.getByTestId('qj-reconcile-banner')).toBeTruthy();
+        expect(screen.queryByText(/ваш номер/i)).toBeNull();
+        expect(screen.queryByText('№3')).toBeNull();
+
+        // B's own reconcile retry works — the claim released A's hung
+        // submit lock and re-uses B's ORIGINAL attempt identity.
+        fireEvent.change(await screen.findByLabelText(/фио пациента/i), {
+            target: { value: 'Пациент Б' },
+        });
+        fireEvent.change(screen.getByLabelText(/номер телефона/i), {
+            target: { value: '+998 (90) 123-45-67' },
+        });
+        fireEvent.click(screen.getByTestId('qj-reconcile-check'));
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(2);
+        });
+        const retryPayload = queueApiMocks.completeQueueJoinSession.mock.calls[1][0] as {
+            session_token?: string;
+        };
+        expect(retryPayload.session_token).toBe('session-B-attempt');
     });
 });
 
