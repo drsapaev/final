@@ -11,6 +11,7 @@ This module provides:
 It is intentionally defensive: it supports get_db() returning either
 an AsyncSession or a regular (sync) Session / sessionmaker instance.
 """
+
 from __future__ import annotations
 
 import inspect
@@ -26,6 +27,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jwt import PyJWTError as JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 # try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
 from app.core.config import settings  # type: ignore
@@ -237,7 +239,7 @@ async def _get_user_with_blacklist(
     if inspect.iscoroutinefunction(execute_callable):
         row = (await db.execute(stmt)).first()
     else:
-        row = db.execute(stmt).first()
+        row = await run_in_threadpool(lambda: db.execute(stmt).first())
 
     if row is None:
         return None, False
@@ -334,7 +336,9 @@ async def get_current_user(
         ) from e
 
     if not user:
-        logger.warning("[deps.get_current_user] user not found (username from token may not exist in DB)")
+        logger.warning(
+            "[deps.get_current_user] user not found (username from token may not exist in DB)"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
@@ -422,7 +426,7 @@ def require_active_roles(*roles: str) -> Callable[..., Any]:
 
 def get_current_user_from_request(request: Request) -> User | None:
     """Получить текущего пользователя из состояния запроса (для middleware)"""
-    user_id = getattr(request.state, 'user_id', None)
+    user_id = getattr(request.state, "user_id", None)
     if not user_id:
         return None
 
@@ -437,12 +441,12 @@ def get_current_user_from_request(request: Request) -> User | None:
 
 def get_current_user_id(request: Request) -> int | None:
     """Получить ID текущего пользователя из состояния запроса"""
-    return getattr(request.state, 'user_id', None)
+    return getattr(request.state, "user_id", None)
 
 
 def get_current_user_role(request: Request) -> str | None:
     """Получить роль текущего пользователя из состояния запроса"""
-    return getattr(request.state, 'role', None)
+    return getattr(request.state, "role", None)
 
 
 def require_authentication(request: Request) -> User:
