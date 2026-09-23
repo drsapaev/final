@@ -2,40 +2,136 @@
 Telegram бот для системы клиники
 """
 
+from __future__ import annotations
+
 import logging
+import threading
 from datetime import datetime
 from typing import Any
 
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command, CommandStart
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler
-
 from ...core.config import settings
-from ..queue_service import QueueBusinessService
 
 logger = logging.getLogger(__name__)
+
+Bot: Any | None = None
+Dispatcher: Any | None = None
+types: Any | None = None
+Command: Any | None = None
+CommandStart: Any | None = None
+InlineKeyboardButton: Any | None = None
+InlineKeyboardMarkup: Any | None = None
+WebAppInfo: Any | None = None
+SimpleRequestHandler: Any | None = None
+
+
+def _load_telegram_dependencies() -> None:
+    """Load the optional aiogram package only for a configured patient bot."""
+    global Bot, Dispatcher, types, Command, CommandStart
+    global InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, SimpleRequestHandler
+
+    if Bot is not None:
+        return
+
+    logger.debug("Loading Telegram SDK for configured patient bot")
+    try:
+        from aiogram import Bot as AiogramBot
+        from aiogram import Dispatcher as AiogramDispatcher
+        from aiogram import types as aiogram_types
+        from aiogram.filters import Command as AiogramCommand
+        from aiogram.filters import CommandStart as AiogramCommandStart
+        from aiogram.types import InlineKeyboardButton as AiogramInlineKeyboardButton
+        from aiogram.types import InlineKeyboardMarkup as AiogramInlineKeyboardMarkup
+        from aiogram.types import WebAppInfo as AiogramWebAppInfo
+        from aiogram.webhook.aiohttp_server import (
+            SimpleRequestHandler as AiogramSimpleRequestHandler,
+        )
+    except ImportError as exc:
+        logger.error("Telegram SDK is unavailable for configured patient bot")
+        raise RuntimeError("Telegram SDK is not installed") from exc
+
+    Bot = AiogramBot
+    Dispatcher = AiogramDispatcher
+    types = aiogram_types
+    Command = AiogramCommand
+    CommandStart = AiogramCommandStart
+    InlineKeyboardButton = AiogramInlineKeyboardButton
+    InlineKeyboardMarkup = AiogramInlineKeyboardMarkup
+    WebAppInfo = AiogramWebAppInfo
+    SimpleRequestHandler = AiogramSimpleRequestHandler
+    logger.debug("Telegram SDK loaded for configured patient bot")
 
 
 """P1-18: This is the PATIENT bot (aiogram-based, env-var token).
 Use services/telegram_bot.py:TelegramBotService for the STAFF bot
 (httpx-based, DB-stored token). Do not confuse the two.
 """
+
+
 class ClinicTelegramBot:
     """Telegram бот клиники"""
 
     def __init__(self):
         self.token = settings.TELEGRAM_BOT_TOKEN
+        self._bot = None
+        self._dp = None
+        self._queue_service = None
+        self._initialized = False
+        self._initialization_lock = threading.Lock()
         if not self.token:
             logger.warning("TELEGRAM_BOT_TOKEN not set. Telegram bot disabled.")
-            self.bot = None
-            self.dp = None
             return
 
-        self.bot = Bot(token=self.token)
-        self.dp = Dispatcher()
-        self.queue_service = QueueBusinessService()
-        self._setup_handlers()
+        logger.debug("Telegram patient bot configured; SDK initialization deferred")
+
+    @property
+    def bot(self) -> Any | None:
+        """Return the configured client, initializing it on its first use."""
+        self._initialize_client()
+        return self._bot
+
+    @property
+    def dp(self) -> Any | None:
+        """Return the configured dispatcher, initializing it on its first use."""
+        self._initialize_client()
+        return self._dp
+
+    @property
+    def queue_service(self) -> Any | None:
+        """Return queue integration only after the patient bot is initialized."""
+        self._initialize_client()
+        return self._queue_service
+
+    def _initialize_client(self) -> None:
+        """Initialize the optional Telegram client without exposing the bot token."""
+        if self._initialized or not self.token:
+            return
+
+        with self._initialization_lock:
+            if self._initialized:
+                return
+
+            logger.info("Initializing configured Telegram patient bot on first use")
+            try:
+                _load_telegram_dependencies()
+                from ..queue_service import QueueBusinessService
+
+                self._bot = Bot(token=self.token)
+                self._dp = Dispatcher()
+                self._queue_service = QueueBusinessService()
+                self._setup_handlers()
+                self._initialized = True
+            except Exception as exc:
+                self._bot = None
+                self._dp = None
+                self._queue_service = None
+                self._initialized = False
+                logger.error(
+                    "Telegram patient bot initialization failed error_type=%s",
+                    type(exc).__name__,
+                )
+                raise
+
+            logger.info("Configured Telegram patient bot initialized")
 
     async def send_confirmation_invitation(
         self, chat_id: int, message: str, keyboard: list
@@ -80,31 +176,31 @@ class ClinicTelegramBot:
 
     def _setup_handlers(self):
         """Настройка обработчиков команд"""
-        if not self.dp:
+        if not self._dp:
             return
 
         # Команда /start
-        @self.dp.message(CommandStart())
+        @self._dp.message(CommandStart())
         async def start_handler(message: types.Message):
             await self.handle_start(message)
 
         # Команда /queue - утренняя очередь
-        @self.dp.message(Command("queue"))
+        @self._dp.message(Command("queue"))
         async def queue_handler(message: types.Message):
             await self.handle_queue(message)
 
         # Обработчик callback'ов для подтверждения визитов
-        @self.dp.callback_query()
+        @self._dp.callback_query()
         async def callback_handler(callback: types.CallbackQuery):
             await self.handle_callback(callback)
 
         # Команда /appointment - запись на прием
-        @self.dp.message(Command("appointment"))
+        @self._dp.message(Command("appointment"))
         async def appointment_handler(message: types.Message):
             await self.handle_appointment(message)
 
         # Команда /help
-        @self.dp.message(Command("help"))
+        @self._dp.message(Command("help"))
         async def help_handler(message: types.Message):
             await self.handle_help(message)
 
@@ -219,7 +315,7 @@ class ClinicTelegramBot:
         )
 
         await message.answer(
-            "📅 Запись на прием\n\n" "Нажмите кнопку ниже, чтобы открыть форму записи:",
+            "📅 Запись на прием\n\nНажмите кнопку ниже, чтобы открыть форму записи:",
             reply_markup=keyboard,
         )
 
@@ -390,6 +486,9 @@ class ClinicTelegramBot:
         self, user_id: int, appointment_data: dict[str, Any]
     ):
         """Отправка напоминания о визите"""
+        if not self.bot:
+            return False
+
         doctor = appointment_data.get("doctor", "Врач")
         time = appointment_data.get("time", "время не указано")
         date = appointment_data.get("date", "дата не указана")
@@ -423,11 +522,14 @@ class ClinicTelegramBot:
 
     async def send_lab_results_ready(self, user_id: int, results_info: dict[str, Any]):
         """Уведомление о готовности результатов"""
+        if not self.bot:
+            return False
+
         message = f"""
 🔬 **Результаты анализов готовы**
 
-📋 Исследование: {results_info.get('test_name', 'Анализы')}
-📅 Дата: {results_info.get('date', 'не указана')}
+📋 Исследование: {results_info.get("test_name", "Анализы")}
+📅 Дата: {results_info.get("date", "не указана")}
 
 Результаты доступны в приложении.
         """
@@ -526,7 +628,9 @@ class ClinicTelegramBot:
         except Exception as e:
             logger.error(f"Ошибка подтверждения визита: {e}")
             try:
-                await callback.answer("Произошла ошибка при подтверждении", show_alert=True)
+                await callback.answer(
+                    "Произошла ошибка при подтверждении", show_alert=True
+                )
             except Exception:
                 pass
             return True

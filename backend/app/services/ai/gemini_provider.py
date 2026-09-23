@@ -7,7 +7,6 @@ import json
 import logging
 from typing import Any
 
-import google.generativeai as genai
 from PIL import Image
 
 from .base_provider import AIRequest, AIResponse, BaseAIProvider
@@ -15,12 +14,26 @@ from .base_provider import AIRequest, AIResponse, BaseAIProvider
 logger = logging.getLogger(__name__)
 
 
+def _load_gemini_sdk() -> Any:
+    """Load the optional Gemini SDK only for a configured Gemini provider."""
+    logger.debug("Loading Gemini SDK for configured provider")
+    try:
+        import google.generativeai as genai
+    except ImportError as exc:
+        logger.error("Gemini SDK is unavailable for configured provider")
+        raise RuntimeError("Gemini SDK is not installed") from exc
+
+    logger.debug("Gemini SDK loaded for configured provider")
+    return genai
+
+
 class GeminiProvider(BaseAIProvider):
     """Провайдер Google Gemini с полной реализацией"""
 
     def __init__(self, api_key: str, model: str | None = None):
         super().__init__(api_key, model)
-        genai.configure(api_key=api_key)
+        self._genai = _load_gemini_sdk()
+        self._genai.configure(api_key=api_key)
 
         # Настройки безопасности для медицинского контента
         # Используем BLOCK_MEDIUM_AND_ABOVE для лучшей совместимости
@@ -43,11 +56,11 @@ class GeminiProvider(BaseAIProvider):
             },
         ]
 
-        self.text_model = genai.GenerativeModel(
+        self.text_model = self._genai.GenerativeModel(
             self.model, safety_settings=safety_settings
         )
-        self.vision_model = genai.GenerativeModel(
-            'gemini-2.5-flash-preview-05-20', safety_settings=safety_settings
+        self.vision_model = self._genai.GenerativeModel(
+            "gemini-2.5-flash-preview-05-20", safety_settings=safety_settings
         )
 
     def get_default_model(self) -> str:
@@ -65,7 +78,7 @@ class GeminiProvider(BaseAIProvider):
             # Генерируем ответ
             response = await self.text_model.generate_content_async(
                 full_prompt,
-                generation_config=genai.types.GenerationConfig(
+                generation_config=self._genai.types.GenerationConfig(
                     max_output_tokens=request.max_tokens,
                     temperature=request.temperature,
                 ),
@@ -157,7 +170,7 @@ class GeminiProvider(BaseAIProvider):
 
         prompt = f"""Вы - помощник врача по кодированию МКБ-10. Предложите подходящие коды.
 
-Симптомы: {', '.join(symptoms)}
+Симптомы: {", ".join(symptoms)}
 """
         if diagnosis:
             prompt += f"Предполагаемый диагноз: {diagnosis}\n"
