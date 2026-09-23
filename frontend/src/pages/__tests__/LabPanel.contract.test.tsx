@@ -778,7 +778,7 @@ describe('LabPanel pending/latest-wins and URL writer contracts (PR #3351)', () 
     const apiSource = fs.readFileSync(
       path.resolve(__dirname, '../../api/labReporting.ts'),
       'utf8',
-    );
+    ).replace(/\r\n/g, '\n');
     const idempotencySource = fs.readFileSync(
       path.resolve(__dirname, '../../components/laboratory/createInstanceIdempotency.ts'),
       'utf8',
