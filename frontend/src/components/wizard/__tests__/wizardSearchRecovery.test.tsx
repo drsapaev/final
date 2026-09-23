@@ -34,10 +34,11 @@ const wizardPath = path.resolve(__dirname, '../AppointmentWizardV2.tsx');
 const patientStepPath = path.resolve(__dirname, '../PatientStepV2.tsx');
 const hotkeysPath = path.resolve(__dirname, '../../../pages/registrar/useRegistrarHotkeys.ts');
 const confirmDialogPath = path.resolve(__dirname, '../../common/ConfirmDialog.tsx');
-const readWizardSource = () => fs.readFileSync(wizardPath, 'utf8');
-const readPatientStepSource = () => fs.readFileSync(patientStepPath, 'utf8');
-const readHotkeysSource = () => fs.readFileSync(hotkeysPath, 'utf8');
-const readWizardUtilsSource = () => fs.readFileSync(path.resolve(__dirname, '../wizardUtils.ts'), 'utf8');
+const readSource = (sourcePath: string) => fs.readFileSync(sourcePath, 'utf8').replace(/\r\n/g, '\n');
+const readWizardSource = () => readSource(wizardPath);
+const readPatientStepSource = () => readSource(patientStepPath);
+const readHotkeysSource = () => readSource(hotkeysPath);
+const readWizardUtilsSource = () => readSource(path.resolve(__dirname, '../wizardUtils.ts'));
 
 const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);

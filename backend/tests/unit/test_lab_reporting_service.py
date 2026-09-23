@@ -1022,6 +1022,11 @@ class TestLabReportingService:
     def test_catalog_reference_mode_resolves_seeded_ranges(
         self, db_session, test_patient
     ):
+        # Each test rolls back its SQLite transaction while the process-level
+        # catalog seed cache survives; re-arm it before using catalog rows.
+        from app.services.lab_reporting._base import reset_lab_seed_cache
+
+        reset_lab_seed_cache()
         test_patient.sex = "M"
         test_patient.birth_date = date(1990, 1, 1)
         db_session.commit()

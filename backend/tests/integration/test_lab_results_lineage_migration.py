@@ -168,7 +168,8 @@ def test_single_alembic_head(fresh_head_url):
     assert len(head_lines) == 1, f"multi-head detected: {r.stdout!r}"
     # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved to
     # 0072; this file still proves 0070's own links via the graph pins below.
-    assert "0072_service_executions" in head_lines[0]
+    # Corrective follow-up: chain head moved to 0073 (routing snapshot).
+    assert "0073_execution_routing_snapshot" in head_lines[0]
 
 
 @pytest.mark.integration

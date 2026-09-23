@@ -24,6 +24,10 @@ from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     _visit_filter_doctor_id,
     router,
 )
+from app.crud.visit_appointment_pairing import (
+    AmbiguousAppointmentPairingError,
+    move_paired_appointment_to_day,
+)
 
 
 @router.get("/doctor/{specialty}/queue/today", response_model=dict[str, Any])
@@ -324,25 +328,24 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 # старом дне (и канонический резолв может родить под
                 # него второй визит). Паринг — тот же, что у
                 # CanonicalVisitRepository (время — оба написания).
-                appointment_filters = [
-                    Appointment.patient_id == visit.patient_id,
-                    Appointment.appointment_date == visit.visit_date,
-                    Appointment.status.not_in(["cancelled", "completed", "no_show"]),
-                ]
-                if visit.doctor_id is None:
-                    appointment_filters.append(Appointment.doctor_id.is_(None))
-                else:
-                    appointment_filters.append(Appointment.doctor_id == visit.doctor_id)
-                if visit.visit_time:
-                    _hhmm = visit.visit_time[:5]
-                    appointment_filters.append(
-                        Appointment.appointment_time.in_((_hhmm, f"{_hhmm}:00"))
-                    )
-                else:
-                    appointment_filters.append(Appointment.appointment_time.is_(None))
-                db.query(Appointment).filter(*appointment_filters).update(
-                    {"appointment_date": queue_day}, synchronize_session=False
-                )
+                # Corrective follow-up (вердикт владельца по смерженному
+                # рантайму, P1): паринг сужается департаментом визита,
+                # берётся под lock, переносится РОВНО ОДНА строка, при
+                # неоднозначности — fail closed (409): старый bulk
+                # UPDATE сдвигал ОБА doctorless-аппойнтмента пациента
+                # того же дня (лабораторию вместе с процедурным
+                # переносом).
+                try:
+                    move_paired_appointment_to_day(db, visit=visit, new_day=queue_day)
+                except AmbiguousAppointmentPairingError as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=(
+                            "Перенос визита отклонён: неоднозначное "
+                            f"сопоставление с appointment (visit_id={visit.id}) "
+                            f"— {exc}"
+                        ),
+                    ) from exc
                 visit.visit_date = queue_day
                 return visit
             # shared by live same-day tickets: fall through to the
@@ -368,6 +371,21 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             .first()
         )
         if visit is None:
+            # Owner round-3 P2 (PR #3367): commit=False — the visit
+            # INSERT joins the CALLER's transaction. Both callers of
+            # this helper (start/complete) stage queue mutations BEFORE
+            # the resolution (in_progress / served + attribution) and
+            # commit AFTER it; with the CRUD default (commit=True) the
+            # internal db.commit() prematurely persisted the staged
+            # served flip + attribution + the new open visit mid-flow,
+            # and a failure of the trailing boundary commit left a
+            # durable served entry (retry rejected: complete is
+            # unavailable for served) with an orphaned open visit and
+            # a lost visit link. create_visit only needs flush() for
+            # the ID (the Fix C contract); the nurse surface
+            # (nurse_serving_api_service._resolve_entry_visit) already
+            # passes commit=False — the N2-2 single-transaction
+            # discipline this aligns the doctor surface with.
             visit = crud_visit.create_visit(
                 db=db,
                 patient_id=queue_entry.patient_id,
@@ -376,6 +394,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 # Codex round-37 P2: время визита — клиник-локальные часы
                 visit_time=_clinic_now(db).strftime("%H:%M"),
                 department=department,
+                commit=False,
             )
     else:
         # Codex round-42 P2: врачебная поверхность резолвит свежий визит
@@ -407,6 +426,11 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             .first()
         )
         if visit is None:
+            # Owner round-3 P2 (PR #3367): commit=False here too — the
+            # doctor-branch creation is the same mid-composition INSERT
+            # as the resource branch above (see the comment there): the
+            # staged served flip + attribution must not become durable
+            # before the caller's single boundary commit.
             visit = crud_visit.create_visit(
                 db=db,
                 patient_id=queue_entry.patient_id,
@@ -415,6 +439,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 # Codex round-37 P2: время визита — клиник-локальные часы
                 visit_time=_clinic_now(db).strftime("%H:%M"),
                 department=department,
+                commit=False,
             )
 
     if queue_entry.visit_id != visit.id:
@@ -687,11 +712,25 @@ def start_patient_visit(
         # the visit. Without this, visit stays in "open" and complete_visit()
         # fails because open→completed is not allowed by the state machine
         # (only open→in_progress is). This was found by Codex review.
+        # Start-atomicity follow-up (PR after #3367): commit=False —
+        # the lifecycle commit joins the CALLER's transaction, exactly
+        # like the completion unit after d5ac9441e. start_patient_visit
+        # stages the queue mutations BEFORE the resolution
+        # (queue_entry.status="in_progress" + updated_at) and writes the
+        # visit annotations (visit_time/notes) AFTER the lifecycle call;
+        # with the service default (commit=True) the internal
+        # db.commit() prematurely persisted the staged flip + the
+        # in_progress transition (+ the created visit and its link on
+        # the resolution path), and a failure of the trailing boundary
+        # commit left a durable partial start: entry in_progress with
+        # visit_time/notes lost. The explicit db.commit() below stays
+        # the SINGLE transaction boundary of the start unit.
         from app.services.visit_lifecycle_service import VisitLifecycleService
         if visit.status == "open":
             visit = VisitLifecycleService(db).start_visit(
                 visit_id=visit.id,
                 current_user=current_user,
+                commit=False,
             )
 
         # Обновляем время начала приема
@@ -903,47 +942,79 @@ def complete_patient_visit(
             # the user keeps the history row with NULL attribution.
             queue_entry.served_by_user_id = current_user.id
             queue_entry.served_at = changed_at
+
+            # Codex round-1 P1 (corrective follow-up): resolve + pair the
+            # visit BEFORE the served-commit. The pairing may FAIL CLOSED
+            # (409 on an ambiguous appointment set), and the broad
+            # ``except Exception`` below the commit deliberately swallows
+            # visit-update errors — an ambiguous pairing swallowed THERE
+            # left the entry committed served while the visit and its
+            # appointment stayed on the old day, exactly the inconsistency
+            # the fail-closed contract forbids. Everything up to this point
+            # is read-only; the resolution's own mutations (visit link /
+            # re-date / appointment move) flush with the served-commit
+            # below, and a 409 propagates through the outer
+            # ``except HTTPException`` with NOTHING committed.
+            resource_department = None
+            if daily_queue is not None and (
+                getattr(daily_queue, "queue_resource_id", None) is not None
+            ):
+                resource = daily_queue.queue_resource
+                resource_department = daily_queue.queue_tag or (
+                    resource.code if resource is not None else None
+                )
+            # QD-2C (Codex round-35 P1): департамент визита записи —
+            # visit_id-first и департаментный поиск у ресурсной
+            # поверхности (см. хелпер): завершение мутирует тот же визит,
+            # что старт.
+            # Codex round-43 P2: департамент завершения врач-очереди —
+            # тот же канонический маппинг, что у старта (тег или
+            # «general»), а не легаси-«cardiology»: с департаментным
+            # lookup резолва (round-43) рассинхрон департаментов
+            # заставлял завершение создавать второй визит и
+            # оставлять исходный открытым.
+            department_hint = resource_department or (
+                getattr(daily_queue, "queue_tag", None) or "general"
+            )
+            resolved_visit = _resolve_entry_visit(
+                db, queue_entry, doctor, department_hint
+            )
+
+            # Codex round-2 P2 + round-3 P2: the lifecycle completion ALSO
+            # runs BEFORE the served-commit — resolution + lifecycle + the
+            # served flip are one atomic unit. A lifecycle failure
+            # (terminal-state conflict, lease conflict) propagates with
+            # NOTHING committed: the entry stays in_progress and the retry
+            # re-enters cleanly (the resolution is same-day-idempotent).
+            # ``commit=False`` keeps the explicit ``db.commit()`` below as
+            # the SINGLE transaction boundary — the service's own default
+            # would commit the visit/appointment move and the served flip
+            # mid-flow, and a failure of the trailing commit would 500 on
+            # an already-durable completion whose retry then hits a
+            # terminal queue entry. The genuinely tolerable tail (payment
+            # markers, appointment status, medical data) stays below the
+            # swallow by the pre-existing design: «не блокируем основной
+            # флоу очереди».
+            from app.services.visit_lifecycle_service import VisitLifecycleService
+
+            resolved_visit = VisitLifecycleService(db).complete_visit(
+                visit_id=resolved_visit.id,
+                current_user=current_user,
+                commit=False,
+            )
+            resolved_visit.updated_at = changed_at
+
             db.commit()
             db.refresh(queue_entry)
 
             # Создаем или обновляем визит на сегодня и помечаем как завершенный,
             # чтобы это отразилось в registrar/queues/today, который читает Visit/Appointment
             try:
-                # QD-2C (Codex round-34 P2): департамент визита — из оси
-                # ресурсной очереди (тег/реестр): у DailyQueue нет
-                # department-атрибута, и легаси-fallback писал «cardiology»
-                # — лабораторный/ЭКГ визит (specialist NULL) попадал в чужое
-                # отделение. Врач-очереди без ресурса сохраняют прежний
-                # fallback байт-идентично.
-                resource_department = None
-                if daily_queue is not None and (
-                    getattr(daily_queue, "queue_resource_id", None) is not None
-                ):
-                    resource = daily_queue.queue_resource
-                    resource_department = daily_queue.queue_tag or (
-                        resource.code if resource is not None else None
-                    )
-                # QD-2C (Codex round-35 P1): визит записи — visit_id-first
-                # и департаментный поиск у ресурсной поверхности (см.
-                # хелпер): завершение мутирует тот же визит, что старт
-                # Codex round-43 P2: департамент завершения врач-очереди —
-                # тот же канонический маппинг, что у старта (тег или
-                # «general»), а не легаси-«cardiology»: с департаментным
-                # lookup резолва (round-43) рассинхрон департаментов
-                # заставлял завершение создавать второй визит и
-                # оставлять исходный открытым
-                department_hint = resource_department or (
-                    getattr(daily_queue, "queue_tag", None) or "general"
-                )
-                visit = _resolve_entry_visit(db, queue_entry, doctor, department_hint)
-                # ✅ Issue #06 Phase 3: delegate to VisitLifecycleService
-                # for state machine validation + row lock.
-                from app.services.visit_lifecycle_service import VisitLifecycleService
-
-                visit = VisitLifecycleService(db).complete_visit(
-                    visit_id=visit.id,
-                    current_user=current_user,
-                )
+                # QD-2C (Codex round-34 P2) + Codex round-43 P2: департамент,
+                # сам визит и lifecycle РАЗРЕШЕНЫ ДО served-коммита выше (см.
+                # комментарий у resolved_visit): здесь остаётся только
+                # платёжная/медицинская запись и статус appointment.
+                visit = resolved_visit
                 visit.updated_at = changed_at
 
                 # ✅ ИСПРАВЛЕНО: Проверяем и сохраняем информацию об оплате, создаем платеж через SSOT

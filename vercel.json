@@ -12,6 +12,17 @@
     }
   },
   "ignoreCommand": "if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then git diff --quiet HEAD^ HEAD -- frontend vercel.json .vercelignore; code=$?; if [ $code -gt 1 ]; then exit 1; fi; exit $code; fi; exit 1",
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",

@@ -4,6 +4,7 @@ import {
   Lock, Monitor, Percent, Phone, Puzzle, Search, Send, Settings, Smile,
   SquareStack, Stethoscope, TestTube2, UserPlus, Users, Wand2,
 } from 'lucide-react';
+import { matchPath } from 'react-router-dom';
 
 export const ROUTE_GROUPS = ['public', 'onboarding', 'clinical', 'admin', 'internal-demo'];
 export const ROUTE_SURFACES = ['screen', 'modal-route', 'callback', 'utility'];
@@ -1557,4 +1558,33 @@ export const ROUTE_REGISTRY = [
 
 export function getCanonicalRoutes() {
   return ROUTE_REGISTRY;
+}
+
+/**
+ * PR 3351 (review round 3, P1): resolve a pathname to its registry route.
+ *
+ * Route IDENTITY — not path prefixes — decides whether a navigation keeps
+ * the current screen mounted. '/lab/results' is not a registered route:
+ * the App wildcard redirects it to /not-found and unmounts LabPanel, so
+ * the lab leave guard must treat it as a transition AWAY from /lab. The
+ * reverse also holds: legacy redirect aliases ('/lab-panel') remount the
+ * panel after the redirect hop, so they are leaves as well — only the
+ * exact registry path that renders the screen preserves its state.
+ *
+ * PR 3351 (review round 4, P1): resolve with the SAME matcher React Router
+ * uses for <Route path={route.path}> — matchPath({ end: true }) — instead of
+ * exact string equality. App renders routes straight from this registry and
+ * never canonicalizes the URL (the Vercel rewrite serves index.html as-is),
+ * so '/lab/' keeps rendering LabPanel via the router's trailing-slash
+ * normalization; exact equality made findRouteByPath('/lab/') return
+ * undefined and the lab leave guard silently skipped arming the sentinel —
+ * browser Back then unmounted the panel with a dirty draft and no dialog.
+ * matchPath mirrors the router faithfully: '/lab/' and (case-insensitive,
+ * like <Route>) '/Lab' resolve to the registered route, while '/lab/results'
+ * and the legacy alias '/lab-panel' still do not. Registry order is safe:
+ * static routes precede their parametric siblings ('/queue/join' before
+ * '/queue/join/:token'), matching the router's static-over-dynamic rank.
+ */
+export function findRouteByPath(pathname: string): (typeof ROUTE_REGISTRY)[number] | undefined {
+  return ROUTE_REGISTRY.find((route) => matchPath({ path: route.path, end: true }, pathname));
 }

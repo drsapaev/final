@@ -447,6 +447,136 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert print_twice_response.json()["status"] == "PRINTED"
 
 
+# PR 3351 (review round 9, P1): report CREATE идемпотентен по операции.
+# Frontend отправляет устойчивый Idempotency-Key (createInstanceIdempotency.ts):
+# ключ генерируется на первом клике, переживает неопределённый исход
+# (sessionStorage — reload-safe) и переиспользуется повтором. Навигационные
+# блокировки round 7/8 не спасают от транспортного разрыва ПОСЛЕ серверного
+# commit (502 reverse proxy, crash вкладки/процесса, подтверждённый
+# beforeunload, retry после reload) — без ключа каждый ретрай коммитил
+# НОВЫЙ LabReportInstance. Ниже — серверная половина exactly-once-контракта
+# (IdempotencyMiddleware + endpoint через полный стек приложения).
+def _lab_create_instance_payload(client, auth_headers, test_patient, test_visit) -> dict:
+    templates_response = client.get("/api/v1/lab/templates", headers=auth_headers)
+    assert templates_response.status_code == 200
+    cbc_template = next(
+        template
+        for template in templates_response.json()
+        if template["code"] == "cbc_oak"
+    )
+    return {
+        "patient_id": test_patient.id,
+        "visit_id": test_visit.id,
+        "template_id": cbc_template["id"],
+    }
+
+
+@pytest.mark.integration
+def test_lab_report_create_same_idempotency_key_replays_committed_instance(
+    client, auth_headers, db_session, test_patient, test_visit
+) -> None:
+    """Повторный POST с тем же Idempotency-Key возвращает закоммиченный
+    instance_id и не создаёт второй бланк (lost-response retry)."""
+    payload = _lab_create_instance_payload(client, auth_headers, test_patient, test_visit)
+    headers = auth_headers | {"Idempotency-Key": "pr3351-r9-create-key-1"}
+
+    first = client.post("/api/v1/lab/report-instances", headers=headers, json=payload)
+    assert first.status_code == 200, first.text
+    first_instance_id = first.json()["id"]
+
+    # «Потерянный ответ»: backend УЖЕ закоммитил бланк, клиент ответ не
+    # получил (502 proxy / crash) и повторяет ту же отправку с тем же ключом.
+    second = client.post("/api/v1/lab/report-instances", headers=headers, json=payload)
+    assert second.status_code == 200, second.text
+    assert second.json()["id"] == first_instance_id, (
+        "повтор с тем же ключом должен вернуть исходный instance_id"
+    )
+
+    count = (
+        db_session.query(LabReportInstance)
+        .filter(LabReportInstance.patient_id == test_patient.id)
+        .count()
+    )
+    assert count == 1, "две отправки с одним ключом создали второй бланк"
+
+
+@pytest.mark.integration
+def test_lab_report_create_new_idempotency_key_creates_new_blank(
+    client, auth_headers, db_session, test_patient, test_visit
+) -> None:
+    """Новый Idempotency-Key — новая операция: создаётся новый, легитимно
+    отдельный бланк (несколько бланков одного пациента и шаблона легитимны)."""
+    payload = _lab_create_instance_payload(client, auth_headers, test_patient, test_visit)
+
+    first = client.post(
+        "/api/v1/lab/report-instances",
+        headers=auth_headers | {"Idempotency-Key": "pr3351-r9-create-key-2"},
+        json=payload,
+    )
+    assert first.status_code == 200, first.text
+
+    second = client.post(
+        "/api/v1/lab/report-instances",
+        headers=auth_headers | {"Idempotency-Key": "pr3351-r9-create-key-3"},
+        json=payload,
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["id"] != first.json()["id"], (
+        "новый ключ обязан создавать отдельный бланк"
+    )
+
+    count = (
+        db_session.query(LabReportInstance)
+        .filter(LabReportInstance.patient_id == test_patient.id)
+        .count()
+    )
+    assert count == 2
+
+
+@pytest.mark.integration
+def test_lab_report_create_idempotency_key_survives_token_refresh_same_user(
+    client, auth_headers, db_session, admin_user, test_patient, test_visit
+) -> None:
+    """Reload/reconcile-ретрай может прийти с другой формой токена того же
+    пользователя (sub=username после login-флоу против sub=user.id у
+    refresh-ротации). Namespace ключа каноничен по user id (Codex R11
+    #3092): тот же ключ продолжает получать закоммиченный ответ."""
+    from app.services.authentication_service import authentication_service
+
+    payload = _lab_create_instance_payload(client, auth_headers, test_patient, test_visit)
+    key = "pr3351-r9-create-key-4"
+
+    login_shaped_token = authentication_service.create_access_token(
+        {"sub": admin_user.username}
+    )
+    first = client.post(
+        "/api/v1/lab/report-instances",
+        headers={"Authorization": f"Bearer {login_shaped_token}", "Idempotency-Key": key},
+        json=payload,
+    )
+    assert first.status_code == 200, first.text
+    first_instance_id = first.json()["id"]
+
+    # «Потерянный ответ», ретрай после refresh-ротации: та же учётная запись,
+    # другая форма токена — тот же ключ и payload.
+    second = client.post(
+        "/api/v1/lab/report-instances",
+        headers=auth_headers | {"Idempotency-Key": key},
+        json=payload,
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["id"] == first_instance_id, (
+        "дрейф namespace после refresh создал бы второй бланк"
+    )
+
+    count = (
+        db_session.query(LabReportInstance)
+        .filter(LabReportInstance.patient_id == test_patient.id)
+        .count()
+    )
+    assert count == 1
+
+
 @pytest.mark.integration
 def test_doctor_lab_report_reads_are_limited_to_own_visits(
     client,
