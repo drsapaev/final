@@ -312,7 +312,10 @@ async def send_appointment_confirmation(
             patient_phone=patient_phone,
             visit_date=appointment_datetime,
             doctor_name=doctor_name,
-            department=appointment.department or specialty,
+            # Round-6 (owner P1, PR #3340): the relationship attribute is a
+            # Department OBJECT once the portal booking persists department_id
+            # — templates rendered it as garbage. Map the canonical key.
+            department=appointment.department_key or specialty,
             db=db,
             patient_id=appointment.patient_id,
         )

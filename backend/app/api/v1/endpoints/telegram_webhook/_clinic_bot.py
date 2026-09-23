@@ -1148,8 +1148,14 @@ def _mini_app_patient_appointments(
 
 
 def _appointment_department_label(appointment: Appointment) -> str | None:
+    # Round-4 (owner P2, PR #3340): `Department` has NO `name` column — only
+    # `key` / `name_ru` / `name_uz` — so the previous
+    # `getattr(department, "name", None)` silently returned None for every
+    # row with a persisted department (the portal booking now guarantees
+    # one). Display the localized Russian name with the canonical key as
+    # the fallback; the shared builder serves both Mini App and JWT portal.
     department = getattr(appointment, "department", None)
-    return getattr(department, "name", None)
+    return getattr(department, "name_ru", None) or getattr(department, "key", None)
 
 
 def _mini_app_patient_cabinet_summary_payload(

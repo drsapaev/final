@@ -154,8 +154,9 @@ def _assert_pg_head(engine) -> None:
     # 0070 extends the chain; the 0065 objects are the invariant here.
     # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved
     # to 0072 (nurse workplace assignments 0071 + service executions 0072);
-    # RQ-18 follow-up round-5 extends it with 0073 (payload binding).
-    assert version == "0073_join_payload_binding", version
+    # main's corrective follow-up moved it to 0073 (routing snapshot);
+    # RQ-18 follow-up round-8 re-parents the payload binding as 0074.
+    assert version == "0074_join_payload_binding", version
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:

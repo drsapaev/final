@@ -103,11 +103,6 @@ const UserManagement = () => {
   { value: 'inactive', label: t('admin2.um_status_inactive_plural') }];
 
 
-  useEffect(() => {
-    loadUsers(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // PR-22: reload when filters or search change
   useEffect(() => {
     setCurrentPage(1);
@@ -486,7 +481,7 @@ const UserManagement = () => {
         variant="ghost"
         size="small"
         className="admin-w-32-h-32-p-0">
-        
+
             <MoreVertical size={16} />
           </Button>
         </div>
@@ -505,7 +500,7 @@ const UserManagement = () => {
           variant="primary"
           onClick={() => openUserDialog()}
           startIcon={<Plus size={16} />}>
-          
+
           {t('admin2.um_btn_add')}
         </Button>
       </Box>
@@ -536,7 +531,7 @@ const UserManagement = () => {
                 value={searchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchTerm(e.target.value)}
                 className="admin-pl-32-w-100pct" />
-              
+
             </div>
           </div>
 
@@ -683,7 +678,7 @@ const UserManagement = () => {
               : t('admin2.um_modal_title_delete_confirm')
         }
         size="small">
-        
+
         <div className="admin-p-0-0-24px-0">
           {deleteDialogMode === 'confirm' ? (
             <Typography>

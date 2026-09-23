@@ -1071,12 +1071,13 @@ def test_alembic_chain_single_head_0069() -> None:
     assert graph["0072_service_executions"] == (
         "0071_nurse_workplace_assignments",
     )
-    # RQ-18 follow-up round-5 (PR #3362 review): the join-session payload
-    # binding extends the chain to 0073.
-    assert graph["0073_join_payload_binding"] == (
+    # Main's corrective follow-up moved the head to 0073 (routing
+    # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
+    # as 0074 on top of it.
+    assert graph["0073_execution_routing_snapshot"] == (
         "0072_service_executions",
     )
-    assert heads == ["0073_join_payload_binding"]
+    assert heads == ["0074_join_payload_binding"]
 
 
 # ===================== C. PostgreSQL FK introspection =====================
@@ -1570,10 +1571,11 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar()
                 # The chain grew past the retirement (0070 lineage; now
-                # NURSE-V2 0071/0072 and the round-5 0073 payload binding);
-                # the retirement end-state (no synthetic usernames/doctors)
-                # is a head-agnostic invariant.
-                assert version == "0073_join_payload_binding"
+                # NURSE-V2 0071/0072, main's 0073 routing snapshot and the
+                # round-8 0074 payload binding); the retirement end-state
+                # (no synthetic usernames/doctors) is a head-agnostic
+                # invariant.
+                assert version == "0074_join_payload_binding"
 
                 usernames = {
                     row[0]

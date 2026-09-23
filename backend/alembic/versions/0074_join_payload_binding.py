@@ -17,31 +17,30 @@ Both columns are nullable: rows created by ``start_join_session`` (status
 ``pending``) carry no payload binding yet; it is written in the same
 single transaction that flips the session to ``joined``.
 
-Revision ID: 0073_join_payload_binding
-Revises: 0072_service_executions
+Revision ID: 0074_join_payload_binding
+Revises: 0073_execution_routing_snapshot
 Create Date: 2026-09-22
 
-MERGE-ORDER PROTOCOL (round-6, P1-4): PR #3367 carries a PARALLEL
-``0073_execution_routing_snapshot`` with the SAME ``down_revision``
-(``0072_service_executions``). Merging both unchanged forks the Alembic
-graph into two heads and blocks the single-head guards plus the normal
-production upgrade. The agreed order:
-
-  1. merge THIS PR (#3362) first;
-  2. rebase #3367 onto the new main and RENUMBER its migration:
-     revision = "0074_execution_routing_snapshot",
-     down_revision = "0073_join_payload_binding";
-  3. the pinned chain-head asserts (advanced to this revision by
-     333cdeab/a7c7aaff/6a984b78) FAIL on #3367's branch until step 2 —
-     that is the intended gate, not a flake.
+MERGE-ORDER RESOLUTION (round-8, review P1): the round-6 protocol above
+became unexecutable — #3367 merged into main FIRST (49be23d3) under the
+name ``0073_execution_routing_snapshot``, so a textual conflict
+resolution cannot remove the graph fork: two revisions sharing
+``down_revision = 0072_service_executions`` always yield two heads
+(verified with real Alembic 1.20 ScriptDirectory: ``alembic heads``
+reported MultipleHeads). Fix applied at merge time: this migration is
+RENUMBERED to ``0074_join_payload_binding`` and re-parented onto the
+merged main's ``0073_execution_routing_snapshot``, restoring the single
+linear head 0072 -> 0073_execution_routing_snapshot -> 0074. The pinned
+chain-head asserts in the integration tests were advanced accordingly in
+the same merge commit, so every commit on the branch stays green.
 """
 
 import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0073_join_payload_binding"
-down_revision = "0072_service_executions"
+revision = "0074_join_payload_binding"
+down_revision = "0073_execution_routing_snapshot"
 branch_labels = None
 depends_on = None
 
