@@ -11,6 +11,295 @@ from app.crud import queue_resource_routing  # QD-2C (round-17 P1)
 from app.crud.clinic import clinic_today
 from app.services.queue_service import queue_service  # noqa: F401
 
+_REGISTRAR_QUEUE_CACHE_KEY = "_registrar_queue_read_cache"
+
+
+def _prime_registrar_queue_read_cache(
+    db: Session,
+    target_day: date,
+    visits: list,
+    appointments: list,
+    online_entries: list,
+) -> dict[str, Any]:
+    """Batch reference reads used while building the registrar queue response.
+
+    The cache lives only for one payload build and is removed by its caller.
+    Helpers keep their original query path when called outside this endpoint.
+    """
+    from sqlalchemy.orm import joinedload, selectinload
+
+    from app.models.appointment import Appointment
+    from app.models.clinic import Doctor
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.patient import Patient
+    from app.models.payment import Payment
+    from app.models.service import Service
+    from app.models.visit import Visit
+    from app.services.payment_invariant_service import PaymentInvariantService
+
+    visit_ids = {visit.id for visit in visits if getattr(visit, "id", None)}
+    patient_ids = {
+        patient_id
+        for patient_id in (
+            [getattr(visit, "patient_id", None) for visit in visits]
+            + [getattr(appointment, "patient_id", None) for appointment in appointments]
+            + [getattr(entry, "patient_id", None) for entry in online_entries]
+        )
+        if patient_id is not None
+    }
+    appointment_patient_ids = {
+        appointment.patient_id
+        for appointment in appointments
+        if getattr(appointment, "patient_id", None) is not None
+    }
+    queue_ids = {
+        entry.queue_id
+        for entry in online_entries
+        if getattr(entry, "queue_id", None) is not None
+    }
+
+    # Visits are already loaded with their service relationship by the base
+    # query. Include linked visits outside that visible set for QR cost/payment
+    # fallback, without issuing a query for each queue row.
+    linked_visit_ids = {
+        entry.visit_id
+        for entry in online_entries
+        if getattr(entry, "visit_id", None) is not None
+    }
+    extra_visit_ids = linked_visit_ids - visit_ids
+    extra_visits = (
+        db.query(Visit)
+        .options(
+            selectinload(Visit.services),
+            joinedload(Visit.patient),
+            joinedload(Visit.doctor).joinedload(Doctor.user),
+        )
+        .filter(Visit.id.in_(extra_visit_ids))
+        .all()
+        if extra_visit_ids
+        else []
+    )
+    all_visits = {visit.id: visit for visit in [*visits, *extra_visits]}
+
+    visit_services_by_id: dict[int, list] = {}
+    service_ids: set[int] = set()
+    for visit in [*visits, *extra_visits]:
+        visit_services = list(visit.services or [])
+        visit_services_by_id[visit.id] = visit_services
+        service_ids.update(
+            item.service_id
+            for item in visit_services
+            if getattr(item, "service_id", None) is not None
+        )
+
+    service_names: set[str] = set()
+    for record in [*appointments, *online_entries]:
+        items = getattr(record, "services", None)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict):
+                service_id = item.get("id") or item.get("service_id")
+                if isinstance(service_id, int):
+                    service_ids.add(service_id)
+            elif isinstance(item, int):
+                service_ids.add(item)
+            elif isinstance(item, str) and isinstance(record, Appointment):
+                service_names.add(item)
+
+    id_services = (
+        db.query(Service).filter(Service.id.in_(service_ids)).all()
+        if service_ids
+        else []
+    )
+    name_services = (
+        db.query(Service).filter(Service.name.in_(service_names)).all()
+        if service_names
+        else []
+    )
+    services_by_id = {service.id: service for service in id_services}
+    services_by_name: dict[str, Any] = {}
+    for service in name_services:
+        services_by_name.setdefault(service.name, service)
+    services = list(services_by_id.values())
+    services.extend(
+        service for service in name_services if service.id not in services_by_id
+    )
+
+    patients = (
+        db.query(Patient).filter(Patient.id.in_(patient_ids)).all()
+        if patient_ids
+        else []
+    )
+    patients_by_id = {patient.id: patient for patient in patients}
+
+    daily_queues = (
+        db.query(DailyQueue)
+        .options(
+            joinedload(DailyQueue.specialist).joinedload(Doctor.user),
+            joinedload(DailyQueue.queue_resource),
+        )
+        .filter(DailyQueue.id.in_(queue_ids))
+        .all()
+        if queue_ids
+        else []
+    )
+    daily_queues_by_id = {queue.id: queue for queue in daily_queues}
+
+    visit_queue_entries: dict[tuple[int, int], Any] = {}
+    if visit_ids:
+        linked_entries = (
+            db.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.visit_id.in_(visit_ids))
+            .order_by(OnlineQueueEntry.id.asc())
+            .all()
+        )
+        for entry in linked_entries:
+            if entry.patient_id is not None:
+                visit_queue_entries.setdefault(
+                    (entry.visit_id, entry.patient_id), entry
+                )
+
+    legacy_visit_keys: set[tuple[int, int | None]] = set()
+    if appointment_patient_ids:
+        existing_visits = (
+            db.query(Visit.patient_id, Visit.doctor_id)
+            .filter(
+                Visit.visit_date == target_day,
+                Visit.patient_id.in_(appointment_patient_ids),
+            )
+            .all()
+        )
+        legacy_visit_keys = set(existing_visits)
+
+    appointment_queue_metadata: dict[tuple[int, date, int], Any] = {}
+    appointment_doctor_ids = {
+        appointment.doctor_id
+        for appointment in appointments
+        if getattr(appointment, "doctor_id", None) is not None
+    }
+    if appointment_patient_ids and appointment_doctor_ids:
+        rows = (
+            db.query(OnlineQueueEntry, DailyQueue.day, DailyQueue.specialist_id)
+            .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+            .filter(
+                OnlineQueueEntry.patient_id.in_(appointment_patient_ids),
+                OnlineQueueEntry.visit_id.is_(None),
+                DailyQueue.day == target_day,
+                DailyQueue.specialist_id.in_(appointment_doctor_ids),
+            )
+            .order_by(OnlineQueueEntry.created_at.desc())
+            .all()
+        )
+        for entry, queue_day, specialist_id in rows:
+            appointment_queue_metadata.setdefault(
+                (entry.patient_id, queue_day, specialist_id), entry
+            )
+
+    payment_truth_by_visit: dict[int, dict[str, Any]] = {}
+    payment_checked_visit_ids = set(all_visits)
+    if all_visits:
+        payment_visit_ids = {
+            visit_id
+            for (visit_id,) in db.query(Payment.visit_id)
+            .filter(Payment.visit_id.in_(payment_checked_visit_ids))
+            .distinct()
+            .all()
+        }
+        if payment_visit_ids:
+            payment_visits = [
+                visit
+                for visit_id, visit in all_visits.items()
+                if visit_id in payment_visit_ids
+            ]
+            summary = PaymentInvariantService(db).summarize_visits(payment_visits)
+            payment_truth_by_visit = {
+                row["visit_id"]: row for row in summary["visits"]
+            }
+
+    return {
+        "patients": patients_by_id,
+        "patient_ids_checked": patient_ids,
+        "services": services,
+        "services_by_id": services_by_id,
+        "service_ids_checked": service_ids,
+        "services_by_name": services_by_name,
+        "service_names_checked": service_names,
+        "visit_services": visit_services_by_id,
+        "daily_queues": daily_queues_by_id,
+        "daily_queue_ids_checked": queue_ids,
+        "visit_queue_entries": visit_queue_entries,
+        "visit_queue_entries_ready": True,
+        "legacy_visit_keys": legacy_visit_keys,
+        "legacy_visit_keys_ready": True,
+        "appointment_queue_metadata": appointment_queue_metadata,
+        "appointment_queue_metadata_ready": True,
+        "payment_truth_by_visit": payment_truth_by_visit,
+        "payment_checked_visit_ids": payment_checked_visit_ids,
+        "default_services_by_specialty": {},
+        "routing_specialists_by_queue": {},
+    }
+
+
+def _cached_patient(db: Session, patient_id: int | None):
+    from app.models.patient import Patient
+
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    if cache is not None and patient_id in cache["patient_ids_checked"]:
+        return cache["patients"].get(patient_id)
+    return db.query(Patient).filter(Patient.id == patient_id).first()
+
+
+def _cached_visit_services(db: Session, visit_id: int) -> list:
+    from app.models.visit import VisitService
+
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    if cache is not None and visit_id in cache["visit_services"]:
+        return cache["visit_services"][visit_id]
+    return db.query(VisitService).filter(VisitService.visit_id == visit_id).all()
+
+
+def _cached_service_by_id(db: Session, service_id: int | None):
+    from app.models.service import Service
+
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    if cache is not None and service_id in cache["service_ids_checked"]:
+        return cache["services_by_id"].get(service_id)
+    return db.query(Service).filter(Service.id == service_id).first()
+
+
+def _cached_service_by_name(db: Session, name: str):
+    from app.models.service import Service
+
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    if cache is not None and name in cache["service_names_checked"]:
+        return cache["services_by_name"].get(name)
+    return db.query(Service).filter(Service.name == name).first()
+
+
+def _cached_services_for_ids(db: Session, service_ids: list[int]) -> list:
+    from app.models.service import Service
+
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    if cache is not None and set(service_ids).issubset(cache["service_ids_checked"]):
+        requested_ids = set(service_ids)
+        return [service for service in cache["services"] if service.id in requested_ids]
+    if not service_ids:
+        return []
+    return db.query(Service).filter(Service.id.in_(service_ids)).all()
+
+
+def _cached_default_service_by_specialty(db: Session, specialty: str):
+    from app.services.service_mapping import get_default_service_by_specialty
+
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    if cache is None:
+        return get_default_service_by_specialty(db, specialty)
+    services = cache["default_services_by_specialty"]
+    if specialty not in services:
+        services[specialty] = get_default_service_by_specialty(db, specialty)
+    return services[specialty]
+
 
 @router.get("/registrar/queue-settings", response_model=dict[str, Any])
 def get_registrar_queue_settings(
@@ -308,12 +597,20 @@ def _load_queue_data_for_date(db: Session, target_day: date) -> tuple:
     Returns:
         tuple of (visits, appointments, online_entries)
     """
+    from sqlalchemy.orm import joinedload, selectinload
+
     from app.models.appointment import Appointment
+    from app.models.clinic import Doctor
     from app.models.online_queue import DailyQueue, OnlineQueueEntry
     from app.models.visit import Visit
 
     visits = (
         db.query(Visit)
+        .options(
+            selectinload(Visit.services),
+            joinedload(Visit.patient),
+            joinedload(Visit.doctor).joinedload(Doctor.user),
+        )
         .filter(
             Visit.visit_date == target_day,
             ~func.lower(func.coalesce(Visit.status, "")).in_(
@@ -325,6 +622,11 @@ def _load_queue_data_for_date(db: Session, target_day: date) -> tuple:
 
     appointments = (
         db.query(Appointment)
+        .options(
+            joinedload(Appointment.patient),
+            joinedload(Appointment.doctor).joinedload(Doctor.user),
+            joinedload(Appointment.department),
+        )
         .filter(
             Appointment.appointment_date == target_day,
             ~func.lower(func.coalesce(Appointment.status, "")).in_(
@@ -433,6 +735,11 @@ def _get_visit_queue_time(
     db: Session, visit: Any
 ) -> Any:
     """R-22: Get queue_time from linked OnlineQueueEntry for a visit."""
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    if cache is not None and cache.get("visit_queue_entries_ready"):
+        queue_entry = cache["visit_queue_entries"].get((visit.id, visit.patient_id))
+        return queue_entry.queue_time if queue_entry else None
+
     from app.models.online_queue import OnlineQueueEntry
     try:
         queue_entry = (
@@ -500,15 +807,27 @@ def _process_online_queue_entries(
                 if patient_has_visit:
                     continue
 
-        daily_queue = (
-            db.query(DailyQueue)
-            .filter(DailyQueue.id == online_entry.queue_id)
-            .first()
-        )
+        cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+        if cache is not None and online_entry.queue_id in cache["daily_queues"]:
+            daily_queue = cache["daily_queues"][online_entry.queue_id]
+        elif cache is not None and online_entry.queue_id in cache["daily_queue_ids_checked"]:
+            daily_queue = None
+        else:
+            daily_queue = (
+                db.query(DailyQueue)
+                .filter(DailyQueue.id == online_entry.queue_id)
+                .first()
+            )
         if not daily_queue:
             continue
 
-        doctor = db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
+        doctor = getattr(daily_queue, "specialist", None)
+        if doctor is None and daily_queue.specialist_id is not None:
+            doctor = (
+                db.query(Doctor)
+                .filter(Doctor.id == daily_queue.specialist_id)
+                .first()
+            )
         integrity_warnings: list[str] = []
         # QD-2C (Codex round-12 P2): ресурсная очередь (queue_resource_id)
         # — владелец по дизайну РЕЕСТР, не врач: без linked_doctor_missing-шума;
@@ -570,10 +889,19 @@ def _process_online_queue_entries(
             # врача — routing_specialists дают ось сопоставления, не
             # подменяя владение (specialist_id остаётся NULL)
             bucket["queue_resource_id"] = daily_queue.queue_resource_id
-            bucket.setdefault(
-                "routing_specialists",
-                queue_resource_routing.routing_specialist_ids(db, daily_queue),
-            )
+            cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+            if cache is None:
+                routing_specialists = queue_resource_routing.routing_specialist_ids(
+                    db, daily_queue
+                )
+            else:
+                routing_by_queue = cache["routing_specialists_by_queue"]
+                if daily_queue.id not in routing_by_queue:
+                    routing_by_queue[daily_queue.id] = (
+                        queue_resource_routing.routing_specialist_ids(db, daily_queue)
+                    )
+                routing_specialists = routing_by_queue[daily_queue.id]
+            bucket.setdefault("routing_specialists", routing_specialists)
 
         entry_time = (
             online_entry.queue_time
@@ -597,7 +925,6 @@ def _process_legacy_appointments(
     today: date,
 ) -> None:
     """R-22 Phase 3: Process legacy Appointment records into specialty queues."""
-    from app.models.service import Service
     from app.models.visit import Visit
 
     for appointment in appointments:
@@ -615,11 +942,11 @@ def _process_legacy_appointments(
                 if isinstance(service_item, dict):
                     service_id = service_item.get('id')
                     if service_id:
-                        service = db.query(Service).filter(Service.id == service_id).first()
+                        service = _cached_service_by_id(db, service_id)
                 elif isinstance(service_item, int):
-                    service = db.query(Service).filter(Service.id == service_item).first()
+                    service = _cached_service_by_id(db, service_item)
                 elif isinstance(service_item, str):
-                    service = db.query(Service).filter(Service.name == service_item).first()
+                    service = _cached_service_by_name(db, service_item)
                 if service and service.department_key:
                     specialty = service.department_key
                     break
@@ -639,7 +966,11 @@ def _process_legacy_appointments(
                     visit_filters.append(Visit.doctor_id == doctor_id)
                 else:
                     visit_filters.append(Visit.doctor_id.is_(None))
-                existing_visit = db.query(Visit).filter(and_(*visit_filters)).first()
+                cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+                if cache is not None and cache.get("legacy_visit_keys_ready"):
+                    existing_visit = (patient_id, doctor_id) in cache["legacy_visit_keys"]
+                else:
+                    existing_visit = db.query(Visit).filter(and_(*visit_filters)).first()
                 if existing_visit:
                     visit_exists = True
             except Exception:
@@ -653,8 +984,14 @@ def _process_legacy_appointments(
         appointment_queue_time = None
         try:
             if patient_id and appointment_date and doctor_id is not None:
-                queue_entry_row = db.execute(
-                    text("""
+                cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+                if cache is not None and cache.get("appointment_queue_metadata_ready"):
+                    queue_entry_row = cache["appointment_queue_metadata"].get(
+                        (patient_id, appointment_date, doctor_id)
+                    )
+                else:
+                    queue_entry_row = db.execute(
+                        text("""
                         SELECT qe.queue_time
                         FROM queue_entries qe
                         JOIN daily_queues dq ON qe.queue_id = dq.id
@@ -665,12 +1002,12 @@ def _process_legacy_appointments(
                         ORDER BY qe.created_at DESC
                         LIMIT 1
                     """),
-                    {
-                        "patient_id": patient_id,
-                        "appointment_date": appointment_date,
-                        "doctor_id": doctor_id,
-                    },
-                ).first()
+                        {
+                            "patient_id": patient_id,
+                            "appointment_date": appointment_date,
+                            "doctor_id": doctor_id,
+                        },
+                    ).first()
                 if queue_entry_row and queue_entry_row.queue_time:
                     appointment_queue_time = queue_entry_row.queue_time
         except Exception:
@@ -889,6 +1226,9 @@ def _same_patient_queue_entry_for_visit_id(
     from app.models.online_queue import OnlineQueueEntry
     if visit_id is None or patient_id is None:
         return None
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    if cache is not None and cache.get("visit_queue_entries_ready"):
+        return cache["visit_queue_entries"].get((visit_id, patient_id))
     return (
         db.query(OnlineQueueEntry)
         .filter(
@@ -973,9 +1313,15 @@ def _resolve_queue_entry_metadata(
             and appointment_date
             and doctor_id is not None
         ):
-            queue_entry_row = db.execute(
-                text(
-                    """
+            cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+            if cache is not None and cache.get("appointment_queue_metadata_ready"):
+                queue_entry_row = cache["appointment_queue_metadata"].get(
+                    (patient_id, appointment_date, doctor_id)
+                )
+            else:
+                queue_entry_row = db.execute(
+                    text(
+                        """
                     SELECT qe.number, qe.queue_time, qe.updated_at
                     FROM queue_entries qe
                     JOIN daily_queues dq ON qe.queue_id = dq.id
@@ -987,12 +1333,12 @@ def _resolve_queue_entry_metadata(
                     LIMIT 1
                     """
                 ),
-                {
+                    {
                     "patient_id": patient_id,
                     "appointment_date": appointment_date,
                     "doctor_id": doctor_id,
-                },
-            ).first()
+                    },
+                ).first()
             if queue_entry_row:
                 queue_entry_number = queue_entry_row.number
                 queue_entry_time = queue_entry_row.queue_time
@@ -1039,8 +1385,6 @@ def _process_appointment_entry(
         logger.warning("get_today_queues: appointment entry with None data, skipping")
         return None
 
-    from app.models.patient import Patient
-
     appointment = entry_data
     record_id = appointment.id
     patient_id = appointment.patient_id
@@ -1057,11 +1401,7 @@ def _process_appointment_entry(
     patient_birth_year = None
     address = None
 
-    patient = (
-        db.query(Patient)
-        .filter(Patient.id == appointment.patient_id)
-        .first()
-    )
+    patient = _cached_patient(db, appointment.patient_id)
     if patient:
         patient_name = patient.short_name()
         phone = patient.phone or "Не указан"
@@ -1160,11 +1500,6 @@ def _process_online_queue_entry(
         logger.warning("get_today_queues: online_queue entry with None data, skipping")
         return None
 
-    from app.models.patient import Patient
-    from app.models.service import Service
-    from app.models.visit import VisitService
-    from app.services.service_mapping import get_default_service_by_specialty
-
     # entry_data может быть OnlineQueueEntry или Visit (для QR-визитов)
     is_visit_object = hasattr(entry_data, 'visit_date') and not hasattr(entry_data, 'queue_id')
 
@@ -1192,7 +1527,7 @@ def _process_online_queue_entry(
         discount_mode = visit.discount_mode or "none"
         visit_time = str(visit.visit_time) if hasattr(visit, 'visit_time') and visit.visit_time else None
 
-        patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+        patient = _cached_patient(db, visit.patient_id)
         if patient:
             patient_name = patient.short_name()
             phone = patient.phone or "Не указан"
@@ -1205,9 +1540,9 @@ def _process_online_queue_entry(
             address = None
 
         # Услуги из VisitService
-        visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+        visit_services = _cached_visit_services(db, visit.id)
         for vs in visit_services:
-            svc = db.query(Service).filter(Service.id == vs.service_id).first()
+            svc = _cached_service_by_id(db, vs.service_id)
             if svc:
                 service_codes.append(svc.service_code or svc.code or "")
                 services.append({
@@ -1265,7 +1600,7 @@ def _process_online_queue_entry(
             service_name = first
 
     if not service_name:
-        default_service = get_default_service_by_specialty(db, specialty)
+        default_service = _cached_default_service_by_specialty(db, specialty)
         if default_service:
             service_name = default_service["name"]
             entry_wrapper["service_id"] = default_service["id"]
@@ -1292,12 +1627,23 @@ def _process_online_queue_entry(
         linked_visit_id = getattr(entry_data, 'visit_id', None) or entry_wrapper.get("visit_id")
         if linked_visit_id:
             try:
-                cost_row = db.execute(
-                    text("SELECT SUM(price * qty) as total FROM visit_services WHERE visit_id = :vid"),
-                    {"vid": linked_visit_id}
-                ).first()
-                if cost_row and cost_row.total:
-                    total_cost = float(cost_row.total)
+                cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+                if cache is not None and linked_visit_id in cache["visit_services"]:
+                    visit_services = cache["visit_services"][linked_visit_id]
+                    service_total = sum(
+                        (vs.price * (vs.qty or 1))
+                        for vs in visit_services
+                        if vs.price is not None
+                    )
+                    if service_total:
+                        total_cost = float(service_total)
+                else:
+                    cost_row = db.execute(
+                        text("SELECT SUM(price * qty) as total FROM visit_services WHERE visit_id = :vid"),
+                        {"vid": linked_visit_id}
+                    ).first()
+                    if cost_row and cost_row.total:
+                        total_cost = float(cost_row.total)
             except Exception:
                 pass  # Fallback на 0
 
@@ -1431,9 +1777,6 @@ def _process_visit_entry(
         logger.warning("get_today_queues: visit entry with None data, skipping")
         return None
 
-    from app.models.patient import Patient
-    from app.models.service import Service
-    from app.models.visit import VisitService
     from app.services.service_mapping import get_service_code
 
     visit = entry_data
@@ -1447,9 +1790,7 @@ def _process_visit_entry(
     patient_birth_year = None
     address = None
 
-    patient = (
-        db.query(Patient).filter(Patient.id == visit.patient_id).first()
-    )
+    patient = _cached_patient(db, visit.patient_id)
     if patient:
         patient_name = patient.short_name()
         phone = patient.phone or "Не указан"
@@ -1468,11 +1809,7 @@ def _process_visit_entry(
             else "Неизвестный пациент"
         )
 
-    all_visit_services = (
-        db.query(VisitService)
-        .filter(VisitService.visit_id == visit.id)
-        .all()
-    )
+    all_visit_services = _cached_visit_services(db, visit.id)
 
     ecg_only_flag = entry_wrapper.get("ecg_only", False)
     filter_services_flag = entry_wrapper.get("filter_services", False)
@@ -1482,11 +1819,7 @@ def _process_visit_entry(
         # Показываем только ЭКГ услуги (для очереди echokg)
         for vs in all_visit_services:
             if hasattr(vs, 'service_id') and vs.service_id:
-                service = (
-                    db.query(Service)
-                    .filter(Service.id == vs.service_id)
-                    .first()
-                )
+                service = _cached_service_by_id(db, vs.service_id)
                 if service and service.queue_tag == 'ecg':
                     visit_services.append(vs)
         if not visit_services:
@@ -1499,11 +1832,7 @@ def _process_visit_entry(
         # Исключаем ЭКГ услуги (для очереди cardiology)
         for vs in all_visit_services:
             if hasattr(vs, 'service_id') and vs.service_id:
-                service = (
-                    db.query(Service)
-                    .filter(Service.id == vs.service_id)
-                    .first()
-                )
+                service = _cached_service_by_id(db, vs.service_id)
                 if service and service.queue_tag != 'ecg':
                     visit_services.append(vs)
         if not visit_services:
@@ -1527,11 +1856,7 @@ def _process_visit_entry(
         service_code_to_use = None
         svc = None
         if hasattr(vs, 'service_id') and vs.service_id:
-            svc = (
-                db.query(Service)
-                .filter(Service.id == vs.service_id)
-                .first()
-            )
+            svc = _cached_service_by_id(db, vs.service_id)
             if svc:
                 service_code_to_use = get_service_code(
                     {
@@ -1591,4 +1916,3 @@ def _process_visit_entry(
 
 
 # ===================== ТЕКУЩИЕ ОЧЕРЕДИ =====================
-
