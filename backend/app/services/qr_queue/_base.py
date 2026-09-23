@@ -50,10 +50,15 @@ JOIN_SESSION_PROCESSING_STATUS = "joining"
 # deployment that let a retry carrying payload B be served patient A's
 # saved ticket (wrong-patient disclosure). New workers write
 # ``joined_v2``: an old worker does NOT recognize it as replayable and
-# classifies the row through its fallback (expires_at long past →
-# ``join_session_expired``) — a decisive, no-business-action refusal,
-# never a replay of a foreign payload. New workers accept BOTH values:
-# legacy rows replay fail-closed (no fingerprint ⇒ used refusal).
+# classifies the row through its fallback. Round-9 (review P1-1): the
+# fallback is kept OUT of the start-over-safe class — on a successful
+# complete the worker extends ``expires_at`` to the attempt horizon
+# (``_extend_joined_expires_to_horizon``), so the old worker answers the
+# SAFE ``join_session_processing`` («outcome unknown, keep waiting»)
+# for the whole recovery window instead of ``join_session_expired``,
+# which the frontend reads as «nothing was created» on top of a
+# COMMITTED талон. New workers accept BOTH values: legacy rows replay
+# fail-closed (no fingerprint ⇒ used refusal).
 JOIN_SESSION_JOINED_STATUS = "joined"
 JOIN_SESSION_JOINED_STATUS_V2 = "joined_v2"
 

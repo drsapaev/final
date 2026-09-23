@@ -7149,6 +7149,8 @@ const en = {
     // replay conflict — 409 join_session_payload_mismatch.
     qj_payload_mismatch: 'This attempt belongs to a different set of details — its result cannot be re-served. You may start over if needed.',
     qj_preexec_refusal: 'The session expired before the submission — no ticket was created. Start over?',
+    qj_preexec_not_executed: 'The submission did not go through — the queue refused it before creating a ticket. Start over?',
+    qj_attempt_guard_unavailable: 'The browser could not save the attempt state — the submission was blocked to prevent a duplicate ticket. Allow site data and try again.',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',
     qj_waiting_until_open: 'до открытия записи',

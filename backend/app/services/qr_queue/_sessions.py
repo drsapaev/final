@@ -129,6 +129,43 @@ class SessionsMixin(QRQueueServiceMixinBase):
             )
         return horizon
 
+    def _extend_joined_expires_to_horizon(self, session: QueueJoinSession) -> None:
+        """Round-9 (PR #3362 review, P1-1): keep the attempt identity alive
+        for ANY worker until the attempt horizon.
+
+        On a SUCCESSFUL complete the 15-minute session TTL must not stay as
+        ``expires_at``: a mixed-version OLD worker does not know the
+        ``joined_v2`` marker, so once the original TTL ran out it classified
+        the row through its fallback as ``join_session_expired`` — and the
+        frontend treats ``expired`` as PROOF that the business operation
+        never ran, offering «Start over» on top of an ALREADY COMMITTED
+        талон. Extending ``expires_at`` to the same attempt horizon the
+        client holds (end of the TARGET queue-day + grace) moves the row
+        into the old worker's SAFE ``join_session_processing`` class for
+        the whole recovery window (unknown outcome ⇒ no second business
+        attempt), while the new worker keeps classifying it as ``used``
+        (both joined markers are replayable state here). Never shortens an
+        existing expiry; preserves the column's storage convention (SQLite
+        test sessions hold naive UTC datetimes, PostgreSQL tz-aware ones).
+        """
+        horizon = self._resolve_attempt_horizon(session.qr_token).get(
+            "attempt_expires_at"
+        )
+        if horizon is None:
+            horizon = datetime.now(UTC) + timedelta(
+                hours=self.ATTEMPT_HORIZON_GRACE_HOURS
+            )
+        current = session.expires_at
+        if current is not None:
+            current_cmp = (
+                current if current.tzinfo is not None else current.replace(tzinfo=UTC)
+            )
+            if current_cmp > horizon:
+                horizon = current_cmp
+            if current.tzinfo is None:
+                horizon = horizon.replace(tzinfo=None)
+        session.expires_at = horizon
+
     def _claim_pending_join_session(self, session_token: str) -> QueueJoinSession | None:
         now_utc = datetime.now(UTC)
         pending_filter = (
@@ -518,6 +555,12 @@ class SessionsMixin(QRQueueServiceMixinBase):
         session.response_snapshot = json.dumps(
             response, ensure_ascii=False, default=str
         )
+        # Round-9 (PR #3362 review, P1-1): the successful complete moves the
+        # row's expiry to the attempt horizon — a mixed-version OLD worker
+        # must classify this row as the SAFE ``join_session_processing``
+        # for the whole recovery window, never as the start-over-safe
+        # ``join_session_expired`` on top of a COMMITTED талон.
+        self._extend_joined_expires_to_horizon(session)
 
         self.db.commit()
 
@@ -821,6 +864,10 @@ class SessionsMixin(QRQueueServiceMixinBase):
         session.response_snapshot = json.dumps(
             response, ensure_ascii=False, default=str
         )
+        # Round-9 (PR #3362 review, P1-1): same horizon extension as the
+        # single path — the old worker keeps the SAFE ``processing`` class
+        # until the attempt horizon ends.
+        self._extend_joined_expires_to_horizon(session)
         self.db.commit()
 
         # Round-5 (P1-4): post-commit side effects are best-effort —

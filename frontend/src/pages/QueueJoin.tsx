@@ -152,11 +152,21 @@ const attemptStateStorageGet = (key: string): string | null => {
     return null;
   }
 };
-const attemptStateStorageSet = (key: string, value: string): void => {
+// Round-9 (review P2-3): the write is VERIFIED, not best-effort — the
+// envelope IS the exactly-once guard for the irreversible complete, so
+// a silent setItem failure (quota / disabled storage / private mode)
+// must be visible to the caller. The read-back check proves the value
+// actually landed in the store.
+const attemptStateStorageSet = (key: string, value: string): boolean => {
   try {
     window.localStorage.setItem(key, value);
   } catch {
-    /* storage full/unavailable — the attempt-state is best-effort */
+    return false;
+  }
+  try {
+    return window.localStorage.getItem(key) === value;
+  } catch {
+    return false;
   }
 };
 const attemptStateStorageRemove = (key: string): void => {
@@ -188,11 +198,27 @@ const attemptStateHorizonValid = (state: {
 // mint a NEW session while the previous attempt's business outcome was
 // still unknown, and the lowercase/uppercase URL alias of the same
 // permanent address would reset the guard too.
-const attemptStateRead = (key: string | null): QueueJoinAttemptState | null => {
-  if (!key) return null;
+//
+// Round-9 (review P1-2): the attempt state is addressed PER ATTEMPT —
+// key = base + '__' + sessionToken — never as ONE shared slot per
+// direction. The old single slot let two tabs of the same /q/<code>
+// destroy each other's recovery state (B's setItem overwrote A's
+// envelope; B's success removeItem wiped the shared slot entirely, so
+// A's lost-response reload lost its attempt identity). Removal deletes
+// ONLY the key of the attempt that owns it.
+const attemptStateKeyBase = (code: string): string => `queue_join_attempt_qdir_${code}`;
+const attemptStateKeyFor = (code: string, sessionToken: string): string =>
+  `${attemptStateKeyBase(code)}__${sessionToken}`;
+// Round-9 (review P1-2): the per-tab owner marker (sessionStorage —
+// survives a reload, dies with the tab) says WHICH outstanding attempt
+// this tab adopted. A reloaded tab finds its own attempt; a reopened
+// tab adopts the single outstanding one (the common case) or the
+// newest — and never destroys the others.
+const attemptStateOwnerKey = (code: string): string => `queue_join_attempt_owner_qdir_${code}`;
+
+const attemptStateParse = (raw: string | null): QueueJoinAttemptState | null => {
+  if (!raw) return null;
   try {
-    const raw = attemptStateStorageGet(key);
-    if (!raw) return null;
     const parsed = safeJsonParse(raw) as Partial<QueueJoinAttemptState> | null;
     if (
       parsed &&
@@ -219,19 +245,105 @@ const attemptStateRead = (key: string | null): QueueJoinAttemptState | null => {
           typeof parsed.attemptExpiresAt === 'string' ? parsed.attemptExpiresAt : null,
       };
     }
-    attemptStateStorageRemove(key);
     return null;
   } catch {
     return null;
   }
 };
-const attemptStateWrite = (key: string | null, state: QueueJoinAttemptState): void => {
-  if (!key) return;
-  attemptStateStorageSet(key, JSON.stringify(state));
+
+// Round-9 (review P1-2): ONE attempt's own envelope — read / verified
+// write / own-key-only removal.
+const attemptStateReadFor = (
+  code: string,
+  sessionToken: string | null | undefined,
+): QueueJoinAttemptState | null => {
+  if (!code || !sessionToken) return null;
+  return attemptStateParse(attemptStateStorageGet(attemptStateKeyFor(code, sessionToken)));
 };
-const attemptStateRemove = (key: string | null): void => {
-  if (!key) return;
-  attemptStateStorageRemove(key);
+const attemptStateWriteFor = (
+  code: string,
+  state: QueueJoinAttemptState,
+): boolean => {
+  if (!code || !state.sessionToken) return false;
+  return attemptStateStorageSet(
+    attemptStateKeyFor(code, state.sessionToken),
+    JSON.stringify(state),
+  );
+};
+const attemptStateRemoveFor = (
+  code: string,
+  sessionToken: string | null | undefined,
+): void => {
+  if (!code || !sessionToken) return;
+  attemptStateStorageRemove(attemptStateKeyFor(code, sessionToken));
+};
+
+const attemptStateOwnerGet = (code: string): string | null => {
+  if (!code) return null;
+  try {
+    return window.sessionStorage.getItem(attemptStateOwnerKey(code));
+  } catch {
+    return null;
+  }
+};
+const attemptStateOwnerSet = (code: string, sessionToken: string): void => {
+  if (!code || !sessionToken) return;
+  try {
+    window.sessionStorage.setItem(attemptStateOwnerKey(code), sessionToken);
+  } catch {
+    /* best-effort — the per-tab identity marker */
+  }
+};
+const attemptStateOwnerClear = (code: string): void => {
+  if (!code) return;
+  try {
+    window.sessionStorage.removeItem(attemptStateOwnerKey(code));
+  } catch {
+    /* noop */
+  }
+};
+
+// Round-9 (review P1-2): ALL outstanding attempts of a direction — the
+// per-attempt keys plus the LEGACY single-slot envelope an older build
+// may have left (migrated by the boot). Invalid / horizon-dead entries
+// are self-healed away; the legacy VALID slot is returned as a
+// candidate and re-homed by the boot only after its per-attempt write
+// is verified.
+const attemptStateScan = (code: string): QueueJoinAttemptState[] => {
+  if (!code) return [];
+  const found: QueueJoinAttemptState[] = [];
+  const prefix = `${attemptStateKeyBase(code)}__`;
+  const legacyKey = attemptStateKeyBase(code);
+  const collect = (store: Storage, key: string) => {
+    const raw = store.getItem(key);
+    if (raw === null) return;
+    const parsed = attemptStateParse(raw);
+    if (
+      parsed &&
+      parsed.publicCode === code &&
+      !found.some((candidate) => candidate.sessionToken === parsed.sessionToken)
+    ) {
+      found.push(parsed);
+    } else if (!parsed) {
+      // unparseable or horizon-dead — self-heal (the old
+      // attemptStateRead removed exactly these on sight)
+      store.removeItem(key);
+    }
+  };
+  try {
+    const storage = window.localStorage;
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (key && (key.startsWith(prefix) || key === legacyKey)) {
+        collect(storage, key);
+      }
+    }
+    // round-5 fallback slot (sessionStorage, single-slot shape)
+    collect(window.sessionStorage, legacyKey);
+  } catch {
+    /* storage unavailable */
+  }
+  return found.sort((a, b) => b.ts - a.ts);
 };
 
 // RQ-18 follow-up round-4 (P2-1): the backend now refuses an unclaimable
@@ -256,6 +368,22 @@ const getJoinRefusalReason = (err: unknown): string | null => {
     typeof (detail as { reason?: unknown }).reason === 'string'
   ) {
     return (detail as { reason: string }).reason;
+  }
+  return null;
+};
+
+// Round-9 (review P2-2): the server's own SAFE domain message from a
+// structured refusal ({detail: {reason, message}}) — the
+// join_session_not_executed class (rollback-proven, e.g. «Очередь
+// заполнена») must reach the patient verbatim instead of being
+// flattened into the generic «сессия истекла» recovery text.
+const getJoinRefusalMessage = (err: unknown): string | null => {
+  const detail = (err as HttpApiError | null)?.response?.data?.detail;
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+    const message = (detail as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
   }
   return null;
 };
@@ -313,6 +441,10 @@ const QueueJoin = () => {
     phoneTooLong: t('misc.qj_phone_too_long'),
     missingSessionToken: t('misc.qj_missing_session_token'),
     joinFailed: t('misc.qj_join_failed'),
+    // Round-9 (review P2-3): the verified-envelope gate — shown when the
+    // browser refused to persist the recovery guard and the business
+    // attempt was therefore NOT sent.
+    attemptGuardUnavailable: t('misc.qj_attempt_guard_unavailable'),
     selectSpecialist: t('misc.qj_select_specialist'),
     directionUnavailable: t('misc.qj_direction_unavailable'),
   };
@@ -341,11 +473,10 @@ const QueueJoin = () => {
     : legacyToken
       ? `queue_join_form_${legacyToken}`
       : null;
-  // RQ-18 follow-up round-4 (P1-2): the attempt-state key — CANONICAL-code
-  // scoped, so both case variants of the URL share one attempt identity.
-  const attemptStorageKey = directionCode
-    ? `queue_join_attempt_qdir_${directionCode}`
-    : null;
+  // RQ-18 follow-up round-4 (P1-2): the attempt-state is addressed PER
+  // ATTEMPT (round-8: base + '__' + sessionToken — no shared per-direction
+  // slot), still under the CANONICAL code so both case variants of the
+  // URL share one attempt identity.
   // RQ-18 follow-up round-4 (P1-2): a hydrated attempt whose business
   // outcome is UNKNOWN — the mount must NOT mint a new session; the
   // patient gets the reconcile/start-over panel instead.
@@ -364,6 +495,12 @@ const QueueJoin = () => {
   // «Сессия истекла до отправки. Начать заново» with a real button, not
   // a blind retry loop against the same dead token.
   const [preExecRefusal, setPreExecRefusal] = useState(false);
+  // Round-9 (review P2-2): WHICH pre-execution refusal fired and the
+  // server's own safe domain message — the rollback-proven
+  // join_session_not_executed class (e.g. «Очередь заполнена») must be
+  // shown verbatim, not flattened into the «сессия истекла» text.
+  const [preExecRefusalReason, setPreExecRefusalReason] = useState<string | null>(null);
+  const [preExecRefusalMessage, setPreExecRefusalMessage] = useState<string | null>(null);
   // RQ-18 follow-up round-5 (P1-3): the server refused the reconcile with
   // join_session_payload_mismatch — the attempt belongs to a DIFFERENT
   // immutable payload. Decisive (the session is provably joined): the
@@ -371,6 +508,14 @@ const QueueJoin = () => {
   // start-over (safe for a different identity — the queue duplicate guard
   // reuses the same ticket for the same person).
   const [payloadMismatch, setPayloadMismatch] = useState(false);
+  // Round-9 (review P2-2): the recovery text is chosen BY REASON — the
+  // expired/not_found class keeps the «сессия истекла» wording, while
+  // join_session_not_executed shows the server's own safe domain
+  // message (with a typed fallback when the server sent none).
+  const preExecRefusalText =
+    preExecRefusalReason === 'join_session_not_executed'
+      ? preExecRefusalMessage || t('misc.qj_preexec_not_executed')
+      : t('misc.qj_preexec_refusal');
 
   const draftGet = useCallback(
     (key: string): string | null =>
@@ -478,6 +623,20 @@ const QueueJoin = () => {
       return responseData.detail
         .map((item: unknown) => (item && typeof item === 'object' && 'msg' in item ? String((item as { msg?: unknown }).msg ?? '') : String(item)))
         .join(', ');
+    }
+    // Round-9 (review P2-2): a structured refusal detail ({reason, message})
+    // is an OBJECT — extract its message instead of discarding it (the
+    // backend's promised «real domain reason» used to fall through to the
+    // generic fallback whenever detail was an object).
+    if (
+      responseData?.detail &&
+      typeof responseData.detail === 'object' &&
+      !Array.isArray(responseData.detail)
+    ) {
+      const detailMessage = (responseData.detail as { message?: unknown }).message;
+      if (typeof detailMessage === 'string' && detailMessage.trim()) {
+        return detailMessage;
+      }
     }
     if (typeof responseData?.message === 'string') {
       return responseData.message;
@@ -746,6 +905,10 @@ const QueueJoin = () => {
     setReconcile(null);
     setReconcileDirectionTitle(null);
     setPreExecRefusal(false);
+    // Round-9 (review P2-2): the refusal reason/message belong to the
+    // PREVIOUS lifecycle too.
+    setPreExecRefusalReason(null);
+    setPreExecRefusalMessage(null);
     setPayloadMismatch(false);
     // RQ-18 follow-up round-3 (P1): a NEW direction is the explicit
     // start-over — the previous code's complete attempt must not
@@ -788,6 +951,10 @@ const QueueJoin = () => {
         : [];
 
       setSessionToken(res.session_token);
+      // Round-9 (review P1-2): this tab now owns the freshly minted
+      // attempt identity — the per-tab owner marker pins the envelope
+      // this tab will write at submit time.
+      attemptStateOwnerSet(directionCode, res.session_token);
       setSessionExpiresAt(res.expires_at ?? null);
       // Round-6 (P1-3): the honest attempt-identity horizon of THIS
       // session (end of the target queue-day + grace) travels with the
@@ -827,7 +994,7 @@ const QueueJoin = () => {
   }, [directionCode, getApiErrorMessage]);
 
   useEffect(() => {
-    if (!directionMode) {
+    if (!directionMode || !directionCode) {
       return;
     }
     // RQ-18 follow-up round-4 (P1-2): the attempt-state survives the
@@ -838,7 +1005,17 @@ const QueueJoin = () => {
     // is preserved for the reconcile retry. A confirmed no-business-op
     // outcome (machine reason) is removed — a fresh session duplicates
     // nothing.
-    const attempt = attemptStateRead(attemptStorageKey);
+    // Round-9 (review P1-2): the discovery is PER ATTEMPT — resolve this
+    // tab's own attempt via the sessionStorage owner marker first, then
+    // the single outstanding one, then the newest. Other tabs' envelopes
+    // are never adopted away nor destroyed; the adopted legacy single-slot
+    // envelope is re-homed to its per-attempt key.
+    const candidates = attemptStateScan(directionCode);
+    const ownerToken = attemptStateOwnerGet(directionCode);
+    const attempt =
+      candidates.find((candidate) => candidate.sessionToken === ownerToken) ??
+      candidates[0] ??
+      null;
     // Round-8 (P1-2): claim the direction context BEFORE any branching —
     // the UNKNOWN-recovery branch below early-returns, and WITHOUT the
     // claim its refs/epoch stayed those of the PREVIOUS direction (the
@@ -847,6 +1024,18 @@ const QueueJoin = () => {
     // same-code effect reruns stay inert.
     const claimed = claimDirectionContext(directionCode);
     if (attempt && attempt.publicCode === directionCode) {
+      // Adopt: the owner marker keeps this tab's identity stable across
+      // further reloads.
+      attemptStateOwnerSet(directionCode, attempt.sessionToken);
+      if (
+        attemptStateWriteFor(directionCode, attempt) &&
+        attemptStateParse(attemptStateStorageGet(attemptStateKeyBase(directionCode)))?.sessionToken ===
+          attempt.sessionToken
+      ) {
+        // The verified per-attempt re-home succeeded — the legacy
+        // single-slot envelope of THIS attempt can go.
+        attemptStateStorageRemove(attemptStateKeyBase(directionCode));
+      }
       if (attempt.completeAttempted && attempt.outcomeUnknown) {
         completeAttemptedRef.current = true;
         setReconcile({
@@ -859,7 +1048,8 @@ const QueueJoin = () => {
         return;
       }
       if (attempt.completeAttempted && !attempt.outcomeUnknown) {
-        attemptStateRemove(attemptStorageKey);
+        attemptStateRemoveFor(directionCode, attempt.sessionToken);
+        attemptStateOwnerClear(directionCode);
       }
     }
     // RQ-18 follow-up (P2-2): only a FRESH claim (a new code inside this
@@ -873,17 +1063,26 @@ const QueueJoin = () => {
       return;
     }
     void runDirectionStart();
-  }, [directionMode, directionCode, attemptStorageKey, runDirectionStart, claimDirectionContext]);
+  }, [directionMode, directionCode, runDirectionStart, claimDirectionContext]);
 
   // RQ-18 follow-up round-4 (P2-1): the EXPLICIT start-over — the only
   // action that may mint a new session after a complete attempt (a
   // confirmed pre-execution refusal or an unknown outcome). The typed
   // form/draft is the patient's own context and is kept.
   const handleStartOver = () => {
-    attemptStateRemove(attemptStorageKey);
+    // Round-9 (review P1-2): remove ONLY this attempt's envelope (the
+    // adopted/owned one) — another tab's outstanding attempt for the same
+    // /q/<code> must survive the start-over untouched.
+    if (directionCode) {
+      const ownToken = reconcile?.sessionToken ?? attemptStateOwnerGet(directionCode);
+      attemptStateRemoveFor(directionCode, ownToken);
+      attemptStateOwnerClear(directionCode);
+    }
     completeAttemptedRef.current = false;
     setReconcile(null);
     setPreExecRefusal(false);
+    setPreExecRefusalReason(null);
+    setPreExecRefusalMessage(null);
     setPayloadMismatch(false);
     setSubmitResultUnknown(false);
     setShowSessionConsumedAdvisory(false);
@@ -1007,6 +1206,11 @@ const QueueJoin = () => {
         // state alone never reaches this running handler.
         setAttemptExpiresAt(res.attempt_expires_at ?? null);
         currentAttemptExpiresAt = res.attempt_expires_at ?? null;
+        // Round-9 (review P1-2): the renewed identity replaces the owned
+        // one — the envelope written below carries THIS token.
+        if (directionCode) {
+          attemptStateOwnerSet(directionCode, res.session_token);
+        }
         setQueueInfo((res.queue_info ?? {}) as QueueJoinPageInfo);
         setDirectionInfo(res.direction);
         // The renewal is transparent: the patient stays on the form step
@@ -1139,18 +1343,21 @@ const QueueJoin = () => {
 
       // RQ-18 follow-up round-2 (P1): bound to the submit epoch (captured
       // above, before the request).
-      // RQ-18 follow-up round-3 (P1): the attempt flag goes up BEFORE the
-      // request — from this moment the result is unknown, whatever happens
-      // to the response (a lost answer must never trigger a renewal).
       // RQ-18 follow-up round-4 (P1-2): the attempt state ALSO persists
       // (per canonical code) — a reload or a closed tab must not reset
       // the guard and silently mint a new session while this attempt's
       // business outcome is still unknown. Round-5 (P1-4): no 15-minute
       // auto-drop. Round-6 (P1-3): localStorage + the server horizon —
       // the identity lives until the end of the TARGET queue-day.
-      completeAttemptedRef.current = true;
-      if (directionMode && attemptStorageKey && directionCode) {
-        attemptStateWrite(attemptStorageKey, {
+      // Round-9 (review P2-3): the envelope IS the exactly-once guard for
+      // the irreversible complete — write it FIRST, to THIS attempt's own
+      // per-attempt key (review P1-2), and VERIFY the store really
+      // persisted it. If the browser refuses (quota / disabled storage /
+      // private mode), the business attempt is NOT sent: a lost response
+      // with no envelope would leave the recovery guard on this mount
+      // only, and a reload would silently mint a second attempt.
+      if (directionMode && directionCode) {
+        const persisted = attemptStateWriteFor(directionCode, {
           ts: Date.now(),
           publicCode: directionCode,
           sessionToken: String(currentSessionToken ?? ''),
@@ -1168,7 +1375,17 @@ const QueueJoin = () => {
           // while the new session is still live.
           attemptExpiresAt: currentAttemptExpiresAt,
         });
+        if (!persisted) {
+          setError(QUEUE_JOIN_MESSAGES.attemptGuardUnavailable);
+          // Nothing was sent — the submit lock is released by the finally
+          // below and the session stays pending (no UNKNOWN to reconcile).
+          return;
+        }
       }
+      // Round-9 (review P2-3): only AFTER the verified envelope persist —
+      // from this moment the result is unknown, whatever happens to the
+      // response (a lost answer must never trigger a renewal).
+      completeAttemptedRef.current = true;
       const joinResult = await completeQueueJoinSession(requestBody);
       if (
         directionMode &&
@@ -1186,7 +1403,12 @@ const QueueJoin = () => {
       }
       // RQ-18 follow-up round-4 (P1-2): the attempt's outcome is KNOWN
       // (success) — the persisted attempt state is no longer needed.
-      attemptStateRemove(attemptStorageKey);
+      // Round-9 (review P1-2): removal touches ONLY this attempt's own
+      // per-attempt key — a parallel tab's outstanding envelope survives.
+      if (directionCode) {
+        attemptStateRemoveFor(directionCode, currentSessionToken);
+        attemptStateOwnerClear(directionCode);
+      }
       setReconcile(null);
 
       // ✅ Отправляем событие обновления очереди для автоматического обновления таблицы
@@ -1280,10 +1502,12 @@ const QueueJoin = () => {
       // stays UNKNOWN: the attempt may already be durably committed, and
       // a fresh session could duplicate the ticket.
       const markOutcomeKnown = () => {
-        if (attemptStorageKey) {
-          const attempt = attemptStateRead(attemptStorageKey);
+        // Round-9 (review P1-2): rewrite ONLY this attempt's own envelope
+        // (the token that actually performed the attempt).
+        if (directionCode) {
+          const attempt = attemptStateReadFor(directionCode, currentSessionToken);
           if (attempt) {
-            attemptStateWrite(attemptStorageKey, {
+            attemptStateWriteFor(directionCode, {
               ...attempt,
               outcomeUnknown: false,
             });
@@ -1304,7 +1528,13 @@ const QueueJoin = () => {
         // refusal (the backend proved nothing was created) — offer the
         // honest explicit start-over instead of a blind retry loop
         // against the same dead token.
+        // Round-9 (review P2-2): keep WHICH refusal fired and the
+        // server's own safe domain message — the recovery text is
+        // selected by reason (not_executed ≠ «сессия истекла»). Also
+        // surface the message in the generic error line.
         setPreExecRefusal(true);
+        setPreExecRefusalReason(refusalReason);
+        setPreExecRefusalMessage(getJoinRefusalMessage(error));
         markOutcomeKnown();
       } else if (refusalReason === 'join_session_payload_mismatch') {
         // Round-5 (P1-3): decisive conflict — the attempt is bound to a
@@ -1394,8 +1624,12 @@ const QueueJoin = () => {
       }
       setResult(joinResult as unknown as QueueJoinResultLocal);
       // The attempt's outcome is KNOWN — the persisted attempt state and
-      // the reconcile panel are no longer needed.
-      attemptStateRemove(attemptStorageKey);
+      // the reconcile panel are no longer needed. Round-9 (review P1-2):
+      // removal touches ONLY this attempt's own per-attempt key.
+      if (directionCode) {
+        attemptStateRemoveFor(directionCode, reconcile.sessionToken);
+        attemptStateOwnerClear(directionCode);
+      }
       setReconcile(null);
       if (formStorageKey) {
         draftRemove(formStorageKey);
@@ -1418,8 +1652,15 @@ const QueueJoin = () => {
       if (refusalReason !== null && JOIN_PRE_EXECUTION_REASONS.has(refusalReason)) {
         // Proven: the original attempt produced NOTHING — the honest
         // explicit start-over replaces the reconcile panel.
+        // Round-9 (review P2-2): keep the refusal reason + the server's
+        // safe domain message for the reason-specific recovery text.
         setPreExecRefusal(true);
-        attemptStateRemove(attemptStorageKey);
+        setPreExecRefusalReason(refusalReason);
+        setPreExecRefusalMessage(getJoinRefusalMessage(err));
+        if (directionCode) {
+          attemptStateRemoveFor(directionCode, reconcile.sessionToken);
+          attemptStateOwnerClear(directionCode);
+        }
       } else if (refusalReason === 'join_session_payload_mismatch') {
         // Round-5 (P1-3): decisive conflict — the attempt is bound to a
         // DIFFERENT immutable payload (the review's wrong-patient hole:
@@ -1427,10 +1668,16 @@ const QueueJoin = () => {
         // session). The typed form does not own this attempt; the panel
         // swaps to the honest conflict message with the start-over.
         setPayloadMismatch(true);
-        attemptStateRemove(attemptStorageKey);
+        if (directionCode) {
+          attemptStateRemoveFor(directionCode, reconcile.sessionToken);
+          attemptStateOwnerClear(directionCode);
+        }
       } else if (refusalReason === 'join_session_used') {
         setShowSessionConsumedAdvisory(true);
-        attemptStateRemove(attemptStorageKey);
+        if (directionCode) {
+          attemptStateRemoveFor(directionCode, reconcile.sessionToken);
+          attemptStateOwnerClear(directionCode);
+        }
         setReconcile(null);
       } else {
         // Round-5 (P1-4) fail-closed: network-class, an in-flight
@@ -2449,7 +2696,7 @@ const QueueJoin = () => {
               {directionMode && reconcile && preExecRefusal && (
                 <div className="qj-reconcile" data-testid="qj-reconcile-banner" role="alert">
                   <p className="qj-reconcile-text" data-testid="qj-preexec-refusal">
-                    {t('misc.qj_preexec_refusal')}
+                    {preExecRefusalText}
                   </p>
                   <div className="qj-reconcile-actions">
                     <button
@@ -2713,7 +2960,7 @@ const QueueJoin = () => {
                     // action), never an automatic renewal.
                     <div className="qj-preexec-recovery">
                       <p className="qj-error-advisory" data-testid="qj-preexec-refusal">
-                        {t('misc.qj_preexec_refusal')}
+                        {preExecRefusalText}
                       </p>
                       <button
                         type="button"

@@ -29588,6 +29588,20 @@ export type components = {
             error: string;
         };
         /**
+         * JoinSessionRefusalErrorResponse
+         * @description Полное HTTP-тело отказа complete-попытки (round-9, review P2-1).
+         *
+         *     Runtime raises ``HTTPException(detail={reason, message[, details]})``,
+         *     so FastAPI serves the refusal wrapped in the standard ``detail``
+         *     envelope: ``{"detail": {"reason": ..., "message": ...}}``. The
+         *     frontend reads ``response.data.detail.reason`` — the declared OpenAPI
+         *     contract must describe EXACTLY that wire format, so 400/409 reference
+         *     THIS wrapper (not the bare inner payload).
+         */
+        JoinSessionRefusalErrorResponse: {
+            detail: components["schemas"]["JoinSessionRefusalResponse"];
+        };
+        /**
          * JoinSessionRefusalResponse
          * @description Структурированный отказ complete-попытки (round-6, P2-1/P2-2).
          *
@@ -46473,7 +46487,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JoinSessionRefusalResponse"];
+                    "application/json": components["schemas"]["JoinSessionRefusalErrorResponse"];
                 };
             };
             /** @description Conflict */
@@ -46482,7 +46496,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JoinSessionRefusalResponse"];
+                    "application/json": components["schemas"]["JoinSessionRefusalErrorResponse"];
                 };
             };
             /** @description Validation Error */

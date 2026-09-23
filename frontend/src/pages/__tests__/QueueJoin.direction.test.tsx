@@ -98,6 +98,22 @@ function renderDirectionRouteWithNav(initialPath: string) {
 }
 
 const CANONICAL_CODE = 'abcd1234efgh';
+
+/** Round-9 (review P1-2): envelopes are addressed PER ATTEMPT —
+ * `queue_join_attempt_qdir_<code>__<sessionToken>`. Returns the envelope
+ * visible for a direction (per-attempt keys, legacy single-slot as the
+ * fallback) so pins read recovery state without hard-coding a token. */
+function readAttemptEnvelope(code = CANONICAL_CODE): Record<string, unknown> | null {
+    const prefix = `queue_join_attempt_qdir_${code}__`;
+    for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith(prefix)) {
+            return JSON.parse(window.localStorage.getItem(key) as string);
+        }
+    }
+    const legacy = window.localStorage.getItem(`queue_join_attempt_qdir_${code}`);
+    return legacy ? JSON.parse(legacy) : null;
+}
 const DRAFT_PHONE = '+998 (90) 123-45-67';
 
 /** Builds a round-4 draft envelope (the shape an OLDER build stored).
@@ -386,13 +402,11 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         // …and the persisted envelope carries the RENEWED session's token
         // AND horizon — the identity protection must outlive exactly as
         // long as the session that performed the attempt.
-        const envelope = JSON.parse(
-            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
-        );
-        expect(envelope.outcomeUnknown).toBe(true);
-        expect(envelope.sessionToken).toBe('session-renewed');
-        expect(envelope.attemptExpiresAt).toBe(FRESH_HORIZON);
-        expect(envelope.attemptExpiresAt).not.toBe(STALE_HORIZON);
+        const envelope = readAttemptEnvelope();
+        expect(envelope?.outcomeUnknown).toBe(true);
+        expect(envelope?.sessionToken).toBe('session-renewed');
+        expect(envelope?.attemptExpiresAt).toBe(FRESH_HORIZON);
+        expect(envelope?.attemptExpiresAt).not.toBe(STALE_HORIZON);
     });
 
     it('PIN 15 (RQ-10 regression guard): a complete-attempt rejection NEVER auto-renews the session', async () => {
@@ -1140,9 +1154,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         await waitFor(() => {
             expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
         });
-        expect(
-            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh'),
-        ).toBeTruthy();
+        expect(readAttemptEnvelope()).toBeTruthy();
         first.unmount();
 
         // THE RELOAD: the attempt state is hydrated, outcome UNKNOWN —
@@ -1180,9 +1192,10 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         await waitFor(() => {
             expect(screen.getByText(/ваш номер/i)).toBeTruthy();
         });
-        // the attempt envelope is consumed
+        // the attempt envelope is consumed (its OWN per-attempt key only)
+        expect(readAttemptEnvelope()).toBeNull();
         expect(
-            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh'),
+            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh__dir-session-token'),
         ).toBeNull();
     });
 
@@ -1243,10 +1256,8 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
         // the machine-reason refusal updated the persisted attempt outcome —
         // a reload boots a FRESH session safely (nothing was created)
-        const attemptState = JSON.parse(
-            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
-        );
-        expect(attemptState.outcomeUnknown).toBe(false);
+        const attemptState = readAttemptEnvelope();
+        expect(attemptState?.outcomeUnknown).toBe(false);
 
         // THE EXPLICIT START-OVER: mints a new session on the deliberate click
         queueApiMocks.completeQueueJoinSession.mockResolvedValue(COMPLETE_MULTI_RESPONSE);
@@ -1297,10 +1308,8 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         expect(screen.getByTestId('qj-reconcile-check')).toBeTruthy();
         expect(screen.queryByTestId('qj-reconcile-start-over')).toBeNull();
         // the persisted attempt state stays UNKNOWN
-        const attemptState = JSON.parse(
-            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
-        );
-        expect(attemptState.outcomeUnknown).toBe(true);
+        const attemptState = readAttemptEnvelope();
+        expect(attemptState?.outcomeUnknown).toBe(true);
     });
 
     it('PIN 38b (round-5 P1-4): an undescribed 500 after submit stays UNKNOWN — the attempt may be committed', async () => {
@@ -1318,10 +1327,8 @@ describe('RQ-18 — /q/:publicCode public route', () => {
             expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
         });
         await screen.findByText(/результат отправки неизвестен/i);
-        const attemptState = JSON.parse(
-            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
-        );
-        expect(attemptState.outcomeUnknown).toBe(true);
+        const attemptState = readAttemptEnvelope();
+        expect(attemptState?.outcomeUnknown).toBe(true);
         // no start-over escape anywhere in the unknown state
         expect(screen.queryByTestId('qj-reconcile-start-over')).toBeNull();
         expect(screen.queryByTestId('qj-start-over')).toBeNull();
@@ -1376,9 +1383,7 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         // the conflict panel replaces the reconcile panel
         await screen.findByTestId('qj-payload-mismatch');
         // decisive → the attempt state is consumed (a reload boots fresh)
-        expect(
-            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh'),
-        ).toBeNull();
+        expect(readAttemptEnvelope()).toBeNull();
         // the deliberate start-over mints a NEW session (a different token)
         queueApiMocks.completeQueueJoinSession.mockResolvedValue(COMPLETE_MULTI_RESPONSE);
         directionApiMocks.startPublicDirectionSession.mockResolvedValue({
@@ -1475,10 +1480,12 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         await screen.findByTestId('qj-preexec-refusal');
         expect(screen.getByTestId('qj-start-over')).toBeTruthy();
         // the outcome is KNOWN — no UNKNOWN reconcile loop on reload
-        const attemptState = JSON.parse(
-            window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh') as string,
-        );
-        expect(attemptState.outcomeUnknown).toBe(false);
+        const attemptState = readAttemptEnvelope();
+        expect(attemptState?.outcomeUnknown).toBe(false);
+        // Round-9 (review P2-2): the server's own domain message is shown
+        // verbatim — NOT the «сессия истекла» wording.
+        expect(screen.getByTestId('qj-preexec-refusal').textContent).toContain('Очередь заполнена');
+        expect(screen.getByTestId('qj-preexec-refusal').textContent).not.toMatch(/Сессия истекла/);
     });
 
     it('PIN 42 (round-6 P1-3): the attempt envelope is written to localStorage and survives a tab close', async () => {
@@ -1493,17 +1500,16 @@ describe('RQ-18 — /q/:publicCode public route', () => {
             expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
         });
         // written to localStorage (tab-close proof)…
-        const stored = window.localStorage.getItem('queue_join_attempt_qdir_abcd1234efgh');
-        expect(stored).not.toBeNull();
-        const envelope = JSON.parse(stored as string);
-        expect(envelope.outcomeUnknown).toBe(true);
+        const envelope = readAttemptEnvelope();
+        expect(envelope).not.toBeNull();
+        expect(envelope?.outcomeUnknown).toBe(true);
         // …carries the server horizon when the start provided one…
-        expect(envelope.attemptExpiresAt).toBeTruthy();
+        expect(envelope?.attemptExpiresAt).toBeTruthy();
         // …and nothing PHI-shaped ever entered the envelope.
         expect(JSON.stringify(envelope)).not.toMatch(/пациент|patient_name|phone.*\d{3}/i);
     });
 
-    it('PIN 43 (round-8 P1-2): the recovery boot CLAIMS the context — a late complete of /q/A can neither render under /q/B nor keep B\'s reconcile locked', async () => {
+    it('PIN 43 (round-9 P1-2): the recovery boot CLAIMS the context — a late complete of /q/A can neither render under /q/B nor keep B\'s reconcile locked', async () => {
         // Scenario (round-7 verdict): /q/A's complete is IN FLIGHT when the
         // patient moves to /q/B, and B carries its OWN unknown-attempt
         // envelope — so B's boot takes the UNKNOWN-recovery branch. Pre-fix
@@ -1610,5 +1616,156 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         };
         expect(retryPayload.session_token).toBe('session-B-attempt');
     });
-});
 
+    // ── Round-9 (PR #3362 review, P1-2 + P2-3) ───────────────────────────
+
+    it('PIN 44b (round-9 P1-2): the envelope is addressed PER ATTEMPT — a parallel tab\'s recovery state survives this tab\'s consume', async () => {
+        // The review repro: two tabs of the SAME /q/<code>. Under the old
+        // single-slot key B\'s setItem overwrote A\'s envelope and B\'s
+        // success removeItem wiped the shared slot — A\'s lost-response
+        // reload lost its attempt identity and minted a fresh session.
+        // Now every attempt owns its own key.
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        queueApiMocks.completeQueueJoinSession.mockRejectedValueOnce({
+            response: { status: 502, data: { detail: 'bad gateway' } },
+        });
+        const first = renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+        await fillAndSubmit();
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
+        });
+        // A\'s envelope lives under ITS OWN per-attempt key — the legacy
+        // single-slot key stays untouched.
+        expect(
+            window.localStorage.getItem(`queue_join_attempt_qdir_${CANONICAL_CODE}__dir-session-token`),
+        ).toBeTruthy();
+        expect(window.localStorage.getItem(`queue_join_attempt_qdir_${CANONICAL_CODE}`)).toBeNull();
+
+        // Tab B (same direction, its own session) writes its own envelope.
+        window.localStorage.setItem(
+            `queue_join_attempt_qdir_${CANONICAL_CODE}__session-B`,
+            JSON.stringify({
+                ts: Date.now() + 1,
+                publicCode: CANONICAL_CODE,
+                sessionToken: 'session-B',
+                profileId: 7,
+                directionTitle: 'Лаборатория',
+                completeAttempted: true,
+                outcomeUnknown: true,
+            }),
+        );
+        first.unmount();
+
+        // A reloads: the owner marker (this tab\'s session) picks A\'s OWN
+        // attempt even though B\'s envelope is newer.
+        queueApiMocks.completeQueueJoinSession.mockResolvedValueOnce(COMPLETE_MULTI_RESPONSE);
+        renderDirectionRoute();
+        await screen.findByTestId('qj-reconcile-banner');
+        fireEvent.change(await screen.findByLabelText(/фио пациента/i), {
+            target: { value: 'Тест Пациент' },
+        });
+        fireEvent.change(screen.getByLabelText(/номер телефона/i), {
+            target: { value: '+998 (90) 123-45-67' },
+        });
+        fireEvent.click(screen.getByTestId('qj-reconcile-check'));
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(2);
+        });
+        await waitFor(() => {
+            expect(screen.getByText(/ваш номер/i)).toBeTruthy();
+        });
+        // A\'s consume removed ONLY A\'s key…
+        expect(
+            window.localStorage.getItem(`queue_join_attempt_qdir_${CANONICAL_CODE}__dir-session-token`),
+        ).toBeNull();
+        // …and B\'s outstanding recovery state is intact.
+        const sibling = JSON.parse(
+            window.localStorage.getItem(
+                `queue_join_attempt_qdir_${CANONICAL_CODE}__session-B`,
+            ) as string,
+        );
+        expect(sibling.sessionToken).toBe('session-B');
+        expect(sibling.outcomeUnknown).toBe(true);
+    });
+
+    it('PIN 44c (round-9 P1-2): a valid LEGACY single-slot envelope migrates to the per-attempt key on boot', async () => {
+        // An older build left the envelope under the shared per-direction
+        // key. The boot adopts it (single outstanding attempt), re-homes it
+        // under the per-attempt key and removes the shared slot — so the
+        // tab-collision fix applies to pre-upgrade data too.
+        window.localStorage.setItem(
+            `queue_join_attempt_qdir_${CANONICAL_CODE}`,
+            JSON.stringify({
+                ts: Date.now(),
+                publicCode: CANONICAL_CODE,
+                sessionToken: 'dir-session-token',
+                profileId: 7,
+                directionTitle: 'Лаборатория',
+                completeAttempted: true,
+                outcomeUnknown: true,
+            }),
+        );
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        renderDirectionRoute();
+        // the migrated attempt hydrates the reconcile panel — no fresh start
+        await screen.findByTestId('qj-reconcile-banner');
+        expect(directionApiMocks.startPublicDirectionSession).not.toHaveBeenCalled();
+        // re-homed to the per-attempt key, the legacy slot is gone
+        expect(
+            window.localStorage.getItem(`queue_join_attempt_qdir_${CANONICAL_CODE}__dir-session-token`),
+        ).toBeTruthy();
+        expect(window.localStorage.getItem(`queue_join_attempt_qdir_${CANONICAL_CODE}`)).toBeNull();
+    });
+
+    it('PIN 45 (round-9 P2-3): the business attempt is GATED on a verified envelope persist — no storage, no complete', async () => {
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        queueApiMocks.completeQueueJoinSession.mockResolvedValue(COMPLETE_MULTI_RESPONSE);
+        renderDirectionRoute();
+        await screen.findByText(/заполните форму/i);
+
+        // The browser refuses to store the attempt envelope (quota /
+        // disabled storage / private mode). The setup provides a plain
+        // store-backed mock (no Storage.prototype in the dispatch chain),
+        // so swap the property and delegate for every other key.
+        const originalSetItem = window.localStorage.setItem;
+        (window.localStorage as { setItem: unknown }).setItem = vi.fn(
+            (key: string, value: string) => {
+                if (String(key).startsWith('queue_join_attempt_qdir_')) {
+                    throw new DOMException('QuotaExceededError');
+                }
+                originalSetItem(key, value);
+            },
+        );
+
+        await fillAndSubmit();
+
+        // The irreversible complete was NEVER sent — the recovery guard is
+        // part of the exactly-once protocol, not a best-effort hint.
+        expect(queueApiMocks.completeQueueJoinSession).not.toHaveBeenCalled();
+        expect(readAttemptEnvelope()).toBeNull();
+        await screen.findByText(/сохранить состояние попытки/i);
+
+        // Storage works again → the same submit goes through. Hold the
+        // complete response open so the envelope is inspected WHILE the
+        // attempt is in flight (a successful submit consumes it).
+        (window.localStorage as { setItem: unknown }).setItem = originalSetItem;
+        let resolveComplete: (value: unknown) => void = () => {};
+        queueApiMocks.completeQueueJoinSession.mockReturnValueOnce(
+            new Promise((resolve) => {
+                resolveComplete = resolve;
+            }) as never,
+        );
+        await React.act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /присоединиться/i }));
+        });
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
+        });
+        // the verified envelope exists exactly while the attempt is in flight
+        expect(readAttemptEnvelope()).not.toBeNull();
+        await React.act(async () => {
+            resolveComplete(COMPLETE_MULTI_RESPONSE);
+        });
+    });
+});

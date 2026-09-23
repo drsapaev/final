@@ -248,6 +248,20 @@ class JoinSessionRefusalResponse(BaseModel):
     )
 
 
+class JoinSessionRefusalErrorResponse(BaseModel):
+    """Полное HTTP-тело отказа complete-попытки (round-9, review P2-1).
+
+    Runtime raises ``HTTPException(detail={reason, message[, details]})``,
+    so FastAPI serves the refusal wrapped in the standard ``detail``
+    envelope: ``{"detail": {"reason": ..., "message": ...}}``. The
+    frontend reads ``response.data.detail.reason`` — the declared OpenAPI
+    contract must describe EXACTLY that wire format, so 400/409 reference
+    THIS wrapper (not the bare inner payload).
+    """
+
+    detail: JoinSessionRefusalResponse
+
+
 class JoinSessionCompleteRequest(BaseModel):
     """Запрос на завершение сессии присоединения"""
 

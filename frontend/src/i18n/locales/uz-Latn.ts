@@ -7149,6 +7149,8 @@ const uzLatn = {
     // replay conflict — 409 join_session_payload_mismatch.
     qj_payload_mismatch: 'Bu urinish boshqa ma’lumotlar to‘plamiga tegishli — uning natijasi qayta berilmaydi. Kerak bo‘lsa qaytadan boshlang.',
     qj_preexec_refusal: 'Sessiya yuborishidan oldin tugadi — yozuv yaratilmadi. Qaytadan boshlash kerakmi?',
+    qj_preexec_not_executed: 'Yuborish bajarilmadi — navbat yozuv yaratilishidan oldin rad etdi. Qaytadan boshlash kerakmi?',
+    qj_attempt_guard_unavailable: 'Brauzer urinish holatini saqlay olmadi — takroriy yozuvning oldini olish uchun yuborish bloklandi. Sayt ma’lumotlariga ruxsat berib, qayta urinib ko‘ring.',
     qj_waiting_title: 'Navbat tez orada ochiladi',
     qj_waiting_will_open_at: 'Navbatga yozilish {time} da ochiladi',
     qj_waiting_until_open: 'yozilish ochilishigacha',

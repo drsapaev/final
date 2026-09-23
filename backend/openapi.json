@@ -8509,7 +8509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JoinSessionRefusalResponse"
+                  "$ref": "#/components/schemas/JoinSessionRefusalErrorResponse"
                 }
               }
             }
@@ -8519,7 +8519,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JoinSessionRefusalResponse"
+                  "$ref": "#/components/schemas/JoinSessionRefusalErrorResponse"
                 }
               }
             }
@@ -85770,6 +85770,19 @@
         ],
         "title": "JoinSessionRefusalDetail",
         "description": "Один per-specialist отказ аллокатора (round-6, P2-1)."
+      },
+      "JoinSessionRefusalErrorResponse": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/JoinSessionRefusalResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "JoinSessionRefusalErrorResponse",
+        "description": "Полное HTTP-тело отказа complete-попытки (round-9, review P2-1).\n\nRuntime raises ``HTTPException(detail={reason, message[, details]})``,\nso FastAPI serves the refusal wrapped in the standard ``detail``\nenvelope: ``{\"detail\": {\"reason\": ..., \"message\": ...}}``. The\nfrontend reads ``response.data.detail.reason`` — the declared OpenAPI\ncontract must describe EXACTLY that wire format, so 400/409 reference\nTHIS wrapper (not the bare inner payload)."
       },
       "JoinSessionRefusalResponse": {
         "properties": {

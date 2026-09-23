@@ -8,16 +8,25 @@ lands on an OLD worker — whose ``_replay_joined_session`` checked exactly
 B was served patient A's saved ticket (wrong-patient disclosure).
 
 The round-6 barrier: the joined marker is VERSIONED (``joined_v2``). The
-old worker does not recognize the row as ITS replayable state and falls
-through its classifier to ``join_session_expired`` — a decisive,
-no-business-action refusal. The talon is never served to a foreign
-payload by ANY version.
+old worker does not recognize the row as ITS replayable state and never
+replays it — the talon is never served to a foreign payload by ANY
+version.
 
-This module pins the mixed-version contract with an EXACT copy of the old
+Round-9 (review P1-1) — the classification side is TIGHTENED: the round-6
+design let the old worker's fallback answer ``join_session_expired`` for
+a ``joined_v2`` row once the original 15-minute TTL ran out, and the
+frontend reads ``expired`` as PROOF that nothing was created — an honest
+«Start over» on top of an ALREADY COMMITTED talon. Since this fix-round
+the successful complete EXTENDS ``expires_at`` to the attempt horizon
+(end of the TARGET queue-day + grace), so the old worker's verbatim
+decision table stays in the SAFE ``join_session_processing`` class for
+the whole recovery window. Pinned here with the EXACT copy of the old
 worker's decision logic (taken from e21f6429) as the oracle:
 
   - old replay predicate on a round-6 joined row  -> never replays;
-  - old classifier on that row                    -> decisive expired refusal;
+  - old classifier on that row                    -> ALWAYS the safe
+    ``join_session_processing`` — even with the clock shifted past the
+    original 15-minute TTL (never not_found / expired / not_executed);
   - new worker: payload A replays its snapshot, payload B gets 409;
   - legacy ``joined`` rows (written by old workers) replay FAIL-CLOSED
     on the new worker (no fingerprint ⇒ used refusal);
@@ -129,18 +138,23 @@ def test_round6_joined_row_is_versioned_and_invisible_to_old_worker_replay(
     # The versioned marker is on the row...
     assert row.status == "joined_v2"
     assert row.payload_fingerprint  # the binding exists
-    # ...and the OLD worker can never REPLAY it. Its classifier falls to a
-    # SAFE answer: with the 15-minute TTL still running it reports the
-    # ambiguous in-flight "processing" (UNKNOWN kept — no start-over); once
-    # the TTL is past it reports the decisive "expired". Either way the row
-    # is never treated as the old worker's replayable "joined" state and no
-    # talon is ever served to a foreign payload.
+    # ...and the OLD worker can never REPLAY it. Round-9 (P1-1): its
+    # classifier answers ONLY the SAFE "processing" — the successful
+    # complete extended expires_at to the attempt horizon, so the row can
+    # never degrade into the start-over-safe "expired" verdict on top of
+    # a COMMITTED talon. The extension is real: the row's expiry now sits
+    # beyond the original 15-minute TTL (in the future).
     assert old_worker_replays(row) is False
-    assert old_worker_classifies(row) in (
-        "join_session_processing",
+    assert old_worker_classifies(row) == "join_session_processing"
+    assert old_worker_classifies(row) not in (
+        "join_session_used",
+        "join_session_not_found",
         "join_session_expired",
     )
-    assert old_worker_classifies(row) not in ("join_session_used", "join_session_not_found")
+    row_expires = row.expires_at
+    if row_expires.tzinfo is None:
+        row_expires = row_expires.replace(tzinfo=ZoneInfo("UTC"))
+    assert row_expires > datetime.now(ZoneInfo("UTC")) + timedelta(minutes=15)
 
 
 @pytest.mark.queue
@@ -198,18 +212,16 @@ def test_round6_foreign_payload_never_receives_talon_via_any_worker(
     assert second.json().get("queue_number") is None
 
     # And the OLD worker's decision on this row can never serve A's talon
-    # to B either — the row is invisible to the old replay (its classifier
-    # answers processing/expired: UNKNOWN retained or a proven refusal).
+    # to B either — the row is invisible to the old replay and its
+    # classifier answers the SAFE processing (Round-9: expired is no
+    # longer an admissible verdict for a row this worker version wrote).
     row = (
         db_session.query(QueueJoinSession)
         .filter(QueueJoinSession.session_token == session_token)
         .one()
     )
     assert old_worker_replays(row) is False
-    assert old_worker_classifies(row) in (
-        "join_session_processing",
-        "join_session_expired",
-    )
+    assert old_worker_classifies(row) == "join_session_processing"
 
     # The queue holds exactly ONE entry — A's.
     entries = (
@@ -359,3 +371,111 @@ def test_round6_token_stats_count_both_joined_markers(
     stats = service.get_active_qr_tokens(user_id=None)
     mine = next(t for t in stats if t["token"] == token_value)
     assert mine["successful_joins"] == 2
+
+
+@pytest.mark.queue
+def test_round9_joined_v2_past_original_ttl_is_never_start_over_safe(
+    client, db_session, test_doctor, monkeypatch
+):
+    """PIN R9-A (round-9 review P1-1): the review's EXACT scenario.
+
+    A new worker commits the talon under ``joined_v2`` and the HTTP
+    response is lost. MORE THAN 15 MINUTES later (the original session
+    TTL is long past) a retry lands on an OLD worker. The old worker does
+    not know ``joined_v2``, so its verdict is decided by ``expires_at``
+    alone — and the frontend reads ``join_session_expired`` as PROOF that
+    the business operation never ran (an honest «Start over» on top of a
+    COMMITTED talon). Since the round-9 fix the successful complete
+    extends ``expires_at`` to the attempt horizon, so the verbatim
+    e21f6429 oracle — even with its clock shifted past the original
+    15-minute TTL — answers the SAFE ``join_session_processing`` and
+    NEVER not_found / expired / not_executed.
+    """
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
+
+    daily_queue = DailyQueue(
+        day=_clinic_day(),
+        specialist_id=test_doctor.id,
+        queue_tag="cardiology_common",
+        active=True,
+    )
+    db_session.add(daily_queue)
+    token_value = "round9-horizon-extend-token"
+    token = QueueToken(
+        token=token_value,
+        day=_clinic_day(),
+        specialist_id=test_doctor.id,
+        department="cardiology",
+        expires_at=_local_now() + timedelta(hours=2),
+        active=True,
+    )
+    db_session.add(token)
+    db_session.commit()
+
+    start_resp = client.post(START_URL, json={"token": token_value})
+    assert start_resp.status_code == 200
+    session_token = start_resp.json()["session_token"]
+
+    first = client.post(
+        COMPLETE_URL,
+        json={
+            "session_token": session_token,
+            "patient_name": "Horizon Patient",
+            "phone": "+998900000901",
+        },
+    )
+    assert first.status_code == 200, first.json()
+
+    row = (
+        db_session.query(QueueJoinSession)
+        .filter(QueueJoinSession.session_token == session_token)
+        .one()
+    )
+    assert row.status == "joined_v2"
+    original_expires = row.expires_at
+    if original_expires.tzinfo is None:
+        original_expires = original_expires.replace(tzinfo=ZoneInfo("UTC"))
+    # The complete EXTENDED the row's expiry (it is no longer the
+    # start-time 15-minute TTL: it sits beyond now + 15 min).
+    assert original_expires > datetime.now(ZoneInfo("UTC")) + timedelta(minutes=15)
+
+    # Simulate the retry arriving >15 minutes after the complete: shift
+    # the oracle's clock 20 minutes forward — past the original session
+    # TTL, still inside the attempt horizon (end of the target queue-day
+    # + 2h grace). The verbatim old-worker decision table must answer
+    # ONLY the safe processing class.
+    import sys
+
+    real_datetime = datetime
+
+    class _ShiftedDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            return real_datetime.now(tz) + timedelta(minutes=20)
+
+    # Patch THIS module's datetime — the oracle resolves it from its own
+    # module globals; sys.modules[__name__] is robust to pytest import
+    # naming (rootdir vs package).
+    monkeypatch.setattr(sys.modules[__name__], "datetime", _ShiftedDateTime)
+    verdict = old_worker_classifies(row)
+
+    assert verdict == "join_session_processing"
+    assert verdict not in (
+        "join_session_not_found",
+        "join_session_expired",
+        "join_session_not_executed",
+    )
+
+    # The new worker itself keeps the decisive replay: the LEGITIMATE
+    # owner's retry (same payload) re-serves the saved snapshot.
+    retry = client.post(
+        COMPLETE_URL,
+        json={
+            "session_token": session_token,
+            "patient_name": "Horizon Patient",
+            "phone": "+998900000901",
+        },
+    )
+    assert retry.status_code == 200
+    assert retry.json()["replayed"] is True
+    assert retry.json()["queue_number"] == first.json()["queue_number"]

@@ -92,8 +92,13 @@ def test_single_path_domain_refusal_is_structured_not_executed(
         },
     )
     assert resp.status_code == 400, resp.json()
-    detail = resp.json()["detail"]
+    body = resp.json()
+    detail = body["detail"]
     assert isinstance(detail, dict)
+    # Round-9 (review P2-1): the runtime body is the FastAPI ``detail``
+    # envelope — the SAME shape the OpenAPI 400 declaration now describes
+    # (JoinSessionRefusalErrorResponse). No top-level reason/message.
+    assert set(body.keys()) == {"detail"}
     assert detail["reason"] == "join_session_not_executed"
     assert "заполнена" in detail["message"]  # the REAL domain message
     assert detail["details"][0]["specialist_id"] is None
@@ -108,9 +113,11 @@ def test_single_path_domain_refusal_is_structured_not_executed(
 
 @pytest.mark.queue
 def test_openapi_contract_declares_refusal_responses(client, db_session):
-    """PIN R6-I (P2-2): the recovery protocol is PART OF THE CONTRACT —
-    the complete path declares 400 + 409 with the refusal DTO, the DTO
-    schemas exist, and the generated TypeScript contract carries them."""
+    """PIN R6-I (P2-2 + round-9 P2-1): the recovery protocol is PART OF
+    THE CONTRACT — the complete path declares 400 + 409, and the declared
+    wire shape matches what the runtime actually serves: the FastAPI
+    ``detail`` envelope (JoinSessionRefusalErrorResponse) wrapping the
+    structured refusal payload (JoinSessionRefusalResponse)."""
     from pathlib import Path
 
     repo_root = Path(__file__).resolve().parents[3]
@@ -120,18 +127,30 @@ def test_openapi_contract_declares_refusal_responses(client, db_session):
     schemas = spec["components"]["schemas"]
     assert "JoinSessionRefusalResponse" in schemas
     assert "JoinSessionRefusalDetail" in schemas
+    # Round-9 (P2-1): the wrapper exists and references the inner payload.
+    wrapper = schemas["JoinSessionRefusalErrorResponse"]
+    assert set(wrapper["required"]) == {"detail"}
+    assert (
+        wrapper["properties"]["detail"]["$ref"].rsplit("/", 1)[-1]
+        == "JoinSessionRefusalResponse"
+    )
 
     responses = spec["paths"]["/api/v1/queue/join/complete"]["post"]["responses"]
     for code in ("400", "409"):
         assert code in responses, f"{code} must be declared on the complete path"
         ref = responses[code]["content"]["application/json"]["schema"]
-        assert ref["$ref"].endswith("JoinSessionRefusalResponse")
+        # Round-9 (P2-1): the declaration describes the REAL wire body —
+        # ``{"detail": {reason, message[, details]}}`` — not a bare
+        # top-level {reason, message} the runtime never served.
+        assert ref["$ref"].endswith("JoinSessionRefusalErrorResponse")
 
-    # The generated TypeScript contract ships the refusal DTO.
+    # The generated TypeScript contract ships BOTH the wrapper and the
+    # inner refusal DTO.
     generated = open(
         repo_root / "frontend" / "src" / "types" / "generated" / "api.ts",
         encoding="utf-8",
     ).read()
+    assert "JoinSessionRefusalErrorResponse" in generated
     assert "JoinSessionRefusalResponse" in generated
     assert "join_session_not_executed" in schemas["JoinSessionRefusalResponse"][
         "description"

@@ -75,9 +75,15 @@ def start_join_session(
     # state/pre-execution refusal (incl. the rollback-proven
     # ``join_session_not_executed``), 409 carries the immutable payload
     # mismatch. Regenerated into openapi.json + the generated TS types.
+    # Round-9 (review P2-1): the runtime raises HTTPException(detail=...),
+    # so the wire body is the FastAPI ``detail`` envelope
+    # ``{"detail": {reason, message[, details]}}`` — exactly what the
+    # frontend reads (``response.data.detail.reason``). The contract
+    # therefore references the WRAPPER (JoinSessionRefusalErrorResponse),
+    # not the bare inner payload.
     responses={
-        400: {"model": JoinSessionRefusalResponse},
-        409: {"model": JoinSessionRefusalResponse},
+        400: {"model": JoinSessionRefusalErrorResponse},
+        409: {"model": JoinSessionRefusalErrorResponse},
     },
 )
 def complete_join_session(
