@@ -11,8 +11,11 @@
  * but that is UX only — the backend stays the correctness boundary:
  *  - 200 idempotent replay  -> render the durable server state (refetch);
  *  - 409                    -> no guesswork, no retry loop — refetch board;
- *  - 403 assignment loss    -> the SYNCHRONOUS revocation clear below,
- *    then the workplaces re-read (owner review round);
+ *  - 401/403 access loss    -> the SYNCHRONOUS revocation clear below,
+ *    then the workplaces re-read (owner review round; review round 3:
+ *    the FINAL 401 — the retry after a dead token refresh — is the SAME
+ *    revocation boundary as 403, never a generic Retry: a dead session
+ *    must not keep the last patient's PHI on the shared tablet);
  *  - 404 operation-specific -> refetch the board (another staffer took
  *    the patient / no one is waiting / the execution is already gone) —
  *    NEVER "station unavailable": that verdict belongs to the board GET
@@ -20,9 +23,9 @@
  *    a perfectly healthy station);
  *  - 5xx/network            -> keep the rendered state, surface Retry.
  *
- * Board-read boundary (owner review): 403/404 on the board GET clear the
- * PHI from the screen IMMEDIATELY (403 also re-reads workplaces — the
- * assignment world changed), while network/5xx keep the last rendered
+ * Board-read boundary (owner review): 401/403/404 on the board GET clear
+ * the PHI from the screen IMMEDIATELY (401/403 also re-read workplaces —
+ * the access world changed), while network/5xx keep the last rendered
  * state; the error is visible EVEN when a previous board is still shown.
  *
  * Workplace discovery (owner review): the zero-workplace screen and the
@@ -51,6 +54,12 @@
  *    the workplaces GET proves NOTHING — the previous list stays, a
  *    visible error appears; only a server-confirmed empty list (or an
  *    access loss) may drop the workflow.
+ *  - Workplaces epoch (review round 3, P2): the workplaces reader gets
+ *    the SAME latest-wins guard the board/draining readers already
+ *    have — a late answer from a superseded world can neither
+ *    resurrect a revoked station list nor wipe a freshly restored one
+ *    (the reader is fired from boot/refresh/focus/reset/change paths
+ *    that can legitimately interleave).
  *  - Draining epoch (P2): terminal mutations and newer draining reads
  *    supersede every earlier in-flight draining response — a late
  *    answer can never resurrect an already-completed card.
@@ -165,6 +174,18 @@ export function useNurseServingBoard() {
   const drainingEpochRef = useRef(0);
 
   /**
+   * The workplaces-response epoch (review round 3, P2): every
+   * workplaces read bumps it; the synchronous revocation clear bumps it
+   * too. The reader is fired from several independent paths (initial
+   * boot, manual refresh, focus discovery, reset/change workplace, the
+   * board 403 re-read) — without the guard a LATE answer from an older
+   * world wins the last write: a revoked station list could reappear
+   * after the empty re-read, or a stale 403 could wipe a freshly
+   * restored workflow. Same latest-wins contract as board/draining.
+   */
+  const workplacesEpochRef = useRef(0);
+
+  /**
    * Which station the RENDERED board describes (owner review round,
    * P1): a board for workplace A must never linger — not while B loads,
    * not after B fails — under workplace B's header.
@@ -192,15 +213,17 @@ export function useNurseServingBoard() {
   /**
    * The SYNCHRONOUS revocation clear (owner review round, P1): ALL PHI
    * leaves the screen at once — every request epoch is bumped (in-flight
-   * responses become stale), the board, the draining discovery and the
-   * selection clear — BEFORE any second request runs. A slow, hung or
-   * dead workplaces re-read must never keep a revoked patient on the
-   * shared tablet; the re-read itself is orchestrated by the caller.
+   * responses become stale, the workplaces reader included), the board,
+   * the draining discovery and the selection clear — BEFORE any second
+   * request runs. A slow, hung or dead workplaces re-read must never
+   * keep a revoked patient on the shared tablet; the re-read itself is
+   * orchestrated by the caller.
    */
   const clearAllPhi = useCallback(
     (notice?: string) => {
       boardEpochRef.current += 1;
       drainingEpochRef.current += 1;
+      workplacesEpochRef.current += 1;
       boardResourceIdRef.current = null;
       applySelection(null);
       patch({
@@ -222,9 +245,22 @@ export function useNurseServingBoard() {
 
   const loadWorkplaces = useCallback(
     async (): Promise<NurseWorkplacesResult> => {
+      // Review round 3 (P2): latest-wins — the success AND the failure of
+      // a workplaces read apply only while it is still the newest request
+      // (and no revocation clear superseded it). A late answer from an
+      // older world must neither re-apply its station list nor run its
+      // access-loss clear over a newer, live workflow.
+      const epoch = ++workplacesEpochRef.current;
       patch({ workplacesLoading: true });
       try {
         const data = await api.listWorkplaces();
+        if (epoch !== workplacesEpochRef.current) {
+          // Superseded by a newer read (or the synchronous revocation
+          // clear): applying this list would resurrect a revoked world's
+          // stations. The newer generation owns the state — this answer
+          // proves nothing current.
+          return { ok: false, status: null };
+        }
         const items = data.items ?? [];
         patch({
           workplaces: items,
@@ -233,6 +269,12 @@ export function useNurseServingBoard() {
         });
         return { ok: true, items };
       } catch (err) {
+        if (epoch !== workplacesEpochRef.current) {
+          // A stale FAILURE is discarded exactly like a stale success —
+          // a late 401/403 from before a re-granted assignment must
+          // never wipe the freshly restored workflow.
+          return { ok: false, status: null };
+        }
         const status = api.nurseServingErrorStatus(err);
         if (status === 401 || status === 403) {
           // Access loss: the unified synchronous clear (PHI out) — the
@@ -345,9 +387,11 @@ export function useNurseServingBoard() {
           return null;
         }
         const status = api.nurseServingErrorStatus(err);
-        if (status === 403 || status === 404) {
-          // Access-revocation boundary (owner review): the PHI leaves
-          // the screen immediately. 403 = the assignment world changed
+        if (status === 401 || status === 403 || status === 404) {
+          // Access-revocation boundary (owner review; round 3: the final
+          // 401 — the retry after a dead refresh — joins 403, the error
+          // contract the patient paths already honor): the PHI leaves
+          // the screen immediately. 401/403 = the access world changed
           // (also re-read workplaces — and the draining discovery clears
           // with the board: the same role world guards it); 404 = this
           // station surface is unavailable today. Network/5xx keep the
@@ -363,7 +407,7 @@ export function useNurseServingBoard() {
           // conservative draining clear; the silent poll's 404 already
           // behaved this way — the two readers now agree.
           boardResourceIdRef.current = null;
-          if (status === 403) {
+          if (status === 401 || status === 403) {
             drainingEpochRef.current += 1;
             patch({
               board: null,
@@ -570,8 +614,9 @@ export function useNurseServingBoard() {
           patch({ notice: 'nurse.notice_state_changed' });
           return 'conflict';
         }
-        if (status === 403) {
-          // assignment lost / never granted for THIS station — the PHI
+        if (status === 401 || status === 403) {
+          // Access loss (review round 3: the final 401 joins 403 — a
+          // dead session is as revoked as a lost assignment): the PHI
           // clears synchronously inside resetWorkplace, then the world
           // is re-read (owner review round: no window where a revoked
           // patient outlives a slow second request).
@@ -738,8 +783,8 @@ export function useNurseServingBoard() {
    *
    * The board response (success OR failure — owner review round, P2)
    * applies only while it still describes the current selection and no
-   * newer request superseded it (the epoch + selected check). 403 -> the
-   * full synchronous revocation reset (PHI out, workplaces re-read);
+   * newer request superseded it (the epoch + selected check). 401/403 ->
+   * the full synchronous revocation reset (PHI out, workplaces re-read);
    * 404 -> the station surface clears; network/5xx -> keep the rendered
    * state. When the tablet sits on the zero-workplace screen (or nothing
    * is selected), the workplaces list is re-read too — a fresh assignment
@@ -777,9 +822,10 @@ export function useNurseServingBoard() {
             selectedRef.current === selected
           ) {
             const status = api.nurseServingErrorStatus(err);
-            if (status === 403) {
-              // assignment revoked: PHI out synchronously + workplaces
-              // re-read + notice
+            if (status === 401 || status === 403) {
+              // access revoked (round 3: 401 = the dead-session retry
+              // joins 403): PHI out synchronously + workplaces re-read
+              // + notice
               await resetWorkplace('nurse.notice_workplace_access_lost');
             } else if (status === 404) {
               boardResourceIdRef.current = null;

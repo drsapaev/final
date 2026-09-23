@@ -1023,6 +1023,162 @@ describe('NURSE-V2 N2-5 tablet — synchronous revocation (owner review round 2 
 });
 
 // ---------------------------------------------------------------------------
+// owner review round 3 — P1: the final 401 is the SAME revocation boundary
+// ---------------------------------------------------------------------------
+describe('NURSE-V2 N2-5 tablet — 401 dead-session revocation (owner review round 3 P1)', () => {
+  it('mutation 401: board AND draining PHI clear BEFORE the hung workplaces re-read resolves', async () => {
+    const user = userEvent.setup();
+    setup({
+      board: CALLED_BOARD,
+      draining: { items: [DRAINING_ITEM], total: 1 },
+    });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Незавершённая работа после смены рабочего места/),
+    ).toBeInTheDocument();
+
+    // The dead session's workplaces re-read NEVER resolves — the PHI must
+    // still be gone: 401 is fail-closed, never a generic Retry.
+    workplacesMock.mockImplementation(
+      () => new Promise(() => {
+        /* hung forever */
+      }),
+    );
+    // The retry after a failed token refresh answers 401.
+    startMock.mockRejectedValue({
+      response: { status: 401, data: { detail: 'сессия истекла' } },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Начать приём' }));
+    await waitFor(() => {
+      expect(screen.queryByText('Анна Тестова')).not.toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/Незавершённая работа после смены рабочего места/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Выполнено' }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/Нет доступа к этому рабочему месту/),
+    ).toBeInTheDocument();
+  });
+
+  it('manual refresh on a 401 board: PHI leaves the screen, workplaces re-read', async () => {
+    const user = userEvent.setup();
+    setup({ board: WAITING_BOARD });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+    boardMock.mockRejectedValue({
+      response: { status: 401, data: { detail: 'сессия истекла' } },
+    });
+    await user.click(screen.getByRole('button', { name: 'Обновить' }));
+    // PHI cleared immediately — a dead session may not keep the board
+    // (the synchronous-before-re-read ordering is the mutation 401 pin
+    // above: both paths run the SAME resetWorkplace machinery).
+    await waitFor(() => {
+      expect(screen.queryByText('Анна Тестова')).not.toBeInTheDocument();
+    });
+    expect(
+      await screen.findByText(/Рабочее место недоступно/),
+    ).toBeInTheDocument();
+    // the access world is re-read (401 = the session that guards it died)
+    await waitFor(() =>
+      expect(workplacesMock.mock.calls.length).toBeGreaterThanOrEqual(2),
+    );
+  });
+
+  it('focus polling on a 401 board: PHI cleared, workplaces re-read, notice shown', async () => {
+    setup({ board: WAITING_BOARD });
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+    boardMock.mockRejectedValue({
+      response: { status: 401, data: { detail: 'сессия истекла' } },
+    });
+    // the 30s silent poll path (throttled focus revalidation stands in)
+    fireEvent(window, new Event('focus'));
+    await waitFor(() => {
+      expect(screen.queryByText('Анна Тестова')).not.toBeInTheDocument();
+    });
+    expect(
+      await screen.findByText(/Нет доступа к этому рабочему месту/),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(workplacesMock.mock.calls.length).toBeGreaterThanOrEqual(2),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// owner review round 3 — P2: the workplaces reader is latest-wins
+// ---------------------------------------------------------------------------
+describe('NURSE-V2 N2-5 tablet — workplaces epoch (owner review round 3 P2)', () => {
+  it('a LATE workplaces response never resurrects the revoked station list', async () => {
+    const user = userEvent.setup();
+    // The initial read (the old world's answer) is SLOW.
+    let resolveInitial: (value: { items: NurseWorkplace[]; total: number }) => void =
+      () => {};
+    workplacesMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveInitial = resolve;
+        }),
+    );
+    setup({ board: WAITING_BOARD });
+
+    // A newer read proves the world empty (assignment revoked) — the
+    // zero-workplace screen is the current truth.
+    workplacesMock.mockResolvedValue({ items: [], total: 0 });
+    await user.click(await screen.findByRole('button', { name: 'Обновить' }));
+    expect(
+      await screen.findByText('Нет назначенного рабочего места'),
+    ).toBeInTheDocument();
+
+    // The OLD world's answer finally lands — it must NOT re-apply its
+    // station list (no resurrection of a revoked workflow).
+    resolveInitial({ items: [WORKPLACE_A, WORKPLACE_B], total: 2 });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(
+      screen.getByText('Нет назначенного рабочего места'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Процедурный кабинет/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Перевязочная/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('a LATE workplaces 403 failure never wipes the freshly restored workflow', async () => {
+    const user = userEvent.setup();
+    // The initial read started under a world that would answer 403 — but
+    // its answer is SLOW.
+    let rejectInitial: (reason: unknown) => void = () => {};
+    workplacesMock.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectInitial = reject;
+        }),
+    );
+    setup({ board: WAITING_BOARD });
+
+    // A newer read restores the assignment world: one station, its board.
+    workplacesMock.mockResolvedValue({ items: [WORKPLACE_A], total: 1 });
+    await user.click(await screen.findByRole('button', { name: 'Обновить' }));
+    expect(await screen.findByText('Анна Тестова')).toBeInTheDocument();
+
+    // The STALE failure finally lands — it must NOT run its access-loss
+    // clear over the newer, live workflow.
+    rejectInitial({
+      response: { status: 403, data: { detail: 'нет активного назначения' } },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(screen.getByText('Анна Тестова')).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Нет доступа к этому рабочему месту/),
+    ).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // owner-review round 2 — P2: a stale silent-poll FAILURE is discarded
 // ---------------------------------------------------------------------------
 describe('NURSE-V2 N2-5 tablet — stale silent failures (owner review round 2 P2)', () => {

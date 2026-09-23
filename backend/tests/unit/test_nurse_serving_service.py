@@ -1314,6 +1314,99 @@ class TestHandoverPredicate:
         db_session.refresh(entry)
         assert entry.status == "served"
 
+    def test_deactivated_owner_with_active_assignment_leaves_entry_actionable(
+        self, db_session: Session
+    ):
+        # Review round 3 (P1): the user lifecycle deactivates the OWNER's
+        # account WITHOUT touching NurseWorkplaceAssignment (only the
+        # Doctor mirror exists in update_user) — the assignment row stays
+        # is_active=True while its user is already locked out by
+        # require_active_roles("Nurse"). An assignment row alone must not
+        # keep the patient stranded: the colleague sees the takeover.
+        owner = _nurse(db_session, "n25_hand_owner_deactivated")
+        colleague = _nurse(db_session, "n25_hand_colleague_deactivated")
+        resource = _resource(db_session, "handover8")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        entry = _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Вера Отключена"),
+            status="called",
+            called_by=owner.id,
+        )
+        owner.is_active = False
+        db_session.commit()
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = next(e for e in state["active"] if e["id"] == entry.id)
+        assert foreign["claim_owner_assignment_active"] is False
+        assert foreign["actionable_by_current_user"] is True
+
+    def test_demoted_owner_with_active_assignment_leaves_entry_actionable(
+        self, db_session: Session
+    ):
+        # Review round 3 (P1): same lifecycle hole via demotion — the
+        # owner's role flips to Registrar while the assignment row stays
+        # ACTIVE. The serving endpoint would 403 her; the board must not
+        # render her patient as "обслуживается другим сотрудником".
+        owner = _nurse(db_session, "n25_hand_owner_demoted")
+        colleague = _nurse(db_session, "n25_hand_colleague_demoted")
+        resource = _resource(db_session, "handover9")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        entry = _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Григорий Понижен"),
+            status="in_progress",
+            called_by=owner.id,
+        )
+        owner.role = "Registrar"
+        db_session.commit()
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = next(e for e in state["active"] if e["id"] == entry.id)
+        assert foreign["claim_owner_assignment_active"] is False
+        assert foreign["actionable_by_current_user"] is True
+
+    def test_case_drifted_role_still_counts_when_account_is_eligible(
+        self, db_session: Session
+    ):
+        # The roles SSOT normalizer (case/whitespace) applies to the
+        # owner's role too — a legacy-stored 'nurse ' spelling with an
+        # otherwise eligible account keeps the entry read-only (the
+        # endpoint gate is case-insensitive the same way).
+        owner = _user(db_session, "n25_hand_owner_casedrift", "nurse ")
+        colleague = _nurse(db_session, "n25_hand_colleague_casedrift")
+        resource = _resource(db_session, "handover10")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Елена Дрейф"),
+            status="called",
+            called_by=owner.id,
+        )
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = state["active"][0]
+        assert foreign["claim_owner_assignment_active"] is True
+        assert foreign["actionable_by_current_user"] is False
+
 
 # ----------------------------------------------------------------------------
 # I. codex round-1 regressions (station chain / visit-day transfer / replay)
@@ -3102,9 +3195,7 @@ class TestOwnerFollowupRoutingSnapshot:
         db_session.refresh(entry)
         assert entry.status == "served"
 
-    def test_same_station_reclaim_through_new_entry_is_409(
-        self, db_session: Session
-    ):
+    def test_same_station_reclaim_through_new_entry_is_409(self, db_session: Session):
         """Owner verdict round-2 P1 (PR #3367): no_show is a QUEUE-level
         transition — it deliberately leaves ServiceExecutions untouched —
         so a restored / re-ticketed visit carries a NEW entry E2 while
@@ -3115,8 +3206,8 @@ class TestOwnerFollowupRoutingSnapshot:
         ENTRY-bound: the cross-entry re-claim fails closed with 409
         (before the catalog gate), the old attempt stays untouched, and
         the recovery is finishing the old attempt by its own id."""
-        nurse, resource, svc, entry_e1, visit, vs, execution = (
-            self._started_execution(db_session, suffix="cfu_rt_eb")
+        nurse, resource, svc, entry_e1, visit, vs, execution = self._started_execution(
+            db_session, suffix="cfu_rt_eb"
         )
         assert visit is not None and vs is not None
         # The cross-surface reality: E1 goes terminal (an admin restore /
