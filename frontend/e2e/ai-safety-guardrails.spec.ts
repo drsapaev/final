@@ -226,7 +226,7 @@ test.describe('AI Safety Guardrails', () => {
       request,
       '/api/v1/ai/v2/analyze-complaints',
       {
-        complaints: 'Боли в груди при физической нагрузке',
+        complaint: 'Синтетическая жалоба для проверки контракта',
         specialty: 'cardiology',
       },
       doctorToken,
@@ -236,22 +236,8 @@ test.describe('AI Safety Guardrails', () => {
       test.skip(true, 'ai_complaint_analysis feature flag is disabled');
     }
 
-    expect([200, 422, 500].includes(resp.status()), `unexpected status: ${resp.status()}`).toBeTruthy();
-
-    if (resp.status() === 200) {
-      const body = await resp.json();
-      // ai_gateway uses a slightly different response shape — check for
-      // either ai_safety_meta or the explicit safety fields.
-      const meta = body.ai_safety_meta || body.safety_meta;
-      if (meta) {
-        expectSafetyMeta(body);
-      } else {
-        // If no safety_meta block, the response must at least include a
-        // provider name and audit_id so we can trace what happened.
-        expect(body.provider || body.ai_provider, 'AI response should identify its provider').toBeTruthy();
-        expect(body.audit_id || body.request_id, 'AI response should include audit id').toBeTruthy();
-      }
-    }
+    expect(resp.status(), 'valid AI v2 request must reach the response contract').toBe(200);
+    expectSafetyMeta(await resp.json());
   });
 
   test('non-doctor role cannot call AI endpoints (403)', async ({ request }) => {

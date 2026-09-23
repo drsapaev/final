@@ -22997,6 +22997,23 @@ export type components = {
              */
             warnings?: string[];
             /**
+             * Requires Doctor Confirmation
+             * @description Врач должен подтвердить предложение AI перед внесением в ЭМК
+             * @constant
+             */
+            requires_doctor_confirmation: true;
+            /**
+             * Decision Boundary
+             * @description Ответ AI является только предложением
+             * @constant
+             */
+            decision_boundary: "suggestion_only";
+            /**
+             * Ai Notice
+             * @description Предупреждение о роли AI
+             */
+            ai_notice: string;
+            /**
              * Disclaimer
              * @description Медицинский дисклеймер
              * @default AI suggestions are advisory only. Final decisions must be made by licensed medical professionals.
