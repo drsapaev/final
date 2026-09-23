@@ -117,6 +117,8 @@ department: str | None = None,
 
         registrars_data = []
         for registrar in registrars:
+            profile = registrar.profile
+            last_login = profile.last_login if profile else None
             registrars_data.append(
                 {
                     "id": registrar.id,
@@ -126,11 +128,7 @@ department: str | None = None,
                     "phone": getattr(registrar, 'phone', None),
                     "telegram_id": getattr(registrar, 'telegram_id', None),
                     "is_active": registrar.is_active,
-                    "last_login": (
-                        registrar.last_login.isoformat()
-                        if registrar.last_login
-                        else None
-                    ),
+                    "last_login": last_login.isoformat() if last_login else None,
                 }
             )
 
