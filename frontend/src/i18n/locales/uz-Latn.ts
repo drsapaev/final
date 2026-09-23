@@ -7151,6 +7151,13 @@ const uzLatn = {
     qj_preexec_refusal: 'Sessiya yuborishidan oldin tugadi — yozuv yaratilmadi. Qaytadan boshlash kerakmi?',
     qj_preexec_not_executed: 'Yuborish bajarilmadi — navbat yozuv yaratilishidan oldin rad etdi. Qaytadan boshlash kerakmi?',
     qj_attempt_guard_unavailable: 'Brauzer urinish holatini saqlay olmadi — takroriy yozuvning oldini olish uchun yuborish bloklandi. Sayt ma’lumotlariga ruxsat berib, qayta urinib ko‘ring.',
+    // Round-10 (PR #3362 review, P1): fail-closed ambiguity — several
+    // outstanding attempts on this device, no live owner marker.
+    qj_attempt_ambiguity_title: 'Bu qurilmada navbatga yozilishning tugallanmagan bir necha urinishi bor.',
+    qj_attempt_ambiguity_hint: 'Takrorlanishning oldini olish uchun har bir urinishni o‘sha urinish yuborilganda kiritilgan F.I.Sh. va telefon bilan tekshiring. Urinishlar o‘chirilmaydi; hech biri ma’lumotlaringizga mos kelmasa, yangi yozuv imkoni ochiladi.',
+    qj_attempt_ambiguity_item: '{time} dagi urinish',
+    qj_attempt_ambiguity_not_mine: 'Tekshirildi: ma’lumotlar mos kelmadi',
+    qj_attempt_ambiguity_resolved_hint: 'Tugallanmagan urinishlarning hech biri ma’lumotlaringizga mos kelmadi. Yangi yozuvni boshlash mumkin.',
     qj_waiting_title: 'Navbat tez orada ochiladi',
     qj_waiting_will_open_at: 'Navbatga yozilish {time} da ochiladi',
     qj_waiting_until_open: 'yozilish ochilishigacha',

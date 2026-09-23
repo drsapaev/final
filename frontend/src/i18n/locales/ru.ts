@@ -7280,6 +7280,16 @@ const ru = {
     qj_preexec_refusal: 'Сессия истекла до отправки — запись не создана. Начать заново?',
     qj_preexec_not_executed: 'Отправка не выполнена — очередь отказала до создания записи. Начать заново?',
     qj_attempt_guard_unavailable: 'Браузер не смог сохранить состояние попытки — отправка заблокирована, чтобы исключить дублирование записи. Разрешите данные сайта и повторите попытку.',
+    // Round-10 (PR #3362 review, P1): fail-closed ambiguity — several
+    // outstanding attempts on this device, no live owner marker. Nothing
+    // is auto-adopted or deleted; the patient checks each attempt with
+    // their own identity; the fresh start unlocks only when all are
+    // proven foreign.
+    qj_attempt_ambiguity_title: 'На этом устройстве есть несколько незавершённых попыток записи.',
+    qj_attempt_ambiguity_hint: 'Чтобы исключить дублирование, проверьте каждую попытку, введя те же ФИО и телефон, что при её отправке. Попытки не удаляются; новая запись станет доступна, когда будет ясно, что ни одна из них не ваша.',
+    qj_attempt_ambiguity_item: 'Попытка от {time}',
+    qj_attempt_ambiguity_not_mine: 'Проверена: данные не совпали',
+    qj_attempt_ambiguity_resolved_hint: 'Ни одна из незавершённых попыток не совпала с вашими данными. Можно начать новую запись.',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',
     qj_waiting_until_open: 'до открытия записи',

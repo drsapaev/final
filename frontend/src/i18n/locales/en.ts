@@ -7151,6 +7151,16 @@ const en = {
     qj_preexec_refusal: 'The session expired before the submission — no ticket was created. Start over?',
     qj_preexec_not_executed: 'The submission did not go through — the queue refused it before creating a ticket. Start over?',
     qj_attempt_guard_unavailable: 'The browser could not save the attempt state — the submission was blocked to prevent a duplicate ticket. Allow site data and try again.',
+    // Round-10 (PR #3362 review, P1): fail-closed ambiguity — several
+    // outstanding attempts on this device, no live owner marker. Nothing
+    // is auto-adopted or deleted; the patient checks each attempt with
+    // their own identity; the fresh start unlocks only when all are
+    // proven foreign.
+    qj_attempt_ambiguity_title: 'This device has several unfinished queue attempts.',
+    qj_attempt_ambiguity_hint: 'To rule out a duplicate, check each attempt by entering the same name and phone you used for it. Attempts are not deleted; a new registration becomes available once none of them matches your details.',
+    qj_attempt_ambiguity_item: 'Attempt from {time}',
+    qj_attempt_ambiguity_not_mine: 'Checked: details did not match',
+    qj_attempt_ambiguity_resolved_hint: 'None of the unfinished attempts matched your details. You can start a new registration.',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',
     qj_waiting_until_open: 'до открытия записи',

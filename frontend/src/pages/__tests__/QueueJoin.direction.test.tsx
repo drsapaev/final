@@ -1341,6 +1341,10 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         // panel is replaced by the conflict message; the start-over is
         // available (decisive verdict) and mints a fresh session only on
         // the deliberate click.
+        // Round-10 (review P1): the mismatch proves NON-OWNERSHIP, not
+        // death — the envelope SURVIVES (the old assertion expected it
+        // consumed; deleting it destroyed the attempt's recovery for its
+        // true owner and unlocked an unchecked fresh start).
         // Pre-seed the UNKNOWN attempt (as a lost response would).
         window.localStorage.setItem(
             `queue_join_attempt_qdir_${CANONICAL_CODE}`,
@@ -1382,8 +1386,11 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         });
         // the conflict panel replaces the reconcile panel
         await screen.findByTestId('qj-payload-mismatch');
-        // decisive → the attempt state is consumed (a reload boots fresh)
-        expect(readAttemptEnvelope()).toBeNull();
+        // Round-10 (review P1): the mismatch does NOT consume the attempt
+        // state — the envelope survives (its true owner — or this very
+        // patient retrying with the exact original identity after a
+        // typo — keeps the recovery; a reload re-adopts it)
+        expect(readAttemptEnvelope()).not.toBeNull();
         // the deliberate start-over mints a NEW session (a different token)
         queueApiMocks.completeQueueJoinSession.mockResolvedValue(COMPLETE_MULTI_RESPONSE);
         directionApiMocks.startPublicDirectionSession.mockResolvedValue({
@@ -1767,5 +1774,148 @@ describe('RQ-18 — /q/:publicCode public route', () => {
         await React.act(async () => {
             resolveComplete(COMPLETE_MULTI_RESPONSE);
         });
+    });
+
+    // ── Round-10 (PR #3362 review, P1) — ownerless-multiple-attempt recovery ─
+
+    /** Seeds an UNKNOWN attempt envelope under its per-attempt key (the
+     * shape a lost complete response leaves behind). */
+    function seedUnknownEnvelope(token: string, ts = Date.now()) {
+        window.localStorage.setItem(
+            `queue_join_attempt_qdir_${CANONICAL_CODE}__${token}`,
+            JSON.stringify({
+                ts,
+                publicCode: CANONICAL_CODE,
+                sessionToken: token,
+                profileId: 7,
+                directionTitle: 'Лаборатория',
+                completeAttempted: true,
+                outcomeUnknown: true,
+            }),
+        );
+    }
+    const envelopeKey = (token: string) =>
+        `queue_join_attempt_qdir_${CANONICAL_CODE}__${token}`;
+    const MISMATCH_REFUSAL = {
+        response: {
+            status: 409,
+            data: {
+                detail: {
+                    reason: 'join_session_payload_mismatch',
+                    message: 'Попытка принадлежит другому набору данных',
+                },
+            },
+        },
+    };
+
+    it('PIN 46 (round-10 P1): ownerless MULTIPLE outstanding attempts fail CLOSED — nothing auto-adopted, nothing destroyed, no fresh start', async () => {
+        // The review repro: tab A (patient A) and tab B (patient B) both
+        // lost their complete responses; both tabs closed — the
+        // sessionStorage owner markers died with the tabs, the localStorage
+        // envelopes survived. The old boot adopted the NEWEST envelope
+        // arbitrarily (= B, another patient's attempt) and the mismatch
+        // path then deleted it. Now the boot fails closed instead.
+        seedUnknownEnvelope('attempt-A', Date.now() - 5000);
+        seedUnknownEnvelope('attempt-B', Date.now());
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+
+        renderDirectionRoute();
+        // the fail-closed ambiguity panel replaces the arbitrary adoption
+        await screen.findByTestId('qj-attempt-ambiguity');
+        // no session minted, no attempt checked behind the patient's back
+        expect(directionApiMocks.startPublicDirectionSession).not.toHaveBeenCalled();
+        expect(queueApiMocks.completeQueueJoinSession).not.toHaveBeenCalled();
+        // neither envelope was destroyed
+        expect(window.localStorage.getItem(envelopeKey('attempt-A'))).toBeTruthy();
+        expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeTruthy();
+        // no reconcile panel was auto-mounted (the old code adopted B and
+        // showed ITS reconcile)
+        expect(screen.queryByTestId('qj-reconcile-banner')).toBeNull();
+        // fresh start stays locked: no start-over until the ambiguity is
+        // resolved, and the plain submit is gated
+        expect(screen.queryByTestId('qj-ambiguity-start-over')).toBeNull();
+        expect(screen.queryByRole('button', { name: /присоединиться/i })).toBeNull();
+    });
+
+    it('PIN 46b (round-10 P1): the ambiguity resolves by CHECKING each attempt — a foreign mismatch keeps its envelope, the fresh start unlocks only when all are proven foreign', async () => {
+        seedUnknownEnvelope('attempt-A', Date.now() - 5000);
+        seedUnknownEnvelope('attempt-B', Date.now());
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        queueApiMocks.completeQueueJoinSession.mockRejectedValue(MISMATCH_REFUSAL);
+        renderDirectionRoute();
+        await screen.findByTestId('qj-attempt-ambiguity');
+
+        // The patient checks the NEWEST attempt first — the exact envelope
+        // the old boot auto-picked and then destroyed on this verdict.
+        fireEvent.click(screen.getByTestId('qj-ambiguity-check-attempt-B'));
+        await screen.findByTestId('qj-reconcile-banner');
+        fireEvent.change(await screen.findByLabelText(/фио пациента/i), {
+            target: { value: 'Пациент А' },
+        });
+        fireEvent.change(screen.getByLabelText(/номер телефона/i), {
+            target: { value: '+998 (90) 123-45-67' },
+        });
+        fireEvent.click(screen.getByTestId('qj-reconcile-check'));
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(1);
+        });
+        const firstCheck = queueApiMocks.completeQueueJoinSession.mock.calls[0][0] as {
+            session_token?: string;
+        };
+        expect(firstCheck.session_token).toBe('attempt-B');
+
+        // The mismatch sends the patient back to the list — and B's
+        // envelope SURVIVES (it belongs to patient B; the round-9 code
+        // deleted it right here).
+        await screen.findByTestId('qj-attempt-ambiguity');
+        expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeTruthy();
+        expect(screen.getByTestId('qj-ambiguity-checked-attempt-B')).toBeTruthy();
+        // still locked: one candidate is unresolved
+        expect(screen.queryByTestId('qj-ambiguity-start-over')).toBeNull();
+
+        // The last candidate mismatches too → every outstanding attempt is
+        // proven foreign → the explicit fresh start unlocks.
+        fireEvent.click(screen.getByTestId('qj-ambiguity-check-attempt-A'));
+        await screen.findByTestId('qj-reconcile-banner');
+        fireEvent.change(await screen.findByLabelText(/фио пациента/i), {
+            target: { value: 'Пациент А' },
+        });
+        fireEvent.change(screen.getByLabelText(/номер телефона/i), {
+            target: { value: '+998 (90) 123-45-67' },
+        });
+        fireEvent.click(screen.getByTestId('qj-reconcile-check'));
+        await waitFor(() => {
+            expect(queueApiMocks.completeQueueJoinSession).toHaveBeenCalledTimes(2);
+        });
+        await screen.findByTestId('qj-ambiguity-start-over');
+        // both envelopes are still intact
+        expect(window.localStorage.getItem(envelopeKey('attempt-A'))).toBeTruthy();
+        expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeTruthy();
+
+        // The deliberate fresh start mints a NEW session and destroys NOTHING.
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue({
+            ...DIRECTION_START_RESPONSE,
+            session_token: 'dir-session-token-2',
+        });
+        fireEvent.click(screen.getByTestId('qj-ambiguity-start-over'));
+        await waitFor(() => {
+            expect(directionApiMocks.startPublicDirectionSession).toHaveBeenCalledTimes(1);
+        });
+        await screen.findByText(/заполните форму/i);
+        expect(window.localStorage.getItem(envelopeKey('attempt-A'))).toBeTruthy();
+        expect(window.localStorage.getItem(envelopeKey('attempt-B'))).toBeTruthy();
+    });
+
+    it('PIN 46c (round-10 P1): a SINGLE ownerless outstanding attempt is still adopted — the common reopen case keeps its recovery', async () => {
+        // The fail-closed gate applies ONLY to the ambiguous multiple case;
+        // the single-outstanding reopen (round-9 accepted behavior) must
+        // keep working — no regression in the boot restructure.
+        seedUnknownEnvelope('solo-attempt');
+        directionApiMocks.startPublicDirectionSession.mockResolvedValue(DIRECTION_START_RESPONSE);
+        renderDirectionRoute();
+        await screen.findByTestId('qj-reconcile-banner');
+        expect(screen.queryByTestId('qj-attempt-ambiguity')).toBeNull();
+        expect(directionApiMocks.startPublicDirectionSession).not.toHaveBeenCalled();
+        expect(window.localStorage.getItem(envelopeKey('solo-attempt'))).toBeTruthy();
     });
 });

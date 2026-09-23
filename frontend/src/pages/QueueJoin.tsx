@@ -212,9 +212,19 @@ const attemptStateKeyFor = (code: string, sessionToken: string): string =>
 // Round-9 (review P1-2): the per-tab owner marker (sessionStorage —
 // survives a reload, dies with the tab) says WHICH outstanding attempt
 // this tab adopted. A reloaded tab finds its own attempt; a reopened
-// tab adopts the single outstanding one (the common case) or the
-// newest — and never destroys the others.
+// tab adopts the single outstanding one — and never destroys the
+// others. Round-10 (review P1): with NO live marker SEVERAL outstanding
+// envelopes are ambiguous — nothing is adopted automatically.
 const attemptStateOwnerKey = (code: string): string => `queue_join_attempt_owner_qdir_${code}`;
+
+// Round-10 (review P1): the ambiguity list labels an outstanding attempt
+// by its direction and LOCAL wall-clock time — the envelope carries no
+// PHI, so the label never reveals who attempted what.
+const attemptTimeLabel = (ts: number): string => {
+  const date = new Date(ts);
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 
 const attemptStateParse = (raw: string | null): QueueJoinAttemptState | null => {
   if (!raw) return null;
@@ -508,6 +518,29 @@ const QueueJoin = () => {
   // start-over (safe for a different identity — the queue duplicate guard
   // reuses the same ticket for the same person).
   const [payloadMismatch, setPayloadMismatch] = useState(false);
+  // Round-10 (review P1): fail-closed ambiguity — the boot found SEVERAL
+  // outstanding attempt envelopes with NO live owner marker (every tab
+  // closed: sessionStorage died, localStorage survived). The old boot
+  // adopted the «newest» arbitrarily — on a shared device that adopts
+  // ANOTHER patient's attempt, and the payload-mismatch path then
+  // DELETED that foreign envelope: the true owner lost their UNKNOWN
+  // recovery (a committed talon replay) and this patient was pushed into
+  // an unchecked fresh start. Now nothing is auto-adopted, fresh start
+  // stays locked, and the ambiguity resolves ONLY by explicitly checking
+  // each attempt with the patient's own identity.
+  const [attemptAmbiguity, setAttemptAmbiguity] = useState<
+    QueueJoinAttemptState[] | null
+  >(null);
+  // Round-10 (review P1): candidates already checked from the ambiguity
+  // list and PROVEN bound to a different payload — marked in the list,
+  // never deleted (the mismatch proves non-ownership, not death).
+  const [ambiguousCheckedTokens, setAmbiguousCheckedTokens] = useState<
+    string[]
+  >([]);
+  // Round-10 (review P1): the ambiguity list while ONE claimed candidate
+  // is being checked — a mismatch restores the list from here without a
+  // re-scan (the claimed envelope must survive the check untouched).
+  const ambiguityCandidatesRef = useRef<QueueJoinAttemptState[] | null>(null);
   // Round-9 (review P2-2): the recovery text is chosen BY REASON — the
   // expired/not_found class keeps the «сессия истекла» wording, while
   // join_session_not_executed shows the server's own safe domain
@@ -910,6 +943,11 @@ const QueueJoin = () => {
     setPreExecRefusalReason(null);
     setPreExecRefusalMessage(null);
     setPayloadMismatch(false);
+    // Round-10 (review P1): the ambiguity panel and its checked marks
+    // belong to the PREVIOUS lifecycle too.
+    ambiguityCandidatesRef.current = null;
+    setAttemptAmbiguity(null);
+    setAmbiguousCheckedTokens([]);
     // RQ-18 follow-up round-3 (P1): a NEW direction is the explicit
     // start-over — the previous code's complete attempt must not
     // forbid B's fresh session lifecycle, and its in-flight/late
@@ -1007,15 +1045,22 @@ const QueueJoin = () => {
     // nothing.
     // Round-9 (review P1-2): the discovery is PER ATTEMPT — resolve this
     // tab's own attempt via the sessionStorage owner marker first, then
-    // the single outstanding one, then the newest. Other tabs' envelopes
-    // are never adopted away nor destroyed; the adopted legacy single-slot
-    // envelope is re-homed to its per-attempt key.
+    // the single outstanding one. Other tabs' envelopes are never adopted
+    // away nor destroyed; the adopted legacy single-slot envelope is
+    // re-homed to its per-attempt key.
+    // Round-10 (review P1): WITHOUT a live owner marker only a SINGLE
+    // outstanding envelope is unambiguous (the common reopen case).
+    // SEVERAL outstanding envelopes with no owner marker mean every tab
+    // was closed — the «newest» may belong to ANOTHER patient of this
+    // shared device, so nothing is auto-adopted and the boot fails
+    // closed into the explicit ambiguity resolution.
     const candidates = attemptStateScan(directionCode);
     const ownerToken = attemptStateOwnerGet(directionCode);
-    const attempt =
-      candidates.find((candidate) => candidate.sessionToken === ownerToken) ??
-      candidates[0] ??
-      null;
+    const ownedAttempt = ownerToken
+      ? candidates.find((candidate) => candidate.sessionToken === ownerToken) ?? null
+      : null;
+    const attempt = ownedAttempt ?? (candidates.length === 1 ? candidates[0] : null);
+    const attemptAmbiguous = ownedAttempt === null && candidates.length > 1;
     // Round-8 (P1-2): claim the direction context BEFORE any branching —
     // the UNKNOWN-recovery branch below early-returns, and WITHOUT the
     // claim its refs/epoch stayed those of the PREVIOUS direction (the
@@ -1023,6 +1068,27 @@ const QueueJoin = () => {
     // a no-op (no epoch bump, no reset) when the code did not change, so
     // same-code effect reruns stay inert.
     const claimed = claimDirectionContext(directionCode);
+    if (attemptAmbiguous) {
+      // Round-10 (review P1): fail-closed. No auto-adopt (the old boot
+      // took candidates[0] — another patient's envelope on a shared
+      // device), no auto-start, no start-over. Every outstanding envelope
+      // stays EXACTLY as it is; the patient resolves the ambiguity via
+      // the explicit per-attempt checks (handleAmbiguityCheck) and the
+      // fresh start unlocks only when every candidate is proven foreign.
+      setReconcile(null);
+      setReconcileDirectionTitle(null);
+      setPreExecRefusal(false);
+      setPreExecRefusalReason(null);
+      setPreExecRefusalMessage(null);
+      setPayloadMismatch(false);
+      setSubmitResultUnknown(false);
+      setShowSessionConsumedAdvisory(false);
+      setError(null);
+      setAttemptAmbiguity(candidates);
+      setAmbiguousCheckedTokens([]);
+      setStep('form');
+      return;
+    }
     if (attempt && attempt.publicCode === directionCode) {
       // Adopt: the owner marker keeps this tab's identity stable across
       // further reloads.
@@ -1073,11 +1139,25 @@ const QueueJoin = () => {
     // Round-9 (review P1-2): remove ONLY this attempt's envelope (the
     // adopted/owned one) — another tab's outstanding attempt for the same
     // /q/<code> must survive the start-over untouched.
+    // Round-10 (review P1): the payload-mismatch panel and the resolved
+    // ambiguity list prove NOTHING about the envelopes' death — a
+    // mismatch only says the TYPED data does not own the attempt. The
+    // old code reached the mismatch panel's start-over right after
+    // deleting the foreign envelope: the true owner lost their UNKNOWN
+    // recovery while this patient got an unchecked fresh start. Both
+    // contexts keep every envelope intact; only the new session is
+    // minted.
+    const keepEnvelopes = payloadMismatch || attemptAmbiguity !== null;
     if (directionCode) {
-      const ownToken = reconcile?.sessionToken ?? attemptStateOwnerGet(directionCode);
-      attemptStateRemoveFor(directionCode, ownToken);
+      if (!keepEnvelopes) {
+        const ownToken = reconcile?.sessionToken ?? attemptStateOwnerGet(directionCode);
+        attemptStateRemoveFor(directionCode, ownToken);
+      }
       attemptStateOwnerClear(directionCode);
     }
+    ambiguityCandidatesRef.current = null;
+    setAttemptAmbiguity(null);
+    setAmbiguousCheckedTokens([]);
     completeAttemptedRef.current = false;
     setReconcile(null);
     setPreExecRefusal(false);
@@ -1090,6 +1170,39 @@ const QueueJoin = () => {
     // Force the fresh public start (a new session, no business action).
     directionStartRef.current = null;
     void runDirectionStart();
+  };
+
+  // Round-10 (review P1): the EXPLICIT resolution of the ownerless
+  // ambiguity — the patient picks ONE outstanding attempt and checks it
+  // with their own identity (the same server-verdict check as the
+  // reconcile retry). The claimed candidate becomes this tab's reconcile
+  // identity; the OTHER envelopes stay untouched. The verdict routes the
+  // flow: a mismatch returns to the list with the candidate marked (its
+  // envelope survives), a proven-dead/used verdict removes only THAT
+  // envelope, a success consumes the claimed attempt normally — and the
+  // fresh start unlocks only when every candidate is resolved.
+  const handleAmbiguityCheck = (candidate: QueueJoinAttemptState) => {
+    if (!directionCode || !attemptAmbiguity || submitAttemptRef.current) {
+      return;
+    }
+    ambiguityCandidatesRef.current = attemptAmbiguity;
+    setAttemptAmbiguity(null);
+    // Claim the candidate as this tab's identity — a reload continues
+    // the same check instead of re-gating the ambiguity.
+    attemptStateOwnerSet(directionCode, candidate.sessionToken);
+    setReconcile({
+      sessionToken: candidate.sessionToken,
+      profileId: candidate.profileId,
+      directionTitle: candidate.directionTitle,
+    });
+    setReconcileDirectionTitle(candidate.directionTitle);
+    setPreExecRefusal(false);
+    setPreExecRefusalReason(null);
+    setPreExecRefusalMessage(null);
+    setPayloadMismatch(false);
+    setSubmitResultUnknown(false);
+    setShowSessionConsumedAdvisory(false);
+    setError(null);
   };
 
   // Обратный отсчет до открытия очереди
@@ -1120,6 +1233,14 @@ const QueueJoin = () => {
 
   const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // Round-10 (review P1): the ambiguity resolution and the reconcile
+    // mode gate the plain submit — no session exists on this mount until
+    // the ambiguity is resolved (or the server verdict unlocks the
+    // start-over). An Enter-key submit must not even hit the guard path.
+    if (directionMode && (reconcile || attemptAmbiguity)) {
+      return;
+    }
 
     if (!String(formData.patientName ?? '').trim() || !String(formData.phone ?? '').trim()) {
       setError(QUEUE_JOIN_MESSAGES.requiredFields);
@@ -1630,6 +1751,11 @@ const QueueJoin = () => {
         attemptStateRemoveFor(directionCode, reconcile.sessionToken);
         attemptStateOwnerClear(directionCode);
       }
+      // Round-10 (review P1): a claimed ambiguity candidate resolved
+      // successfully — the ambiguity lifecycle is over for this mount.
+      ambiguityCandidatesRef.current = null;
+      setAttemptAmbiguity(null);
+      setAmbiguousCheckedTokens([]);
       setReconcile(null);
       if (formStorageKey) {
         draftRemove(formStorageKey);
@@ -1661,16 +1787,80 @@ const QueueJoin = () => {
           attemptStateRemoveFor(directionCode, reconcile.sessionToken);
           attemptStateOwnerClear(directionCode);
         }
+        // Round-10 (review P1): a proven-dead candidate checked from the
+        // ambiguity list — its envelope guards nothing anymore (the
+        // backend proved nothing was created), so ONLY that envelope is
+        // dropped. The remaining outstanding ones still gate the fresh
+        // start — the start-over panel is replaced by the ambiguity list
+        // until every candidate is resolved.
+        if (directionCode && ambiguityCandidatesRef.current !== null) {
+          ambiguityCandidatesRef.current = null;
+          setPreExecRefusal(false);
+          setPreExecRefusalReason(null);
+          setPreExecRefusalMessage(null);
+          const rest = attemptStateScan(directionCode);
+          setAmbiguousCheckedTokens([]);
+          if (rest.length > 1) {
+            setReconcile(null);
+            setAttemptAmbiguity(rest);
+          } else if (rest.length === 1) {
+            // The last remaining outstanding attempt re-adopts exactly
+            // like the boot's single-candidate case.
+            attemptStateOwnerSet(directionCode, rest[0].sessionToken);
+            setReconcile({
+              sessionToken: rest[0].sessionToken,
+              profileId: rest[0].profileId,
+              directionTitle: rest[0].directionTitle,
+            });
+            setReconcileDirectionTitle(rest[0].directionTitle);
+          } else {
+            setReconcile(null);
+          }
+        }
       } else if (refusalReason === 'join_session_payload_mismatch') {
         // Round-5 (P1-3): decisive conflict — the attempt is bound to a
         // DIFFERENT immutable payload (the review's wrong-patient hole:
         // «Replay Patient» must never re-use «Boundary Patient»'s
         // session). The typed form does not own this attempt; the panel
         // swaps to the honest conflict message with the start-over.
-        setPayloadMismatch(true);
-        if (directionCode) {
-          attemptStateRemoveFor(directionCode, reconcile.sessionToken);
+        // Round-10 (review P1): the mismatch proves NON-OWNERSHIP for the
+        // typed payload — it says NOTHING about the attempt being dead.
+        // The envelope MUST SURVIVE: on a shared device it likely belongs
+        // to ANOTHER patient whose UNKNOWN recovery (a committed talon
+        // replay) the old code destroyed here, and even its true owner
+        // may have mistyped — the retry with the exact original identity
+        // needs the envelope alive. Deleting it also unlocked an
+        // UNCHECKED fresh start while the patient's own outstanding
+        // attempt was never looked at.
+        if (
+          directionCode &&
+          ambiguityCandidatesRef.current !== null &&
+          ambiguityCandidatesRef.current.some(
+            (candidate) => candidate.sessionToken === reconcile.sessionToken,
+          )
+        ) {
+          // A claimed ambiguity candidate is proven not ours — back to
+          // the list, marked; NO envelope is destroyed; the fresh start
+          // stays locked until every outstanding attempt is resolved.
+          const list = ambiguityCandidatesRef.current;
+          ambiguityCandidatesRef.current = null;
           attemptStateOwnerClear(directionCode);
+          setReconcile(null);
+          setPayloadMismatch(false);
+          setSubmitResultUnknown(false);
+          setShowSessionConsumedAdvisory(false);
+          setAttemptAmbiguity(list);
+          setAmbiguousCheckedTokens((prev) =>
+            prev.includes(reconcile.sessionToken)
+              ? prev
+              : [...prev, reconcile.sessionToken],
+          );
+        } else {
+          setPayloadMismatch(true);
+          // Round-10 (review P1): the envelope and the owner marker
+          // survive in the single-candidate flow too — a reload re-adopts
+          // THIS attempt and the patient can retry with the exact
+          // original identity (the old code deleted the envelope here).
         }
       } else if (refusalReason === 'join_session_used') {
         setShowSessionConsumedAdvisory(true);
@@ -1678,7 +1868,33 @@ const QueueJoin = () => {
           attemptStateRemoveFor(directionCode, reconcile.sessionToken);
           attemptStateOwnerClear(directionCode);
         }
-        setReconcile(null);
+        // Round-10 (review P1): the used verdict means the attempt's
+        // outcome is KNOWN (committed) — its envelope guards nothing
+        // further, so ONLY that envelope is dropped; the remaining
+        // outstanding ones keep gating the fresh start.
+        if (directionCode && ambiguityCandidatesRef.current !== null) {
+          ambiguityCandidatesRef.current = null;
+          const rest = attemptStateScan(directionCode);
+          setAmbiguousCheckedTokens([]);
+          if (rest.length > 1) {
+            setReconcile(null);
+            setShowSessionConsumedAdvisory(false);
+            setAttemptAmbiguity(rest);
+          } else if (rest.length === 1) {
+            setShowSessionConsumedAdvisory(false);
+            attemptStateOwnerSet(directionCode, rest[0].sessionToken);
+            setReconcile({
+              sessionToken: rest[0].sessionToken,
+              profileId: rest[0].profileId,
+              directionTitle: rest[0].directionTitle,
+            });
+            setReconcileDirectionTitle(rest[0].directionTitle);
+          } else {
+            setReconcile(null);
+          }
+        } else {
+          setReconcile(null);
+        }
       } else {
         // Round-5 (P1-4) fail-closed: network-class, an in-flight
         // processing claim, a 5xx after the business commit, or ANY
@@ -2672,6 +2888,81 @@ const QueueJoin = () => {
                   decisively, so the unsafe «Начать заново» escape is gone
                   from this panel — it remains available only on the PROVEN
                   panels below (pre-execution refusal / payload conflict). */}
+              {directionMode && attemptAmbiguity && (
+                /* Round-10 (review P1): fail-closed ambiguity — several
+                   outstanding attempts, no live owner marker. Nothing is
+                   auto-adopted or destroyed; the patient resolves the
+                   ambiguity by checking each attempt with their own
+                   identity; the fresh start unlocks only when every
+                   outstanding envelope is proven foreign. */
+                <div className="qj-reconcile" data-testid="qj-attempt-ambiguity" role="alert">
+                  <p className="qj-reconcile-text" data-testid="qj-attempt-ambiguity-text">
+                    {t('misc.qj_attempt_ambiguity_title')}
+                  </p>
+                  <p className="qj-reconcile-hint">{t('misc.qj_attempt_ambiguity_hint')}</p>
+                  <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
+                    {attemptAmbiguity.map((candidate) => {
+                      const checked = ambiguousCheckedTokens.includes(candidate.sessionToken);
+                      return (
+                        <li
+                          key={candidate.sessionToken}
+                          className="qj-ambiguity-item"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 'var(--mac-spacing-3)',
+                          }}
+                        >
+                          <span className="qj-ambiguity-item-label" style={{ color: 'var(--mac-text-secondary)' }}>
+                            {candidate.directionTitle ? `${candidate.directionTitle} · ` : ''}
+                            {t('misc.qj_attempt_ambiguity_item', {
+                              time: attemptTimeLabel(candidate.ts),
+                            })}
+                          </span>
+                          {checked ? (
+                            <span
+                              className="qj-ambiguity-item-checked"
+                              data-testid={`qj-ambiguity-checked-${candidate.sessionToken}`}
+                              style={{ color: 'var(--mac-text-tertiary)' }}
+                            >
+                              {t('misc.qj_attempt_ambiguity_not_mine')}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="qj-draft-btn qj-draft-btn-primary"
+                              data-testid={`qj-ambiguity-check-${candidate.sessionToken}`}
+                              disabled={loading}
+                              onClick={() => handleAmbiguityCheck(candidate)}
+                            >
+                              {t('misc.qj_reconcile_check')}
+                            </button>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {attemptAmbiguity.length > 0 &&
+                    attemptAmbiguity.every((candidate) =>
+                      ambiguousCheckedTokens.includes(candidate.sessionToken),
+                    ) && (
+                      <div className="qj-reconcile-actions">
+                        <p className="qj-reconcile-hint">
+                          {t('misc.qj_attempt_ambiguity_resolved_hint')}
+                        </p>
+                        <button
+                          type="button"
+                          className="qj-draft-btn qj-draft-btn-primary"
+                          data-testid="qj-ambiguity-start-over"
+                          onClick={handleStartOver}
+                        >
+                          {t('misc.qj_reconcile_start_over')}
+                        </button>
+                      </div>
+                    )}
+                </div>
+              )}
               {directionMode && reconcile && !preExecRefusal && !payloadMismatch && (
                 <div className="qj-reconcile" data-testid="qj-reconcile-banner" role="alert">
                   <p className="qj-reconcile-text" data-testid="qj-reconcile-text">
@@ -2978,8 +3269,11 @@ const QueueJoin = () => {
               {/* Кнопки - macOS стиль. Round-4 (P1-2): in reconcile mode the
                   normal submit is replaced by the reconcile panel's actions —
                   a plain submit here would hit the attempt guard (no
-                  auto-renewal) or send the UNKNOWN attempt again blindly. */}
-              {!(directionMode && reconcile) && (
+                  auto-renewal) or send the UNKNOWN attempt again blindly.
+                  Round-10 (review P1): the ambiguity resolution gates the
+                  plain submit the same way — no session exists until the
+                  ambiguity is resolved (or a fresh start is unlocked). */}
+              {!(directionMode && (reconcile || attemptAmbiguity)) && (
                 <div className="flex" style={{ gap: 'var(--mac-spacing-3)', paddingTop: '16px' }}>
                   <button
                     type="button"
