@@ -10,7 +10,12 @@ from app.api.v1.endpoints.registrar_integration._helpers import (
     _resolve_payment_truth,
 )  # noqa: F401
 from app.api.v1.endpoints.registrar_integration._queue_ops import (  # noqa: F401
+    _REGISTRAR_QUEUE_CACHE_KEY,
     _build_queue_payload,
+    _cached_service_by_id,
+    _cached_service_by_name,
+    _cached_services_for_ids,
+    _cached_visit_services,
     _detect_ecg_services,
     _ensure_specialty_queue,
     _get_visit_created_at,
@@ -18,6 +23,7 @@ from app.api.v1.endpoints.registrar_integration._queue_ops import (  # noqa: F40
     _load_queue_data_for_date,
     _normalize_department_filter,
     _parse_queue_target_date,
+    _prime_registrar_queue_read_cache,
     _process_appointment_entry,
     _process_legacy_appointments,
     _process_online_queue_entries,
@@ -44,9 +50,6 @@ def _resolve_entry_department(
     For appointment entries: uses appointment.services → Service.department_key.
     Returns (entry_department_key, entry_department).
     """
-    from app.models.service import Service
-    from app.models.visit import VisitService
-
     # [OK] ДОБАВЛЯЕМ department_key и department для фронтенда
     entry_department_key = None
     entry_department = None
@@ -55,14 +58,10 @@ def _resolve_entry_department(
         entry_department = visit_department
 
         # Для Visit получаем department_key из услуг
-        from app.models.visit import VisitService
-
-        visit_services_for_dept = (
-            db.query(VisitService).filter(VisitService.visit_id == record_id).all()
-        )
+        visit_services_for_dept = _cached_visit_services(db, record_id)
         for vs in visit_services_for_dept:
             if vs.service_id:
-                svc = db.query(Service).filter(Service.id == vs.service_id).first()
+                svc = _cached_service_by_id(db, vs.service_id)
                 if svc and svc.department_key:
                     entry_department_key = svc.department_key
                     break
@@ -80,12 +79,12 @@ def _resolve_entry_department(
                 if isinstance(service_item, dict):
                     service_id = service_item.get('id')
                     if service_id:
-                        svc = db.query(Service).filter(Service.id == service_id).first()
+                        svc = _cached_service_by_id(db, service_id)
                 elif isinstance(service_item, int):
-                    svc = db.query(Service).filter(Service.id == service_item).first()
+                    svc = _cached_service_by_id(db, service_item)
                 elif isinstance(service_item, str):
                     # [OK] ДОБАВЛЕНО: Поиск услуги по названию (Appointment.services - это JSON строк)
-                    svc = db.query(Service).filter(Service.name == service_item).first()
+                    svc = _cached_service_by_name(db, service_item)
 
                 if svc and svc.department_key:
                     entry_department_key = svc.department_key
@@ -132,9 +131,6 @@ def _process_visits_for_queues(
     - Visits with only ECG go to echokg.
     - Other visits go to specialty from service.department_key or visit.department.
     """
-    from app.models.service import Service
-    from app.models.visit import VisitService
-
     for visit in visits:
         # Пропускаем если уже обработан
         if visit.id in seen_visit_ids:
@@ -157,18 +153,9 @@ def _process_visits_for_queues(
 
         # [OK] Определяем specialty на основе услуг визита, а не только department
         # Проверяем услуги визита для правильного определения очереди
-        from app.models.service import Service
-        from app.models.visit import VisitService
-
-        visit_services = (
-            db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
-        )
+        visit_services = _cached_visit_services(db, visit.id)
         service_ids = [vs.service_id for vs in visit_services]
-        services = (
-            db.query(Service).filter(Service.id.in_(service_ids)).all()
-            if service_ids
-            else []
-        )
+        services = _cached_services_for_ids(db, service_ids)
 
         # R-22: ECG detection extracted to helper. Queue routing keeps the
         # compatibility detector, while page eligibility must mirror the
@@ -815,11 +802,16 @@ def _get_today_queues_payload(
     offset: int = 0,
 ) -> dict[str, Any]:
     """Shared registrar payload builder with an optional internal row window."""
+    cache_missing = object()
+    previous_cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY, cache_missing)
     try:
         today = _parse_queue_target_date(target_date, db)
         department_filter = _normalize_department_filter(department)
 
         visits, appointments, online_entries = _load_queue_data_for_date(db, today)
+        db.info[_REGISTRAR_QUEUE_CACHE_KEY] = _prime_registrar_queue_read_cache(
+            db, today, visits, appointments, online_entries
+        )
 
         queues_by_specialty = {}
         seen_visit_ids = set()
@@ -879,6 +871,11 @@ def _get_today_queues_payload(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Внутренняя ошибка сервера. Подробности в журнале.",
         )
+    finally:
+        if previous_cache is cache_missing:
+            db.info.pop(_REGISTRAR_QUEUE_CACHE_KEY, None)
+        else:
+            db.info[_REGISTRAR_QUEUE_CACHE_KEY] = previous_cache
 
 
 def get_today_queues_page(
