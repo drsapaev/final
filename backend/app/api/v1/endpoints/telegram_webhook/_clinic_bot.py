@@ -20,6 +20,7 @@ from app.crud import telegram_config as crud_telegram
 from app.crud.clinic import clinic_today
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
+from app.models.department import Department
 from app.models.lab import LabReportInstance
 from app.models.patient import Patient
 from app.models.telegram_config import TelegramUser
@@ -524,6 +525,26 @@ class TelegramMiniAppPatientManifestRequest(BaseModel):
     section: str | None = None
 
 
+class TelegramMiniAppBookingDepartmentsRequest(BaseModel):
+    """Round-12 (owner P1, PR #3386 review): auth shape for the booking
+    departments reference endpoint.
+
+    The Mini App booking form no longer free-types a department name (a
+    localized label like "Кардиология" is NOT the canonical `Department.key`
+    the routing contract resolves); it picks from THIS endpoint's list, so
+    the submitted value is always a canonical key. Same identity contract
+    as the booking endpoints themselves (initData primary, entry token
+    allowed) — the reference data rides the SAME authenticated surface it
+    feeds, and the error reasons match the booking scope contract.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    init_data: str | None = Field(default=None, alias="initData")
+    entry_token: str | None = Field(default=None, alias="entryToken")
+    section: str | None = None
+
+
 class TelegramMiniAppPatientFormsPreviewRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -650,12 +671,39 @@ def _mini_app_booking_deny_reason(detail: Any) -> str:
     return "mini_app_error"
 
 
+def _mini_app_booking_departments_payload(db: Session) -> dict[str, Any]:
+    """Round-12 (owner P1, PR #3386 review): ACTIVE departments for the
+    Mini App booking form's department selector.
+
+    The selector submits the canonical `Department.key` — the exact value
+    `resolve_booking_department` resolves — so a normal user can no longer
+    send a localized label ("Кардиология") and receive 400
+    `department_unknown`. Only ACTIVE rows are listed (an inactive
+    department in the list would guarantee a 400 on submit), and the
+    display name is the clinic's own `name_ru` — the Mini App booking
+    surface is Russian-first (same choice as every other patient-facing
+    string there).
+    """
+    department_rows = (
+        db.query(Department)
+        .filter(Department.active == True)  # noqa: E712 - SQLAlchemy filter
+        .order_by(Department.name_ru.asc(), Department.key.asc())
+        .all()
+    )
+    return {
+        "departments": [
+            {"key": row.key, "name": row.name_ru} for row in department_rows
+        ]
+    }
+
+
 def _build_mini_app_appointment_booking_preview_from_request(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
     db: Session,
     *,
     allow_entry_token: bool = False,
     request: "Request | None" = None,  # M4-P0-1: for audit logging
+    resolve_routing: bool = True,
 ):
     from app.services.patient_access_audit import log_patient_access
 
@@ -731,29 +779,38 @@ def _build_mini_app_appointment_booking_preview_from_request(
     # 400s for unknown/inactive/missing/mismatched departments BEFORE any
     # mutation). A missing Doctor row keeps the pre-round-11 preview shape;
     # create's eligibility gate still answers 404 for it.
-    try:
-        department_row = resolve_booking_department(db, preview.draft.department)
-        if preview.draft.doctor_id is not None:
-            doctor_row = (
-                db.query(Doctor).filter(Doctor.id == preview.draft.doctor_id).first()
-            )
-            if doctor_row is not None:
-                department_row = resolve_doctor_routing_department(
-                    doctor_row, department_row
+    #
+    # Round-12 (owner P1/P2, PR #3386 review): the CREATE endpoint passes
+    # ``resolve_routing=False`` — its routing context is resolved AFTER the
+    # established doctor_not_eligible gate (the eligibility contract keeps
+    # precedence over request-shaped routing 400s) and re-validated under
+    # FOR UPDATE next to the INSERT (lock_department_for_booking). Only the
+    # non-mutating preview keeps the early resolution here.
+    department_row: Department | None = None
+    if resolve_routing:
+        try:
+            department_row = resolve_booking_department(db, preview.draft.department)
+            if preview.draft.doctor_id is not None:
+                doctor_row = (
+                    db.query(Doctor).filter(Doctor.id == preview.draft.doctor_id).first()
                 )
-    except HTTPException as exc:
-        # SSOT parity (portal round-3): a routing denial leaves an audit
-        # trail row too.
-        log_patient_access(
-            db=db,
-            scope=scope,
-            resource_type="appointment",
-            action="preview",
-            outcome="denied",
-            request=request,
-            extra_data={"reason": _mini_app_booking_deny_reason(exc.detail)},
-        )
-        raise
+                if doctor_row is not None:
+                    department_row = resolve_doctor_routing_department(
+                        doctor_row, department_row
+                    )
+        except HTTPException as exc:
+            # SSOT parity (portal round-3): a routing denial leaves an audit
+            # trail row too.
+            log_patient_access(
+                db=db,
+                scope=scope,
+                resource_type="appointment",
+                action="preview",
+                outcome="denied",
+                request=request,
+                extra_data={"reason": _mini_app_booking_deny_reason(exc.detail)},
+            )
+            raise
     # M4-P0-1: Log successful appointment preview access
     # (audit for actual creation happens in _routes.py create_mini_app_appointment_booking)
     log_patient_access(

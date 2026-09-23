@@ -414,3 +414,46 @@ Mini App booking endpoints):
   `outcome="denied"` `patient_access_audit` rows with the failing reason
   (same SSOT pattern as the portal's round-3 denied rows); success rows
   carry the resolved `department_id`.
+
+Round-12 (PR #3386 review: canonical keys end-to-end, atomic routing):
+
+- The Mini App booking form no longer free-types a department name. A
+  localized label ("Кардиология") is NOT a `Department.key`, so a normal
+  user input would be refused with `400 department_unknown` after the
+  routing contract landed. The form's department field is now a SELECTOR
+  fed by a new authenticated reference endpoint,
+  `POST /telegram/mini-app/booking/departments`
+  (`operation_id=telegram_mini_app_list_booking_departments`): it returns
+  `{ departments: [{ key, name }] }` — ACTIVE rows only, `name` is the
+  clinic's own `name_ru` (the Mini App booking surface is Russian-first).
+  The selector submits the canonical `key`; on endpoint failure the form
+  degrades to "без отделения" (a departmentless booking stays valid) and
+  never falls back to free text. Identity contract mirrors the booking
+  endpoints (initData primary, entry token allowed); no PHI is returned.
+- Atomic routing check (P1): the `active` validation in
+  `resolve_booking_department` / the canonical path is a plain read, so an
+  admin deactivate/delete could commit between the check and the
+  appointment INSERT, persisting a routing context that points at a
+  non-active department. The create endpoints now re-validate the FINAL
+  department row under `FOR UPDATE` inside the booking transaction
+  (`lock_department_for_booking`): a department-only create resolves its
+  row `for_update=True`; a doctor-booking locks the CANONICAL row by id
+  right before persisting. A racing admin change either commits first
+  (controlled 400 `department_inactive`, or `department_unknown` when the
+  row was deleted outright — never an IntegrityError/500) or commits after
+  the booking.
+- Routing vs eligibility ordering (P2): on BOTH create surfaces the
+  routing resolution now runs AFTER the established `doctor_not_eligible`
+  gate (the Mini App helper gained `resolve_routing=False` for the create
+  endpoint; the portal create moved its submitted-key resolution into the
+  post-eligibility branch). A request that is both ineligible-doctor AND
+  bad-department answers the established 404/409 `doctor_not_eligible`
+  contract, not a 400. Routing refusals on the Mini App create flow keep
+  their `outcome="denied"` audit rows (the create endpoint writes them
+  itself now that routing moved out of the shared helper).
+- Patient-safe frontend errors (P2): the Mini App booking panel maps the
+  new reasons to actionable Russian copy (`department_unknown`,
+  `department_inactive`, `doctor_department_missing`,
+  `doctor_department_mismatch`, plus `doctor_not_eligible`) in
+  `patientUtils.ts` — a refused request no longer falls back to the
+  generic "Не удалось обработать заявку" line.

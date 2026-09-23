@@ -21,6 +21,14 @@ The 400 reason contract is identical on both surfaces:
   doctor's own canonical department;
 * ``department_inactive`` (canonical path) — the doctor's own department
   exists but is deactivated (round-10 owner P1).
+
+Round-12 (owner P1, PR #3386 review): the ACTIVE check is only as strong
+as the row version it read. The create endpoints re-validate the FINAL
+department row under ``FOR UPDATE`` (``lock_department_for_booking``)
+inside the booking transaction, so an admin deactivate/delete that races
+the appointment INSERT either commits first (the locked re-read refuses
+with the SAME 400 reasons) or commits after the booking — the persisted
+routing context can never point at a row that is no longer active.
 """
 
 from __future__ import annotations
@@ -35,7 +43,7 @@ from app.models.department import Department
 
 
 def resolve_booking_department(
-    db: Session, department: str | None
+    db: Session, department: str | None, *, for_update: bool = False
 ) -> Department | None:
     """Resolve a booking `department` to an ACTIVE department row.
 
@@ -50,13 +58,22 @@ def resolve_booking_department(
     could 400 on `" cardio "` the preview had already accepted. Normalizing
     here keeps the resolver safe for ANY caller, not just the draft-fed
     path.
+
+    Round-12 (owner P1, PR #3386 review): ``for_update=True`` is for the
+    CREATE paths where the resolved row is the one about to be persisted —
+    the row is read ``FOR UPDATE`` inside the booking transaction, so a
+    concurrent admin deactivate/delete serializes: the lock acquisition
+    re-reads the latest committed row version BEFORE the ``active`` check
+    below, making the check atomic with the appointment INSERT. Previews
+    keep the default (a non-mutating read must not take row locks).
     """
     if department is None or not department.strip():
         return None
     normalized_key = department.strip()
-    department_row = (
-        db.query(Department).filter(Department.key == normalized_key).first()
-    )
+    department_query = db.query(Department).filter(Department.key == normalized_key)
+    if for_update:
+        department_query = department_query.with_for_update()
+    department_row = department_query.first()
     if department_row is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -124,6 +141,52 @@ def resolve_doctor_routing_department(
             detail={"reason": "doctor_department_mismatch"},
         )
     return department
+
+
+def lock_department_for_booking(
+    db: Session, department_row: Department | None
+) -> Department | None:
+    """Re-validate the FINAL routing department under ``FOR UPDATE``.
+
+    Round-12 (owner P1, PR #3386 review): ``resolve_booking_department``
+    and the canonical path check ``active`` on a plain (unlocked) read —
+    an admin deactivate/delete can commit between that check and the
+    appointment INSERT, so the created row would carry a routing context
+    pointing at an inactive (or gone) department. The create endpoints
+    call THIS immediately before persisting ``department_id``:
+
+    * the row is re-read by id ``FOR UPDATE`` inside the booking
+      transaction — a concurrent admin UPDATE/DELETE on the department
+      blocks until the booking commits, and the lock acquisition itself
+      re-reads the latest committed row version (READ COMMITTED);
+    * a row that is no longer active answers the SAME 400
+      ``department_inactive`` the routing contract already publishes;
+    * a row deleted outright answers 400 ``department_unknown`` (the FK
+      the INSERT would need no longer resolves — a controlled refusal,
+      never an IntegrityError/500).
+
+    ``None`` passes through (a departmentless booking has no row to lock
+    and no routing context to lose).
+    """
+    if department_row is None:
+        return None
+    locked_row = (
+        db.query(Department)
+        .filter(Department.id == department_row.id)
+        .with_for_update()
+        .first()
+    )
+    if locked_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "department_unknown"},
+        )
+    if not getattr(locked_row, "active", True):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason": "department_inactive"},
+        )
+    return locked_row
 
 
 def attach_department_id(

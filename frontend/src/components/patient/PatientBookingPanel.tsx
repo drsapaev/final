@@ -1,8 +1,8 @@
 
 import type { HttpApiError } from '../../types/errors';
 import { extractDetailReason } from '../../utils/error-utils';
-import { useState } from 'react';
-import { Badge, Button, Input, Textarea } from '../ui/macos';
+import { useEffect, useState } from 'react';
+import { Badge, Button, Input, Select, Textarea } from '../ui/macos';
 import { api } from '../../api/client';
 import {
   readTelegramMiniAppInitData,
@@ -30,6 +30,12 @@ interface BookingCreatedResponse {
   preview?: { appointment?: BookingAppointment };
 }
 
+/** Round-12: reference rows for the department selector (canonical keys). */
+interface BookingDepartmentOption {
+  key: string;
+  name: string;
+}
+
 /**
  * L-H-4 fix: PatientBookingPanel выделен в отдельный файл (~120 строк).
  *
@@ -41,6 +47,12 @@ interface BookingCreatedResponse {
  *
  * Форма записи на приём через Telegram Mini App identity.
  * Поток: preview → review summary → create booking.
+ *
+ * Round-12 (PR #3386 review): отделение выбирается из справочника
+ * активных отделений (POST /telegram/mini-app/booking/departments), а не
+ * свободным текстом — селектор отправляет канонический `Department.key`
+ * (например `cardio`), который резолвит routing-контракт. Свободный ввод
+ * («Кардиология») после PR получал бы 400 department_unknown.
  */
 function PatientBookingPanel() {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -55,9 +67,41 @@ function PatientBookingPanel() {
   const [bookingPreview, setBookingPreview] = useState<{ appointment?: BookingAppointment; preview?: { appointment?: BookingAppointment } } | null>(null);
   const [createdBooking, setCreatedBooking] = useState<BookingCreatedResponse | null>(null);
   const [bookingError, setBookingError] = useState('');
+  const [departmentOptions, setDepartmentOptions] = useState<BookingDepartmentOption[]>([]);
+  const [departmentsUnavailable, setDepartmentsUnavailable] = useState(false);
   const initData = readTelegramMiniAppInitData();
   const isBusy = bookingStatus === 'previewing' || bookingStatus === 'creating';
   const appointment = bookingPreview?.appointment || createdBooking?.preview?.appointment || null;
+
+  // Round-12: the selector's options come from the authenticated reference
+  // endpoint — only ACTIVE departments, keyed by canonical `Department.key`.
+  // On failure the form degrades to "без отделения" (a departmentless
+  // booking stays valid); it never falls back to free-text input.
+  // NOTE: declared BEFORE any early return (Rules of Hooks).
+  useEffect(() => {
+    if (!initData) return;
+    let cancelled = false;
+    setDepartmentsUnavailable(false);
+    api
+      .post('/telegram/mini-app/booking/departments', { initData })
+      .then((response) => {
+        if (cancelled) return;
+        const rows = (response.data as { departments?: BookingDepartmentOption[] })?.departments;
+        setDepartmentOptions(
+          Array.isArray(rows)
+            ? rows.filter((row) => row && typeof row.key === 'string' && row.key)
+            : [],
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDepartmentOptions([]);
+        setDepartmentsUnavailable(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initData]);
 
   if (!initData) {
     return (
@@ -150,13 +194,19 @@ function PatientBookingPanel() {
             disabled={isBusy}
             onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('appointmentTime', event.target.value)}
           />
-          <Input
+          <Select
             label={t('patient.pat_book_label_department')}
             value={bookingForm.department}
             disabled={isBusy}
-            maxLength={64}
             placeholder={t('patient.pat_book_placeholder_department')}
-            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('department', event.target.value)}
+            options={[
+              { value: '', label: t('patient.pat_book_option_no_department') },
+              ...departmentOptions.map((department) => ({
+                value: department.key,
+                label: department.name,
+              })),
+            ]}
+            onValueChange={(value) => handleChange('department', String(value))}
           />
           <Input
             label={t('patient.pat_book_label_services')}
@@ -203,6 +253,11 @@ function PatientBookingPanel() {
             <div className="pp-grid-span-2 pp-message pp-message--error" role="alert">
               <AlertTriangle size={16} aria-hidden="true" />
               {bookingError}
+            </div>
+          )}
+          {departmentsUnavailable && (
+            <div className="pp-grid-span-2 pp-summary-services" role="note">
+              {t('patient.pat_book_departments_unavailable')}
             </div>
           )}
 

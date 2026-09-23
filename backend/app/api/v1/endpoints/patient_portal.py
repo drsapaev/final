@@ -90,6 +90,7 @@ from app.models.user import User
 from app.schemas import appointment as appointment_schemas
 from app.services.appointment_booking_routing import (
     attach_department_id,
+    lock_department_for_booking,
     resolve_booking_department,
     resolve_doctor_routing_department,
 )
@@ -502,7 +503,7 @@ def _raise_scope_error(
 
 
 def _resolve_portal_department(
-    db: Session, department: str | None
+    db: Session, department: str | None, *, for_update: bool = False
 ) -> Department | None:
     """Resolve a booking `department` to an ACTIVE department row (P1).
 
@@ -510,8 +511,13 @@ def _resolve_portal_department(
     booking-routing service so the Mini App booking endpoints resolve the
     SAME canonical routing context through the SAME helper — one SSOT for
     every protected patient booking surface.
+
+    Round-12 (owner P1, PR #3386 review): ``for_update=True`` — create
+    paths whose resolved row IS the final routing context read the row
+    ``FOR UPDATE`` so the active check is atomic with the appointment
+    INSERT (see ``lock_department_for_booking``).
     """
-    return resolve_booking_department(db, department)
+    return resolve_booking_department(db, department, for_update=for_update)
 
 
 def _with_resolved_department(
@@ -820,9 +826,15 @@ def create_patient_portal_booking(
         # P1 (round 2): resolve BEFORE any mutation — unknown/inactive keys are a
         # 400, never a silently-NULL routing context on the created row.
         # Round-4 (owner P2): SSOT-NORMALIZED draft value (see preview).
-        department_row = _resolve_portal_department(db, preview.draft.department)
-
+        # Round-12 (owner P1/P2, PR #3386 review): the resolution moved INTO
+        # the branches below — AFTER the established doctor_not_eligible gate
+        # (eligibility keeps precedence over request-shaped routing 400s),
+        # with the FINAL row re-validated under FOR UPDATE next to the
+        # INSERT so an admin deactivate/delete racing the appointment
+        # creation cannot persist a routing context pointing at a
+        # non-active department.
         draft_payload = preview.draft.to_appointment_create_payload()
+        department_row: Department | None = None
 
         if preview.draft.doctor_id is not None:
             # Atomic slot reservation — concurrent same-slot writers
@@ -842,18 +854,28 @@ def create_patient_portal_booking(
                     },
                 ) from exc
 
+            # Round-9 (owner P1): the persisted routing context is the
+            # doctor's CANONICAL department — resolved AFTER eligibility
+            # (round-12: the submitted-key resolution moved here too, so a
+            # request that is both ineligible-doctor AND bad-department
+            # keeps answering the established doctor_not_eligible contract)
+            # and BEFORE the slot check (a routing refusal never creates
+            # anything). The submitted department either matches the
+            # doctor's own or the request is a controlled 400; a
+            # departmentless doctor is an explicit refusal, not a NULL
+            # department_id.
+            department_row = _resolve_portal_department(
+                db, preview.draft.department
+            )
             if doctor_row is not None:
-                # Round-9 (owner P1): the persisted routing context is the
-                # doctor's CANONICAL department — resolved AFTER eligibility
-                # so the established doctor_not_eligible contract is
-                # unchanged, and BEFORE the slot check (a routing refusal
-                # never creates anything). The submitted department either
-                # matches the doctor's own or the request is a controlled
-                # 400; a departmentless doctor is an explicit refusal, not
-                # a NULL department_id.
                 department_row = _resolve_doctor_routing_department(
                     doctor_row, department_row
                 )
+                # Round-12 (owner P1): atomic re-validation — the row about
+                # to be persisted is re-read FOR UPDATE inside the booking
+                # transaction; a concurrent admin deactivate/delete either
+                # commits first (controlled 400) or after the booking.
+                department_row = lock_department_for_booking(db, department_row)
 
             if preview.draft.appointment_time:
                 if appointment_crud.is_time_slot_occupied(
@@ -866,6 +888,13 @@ def create_patient_portal_booking(
                         status_code=status.HTTP_409_CONFLICT,
                         detail={"reason": "appointment_time_slot_occupied"},
                     )
+        else:
+            # Department-only booking: the resolved row IS the final routing
+            # context — read FOR UPDATE so the active check is atomic with
+            # the appointment INSERT (round-12 owner P1).
+            department_row = _resolve_portal_department(
+                db, preview.draft.department, for_update=True
+            )
     except HTTPException as exc:
         # Round-3 (owner P2): denial leaves a trail row (SSOT parity) —
         # unknown/inactive department 400, doctor eligibility 404, occupied

@@ -16,11 +16,15 @@ from app.api.v1.endpoints.telegram_webhook._clinic_bot import (  # noqa: F401
     _build_mini_app_patient_manifest_from_request,
     _build_mini_app_patient_report_download_response,
     _handle_clinic_bot_update,
+    _mini_app_booking_deny_reason,
+    _mini_app_booking_departments_payload,
     _raise_telegram_webhook_internal_error,
+    _resolve_mini_app_patient_scope_from_auth,
     _save_mini_app_patient_form_submission_from_request,
     _telegram_bot_info_failure,
     _telegram_user_from_onboarding_request_auth,
     _validate_webhook_secret,
+    TelegramMiniAppBookingDepartmentsRequest,
 )
 
 # Import everything from all submodules (wildcard for backward compat)
@@ -48,6 +52,8 @@ from app.schemas.notifications import (
 )
 from app.services.appointment_booking_routing import (
     attach_department_id,
+    lock_department_for_booking,
+    resolve_booking_department,
     resolve_doctor_routing_department,
 )
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
@@ -518,6 +524,46 @@ def revoke_all_mini_app_patient_sessions(
 
 
 @router.post(
+    "/mini-app/booking/departments",
+    operation_id="telegram_mini_app_list_booking_departments",
+    response_model=dict[str, Any],
+)
+def list_mini_app_booking_departments(
+    request_body: TelegramMiniAppBookingDepartmentsRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Round-12 (owner P1, PR #3386 review): ACTIVE departments for the
+    Mini App booking form's department selector.
+
+    The form submits the canonical `Department.key` picked from THIS list —
+    a localized free-text label ("Кардиология") is not a `Department.key`
+    and would be refused with 400 `department_unknown` by the routing
+    contract. Same authenticated identity surface as the booking endpoints
+    themselves (initData primary, entry token allowed); no PHI is returned.
+    """
+
+    try:
+        _resolve_mini_app_patient_scope_from_auth(
+            db,
+            init_data_payload=request_body.init_data,
+            entry_token=request_body.entry_token,
+            expected_section=request_body.section or "appointments",
+        )
+    except TelegramMiniAppInitDataError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"reason": exc.reason},
+        ) from exc
+    except TelegramMiniAppSessionScopeError as exc:
+        raise HTTPException(
+            status_code=_mini_app_booking_scope_status_code(exc.reason),
+            detail={"reason": exc.reason},
+        ) from exc
+    return _mini_app_booking_departments_payload(db)
+
+
+@router.post(
     "/mini-app/appointments/preview",
     operation_id="telegram_mini_app_preview_appointment_booking",
     response_model=dict[str, Any],
@@ -650,16 +696,27 @@ def create_mini_app_appointment_booking(
 ):
     """Create one trusted Mini App appointment for a linked patient."""
 
+    # Round-12 (owner P1/P2, PR #3386 review): ``resolve_routing=False`` —
+    # the routing context is resolved HERE, after the established
+    # doctor_not_eligible gate (eligibility keeps precedence over the
+    # request-shaped routing 400s) and re-validated under FOR UPDATE next
+    # to the INSERT. The endpoint's own denial audit below preserves the
+    # audited routing-refusal trail the shared helper provided in
+    # round-11.
     (
         preview,
-        department_row,
+        _early_department_row,
     ) = _build_mini_app_appointment_booking_preview_from_request(
         request_body,
         db,
         allow_entry_token=True,
         request=request,  # M4-P0-1: pass request for audit logging
+        resolve_routing=False,
     )
     draft_payload = preview.draft.to_appointment_create_payload()
+    department_row: Department | None = None
+
+    from app.services.patient_access_audit import log_patient_access
 
     if preview.draft.doctor_id is not None:
         # Atomic slot reservation (Codex P1 round-7, ordering fixed round-8:
@@ -686,15 +743,59 @@ def create_mini_app_appointment_booking(
             ) from exc
 
         if doctor_row is not None:
-            # Round-11 (owner P1 parity, PR #3340): the persisted routing
-            # context is the doctor's CANONICAL department — re-resolved on
-            # the LOCKED doctor row AFTER eligibility (the established
+            # Round-12 (owner P1/P2, PR #3386 review): routing resolution
+            # moved AFTER the eligibility gate (the established
             # doctor_not_eligible contract is unchanged) and BEFORE the slot
-            # check (a routing refusal never creates anything). Mirrors the
-            # portal create flow exactly.
-            department_row = resolve_doctor_routing_department(
-                doctor_row, department_row
-            )
+            # check (a routing refusal never creates anything). The
+            # submitted key either matches the doctor's own canonical
+            # department or the request is a controlled 400 — and the FINAL
+            # canonical row is re-validated under FOR UPDATE so an admin
+            # deactivate/delete racing the INSERT cannot persist a routing
+            # context pointing at a non-active department.
+            try:
+                department_row = resolve_booking_department(
+                    db, preview.draft.department
+                )
+                department_row = resolve_doctor_routing_department(
+                    doctor_row, department_row
+                )
+                department_row = lock_department_for_booking(db, department_row)
+            except HTTPException as exc:
+                # SSOT parity (portal round-3): a routing denial leaves an
+                # audit trail row too (the helper skipped routing).
+                log_patient_access(
+                    db=db,
+                    scope=preview.scope,
+                    resource_type="appointment",
+                    action="create",
+                    outcome="denied",
+                    request=request,
+                    extra_data={
+                        "reason": _mini_app_booking_deny_reason(exc.detail)
+                    },
+                )
+                raise
+        else:
+            # Doctor row vanished between the draft and the lock: the
+            # eligibility gate above already answered; the submitted key is
+            # still request-validated so a stale client cannot skip it.
+            try:
+                department_row = resolve_booking_department(
+                    db, preview.draft.department
+                )
+            except HTTPException as exc:
+                log_patient_access(
+                    db=db,
+                    scope=preview.scope,
+                    resource_type="appointment",
+                    action="create",
+                    outcome="denied",
+                    request=request,
+                    extra_data={
+                        "reason": _mini_app_booking_deny_reason(exc.detail)
+                    },
+                )
+                raise
 
         if preview.draft.appointment_time:
             slot_occupied = appointment_crud.is_time_slot_occupied(
@@ -708,6 +809,25 @@ def create_mini_app_appointment_booking(
                     status_code=status.HTTP_409_CONFLICT,
                     detail={"reason": "appointment_time_slot_occupied"},
                 )
+    else:
+        # Department-only booking: the resolved row IS the final routing
+        # context — read FOR UPDATE so the active check is atomic with the
+        # appointment INSERT (round-12 owner P1).
+        try:
+            department_row = resolve_booking_department(
+                db, preview.draft.department, for_update=True
+            )
+        except HTTPException as exc:
+            log_patient_access(
+                db=db,
+                scope=preview.scope,
+                resource_type="appointment",
+                action="create",
+                outcome="denied",
+                request=request,
+                extra_data={"reason": _mini_app_booking_deny_reason(exc.detail)},
+            )
+            raise
 
     appointment_create_payload = dict(draft_payload)
     appointment_create_payload.pop("department", None)

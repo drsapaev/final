@@ -42055,6 +42055,50 @@
         }
       }
     },
+    "/api/v1/telegram/mini-app/booking/departments": {
+      "post": {
+        "tags": [
+          "telegram-webhook"
+        ],
+        "summary": "List Mini App Booking Departments",
+        "description": "Round-12 (owner P1, PR #3386 review): ACTIVE departments for the\nMini App booking form's department selector.\n\nThe form submits the canonical `Department.key` picked from THIS list —\na localized free-text label (\"Кардиология\") is not a `Department.key`\nand would be refused with 400 `department_unknown` by the routing\ncontract. Same authenticated identity surface as the booking endpoints\nthemselves (initData primary, entry token allowed); no PHI is returned.",
+        "operationId": "telegram_mini_app_list_booking_departments",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramMiniAppBookingDepartmentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Telegram Mini App List Booking Departments"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/telegram/mini-app/appointments/preview": {
       "post": {
         "tags": [
@@ -107327,6 +107371,46 @@
           "appointmentDate"
         ],
         "title": "TelegramMiniAppAppointmentPreviewRequest"
+      },
+      "TelegramMiniAppBookingDepartmentsRequest": {
+        "properties": {
+          "initData": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initdata"
+          },
+          "entryToken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entrytoken"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          }
+        },
+        "type": "object",
+        "title": "TelegramMiniAppBookingDepartmentsRequest",
+        "description": "Round-12 (owner P1, PR #3386 review): auth shape for the booking\ndepartments reference endpoint.\n\nThe Mini App booking form no longer free-types a department name (a\nlocalized label like \"Кардиология\" is NOT the canonical `Department.key`\nthe routing contract resolves); it picks from THIS endpoint's list, so\nthe submitted value is always a canonical key. Same identity contract\nas the booking endpoints themselves (initData primary, entry token\nallowed) — the reference data rides the SAME authenticated surface it\nfeeds, and the error reasons match the booking scope contract."
       },
       "TelegramMiniAppPatientCabinetSummaryRequest": {
         "properties": {
