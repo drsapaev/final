@@ -722,6 +722,6 @@ class ReportsMixin(ReportingServiceMixinBase):
 
 def get_reporting_service(db: Session) -> ReportingService:
     """Получить экземпляр сервиса отчетов"""
+    from app.services.reporting_svc import ReportingService
+
     return ReportingService(db)
-
-
