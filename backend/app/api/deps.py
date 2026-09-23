@@ -14,6 +14,7 @@ an AsyncSession or a regular (sync) Session / sessionmaker instance.
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 import uuid
@@ -22,12 +23,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
+from anyio import CancelScope, CapacityLimiter, to_thread
+from anyio.lowlevel import RunVar
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt import PyJWTError as JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from starlette.concurrency import run_in_threadpool
 
 # try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
 from app.core.config import settings  # type: ignore
@@ -57,6 +59,42 @@ except Exception:
     TokenBlacklist = None  # type: ignore
 
 logger = logging.getLogger(__name__)
+
+_AUTH_DB_THREAD_LIMITER: RunVar[CapacityLimiter] = RunVar("auth_db_thread_limiter")
+
+
+def _auth_db_thread_limiter() -> CapacityLimiter:
+    """Limit sync auth queries per event loop without occupying the shared worker quota."""
+    limiter = _AUTH_DB_THREAD_LIMITER.get(None)
+    if limiter is None:
+        # Match the default SQLAlchemy pool size while leaving shared workers free.
+        limiter = CapacityLimiter(8)
+        _AUTH_DB_THREAD_LIMITER.set(limiter)
+    return limiter
+
+
+async def _run_sync_auth_query(db: Session, stmt: Any) -> Any:
+    """Keep the session alive until its worker completes, even on request cancellation."""
+    lookup = asyncio.create_task(
+        to_thread.run_sync(
+            lambda: db.execute(stmt).first(), limiter=_auth_db_thread_limiter()
+        )
+    )
+    try:
+        return await asyncio.shield(lookup)
+    except asyncio.CancelledError:
+        # A direct Task.cancel() bypasses AnyIO's cancellation shield. Wait for
+        # the SQL worker before FastAPI can close the request-scoped Session.
+        with CancelScope(shield=True):
+            while not lookup.done():
+                try:
+                    await asyncio.shield(lookup)
+                except asyncio.CancelledError:
+                    continue
+        if not lookup.cancelled():
+            lookup.exception()  # Mark a concurrent DB error as observed.
+        raise
+
 
 # Document the 2FA-aware canonical login endpoint in OpenAPI.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/authentication/login")
@@ -239,7 +277,7 @@ async def _get_user_with_blacklist(
     if inspect.iscoroutinefunction(execute_callable):
         row = (await db.execute(stmt)).first()
     else:
-        row = await run_in_threadpool(lambda: db.execute(stmt).first())
+        row = await _run_sync_auth_query(db, stmt)
 
     if row is None:
         return None, False

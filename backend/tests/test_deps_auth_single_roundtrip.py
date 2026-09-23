@@ -16,10 +16,13 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
+from anyio import CancelScope
 from fastapi import HTTPException
 from sqlalchemy import event
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import (
+    _auth_db_thread_limiter,
     _get_user_with_blacklist,
     create_access_token,
     get_current_user,
@@ -122,6 +125,124 @@ def test_async_auth_query_still_uses_single_execute():
     assert user is expected_user
     assert blacklisted is False
     assert db.calls == 1
+
+
+def test_auth_worker_limiter_is_scoped_to_each_event_loop():
+    async def limiter_for_this_loop():
+        limiter = _auth_db_thread_limiter()
+        assert limiter is _auth_db_thread_limiter()
+        return limiter
+
+    first = asyncio.run(limiter_for_this_loop())
+    second = asyncio.run(limiter_for_this_loop())
+    assert first is not second
+
+
+def test_auth_burst_keeps_shared_worker_available():
+    started_eight = threading.Event()
+    release = threading.Event()
+    calls_lock = threading.Lock()
+
+    class FakeResult:
+        def first(self):
+            return None
+
+    class BlockingSyncSession:
+        calls = 0
+
+        def execute(self, _statement):
+            with calls_lock:
+                self.calls += 1
+                if self.calls == 8:
+                    started_eight.set()
+            if not release.wait(timeout=10):
+                raise AssertionError("fake database call was not released")
+            return FakeResult()
+
+    db = BlockingSyncSession()
+
+    async def check():
+        auth_tasks = [
+            asyncio.create_task(
+                _get_user_with_blacklist(db, jti=f"test-jti-{index}", user_id=1)
+            )
+            for index in range(40)
+        ]
+        try:
+            assert await asyncio.wait_for(asyncio.to_thread(started_eight.wait, 5), 6)
+            assert db.calls == 8
+            assert (
+                await asyncio.wait_for(run_in_threadpool(lambda: "free"), 2) == "free"
+            )
+            assert db.calls == 8
+        finally:
+            release.set()
+            results = await asyncio.gather(*auth_tasks)
+        return results
+
+    results = asyncio.run(check())
+    assert results == [(None, False)] * 40
+    assert db.calls == 40
+
+
+@pytest.mark.parametrize("cancellation", ["direct_twice", "anyio_scope"])
+def test_cancelled_auth_waits_for_sync_lookup_before_session_teardown(cancellation):
+    started = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    scopes = []
+
+    class FakeResult:
+        def first(self):
+            return None
+
+    class BlockingSyncSession:
+        def execute(self, _statement):
+            started.set()
+            try:
+                if not release.wait(timeout=5):
+                    raise AssertionError("fake database call was not released")
+                return FakeResult()
+            finally:
+                finished.set()
+
+    async def check():
+        async def lookup():
+            if cancellation == "anyio_scope":
+                with CancelScope() as scope:
+                    scopes.append(scope)
+                    await _get_user_with_blacklist(
+                        BlockingSyncSession(), jti="test-jti", user_id=1
+                    )
+                return "cancelled"
+            return await _get_user_with_blacklist(
+                BlockingSyncSession(), jti="test-jti", user_id=1
+            )
+
+        auth_task = asyncio.create_task(lookup())
+        try:
+            assert await asyncio.wait_for(asyncio.to_thread(started.wait, 2), 3)
+            if cancellation == "anyio_scope":
+                scopes[0].cancel()
+            else:
+                auth_task.cancel()
+            await asyncio.sleep(0)
+            assert not auth_task.done()
+            if cancellation == "direct_twice":
+                auth_task.cancel()  # A second cancellation must not abandon the worker.
+                await asyncio.sleep(0)
+                assert not auth_task.done()
+            assert not finished.is_set()
+        finally:
+            release.set()
+        if cancellation == "anyio_scope":
+            assert await asyncio.wait_for(auth_task, 3) == "cancelled"
+        else:
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(auth_task, 3)
+        assert finished.is_set()
+
+    asyncio.run(check())
 
 
 @pytest.fixture
