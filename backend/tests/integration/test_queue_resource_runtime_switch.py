@@ -8023,7 +8023,7 @@ def _atomicity_scratch_world():
     return engine, db_path
 
 
-def _inject_boundary_commit_failure(db):
+def _inject_boundary_commit_failure(db, frame_name="complete_patient_visit"):
     """Fail ONLY the boundary commit; let every other site commit.
 
     The wrapper raises when ``db.commit()`` is called directly from
@@ -8036,6 +8036,11 @@ def _inject_boundary_commit_failure(db):
     succeeds, the final one fails. On the fixed head the boundary
     commit is the first and only commit of the flow.
 
+    The start-atomicity follow-up reuses the same discipline with
+    ``frame_name="start_patient_visit"``: the lifecycle service's
+    internal commit (the defect under test) must run for real, only
+    the endpoint's own boundary commit fails.
+
     Returns the real bound ``commit`` for restoration in a ``finally``.
     """
     import sys
@@ -8043,7 +8048,7 @@ def _inject_boundary_commit_failure(db):
     real_commit = db.commit
 
     def _failing_commit() -> None:
-        if sys._getframe(1).f_code.co_name == "complete_patient_visit":
+        if sys._getframe(1).f_code.co_name == frame_name:
             raise RuntimeError("simulated boundary-commit failure")
         real_commit()
 
@@ -8229,6 +8234,425 @@ def test_resource_branch_created_visit_not_durable_when_boundary_commit_fails() 
                     check.query(Visit).filter(Visit.patient_id == patient_id).count()
                     == 0
                 )  # the created visit did not survive
+            finally:
+                check.close()
+    finally:
+        engine.dispose()
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
+
+# ===================== Start-atomicity follow-up (PR after #3367) =====================
+#
+# The completion unit got its single transaction boundary in #3367
+# (d5ac9441e: create_visit commit=False x2; 6a12190f4: complete_visit
+# commit=False). The START unit still called
+# ``VisitLifecycleService.start_visit()`` with the service default
+# (commit=True) and then made its own ``db.commit()`` — the same
+# premature-internal-commit shape: the staged entry flip (in_progress),
+# the in_progress transition (+ started_at), the created visit and its
+# link all became durable at the lifecycle commit, while the visit
+# annotations (visit_time/notes) written AFTER it were still in flight;
+# a failure of the trailing boundary commit left a durable partial
+# start. The fix passes commit=False — the explicit db.commit() in
+# start_patient_visit is the SINGLE boundary of the start unit.
+#
+# The discipline is the d5ac9441e one: run-unique SQLite scratch world
+# with REAL commits (the suite's savepoint fixture is never file-durable
+# and would hide exactly this defect), fail ONLY the endpoint's own
+# boundary commit (frame-name injection — the lifecycle service's
+# internal commit runs for real), roll back, and verify durability
+# through a FRESH session. The PostgreSQL twin of the core scenarios
+# lives in tests/integration/test_start_visit_atomicity_pg.py and runs
+# in the CI Gate D backend job.
+
+
+def _seed_started_called_entry(db, *, resource: bool):
+    """Seed a `called` entry (+ patient/queue/doctor) for start tests.
+
+    Returns ``(entry, patient, caller)``; for ``resource=False`` a
+    doctor-owned queue and its doctor user are seeded and the DOCTOR
+    user is returned as the caller, for ``resource=True`` a plain Admin
+    owns the resource surface.
+    """
+    from app.models.patient import Patient
+
+    if resource:
+        patient = Patient(
+            last_name="Стартовый1",
+            first_name="Пациент",
+            phone="+998901234560",
+            is_deleted=False,
+        )
+        db.add(patient)
+        db.commit()
+
+        queue_day = _dt_now_tashkent_day()
+        _make_resource(db, code="prcstart", queue_tag="prcstart")
+        queue = queue_service.get_or_create_daily_queue(
+            db, day=queue_day, specialist_id=None, queue_tag="prcstart"
+        )
+        assert queue.specialist_id is None
+        assert queue.queue_resource_id is not None
+
+        entry = _make_waiting_entry(db, queue, number=119)
+        entry.patient_id = patient.id
+        entry.status = "called"
+        db.commit()
+
+        caller = _make_user(db, username="adm_start1", role="Admin")
+        return entry, patient, caller
+
+    patient = Patient(
+        last_name="Стартовый2",
+        first_name="Пациент",
+        phone="+998901234561",
+        is_deleted=False,
+    )
+    db.add(patient)
+    db.commit()
+
+    queue_day = _dt_now_tashkent_day()
+    doc_user = _make_user(db, username="doc_start1", role="Doctor")
+    therapist = _make_doctor(db, user_id=doc_user.id, specialty="therapy")
+    queue = queue_service.get_or_create_daily_queue(
+        db, day=queue_day, specialist_id=therapist.id
+    )
+
+    entry = _make_waiting_entry(db, queue, number=120)
+    entry.patient_id = patient.id
+    entry.status = "called"
+    db.commit()
+
+    return entry, patient, doc_user
+
+
+def test_existing_visit_start_not_durable_when_boundary_commit_fails() -> None:
+    """Start-atomicity, EXISTING visit: a boundary-commit failure must
+    leave NOTHING partially durable.
+
+    ``start_patient_visit`` stages the entry flip, resolves the linked
+    open visit, runs the lifecycle start (the internal commit of the
+    broken head persists entry in_progress + visit in_progress +
+    started-at fields exist on the model), then writes visit_time/notes and fails its own boundary
+    commit — on the broken head a fresh session sees a durable partial
+    start (both flips without the annotations). After the fix the single
+    boundary is the endpoint's commit: the rollback leaves the entry
+    ``called`` and the visit ``open``, untouched."""
+    import os
+
+    from fastapi import HTTPException
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        start_patient_visit,
+    )
+    from app.models.online_queue import OnlineQueueEntry
+    from app.models.visit import Visit
+
+    engine, db_path = _atomicity_scratch_world()
+    try:
+        maker = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+        db = maker()
+
+        entry, patient, doc_user = _seed_started_called_entry(db, resource=False)
+
+        visit = Visit(
+            patient_id=patient.id,
+            doctor_id=None,
+            visit_date=getattr(entry.queue, "day", None) or _dt_now_tashkent_day(),
+            visit_time="09:00",
+            status="open",
+            department="general",
+        )
+        db.add(visit)
+        db.commit()
+        entry.visit_id = visit.id
+        db.commit()
+
+        entry_id, visit_id = entry.id, visit.id
+
+        db.rollback()
+        real_commit = _inject_boundary_commit_failure(
+            db, frame_name="start_patient_visit"
+        )
+        try:
+            with pytest.raises(HTTPException) as exc:
+                start_patient_visit(entry_id=entry_id, db=db, current_user=doc_user)
+            assert exc.value.status_code == 500
+        finally:
+            db.commit = real_commit
+        db.rollback()
+        db.close()
+
+        with engine.connect() as check_conn:
+            check = Session(bind=check_conn)
+            try:
+                row = check.get(OnlineQueueEntry, entry_id)
+                assert row is not None
+                assert row.status == "called"  # NOT in_progress
+                fresh_visit = check.get(Visit, visit_id)
+                assert fresh_visit is not None
+                assert fresh_visit.status == "open"  # NOT in_progress
+                assert fresh_visit.visit_time == "09:00"  # annotation not durable
+                assert fresh_visit.notes is None
+            finally:
+                check.close()
+    finally:
+        engine.dispose()
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
+
+def test_created_visit_start_not_durable_when_boundary_commit_fails() -> None:
+    """Start-atomicity, CREATED visit (doctor branch): the visit INSERT,
+    its link and the staged entry flip must join the caller's
+    transaction — none of them may be durable when the boundary commit
+    fails.
+
+    On the broken head the lifecycle service's internal commit
+    (start_visit's default commit=True) was the FIRST real commit of
+    the flow: it persisted the flushed create_visit INSERT (#3367 made
+    the CRUD itself commit=False), the entry link, the staged
+    in_progress flip AND the open→in_progress transition; the trailing
+    boundary-commit failure then left a durable started visit with a
+    durable in_progress entry. After the fix the fresh session sees the
+    entry still ``called`` with no link and NO visit row at all."""
+    import os
+
+    from fastapi import HTTPException
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        start_patient_visit,
+    )
+    from app.models.online_queue import OnlineQueueEntry
+    from app.models.visit import Visit
+
+    engine, db_path = _atomicity_scratch_world()
+    try:
+        maker = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+        db = maker()
+
+        entry, patient, doc_user = _seed_started_called_entry(db, resource=False)
+        entry_id, patient_id = entry.id, patient.id
+
+        db.rollback()
+        real_commit = _inject_boundary_commit_failure(
+            db, frame_name="start_patient_visit"
+        )
+        try:
+            with pytest.raises(HTTPException) as exc:
+                start_patient_visit(entry_id=entry_id, db=db, current_user=doc_user)
+            assert exc.value.status_code == 500
+        finally:
+            db.commit = real_commit
+        db.rollback()
+        db.close()
+
+        with engine.connect() as check_conn:
+            check = Session(bind=check_conn)
+            try:
+                row = check.get(OnlineQueueEntry, entry_id)
+                assert row is not None
+                assert row.status == "called"  # NOT in_progress
+                assert row.visit_id is None  # the link never persisted
+                assert (
+                    check.query(Visit).filter(Visit.patient_id == patient_id).count()
+                    == 0
+                )  # the created visit did not survive
+            finally:
+                check.close()
+    finally:
+        engine.dispose()
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
+
+def test_resource_branch_created_visit_start_not_durable_when_boundary_commit_fails() -> (
+    None
+):
+    """Start-atomicity, CREATED visit (resource branch): the same
+    contract through the resource surface (Admin caller, doctorless
+    queue, department = the queue tag). The resource-branch resolution
+    creates the visit with commit=False (#3367); the premature commit
+    under test is the lifecycle start's internal one — on the broken
+    head it persisted the created visit + link + the staged flip, and
+    the boundary-commit failure left them durable. After the fix
+    nothing survives the rollback."""
+    import os
+
+    from fastapi import HTTPException
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        start_patient_visit,
+    )
+    from app.models.online_queue import OnlineQueueEntry
+    from app.models.visit import Visit
+
+    engine, db_path = _atomicity_scratch_world()
+    try:
+        maker = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+        db = maker()
+
+        entry, patient, admin = _seed_started_called_entry(db, resource=True)
+        entry_id, patient_id = entry.id, patient.id
+
+        db.rollback()
+        real_commit = _inject_boundary_commit_failure(
+            db, frame_name="start_patient_visit"
+        )
+        try:
+            with pytest.raises(HTTPException) as exc:
+                start_patient_visit(entry_id=entry_id, db=db, current_user=admin)
+            assert exc.value.status_code == 500
+        finally:
+            db.commit = real_commit
+        db.rollback()
+        db.close()
+
+        with engine.connect() as check_conn:
+            check = Session(bind=check_conn)
+            try:
+                row = check.get(OnlineQueueEntry, entry_id)
+                assert row is not None
+                assert row.status == "called"  # NOT in_progress
+                assert row.visit_id is None  # the link never persisted
+                assert (
+                    check.query(Visit).filter(Visit.patient_id == patient_id).count()
+                    == 0
+                )  # the created visit did not survive
+            finally:
+                check.close()
+    finally:
+        engine.dispose()
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
+
+def test_start_visit_success_persists_whole_unit_existing_visit() -> None:
+    """Start-atomicity, SUCCESS path (existing visit): the endpoint's
+    single boundary commit persists the WHOLE unit — the entry flip,
+    the lifecycle transition AND the visit
+    annotations (visit_time/notes). Guards the fix from being
+    "simplified" into dropping the boundary commit entirely."""
+    import os
+
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        start_patient_visit,
+    )
+    from app.models.online_queue import OnlineQueueEntry
+    from app.models.visit import Visit
+
+    engine, db_path = _atomicity_scratch_world()
+    try:
+        maker = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+        db = maker()
+
+        entry, patient, doc_user = _seed_started_called_entry(db, resource=False)
+
+        visit = Visit(
+            patient_id=patient.id,
+            doctor_id=None,
+            visit_date=getattr(entry.queue, "day", None) or _dt_now_tashkent_day(),
+            visit_time="09:00",
+            status="open",
+            department="general",
+        )
+        db.add(visit)
+        db.commit()
+        entry.visit_id = visit.id
+        db.commit()
+
+        entry_id, visit_id, caller_id = entry.id, visit.id, doc_user.id
+        db.close()
+
+        with Session(engine) as run_db:
+            # the caller must be bound to the RUN session (the seeding
+            # session is closed — a detached instance would fail the
+            # endpoint's role/id attribute access)
+            doc_user_fresh = run_db.get(User, caller_id)
+            result = start_patient_visit(
+                entry_id=entry_id, db=run_db, current_user=doc_user_fresh
+            )
+            assert result["success"] is True
+            assert result["status"] == "in_progress"
+
+        with engine.connect() as check_conn:
+            check = Session(bind=check_conn)
+            try:
+                row = check.get(OnlineQueueEntry, entry_id)
+                assert row.status == "in_progress"
+                fresh_visit = check.get(Visit, visit_id)
+                assert fresh_visit.status == "in_progress"
+                assert fresh_visit.visit_time is not None
+                assert fresh_visit.visit_time != "09:00"  # annotated at start
+                assert fresh_visit.notes is not None
+                assert "Прием начат" in fresh_visit.notes
+            finally:
+                check.close()
+    finally:
+        engine.dispose()
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
+
+def test_resource_branch_start_success_persists_created_visit_unit() -> None:
+    """Start-atomicity, SUCCESS path (resource branch, created visit):
+    the single boundary commit persists the whole unit — the created
+    visit (in_progress, department = the queue tag), the entry link and
+    the entry flip together."""
+    import os
+
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from app.api.v1.endpoints.doctor_integration._queue_ops import (
+        start_patient_visit,
+    )
+    from app.models.online_queue import OnlineQueueEntry
+    from app.models.visit import Visit
+
+    engine, db_path = _atomicity_scratch_world()
+    try:
+        maker = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+        db = maker()
+
+        entry, patient, admin = _seed_started_called_entry(db, resource=True)
+        entry_id, patient_id, caller_id = entry.id, patient.id, admin.id
+        db.close()
+
+        with Session(engine) as run_db:
+            admin_fresh = run_db.get(User, caller_id)
+            result = start_patient_visit(
+                entry_id=entry_id, db=run_db, current_user=admin_fresh
+            )
+            assert result["success"] is True
+
+        with engine.connect() as check_conn:
+            check = Session(bind=check_conn)
+            try:
+                row = check.get(OnlineQueueEntry, entry_id)
+                assert row.status == "in_progress"
+                assert row.visit_id is not None  # the link persisted
+                fresh_visit = check.get(Visit, row.visit_id)
+                assert fresh_visit is not None
+                assert fresh_visit.status == "in_progress"
+                assert fresh_visit.doctor_id is None  # resource surface
+                assert fresh_visit.department == "prcstart"
+                assert fresh_visit.notes is not None
             finally:
                 check.close()
     finally:
