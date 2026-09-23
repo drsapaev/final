@@ -5,8 +5,12 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.models.clinic import Doctor
+from app.models.online_queue import OnlineQueueEntry, QueueResource
+from app.models.user import User
 from app.repositories.morning_assignment_api_repository import (
     MorningAssignmentApiRepository,
 )
@@ -253,27 +257,48 @@ class MorningAssignmentApiService:
 
     def get_queue_summary_payload(self, *, target_date: date) -> dict:
         queues = self.repository.list_daily_queues(day=target_date)
+        lookups = self._load_queue_summary_lookups(queues)
+        if lookups is None:
+            entry_counts: dict[int, int] = {}
+            doctor_names: dict[int, str | None] = {}
+            resource_names: dict[int, str] = {}
+        else:
+            entry_counts, doctor_names, resource_names = lookups
+
         queue_summary = []
 
         for queue in queues:
-            entries_count = self.repository.count_queue_entries(queue_id=queue.id)
+            if lookups is None:
+                entries_count = self.repository.count_queue_entries(queue_id=queue.id)
+            else:
+                entries_count = entry_counts.get(queue.id, 0)
             # QD-2C (Codex round-15 P2): resource-очередь (specialist
             # NULL) — владелец из реестра (display_name), не «ID:None»
             # в админ-сводке; врач-очереди байт-идентичны. getattr:
             # юнит-стабы (SimpleNamespace) — round-8/10 конвенция.
             resource_id = getattr(queue, "queue_resource_id", None)
             if resource_id is not None:
-                resource = getattr(queue, "queue_resource", None)
-                doctor_name = (
-                    resource.display_name if resource is not None else "Ресурс очереди"
-                )
+                if lookups is None:
+                    resource = getattr(queue, "queue_resource", None)
+                    doctor_name = (
+                        resource.display_name
+                        if resource is not None
+                        else "Ресурс очереди"
+                    )
+                else:
+                    doctor_name = resource_names.get(resource_id, "Ресурс очереди")
             else:
-                doctor = self.repository.get_doctor(queue.specialist_id)
-                doctor_name = (
-                    doctor.user.full_name
-                    if doctor and doctor.user
-                    else f"ID:{queue.specialist_id}"
-                )
+                if lookups is None:
+                    doctor = self.repository.get_doctor(queue.specialist_id)
+                    doctor_name = (
+                        doctor.user.full_name
+                        if doctor and doctor.user
+                        else f"ID:{queue.specialist_id}"
+                    )
+                else:
+                    doctor_name = doctor_names.get(
+                        queue.specialist_id, f"ID:{queue.specialist_id}"
+                    )
             queue_summary.append(
                 {
                     "queue_id": queue.id,
@@ -296,6 +321,58 @@ class MorningAssignmentApiService:
             "total_entries": sum(item["entries_count"] for item in queue_summary),
             "queues": queue_summary,
         }
+
+    def _load_queue_summary_lookups(
+        self, queues: list[Any]
+    ) -> tuple[dict[int, int], dict[int, str | None], dict[int, str]] | None:
+        db = getattr(self.repository, "db", None)
+        if not callable(getattr(db, "query", None)):
+            return None
+
+        queue_ids = [queue.id for queue in queues]
+        if not queue_ids:
+            return {}, {}, {}
+
+        entry_counts = dict(
+            db.query(OnlineQueueEntry.queue_id, func.count(OnlineQueueEntry.id))
+            .filter(OnlineQueueEntry.queue_id.in_(queue_ids))
+            .group_by(OnlineQueueEntry.queue_id)
+            .all()
+        )
+
+        doctor_ids = {
+            queue.specialist_id
+            for queue in queues
+            if getattr(queue, "queue_resource_id", None) is None
+            and queue.specialist_id is not None
+        }
+        doctor_names: dict[int, str | None] = {}
+        if doctor_ids:
+            doctor_rows = (
+                db.query(Doctor.id, User.id, User.full_name)
+                .outerjoin(User, Doctor.user_id == User.id)
+                .filter(Doctor.id.in_(doctor_ids))
+                .all()
+            )
+            doctor_names = {
+                doctor_id: full_name if user_id is not None else f"ID:{doctor_id}"
+                for doctor_id, user_id, full_name in doctor_rows
+            }
+
+        resource_ids = {
+            queue.queue_resource_id
+            for queue in queues
+            if getattr(queue, "queue_resource_id", None) is not None
+        }
+        resource_names: dict[int, str] = {}
+        if resource_ids:
+            resource_names = dict(
+                db.query(QueueResource.id, QueueResource.display_name)
+                .filter(QueueResource.id.in_(resource_ids))
+                .all()
+            )
+
+        return entry_counts, doctor_names, resource_names
 
     def rollback(self) -> None:
         self.repository.rollback()
