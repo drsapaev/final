@@ -827,6 +827,39 @@
   line-height: 1.45;
 }
 
+/* Round-10 (review P1): the ownerless-multiple-attempt ambiguity panel —
+   the outstanding attempts are listed for the explicit per-attempt check.
+   Ratchet-safe property chain (see .qj-draft-btn-primary): every var()
+   carries a fallback — NO bare var() (varUsagesNoFallback ratchet) and
+   NO raw hex (cssHexOutsideTokens ratchet); the terminal links are CSS
+   keywords / plain lengths. */
+.qj-ambiguity-list {
+  list-style: none;
+  margin: 0 0 var(--mac-spacing-2, 8px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2, 8px);
+}
+
+.qj-ambiguity-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mac-spacing-3, 12px);
+}
+
+.qj-ambiguity-item-label {
+  color: var(--mac-text-secondary, darkgray);
+  font-size: var(--mac-font-size-xs, 11px);
+}
+
+.qj-ambiguity-item-checked {
+  color: var(--mac-text-tertiary, darkgray);
+  font-size: var(--mac-font-size-xs, 11px);
+  white-space: nowrap;
+}
+
 .qj-reconcile-actions {
   display: flex;
   gap: var(--mac-spacing-3, 12px);

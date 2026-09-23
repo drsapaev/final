@@ -2900,21 +2900,12 @@ const QueueJoin = () => {
                     {t('misc.qj_attempt_ambiguity_title')}
                   </p>
                   <p className="qj-reconcile-hint">{t('misc.qj_attempt_ambiguity_hint')}</p>
-                  <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
+                  <ul className="qj-ambiguity-list">
                     {attemptAmbiguity.map((candidate) => {
                       const checked = ambiguousCheckedTokens.includes(candidate.sessionToken);
                       return (
-                        <li
-                          key={candidate.sessionToken}
-                          className="qj-ambiguity-item"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 'var(--mac-spacing-3)',
-                          }}
-                        >
-                          <span className="qj-ambiguity-item-label" style={{ color: 'var(--mac-text-secondary)' }}>
+                        <li key={candidate.sessionToken} className="qj-ambiguity-item">
+                          <span className="qj-ambiguity-item-label">
                             {candidate.directionTitle ? `${candidate.directionTitle} · ` : ''}
                             {t('misc.qj_attempt_ambiguity_item', {
                               time: attemptTimeLabel(candidate.ts),
@@ -2924,7 +2915,6 @@ const QueueJoin = () => {
                             <span
                               className="qj-ambiguity-item-checked"
                               data-testid={`qj-ambiguity-checked-${candidate.sessionToken}`}
-                              style={{ color: 'var(--mac-text-tertiary)' }}
                             >
                               {t('misc.qj_attempt_ambiguity_not_mine')}
                             </span>
