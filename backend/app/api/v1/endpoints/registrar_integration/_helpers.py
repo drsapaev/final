@@ -333,6 +333,13 @@ def _resolve_payment_truth(
     legacy_paid_at: datetime | None = None,
 ) -> tuple[str, str | None]:
     """Resolve payment status/method from payments, with a narrow legacy fallback."""
+    cache = db.info.get("_registrar_queue_read_cache")
+    if cache is not None and visit_id in cache["payment_checked_visit_ids"]:
+        row = cache["payment_truth_by_visit"].get(visit_id)
+        if row is not None:
+            return row["payment_status"], row["payment_type"]
+        return ("paid", None) if legacy_paid_at else ("pending", None)
+
     if visit_id:
         from app.models.payment import Payment
         from app.models.visit import Visit
@@ -360,4 +367,3 @@ def _raise_registrar_internal_error(action: str, exc: Exception) -> None:
     )
 
 # ===================== ОТДЕЛЕНИЯ ДЛЯ РЕГИСТРАТУРЫ =====================
-
