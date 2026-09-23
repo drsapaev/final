@@ -1,21 +1,24 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+import re
+from datetime import datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
+from sqlalchemy import event
 
-from app.api.v1.endpoints.registrar_integration import _registrar_available_actions
-from app.api.v1.endpoints.registrar_integration import _serialize_registrar_datetime
+from app.api.v1.endpoints.registrar_integration import (
+    _registrar_available_actions,
+    _serialize_registrar_datetime,
+)
 from app.models.appointment import Appointment
 from app.models.lab import LabReportInstance
-from app.models.online_queue import DailyQueue
-from app.models.online_queue import OnlineQueueEntry
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment
-from app.models.visit import Visit
-from app.models.visit import VisitService
+from app.models.visit import Visit, VisitService
+
 
 def _clinic_today(db_session):
     """SSOT: «сегодня» в тестах = день КЛИНИКИ (не host-UTC дата).
@@ -32,6 +35,81 @@ def _clinic_today(db_session):
 
 @pytest.mark.integration
 class TestRegistrarAllAppointments:
+    def test_today_queue_reference_reads_are_batched_for_multiple_visits(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        test_service,
+    ):
+        today = _clinic_today(db_session)
+        visits = [
+            Visit(
+                patient_id=test_patient.id,
+                doctor_id=test_doctor.id,
+                visit_date=today,
+                visit_time=f"10:{minute:02d}",
+                status="waiting",
+                discount_mode="none",
+                department="cardiology",
+                source="desk",
+            )
+            for minute in range(20, 24)
+        ]
+        db_session.add_all(visits)
+        db_session.flush()
+        db_session.add_all(
+            VisitService(
+                visit_id=visit.id,
+                service_id=test_service.id,
+                code=test_service.code,
+                name=test_service.name,
+                qty=1,
+                price=test_service.price,
+                currency="UZS",
+            )
+            for visit in visits
+        )
+        db_session.commit()
+
+        query_counts = {"patients": 0, "visit_services": 0, "services": 0}
+
+        def count_reference_reads(
+            _conn, _cursor, statement, _parameters, _context, _many
+        ):
+            lowered = statement.lower()
+            for table in query_counts:
+                if re.search(
+                    rf"\b(?:from|join)\s+[\"`\[]?{table}\b", lowered
+                ):
+                    query_counts[table] += 1
+
+        connection = db_session.connection()
+        event.listen(connection, "before_cursor_execute", count_reference_reads)
+        try:
+            response = client.get(
+                f"/api/v1/registrar/queues/today?target_date={today.isoformat()}",
+                headers=auth_headers,
+            )
+        finally:
+            event.remove(connection, "before_cursor_execute", count_reference_reads)
+
+        assert response.status_code == 200, response.text
+        rows = [
+            entry
+            for queue in response.json()["queues"]
+            for entry in queue["entries"]
+        ]
+        returned_visit_ids = {
+            entry["id"] for entry in rows if entry.get("record_kind") == "visit"
+        }
+        assert {visit.id for visit in visits}.issubset(returned_visit_ids)
+        assert query_counts["patients"] <= 3, query_counts
+        assert query_counts["visit_services"] <= 2, query_counts
+        assert query_counts["services"] <= 2, query_counts
+
     def test_date_filters_accept_iso_strings_for_appointments_and_visits(
         self,
         client,
