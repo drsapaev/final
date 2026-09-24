@@ -1,9 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-// Unified i18n: initializes react-i18next with ru/uz-Latn/uz-Cyrl/en/kk locales.
-// See frontend/src/i18n/index.js for supported languages and configuration.
-import './i18n';
+// Russian initializes immediately; the saved locale loads after URL credential extraction.
+import { loadPersistedLanguage } from './i18n';
 import App from './App';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
@@ -38,21 +37,12 @@ bootstrapStoredColorScheme();
 setupInterceptors();
 initializeAuth();
 
-const rootEl = document.getElementById('root');
-if (!rootEl) {
-  const el = document.createElement('div');
-  el.id = 'root';
-  document.body.appendChild(el);
-  createRoot(el).render(
-    <React.StrictMode>
-      {/* react-router-dom v7: флаги v7_startTransition/v7_relativeSplatPath
-          стали поведением по умолчанию, проп future удалён */}
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </React.StrictMode>
-  );
-} else {
+function mountApp() {
+  const rootEl = document.getElementById('root') ?? document.createElement('div');
+  if (!rootEl.isConnected) {
+    rootEl.id = 'root';
+    document.body.appendChild(rootEl);
+  }
   createRoot(rootEl).render(
     <React.StrictMode>
       {/* react-router-dom v7: флаги v7_startTransition/v7_relativeSplatPath
@@ -64,3 +54,5 @@ if (!rootEl) {
   );
 }
 
+// Wait for the selected catalog (or Russian fallback) before the first paint.
+void loadPersistedLanguage().then(mountApp, mountApp);
