@@ -174,6 +174,54 @@ class TestVisitConfirmationAPI:
         data = response.json()
         assert "не совпадает" in data["detail"]
 
+    @pytest.mark.parametrize("status_code", [500, 503])
+    def test_confirm_visit_pwa_hides_internal_error(
+        self, client, monkeypatch, status_code
+    ):
+        marker = "SYNTHETIC-SENSITIVE-DETAIL"
+
+        def fail_confirmation(_service, **_kwargs):
+            raise VisitConfirmationDomainError(
+                status_code=status_code, detail=f"Internal error: {marker}"
+            )
+
+        monkeypatch.setattr(
+            VisitConfirmationService, "confirm_by_pwa", fail_confirmation
+        )
+        response = client.post(
+            "/api/v1/patient/visits/confirm",
+            json={"token": "synthetic-confirm-token"},
+        )
+
+        assert response.status_code == status_code
+        assert response.json() == {"detail": "Не удалось подтвердить визит"}
+        assert marker not in response.text
+
+    @pytest.mark.parametrize("status_code", [400, 404, 429])
+    def test_confirm_visit_pwa_preserves_domain_error(
+        self, client, monkeypatch, status_code
+    ):
+        detail = "Синтетическая ошибка подтверждения"
+        headers = {"Retry-After": "7"} if status_code == 429 else None
+
+        def fail_confirmation(_service, **_kwargs):
+            raise VisitConfirmationDomainError(
+                status_code=status_code, detail=detail, headers=headers
+            )
+
+        monkeypatch.setattr(
+            VisitConfirmationService, "confirm_by_pwa", fail_confirmation
+        )
+        response = client.post(
+            "/api/v1/patient/visits/confirm",
+            json={"token": "synthetic-confirm-token"},
+        )
+
+        assert response.status_code == status_code
+        assert response.json() == {"detail": detail}
+        if headers:
+            assert response.headers["Retry-After"] == "7"
+
     def test_confirm_visit_registrar_success(self, client, test_visit, registrar_auth_headers, test_daily_queue):
         """Тест подтверждения визита регистратором"""
         response = client.post(

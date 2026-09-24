@@ -119,6 +119,14 @@ def confirm_visit_by_pwa(
         )
         return ConfirmationResponse(**result)
     except VisitConfirmationDomainError as exc:
+        if exc.status_code >= 500:
+            # This service wraps raw exception text in its 5xx detail.
+            # Do not expose that text on the public PWA confirmation route.
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail="Не удалось подтвердить визит",
+                headers=exc.headers,
+            ) from None
         _raise_http_error(exc)
 
 
