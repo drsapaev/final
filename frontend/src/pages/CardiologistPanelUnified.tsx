@@ -1,5 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import { createElement, lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
@@ -22,7 +21,8 @@ import AiTab from '../components/cardiology/AiTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import { queueService } from '../services/queue';
 import { printPanelTicket } from '../services/panelPrint';
-import QueueIntegration from '../components/QueueIntegration';
+import apiClient from '../api/client';
+import CardiologyQueueTab, { type CardiologyQueueEntry } from '../components/cardiology/CardiologyQueueTab';
 import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -34,6 +34,7 @@ import { useTranslation } from '../i18n/useTranslation';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import tokenManager from '../utils/tokenManager';
 import { countAppointmentsByStatuses, SPECIALTY_KEYS, getAllPatientServices, makeEnsureCanonicalVisitId } from '../utils/doctorPanelShared';
+import { selectEntriesForSpecialist } from '../utils/cardiologyQueue';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 import { Download, Settings } from 'lucide-react';
 
@@ -144,6 +145,8 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   const confirm = confirmRaw;
   // STRAT#32: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
+  const tI18nRef = useRef(tI18n);
+  tI18nRef.current = tI18n;
   const [scheduleNextModal, setScheduleNextModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null }>({ open: false, patient: null });
   const [editPatientModal, setEditPatientModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null; loading: boolean }>({ open: false, patient: null, loading: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -161,6 +164,8 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   // Состояния для таблицы записей
   const [appointments, setAppointments] = useState<Record<string, unknown>[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState(false);
+  const currentDoctorIdRef = useRef<number | null>(null);
   const [services, setServices] = useState({} as Record<string, unknown>); // ✅ Добавлено: состояние для услуг
 
   // P-021 (UX audit): session timeout warning state. When the JWT is
@@ -654,147 +659,103 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     return getAllPatientServices(patientId, allAppointments);
   }, []);
 
-  // Загрузка записей кардиолога
+  const resolveCurrentDoctorId = useCallback(async (): Promise<number> => {
+    if (currentDoctorIdRef.current !== null) return currentDoctorIdRef.current;
+
+    const { data: profile } = await apiClient.get<{ doctor?: { id?: unknown } }>('/doctor/my-info');
+    const doctorId = Number(profile?.doctor?.id);
+    if (!Number.isInteger(doctorId) || doctorId <= 0) {
+      throw new Error('Current doctor profile has no canonical Doctor.id');
+    }
+
+    currentDoctorIdRef.current = doctorId;
+    return doctorId;
+  }, []);
+
+  // Загрузка записей текущего кардиолога по каноническому Doctor.id.
   const loadMacOSCardiologyAppointments = useCallback(async (_silent?: boolean) => {
     setAppointmentsLoading(true);
+    setAppointmentsError(false);
     try {
-      const token = tokenManager.getAccessToken();
-      if (!token) {
-        setAppointmentsLoading(false);
-        return;
-      }
+      const currentDoctorId = await resolveCurrentDoctorId();
+      const { data } = await apiClient.get('/registrar/queues/today');
+      const selectedEntries = selectEntriesForSpecialist(data, currentDoctorId);
+      const seenIds = new Set<string>();
+      const appointmentsData: Record<string, unknown>[] = [];
 
-      // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
-      const response = await fetch(`${API_V1_BASE}/registrar/queues/today`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      selectedEntries.forEach(({ queue, entry }) => {
+        const appointmentId = entry.appointment_id || null;
+        const doctorQueueEntryId = resolveDoctorQueueEntryId(entry);
+        const recordKey = `${entry.patient_id}_${entry.canonical_record_id || entry.id}_${queue.specialty}`;
+        if (seenIds.has(recordKey)) return;
+        seenIds.add(recordKey);
+
+        const patientEntry = entry.patient as Record<string, unknown> | undefined;
+        appointmentsData.push({
+          id: entry.id,
+          appointment_id: appointmentId,
+          visit_id: entry.visit_id || null,
+          patient_id: entry.patient_id,
+          patient_fio: entry.patient_name || `${patientEntry?.first_name || ''} ${patientEntry?.last_name || ''}`.trim(),
+          patient_phone: entry.phone || '',
+          patient_birth_year: entry.patient_birth_year || '',
+          address: entry.address || '',
+          visit_type:
+            entry.discount_mode === 'repeat' ? tI18nRef.current('cardio.cardio_panel_visit_type_repeat') :
+            entry.discount_mode === 'benefit' ? tI18nRef.current('cardio.cardio_panel_visit_type_benefit') :
+            entry.discount_mode === 'all_free' ? 'All Free' :
+            tI18nRef.current('cardio.cardio_panel_visit_type_paid'),
+          discount_mode: entry.discount_mode || 'none',
+          services: entry.services || [],
+          service_codes: entry.service_codes || [],
+          payment_type: entry.payment_type || null,
+          payment_status: entry.payment_status ?? null,
+          available_actions: entry.available_actions || [],
+          can_mark_paid: Boolean(entry.can_mark_paid),
+          can_start_visit: Boolean(entry.can_start_visit) && doctorQueueEntryId !== null,
+          can_print_ticket: Boolean(entry.can_print_ticket),
+          can_complete: Boolean(entry.can_complete) && doctorQueueEntryId !== null,
+          can_cancel: Boolean(entry.can_cancel),
+          queue_entry_id: entry.queue_entry_id ?? null,
+          doctor_queue_entry_id: doctorQueueEntryId,
+          canonical_record_id: entry.canonical_record_id || entry.id,
+          record_kind: entry.record_kind,
+          source_kind: entry.source_kind,
+          canonical_status: entry.canonical_status ?? null,
+          queue_status: entry.queue_status ?? null,
+          queue_position: entry.queue_position,
+          doctor: queue.specialist_name || tI18nRef.current('cardio.cardio_panel_doctor_fallback'),
+          specialty: queue.specialty,
+          ...adaptTimeFields(entry, data),
+          status: entry.status ?? null,
+          cost: entry.cost || 0,
+        });
       });
 
-      if (response.ok) {
-        const data = await response.json();
-
-        // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
-        const allAppointments: Record<string, unknown>[] = [];
-        const seenIds = new Set<string>(); // Для отслеживания уже добавленных записей
-
-        if (data && data.queues && Array.isArray(data.queues)) {
-          data.queues.forEach((queue: Record<string, unknown>) => {
-            const entries = queue.entries;
-            if (Array.isArray(entries)) {
-              entries.forEach((entry: Record<string, unknown>) => {
-                const appointmentId = entry.appointment_id || null;
-                const doctorQueueEntryId = resolveDoctorQueueEntryId(entry);
-                const recordKey = `${entry.patient_id}_${entry.canonical_record_id || entry.id}_${queue.specialty}`;
-
-                // Пропускаем дубликаты (один и тот же пациент с одним и тем же appointment_id в одной специальности)
-                if (seenIds.has(recordKey)) {
-                  return;
-                }
-                seenIds.add(recordKey);
-
-                const patientEntry = entry.patient as Record<string, unknown> | undefined;
-                allAppointments.push({
-                  id: entry.id,
-                  appointment_id: appointmentId,
-                  visit_id: entry.visit_id || null,
-                  patient_id: entry.patient_id,
-                  patient_fio: entry.patient_name || `${patientEntry?.first_name || ''} ${patientEntry?.last_name || ''}`.trim(),
-                  patient_phone: entry.phone || '',
-                  patient_birth_year: entry.patient_birth_year || '',
-                  address: entry.address || '',
-                  visit_type:
-                    entry.discount_mode === 'repeat' ? tI18n('cardio.cardio_panel_visit_type_repeat') :
-                    entry.discount_mode === 'benefit' ? tI18n('cardio.cardio_panel_visit_type_benefit') :
-                    entry.discount_mode === 'all_free' ? 'All Free' :
-                    tI18n('cardio.cardio_panel_visit_type_paid'),
-                  discount_mode: entry.discount_mode || 'none',
-                  services: entry.services || [],
-                  service_codes: entry.service_codes || [],
-                  payment_type: entry.payment_type || null,
-                  payment_status: entry.payment_status ?? null,
-                  available_actions: entry.available_actions || [],
-                  can_mark_paid: Boolean(entry.can_mark_paid),
-                  can_start_visit: Boolean(entry.can_start_visit) && doctorQueueEntryId !== null,
-                  can_print_ticket: Boolean(entry.can_print_ticket),
-                  can_complete: Boolean(entry.can_complete) && doctorQueueEntryId !== null,
-                  can_cancel: Boolean(entry.can_cancel),
-                  queue_entry_id: entry.queue_entry_id ?? null,
-                  doctor_queue_entry_id: doctorQueueEntryId,
-                  canonical_record_id: entry.canonical_record_id || entry.id,
-                  record_kind: entry.record_kind,
-                  source_kind: entry.source_kind,
-                  canonical_status: entry.canonical_status ?? null,
-                  queue_status: entry.queue_status ?? null,
-                  queue_position: entry.queue_position,
-                  doctor: entry.doctor_name || tI18n('cardio.cardio_panel_doctor_fallback'),
-                  specialty: queue.specialty,
-                  ...adaptTimeFields(entry, data),
-                  status: entry.status ?? null,
-                  cost: entry.cost || 0
-                });
-              });
-            }
-          });
-        }
-
-        // ✅ Фильтруем только кардиологические записи, исключая ЭКГ
-        const appointmentsData = allAppointments.filter((apt) => {
-          // Исключаем записи из очереди ЭКГ
-          if (apt.specialty === 'echokg' || apt.specialty === 'ecg') {
-            return false;
-          }
-
-          // Проверяем по specialty
-          const isCardiology = apt.specialty === 'cardio' || apt.specialty === 'cardiology';
-
-          // ✅ Проверяем по кодам услуг: исключаем записи, которые содержат только ЭКГ
-          const serviceCodes = (apt.service_codes || apt.services || []) as unknown[];
-          const hasOnlyECG = serviceCodes.length > 0 && serviceCodes.every((code) => {
-            const codeStr = String(code).toUpperCase();
-            return codeStr.includes('ECG') || codeStr.includes('ЭКГ') || codeStr === 'ECG';
-          });
-
-          // Если запись содержит только ЭКГ, исключаем её
-          if (hasOnlyECG) {
-            return false;
-          }
-
-          // ✅ Проверяем, содержит ли запись консультацию кардиолога (не только ЭКГ)
-          const hasCardiologyConsultation = serviceCodes.some((code) => {
-            const codeStr = String(code).toUpperCase();
-            // Коды кардиологии: K01, K02, CARD_, CONSULTATION.CARDIOLOGY и т.д., но не ECG
-            return (codeStr.startsWith('K') || codeStr.startsWith('CARD_') || codeStr.includes('CONSULT')) &&
-            !codeStr.includes('ECG') && !codeStr.includes('ЭКГ');
-          });
-
-          // Если есть консультация кардиолога и specialty правильный, включаем
-          return isCardiology && (hasCardiologyConsultation || serviceCodes.length === 0);
-        });
-
         // Добавляем информацию о всех услугах пациента в каждую запись
-        const enrichedAppointmentsData = appointmentsData.map((apt) => {
-          const allPatientServices = getAllPatientServicesCb(apt.patient_id as string | number | null | undefined, allAppointments);
-          return {
-            ...apt,
-            all_patient_services: (allPatientServices as { services?: unknown[]; service_codes?: unknown[] }).services,
-            all_patient_service_codes: (allPatientServices as { services?: unknown[]; service_codes?: unknown[] }).service_codes
-          };
-        });
+      const enrichedAppointmentsData = appointmentsData.map((apt) => {
+        const allPatientServices = getAllPatientServicesCb(
+          apt.patient_id as string | number | null | undefined,
+          appointmentsData,
+        );
+        return {
+          ...apt,
+          all_patient_services: (allPatientServices as { services?: unknown[]; service_codes?: unknown[] }).services,
+          all_patient_service_codes: (allPatientServices as { services?: unknown[]; service_codes?: unknown[] }).service_codes,
+        };
+      });
 
-        setAppointments(enrichedAppointmentsData);
-      }
-    } catch (error: unknown) {
-      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_appointments_load_failed')));
+      setAppointments(enrichedAppointmentsData);
+    } catch {
+      setAppointmentsError(true);
     } finally {
       setAppointmentsLoading(false);
     }
-  }, [getAllPatientServicesCb]);
+  }, [getAllPatientServicesCb, resolveCurrentDoctorId]);
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
-    if (activeTab === 'appointments' || shouldHydrateAppointmentContext) {
+    if (activeTab === 'patients' || activeTab === 'appointments' || shouldHydrateAppointmentContext) {
       loadMacOSCardiologyAppointments();
     }
 
@@ -805,13 +766,13 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
 
       // Автоматически обновляем список appointments после завершения приёма
       if (action === 'visitCompleted' || action === 'nextPatientCalled') {
-        if (activeTab === 'appointments' || shouldHydrateAppointmentContext) {
+        if (activeTab === 'patients' || activeTab === 'appointments' || shouldHydrateAppointmentContext) {
           loadMacOSCardiologyAppointments();
         }
       }
 
       // Обновляем при любых изменениях, если открыта вкладка appointments
-      if (activeTab === 'appointments' || shouldHydrateAppointmentContext) {
+      if (activeTab === 'patients' || activeTab === 'appointments' || shouldHydrateAppointmentContext) {
         // Небольшая задержка, чтобы дать бэкенду время обновить статусы
         setTimeout(() => {
           loadMacOSCardiologyAppointments();
@@ -1740,10 +1701,58 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     }
   ];
 
-  // TECH-DEBT(cardio-queue-panel): queuePanel is `any` — QueueIntegration return type inference issue under strict:true
-  const queuePanel: any = activeTab === 'queue' ? (
-    <QueueIntegration specialty="cardiology" />
-  ) : null;
+  const handleDoctorQueueStartVisit = (entry: CardiologyQueueEntry, result: { patient_id?: number | null; visit_id?: number | null }) => {
+    preloadVisitTab();
+    setEmr(null);
+    setSelectedPatient({
+      id: entry.id,
+      patient_id: result.patient_id,
+      visit_id: result.visit_id,
+      patient_name: entry.patient_name || '',
+      phone: entry.phone || '',
+      number: entry.number ?? entry.id,
+      doctor_queue_entry_id: entry.id,
+      source: 'doctor_queue',
+      status: 'in_progress',
+      specialty: 'cardiology',
+    });
+    goToTab('visit');
+  };
+
+  const handleDoctorQueueOpenVisit = async (entry: CardiologyQueueEntry, completed: boolean) => {
+    if (entry.patient_id == null || entry.visit_id == null) return;
+
+    preloadVisitTab();
+    setSelectedPatient({
+      id: entry.id,
+      patient_id: entry.patient_id,
+      visit_id: entry.visit_id,
+      patient_name: entry.patient_name || '',
+      phone: entry.phone || '',
+      number: entry.number ?? entry.id,
+      doctor_queue_entry_id: entry.id,
+      source: 'doctor_queue',
+      status: completed ? 'completed' : entry.status,
+      specialty: 'cardiology',
+    });
+
+    if (completed) {
+      await loadEMR(entry.visit_id);
+    } else {
+      setEmr(null);
+    }
+    goToTab('visit');
+  };
+
+  // Keep this dynamic JSX slot as `any`; narrowing its inferred result to a
+  // ReactNode currently makes the legacy parent fail strict child checking.
+  const cardiologyQueuePanel: any = activeTab === 'queue'
+    ? createElement(CardiologyQueueTab, {
+      onStartVisit: handleDoctorQueueStartVisit,
+      onOpenVisit: (entry, completed) => { void handleDoctorQueueOpenVisit(entry, completed); },
+    })
+    : null;
+
   const tabLoadingFallback = (
     <Card role="status" aria-live="polite" className="cardio-card-fullwidth">
       {tI18n('common.loading')}
@@ -1767,6 +1776,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
               <AppointmentsTab
                 appointments={appointments}
                 appointmentsLoading={appointmentsLoading}
+                appointmentsError={appointmentsError}
                 appointmentSummaryItems={appointmentSummaryItems}
                 onRefresh={loadMacOSCardiologyAppointments}
                 onRowClick={(row) => { void handleAppointmentRowClick(row as Record<string, unknown>); }}
@@ -1777,9 +1787,8 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
             </Suspense>
           }
 
-          {/* Прием пациента */}
-          {/* Очередь — trivial 1-liner, no extraction needed */}
-          {queuePanel}
+          {/* The queue screen reads only the authenticated doctor's own queue. */}
+          {cardiologyQueuePanel}
 
           {/* Приём пациента — R-15: extracted to VisitTab component */}
           {activeTab === 'visit' &&
