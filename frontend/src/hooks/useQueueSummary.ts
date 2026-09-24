@@ -59,7 +59,7 @@
  *     loading,            // true during the queue-summary fetch
  *     error,              // string | null — surfaces only on hard failure
  *     refresh,            // () => void — re-fetches
- *   } = useQueueSummary({ enabled: true, date: '2026-08-28' });
+ *   } = useQueueSummary({ enabled: true, date: '2026-08-28', statsData });
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -115,6 +115,7 @@ export interface QueueSummaryAggregate {
 export interface UseQueueSummaryOptions {
   enabled?: boolean;
   date?: string; // YYYY-MM-DD
+  statsData: AdminStatsPayload | null | undefined;
 }
 
 export interface UseQueueSummaryReturn {
@@ -146,8 +147,8 @@ function toInt(value: unknown): number {
   return value;
 }
 
-const useQueueSummary = (options: UseQueueSummaryOptions = {}): UseQueueSummaryReturn => {
-  const { enabled = true, date = todayIso() } = options;
+const useQueueSummary = (options: UseQueueSummaryOptions): UseQueueSummaryReturn => {
+  const { enabled = true, date = todayIso(), statsData } = options;
 
   // PR-UI-11-1 (Codex P1 #2 mitigation): canonical SSOT endpoint for clinic-
   // wide queue summary. Reads from `DailyQueue` + `OnlineQueueEntry` (the
@@ -165,19 +166,8 @@ const useQueueSummary = (options: UseQueueSummaryOptions = {}): UseQueueSummaryR
     initialData: null,
   });
 
-  // `/admin/stats` provides the clinic-wide `visitsToday` and
-  // `appointmentsToday` counts used as best-effort proxies for the
-  // `serving` / `done` tiles (see header note). The same endpoint is also
-  // consumed by the dashboard's KPI grid; this second fetch is acceptable
-  // because both calls fire in parallel and `useAdminData` aborts prior
-  // requests on rapid re-fetches.
-  const {
-    data: statsDataRaw,
-  } = useAdminData('/admin/stats', {
-    refreshInterval: 0,
-    enabled,
-    initialData: null,
-  });
+  // Reuse the dashboard's `/admin/stats` response for the coarse
+  // `serving` / `done` proxies; the queue hook only fetches its queue SSOT.
 
   const [summary, setSummary] = useState<QueueSummaryAggregate>(emptySummary);
   const mountedRef = useRef<boolean>(true);
@@ -201,7 +191,7 @@ const useQueueSummary = (options: UseQueueSummaryOptions = {}): UseQueueSummaryR
     }
 
     const queuePayload = (queueDataRaw ?? null) as QueueSummaryPayload | null;
-    const statsPayload = (statsDataRaw ?? null) as AdminStatsPayload | null;
+    const statsPayload = statsData ?? null;
 
     const totalEntries = toInt(queuePayload?.total_entries);
     const queuesCount = toInt(queuePayload?.queues_count);
@@ -224,7 +214,7 @@ const useQueueSummary = (options: UseQueueSummaryOptions = {}): UseQueueSummaryR
         partial: true, // until backend exposes per-status breakdown
       });
     }
-  }, [queueDataRaw, statsDataRaw, queueLoading, queueError, enabled]);
+  }, [queueDataRaw, statsData, queueLoading, queueError, enabled]);
 
   const refresh = useCallback((): void => {
     refreshQueue();
