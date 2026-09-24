@@ -250,18 +250,23 @@ def _deterministic_clinic_day(monkeypatch):
     # The queue_service SINGLETON caches its settings read for its whole
     # lifetime: in the full CI suite earlier tests populate the cache
     # with the real clinic settings before this module runs, and the
-    # pinned settings below would silently lose to that cache. Reset the
-    # cache so the first read inside the module gets the pinned values.
+    # pinned settings below would silently lose to that cache. The
+    # attribute is replaced via monkeypatch so the ORIGINAL cached value
+    # is RESTORED after every test — no state leaks into later suites
+    # (a leaked UTC/cutoff-24 dict changes later tests' day math).
     import app.services.queue_service as queue_service_module
 
-    queue_service_module.queue_service._cached_settings = None
+    monkeypatch.setattr(
+        queue_service_module.queue_service, "_cached_settings", None
+    )
 
     # Same singleton-cache class for the board name-format cache
-    # (RQ-24.a.1): a earlier suite test that connected to the display
-    # WS would pin main_board's format from the real clinic DB.
+    # (RQ-24.a.1): an earlier suite test that connected to the display
+    # WS would pin main_board's format from the real clinic DB. The
+    # whole dict is swapped (not cleared) and restored by monkeypatch.
     from app.services.display_websocket import get_display_manager
 
-    get_display_manager()._name_format_cache.clear()
+    monkeypatch.setattr(get_display_manager(), "_name_format_cache", {})
 
 
 @pytest.fixture
