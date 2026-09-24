@@ -2,6 +2,7 @@
 
 Split from doctor_integration.py (1900 LOC god file → modular).
 """
+
 from __future__ import annotations
 
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
@@ -28,9 +29,17 @@ from app.crud.visit_appointment_pairing import (
     AmbiguousAppointmentPairingError,
     move_paired_appointment_to_day,
 )
+from app.schemas.doctor_queue import (
+    DoctorQueueStartVisitResponse,
+    DoctorQueueTodayResponse,
+)
 
 
-@router.get("/doctor/{specialty}/queue/today", response_model=dict[str, Any])
+@router.get(
+    "/doctor/{specialty}/queue/today",
+    response_model=DoctorQueueTodayResponse,
+    response_model_exclude_unset=True,
+)
 def get_doctor_queue_today(
     specialty: str,
     db: Session = Depends(get_db),
@@ -190,6 +199,8 @@ def get_doctor_queue_today(
             queue_entries.append(
                 {
                     "id": entry.id,
+                    "patient_id": entry.patient_id,
+                    "visit_id": entry.visit_id,
                     "number": entry.number,
                     "patient_name": entry.patient_name
                     or (
@@ -200,11 +211,21 @@ def get_doctor_queue_today(
                     "phone": entry.phone,
                     "source": entry.source,
                     "status": entry.status,
-                    "created_at": entry.created_at.isoformat() if entry.created_at else None,
-                    "queue_time": entry.queue_time.isoformat() if entry.queue_time else None,
-                    "updated_at": entry.updated_at.isoformat() if entry.updated_at else None,
-                    "last_changed_at": entry.updated_at.isoformat() if entry.updated_at else None,
-                    "display_time_kind": "queue_time" if entry.queue_time else "created_at",
+                    "created_at": (
+                        entry.created_at.isoformat() if entry.created_at else None
+                    ),
+                    "queue_time": (
+                        entry.queue_time.isoformat() if entry.queue_time else None
+                    ),
+                    "updated_at": (
+                        entry.updated_at.isoformat() if entry.updated_at else None
+                    ),
+                    "last_changed_at": (
+                        entry.updated_at.isoformat() if entry.updated_at else None
+                    ),
+                    "display_time_kind": (
+                        "queue_time" if entry.queue_time else "created_at"
+                    ),
                     "timezone": "Asia/Tashkent",
                     "called_at": (
                         entry.called_at.isoformat() if entry.called_at else None
@@ -234,7 +255,9 @@ def get_doctor_queue_today(
                 if daily_queues[0].opened_at
                 else None
             ),
-            "doctor": _serialize_queue_doctor(doctor, current_user, normalized_specialty),
+            "doctor": _serialize_queue_doctor(
+                doctor, current_user, normalized_specialty
+            ),
             "date": today.isoformat(),
             "entries": queue_entries,
             "stats": stats,
@@ -516,10 +539,14 @@ def call_patient(
         # Now: Admin can always call; any doctor can call from queues
         # where the queue's doctor has the same specialty as the caller.
         if current_user.role != "Admin":
-            caller_doctor = db.query(Doctor).filter(
-                Doctor.user_id == current_user.id,
-                Doctor.active == True,
-            ).first()
+            caller_doctor = (
+                db.query(Doctor)
+                .filter(
+                    Doctor.user_id == current_user.id,
+                    Doctor.active == True,
+                )
+                .first()
+            )
 
             if not caller_doctor:
                 raise HTTPException(
@@ -531,7 +558,11 @@ def call_patient(
             if doctor.user_id != current_user.id:
                 caller_specialty = (caller_doctor.specialty or "").lower().strip()
                 queue_specialty = (doctor.specialty or "").lower().strip()
-                if not caller_specialty or not queue_specialty or caller_specialty != queue_specialty:
+                if (
+                    not caller_specialty
+                    or not queue_specialty
+                    or caller_specialty != queue_specialty
+                ):
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
                         detail="Нет прав для работы с этой очередью — вы не владелец и специальность не совпадает",
@@ -601,7 +632,11 @@ def call_patient(
                 "number": queue_entry.number,
                 "status": queue_entry.status,
                 "called_at": queue_entry.called_at.isoformat(),
-                "updated_at": queue_entry.updated_at.isoformat() if queue_entry.updated_at else None,
+                "updated_at": (
+                    queue_entry.updated_at.isoformat()
+                    if queue_entry.updated_at
+                    else None
+                ),
             },
         }
 
@@ -614,7 +649,10 @@ def call_patient(
         )
 
 
-@router.post("/doctor/queue/{entry_id}/start-visit", response_model=dict[str, Any])
+@router.post(
+    "/doctor/queue/{entry_id}/start-visit",
+    response_model=DoctorQueueStartVisitResponse,
+)
 def start_patient_visit(
     entry_id: int,
     db: Session = Depends(get_db),
@@ -669,18 +707,35 @@ def start_patient_visit(
                 )
 
         # PR-26: same-specialty doctors can also work with this queue
-        if current_user.role != "Admin" and doctor.user_id and doctor.user_id != current_user.id:
-            caller_doctor = db.query(Doctor).filter(
-                Doctor.user_id == current_user.id, Doctor.active == True,
-            ).first()
+        if (
+            current_user.role != "Admin"
+            and doctor.user_id
+            and doctor.user_id != current_user.id
+        ):
+            caller_doctor = (
+                db.query(Doctor)
+                .filter(
+                    Doctor.user_id == current_user.id,
+                    Doctor.active == True,
+                )
+                .first()
+            )
             if not caller_doctor:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Только врач может работать с этой очередью")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Только врач может работать с этой очередью",
+                )
             caller_specialty = (caller_doctor.specialty or "").lower().strip()
             queue_specialty = (doctor.specialty or "").lower().strip()
-            if not caller_specialty or not queue_specialty or caller_specialty != queue_specialty:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Нет прав для работы с этой очередью")
+            if (
+                not caller_specialty
+                or not queue_specialty
+                or caller_specialty != queue_specialty
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Нет прав для работы с этой очередью",
+                )
 
         # Обновляем статус
         if "start_visit" not in _doctor_queue_available_actions(queue_entry):
@@ -726,6 +781,7 @@ def start_patient_visit(
         # visit_time/notes lost. The explicit db.commit() below stays
         # the SINGLE transaction boundary of the start unit.
         from app.services.visit_lifecycle_service import VisitLifecycleService
+
         if visit.status == "open":
             visit = VisitLifecycleService(db).start_visit(
                 visit_id=visit.id,
@@ -750,6 +806,8 @@ def start_patient_visit(
             "success": True,
             "message": "Прием пациента начат",
             "entry_id": entry_id,
+            "patient_id": queue_entry.patient_id,
+            "visit_id": visit.id,
             "status": "in_progress",
         }
 
@@ -1038,11 +1096,11 @@ def complete_patient_visit(
                     # Paid payment may update explicit payment markers only;
                     # registration discount_mode must be preserved.
                     if (
-                        hasattr(visit, 'payment_processed_at')
+                        hasattr(visit, "payment_processed_at")
                         and not visit.payment_processed_at
                     ):
-                        visit.payment_processed_at = (
-                            payment.paid_at or datetime.now(UTC)
+                        visit.payment_processed_at = payment.paid_at or datetime.now(
+                            UTC
                         )
                 # ✅ Также обновляем соответствующий Appointment, если он существует
                 from app.models.appointment import Appointment
@@ -1066,10 +1124,7 @@ def complete_patient_visit(
                 if appointment:
                     appointment.status = "completed"
                     # Appointment has no discount_mode; use its explicit payment marker.
-                    if (
-                        payment_is_paid
-                        and not appointment.payment_processed_at
-                    ):
+                    if payment_is_paid and not appointment.payment_processed_at:
                         appointment.payment_processed_at = (
                             payment.paid_at or datetime.now(UTC)
                         )
@@ -1114,5 +1169,3 @@ def complete_patient_visit(
 
 
 # ===================== УСЛУГИ ДЛЯ ВРАЧА =====================
-
-

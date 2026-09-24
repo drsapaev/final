@@ -26951,6 +26951,73 @@ export type components = {
             /** Max Online Per Day */
             max_online_per_day?: number | null;
         };
+        /** DoctorQueueDoctor */
+        DoctorQueueDoctor: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Specialty */
+            specialty: string;
+            /** Cabinet */
+            cabinet?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DoctorQueueEntry */
+        DoctorQueueEntry: {
+            /** Id */
+            id: number;
+            /** Number */
+            number: number;
+            /** Patient Id */
+            patient_id: number | null;
+            /** Visit Id */
+            visit_id: number | null;
+            /** Patient Name */
+            patient_name: string;
+            /** Phone */
+            phone?: string | null;
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+            /** Created At */
+            created_at?: string | null;
+            /** Queue Time */
+            queue_time?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Last Changed At */
+            last_changed_at?: string | null;
+            /** Display Time Kind */
+            display_time_kind: string;
+            /** Timezone */
+            timezone: string;
+            /** Called At */
+            called_at?: string | null;
+            patient?: components["schemas"]["DoctorQueuePatient"] | null;
+            /** Available Actions */
+            available_actions: string[];
+            /** Can Call */
+            can_call: boolean;
+            /** Can Start Visit */
+            can_start_visit: boolean;
+            /** Can No Show */
+            can_no_show: boolean;
+            /** Can Send To Diagnostics */
+            can_send_to_diagnostics: boolean;
+            /** Can Complete */
+            can_complete: boolean;
+            /** Can Notify Diagnostics Return */
+            can_notify_diagnostics_return: boolean;
+            /** Can Mark Incomplete */
+            can_mark_incomplete: boolean;
+            /** Can Restore Next */
+            can_restore_next: boolean;
+        } & {
+            [key: string]: unknown;
+        };
         /**
          * DoctorQueueLimit
          * @description Индивидуальный лимит для врача
@@ -26973,6 +27040,83 @@ export type components = {
              * @default 15
              */
             max_online_entries: number;
+        };
+        /** DoctorQueuePatient */
+        DoctorQueuePatient: {
+            /** Id */
+            id: number;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Middle Name */
+            middle_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Birth Date */
+            birth_date?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DoctorQueueStartVisitResponse */
+        DoctorQueueStartVisitResponse: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
+            /** Entry Id */
+            entry_id: number;
+            /** Patient Id */
+            patient_id: number | null;
+            /** Visit Id */
+            visit_id: number;
+            /** Status */
+            status: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DoctorQueueStats */
+        DoctorQueueStats: {
+            /** Total */
+            total: number;
+            /** Waiting */
+            waiting: number;
+            /** Called */
+            called: number;
+            /** Served */
+            served: number;
+            /** Online Entries */
+            online_entries?: number | null;
+            /** Desk Entries */
+            desk_entries?: number | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DoctorQueueTodayResponse */
+        DoctorQueueTodayResponse: {
+            /** Queue Exists */
+            queue_exists: boolean;
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Queue Ids */
+            queue_ids?: number[] | null;
+            /** Opened At */
+            opened_at?: string | null;
+            doctor: components["schemas"]["DoctorQueueDoctor"];
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Entries */
+            entries: components["schemas"]["DoctorQueueEntry"][];
+            stats: components["schemas"]["DoctorQueueStats"];
+            /** Can Call Next */
+            can_call_next: boolean;
+            /** Next Call Entry Id */
+            next_call_entry_id: number | null;
+        } & {
+            [key: string]: unknown;
         };
         /**
          * DoctorSearchRequest
@@ -53119,9 +53263,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DoctorQueueTodayResponse"];
                 };
             };
             /** @description Validation Error */
@@ -53185,9 +53327,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DoctorQueueStartVisitResponse"];
                 };
             };
             /** @description Validation Error */

@@ -67,6 +67,8 @@ class TestDoctorGeneralQueue:
         assert payload["stats"]["waiting"] == 1
         assert len(payload["entries"]) == 1
         assert payload["entries"][0]["id"] == entry.id
+        assert payload["entries"][0]["patient_id"] == test_patient.id
+        assert payload["entries"][0]["visit_id"] is None
         assert payload["entries"][0]["patient_name"] == test_patient.short_name()
         assert payload["can_call_next"] is True
         assert payload["next_call_entry_id"] == entry.id
@@ -293,6 +295,7 @@ class TestDoctorGeneralQueue:
         )
 
         assert response.status_code == 200, response.text
+        start_payload = response.json()
         db_session.refresh(entry)
         db_session.refresh(unrelated_visit)
         created_visit = (
@@ -306,6 +309,10 @@ class TestDoctorGeneralQueue:
         )
 
         assert entry.status == "in_progress"
+        assert start_payload["entry_id"] == entry.id
+        assert start_payload["patient_id"] == test_patient.id
+        assert start_payload["visit_id"] == created_visit.id
+        assert entry.visit_id == created_visit.id
         assert created_visit.id != unrelated_visit.id
         assert created_visit.notes is not None
         assert unrelated_visit.status == "open"
@@ -791,7 +798,10 @@ class TestDoctorGeneralQueue:
 
         login_response = client.post(
             "/api/v1/authentication/login",
-            json={"username": cardiologist_user.username, "password": "cardiologist123"},
+            json={
+                "username": cardiologist_user.username,
+                "password": "cardiologist123",
+            },
         )
         assert login_response.status_code == 200
         headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
