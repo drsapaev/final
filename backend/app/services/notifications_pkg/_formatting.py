@@ -177,7 +177,14 @@ class FormattingMixin(NotificationSenderMixinBase):
             # buttons and QR codes. The PWA is served by the same frontend
             # origin; there is no separate PWA_BASE_URL setting (staging
             # Check 5b finding: reading it crashed every PWA reminder).
-            pwa_url = f"{settings.FRONTEND_URL}/confirm-visit?token={data['confirmation_token']}"
+            # rstrip("/"): Settings already normalizes FRONTEND_URL, but the
+            # deep-link builders follow the defensive repo convention
+            # (see telegram_service) so a stray trailing slash can never
+            # yield a "//confirm-visit" path that misses the route.
+            pwa_url = (
+                f"{settings.FRONTEND_URL.rstrip('/')}"
+                f"/confirm-visit?token={data['confirmation_token']}"
+            )
             sms_text = self._format_sms_message(data, pwa_url)
 
             success = await self.send_sms(patient.phone, sms_text)
