@@ -204,6 +204,30 @@ function buildQaApiPayload(pathname: string, profile: QaProfile, method: string)
     return profile;
   }
 
+  if (lowerPath === '/doctor/my-info') {
+    return {
+      doctor: {
+        id: 98001,
+        name: 'QA Doctor',
+      },
+    };
+  }
+
+  if (/^\/doctor\/[^/]+\/queue\/today$/.test(lowerPath)) {
+    return {
+      queue_exists: true,
+      doctor: {
+        id: 98001,
+        name: 'QA Doctor',
+      },
+      entries: [],
+    };
+  }
+
+  if (lowerPath === '/registrar/queues/today') {
+    return { queues: [] };
+  }
+
   if (method !== 'GET') {
     return { success: true, id: 'qa-write-disabled' };
   }
