@@ -89,41 +89,35 @@ def get_admin_stats(
             role.lower(): int(user_counts_by_role.get(role, 0)) for role in roles
         }
 
-        # Доход (успешные платежи; amount хранится в тийинах)
-        total_revenue_cents = (
-            db.query(func.coalesce(func.sum(PaymentWebhook.amount), 0))
-            .filter(PaymentWebhook.status == "processed")
-            .scalar()
-            or 0
-        )
-        total_revenue = float(total_revenue_cents) / 100.0
-
         # Используем сравнение datetime для SQLite совместимости
         today_start = datetime.combine(today, time.min)
         today_end = datetime.combine(today, time.max)
 
-        patient_counts = (
-            db.query(
-                func.count(Patient.id),
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (
-                                and_(
-                                    Patient.created_at >= today_start,
-                                    Patient.created_at <= today_end,
-                                ),
-                                1,
-                            ),
-                            else_=0,
-                        )
-                    ),
-                    0,
-                ),
-            )
-            .one()
+        # Независимые агрегаты собираем одним SQL-запросом: при удалённой БД
+        # каждый отдельный запрос добавляет задержку сети к открытию панели.
+        revenue_cents = (
+            select(func.coalesce(func.sum(PaymentWebhook.amount), 0))
+            .where(PaymentWebhook.status == "processed")
+            .scalar_subquery()
         )
-        total_patients, new_patients_today = map(int, patient_counts)
+        patient_counts = select(
+            func.count(Patient.id).label("total_patients"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                Patient.created_at >= today_start,
+                                Patient.created_at <= today_end,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("new_patients_today"),
+        ).subquery()
 
         appointments_today_count = (
             select(func.count(Appointment.id))
@@ -135,18 +129,32 @@ def get_admin_stats(
             .where(Appointment.status == "pending")
             .scalar_subquery()
         )
-        appointment_counts = db.query(
-            appointments_today_count, pending_approvals_count
-        ).one()
-        appointments_today, pending_approvals = map(int, appointment_counts)
-
-        visits_today = (
-            db.query(Visit)
-            .filter(
-                and_(Visit.created_at >= today_start, Visit.created_at <= today_end)
-            )
-            .count()
+        visits_today_count = (
+            select(func.count(Visit.id))
+            .where(and_(Visit.created_at >= today_start, Visit.created_at <= today_end))
+            .scalar_subquery()
         )
+        (
+            total_revenue_cents,
+            total_patients,
+            new_patients_today,
+            appointments_today,
+            pending_approvals,
+            visits_today,
+        ) = db.query(
+            revenue_cents,
+            patient_counts.c.total_patients,
+            patient_counts.c.new_patients_today,
+            appointments_today_count,
+            pending_approvals_count,
+            visits_today_count,
+        ).one()
+        total_revenue = float(total_revenue_cents or 0) / 100.0
+        total_patients = int(total_patients)
+        new_patients_today = int(new_patients_today)
+        appointments_today = int(appointments_today)
+        pending_approvals = int(pending_approvals)
+        visits_today = int(visits_today)
 
         return {
             "totalUsers": total_users,
