@@ -1,12 +1,12 @@
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * EMRContainerV2 - Modular EMR container using v2 sections
- * 
+ *
  * Phase 4 Result:
  * - Uses modular sections instead of inline JSX
  * - Legacy single-sheet EMR has been retired
  * - All Phase 1-3 features work (autosave, guards, history, conflict)
- * 
+ *
  * Phase 6 Additions:
  * - Keyboard shortcuts (Ctrl+S, Ctrl+Z, Ctrl+Y)
  * - Sticky header
@@ -83,7 +83,7 @@ import {
 
 /**
  * EMRContainerV2 Component
- * 
+ *
  * @param {Object} props
  * @param {number} props.visitId - Visit ID
  * @param {number} props.patientId - Patient ID
@@ -128,6 +128,58 @@ function fieldText(value: unknown): string {
     return '';
 }
 
+type PersistAndSignResult = 'cancelled' | 'save_failed' | 'sign_failed' | 'sign_attempted';
+
+function isRejectedEMRWrite(value: unknown): boolean {
+    if (!value || typeof value !== 'object') return true;
+    const result = value as Record<string, unknown>;
+    return result.accessDenied === true ||
+        result.conflict === true ||
+        result.signed === true ||
+        result.success === false ||
+        result.status === 'error' ||
+        (result.error !== undefined && result.error !== null);
+}
+
+function getSavedRowVersion(value: unknown): number | null {
+    if (isRejectedEMRWrite(value)) return null;
+    const result = value as Record<string, unknown>;
+    if (result.status === 'draft') return null;
+    const rowVersion = Number(result.row_version);
+    return Number.isInteger(rowVersion) && rowVersion > 0 ? rowVersion : null;
+}
+
+export async function persistAndSignEMR(actions: {
+    confirm: () => Promise<boolean>;
+    save: (options: Record<string, unknown>) => Promise<unknown>;
+    sign: (options: { rowVersion: number }) => Promise<unknown>;
+}): Promise<PersistAndSignResult> {
+    let confirmed: boolean;
+    try {
+        confirmed = await actions.confirm();
+    } catch {
+        return 'cancelled';
+    }
+    if (!confirmed) return 'cancelled';
+
+    let saved: unknown;
+    try {
+        saved = await actions.save({ isDraft: false });
+    } catch {
+        return 'save_failed';
+    }
+
+    const rowVersion = getSavedRowVersion(saved);
+    if (rowVersion === null) return 'save_failed';
+
+    try {
+        const signed = await actions.sign({ rowVersion });
+        return isRejectedEMRWrite(signed) ? 'sign_failed' : 'sign_attempted';
+    } catch {
+        return 'sign_failed';
+    }
+}
+
 interface EMRHookResult {
     data: EMRDataShape | null;
     status: string;
@@ -145,7 +197,7 @@ interface EMRHookResult {
     canRedo: boolean;
     loadEMR: () => Promise<unknown>;
     saveEMR: (opts?: Record<string, unknown>) => Promise<unknown>;
-    signEMR: (opts?: Record<string, unknown>) => Promise<unknown>;
+    signEMR: (opts?: { rowVersion?: number }) => Promise<unknown>;
     amendEMR: (reason: string, opts?: Record<string, unknown>) => Promise<unknown>;
     setField: (field: string, value: unknown) => void;
     undo: () => void;
@@ -511,20 +563,24 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
     // Actions
     const handleSign = useCallback(async () => {
-        // P-013 fix: replaced window.confirm() with shared useConfirm hook.
-        const ok = await confirm({
-            title: t('misc.emr_sign_title'),
-            message: t('misc.emr_sign_message'),
-            description: t('misc.emr_sign_desc'),
-            confirmLabel: t('misc.emr_sign_confirm'),
-            cancelLabel: t('misc.cancel'),
-            intent: 'primary',
+        const result = await persistAndSignEMR({
+            confirm: () => confirm({
+                title: t('misc.emr_sign_title'),
+                message: t('misc.emr_sign_message'),
+                description: t('misc.emr_sign_desc'),
+                confirmLabel: t('misc.emr_sign_confirm'),
+                cancelLabel: t('misc.cancel'),
+                intent: 'primary',
+            }),
+            save: saveEMR,
+            sign: signEMR,
         });
-        if (!ok) {
-            return;
+        if (result === 'save_failed') {
+            logger.error('[EMR] Save-and-sign stopped because the save did not return a valid non-draft version');
+        } else if (result === 'sign_failed') {
+            logger.error('[EMR] Save-and-sign stopped because signing failed');
         }
-        await signEMR();
-    }, [signEMR, confirm]);
+    }, [saveEMR, signEMR, confirm, t]);
 
     // Keyboard shortcuts (must be after handleSign declaration)
     useEMRKeyboard({
@@ -798,23 +854,23 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                         defaultOpen={false}
                     />
 
-                    {/* Recommendations is reused in TreatmentSection above, or separate? 
+                    {/* Recommendations is reused in TreatmentSection above, or separate?
                         EMR V2 usually separates Treatment (Process) and Recommendations (Output).
                         But TreatmentSection title is "Лечение".
-                        If data.treatment doesn't exist in backend, and TreatmentSection uses data.treatment, 
+                        If data.treatment doesn't exist in backend, and TreatmentSection uses data.treatment,
                         then it was broken or binding to undefined.
                         I'll bind it to 'recommendations' for now or 'treatment' if I add it to schema.
                         Wait, earlier view showed 'recommendations' in schema but no 'treatment'.
                         I will assume 'treatment' matches the UI intent for "Plan/Treatment".
                         But if backend lacks it, I should maybe use 'recommendations'.
                         However, usually "Recommendations" is separate.
-                        
+
                         Let's check 'data.treatment' usage in original file.
-                        Original file used 'data.treatment'. 
+                        Original file used 'data.treatment'.
                         If backend doesn't return it, it's undefined.
-                        
+
                         I will stick to 'data.treatment' for text value to avoid breaking existing logic if it exists somewhere else or is dynamic.
-                        BUT I will bind medications to 'medications'. 
+                        BUT I will bind medications to 'medications'.
                     */}
                     <RecommendationsSection
                         value={data?.recommendations}
@@ -913,12 +969,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             {/* UX Audit Doctor M-13: комбинированная кнопка «Сохранить и подписать». */}
                             <button
                                 className="emr-v2-btn emr-v2-btn--success"
-                                onClick={async () => {
-                                    if (isDirty) {
-                                        await saveEMR({ isDraft: false });
-                                    }
-                                    handleSign();
-                                }}
+                                onClick={handleSign}
                                 disabled={isSaving || accessDenied}
                                 title={accessDenied ? t('misc.emr_no_access_save_title') : t('misc.emr_save_sign_title')}
                                 aria-label={t('misc.emr_save_sign_aria')}
