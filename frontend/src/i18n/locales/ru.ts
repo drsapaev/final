@@ -1685,6 +1685,8 @@ const ru = {
     dental_vp_btn_edit: 'Редактировать',
     dental_vp_btn_cancel: 'Отмена',
     dental_vp_btn_save: 'Сохранить',
+    dental_vp_unavailable_title: 'Форма протокола временно отключена',
+    dental_vp_unavailable: 'Вложения из этой формы не сохраняются. Внесите записи на экране приёма.',
     dental_vp_btn_saving: 'Сохранение...',
     dental_vp_btn_complete: 'Завершить приём',
     dental_vp_aria_complete: 'Завершить приём и вызвать следующего пациента',
@@ -2044,6 +2046,9 @@ const ru = {
     dental_pa_meta_description: 'Описание: {description}',
     // Title and footer (9)
     dental_pa_title: 'Фото и рентген архив: {name}',
+    dental_pa_unavailable_title: 'Фотоархив временно отключён',
+    dental_pa_unavailable: 'Загрузка и изменение снимков будут доступны после подключения защищённого хранения.',
+    dental_panel_photo_archive_unavailable: 'Фотоархив временно недоступен: загрузка снимков пока отключена.',
     dental_pa_file_count: '{count} файлов',
     dental_pa_mode_edit: 'Режим редактирования',
     dental_pa_mode_view: 'Просмотр',
