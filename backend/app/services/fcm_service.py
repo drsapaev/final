@@ -70,7 +70,14 @@ class FCMService:
         self._load_credentials()
 
     def _load_credentials(self):
-        """Загрузка учетных данных сервисного аккаунта"""
+        """Загрузка учетных данных сервисного аккаунта.
+
+        Log severity must match intent: an intentionally disabled channel
+        (FCM_ENABLED=false, the default) is INFO — every local/dev startup
+        used to emit a scary WARNING for a perfectly valid configuration.
+        Only an ENABLED channel with missing/unloadable credentials is a
+        WARNING (a real misconfiguration: pushes silently never fire).
+        """
         try:
             # Пытаемся найти путь к JSON файлу в env или settings
             cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -81,8 +88,20 @@ class FCMService:
                     cred_path, scopes=scopes
                 )
                 logger.info("FCM credentials loaded successfully")
+            elif bool(getattr(settings, "FCM_ENABLED", False)):
+                logger.warning(
+                    "FCM_ENABLED=true but GOOGLE_APPLICATION_CREDENTIALS is "
+                    "not set or the file does not exist — push notifications "
+                    "stay disabled. Generate a Firebase service-account JSON "
+                    "(Firebase Console > Project Settings > Service accounts "
+                    "> Generate new private key), point the env var at it, "
+                    "set FCM_PROJECT_ID, and restart the process"
+                )
             else:
-                logger.warning("GOOGLE_APPLICATION_CREDENTIALS not found or invalid. FCM disabled.")
+                logger.info(
+                    "FCM disabled by configuration (FCM_ENABLED=false); "
+                    "push notifications are off"
+                )
 
         except Exception as e:
             logger.error(f"Failed to load FCM credentials: {e}")
