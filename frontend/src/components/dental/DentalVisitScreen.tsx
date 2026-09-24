@@ -32,8 +32,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  *   - Встроен в экран, не отдельная вкладка
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import type { CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Button, Card, Badge, Input, Textarea, Label,
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -79,18 +78,12 @@ const EMPTY_EMR_DATA = {
 
 const loadExistingEMR = async (visitId: string | number) => {
   if (!visitId) return null;
-  try {
-    const response = await apiClient.get(`/v2/emr/${visitId}`, {
-      silent: true,
-      validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
-    } as Record<string, unknown>);
-    if (response.status === 404) return null;
-    return response.data;
-  } catch (error) {
-    const err = error as { message?: string };
-    logger.warn('[DentalVisitScreen] Failed to load EMR', { visitId, error: err?.message });
-    return null;
-  }
+  const response = await apiClient.get(`/v2/emr/${visitId}`, {
+    silent: true,
+    validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
+  } as Record<string, unknown>);
+  if (response.status === 404) return null;
+  return response.data as { data?: Record<string, unknown>; row_version?: number };
 };
 
 const saveEMR = async (visitId: string | number, data: unknown, rowVersion: unknown, isDraft = true) => {
@@ -102,13 +95,22 @@ const saveEMR = async (visitId: string | number, data: unknown, rowVersion: unkn
   return response.data;
 };
 
+const isSameVisit = (left: string | number | null | undefined, right: string | number | null | undefined) =>
+  left !== null && left !== undefined && right !== null && right !== undefined && String(left) === String(right);
+
+const getHttpStatus = (error: unknown): number | undefined => {
+  if (!error || typeof error !== 'object') return undefined;
+  const response = (error as { response?: { status?: unknown } }).response;
+  return typeof response?.status === 'number' ? response.status : undefined;
+};
+
 // =============================================================================
 // Sub-components
 // =============================================================================
 
 interface PatientHeaderProps {
   patient: Record<string, unknown> | null;
-  onCompleteVisit: () => void;
+  onCompleteVisit: () => void | Promise<void>;
   loading?: boolean;
 }
 
@@ -147,7 +149,7 @@ const PatientHeader = ({ patient, onCompleteVisit, loading }: PatientHeaderProps
       </div>
       <Button
         variant="primary"
-        onClick={onCompleteVisit}
+        onClick={() => { void onCompleteVisit(); }}
         disabled={loading}
         aria-label={t('dental.dental_dvs_aria_complete')}>
         <CheckCircle size={16} style={{ marginRight: 6 }} aria-hidden="true" />
@@ -527,16 +529,19 @@ const DentalVisitScreen = ({
   loading: parentLoading,
 }: {
   patient?: { visit_id?: string | number; patient_id?: string | number; id?: string | number; patient?: { id?: string | number } };
-  onCompleteVisit?: () => void;
+  onCompleteVisit?: (latestDraft: Record<string, unknown>) => void | Promise<void>;
   loading?: boolean;
   [k: string]: unknown;
 }) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const [emrData, setEmrData] = useState(EMPTY_EMR_DATA);
-  const [rowVersion, setRowVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [loadError, setLoadError] = useState<'missing_visit' | 'load' | null>(null);
+  const [saveError, setSaveError] = useState<'conflict' | 'save' | null>(null);
+  const [loadedVisitId, setLoadedVisitId] = useState<string | number | null>(null);
   const [selectedTooth, setSelectedTooth] = useState<{ number: string | number; data: Record<string, unknown> } | null>(null);
   const [toothModalOpen, setToothModalOpen] = useState(false);
   const [showAIDialog, setShowAIDialog] = useState(false);
@@ -550,110 +555,258 @@ const DentalVisitScreen = ({
     patient?.id ||
     null;
 
-  // Load EMR on mount
+  const latestDraftRef = useRef<typeof EMPTY_EMR_DATA>(EMPTY_EMR_DATA);
+  const rowVersionRef = useRef(0);
+  const loadedVisitIdRef = useRef<string | number | null>(null);
+  const retryCompletionRef = useRef(false);
+  const loadSequenceRef = useRef(0);
+  const historySequenceRef = useRef(0);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // A failed EMR read must not be treated as an empty draft. Keep the visit
+  // open and require a successful read before editing or completing it.
   const loadEMR = useCallback(async () => {
-    if (!visitId) {
+    const requestSequence = ++loadSequenceRef.current;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setLoading(true);
+    setSaving(false);
+    setCompleting(false);
+    setLoadError(null);
+    setSaveError(null);
+    retryCompletionRef.current = false;
+    setLoadedVisitId(null);
+    loadedVisitIdRef.current = null;
+    latestDraftRef.current = EMPTY_EMR_DATA;
+    rowVersionRef.current = 0;
+    setEmrData(EMPTY_EMR_DATA);
+
+    if (visitId === null || visitId === undefined || visitId === '') {
+      setLoadError('missing_visit');
       setLoading(false);
       return;
     }
-    setLoading(true);
+
     try {
       const existing = await loadExistingEMR(visitId);
-      if (existing) {
-        const data = existing.data || EMPTY_EMR_DATA;
-        setEmrData({
-          ...EMPTY_EMR_DATA,
-          ...data,
-          specialty_data: {
-            ...EMPTY_EMR_DATA.specialty_data,
-            ...(data.specialty_data || {}),
-          },
-        });
-        setRowVersion(existing.row_version || 0);
-      } else {
-        setEmrData({ ...EMPTY_EMR_DATA });
-        setRowVersion(0);
+      if (requestSequence !== loadSequenceRef.current) return;
+
+      const rowVersion = existing?.row_version;
+      if (existing && (typeof rowVersion !== 'number' || !Number.isInteger(rowVersion))) {
+        throw new Error('Invalid EMR version response');
       }
-    } catch (error) {
-      const err = error as { message?: string } | undefined;
-      logger.error('[DentalVisitScreen] loadEMR failed', { error: err?.message });
+
+      const data = (existing?.data || EMPTY_EMR_DATA) as typeof EMPTY_EMR_DATA;
+      const nextDraft = {
+        ...EMPTY_EMR_DATA,
+        ...data,
+        specialty_data: {
+          ...EMPTY_EMR_DATA.specialty_data,
+          ...(data.specialty_data || {}),
+        },
+      };
+      latestDraftRef.current = nextDraft;
+      rowVersionRef.current = rowVersion ?? 0;
+      loadedVisitIdRef.current = visitId;
+      setLoadedVisitId(visitId);
+      setEmrData(nextDraft);
+    } catch {
+      if (requestSequence !== loadSequenceRef.current) return;
+      logger.warn('[DentalVisitScreen] loadEMR failed');
+      setLoadError('load');
       notify.error(t('dental2.visit_map_load_failed'));
     } finally {
-      setLoading(false);
+      if (requestSequence === loadSequenceRef.current) setLoading(false);
     }
   }, [visitId, t]);
 
   // Load patient history
   const loadHistory = useCallback(async () => {
-    if (!patientId) return;
+    const requestSequence = ++historySequenceRef.current;
+    if (!patientId) {
+      setHistory([]);
+      setHistoryLoading(false);
+      return;
+    }
+    setHistory([]);
     setHistoryLoading(true);
     try {
       const response = await apiClient.get(`/v2/emr/patient/${patientId}`, {
         silent: true,
         validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
       } as Record<string, unknown>);
+      if (requestSequence !== historySequenceRef.current) return;
       if (response.status === 404) {
         setHistory([]);
       } else {
         const summaries = response.data?.summaries || response.data || [];
         setHistory(Array.isArray(summaries) ? summaries : []);
       }
-    } catch (error) {
-      const err = error as { message?: string } | undefined;
-      logger.warn('[DentalVisitScreen] loadHistory failed', { error: err?.message });
+    } catch {
+      if (requestSequence !== historySequenceRef.current) return;
+      logger.warn('[DentalVisitScreen] loadHistory failed');
       setHistory([]);
     } finally {
-      setHistoryLoading(false);
+      if (requestSequence === historySequenceRef.current) setHistoryLoading(false);
     }
   }, [patientId]);
 
   useEffect(() => {
-    loadEMR();
-    loadHistory();
+    void loadEMR();
+    void loadHistory();
+    return () => {
+      loadSequenceRef.current += 1;
+      historySequenceRef.current += 1;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
   }, [loadEMR, loadHistory]);
 
-  // Auto-save EMR draft (debounced via 1.5s timeout on field changes)
-  const [saveTimer, setSaveTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
-  const scheduleAutosave = useCallback((nextData: typeof EMPTY_EMR_DATA) => {
-    if (saveTimer) clearTimeout(saveTimer);
-    const timer = setTimeout(async () => {
-      if (!visitId) return;
-      setSaving(true);
-      try {
-        const result = await saveEMR(visitId, nextData, rowVersion, true);
-        setRowVersion(result.row_version || rowVersion);
-      } catch (error) {
-        const err = error as { message?: string } | undefined;
-        logger.warn('[DentalVisitScreen] autosave failed', { error: err?.message });
-      } finally {
-        setSaving(false);
+  const persistDraft = useCallback((targetVisitId: string | number, snapshot: typeof EMPTY_EMR_DATA) => {
+    const operation = saveQueueRef.current.catch(() => undefined).then(async () => {
+      if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        throw new Error('Visit changed before EMR save');
       }
-    }, 1500);
-    setSaveTimer(timer);
-  }, [saveTimer, visitId, rowVersion]);
 
-  // Field change handlers
-  const updateField = useCallback((field: string, value: unknown) => {
-    setEmrData(prev => {
-      const next = { ...prev, [field]: value } as typeof prev;
-      scheduleAutosave(next);
-      return next;
+      const response = await saveEMR(targetVisitId, snapshot, rowVersionRef.current, true) as { row_version?: unknown };
+      if (typeof response.row_version !== 'number' || !Number.isInteger(response.row_version)) {
+        throw new Error('EMR save response is missing row_version');
+      }
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        rowVersionRef.current = response.row_version;
+      }
     });
+    saveQueueRef.current = operation.then(() => undefined, () => undefined);
+    return operation;
+  }, []);
+
+  // Keep draft writes sequential so each POST uses the version returned by
+  // the previous successful save.
+  const scheduleAutosave = useCallback((nextData: typeof EMPTY_EMR_DATA) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const scheduledVisitId = visitId;
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      if (scheduledVisitId === null || scheduledVisitId === undefined || !isSameVisit(loadedVisitIdRef.current, scheduledVisitId)) return;
+
+      setSaving(true);
+      void persistDraft(scheduledVisitId, nextData).then(() => {
+        if (isSameVisit(loadedVisitIdRef.current, scheduledVisitId)) setSaveError(null);
+      }).catch((error: unknown) => {
+        if (!isSameVisit(loadedVisitIdRef.current, scheduledVisitId)) return;
+        setSaveError(getHttpStatus(error) === 409 ? 'conflict' : 'save');
+        logger.warn('[DentalVisitScreen] autosave failed');
+        notify.error(t('dental2.visit_protocol_save_failed'));
+      }).finally(() => {
+        if (isSameVisit(loadedVisitIdRef.current, scheduledVisitId)) setSaving(false);
+      });
+    }, 1500);
+  }, [persistDraft, t, visitId]);
+
+  const updateField = useCallback((field: string, value: unknown) => {
+    const next = { ...latestDraftRef.current, [field]: value } as typeof EMPTY_EMR_DATA;
+    latestDraftRef.current = next;
+    setEmrData(next);
+    setSaveError(null);
+    scheduleAutosave(next);
   }, [scheduleAutosave]);
 
   const updateSpecialtyData = useCallback((field: string, value: unknown) => {
-    setEmrData(prev => {
-      const next = {
-        ...prev,
-        specialty_data: {
-          ...prev.specialty_data,
-          [field]: value,
-        },
-      } as typeof prev;
-      scheduleAutosave(next);
-      return next;
-    });
+    const next = {
+      ...latestDraftRef.current,
+      specialty_data: {
+        ...latestDraftRef.current.specialty_data,
+        [field]: value,
+      },
+    } as typeof EMPTY_EMR_DATA;
+    latestDraftRef.current = next;
+    setEmrData(next);
+    setSaveError(null);
+    scheduleAutosave(next);
   }, [scheduleAutosave]);
+
+  const handleCompleteVisit = useCallback(async () => {
+    const targetVisitId = visitId;
+    if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') {
+      setLoadError('missing_visit');
+      return;
+    }
+    if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+      setLoadError('load');
+      return;
+    }
+
+    const snapshot = latestDraftRef.current;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setCompleting(true);
+    setSaveError(null);
+    retryCompletionRef.current = false;
+    try {
+      await persistDraft(targetVisitId, snapshot);
+    } catch (error: unknown) {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        setSaveError(getHttpStatus(error) === 409 ? 'conflict' : 'save');
+        retryCompletionRef.current = true;
+        logger.warn('[DentalVisitScreen] save before completion failed');
+        notify.error(t('dental2.visit_protocol_save_failed'));
+      }
+      setCompleting(false);
+      return;
+    }
+
+    if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+      setSaveError(null);
+      try {
+        await onCompleteVisit?.(snapshot);
+      } catch {
+        logger.warn('[DentalVisitScreen] queue completion callback failed');
+      }
+    }
+    setCompleting(false);
+  }, [onCompleteVisit, persistDraft, t, visitId]);
+
+  const handleRetrySave = useCallback(async () => {
+    if (retryCompletionRef.current) {
+      await handleCompleteVisit();
+      return;
+    }
+
+    const targetVisitId = visitId;
+    if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') {
+      setLoadError('missing_visit');
+      return;
+    }
+    if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+      setLoadError('load');
+      return;
+    }
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setSaving(true);
+    try {
+      await persistDraft(targetVisitId, latestDraftRef.current);
+      setSaveError(null);
+    } catch (error: unknown) {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        setSaveError(getHttpStatus(error) === 409 ? 'conflict' : 'save');
+        logger.warn('[DentalVisitScreen] retry save failed');
+        notify.error(t('dental2.visit_protocol_save_failed'));
+      }
+    } finally {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) setSaving(false);
+    }
+  }, [handleCompleteVisit, persistDraft, t, visitId]);
 
   // Tooth click → open ToothModal
   const handleToothClick = useCallback((toothNumber: string | number, toothData: Record<string, unknown> | null) => {
@@ -681,7 +834,9 @@ const DentalVisitScreen = ({
     notify.success(t('dental.dental_dvs_icd10_added', { code: icd10Code }));
   }, [updateField, t]);
 
-  const isLoading = loading || parentLoading;
+  const isEMRLoaded = isSameVisit(loadedVisitId, visitId);
+  const isLoading = loading || parentLoading || (Boolean(visitId) && !isEMRLoaded && !loadError);
+  const fieldsDisabled = completing || !isEMRLoaded;
   const toothStatus = emrData.specialty_data?.tooth_status || {};
 
   return (
@@ -689,11 +844,35 @@ const DentalVisitScreen = ({
       <Card padding="default">
         <PatientHeader
           patient={patient as Record<string, unknown> | null}
-          onCompleteVisit={onCompleteVisit || (() => {})}
-          loading={saving || parentLoading}
+          onCompleteVisit={handleCompleteVisit}
+          loading={saving || completing || parentLoading || !isEMRLoaded || Boolean(loadError)}
         />
 
-        {isLoading ? (
+        {loadError && (
+          <Alert
+            type="error"
+            description={loadError === 'missing_visit' ? t('dental.protocol_needs_visit_id') : t('dental2.visit_map_load_failed')}
+            action={(
+              <Button variant="outline" onClick={() => { void loadEMR(); }}>
+                {t('doctor.btn_retry')}
+              </Button>
+            )}
+          />
+        )}
+
+        {saveError && (
+          <Alert
+            type="error"
+            description={t('dental2.visit_protocol_save_failed')}
+            action={(
+              <Button variant="outline" onClick={() => { void handleRetrySave(); }} disabled={saving || completing}>
+                {t('doctor.btn_retry')}
+              </Button>
+            )}
+          />
+        )}
+
+        {loadError ? null : isLoading ? (
           <div style={{ padding: 20 }}>
             <Skeleton style={{ height: 60, marginBottom: 12 }} />
             <Skeleton style={{ height: 200, marginBottom: 12 }} />
@@ -705,7 +884,7 @@ const DentalVisitScreen = ({
             <AnamnesisSection
               value={emrData.anamnesis_morbi || emrData.complaints || ''}
               onChange={(v: string) => updateField('anamnesis_morbi', v)}
-              disabled={saving}
+              disabled={fieldsDisabled}
             />
 
             {/* Diagnosis + ICD-10 + AI button */}
@@ -715,7 +894,7 @@ const DentalVisitScreen = ({
               onDiagnosisChange={(v) => updateField('diagnosis', v)}
               onIcd10Change={(v) => updateField('icd10_code', v)}
               onAISuggestion={handleAISuggestion}
-              disabled={saving}
+              disabled={fieldsDisabled}
             />
 
             {/* Tooth chart — основная рабочая область */}
@@ -726,7 +905,7 @@ const DentalVisitScreen = ({
               <TeethChart
                 initialData={toothStatus}
                 onToothClick={handleToothClick}
-                readOnly={false}
+                readOnly={fieldsDisabled}
               />
               <ToothSummary toothStatus={toothStatus} />
             </div>
@@ -738,7 +917,7 @@ const DentalVisitScreen = ({
                 ...(emrData.specialty_data?.hygiene_indices || {}),
                 [field]: value,
               })}
-              disabled={saving}
+              disabled={fieldsDisabled}
             />
 
             {/* Visit history — read-only */}
