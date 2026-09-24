@@ -99,25 +99,7 @@ const ChatButton = () => {
             </button>
 
             {hasOpened && (
-                <Suspense fallback={
-                    <div
-                        role="status"
-                        aria-live="polite"
-                        style={{
-                            position: 'fixed',
-                            right: 'var(--mac-spacing-4)',
-                            bottom: 'var(--mac-spacing-4)',
-                            zIndex: 10000,
-                            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
-                            border: '1px solid var(--mac-border)',
-                            borderRadius: 'var(--mac-radius-sm)',
-                            background: 'var(--mac-bg-primary)',
-                            color: 'var(--mac-text-primary)'
-                        }}
-                    >
-                        {t('common.loading')}
-                    </div>
-                }>
+                <Suspense fallback={<span role="status" aria-live="polite">{t('common.loading')}</span>}>
                     <ChatWindow isOpen={isOpen} onClose={() => setIsOpen(false)} />
                 </Suspense>
             )}
