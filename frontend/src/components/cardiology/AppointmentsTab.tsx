@@ -11,7 +11,7 @@
 
 import React from 'react';
 import { Calendar } from 'lucide-react';
-import { Card, Skeleton, AppEmpty } from '../ui/macos';
+import { Button, Card, Skeleton, AppEmpty, AppError } from '../ui/macos';
 import AppointmentSummaryBar from '../doctor/AppointmentSummaryBar';
 import EnhancedAppointmentsTable from '../tables/EnhancedAppointmentsTable';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -20,6 +20,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 export function AppointmentsTab({
   appointments = [],
   appointmentsLoading = false,
+  appointmentsError = false,
   appointmentSummaryItems = [],
   onRefresh,
   onRowClick,
@@ -29,6 +30,7 @@ export function AppointmentsTab({
 }: {
   appointments?: Array<Record<string, unknown>>;
   appointmentsLoading?: boolean;
+  appointmentsError?: boolean;
   appointmentSummaryItems?: Array<{ key: string; label: string; value: string | number; variant: string }>;
   onRefresh: () => void;
   onRowClick?: (row: unknown) => void;
@@ -54,10 +56,18 @@ export function AppointmentsTab({
           />
         </div>
 
+        {appointmentsError && (
+          <AppError
+            title={t('cardio.cardio_appt_error_title')}
+            description={t('cardio.cardio_panel_appointments_load_failed')}
+            action={<Button variant="outline" onClick={onRefresh}>{t('cardio.cardio_queue_retry')}</Button>}
+          />
+        )}
+
         {appointmentsLoading ? (
           <Skeleton type="table" count={5} />
         ) : appointments.length === 0 ? (
-          <AppEmpty title={t('cardio.cardio_appt_empty_title')} description={t('cardio.cardio_appt_empty_desc')} />
+          appointmentsError ? null : <AppEmpty title={t('cardio.cardio_appt_empty_title')} description={t('cardio.cardio_appt_empty_desc')} />
         ) : (
           <EnhancedAppointmentsTable
             data={appointments as never[]}
