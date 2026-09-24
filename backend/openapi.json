@@ -19624,9 +19624,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Doctor Queue Today Api V1 Doctor  Specialty  Queue Today Get"
+                  "$ref": "#/components/schemas/DoctorQueueTodayResponse"
                 }
               }
             }
@@ -19724,9 +19722,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Start Patient Visit Api V1 Doctor Queue  Entry Id  Start Visit Post"
+                  "$ref": "#/components/schemas/DoctorQueueStartVisitResponse"
                 }
               }
             }
@@ -78712,6 +78708,238 @@
         "title": "DoctorProfileCreate",
         "description": "Doctor profile block for canonical new-doctor onboarding (POST /users).\n\nOnly accepted for role=\"Doctor\" (canonical onboarding); legacy\ndoctor-role spellings keep their compatibility auto-map and must not\nsend this block. ``specialty`` must be a canonical onboarding id —\nthe incomplete sentinel (\"general\"), legacy dental spellings and any\nfree-text value are rejected."
       },
+      "DoctorQueueDoctor": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "specialty": {
+            "type": "string",
+            "title": "Specialty"
+          },
+          "cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "specialty"
+        ],
+        "title": "DoctorQueueDoctor"
+      },
+      "DoctorQueueEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Id"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "queue_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Time"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "last_changed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Changed At"
+          },
+          "display_time_kind": {
+            "type": "string",
+            "title": "Display Time Kind"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "called_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Called At"
+          },
+          "patient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DoctorQueuePatient"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "available_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Actions"
+          },
+          "can_call": {
+            "type": "boolean",
+            "title": "Can Call"
+          },
+          "can_start_visit": {
+            "type": "boolean",
+            "title": "Can Start Visit"
+          },
+          "can_no_show": {
+            "type": "boolean",
+            "title": "Can No Show"
+          },
+          "can_send_to_diagnostics": {
+            "type": "boolean",
+            "title": "Can Send To Diagnostics"
+          },
+          "can_complete": {
+            "type": "boolean",
+            "title": "Can Complete"
+          },
+          "can_notify_diagnostics_return": {
+            "type": "boolean",
+            "title": "Can Notify Diagnostics Return"
+          },
+          "can_mark_incomplete": {
+            "type": "boolean",
+            "title": "Can Mark Incomplete"
+          },
+          "can_restore_next": {
+            "type": "boolean",
+            "title": "Can Restore Next"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "patient_id",
+          "visit_id",
+          "patient_name",
+          "source",
+          "status",
+          "display_time_kind",
+          "timezone",
+          "available_actions",
+          "can_call",
+          "can_start_visit",
+          "can_no_show",
+          "can_send_to_diagnostics",
+          "can_complete",
+          "can_notify_diagnostics_return",
+          "can_mark_incomplete",
+          "can_restore_next"
+        ],
+        "title": "DoctorQueueEntry"
+      },
       "DoctorQueueLimit": {
         "properties": {
           "doctor_id": {
@@ -78741,6 +78969,263 @@
         ],
         "title": "DoctorQueueLimit",
         "description": "Индивидуальный лимит для врача"
+      },
+      "DoctorQueuePatient": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "middle_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middle Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "DoctorQueuePatient"
+      },
+      "DoctorQueueStartVisitResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "entry_id": {
+            "type": "integer",
+            "title": "Entry Id"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "entry_id",
+          "patient_id",
+          "visit_id",
+          "status"
+        ],
+        "title": "DoctorQueueStartVisitResponse"
+      },
+      "DoctorQueueStats": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting"
+          },
+          "called": {
+            "type": "integer",
+            "title": "Called"
+          },
+          "served": {
+            "type": "integer",
+            "title": "Served"
+          },
+          "online_entries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Entries"
+          },
+          "desk_entries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desk Entries"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "total",
+          "waiting",
+          "called",
+          "served"
+        ],
+        "title": "DoctorQueueStats"
+      },
+      "DoctorQueueTodayResponse": {
+        "properties": {
+          "queue_exists": {
+            "type": "boolean",
+            "title": "Queue Exists"
+          },
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
+          "queue_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Ids"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "doctor": {
+            "$ref": "#/components/schemas/DoctorQueueDoctor"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorQueueEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/DoctorQueueStats"
+          },
+          "can_call_next": {
+            "type": "boolean",
+            "title": "Can Call Next"
+          },
+          "next_call_entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Call Entry Id"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "queue_exists",
+          "doctor",
+          "date",
+          "entries",
+          "stats",
+          "can_call_next",
+          "next_call_entry_id"
+        ],
+        "title": "DoctorQueueTodayResponse"
       },
       "DoctorSearchRequest": {
         "properties": {
