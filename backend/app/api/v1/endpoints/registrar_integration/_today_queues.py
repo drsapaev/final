@@ -424,6 +424,11 @@ def _build_queue_result(
     result = []
     queue_number = 1
     seen_entry_keys = set()
+    user_role = str(getattr(current_user, "role", "")).strip().lower()
+    can_include_patient_gender = user_role in {"admin", "registrar"}
+    cached_patients = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY, {}).get(
+        "patients", {}
+    )
     latest_lab_reports_by_visit, include_lab_report_summary = (
         _collect_lab_report_summaries(
             db=db,
@@ -637,42 +642,46 @@ def _build_queue_result(
             )
             # R-22 Phase 4: entry serialization extracted to helper
             # (can_* flags are computed inside _serialize_queue_entry)
-            entries.append(
-                _serialize_queue_entry(
-                    entry_type=entry_type,
-                    record_id=record_id,
-                    source=source,
-                    appointment_id_value=appointment_id_value,
-                    entry_visit_id=entry_visit_id,
-                    queue_entry_number=queue_entry_number,
-                    patient_id=patient_id,
-                    patient_name=patient_name,
-                    patient_birth_year=patient_birth_year,
-                    phone=phone,
-                    address=address,
-                    services=services,
-                    service_codes=service_codes,
-                    service_details=service_details,
-                    entry_wrapper=entry_wrapper,
-                    total_cost=total_cost,
-                    payment_status=payment_status,
-                    payment_type=payment_type,
-                    available_actions=available_actions,
-                    canonical_status=canonical_status,
-                    entry_queue_time=entry_queue_time,
-                    entry_updated_at=entry_updated_at,
-                    entry_display_time_kind=entry_display_time_kind,
-                    visit_time=visit_time,
-                    discount_mode=discount_mode,
-                    entry_data=entry_data,
-                    latest_lab_report=latest_lab_report,
-                    entry_department_key=entry_department_key,
-                    entry_department=entry_department,
-                    # W2-PR2: канонический день строки read-модели — день,
-                    # для которого построен лист (target_date запроса).
-                    record_date=today,
-                )
+            serialized_entry = _serialize_queue_entry(
+                entry_type=entry_type,
+                record_id=record_id,
+                source=source,
+                appointment_id_value=appointment_id_value,
+                entry_visit_id=entry_visit_id,
+                queue_entry_number=queue_entry_number,
+                patient_id=patient_id,
+                patient_name=patient_name,
+                patient_birth_year=patient_birth_year,
+                phone=phone,
+                address=address,
+                services=services,
+                service_codes=service_codes,
+                service_details=service_details,
+                entry_wrapper=entry_wrapper,
+                total_cost=total_cost,
+                payment_status=payment_status,
+                payment_type=payment_type,
+                available_actions=available_actions,
+                canonical_status=canonical_status,
+                entry_queue_time=entry_queue_time,
+                entry_updated_at=entry_updated_at,
+                entry_display_time_kind=entry_display_time_kind,
+                visit_time=visit_time,
+                discount_mode=discount_mode,
+                entry_data=entry_data,
+                latest_lab_report=latest_lab_report,
+                entry_department_key=entry_department_key,
+                entry_department=entry_department,
+                # W2-PR2: канонический день строки read-модели — день,
+                # для которого построен лист (target_date запроса).
+                record_date=today,
             )
+            if can_include_patient_gender:
+                patient = cached_patients.get(patient_id)
+                serialized_entry["patient_gender"] = (
+                    patient.sex if patient is not None else None
+                )
+            entries.append(serialized_entry)
 
         # R-22 Phase 4: queue payload construction extracted to helper
         queue_data = _build_queue_payload(
