@@ -1,10 +1,12 @@
 /**
  * Public visit-confirmation service (PWA/SMS invitation deep link).
  *
- * Backend surface (merged long ago, consumed AS-IS — no backend changes):
- *   GET  /visits/info/{token}
+ * Backend surface:
+ *   POST /visits/info {token}
  *     Public visit card for the invitation link (no confirmation side
- *     effects). 404 = token unknown, 400 = already processed / expired.
+ *     effects). The legacy GET /visits/info/{token} remains for older
+ *     clients; this page keeps the bearer token out of request URLs.
+ *     404 = token unknown, 400 = already processed / expired.
  *   POST /patient/visits/confirm
  *     Confirms the pending visit for the token. Same-day confirmations
  *     also issue queue numbers. 404 = unknown/already confirmed, 400 =
@@ -28,7 +30,7 @@ export interface VisitQueueNumberDto {
     queue_id: number;
 }
 
-/** GET /visits/info/{token} response (backend returns dict[str, Any]; shape pinned by visit_confirmation_service.get_visit_info). */
+/** POST /visits/info response; mirrors the published VisitInfoResponse schema. */
 export interface VisitInfoByTokenDto {
     success: boolean;
     visit_id: number;
@@ -38,6 +40,7 @@ export interface VisitInfoByTokenDto {
     visit_date: string;
     visit_time: string | null;
     department: string | null;
+    discount_mode: string | null;
     services: Array<{
         name: string;
         code: string | null;
@@ -55,7 +58,7 @@ export interface VisitInfoByTokenDto {
 export async function getVisitInfoByToken(
     token: string,
 ): Promise<VisitInfoByTokenDto> {
-    const res = await api.get(`/visits/info/${encodeURIComponent(token)}`);
+    const res = await api.post('/visits/info', { token });
     return (res as { data: VisitInfoByTokenDto }).data;
 }
 

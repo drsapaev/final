@@ -17,22 +17,24 @@ import './ConfirmVisitPage.css';
  *
  * Ссылка из напоминания (backend notifications_pkg/_formatting.py) ведёт на
  * /confirm-visit?token=…; страница читает карточку визита
- * (GET /visits/info/{token}) и подтверждает визит
+ * (POST /visits/info с токеном в теле) и подтверждает визит
  * (POST /patient/visits/confirm).
  *
  * PR 3390 review round (P1): маршрут отсутствовал — wildcard уводил ссылку
  * пациента на /not-found, при этом напоминание отмечалось доставленным.
  */
 
-type Phase = 'checking' | 'ready' | 'invalid' | 'done';
+type Phase = 'checking' | 'ready' | 'load-error' | 'invalid' | 'done';
 
 const isAxiosLikeError = (
     err: unknown,
 ): err is { response?: { status?: number; data?: { detail?: string } } } =>
     typeof err === 'object' && err !== null && 'response' in err;
 
-const errorDetail = (err: unknown): string =>
-    isAxiosLikeError(err) ? (err.response?.data?.detail ?? '') : '';
+const errorDetail = (err: unknown): string => {
+    const detail = isAxiosLikeError(err) ? err.response?.data?.detail : undefined;
+    return typeof detail === 'string' ? detail : '';
+};
 
 /** Локальный формат даты ISO (YYYY-MM-DD) → DD.MM.YYYY без сдвига таймзоны. */
 const formatVisitDate = (iso: string): string => {
@@ -49,10 +51,14 @@ const ConfirmVisitPage = () => {
     const [info, setInfo] = useState<VisitInfoByTokenDto | null>(null);
     const [confirming, setConfirming] = useState(false);
     const [actionError, setActionError] = useState('');
+    const [loadError, setLoadError] = useState('');
     const [invalidReason, setInvalidReason] = useState('');
     const [queueNumbers, setQueueNumbers] = useState<VisitQueueNumberDto[]>([]);
     const [doneMessage, setDoneMessage] = useState('');
+    const [stateToken, setStateToken] = useState(token);
     const aliveRef = useRef(true);
+    const activeTokenRef = useRef(token);
+    const loadSequenceRef = useRef(0);
 
     useEffect(() => {
         aliveRef.current = true;
@@ -61,32 +67,57 @@ const ConfirmVisitPage = () => {
         };
     }, []);
 
-    /** Загрузка карточки визита; терминальные статусы (404/400) — invalid. */
-    const loadInfo = useCallback(async () => {
+    /** Загрузка карточки; только 400/404 делают ссылку недействительной. */
+    const loadInfo = useCallback(async (requestedToken: string) => {
+        const sequence = ++loadSequenceRef.current;
+        setStateToken(requestedToken);
         setPhase('checking');
+        setInfo(null);
         setActionError('');
+        setLoadError('');
+        setInvalidReason('');
+        setDoneMessage('');
+        setQueueNumbers([]);
+        setConfirming(false);
         try {
-            const data = await getVisitInfoByToken(token);
-            if (!aliveRef.current) return;
+            const data = await getVisitInfoByToken(requestedToken);
+            if (!aliveRef.current || loadSequenceRef.current !== sequence ||
+                activeTokenRef.current !== requestedToken) return;
             setInfo(data);
             setPhase('ready');
         } catch (err) {
-            if (!aliveRef.current) return;
-            // 404 = токен неизвестен, 400 = уже обработан/истек — ссылка
-            // permanently непригодна; причина сервера информативнее generic-текста.
-            setInvalidReason(errorDetail(err) || t('cv_invalid_link'));
-            setPhase('invalid');
+            if (!aliveRef.current || loadSequenceRef.current !== sequence ||
+                activeTokenRef.current !== requestedToken) return;
+            const status = isAxiosLikeError(err) ? err.response?.status : undefined;
+            if (status === 400 || status === 404) {
+                setInvalidReason(errorDetail(err));
+                setPhase('invalid');
+            } else {
+                setLoadError(errorDetail(err));
+                setPhase('load-error');
+            }
         }
-    }, [token, t]);
+    }, []);
 
     useEffect(() => {
+        activeTokenRef.current = token;
         if (!token) {
-            setInvalidReason(t('cv_invalid_link'));
+            ++loadSequenceRef.current;
+            setStateToken(token);
+            setInfo(null);
+            setInvalidReason('');
+            setActionError('');
+            setLoadError('');
+            setConfirming(false);
             setPhase('invalid');
-            return;
+        } else {
+            void loadInfo(token);
         }
-        void loadInfo();
-    }, [token, loadInfo, t]);
+        return () => {
+            // Ignore a response from the previous token or StrictMode effect.
+            ++loadSequenceRef.current;
+        };
+    }, [token, loadInfo]);
 
     const confirm = useCallback(async () => {
         if (!token || confirming) return;
@@ -94,7 +125,7 @@ const ConfirmVisitPage = () => {
         setActionError('');
         try {
             const data = await confirmVisitByPwa(token);
-            if (!aliveRef.current) return;
+            if (!aliveRef.current || activeTokenRef.current !== token) return;
             setDoneMessage(data.message || t('cv_confirmed'));
             // ConfirmationResponse.queue_numbers is {[key: string]: unknown}[]
             // in the generated contract; the backend pins {queue_tag, number,
@@ -104,7 +135,7 @@ const ConfirmVisitPage = () => {
             );
             setPhase('done');
         } catch (err) {
-            if (!aliveRef.current) return;
+            if (!aliveRef.current || activeTokenRef.current !== token) return;
             if (isAxiosLikeError(err)) {
                 const status = err.response?.status ?? 0;
                 if (status === 404 || status === 400) {
@@ -117,9 +148,11 @@ const ConfirmVisitPage = () => {
             }
             setActionError(errorDetail(err) || t('cv_error'));
         } finally {
-            if (aliveRef.current) setConfirming(false);
+            if (aliveRef.current && activeTokenRef.current === token) setConfirming(false);
         }
     }, [token, confirming, t]);
+
+    const visiblePhase = stateToken === token ? phase : token ? 'checking' : 'invalid';
 
     const totalLabel = info
         ? `${new Intl.NumberFormat('ru-RU').format(info.total_amount)} ${info.currency}`
@@ -135,7 +168,7 @@ const ConfirmVisitPage = () => {
                     <p className="cv-subtitle">{t('cv_subtitle')}</p>
                 </header>
 
-                {phase === 'checking' && (
+                {visiblePhase === 'checking' && (
                     <div className="cv-status" role="status" aria-live="polite">
                         <RefreshCw
                             className="cv-status-icon cv-status-icon-muted"
@@ -145,20 +178,33 @@ const ConfirmVisitPage = () => {
                     </div>
                 )}
 
-                {phase === 'invalid' && (
+                {visiblePhase === 'load-error' && (
+                    <div className="cv-status" role="alert">
+                        <XCircle
+                            className="cv-status-icon cv-status-icon-error"
+                            aria-hidden="true"
+                        />
+                        <p className="cv-status-text">{loadError || t('cv_error')}</p>
+                        <Button onClick={() => void loadInfo(token)}>
+                            {t('btn_retry')}
+                        </Button>
+                    </div>
+                )}
+
+                {visiblePhase === 'invalid' && (
                     <div className="cv-status" role="alert">
                         <XCircle
                             className="cv-status-icon cv-status-icon-error"
                             aria-hidden="true"
                         />
                         <p className="cv-status-text">
-                            {invalidReason || t('cv_invalid_link')}
+                            {(stateToken === token && invalidReason) || t('cv_invalid_link')}
                         </p>
                         <p className="cv-status-hint">{t('cv_invalid_hint')}</p>
                     </div>
                 )}
 
-                {phase === 'ready' && info && (
+                {visiblePhase === 'ready' && info && (
                     <>
                         <div className="cv-fields">
                             <div className="cv-field">
@@ -218,7 +264,7 @@ const ConfirmVisitPage = () => {
                     </>
                 )}
 
-                {phase === 'done' && (
+                {visiblePhase === 'done' && (
                     <div className="cv-status" role="status">
                         <CheckCircle2
                             className="cv-status-icon cv-status-icon-ok"

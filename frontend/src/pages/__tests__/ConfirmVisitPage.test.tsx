@@ -5,23 +5,19 @@
  * Pins:
  *  - the public /confirm-visit route exists in the registry (the SMS
  *    invitation must not land on the /not-found wildcard);
- *  - the visit card loads via GET /visits/info/{token};
+ *  - the visit card loads via POST /visits/info with token in the body;
  *  - confirmation goes through POST /patient/visits/confirm and surfaces
  *    the same-day queue number;
  *  - terminal failures (404/400, incl. "already confirmed"/"expired")
  *    show the server reason on the invalid screen;
- *  - transient failures (429) keep the card with the server detail.
+ *  - transient read failures offer explicit retry.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 
-const { apiMock, tStub } = vi.hoisted(() => ({
+const { apiMock } = vi.hoisted(() => ({
   apiMock: vi.fn(),
-  // STABLE identity: the real useTranslation returns a stable t between
-  // renders; a fresh arrow per render would re-run the load effect after
-  // every state update and consume the queued response mocks.
-  tStub: (key: string) => key,
 }));
 
 vi.mock('../../api/client', () => ({
@@ -32,7 +28,8 @@ vi.mock('../../api/client', () => ({
 }));
 
 vi.mock('../../i18n/useTranslation', () => ({
-  useTranslation: () => ({ t: tStub }),
+  // The real hook creates a fresh t closure on every render.
+  useTranslation: () => ({ t: (key: string) => key }),
 }));
 
 import ConfirmVisitPage from '../ConfirmVisitPage';
@@ -51,6 +48,7 @@ const VISIT_INFO = {
   visit_date: '2026-09-25',
   visit_time: '10:30',
   department: null,
+  discount_mode: 'none',
   services: [
     {
       name: 'Приём SYNTHETIC-кардиолога',
@@ -104,7 +102,7 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
     expect(route?.nav).toBe(false);
   });
 
-  it('loads the visit card via GET /visits/info/{token} and renders it', async () => {
+  it('loads one visit card via POST /visits/info without the token in the URL', async () => {
     apiMock.mockResolvedValueOnce(ok(VISIT_INFO));
 
     renderAt(`?token=${TOKEN}`);
@@ -115,10 +113,11 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
     expect(screen.getByText(/25\.09\.2026/)).toBeTruthy();
     expect(screen.getByText('Приём SYNTHETIC-кардиолога')).toBeTruthy();
 
-    const infoCall = apiMock.mock.calls.find(([url]) =>
-      String(url).includes('/visits/info/'),
-    );
-    expect(infoCall?.[0]).toBe(`/visits/info/${TOKEN}`);
+    await act(async () => { await Promise.resolve(); });
+    const infoCalls = apiMock.mock.calls.filter(([url]) => url === '/visits/info');
+    expect(infoCalls).toHaveLength(1);
+    expect(infoCalls[0]?.[1]).toEqual({ token: TOKEN });
+    expect(apiMock.mock.calls.every(([url]) => !String(url).includes(TOKEN))).toBe(true);
   });
 
   it('confirms via POST /patient/visits/confirm and shows the queue number', async () => {
@@ -140,18 +139,63 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
     expect(screen.getByText('cardiology_common')).toBeTruthy();
   });
 
-  it('unknown token (404) — terminal invalid state with the server reason', async () => {
-    apiMock.mockRejectedValueOnce({
-      response: {
-        status: 404,
-        data: { detail: 'Визит не найден или уже подтвержден' },
-      },
-    });
+  it.each([
+    [404, 'Визит не найден или уже подтвержден'],
+    [400, 'Срок подтверждения истек'],
+  ])('read failure %i is terminal, with no retry button', async (status, detail) => {
+    apiMock.mockRejectedValueOnce({ response: { status, data: { detail } } });
 
     renderAt('?token=unknown-token-999');
-    expect(
-      await screen.findByText('Визит не найден или уже подтвержден'),
-    ).toBeTruthy();
+    expect(await screen.findByText(detail)).toBeTruthy();
+    expect(screen.queryByText('btn_retry')).toBeNull();
+    expect(apiMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['rate limit', { response: { status: 429, data: { detail: 'Попробуйте позже' } } }],
+    ['server failure', { response: { status: 503, data: { detail: 'Сервис временно недоступен' } } }],
+    ['network failure', new Error('synthetic network failure')],
+  ])('retry after %s reads the card once more', async (_cause, error) => {
+    apiMock.mockRejectedValueOnce(error).mockResolvedValueOnce(ok(VISIT_INFO));
+
+    renderAt(`?token=${TOKEN}`);
+    fireEvent.click(await screen.findByText('btn_retry'));
+
+    expect(await screen.findByText('SYNTHETIC Test Doctor')).toBeTruthy();
+    expect(apiMock.mock.calls.filter(([url]) => url === '/visits/info')).toHaveLength(2);
+    expect(apiMock.mock.calls.every(([url]) => !String(url).includes(TOKEN))).toBe(true);
+  });
+
+  it('ignores an old token response after navigating to a new token', async () => {
+    const newToken = 'synthetic-new-token';
+    let resolveFirst!: (value: ReturnType<typeof ok>) => void;
+    const firstRead = new Promise<ReturnType<typeof ok>>((resolve) => {
+      resolveFirst = resolve;
+    });
+    apiMock.mockReturnValueOnce(firstRead).mockResolvedValueOnce(ok({
+      ...VISIT_INFO,
+      doctor_name: 'SYNTHETIC Second Doctor',
+    }));
+
+    const NavigateToNextToken = () => {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate(`?token=${newToken}`)}>next token</button>;
+    };
+    render(
+      <MemoryRouter initialEntries={[`/confirm-visit?token=${TOKEN}`]}>
+        <NavigateToNextToken />
+        <ConfirmVisitPage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText('next token'));
+    expect(await screen.findByText('SYNTHETIC Second Doctor')).toBeTruthy();
+    await act(async () => { resolveFirst(ok(VISIT_INFO)); });
+    expect(screen.queryByText('SYNTHETIC Test Doctor')).toBeNull();
+    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2));
+    expect(apiMock.mock.calls.map(([, body]) => body)).toEqual([
+      { token: TOKEN }, { token: newToken },
+    ]);
   });
 
   it('missing token — invalid state, no API call', () => {

@@ -6,6 +6,10 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.models.online_queue import OnlineQueueEntry
+from app.services.visit_confirmation_service import (
+    VisitConfirmationDomainError,
+    VisitConfirmationService,
+)
 
 
 @pytest.mark.integration
@@ -44,6 +48,63 @@ class TestVisitConfirmationAPI:
         assert response.status_code == 400
         data = response.json()
         assert "истек" in data["detail"]
+
+    def test_post_visit_info_matches_legacy_get(self, client, test_visit):
+        """The token moves to the request body; the visit card is unchanged."""
+        token = test_visit.confirmation_token
+        post_response = client.post("/api/v1/visits/info", json={"token": token})
+        get_response = client.get(f"/api/v1/visits/info/{token}")
+
+        assert post_response.status_code == get_response.status_code == 200
+        assert post_response.json() == get_response.json()
+        assert token not in post_response.request.url.path
+
+    def test_post_visit_info_unknown_token_matches_legacy_get(self, client):
+        token = "synthetic-unknown-token"
+        post_response = client.post("/api/v1/visits/info", json={"token": token})
+        get_response = client.get(f"/api/v1/visits/info/{token}")
+
+        assert post_response.status_code == get_response.status_code == 404
+        assert post_response.json() == get_response.json()
+
+    def test_post_visit_info_expired_token_matches_legacy_get(self, client, test_visit):
+        test_visit.confirmation_expires_at = datetime.utcnow() - timedelta(hours=1)
+        token = test_visit.confirmation_token
+        post_response = client.post("/api/v1/visits/info", json={"token": token})
+        get_response = client.get(f"/api/v1/visits/info/{token}")
+
+        assert post_response.status_code == get_response.status_code == 400
+        assert post_response.json() == get_response.json()
+
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            VisitConfirmationDomainError(
+                status_code=500, detail="SYNTHETIC-SENSITIVE-DETAIL"
+            ),
+            RuntimeError("SYNTHETIC-SENSITIVE-DETAIL"),
+        ],
+    )
+    def test_post_visit_info_hides_internal_errors(self, client, monkeypatch, failure):
+        def fail_read(_service, _token):
+            raise failure
+
+        monkeypatch.setattr(VisitConfirmationService, "get_visit_info", fail_read)
+        response = client.post(
+            "/api/v1/visits/info", json={"token": "synthetic-error-token"}
+        )
+
+        assert response.status_code == 500
+        assert response.json() == {"detail": "Не удалось получить информацию о визите"}
+        assert "SYNTHETIC-SENSITIVE-DETAIL" not in response.text
+
+    def test_post_visit_info_is_in_openapi(self, client):
+        schema = client.get("/openapi.json").json()
+        operation = schema["paths"]["/api/v1/visits/info"]["post"]
+        request_ref = operation["requestBody"]["content"]["application/json"]["schema"]
+        assert request_ref["$ref"] == "#/components/schemas/VisitInfoRequest"
+        response_ref = operation["responses"]["200"]["content"]["application/json"]["schema"]
+        assert response_ref["$ref"] == "#/components/schemas/VisitInfoResponse"
 
     def test_confirm_visit_telegram_success(self, client, test_visit, test_daily_queue):
         """Тест успешного подтверждения визита через Telegram"""
