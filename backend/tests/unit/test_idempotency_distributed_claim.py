@@ -5026,3 +5026,311 @@ def test_expired_local_snapshot_does_not_replay_in_dispatch(two_workers):
     finally:
         idem_module._local_scope_bindings.clear()
         idem_module._local_scope_bindings_expiry.clear()
+
+
+# ---------------------------------------------------------------------------
+# Merged-#3340 follow-up (owner review): bridge-anchor proof gate + the
+# three distributed race exits audited like every other replay.
+# ---------------------------------------------------------------------------
+
+
+def test_bridge_anchor_returns_none_and_is_not_cached_on_redis_failure(monkeypatch):
+    """Merged-#3340 follow-up (owner P2): ``bridge_anchor`` returned the
+    fallback ``now`` indistinguishably from a PROVEN anchor when Redis died
+    mid-probe (GET fails → SET fails → read-back fails → ``return now``),
+    and the caller cached that process-local value as (resolved=True) FOR
+    THE LIFETIME OF THE PROCESS — after Redis recovered the worker never
+    re-read the real deployment-wide anchor and kept a process-local
+    ~25 h legacy bridge open.
+
+    Pin: every transient failure inside the probe answers ``None``, the
+    process cache stays UNRESOLVED, and the next successful probe adopts
+    the SHARED anchor."""
+    import time as _time
+
+    fake = FakeRedis()
+    claim = _make_claim(fake)
+
+    # A shared anchor already exists (another worker anchored the rollout).
+    shared_anchor = 1700000000.0
+    fake.store["idem:legacy_bridge_anchor"] = str(shared_anchor)
+
+    saved_claim = idem_module._distributed_claim
+    saved_cache = idem_module._BRIDGE_ANCHOR_CACHE
+    idem_module._distributed_claim = claim
+    idem_module._BRIDGE_ANCHOR_CACHE = (False, 0.0)
+    try:
+        # Transient failure on the anchor GET (try_available() succeeded a
+        # moment earlier — Redis died between the ping and the read).
+        fake.fail_next_ops = 1
+        assert claim.bridge_anchor(_time.time()) is None, (
+            "an unproven probe answers None — never the `now` fallback"
+        )
+
+        # The caller contract: a None is NEVER cached as resolved.
+        value = idem_module._bridge_anchor()
+        assert value == idem_module._LEGACY_BRIDGE_EPOCH, (
+            "the unresolved process stays on the process-start fallback"
+        )
+        assert idem_module._BRIDGE_ANCHOR_CACHE[0] is False, (
+            "the fallback must not be cached as a resolved anchor (the "
+            "pre-fix bug pinned: cache stayed (True, now) for the "
+            "worker's lifetime)"
+        )
+
+        # Redis recovers: the very next dispatch re-probes and adopts the
+        # REAL deployment-wide anchor (cooldown bypassed — recovery is the
+        # scenario under test, not the reconnect pacing).
+        fake.fail_next_ops = 0
+        claim._failed_at = 0.0
+        assert idem_module._bridge_anchor() == pytest.approx(shared_anchor)
+        resolved, cached_value = idem_module._BRIDGE_ANCHOR_CACHE
+        assert resolved is True
+        assert cached_value == pytest.approx(shared_anchor), (
+            "the SHARED anchor governs — not a process-local fallback"
+        )
+    finally:
+        idem_module._distributed_claim = saved_claim
+        idem_module._BRIDGE_ANCHOR_CACHE = saved_cache
+        monkeypatch.undo()
+
+
+def test_bridge_anchor_cache_unset_when_claim_is_unavailable(monkeypatch):
+    """No shared store at all → the process-start fallback answers and the
+    cache stays UNRESOLVED (a later probe must still be possible)."""
+    saved_claim = idem_module._distributed_claim
+    saved_cache = idem_module._BRIDGE_ANCHOR_CACHE
+    idem_module._distributed_claim = None
+    monkeypatch.setattr(idem_module, "get_distributed_claim", lambda: None)
+    idem_module._BRIDGE_ANCHOR_CACHE = (False, 0.0)
+    try:
+        assert idem_module._bridge_anchor() == idem_module._LEGACY_BRIDGE_EPOCH
+        assert idem_module._BRIDGE_ANCHOR_CACHE == (False, 0.0)
+        assert idem_module._bridge_anchor() == idem_module._LEGACY_BRIDGE_EPOCH
+    finally:
+        idem_module._distributed_claim = saved_claim
+        idem_module._BRIDGE_ANCHOR_CACHE = saved_cache
+        monkeypatch.undo()
+
+
+def _audit_replay_harness(monkeypatch, tmp_path):
+    """Shared setup for the race-exit audit pins: a disposable SQLite audit
+    table wired through _resolve_request_db + the patient-scoped replay
+    policy (the same contract the round-10 ordinary-replay pin uses)."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.models.patient_access_audit import PatientAccessAuditLog
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'audit.db'}")
+    PatientAccessAuditLog.__table__.create(bind=engine)
+    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    def _fake_resolve_db(request):
+        session = TestingSession()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    monkeypatch.setattr(idem_module, "_resolve_request_db", _fake_resolve_db)
+    idem_module._patient_replay_policy_sync = lambda request, canonical_id: (
+        "patient:7",
+        False,
+        True,
+    )
+    idem_module._local_scope_bindings.clear()
+    idem_module._local_scope_bindings_expiry.clear()
+
+    def _rows():
+        session = TestingSession()
+        try:
+            return (
+                session.query(PatientAccessAuditLog)
+                .filter(
+                    PatientAccessAuditLog.subject_patient_id == 7,
+                    PatientAccessAuditLog.outcome == "success",
+                )
+                .all()
+            )
+        finally:
+            session.close()
+
+    return _rows
+
+
+def test_patient_replay_audited_at_post_inflight_race_exit(
+    two_workers, monkeypatch, tmp_path
+):
+    """Merged-#3340 follow-up (owner P2) — POST-INFLIGHT exit: the retry's
+    acquire finds the claim held elsewhere, the re-check then discovers the
+    JUST-COMPLETED outcome and answers the stored patient response. The
+    endpoint never runs, so its audited dependency never executes — the
+    middleware writes THIS attempt's own trail row before serving."""
+    client1, client2, counters, _ = two_workers
+    _rows = _audit_replay_harness(monkeypatch, tmp_path)
+
+    key = "race-audit-post-inflight"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+
+    try:
+        first = client1.post("/echo", headers=headers)
+        assert first.status_code == 200
+        assert counters["w1"]["calls"] == 1
+        assert _rows() == [], "the first execution writes no middleware row"
+
+        # The interleaving that lands in the post-inflight branch: every
+        # load_response BEFORE the acquire attempt sees nothing (the
+        # ordinary distributed-replay branch is skipped), the acquire
+        # attempt "fails" (claim held elsewhere), and the branch's own
+        # re-check then finds the stored outcome.
+        real_load = DistributedIdempotencyClaim.load_response
+        state = {"pre_acquire": True}
+
+        def fake_load(self, user_id, key_):
+            if state["pre_acquire"]:
+                return None, None, None
+            return real_load(self, user_id, key_)
+
+        def fake_acquire(self, user_id, key_):
+            state["pre_acquire"] = False
+            return None
+
+        monkeypatch.setattr(DistributedIdempotencyClaim, "load_response", fake_load)
+        monkeypatch.setattr(DistributedIdempotencyClaim, "acquire", fake_acquire)
+
+        replay = client2.post("/echo", headers=headers)
+        assert replay.status_code == 200, replay.text
+        assert replay.json() == first.json(), "the stored outcome is replayed"
+        assert counters["w1"]["calls"] == 1 and counters["w2"]["calls"] == 0, (
+            "the post-inflight replay never executes the handler"
+        )
+
+        rows = _rows()
+        assert len(rows) == 1, "exactly one row: THIS race-exit replay attempt"
+        extra = rows[0].extra_data or {}
+        assert extra.get("replayed") is True
+        assert extra.get("surface") == "jwt_portal"
+        assert rows[0].subject_patient_id == 7
+    finally:
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
+        monkeypatch.undo()
+
+
+def test_patient_replay_audited_at_post_acquire_race_exit(
+    two_workers, monkeypatch, tmp_path
+):
+    """Merged-#3340 follow-up (owner P2) — POST-ACQUIRE exit: the acquire
+    SUCCEEDS (R18 #3277: between the early check and the acquire another
+    worker completed, stored the outcome and released), the mandatory
+    re-check then finds it and answers the stored patient response without
+    executing. The attempt is audited at the exit."""
+    client1, client2, counters, _ = two_workers
+    _rows = _audit_replay_harness(monkeypatch, tmp_path)
+
+    key = "race-audit-post-acquire"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+
+    try:
+        first = client1.post("/echo", headers=headers)
+        assert first.status_code == 200
+        assert counters["w1"]["calls"] == 1
+        assert _rows() == []
+
+        # Every load_response BEFORE the acquire sees nothing; the acquire
+        # succeeds (a fresh claim on the released key); the branch's
+        # re-check then finds the stored outcome.
+        real_load = DistributedIdempotencyClaim.load_response
+        real_acquire = DistributedIdempotencyClaim.acquire
+        state = {"pre_acquire": True}
+
+        def fake_load(self, user_id, key_):
+            if state["pre_acquire"]:
+                return None, None, None
+            return real_load(self, user_id, key_)
+
+        def fake_acquire(self, user_id, key_):
+            state["pre_acquire"] = False
+            return real_acquire(self, user_id, key_)
+
+        monkeypatch.setattr(DistributedIdempotencyClaim, "load_response", fake_load)
+        monkeypatch.setattr(DistributedIdempotencyClaim, "acquire", fake_acquire)
+
+        replay = client2.post("/echo", headers=headers)
+        assert replay.status_code == 200, replay.text
+        assert replay.json() == first.json()
+        assert counters["w2"]["calls"] == 0, (
+            "the post-acquire replay never executes the handler"
+        )
+
+        rows = _rows()
+        assert len(rows) == 1, "exactly one row: THIS race-exit replay attempt"
+        extra = rows[0].extra_data or {}
+        assert extra.get("replayed") is True
+        assert extra.get("surface") == "jwt_portal"
+    finally:
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
+        monkeypatch.undo()
+
+
+def test_patient_replay_audited_at_lease_lapse_race_exit(
+    two_workers, monkeypatch, tmp_path
+):
+    """Merged-#3340 follow-up (owner P2) — LEASE-LAPSE exit: the CAS-renew
+    before execution fails (the lease lapsed and the key could have been
+    re-grabbed), the mandatory re-check finds the outcome stored by the new
+    owner, and the stored patient response is served after the same
+    replay-authorization chain. The endpoint never runs — the attempt is
+    audited at the exit."""
+    client1, client2, counters, _ = two_workers
+    _rows = _audit_replay_harness(monkeypatch, tmp_path)
+
+    key = "race-audit-lease-lapse"
+    headers = {**auth_headers("1"), "Idempotency-Key": key}
+
+    try:
+        first = client1.post("/echo", headers=headers)
+        assert first.status_code == 200
+        assert counters["w1"]["calls"] == 1
+        assert _rows() == []
+
+        # Every load_response BEFORE the renew attempt sees nothing (both
+        # the ordinary and the post-acquire branches are skipped); the
+        # renew FAILS (lease lapsed); the branch's re-check then finds the
+        # stored outcome.
+        real_load = DistributedIdempotencyClaim.load_response
+        state = {"renew_attempted": False}
+
+        def fake_load(self, user_id, key_):
+            if not state["renew_attempted"]:
+                return None, None, None
+            return real_load(self, user_id, key_)
+
+        def fake_renew(self, user_id, key_, token):
+            state["renew_attempted"] = True
+            return False
+
+        monkeypatch.setattr(DistributedIdempotencyClaim, "load_response", fake_load)
+        monkeypatch.setattr(DistributedIdempotencyClaim, "renew", fake_renew)
+
+        replay = client2.post("/echo", headers=headers)
+        assert replay.status_code == 200, replay.text
+        assert replay.json() == first.json(), (
+            "the outcome stored by the (previous) owner is replayed"
+        )
+        assert counters["w2"]["calls"] == 0, (
+            "the lease-lapse replay never executes the handler"
+        )
+
+        rows = _rows()
+        assert len(rows) == 1, "exactly one row: THIS race-exit replay attempt"
+        extra = rows[0].extra_data or {}
+        assert extra.get("replayed") is True
+        assert extra.get("surface") == "jwt_portal"
+        assert rows[0].subject_patient_id == 7
+    finally:
+        idem_module._local_scope_bindings.clear()
+        idem_module._local_scope_bindings_expiry.clear()
+        monkeypatch.undo()

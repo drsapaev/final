@@ -219,9 +219,9 @@ class TestScheduleDepartmentKeyContract:
         assert response.status_code == 200, response.text
         slots = response.json()
         assert slots, "the canonical key filter must surface the template's slots"
-        assert all(slot["department"] == portal_department.key for slot in slots), (
-            "slot payloads carry the department KEY string"
-        )
+        assert all(
+            slot["department"] == portal_department.key for slot in slots
+        ), "slot payloads carry the department KEY string"
 
         empty = client.get(
             "/api/v1/schedule/available-slots",
@@ -269,9 +269,9 @@ class TestScheduleDepartmentKeyContract:
         assert created.status_code == 200, created.text
         row = db_session.get(ScheduleTemplate, created.json()["id"])
         assert row is not None
-        assert row.department_id == portal_department.id, (
-            "the create path persists the department FK from the key string"
-        )
+        assert (
+            row.department_id == portal_department.id
+        ), "the create path persists the department FK from the key string"
         assert created.json()["department"] == portal_department.key
 
         unknown = client.post(
@@ -281,6 +281,159 @@ class TestScheduleDepartmentKeyContract:
         )
         assert unknown.status_code == 400, unknown.text
         assert unknown.json()["detail"]["reason"] == "department_unknown"
+
+
+class TestScheduleCreateConsistencyContract:
+    """Merged-#3340 follow-up (owner P2): the create flow resolved
+    `department` and `doctor_id` INDEPENDENTLY, so (a) a DEACTIVATED
+    department key produced an ACTIVE template advertising a booking route
+    the patient-booking contract refuses with `department_inactive`, and
+    (b) a Cardiologist could be scheduled under dentistry — the template
+    advertised a doctor/department pair the booking routing refuses with
+    `doctor_department_mismatch`. Both shapes are now controlled 400s
+    BEFORE any INSERT (unknown → `department_unknown`, inactive →
+    `department_inactive`, dangling doctor → `doctor_unknown`, doctor
+    without a canonical department → `doctor_department_missing`,
+    foreign department → `doctor_department_mismatch`)."""
+
+    def _payload(self, department_key, **overrides) -> dict:
+        payload = {
+            "department": department_key,
+            "weekday": 4,
+            "start_time": "08:00",
+            "end_time": "10:00",
+            "active": True,
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_inactive_department_is_refused_before_insert(
+        self, client, db_session, admin_auth_headers, portal_department
+    ):
+        portal_department.active = False
+        db_session.commit()
+
+        refused = client.post(
+            "/api/v1/schedule",
+            headers=admin_auth_headers,
+            json=self._payload(portal_department.key),
+        )
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["detail"]["reason"] == "department_inactive"
+
+        from sqlalchemy import select
+
+        orphans = (
+            db_session.execute(
+                select(ScheduleTemplate).where(
+                    ScheduleTemplate.department_id == portal_department.id
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert orphans == [], "a refused create persists nothing"
+
+    def test_doctor_department_mismatch_is_refused_before_insert(
+        self,
+        client,
+        db_session,
+        admin_auth_headers,
+        portal_department,
+        test_doctor,
+    ):
+        from app.models.department import Department as DepartmentModel
+
+        dentistry = DepartmentModel(
+            key="dentistry-sched",
+            name_ru="Стоматология",
+            name_uz="Stomatologiya",
+            active=True,
+        )
+        db_session.add(dentistry)
+        db_session.commit()
+        db_session.refresh(dentistry)
+
+        # The doctor's CANONICAL department is cardiology — scheduling the
+        # cardiologist under dentistry is the contradictory template.
+        test_doctor.department_id = portal_department.id
+        db_session.commit()
+
+        refused = client.post(
+            "/api/v1/schedule",
+            headers=admin_auth_headers,
+            json=self._payload(dentistry.key, doctor_id=test_doctor.id),
+        )
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["detail"]["reason"] == "doctor_department_mismatch"
+
+        from sqlalchemy import select
+
+        orphans = db_session.execute(select(ScheduleTemplate)).scalars().all()
+        assert orphans == [], "the inconsistent template is never persisted"
+
+    def test_doctor_without_department_is_refused(
+        self, client, db_session, admin_auth_headers, portal_department, test_doctor
+    ):
+        test_doctor.department_id = None
+        db_session.commit()
+
+        refused = client.post(
+            "/api/v1/schedule",
+            headers=admin_auth_headers,
+            json=self._payload(portal_department.key, doctor_id=test_doctor.id),
+        )
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["detail"]["reason"] == "doctor_department_missing"
+
+    def test_dangling_doctor_id_is_refused_not_500(
+        self, client, admin_auth_headers, portal_department
+    ):
+        refused = client.post(
+            "/api/v1/schedule",
+            headers=admin_auth_headers,
+            json=self._payload(portal_department.key, doctor_id=999999),
+        )
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["detail"]["reason"] == "doctor_unknown"
+
+    def test_matching_doctor_department_is_persisted(
+        self,
+        client,
+        db_session,
+        admin_auth_headers,
+        portal_department,
+        test_doctor,
+    ):
+        test_doctor.department_id = portal_department.id
+        db_session.commit()
+
+        created = client.post(
+            "/api/v1/schedule",
+            headers=admin_auth_headers,
+            json=self._payload(portal_department.key, doctor_id=test_doctor.id),
+        )
+        assert created.status_code == 200, created.text
+        row = db_session.get(ScheduleTemplate, created.json()["id"])
+        assert row is not None
+        assert int(row.department_id) == int(portal_department.id)
+        assert int(row.doctor_id) == int(test_doctor.id)
+
+    def test_doctorless_template_is_unaffected(
+        self, client, db_session, admin_auth_headers, portal_department
+    ):
+        """The consistency check binds doctor+department only when BOTH are
+        present — the department-only template shape keeps working."""
+        created = client.post(
+            "/api/v1/schedule",
+            headers=admin_auth_headers,
+            json=self._payload(portal_department.key),
+        )
+        assert created.status_code == 200, created.text
+        row = db_session.get(ScheduleTemplate, created.json()["id"])
+        assert row is not None
+        assert row.doctor_id is None
+        assert int(row.department_id) == int(portal_department.id)
 
 
 class TestCreateSchedulePersistence:
@@ -299,9 +452,7 @@ class TestCreateSchedulePersistence:
     (a fresh connection) after the request dependency has closed its
     session. The unknown-key refusal must stay a rollback (no row)."""
 
-    def test_created_template_survives_the_request_session(
-        self, client, tmp_path
-    ):
+    def test_created_template_survives_the_request_session(self, client, tmp_path):
         import uuid
 
         from sqlalchemy import create_engine, select

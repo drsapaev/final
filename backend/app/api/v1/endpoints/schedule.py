@@ -8,9 +8,46 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.crud import schedule as crud
+from app.models.clinic import Doctor
+from app.models.department import Department
 from app.schemas.schedule import ScheduleCreateIn, ScheduleRowOut
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
+
+
+def _resolve_active_department(
+    db: Session, department: str | None
+) -> Department | None:
+    """Merged-#3340 follow-up (owner P2): CREATE-time department resolution
+    with the ACTIVE gate the shared `_resolve_department_id` deliberately
+    lacks for reads.
+
+    The previous create flow resolved the key to an id UNCONDITIONALLY, so
+    `Department(key="cardio", active=False)` produced an ACTIVE
+    ScheduleTemplate advertising a booking route the patient-booking
+    contract refuses with `department_inactive` — the schedule API was
+    publishing a заведомо непригодный route. Unknown and deactivated keys
+    are now controlled 400s BEFORE any INSERT, with the two shapes
+    distinguished (the reads keep their exact-key empty-answer semantics;
+    only the WRITE path refuses):
+
+    * `department_unknown`  — no department carries the key;
+    * `department_inactive` — the department exists but is deactivated.
+    """
+    if not department:
+        return None
+    row = db.query(Department).filter(Department.key == department).first()
+    if row is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"reason": "department_unknown"},
+        )
+    if not getattr(row, "active", True):
+        raise HTTPException(
+            status_code=400,
+            detail={"reason": "department_inactive"},
+        )
+    return row
 
 
 def _to_out(r) -> ScheduleRowOut:
@@ -61,6 +98,39 @@ async def create_template(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin")),
 ):
+    # Merged-#3340 follow-up (owner P2): unknown AND DEACTIVATED keys are
+    # refused BEFORE any INSERT — an active template advertising an
+    # inactive department publishes a booking route the booking contract
+    # itself rejects (see _resolve_active_department).
+    department_row = _resolve_active_department(db, payload.department)
+
+    # Merged-#3340 follow-up (owner P2): a doctor+department template must
+    # be INTERNALLY CONSISTENT. The two entities were previously resolved
+    # independently, so a Cardiologist could be scheduled under dentistry:
+    # the template advertised the doctor as available in a department the
+    # patient-booking routing refuses with `doctor_department_mismatch` —
+    # an internally contradictory schedule. The check runs BEFORE the
+    # INSERT (до commit) with the booking contract's established vocabulary.
+    doctor_id = payload.doctor_id or None
+    if doctor_id is not None and department_row is not None:
+        doctor_row = db.query(Doctor).filter(Doctor.id == doctor_id).first()
+        if doctor_row is None:
+            # A dangling doctor_id would otherwise die as an FK IntegrityError (500).
+            raise HTTPException(
+                status_code=400,
+                detail={"reason": "doctor_unknown"},
+            )
+        if doctor_row.department_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail={"reason": "doctor_department_missing"},
+            )
+        if int(doctor_row.department_id) != int(department_row.id):
+            raise HTTPException(
+                status_code=400,
+                detail={"reason": "doctor_department_mismatch"},
+            )
+
     row = crud.create_schedule(
         db,
         department=payload.department,
@@ -197,10 +267,12 @@ async def get_available_slots(
         db, target_date=target_date, department=department, doctor_id=doctor_id
     )
     # P1 FIX: cap results to prevent unbounded response
-    return available_slots[offset:offset + limit]
+    return available_slots[offset : offset + limit]
 
 
-@router.get("/doctors", summary="Список врачей по отделениям", response_model=dict[str, Any])
+@router.get(
+    "/doctors", summary="Список врачей по отделениям", response_model=dict[str, Any]
+)
 async def get_doctors_by_department(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
