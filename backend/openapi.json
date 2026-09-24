@@ -67804,6 +67804,24 @@
             "title": "Warnings",
             "description": "Предупреждения"
           },
+          "requires_doctor_confirmation": {
+            "type": "boolean",
+            "const": true,
+            "title": "Requires Doctor Confirmation",
+            "description": "Врач должен подтвердить предложение AI перед внесением в ЭМК"
+          },
+          "decision_boundary": {
+            "type": "string",
+            "const": "suggestion_only",
+            "title": "Decision Boundary",
+            "description": "Ответ AI является только предложением"
+          },
+          "ai_notice": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ai Notice",
+            "description": "Предупреждение о роли AI"
+          },
           "disclaimer": {
             "type": "string",
             "title": "Disclaimer",
@@ -67848,7 +67866,10 @@
           "status",
           "provider",
           "model",
-          "latency_ms"
+          "latency_ms",
+          "requires_doctor_confirmation",
+          "decision_boundary",
+          "ai_notice"
         ],
         "title": "AIResponse",
         "description": "Единый контракт ответа для ВСЕХ AI endpoints.\n\nFrontend всегда получает этот формат, независимо от провайдера или task type."
