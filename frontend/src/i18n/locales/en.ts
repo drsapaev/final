@@ -2502,6 +2502,7 @@ const en = {
         unknown: 'Permanent QR status is unknown (status read failed)',
         failed: 'Failed to create the permanent QR',
         sr_qr: 'QR code of the permanent direction address',
+        dedupe_note: 'This direction’s permanent QR is shown in the «{tag}» row — the address belongs to the whole profile, not to an individual tag.',
         },
     qrm_title: 'QueueResource registry',
     qrm_subtitle: 'Resource owners of tags. Creation is draft; activation goes through the §3.1 invariant gate. code/queue_tag are immutable after creation (§3.2).',
@@ -7142,6 +7143,31 @@ const en = {
     qj_retry_btn: 'Попробовать снова',
     qj_home_btn: 'Главная страница',
     qj_direction_unavailable: 'This direction is unavailable',
+    // RQ-18 follow-up round-2 (P1): draft-owner confirmation — the prompt
+    // reveals no PHI (no name/phone) on the shared permanent route.
+    qj_reconcile_title: 'The result of the previous submission is unknown.',
+    qj_reconcile_hint: 'Re-enter the same name and phone you used in the first attempt and press «Check attempt». While the result is unknown, no new session is created.',
+    qj_reconcile_check: 'Check the attempt',
+    qj_reconcile_start_over: 'Start over',
+    // Round-5 (PR #3362 review, P1-3): the decisive payload-bound
+    // replay conflict — 409 join_session_payload_mismatch.
+    qj_payload_mismatch: 'This attempt belongs to a different set of details — its result cannot be re-served. You may start over if needed.',
+    qj_preexec_refusal: 'The session expired before the submission — no ticket was created. Start over?',
+    qj_preexec_not_executed: 'The submission did not go through — the queue refused it before creating a ticket. Start over?',
+    qj_attempt_guard_unavailable: 'The browser could not save the attempt state — the submission was blocked to prevent a duplicate ticket. Allow site data and try again.',
+    // Round-10 (PR #3362 review, P1): fail-closed ambiguity — several
+    // outstanding attempts on this device, no live owner marker. Nothing
+    // is auto-adopted or deleted; the patient checks each attempt with
+    // their own identity; the fresh start unlocks only when all are
+    // proven foreign.
+    qj_attempt_ambiguity_title: 'This device has several unfinished queue attempts.',
+    qj_attempt_ambiguity_hint: 'To rule out a duplicate, check each attempt by entering the same name and phone you used for it. Checking executes nothing; an attempt is removed only once the server proves it created no registration.',
+    qj_attempt_ambiguity_item: 'Attempt from {time}',
+    qj_attempt_ambiguity_not_mine: 'Checked: details did not match',
+    qj_attempt_ambiguity_resolved_hint: 'None of the unfinished attempts matched your details. You can start a new registration.',
+    qj_attempt_probe_unbound: 'Never finished: no registration',
+    qj_attempt_probe_unbound_discard: 'Remove attempt',
+    qj_attempt_probe_unknown: 'This attempt’s status is currently unknown — the request may still be processing. Try checking it again later.',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',
     qj_waiting_until_open: 'до открытия записи',

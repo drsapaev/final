@@ -2626,6 +2626,7 @@ const ru = {
         unknown: 'Статус постоянного QR неизвестен (ошибка чтения статуса)',
         failed: 'Не удалось создать постоянный QR',
         sr_qr: 'QR-код постоянного адреса направления',
+        dedupe_note: 'Постоянный QR этого направления показан в строке «{tag}» — адрес принадлежит профилю целиком, а не отдельному тегу.',
         },
     qrm_title: 'Реестр QueueResource',
     qrm_subtitle: 'Ресурсные владельцы тегов. Создание — draft; активация через gate инварианта §3.1. code/queue_tag после создания не меняются (§3.2).',
@@ -7271,6 +7272,31 @@ const ru = {
     qj_retry_btn: 'Попробовать снова',
     qj_home_btn: 'Главная страница',
     qj_direction_unavailable: 'Направление недоступно',
+    // RQ-18 follow-up round-2 (P1): draft-owner confirmation — the prompt
+    // reveals no PHI (no name/phone) on the shared permanent route.
+    qj_reconcile_title: 'Результат предыдущей отправки неизвестен.',
+    qj_reconcile_hint: 'Введите те же ФИО и телефон, что при первой отправке, и нажмите «Проверить попытку». Пока результат неизвестен, новая сессия не создаётся.',
+    qj_reconcile_check: 'Проверить попытку',
+    qj_reconcile_start_over: 'Начать заново',
+    // Round-5 (PR #3362 review, P1-3): the decisive payload-bound
+    // replay conflict — 409 join_session_payload_mismatch.
+    qj_payload_mismatch: 'Эта попытка принадлежит другому набору данных — её результат не может быть выдан повторно. При необходимости начните заново.',
+    qj_preexec_refusal: 'Сессия истекла до отправки — запись не создана. Начать заново?',
+    qj_preexec_not_executed: 'Отправка не выполнена — очередь отказала до создания записи. Начать заново?',
+    qj_attempt_guard_unavailable: 'Браузер не смог сохранить состояние попытки — отправка заблокирована, чтобы исключить дублирование записи. Разрешите данные сайта и повторите попытку.',
+    // Round-10 (PR #3362 review, P1): fail-closed ambiguity — several
+    // outstanding attempts on this device, no live owner marker. Nothing
+    // is auto-adopted or deleted; the patient checks each attempt with
+    // their own identity; the fresh start unlocks only when all are
+    // proven foreign.
+    qj_attempt_ambiguity_title: 'На этом устройстве есть несколько незавершённых попыток записи.',
+    qj_attempt_ambiguity_hint: 'Чтобы исключить дублирование, проверьте каждую попытку, введя те же ФИО и телефон, что при её отправке. Проверка ничего не выполняет и не создаёт; попытка удаляется, только если сервер докажет, что запись по ней не создавалась.',
+    qj_attempt_ambiguity_item: 'Попытка от {time}',
+    qj_attempt_ambiguity_not_mine: 'Проверена: данные не совпали',
+    qj_attempt_ambiguity_resolved_hint: 'Ни одна из незавершённых попыток не совпала с вашими данными. Можно начать новую запись.',
+    qj_attempt_probe_unbound: 'Не была завершена: записи нет',
+    qj_attempt_probe_unbound_discard: 'Удалить попытку',
+    qj_attempt_probe_unknown: 'Статус этой попытки сейчас неизвестен — возможно, запрос ещё обрабатывается. Попробуйте проверить её позже.',
     qj_waiting_title: 'Очередь скоро откроется',
     qj_waiting_will_open_at: 'Запись в очередь откроется в {time}',
     qj_waiting_until_open: 'до открытия записи',

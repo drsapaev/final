@@ -8546,6 +8546,68 @@
               }
             }
           },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinSessionRefusalErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinSessionRefusalErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queue/join/probe": {
+      "post": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Probe Join Session",
+        "description": "Round-11 (PR #3362 review, P1-2): read-only oracle состояния попытки\nприсоединения (публичный эндпоинт).\n\nOwnerless-ambiguity recovery НЕ ДОЛЖЕН вызывать ``/join/complete`` как\n«проверку»: для ещё не claims-нутой (``pending``) сессии complete — это\nсамо исполнение бизнес-операции с введённым payload'ом (второй заход\nдля пациента, чья настоящая попытка уже может быть закоммичена).\nЭтот оракул возвращает класс состояния attempt'а относительно введённых\nданных, не мутируя ни одной строки; для совпавшей закоммиченной попытки\nповторно отдаёт СОХРАНЁННЫЙ ответ первой попытки (без записи).",
+        "operationId": "probe_join_session_api_v1_queue_join_probe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinSessionProbeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinSessionProbeResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -85653,6 +85715,11 @@
           "message": {
             "type": "string",
             "title": "Message"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "Replayed",
+            "default": false
           }
         },
         "type": "object",
@@ -85763,6 +85830,11 @@
           "department": {
             "type": "string",
             "title": "Department"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "Replayed",
+            "default": false
           }
         },
         "type": "object",
@@ -85776,6 +85848,183 @@
         ],
         "title": "JoinSessionCompleteResponse",
         "description": "Ответ с результатом присоединения"
+      },
+      "JoinSessionProbeRequest": {
+        "properties": {
+          "session_token": {
+            "type": "string",
+            "title": "Session Token",
+            "description": "Токен сессии"
+          },
+          "patient_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Patient Name",
+            "description": "ФИО пациента"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 5,
+            "title": "Phone",
+            "description": "Номер телефона"
+          },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id",
+            "description": "Telegram ID"
+          },
+          "specialist_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Ids",
+            "description": "Список ID специалистов (для общего QR)"
+          },
+          "specialist_entity_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Entity Types",
+            "description": "Типы сущностей specialist_ids, выровненные по индексам ('doctor' | 'profile')"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_token",
+          "patient_name",
+          "phone"
+        ],
+        "title": "JoinSessionProbeRequest",
+        "description": "Round-11 (PR #3362 review, P1-2): запрос read-only oracle'а.\n\nПоля идентичны ``JoinSessionCompleteRequest`` — оракул сравнивает\nканонизированный отпечаток ТЕМ ЖЕ алгоритмом, которым complete\nсвязывает попытку с payload'ом. Никаких бизнес-эффектов запрос не\nимеет: ни claim, ни создание пациента, ни выдача талона."
+      },
+      "JoinSessionProbeResponse": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "description": "joined_match | joined_mismatch | joined_owner_unknown | pending_unbound | processing | expired | not_found"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result",
+            "description": "Сохранённый ответ первой попытки (только для joined_match); иначе null"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "title": "JoinSessionProbeResponse",
+        "description": "Round-11 (PR #3362 review, P1-2): классификация попытки БЕЗ мутаций.\n\n``outcome``:\n  joined_match         — typed payload владеет уже совершённой попыткой;\n                         ``result`` несёт СОХРАНЁННЫЙ ответ первой попытки\n                         (read-only re-serve, эквивалент replay-ветки);\n  joined_mismatch      — попытка совершена с другим payload'ом (чужая);\n  joined_owner_unknown — устаревшая строка без отпечатка — владение\n                         недоказуемо, ведёт себя как UNKNOWN;\n  pending_unbound      — сессия жива, но под ней НЕ выполнено ни одного\n                         бизнес-действия — конверт можно безопасно удалить;\n  processing           — claim в полёте — UNKNOWN, повторить позже;\n  expired / not_found  — попытка мертва, ничего не создано."
+      },
+      "JoinSessionRefusalDetail": {
+        "properties": {
+          "specialist_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Id",
+            "description": "ID выбора (Doctor.id или QueueProfile.id); None для одиночного пути"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Человекочитаемое сообщение домена"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "JoinSessionRefusalDetail",
+        "description": "Один per-specialist отказ аллокатора (round-6, P2-1)."
+      },
+      "JoinSessionRefusalErrorResponse": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/JoinSessionRefusalResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "JoinSessionRefusalErrorResponse",
+        "description": "Полное HTTP-тело отказа complete-попытки (round-9, review P2-1).\n\nRuntime raises ``HTTPException(detail={reason, message[, details]})``,\nso FastAPI serves the refusal wrapped in the standard ``detail``\nenvelope: ``{\"detail\": {\"reason\": ..., \"message\": ...}}``. The\nfrontend reads ``response.data.detail.reason`` — the declared OpenAPI\ncontract must describe EXACTLY that wire format, so 400/409 reference\nTHIS wrapper (not the bare inner payload)."
+      },
+      "JoinSessionRefusalResponse": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Машиночитаемая причина отказа"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Человекочитаемое сообщение"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/JoinSessionRefusalDetail"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details",
+            "description": "Per-specialist ошибки (только для join_session_not_executed)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "message"
+        ],
+        "title": "JoinSessionRefusalResponse",
+        "description": "Структурированный отказ complete-попытки (round-6, P2-1/P2-2).\n\n400 — session-state / pre-execution refusals (incl. the\nrollback-proven ``join_session_not_executed``); 409 — immutable\npayload mismatch. ``reason`` vocabulary:\njoin_session_not_found | join_session_expired | join_session_processing |\njoin_session_used | join_session_payload_mismatch | join_session_not_executed."
       },
       "JoinSessionStartRequest": {
         "properties": {
@@ -85806,6 +86055,30 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Queue Info"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Date",
+            "description": "Целевая дата очереди токена (YYYY-MM-DD)"
+          },
+          "attempt_expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Expires At",
+            "description": "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace"
           }
         },
         "type": "object",
@@ -99238,6 +99511,30 @@
             "type": "boolean",
             "title": "Permanent Address",
             "description": "Always True on this surface (the address is permanent)"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Date",
+            "description": "Целевая дата очереди токена (YYYY-MM-DD)"
+          },
+          "attempt_expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Expires At",
+            "description": "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки"
           },
           "direction": {
             "$ref": "#/components/schemas/PublicDirectionAddressInfo"
