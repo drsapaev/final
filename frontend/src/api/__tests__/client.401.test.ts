@@ -44,7 +44,7 @@ vi.mock('../../utils/logger', () => ({
 }));
 
 import axios from 'axios';
-import { api } from '../client';
+import { api, setSessionInvalidationListener } from '../client';
 
 // Some sibling suites stub the global URL with a non-constructor; capture the
 // real one at import time and restore it per test so the axios pipeline can
@@ -287,5 +287,68 @@ describe('access-only session 401 lifecycle (Phase 0 follow-up)', () => {
     // replacement session survives untouched.
     expect(tokenState.cleared).toBe(0);
     expect(tokenState.access).toBe('fresh-login-jwt');
+  });
+});
+
+describe('staff dead-session termination (N2-5 review round 3 P1)', () => {
+  // The staff refresh-failure branch must terminate the session through
+  // the SAME machinery as the access-only path: the session-invalidation
+  // listener (the auth store hook — auth_profile + subscribers +
+  // RouteAccessBoundary redirect) PLUS the idempotent client-level
+  // credential drop. The old manual clearAll() left auth_profile and the
+  // React auth subscribers untouched (a zombie logged-in staff session
+  // with no guaranteed redirect).
+  afterEach(() => {
+    setSessionInvalidationListener(null);
+  });
+
+  it('a failed refresh on a staff session runs the invalidation listener AND drops the credentials', async () => {
+    const listener = vi.fn();
+    setSessionInvalidationListener(listener);
+
+    api.defaults.adapter = async (config) => {
+      const url = String(config.url || '');
+      if (url.includes('/visits/')) throw make401(url);
+      throw new Error(`unexpected adapter call: ${url}`);
+    };
+    vi.spyOn(axios, 'post').mockRejectedValue(
+      make401('/api/v1/authentication/refresh', 'post')
+    );
+
+    await expect(api.get('/api/v1/visits/42')).rejects.toMatchObject({
+      response: { status: 401 }
+    });
+    // The store-level termination ran (auth_profile/subscribers react)...
+    expect(listener).toHaveBeenCalledTimes(1);
+    // ...and the client-level credentials dropped with it.
+    expect(tokenState.cleared).toBe(1);
+    expect(tokenState.access).toBeNull();
+    expect(api.defaults.headers.common['Authorization']).toBeUndefined();
+  });
+
+  it('the login-transition race guard keeps protecting a replaced session from the listener path', async () => {
+    const listener = vi.fn();
+    setSessionInvalidationListener(listener);
+
+    api.defaults.adapter = async (config) => {
+      const url = String(config.url || '');
+      if (url.includes('/visits/')) throw make401(url);
+      throw new Error(`unexpected adapter call: ${url}`);
+    };
+    vi.spyOn(axios, 'post').mockRejectedValue(
+      make401('/api/v1/authentication/refresh', 'post')
+    );
+
+    // Mid-flight a fresh login replaces the staff token.
+    const promise = api.get('/api/v1/visits/42');
+    tokenState.access = 'fresh-login-token';
+
+    await expect(promise).rejects.toMatchObject({
+      response: { status: 401 }
+    });
+    // liveToken !== failedToken → neither the listener nor clearAll ran.
+    expect(listener).not.toHaveBeenCalled();
+    expect(tokenState.cleared).toBe(0);
+    expect(tokenState.access).toBe('fresh-login-token');
   });
 });
