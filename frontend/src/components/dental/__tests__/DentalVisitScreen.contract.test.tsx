@@ -118,12 +118,13 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
     expect(source).toContain('useState(false)');
   });
 
-  it('passes onCompleteVisit through to PatientHeader (wired to C-1/C-3 confirm)', () => {
+  it('completes only through the save-before-queue handler', () => {
     const source = readSource('DentalVisitScreen.tsx');
 
-    // Strict:true migration added `|| (() => {})` fallback so the prop is
-    // always a function (PatientHeader propTypes mark it as isRequired).
-    expect(source).toContain('onCompleteVisit={onCompleteVisit || (() => {})}');
+    expect(source).toContain('onCompleteVisit={handleCompleteVisit}');
+    expect(source.indexOf('await persistDraft(targetVisitId, snapshot)')).toBeLessThan(
+      source.indexOf('await onCompleteVisit?.(snapshot)'),
+    );
     expect(source).toContain('Завершить визит');
   });
 
