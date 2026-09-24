@@ -10115,6 +10115,7 @@ const kk = {
     cv_confirmed: 'Келу расталды!',
     cv_queue_numbers: 'Кезектегі нөміріңіз',
     cv_error: 'Растау қатесі. Қайталап көріңіз.',
+    cv_btn_retry: 'Қайталау',
     // ─── ForgotPassword.jsx — password strength labels ────────────────────
     fp_strength_very_weak: 'Очень слабый',
     fp_strength_weak: 'Слабый',

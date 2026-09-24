@@ -30,7 +30,8 @@ export interface VisitQueueNumberDto {
     queue_id: number;
 }
 
-/** POST /visits/info response; mirrors the published VisitInfoResponse schema. */
+/** POST /visits/info response; mirrors the published VisitInfoResponse
+ * schema (patient-safe: no internal Visit.notes — PR 3390 review P2). */
 export interface VisitInfoByTokenDto {
     success: boolean;
     visit_id: number;
@@ -51,14 +52,25 @@ export interface VisitInfoByTokenDto {
     total_amount: number;
     currency: string;
     confirmation_expires_at: string | null;
-    notes: string | null;
 }
+
+/**
+ * Split-origin CSRF contract (PR 3390 review P1): the documented
+ * VITE_API_BASE_URL deployment (frontend origin ≠ API origin) still runs
+ * the backend CSRFMiddleware, which validates the double-submit pair
+ * (csrf_token cookie + X-CSRF-Token header). The CSRF bootstrap GET already
+ * uses withCredentials; without it on these POSTs the browser would omit the
+ * cookie on the cross-origin request and the backend would answer
+ * 403 missing_cookie. Same-origin deployments are unaffected (cookies are
+ * always sent there).
+ */
+const WITH_CREDENTIALS = { withCredentials: true } as const;
 
 /** Public visit card for the invitation token — no confirmation side effects. */
 export async function getVisitInfoByToken(
     token: string,
 ): Promise<VisitInfoByTokenDto> {
-    const res = await api.post('/visits/info', { token });
+    const res = await api.post('/visits/info', { token }, WITH_CREDENTIALS);
     return (res as { data: VisitInfoByTokenDto }).data;
 }
 
@@ -70,6 +82,10 @@ export async function getVisitInfoByToken(
 export async function confirmVisitByPwa(
     token: string,
 ): Promise<VisitConfirmationResponse> {
-    const res = await api.post('/patient/visits/confirm', { token });
+    const res = await api.post(
+        '/patient/visits/confirm',
+        { token },
+        WITH_CREDENTIALS,
+    );
     return (res as { data: VisitConfirmationResponse }).data;
 }

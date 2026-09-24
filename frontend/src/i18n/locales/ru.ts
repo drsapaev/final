@@ -10248,6 +10248,7 @@ const ru = {
     cv_confirmed: 'Визит подтверждён!',
     cv_queue_numbers: 'Ваш номер в очереди',
     cv_error: 'Ошибка подтверждения. Попробуйте ещё раз.',
+    cv_btn_retry: 'Повторить',
     // ─── ForgotPassword.jsx — password strength labels ────────────────────
     fp_strength_very_weak: 'Очень слабый',
     fp_strength_weak: 'Слабый',

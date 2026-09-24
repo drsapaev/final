@@ -61,7 +61,6 @@ const VISIT_INFO = {
   total_amount: 150000,
   currency: 'UZS',
   confirmation_expires_at: null,
-  notes: null,
 };
 
 const CONFIRM_OK = {
@@ -107,7 +106,7 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
     apiMock.mockResolvedValueOnce(ok(VISIT_INFO));
 
     renderAt(`?token=${TOKEN}`);
-    expect(screen.getByText('cv_loading')).toBeTruthy();
+    expect(screen.getByText('final.cv_loading')).toBeTruthy();
 
     expect(await screen.findByText('SYNTHETIC Test Doctor')).toBeTruthy();
     expect(screen.getByText('Синтетик SYNTHETIC-Testpatient')).toBeTruthy();
@@ -127,7 +126,7 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
       .mockResolvedValueOnce(ok(CONFIRM_OK));
 
     renderAt(`?token=${TOKEN}`);
-    fireEvent.click(await screen.findByText('cv_confirm'));
+    fireEvent.click(await screen.findByText('final.cv_confirm'));
 
     expect(await screen.findByText('Визит подтвержден')).toBeTruthy();
     const confirmCall = apiMock.mock.calls.find(([url]) =>
@@ -140,6 +139,29 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
     expect(screen.getByText('cardiology_common')).toBeTruthy();
   });
 
+  it('sends both public POSTs with credentials so the CSRF cookie travels cross-origin', async () => {
+    // PR 3390 review P1: in the documented split-origin deployment
+    // (VITE_API_BASE_URL, e.g. clinic.example.com + api.clinic.example.com)
+    // the backend CSRFMiddleware requires BOTH the X-CSRF-Token header and
+    // the csrf_token cookie. Without withCredentials the browser omits the
+    // cookie on the cross-origin POST -> 403 missing_cookie. The bootstrap
+    // GET already sends credentials; both page POSTs must do the same.
+    apiMock
+      .mockResolvedValueOnce(ok(VISIT_INFO))
+      .mockResolvedValueOnce(ok(CONFIRM_OK));
+
+    renderAt(`#token=${TOKEN}`);
+    fireEvent.click(await screen.findByText('final.cv_confirm'));
+
+    expect(await screen.findByText('Визит подтвержден')).toBeTruthy();
+    const infoCall = apiMock.mock.calls.find(([url]) => url === '/visits/info');
+    const confirmCall = apiMock.mock.calls.find(
+      ([url]) => url === '/patient/visits/confirm',
+    );
+    expect(infoCall?.[2]).toEqual({ withCredentials: true });
+    expect(confirmCall?.[2]).toEqual({ withCredentials: true });
+  });
+
   it.each([
     [404, 'Визит не найден или уже подтвержден'],
     [400, 'Срок подтверждения истек'],
@@ -148,7 +170,7 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
 
     renderAt('?token=unknown-token-999');
     expect(await screen.findByText(detail)).toBeTruthy();
-    expect(screen.queryByText('btn_retry')).toBeNull();
+    expect(screen.queryByText('final.cv_btn_retry')).toBeNull();
     expect(apiMock).toHaveBeenCalledTimes(1);
   });
 
@@ -160,7 +182,7 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
     apiMock.mockRejectedValueOnce(error).mockResolvedValueOnce(ok(VISIT_INFO));
 
     renderAt(`#token=${TOKEN}`);
-    fireEvent.click(await screen.findByText('btn_retry'));
+    fireEvent.click(await screen.findByText('final.cv_btn_retry'));
 
     expect(await screen.findByText('SYNTHETIC Test Doctor')).toBeTruthy();
     expect(apiMock.mock.calls.filter(([url]) => url === '/visits/info')).toHaveLength(2);
@@ -193,7 +215,7 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
     window.history.replaceState(null, '', `/confirm-visit?token=${TOKEN}#token=`);
     render(<BrowserRouter><ConfirmVisitPage /></BrowserRouter>);
 
-    expect(screen.getByText('cv_invalid_link')).toBeTruthy();
+    expect(screen.getByText('final.cv_invalid_link')).toBeTruthy();
     expect(window.location.pathname + window.location.search + window.location.hash)
       .toBe('/confirm-visit');
     expect(apiMock).not.toHaveBeenCalled();
@@ -270,7 +292,7 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
 
   it('missing token — invalid state, no API call', () => {
     renderAt('');
-    expect(screen.getByText('cv_invalid_link')).toBeTruthy();
+    expect(screen.getByText('final.cv_invalid_link')).toBeTruthy();
     expect(apiMock).not.toHaveBeenCalled();
   });
 
@@ -282,7 +304,7 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
       });
 
     renderAt(`?token=${TOKEN}`);
-    fireEvent.click(await screen.findByText('cv_confirm'));
+    fireEvent.click(await screen.findByText('final.cv_confirm'));
 
     expect(await screen.findByText('Слишком много попыток')).toBeTruthy();
     // The card is still on screen — the patient can retry.
@@ -297,7 +319,7 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
       });
 
     renderAt(`?token=${TOKEN}`);
-    fireEvent.click(await screen.findByText('cv_confirm'));
+    fireEvent.click(await screen.findByText('final.cv_confirm'));
 
     expect(await screen.findByText('Срок подтверждения истек')).toBeTruthy();
   });

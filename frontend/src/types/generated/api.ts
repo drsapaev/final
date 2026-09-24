@@ -39728,7 +39728,17 @@ export type components = {
             /** Token */
             token: string;
         };
-        /** VisitInfoResponse */
+        /**
+         * VisitInfoResponse
+         * @description Patient-safe public visit card (POST /visits/info).
+         *
+         *     PR 3390 review P2: deliberately does NOT include ``notes``. The
+         *     service card still carries it for the legacy GET /visits/info/{token}
+         *     (historical shape for already-delivered links); FastAPI filters the
+         *     response through this model, so the new POST never publishes the
+         *     internal clinical/admin field (``diagnosis: …``, cancel reasons,
+         *     force-reopen audit lines) to bearer-token link holders.
+         */
         VisitInfoResponse: {
             /** Success */
             success: boolean;
@@ -39756,8 +39766,6 @@ export type components = {
             currency: string;
             /** Confirmation Expires At */
             confirmation_expires_at: string | null;
-            /** Notes */
-            notes: string | null;
         };
         /** VisitInfoServiceItem */
         VisitInfoServiceItem: {
