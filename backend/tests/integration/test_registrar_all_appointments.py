@@ -17,6 +17,7 @@ from app.models.lab import LabReportInstance
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment
+from app.models.user import User
 from app.models.visit import Visit, VisitService
 
 
@@ -44,6 +45,8 @@ class TestRegistrarAllAppointments:
         test_doctor,
         test_service,
     ):
+        test_patient.sex = "M"
+        db_session.commit()
         today = _clinic_today(db_session)
         visits = [
             Visit(
@@ -105,7 +108,14 @@ class TestRegistrarAllAppointments:
         returned_visit_ids = {
             entry["id"] for entry in rows if entry.get("record_kind") == "visit"
         }
-        assert {visit.id for visit in visits}.issubset(returned_visit_ids)
+        expected_visit_ids = {visit.id for visit in visits}
+        assert expected_visit_ids.issubset(returned_visit_ids)
+        assert all(
+            entry["patient_gender"] == "M"
+            for entry in rows
+            if entry.get("id") in expected_visit_ids
+            and entry.get("record_kind") == "visit"
+        )
         assert query_counts["patients"] <= 3, query_counts
         assert query_counts["visit_services"] <= 2, query_counts
         assert query_counts["services"] <= 2, query_counts
@@ -221,6 +231,8 @@ class TestRegistrarAllAppointments:
         client,
         db_session,
         auth_headers,
+        registrar_user,
+        cardio_user,
         test_patient,
         test_doctor,
     ):
@@ -305,6 +317,44 @@ class TestRegistrarAllAppointments:
         assert found_entry["phone"] == test_patient.phone
         assert found_entry["patient_birth_year"] == 1985
         assert found_entry["address"] == "Clinic Street 1"
+        assert "patient_gender" in found_entry
+        assert found_entry["patient_gender"] is None
+
+        from tests.conftest import mint_access_token
+
+        non_registrar_users = [
+            User(
+                username=f"synthetic_gender_{role.lower()}",
+                hashed_password=cardio_user.hashed_password,
+                role=role,
+                is_active=True,
+                is_superuser=False,
+            )
+            for role in ("Cashier", "Lab")
+        ]
+        db_session.add_all(non_registrar_users)
+        db_session.commit()
+
+        for user, should_have_gender in (
+            (registrar_user, True),
+            (cardio_user, False),
+            *((user, False) for user in non_registrar_users),
+        ):
+            role_response = client.get(
+                f"/api/v1/registrar/queues/today?target_date={_clinic_today(db_session).isoformat()}",
+                headers={"Authorization": f"Bearer {mint_access_token(user)}"},
+            )
+            assert role_response.status_code == 200, role_response.text
+            role_entries = [
+                item
+                for queue_payload in role_response.json()["queues"]
+                for item in queue_payload["entries"]
+                if item.get("id") == entry.id
+            ]
+            assert len(role_entries) == 1
+            assert ("patient_gender" in role_entries[0]) is should_have_gender
+            if should_have_gender:
+                assert role_entries[0]["patient_gender"] is None
 
     def test_today_queues_appointment_does_not_inherit_unrelated_patient_queue_time(
         self,

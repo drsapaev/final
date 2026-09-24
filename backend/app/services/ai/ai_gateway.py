@@ -29,6 +29,10 @@ from .pii_anonymizer import get_anonymizer
 from .rate_limiter import get_rate_limiter
 
 logger = logging.getLogger(__name__)
+AI_NOTICE = (
+    "AI output is a draft suggestion. A doctor must confirm it before it "
+    "becomes part of the medical record."
+)
 
 
 class CircuitBreaker:
@@ -208,7 +212,10 @@ class AIGateway(IAIGateway):
                     model="none",
                     latency_ms=0,
                     error=f"Rate limit exceeded. Retry after {retry_after} seconds.",
-                    request_id=request_id
+                    request_id=request_id,
+                    requires_doctor_confirmation=True,
+                    decision_boundary="suggestion_only",
+                    ai_notice=AI_NOTICE,
                 )
 
             # 2. Cache lookup
@@ -271,7 +278,10 @@ class AIGateway(IAIGateway):
                 model="none",
                 latency_ms=latency_ms,
                 error="AI service temporarily unavailable",  # sanitized
-                request_id=request_id
+                request_id=request_id,
+                requires_doctor_confirmation=True,
+                decision_boundary="suggestion_only",
+                ai_notice=AI_NOTICE,
             )
 
     async def execute_stream(
@@ -363,7 +373,10 @@ class AIGateway(IAIGateway):
                     provider=provider_type.value,
                     model=getattr(provider, "model", None) or "unknown",
                     latency_ms=0,  # Will be set by caller
-                    tokens_used=result.get("tokens_used") if isinstance(result, dict) else None
+                    tokens_used=result.get("tokens_used") if isinstance(result, dict) else None,
+                    requires_doctor_confirmation=True,
+                    decision_boundary="suggestion_only",
+                    ai_notice=AI_NOTICE,
                 )
 
             except Exception as e:
@@ -380,7 +393,10 @@ class AIGateway(IAIGateway):
             provider="none",
             model="none",
             latency_ms=0,
-            error="All AI providers failed"  # sanitized
+            error="All AI providers failed",  # sanitized
+            requires_doctor_confirmation=True,
+            decision_boundary="suggestion_only",
+            ai_notice=AI_NOTICE,
         )
 
     def _get_provider_instance(self, provider_type: AIProviderType):

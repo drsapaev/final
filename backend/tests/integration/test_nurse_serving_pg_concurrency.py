@@ -37,6 +37,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
+from app.crud.clinic import clinic_today
 from app.db.base_class import Base
 from app.crud.clinic import clinic_today
 from app.models.nurse_workplace import NurseWorkplaceAssignment

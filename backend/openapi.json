@@ -4488,6 +4488,48 @@
         }
       }
     },
+    "/api/v1/visits/info": {
+      "post": {
+        "tags": [
+          "visit-confirmation"
+        ],
+        "summary": "Post Visit Info By Token",
+        "description": "Read a public visit card without putting its bearer token in the URL.",
+        "operationId": "post_visit_info_by_token_api_v1_visits_info_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitInfoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitInfoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/visits/{visit_id}": {
       "get": {
         "tags": [
@@ -67866,6 +67908,24 @@
             "title": "Warnings",
             "description": "Предупреждения"
           },
+          "requires_doctor_confirmation": {
+            "type": "boolean",
+            "const": true,
+            "title": "Requires Doctor Confirmation",
+            "description": "Врач должен подтвердить предложение AI перед внесением в ЭМК"
+          },
+          "decision_boundary": {
+            "type": "string",
+            "const": "suggestion_only",
+            "title": "Decision Boundary",
+            "description": "Ответ AI является только предложением"
+          },
+          "ai_notice": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ai Notice",
+            "description": "Предупреждение о роли AI"
+          },
           "disclaimer": {
             "type": "string",
             "title": "Disclaimer",
@@ -67910,7 +67970,10 @@
           "status",
           "provider",
           "model",
-          "latency_ms"
+          "latency_ms",
+          "requires_doctor_confirmation",
+          "decision_boundary",
+          "ai_notice"
         ],
         "title": "AIResponse",
         "description": "Единый контракт ответа для ВСЕХ AI endpoints.\n\nFrontend всегда получает этот формат, независимо от провайдера или task type."
@@ -112465,6 +112528,175 @@
         },
         "type": "object",
         "title": "VisitCreate"
+      },
+      "VisitInfoRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "VisitInfoRequest"
+      },
+      "VisitInfoResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "doctor_name": {
+            "type": "string",
+            "title": "Doctor Name"
+          },
+          "visit_date": {
+            "type": "string",
+            "title": "Visit Date"
+          },
+          "visit_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Time"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "discount_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discount Mode"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/VisitInfoServiceItem"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "total_amount": {
+            "type": "number",
+            "title": "Total Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "confirmation_expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Expires At"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "visit_id",
+          "status",
+          "patient_name",
+          "doctor_name",
+          "visit_date",
+          "visit_time",
+          "department",
+          "discount_mode",
+          "services",
+          "total_amount",
+          "currency",
+          "confirmation_expires_at",
+          "notes"
+        ],
+        "title": "VisitInfoResponse"
+      },
+      "VisitInfoServiceItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "code",
+          "quantity",
+          "price",
+          "total"
+        ],
+        "title": "VisitInfoServiceItem"
       },
       "VisitOut": {
         "properties": {

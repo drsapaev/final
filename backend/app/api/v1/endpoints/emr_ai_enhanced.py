@@ -43,25 +43,7 @@ async def generate_smart_template(
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
     """Генерация умного шаблона EMR на основе данных пациента"""
-    try:
-        # patient_data is now a Pydantic model (defaults to empty dict)
-        template = await emr_ai_enhanced.generate_smart_template(
-            specialty=specialty,
-            patient_data=patient_data.model_dump(exclude_none=True),
-            doctor_preferences=doctor_preferences.model_dump(exclude_none=True) if doctor_preferences else None,
-        )
-
-        return {
-            "template": template,
-            "specialty": specialty,
-            "generated_at": "2024-01-01T00:00:00Z",
-            **ai_safety_meta(),
-        }
-
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+    raise HTTPException(status_code=503, detail={"error": "ai_feature_unavailable"})
 
 
 @router.post("/smart-suggestions", dependencies=[Depends(RequireAiFeature("ai_smart_suggestions"))], response_model=Any)
@@ -73,23 +55,7 @@ async def get_smart_suggestions(
     current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
 ) -> Any:
     """Получить умные подсказки для поля EMR"""
-    try:
-        # current_data is now a Pydantic model (defaults to empty dict)
-        suggestions = await emr_ai_enhanced.get_smart_suggestions(
-            current_data=current_data.model_dump(exclude_none=True), field_name=field_name, specialty=specialty
-        )
-
-        return {
-            "field_name": field_name,
-            "suggestions": suggestions,
-            "count": len(suggestions),
-            **ai_safety_meta(),
-        }
-
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+    raise HTTPException(status_code=503, detail={"error": "ai_feature_unavailable"})
 
 
 @router.post("/auto-fill", dependencies=[Depends(RequireAiFeature("ai_smart_template"))], response_model=Any)

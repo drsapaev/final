@@ -71,6 +71,9 @@ export type DoctorListResponseDto = Schemas['DoctorListResponse'];
 export type VisitDto = Schemas['VisitOut'];
 export type VisitCreateDto = Schemas['VisitCreate'];
 export type VisitWithServicesDto = Schemas['VisitWithServices'];
+// Public PWA visit-confirmation endpoints (visit_confirmation.py)
+export type VisitConfirmationResponseDto = Schemas['ConfirmationResponse'];
+export type PWAConfirmRequestDto = Schemas['PWAConfirmRequest'];
 
 export type EMRDto = Schemas['EMR'];
 export type EMRCreateDto = Schemas['EMRCreate'];

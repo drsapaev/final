@@ -1,13 +1,13 @@
 {
   "version": 1,
   "description": "UI_AUDIT_PLAN.md Phase 0 baseline. Ratchet: values may only improve (decrease). To move the baseline intentionally run: node scripts/ui-baseline.mjs --write-baseline and justify the change in the PR description.",
-  "generatedAt": "2026-09-19T02:35:21.826Z",
-  "gitCommit": "a5c87aa",
+  "generatedAt": "2026-09-24T03:15:01.984Z",
+  "gitCommit": "712ba53f0",
   "metrics": {
     "tokenSourceFiles": [
       {
         "file": "src/design-system/tokens.css",
-        "definitions": 270
+        "definitions": 275
       },
       {
         "file": "src/styles/emr-tokens.css",
@@ -48,7 +48,7 @@
       "other": 165,
       "surface": 7,
       "text-legacy": 10,
-      "mac": 132,
+      "mac": 133,
       "bg-legacy": 5,
       "accent-legacy": 13,
       "landing": 3,
@@ -218,8 +218,8 @@
       "--warning-border",
       "--warning-text"
     ],
-    "varUsagesTotal": 12593,
-    "varUsagesNoFallback": 11301,
+    "varUsagesTotal": 12701,
+    "varUsagesNoFallback": 11366,
     "cssHexOutsideTokens": 743,
     "tsxHex": 384,
     "tsxHexFiles": 64,
@@ -256,7 +256,7 @@
     "kitModalImporters": 15,
     "kitDialogImporters": 14,
     "reactToastifyImporters": 45,
-    "notifyServiceImporters": 56,
+    "notifyServiceImporters": 58,
     "customToastProviderImporters": 3,
     "macTabImporters": 7,
     "modernTabsImporters": 0,
