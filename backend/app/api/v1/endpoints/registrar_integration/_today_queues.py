@@ -426,7 +426,7 @@ def _build_queue_result(
     seen_entry_keys = set()
     user_role = str(getattr(current_user, "role", "")).strip().lower()
     can_include_patient_gender = user_role in {"admin", "registrar"}
-    cached_patients = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY, {}).get(
+    cached_patients = getattr(db, "info", {}).get(_REGISTRAR_QUEUE_CACHE_KEY, {}).get(
         "patients", {}
     )
     latest_lab_reports_by_visit, include_lab_report_summary = (
