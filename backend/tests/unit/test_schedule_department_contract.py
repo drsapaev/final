@@ -721,3 +721,223 @@ class TestCreateSchedulePersistence:
         finally:
             app.dependency_overrides.pop(canonical_get_db, None)
             engine.dispose()
+
+
+class TestScheduleReadSideConsistency:
+    """Review round 3 (owner P2, #3402): the CREATE boundary validates
+    department activity and doctor eligibility under row locks, but a row
+    lock cannot outlive its transaction — an admin deactivation committed
+    AFTER a template was created must be reflected by the ADVERTISING reads
+    (available-slots, doctors/departments listings), while the template row
+    itself stays active (deactivation stays reversible). The management
+    view (list_schedules) deliberately keeps showing the template so an
+    admin can see and re-enable it."""
+
+    @staticmethod
+    def _monday() -> date:
+        return date.today() + timedelta(days=(1 - date.today().weekday()) % 7)
+
+    @staticmethod
+    def _template(db_session, *, department=None, doctor_id=None, weekday=1):
+        from app.crud.schedule import create_schedule
+
+        return create_schedule(
+            db_session,
+            department=department,
+            doctor_id=doctor_id,
+            weekday=weekday,
+            start_time="08:00",
+            end_time="10:00",
+            room=None,
+            capacity_per_hour=None,
+            active=True,
+        )
+
+    @pytest.fixture
+    def eligible_doctor(self, db_session: Session):
+        """An eligible doctor (active profile, real specialty, active owner
+        with a doctor-family role) — the mirror of the PG harness seeding."""
+        from app.models.clinic import Doctor
+
+        owner = User(
+            username="rs_doctor_owner",
+            email="rs_doctor_owner@test.com",
+            hashed_password=get_password_hash("rs_doctor_pass"),
+            role="Doctor",
+            is_active=True,
+            is_superuser=False,
+        )
+        db_session.add(owner)
+        db_session.flush()
+        doctor = Doctor(user_id=owner.id, specialty="Кардиология", active=True)
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+        return doctor
+
+    def test_inactive_department_stops_advertising_slots(
+        self, db_session: Session, portal_department
+    ):
+        """The review's exact scenario: a template created while the
+        department was active keeps ScheduleTemplate.active=True after the
+        admin deactivates the department — available-slots must answer
+        empty, and reactivation must restore the slots (non-destructive)."""
+        from app.crud.schedule import get_available_slots
+
+        self._template(db_session, department=portal_department.key, weekday=1)
+        monday = self._monday()
+
+        before = get_available_slots(
+            db_session, target_date=monday, department="cardio"
+        )
+        assert [s["time"] for s in before] == ["08:00", "09:00"]
+
+        portal_department.active = False
+        db_session.commit()
+
+        assert (
+            get_available_slots(db_session, target_date=monday, department="cardio")
+            == []
+        )
+        # The read-side exclusion must not destroy data: the template row is
+        # still active — the create boundary's row lock never had the power
+        # to keep this invariant past commit; the reads now carry it.
+        row = (
+            db_session.query(ScheduleTemplate)
+            .filter(ScheduleTemplate.department_id == portal_department.id)
+            .first()
+        )
+        assert row is not None
+        assert row.active is True
+
+        portal_department.active = True
+        db_session.commit()
+        after = get_available_slots(
+            db_session, target_date=monday, department="cardio"
+        )
+        assert [s["time"] for s in after] == ["08:00", "09:00"]
+
+    def test_inactive_department_hidden_from_advertising_listings(
+        self, db_session: Session, portal_department
+    ):
+        """The doctors/departments listings are DERIVED from active
+        templates — which outlive a deactivation — so they must re-check
+        Department.active themselves. The management view keeps showing the
+        template."""
+        from app.crud.schedule import (
+            get_departments,
+            get_doctors_by_department,
+            list_schedules,
+        )
+
+        self._template(db_session, department=portal_department.key, weekday=1)
+
+        assert any(d["department"] == "cardio" for d in get_departments(db_session))
+        assert any(
+            d["department"] == "cardio"
+            for d in get_doctors_by_department(db_session)
+        )
+
+        portal_department.active = False
+        db_session.commit()
+
+        assert not any(
+            d["department"] == "cardio" for d in get_departments(db_session)
+        )
+        assert not any(
+            d["department"] == "cardio"
+            for d in get_doctors_by_department(db_session)
+        )
+
+        rows = list_schedules(db_session, department="cardio")
+        assert len(rows) == 1
+        assert rows[0].active is True
+
+    def test_ineligible_doctor_template_not_advertised(
+        self, db_session: Session, portal_department, eligible_doctor
+    ):
+        """Differential proof: the doctor leg is PER-TEMPLATE — the pinned
+        doctor's template stops advertising while the same department's
+        doctorless template keeps its slots."""
+        from app.crud.schedule import get_available_slots
+
+        self._template(
+            db_session,
+            department=portal_department.key,
+            doctor_id=eligible_doctor.id,
+            weekday=1,
+        )
+        self._template(db_session, department=portal_department.key, weekday=1)
+        monday = self._monday()
+
+        slots = get_available_slots(
+            db_session, target_date=monday, department="cardio"
+        )
+        assert len([s for s in slots if s["doctor_id"] == eligible_doctor.id]) == 2
+        assert len([s for s in slots if s["doctor_id"] is None]) == 2
+
+        eligible_doctor.active = False
+        db_session.commit()
+
+        slots = get_available_slots(
+            db_session, target_date=monday, department="cardio"
+        )
+        assert [s for s in slots if s["doctor_id"] == eligible_doctor.id] == []
+        assert len([s for s in slots if s["doctor_id"] is None]) == 2
+
+    def test_owner_ghost_and_incomplete_specialty_excluded(
+        self, db_session: Session, portal_department, eligible_doctor
+    ):
+        """The legacy-ghost mirrors of the booking eligibility SSOT: an
+        owner-deactivated account and the 'general' placeholder specialty
+        both make the pinned template unbookable — and thus
+        unadvertisable, on slots AND on the doctors listing."""
+        from app.crud.schedule import (
+            get_available_slots,
+            get_doctors_by_department,
+        )
+
+        self._template(
+            db_session,
+            department=portal_department.key,
+            doctor_id=eligible_doctor.id,
+            weekday=1,
+        )
+        monday = self._monday()
+
+        assert (
+            len(get_available_slots(db_session, target_date=monday, department="cardio"))
+            == 2
+        )
+        listed = {
+            d["department"]: [x["id"] for x in d["doctors"]]
+            for d in get_doctors_by_department(db_session)
+        }
+        assert listed.get("cardio") == [eligible_doctor.id]
+
+        owner = db_session.get(User, eligible_doctor.user_id)
+        owner.is_active = False
+        db_session.commit()
+        assert (
+            get_available_slots(db_session, target_date=monday, department="cardio")
+            == []
+        )
+
+        owner.is_active = True
+        db_session.commit()
+        assert (
+            len(get_available_slots(db_session, target_date=monday, department="cardio"))
+            == 2
+        )
+
+        eligible_doctor.specialty = "general"  # the auto-create placeholder
+        db_session.commit()
+        assert (
+            get_available_slots(db_session, target_date=monday, department="cardio")
+            == []
+        )
+        listed = {
+            d["department"]: [x["id"] for x in d["doctors"]]
+            for d in get_doctors_by_department(db_session)
+        }
+        assert listed.get("cardio") == []
