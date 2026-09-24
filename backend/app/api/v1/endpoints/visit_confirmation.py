@@ -31,6 +31,35 @@ class PWAConfirmRequest(BaseModel):
     ip_address: str | None = None
 
 
+class VisitInfoRequest(BaseModel):
+    token: str
+
+
+class VisitInfoServiceItem(BaseModel):
+    name: str
+    code: str | None
+    quantity: int
+    price: float
+    total: float
+
+
+class VisitInfoResponse(BaseModel):
+    success: bool
+    visit_id: int
+    status: str
+    patient_name: str
+    doctor_name: str
+    visit_date: str
+    visit_time: str | None
+    department: str | None
+    discount_mode: str | None
+    services: list[VisitInfoServiceItem]
+    total_amount: float
+    currency: str
+    confirmation_expires_at: str | None
+    notes: str | None
+
+
 class ConfirmationResponse(BaseModel):
     success: bool
     message: str
@@ -90,6 +119,14 @@ def confirm_visit_by_pwa(
         )
         return ConfirmationResponse(**result)
     except VisitConfirmationDomainError as exc:
+        if exc.status_code >= 500:
+            # This service wraps raw exception text in its 5xx detail.
+            # Do not expose that text on the public PWA confirmation route.
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail="Не удалось подтвердить визит",
+                headers=exc.headers,
+            ) from None
         _raise_http_error(exc)
 
 
@@ -102,3 +139,29 @@ def get_visit_info_by_token(token: str, db: Session = Depends(get_db)):
         return service.get_visit_info(token)
     except VisitConfirmationDomainError as exc:
         _raise_http_error(exc)
+
+
+@router.post("/visits/info", response_model=VisitInfoResponse)
+def post_visit_info_by_token(
+    request_body: VisitInfoRequest, db: Session = Depends(get_db)
+):
+    """Read a public visit card without putting its bearer token in the URL."""
+    service = VisitConfirmationService(db)
+
+    try:
+        return service.get_visit_info(request_body.token)
+    except VisitConfirmationDomainError as exc:
+        # The service includes raw exception text in its 500 detail. Keep the
+        # existing GET contract unchanged, but do not expose it on this route.
+        detail = (
+            "Не удалось получить информацию о визите"
+            if exc.status_code >= 500
+            else exc.detail
+        )
+        raise HTTPException(
+            status_code=exc.status_code, detail=detail, headers=exc.headers
+        ) from None
+    except Exception:
+        raise HTTPException(
+            status_code=500, detail="Не удалось получить информацию о визите"
+        ) from None

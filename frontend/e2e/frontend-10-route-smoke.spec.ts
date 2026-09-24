@@ -7,6 +7,10 @@ const PUBLIC_ROUTES = [
   { path: '/patient/login', name: 'patient login' },
   { path: '/patient/activate', name: 'patient activation' },
   { path: '/queue/join', name: 'queue join' },
+  // PR 3390 review round: the PWA/SMS invitation deep link must render a
+  // live public screen (was: wildcard -> /not-found). Without a token the
+  // page shows the terminal invalid-link state without any API call.
+  { path: '/confirm-visit', name: 'visit confirmation' },
   { path: '/payment/success', name: 'payment success callback' },
   { path: '/payment/cancel', name: 'payment cancel callback' },
 ];
