@@ -1120,10 +1120,15 @@ jobs:
     # locks (SQLite ignores FOR UPDATE). gate_d is excluded from the main
     # suite above; this step runs the dedicated proof against the job's
     # postgres service.
-    - name: 🧪 Reminder PG concurrency (gate_d)
+    # Round-12 (PR #3362 review, P1): the same applies to the QR-join
+    # recovery probe — its FOR UPDATE NOWAIT lock-conflict mapping
+    # (55P03 -> processing) and the in-flight-claim MVCC race are proven
+    # here with two independent connections against the alembic-provisioned
+    # schema from the step above.
+    - name: 🧪 Reminder + QR-join probe PG concurrency (gate_d)
       run: |
         cd backend
-        pytest tests/integration/test_reminder_pipeline_pg.py -m gate_d --noconftest
+        pytest tests/integration/test_reminder_pipeline_pg.py tests/integration/test_qr_join_probe_concurrency_pg.py -m gate_d --noconftest
 
     - name: 🧪 Critical E2E Smoke
       run: |

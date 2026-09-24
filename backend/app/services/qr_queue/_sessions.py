@@ -9,6 +9,8 @@ import json
 import re
 from zoneinfo import ZoneInfo
 
+from sqlalchemy.exc import DBAPIError
+
 from app.services.qr_queue._base import *  # noqa: F401, F403
 from app.services.qr_queue._base import (
     JOIN_SESSION_JOINED_STATUS,
@@ -962,12 +964,52 @@ class SessionsMixin(QRQueueServiceMixinBase):
 
         The classification decision table lives in the module docstring of
         the ``JOIN_PROBE_OUTCOME_*`` constants above.
+
+        Round-12 (PR #3362 review, P1): the oracle must also be
+        CONCURRENCY-SAFE. Between the claim (``UPDATE pending -> joining``)
+        and the single COMMIT the complete transaction HOLDS the row lock
+        while the last COMMITTED version of the row is still ``pending``.
+        Under MVCC a plain SELECT would read that stale committed version
+        and classify an IN-FLIGHT business join as ``pending_unbound``
+        (or, near TTL, as ``expired``) — the ambiguity panel would then
+        offer the discard of an attempt that is about to commit, and a
+        fresh start could ride on top of the first attempt's талон.
+        Therefore the row is read ``FOR UPDATE NOWAIT``: a concurrent
+        complete surfaces as PostgreSQL ``55P03 lock_not_available``, and
+        the probe answers the honest UNKNOWN (``processing``) instead of
+        any dead/discarding class. When no complete is in flight the lock
+        is granted instantly and the classification below runs on the
+        decisive committed state (``joined_v2`` after a commit, ``pending``
+        after a rollback). SQLite ignores ``FOR UPDATE`` (single writer,
+        no MVCC race), so the committed-state classes stay testable there
+        unchanged.
         """
-        row = (
-            self.db.query(QueueJoinSession)
-            .filter(QueueJoinSession.session_token == session_token)
-            .first()
-        )
+        try:
+            row = (
+                self.db.query(QueueJoinSession)
+                .filter(QueueJoinSession.session_token == session_token)
+                .populate_existing()
+                .with_for_update(nowait=True)
+                .first()
+            )
+        except DBAPIError as exc:
+            # psycopg 3 exposes the SQLSTATE as ``sqlstate`` (psycopg 2
+            # historically as ``pgcode``) — check both so the mapping
+            # survives a driver swap.
+            orig = getattr(exc, "orig", None)
+            sqlstate = getattr(orig, "sqlstate", None) or getattr(
+                orig, "pgcode", None
+            )
+            if sqlstate == "55P03":  # lock_not_available
+                # A concurrent complete holds the claim — the business
+                # operation is IN FLIGHT. No decisive classification is
+                # possible (and none is needed): UNKNOWN keeps every
+                # envelope intact and forbids both discard and start-over.
+                return {
+                    "outcome": JOIN_PROBE_OUTCOME_PROCESSING,
+                    "result": None,
+                }
+            raise
         if row is None:
             return {
                 "outcome": JOIN_PROBE_OUTCOME_NOT_FOUND,
