@@ -212,7 +212,10 @@ def test_single_alembic_head(head_url):
     assert r.returncode == 0, r.stderr[-800:]
     head_lines = [line for line in r.stdout.splitlines() if "(head)" in line]
     assert len(head_lines) == 1, f"multi-head detected: {r.stdout!r}"
-    assert "0073_execution_routing_snapshot" in head_lines[0]
+    # Main's corrective follow-up moved the head to 0073 (routing
+    # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
+    # as 0074 on top of it.
+    assert "0074_join_payload_binding" in head_lines[0]
 
 
 @pytest.mark.integration

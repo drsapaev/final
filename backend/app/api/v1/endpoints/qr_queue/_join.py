@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from app.api.v1.endpoints.qr_queue._helpers import *  # noqa: F401, F403
 from app.api.v1.endpoints.qr_queue._helpers import router
+from app.services.qr_queue._base import (
+    JoinSessionNotExecutedRefusal,
+    JoinSessionStateRefusal,
+)
 
 
 @router.post("/join/start", response_model=JoinSessionStartResponse)
@@ -63,7 +67,25 @@ def start_join_session(
         )
 
 
-@router.post("/join/complete", response_model=JoinSessionCompleteResponse | JoinSessionCompleteMultipleResponse)
+@router.post(
+    "/join/complete",
+    response_model=JoinSessionCompleteResponse | JoinSessionCompleteMultipleResponse,
+    # Round-6 (PR #3362 review, P2-2): the recovery protocol the client
+    # depends on is now PART OF THE CONTRACT — 400 carries the structured
+    # state/pre-execution refusal (incl. the rollback-proven
+    # ``join_session_not_executed``), 409 carries the immutable payload
+    # mismatch. Regenerated into openapi.json + the generated TS types.
+    # Round-9 (review P2-1): the runtime raises HTTPException(detail=...),
+    # so the wire body is the FastAPI ``detail`` envelope
+    # ``{"detail": {reason, message[, details]}}`` — exactly what the
+    # frontend reads (``response.data.detail.reason``). The contract
+    # therefore references the WRAPPER (JoinSessionRefusalErrorResponse),
+    # not the bare inner payload.
+    responses={
+        400: {"model": JoinSessionRefusalErrorResponse},
+        409: {"model": JoinSessionRefusalErrorResponse},
+    },
+)
 def complete_join_session(
     request: JoinSessionCompleteRequest, db: Session = Depends(get_db)
 ):
@@ -113,9 +135,94 @@ def complete_join_session(
             )
             return JoinSessionCompleteResponse(**result)
 
+    except JoinSessionStateRefusal as e:
+        # Round-4 (PR #3362, P1-2/P2-1): a PROVEN session-state refusal —
+        # the machine-readable reason lets the client offer the honest
+        # recovery path (an explicit start-over for a pre-execution
+        # refusal; the reconcile/replay contract for a used session)
+        # instead of the blind «Internal server error» dead-end.
+        # Round-5 (P1-3): a payload-bound replay refusal is a CONFLICT
+        # with the attempt's immutable identity — 409, not a generic 400.
+        refusal_status = (
+            status.HTTP_409_CONFLICT
+            if e.reason == "join_session_payload_mismatch"
+            else status.HTTP_400_BAD_REQUEST
+        )
+        logger.warning(
+            "[complete_join_session] Сессионный отказ: reason=%s",
+            e.reason,
+        )
+        raise HTTPException(
+            status_code=refusal_status,
+            detail={"reason": e.reason, "message": str(e)},
+        ) from e
+    except JoinSessionNotExecutedRefusal as e:
+        # Round-6 (PR #3362 review, P2-1): the batch was ALREADY rolled
+        # back — zero tickets exist. The structured refusal lets the
+        # client show the real domain message and offer the honest
+        # start-over immediately instead of looping on UNKNOWN until the
+        # session TTL.
+        logger.warning(
+            "[complete_join_session] Отказ после подтверждённого rollback: %s",
+            str(e),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "reason": e.reason,
+                "message": str(e),
+                "details": e.details,
+            },
+        ) from e
     except ValueError as e:
         logger.warning(
             "[complete_join_session] ValueError: %s",
+            str(e),
+        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Internal server error")
+    # Остальные исключения обрабатываются централизованными обработчиками
+    # (exception_handlers.py)
+
+
+@router.post("/join/probe", response_model=JoinSessionProbeResponse)
+def probe_join_session(
+    request: JoinSessionProbeRequest, db: Session = Depends(get_db)
+):
+    """
+    Round-11 (PR #3362 review, P1-2): read-only oracle состояния попытки
+    присоединения (публичный эндпоинт).
+
+    Ownerless-ambiguity recovery НЕ ДОЛЖЕН вызывать ``/join/complete`` как
+    «проверку»: для ещё не claims-нутой (``pending``) сессии complete — это
+    само исполнение бизнес-операции с введённым payload'ом (второй заход
+    для пациента, чья настоящая попытка уже может быть закоммичена).
+    Этот оракул возвращает класс состояния attempt'а относительно введённых
+    данных, не мутируя ни одной строки; для совпавшей закоммиченной попытки
+    повторно отдаёт СОХРАНЁННЫЙ ответ первой попытки (без записи).
+    """
+    service = QRQueueService(db)
+
+    logger.info(
+        "[probe_join_session] Read-only probe: session_token_present=%s, phone_present=%s",
+        bool(request.session_token),
+        bool(request.phone),
+    )
+    try:
+        result = service.probe_join_session(
+            session_token=request.session_token,
+            patient_name=request.patient_name,
+            phone=request.phone,
+            telegram_id=request.telegram_id,
+            specialist_ids=request.specialist_ids,
+            specialist_entity_types=request.specialist_entity_types,
+        )
+        return JoinSessionProbeResponse(**result)
+    except ValueError as e:
+        # The oracle is total for unknown/expired/foreign sessions — they
+        # are OUTCOMES, not errors. Anything reaching this handler is an
+        # unexpected domain error; keep it honest in the logs.
+        logger.warning(
+            "[probe_join_session] ValueError: %s",
             str(e),
         )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Internal server error")

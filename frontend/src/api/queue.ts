@@ -50,6 +50,33 @@ export async function completeQueueJoinSession(payload: Record<string, unknown>)
   return mapQueueActionResponseDto(response.data as Record<string, unknown>);
 }
 
+/** Round-11 (review P1-2): the READ-ONLY recovery oracle — classifies an
+ * outstanding attempt against the typed payload WITHOUT any business
+ * effect. `/queue/join/complete` must never be used as the ownership
+ * probe: for a still-pending session its first claim EXECUTES the join.
+ * `result` (only for `joined_match`) is the saved first-attempt response,
+ * mapped through the same mapper the complete responses go through. */
+export interface QueueJoinProbeResult {
+  outcome:
+    | 'joined_match'
+    | 'joined_mismatch'
+    | 'joined_owner_unknown'
+    | 'pending_unbound'
+    | 'processing'
+    | 'expired'
+    | 'not_found';
+  result: QueueActionResponse | null;
+}
+
+export async function probeQueueJoinSession(payload: Record<string, unknown>): Promise<QueueJoinProbeResult> {
+  const response = await api.post('/queue/join/probe', payload);
+  const data = response.data as { outcome?: string; result?: Record<string, unknown> | null };
+  return {
+    outcome: (data.outcome ?? 'processing') as QueueJoinProbeResult['outcome'],
+    result: data.result ? mapQueueActionResponseDto(data.result) : null,
+  };
+}
+
 export async function fetchQueuesToday(targetDate: string): Promise<QueuePayload> {
   const response = await api.get('/registrar/queues/today', {
     params: withParams({ target_date: targetDate }),

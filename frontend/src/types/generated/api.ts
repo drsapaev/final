@@ -3042,6 +3042,35 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/join/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Probe Join Session
+         * @description Round-11 (PR #3362 review, P1-2): read-only oracle состояния попытки
+         *     присоединения (публичный эндпоинт).
+         *
+         *     Ownerless-ambiguity recovery НЕ ДОЛЖЕН вызывать ``/join/complete`` как
+         *     «проверку»: для ещё не claims-нутой (``pending``) сессии complete — это
+         *     само исполнение бизнес-операции с введённым payload'ом (второй заход
+         *     для пациента, чья настоящая попытка уже может быть закоммичена).
+         *     Этот оракул возвращает класс состояния attempt'а относительно введённых
+         *     данных, не мутируя ни одной строки; для совпавшей закоммиченной попытки
+         *     повторно отдаёт СОХРАНЁННЫЙ ответ первой попытки (без записи).
+         */
+        post: operations["probe_join_session_api_v1_queue_join_probe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/online-entry/{entry_id}/update": {
         parameters: {
             query?: never;
@@ -29543,6 +29572,11 @@ export type components = {
             }[] | null;
             /** Message */
             message: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
         };
         /**
          * JoinSessionCompleteRequest
@@ -29597,6 +29631,139 @@ export type components = {
             specialist_name: string;
             /** Department */
             department: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+        };
+        /**
+         * JoinSessionProbeRequest
+         * @description Round-11 (PR #3362 review, P1-2): запрос read-only oracle'а.
+         *
+         *     Поля идентичны ``JoinSessionCompleteRequest`` — оракул сравнивает
+         *     канонизированный отпечаток ТЕМ ЖЕ алгоритмом, которым complete
+         *     связывает попытку с payload'ом. Никаких бизнес-эффектов запрос не
+         *     имеет: ни claim, ни создание пациента, ни выдача талона.
+         */
+        JoinSessionProbeRequest: {
+            /**
+             * Session Token
+             * @description Токен сессии
+             */
+            session_token: string;
+            /**
+             * Patient Name
+             * @description ФИО пациента
+             */
+            patient_name: string;
+            /**
+             * Phone
+             * @description Номер телефона
+             */
+            phone: string;
+            /**
+             * Telegram Id
+             * @description Telegram ID
+             */
+            telegram_id?: number | null;
+            /**
+             * Specialist Ids
+             * @description Список ID специалистов (для общего QR)
+             */
+            specialist_ids?: number[] | null;
+            /**
+             * Specialist Entity Types
+             * @description Типы сущностей specialist_ids, выровненные по индексам ('doctor' | 'profile')
+             */
+            specialist_entity_types?: string[] | null;
+        };
+        /**
+         * JoinSessionProbeResponse
+         * @description Round-11 (PR #3362 review, P1-2): классификация попытки БЕЗ мутаций.
+         *
+         *     ``outcome``:
+         *       joined_match         — typed payload владеет уже совершённой попыткой;
+         *                              ``result`` несёт СОХРАНЁННЫЙ ответ первой попытки
+         *                              (read-only re-serve, эквивалент replay-ветки);
+         *       joined_mismatch      — попытка совершена с другим payload'ом (чужая);
+         *       joined_owner_unknown — устаревшая строка без отпечатка — владение
+         *                              недоказуемо, ведёт себя как UNKNOWN;
+         *       pending_unbound      — сессия жива, но под ней НЕ выполнено ни одного
+         *                              бизнес-действия — конверт можно безопасно удалить;
+         *       processing           — claim в полёте — UNKNOWN, повторить позже;
+         *       expired / not_found  — попытка мертва, ничего не создано.
+         */
+        JoinSessionProbeResponse: {
+            /**
+             * Outcome
+             * @description joined_match | joined_mismatch | joined_owner_unknown | pending_unbound | processing | expired | not_found
+             */
+            outcome: string;
+            /**
+             * Result
+             * @description Сохранённый ответ первой попытки (только для joined_match); иначе null
+             */
+            result?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * JoinSessionRefusalDetail
+         * @description Один per-specialist отказ аллокатора (round-6, P2-1).
+         */
+        JoinSessionRefusalDetail: {
+            /**
+             * Specialist Id
+             * @description ID выбора (Doctor.id или QueueProfile.id); None для одиночного пути
+             */
+            specialist_id?: number | null;
+            /**
+             * Error
+             * @description Человекочитаемое сообщение домена
+             */
+            error: string;
+        };
+        /**
+         * JoinSessionRefusalErrorResponse
+         * @description Полное HTTP-тело отказа complete-попытки (round-9, review P2-1).
+         *
+         *     Runtime raises ``HTTPException(detail={reason, message[, details]})``,
+         *     so FastAPI serves the refusal wrapped in the standard ``detail``
+         *     envelope: ``{"detail": {"reason": ..., "message": ...}}``. The
+         *     frontend reads ``response.data.detail.reason`` — the declared OpenAPI
+         *     contract must describe EXACTLY that wire format, so 400/409 reference
+         *     THIS wrapper (not the bare inner payload).
+         */
+        JoinSessionRefusalErrorResponse: {
+            detail: components["schemas"]["JoinSessionRefusalResponse"];
+        };
+        /**
+         * JoinSessionRefusalResponse
+         * @description Структурированный отказ complete-попытки (round-6, P2-1/P2-2).
+         *
+         *     400 — session-state / pre-execution refusals (incl. the
+         *     rollback-proven ``join_session_not_executed``); 409 — immutable
+         *     payload mismatch. ``reason`` vocabulary:
+         *     join_session_not_found | join_session_expired | join_session_processing |
+         *     join_session_used | join_session_payload_mismatch | join_session_not_executed.
+         */
+        JoinSessionRefusalResponse: {
+            /**
+             * Reason
+             * @description Машиночитаемая причина отказа
+             */
+            reason: string;
+            /**
+             * Message
+             * @description Человекочитаемое сообщение
+             */
+            message: string;
+            /**
+             * Details
+             * @description Per-specialist ошибки (только для join_session_not_executed)
+             */
+            details?: components["schemas"]["JoinSessionRefusalDetail"][] | null;
         };
         /**
          * JoinSessionStartRequest
@@ -29622,6 +29789,16 @@ export type components = {
             queue_info: {
                 [key: string]: unknown;
             };
+            /**
+             * Target Date
+             * @description Целевая дата очереди токена (YYYY-MM-DD)
+             */
+            target_date?: string | null;
+            /**
+             * Attempt Expires At
+             * @description Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace
+             */
+            attempt_expires_at?: string | null;
         };
         /** LabCatalogAnalyteOut */
         LabCatalogAnalyteOut: {
@@ -34739,6 +34916,16 @@ export type components = {
              * @description Always True on this surface (the address is permanent)
              */
             permanent_address: boolean;
+            /**
+             * Target Date
+             * @description Целевая дата очереди токена (YYYY-MM-DD)
+             */
+            target_date?: string | null;
+            /**
+             * Attempt Expires At
+             * @description Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки
+             */
+            attempt_expires_at?: string | null;
             direction: components["schemas"]["PublicDirectionAddressInfo"];
             /**
              * Queue Info
@@ -46523,6 +46710,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JoinSessionCompleteResponse"] | components["schemas"]["JoinSessionCompleteMultipleResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinSessionRefusalErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinSessionRefusalErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    probe_join_session_api_v1_queue_join_probe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinSessionProbeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinSessionProbeResponse"];
                 };
             };
             /** @description Validation Error */
