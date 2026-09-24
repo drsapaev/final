@@ -11,6 +11,7 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 - Architecture: see `docs/adr/ADR-001-queue-ownership-and-specialty-architecture.md` for queue ownership and specialty routing decisions.
 - Frontend: React 19, Vite, React Router, TypeScript (strict) / TSX.
 - Runtime defaults: backend `18000`, frontend `5173`, staging Postgres `55432`.
+- This Windows host also has isolated Linux staging in WSL2 Ubuntu 24.04 with Docker Compose. Production still runs from Windows `C:\final` on `:18000`; staging uses a separate Compose project, database, and host ports (backend `:18001`, frontend `:18080`, Postgres `:55432` in the current setup), with synthetic data only. Staging may be stopped; verify it before use. See `docs/runbooks/AGENT_SESSION_WORKTREES.md`.
 - Context SSOT: `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, this file, and the canonical source/test files found for the task.
 - Active local dev-brain tooling lives outside runtime in `ai/langgraph`.
 - `ai/llamaindex` and `ai/lightrag` are not guaranteed to exist in this checkout; use them only after verifying the directories and commands are present.
@@ -97,6 +98,13 @@ production host (uvicorn :18000 behind Cloudflare Tunnel). Rules:
   your worktree, not the main tree. `_wt*/` is gitignored.
 - Mechanics (venv reuse, test runs from a worktree, deploy procedure):
   `docs/runbooks/AGENT_SESSION_WORKTREES.md`.
+
+## First-Screen Latency Guardrail
+
+- For Registrar, Admin, and Doctor panel changes, measure time until actual rows or queue content appear, including a cold first visit and repeated navigation. Backend process startup time is a different measurement.
+- Inspect browser asset/API waterfalls and backend/DB timings before attributing a delay to one service. Keep independent requests parallel where safe; avoid duplicate prerequisite requests and loading inactive panel tabs on the first screen.
+- A closed `/ws/queue` socket must leave its receive loop, cancel its heartbeat, and leave its room. Run `backend/tests/unit/test_queue_ws_disconnect.py` for queue WebSocket changes; never log raw query strings, tokens, or broadcast payloads.
+- Use `docs/runbooks/SCREEN_LATENCY_REGRESSION.md` for the focused check and record comparable before/after evidence from synthetic staging or user-provided timing.
 
 ## Skill Routing Policy
 
