@@ -13,6 +13,34 @@ deploy surface, not a workspace.
    main tree.
 3. The main tree returns to `main` only after your own PR is merged.
 
+## Isolated Linux staging on this host
+
+The separate test environment runs in WSL2 Ubuntu 24.04 with Docker Compose
+on this same Windows computer; it is not a VPS. Its executable configuration
+is `ops/compose.staging.yml`. Run it from the worktree containing the commit
+under test, not from an old staging worktree snapshot. The Compose project,
+Postgres/Redis volumes, database credentials, and host ports must be separate
+from production. Staging can be stopped between tests; check its state first.
+
+Current local staging uses backend `127.0.0.1:18001`, frontend
+`127.0.0.1:18080`, and Postgres `127.0.0.1:55432`. Windows production uses
+backend `:18000`. Set `STAGING_BACKEND_PORT=18001` (or another free port)
+and `STAGING_POSTGRES_HOST_PORT=55432` explicitly in the untracked staging
+env file before starting Compose: the repository sample still specifies
+backend `18000` and Postgres `15432`, and the Compose backend fallback is
+also `18000`. The backend value would collide with production. Check the
+effective project name and port bindings
+with `docker compose ps`, then check staging backend health at
+`http://127.0.0.1:18001/api/v1/health`. Do not print the env file or
+interpolated Compose configuration into logs because it contains secrets.
+Postgres is loopback-bound; the current Compose file publishes backend and
+frontend host ports on all interfaces, so verify intended LAN access.
+
+Use synthetic staging fixtures only. Never restore or copy production
+patient data into this environment. Role-by-role checks live in
+`docs/runbooks/LOCAL_STAGING_ACCEPTANCE_RUNBOOK.md`; the full pre-deploy
+checklist remains `docs/runbooks/STAGING_VALIDATION.md`.
+
 ## Session worktree setup
 
 ```powershell
