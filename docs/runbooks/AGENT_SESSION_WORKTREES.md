@@ -26,10 +26,10 @@ Current local staging uses backend `127.0.0.1:18001`, frontend
 `127.0.0.1:18080`, and Postgres `127.0.0.1:55432`. Windows production uses
 backend `:18000`. Set `STAGING_BACKEND_PORT=18001` (or another free port)
 and `STAGING_POSTGRES_HOST_PORT=55432` explicitly in the untracked staging
-env file before starting Compose: the repository sample still specifies
-backend `18000` and Postgres `15432`, and the Compose backend fallback is
-also `18000`. The backend value would collide with production. Check the
-effective project name and port bindings
+env file before starting Compose. The sample and Compose backend fallback
+now both use `18001`; the sample Postgres port is `15432`, while the current
+local staging contour uses `55432`. Check the effective project name and
+port bindings
 with `docker compose ps`, then check staging backend health at
 `http://127.0.0.1:18001/api/v1/health`. Do not print the env file or
 interpolated Compose configuration into logs because it contains secrets.
