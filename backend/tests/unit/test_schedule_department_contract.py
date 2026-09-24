@@ -436,6 +436,156 @@ class TestScheduleCreateConsistencyContract:
         assert int(row.department_id) == int(portal_department.id)
 
 
+class TestScheduleCreateDoctorBoundary:
+    """#3402 review round (owner P2-1): the doctor validation previously ran
+    only when a department was ALSO supplied — `{"doctor_id": 999999,
+    "department": null}` bypassed the controlled `doctor_unknown` 400 and
+    died as an FK IntegrityError (500-class) at INSERT time; and even with
+    a department the validator never applied the booking ELIGIBILITY
+    contract (`ensure_doctor_eligible_for_appointment`), so a deactivated /
+    incomplete doctor or a doctor with an inactive / non-doctor owner could
+    receive an ACTIVE schedule template and surface in /available-slots
+    while patient booking refuses the same doctor. The doctor boundary now
+    runs FIRST (canonical lock order doctor → department) and independently
+    of the department payload."""
+
+    def _payload(self, **overrides) -> dict:
+        payload = {
+            "department": None,
+            "weekday": 4,
+            "start_time": "08:00",
+            "end_time": "10:00",
+            "active": True,
+        }
+        payload.update(overrides)
+        return payload
+
+    def _template_count(self, db_session) -> int:
+        from sqlalchemy import select
+
+        return len(
+            db_session.execute(select(ScheduleTemplate)).scalars().all()
+        )
+
+    def test_dangling_doctor_id_without_department_is_refused(
+        self, client, db_session, admin_auth_headers
+    ):
+        """The exact review shape: doctor_id set, department null — the
+        controlled `doctor_unknown` 400 must fire BEFORE any INSERT, never
+        an FK IntegrityError 500 from `crud.create_schedule(...)`."""
+        before = self._template_count(db_session)
+        refused = client.post(
+            "/api/v1/schedule",
+            headers=admin_auth_headers,
+            json=self._payload(doctor_id=999999),
+        )
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["detail"]["reason"] == "doctor_unknown"
+        assert (
+            self._template_count(db_session) == before
+        ), "a refused create persists nothing"
+
+    def test_deactivated_doctor_is_refused_before_insert(
+        self, client, db_session, admin_auth_headers, test_doctor, portal_department
+    ):
+        """Eligibility must gate the template independent of the department
+        payload — pinned for BOTH shapes (department=null and the doctor's
+        canonical department): booking refuses an inactive doctor with the
+        409 contract, so the schedule must never publish one."""
+        test_doctor.active = False
+        db_session.commit()
+
+        for department in (None, portal_department.key):
+            refused = client.post(
+                "/api/v1/schedule",
+                headers=admin_auth_headers,
+                json=self._payload(department=department, doctor_id=test_doctor.id),
+            )
+            assert refused.status_code == 409, refused.text
+        assert (
+            self._template_count(db_session) == 0
+        ), "an ineligible doctor must not receive an ACTIVE template"
+
+    def test_incomplete_doctor_profile_is_refused(
+        self, client, db_session, admin_auth_headers, cardio_user
+    ):
+        """The "general" placeholder specialty is the incomplete-profile
+        marker the booking contract refuses — the schedule boundary refuses
+        it too."""
+        from app.models.clinic import Doctor
+
+        doctor = Doctor(
+            user_id=cardio_user.id,
+            specialty="general",
+            active=True,
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        refused = client.post(
+            "/api/v1/schedule",
+            headers=admin_auth_headers,
+            json=self._payload(doctor_id=doctor.id),
+        )
+        assert refused.status_code == 409, refused.text
+        assert self._template_count(db_session) == 0
+
+    def test_doctor_with_non_doctor_owner_is_refused(
+        self, client, db_session, admin_auth_headers
+    ):
+        """An owner account without a doctor-family role makes the doctor
+        ineligible for booking (Codex round-8 P2) — the schedule template
+        boundary enforces the same owner contract."""
+        from app.core.security import get_password_hash
+        from app.models.clinic import Doctor
+        from app.models.user import User
+
+        owner = User(
+            username="sched_non_doctor_owner",
+            email="sched_nda@test.com",
+            hashed_password=get_password_hash("x12345678"),
+            role="Registrar",
+            is_active=True,
+            is_superuser=False,
+        )
+        db_session.add(owner)
+        db_session.flush()
+        doctor = Doctor(
+            user_id=owner.id,
+            specialty="Кардиология",
+            active=True,
+        )
+        db_session.add(doctor)
+        db_session.commit()
+        db_session.refresh(doctor)
+
+        refused = client.post(
+            "/api/v1/schedule",
+            headers=admin_auth_headers,
+            json=self._payload(doctor_id=doctor.id),
+        )
+        assert refused.status_code == 409, refused.text
+        assert self._template_count(db_session) == 0
+
+    def test_eligible_doctor_only_template_is_allowed(
+        self, client, db_session, admin_auth_headers, test_doctor
+    ):
+        """Contract decision: a doctor-only template (department=null) stays
+        a legal shape — for an ELIGIBLE doctor (active, completed profile,
+        active owner with a doctor-family role)."""
+        created = client.post(
+            "/api/v1/schedule",
+            headers=admin_auth_headers,
+            json=self._payload(doctor_id=test_doctor.id),
+        )
+        assert created.status_code == 200, created.text
+        row = db_session.get(ScheduleTemplate, created.json()["id"])
+        assert row is not None
+        assert int(row.doctor_id) == int(test_doctor.id)
+        assert row.department_id is None
+
+
 class TestCreateSchedulePersistence:
     """Round-10 owner P2 (PR #3340): `create_schedule` stopped at `flush()`
     and the endpoint never COMMITTED — `get_db` only closes the session
