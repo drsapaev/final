@@ -748,61 +748,13 @@ async def _startup_tasks() -> None:
     except Exception as e:
         log.warning(f"Failed to start lab notification scheduler: {e}")
 
-# -----------------------------------------------------------------------------
-# F-017: Retention cleanup scheduler — daily at 03:00
-# -----------------------------------------------------------------------------
-try:
-    import asyncio
-
-    async def _retention_cleanup_loop():
-        """F-017: daily cleanup of old/soft-deleted messages."""
-        while True:
-            try:
-                from app.db.session import SessionLocal
-                from app.services.data_retention import DataRetentionService
-                db = SessionLocal()
-                try:
-                    service = DataRetentionService(db)
-                    result = service.cleanup_deleted_messages(batch_size=500)
-                    log.info("F-017 retention cleanup: %s", result)
-                finally:
-                    db.close()
-            except Exception as exc:
-                log.error("F-017 retention cleanup error: %s", exc)
-            # Run every 24 hours
-            await asyncio.sleep(86400)
-
-    asyncio.create_task(_retention_cleanup_loop())
-    log.info("✅ F-017: Retention cleanup scheduler started (daily)")
-except Exception as e:
-    log.warning(f"Failed to start retention scheduler: {e}")
-
-
-    # Print routes
-    try:
-        lines: list[str] = []
-        for r in app.router.routes:
-            path = getattr(r, "path", "")
-            methods = ",".join(sorted(getattr(r, "methods", []) or []))
-            name = getattr(r, "name", "")
-            lines.append(f"{methods:20s}  {path:40s}  {name}")
-        log.info("Mounted routes:\n%s", "\n".join(lines))
-        log.info(
-            "Flags: TESTING=%s CORS_DISABLE=%s",
-            os.getenv("TESTING"),
-            os.getenv("CORS_DISABLE"),
-        )
-    except Exception:
-        pass
-
-
 # Dev-only diagnostic endpoints. In production they are not registered at all -
 # less code = smaller attack surface (SEC-002, SEC-003).
 if settings.is_development:
     @app.get("/_routes", include_in_schema=False)
     def _routes():
         return [
-            {"path": getattr(r, "path", ""), "methods": sorted(list(getattr(r, "methods", []) or [])), "name": getattr(r, "name", "")}
+            {"path": getattr(r, "path", ""), "methods": sorted(getattr(r, "methods", []) or []), "name": getattr(r, "name", "")}
             for r in app.router.routes
         ]
 
