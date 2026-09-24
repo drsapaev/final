@@ -50,14 +50,53 @@ class TestVisitConfirmationAPI:
         assert "истек" in data["detail"]
 
     def test_post_visit_info_matches_legacy_get(self, client, test_visit):
-        """The token moves to the request body; the visit card is unchanged."""
+        """The token moves to the request body; the card keeps its fields.
+
+        PR 3390 review P2: the POST is a *patient-safe* card and no longer
+        copies the legacy GET byte-for-byte — the internal ``notes`` field
+        (clinical/admin text) is dropped from the public POST response while
+        the legacy GET keeps its historical shape for already-delivered
+        links.
+        """
         token = test_visit.confirmation_token
+        test_visit.notes = "diagnosis: private clinical note"
         post_response = client.post("/api/v1/visits/info", json={"token": token})
         get_response = client.get(f"/api/v1/visits/info/{token}")
 
         assert post_response.status_code == get_response.status_code == 200
-        assert post_response.json() == get_response.json()
+        assert post_response.json() == {
+            key: value for key, value in get_response.json().items()
+            if key != "notes"
+        }
         assert token not in post_response.request.url.path
+
+    def test_post_visit_info_omits_internal_notes(self, client, test_visit):
+        """PR 3390 review P2: the public POST card must not leak Visit.notes.
+
+        ``Visit.notes`` carries clinical/admin text (the same marker the
+        Telegram security tests keep off patient-facing messaging:
+        "diagnosis: private clinical note", cancel reasons, force-reopen
+        audit lines). The bearer-token confirmation card does not need it,
+        so the POST response is a minimal patient-safe DTO without the
+        field — even though the UI never renders it, any link holder could
+        read it in the Network response.
+        """
+        test_visit.notes = "diagnosis: private clinical note"
+        response = client.post(
+            "/api/v1/visits/info", json={"token": test_visit.confirmation_token}
+        )
+
+        assert response.status_code == 200
+        assert "notes" not in response.json()
+        assert "private clinical note" not in response.text
+
+        # Documented divergence: the legacy GET keeps its historical shape
+        # (older clients), so the minimal-DTO decision is visible here.
+        legacy = client.get(
+            f"/api/v1/visits/info/{test_visit.confirmation_token}"
+        )
+        assert legacy.status_code == 200
+        assert legacy.json()["notes"] == "diagnosis: private clinical note"
 
     def test_post_visit_info_unknown_token_matches_legacy_get(self, client):
         token = "synthetic-unknown-token"
@@ -68,6 +107,7 @@ class TestVisitConfirmationAPI:
         assert post_response.json() == get_response.json()
 
     def test_post_visit_info_expired_token_matches_legacy_get(self, client, test_visit):
+        """Error bodies stay identical between POST and legacy GET."""
         test_visit.confirmation_expires_at = datetime.utcnow() - timedelta(hours=1)
         token = test_visit.confirmation_token
         post_response = client.post("/api/v1/visits/info", json={"token": token})

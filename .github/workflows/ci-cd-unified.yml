@@ -846,22 +846,27 @@ jobs:
         # reality: if the count drops below the expected number, something
         # was skipped).
         #
-        # Expected: 127 passed, 0 skipped, 0 failed
+        # Expected: 131 passed, 0 skipped, 0 failed
         # (12 cashier + 9 registrar + 40 visual [7 state baselines + EAT +
-        #  pr16-landing + 22 pr18 twelve-screen baselines] + 8 route-smoke
+        #  pr16-landing + 22 pr18 twelve-screen baselines] + 12 route-smoke
         # + 12 visual-a11y + 12 a11y-axe-audit + 34 a11y-axe-authenticated).
         # Metric integrity (§17, original → revised → methodology → reason):
-        # 93 → 127. Methodology unchanged (same CI step, count-invariant on
-        # passed tests). Reason: AXE-EXP-1 adds a11y-axe-authenticated.spec.ts
+        # 93 → 127 → 131. Methodology unchanged (same CI step, count-invariant
+        # on passed tests). Reason: AXE-EXP-1 adds a11y-axe-authenticated.spec.ts
         # (17 authorized QA-harness routes × 2 themes = 34 audits, seeded
-        # shrink-only baseline e2e/a11y-baseline-auth.json). Historical
-        # values: 93 = pre-AXE-EXP canonical count (12+9+40+8+12+12).
+        # shrink-only baseline e2e/a11y-baseline-auth.json). 127 → 131: PR #3390
+        # adds the /confirm-visit public route smoke (11 route-smoke) plus the
+        # split-origin CSRF credentials regression (12 route-smoke; the gate
+        # floor previously lagged the file at 8). Historical values: 93 =
+        # pre-AXE-EXP canonical count (12+9+40+8+12+12); 127 = AXE-EXP-1
+        # (12+9+40+8+12+12+34, floor never re-bumped for the route-smoke
+        # growth to 11).
         # Reconciliation note: registrar-time.spec.ts (1 test) runs in its own
         # step above and is intentionally NOT counted here. Empirically
-        # verified locally with `playwright --list` per file on the PR-UI-18-5
-        # head. If a test is intentionally added/removed, update EXPECTED_COUNT
-        # below.
-        EXPECTED_COUNT=127
+        # verified locally with `playwright --list` per file on the PR-3390
+        # review-fix head. If a test is intentionally added/removed, update
+        # EXPECTED_COUNT below.
+        EXPECTED_COUNT=131
         if [ ! -f ux-audit-output.txt ]; then
           echo "ERROR: ux-audit-output.txt not found. The UX Audit step may not have run."
           exit 1

@@ -145,7 +145,7 @@ const ConfirmVisitPage = () => {
         try {
             const data = await confirmVisitByPwa(token);
             if (!aliveRef.current || activeTokenRef.current !== token) return;
-            setDoneMessage(data.message || t('cv_confirmed'));
+            setDoneMessage(data.message || t('final.cv_confirmed'));
             // ConfirmationResponse.queue_numbers is {[key: string]: unknown}[]
             // in the generated contract; the backend pins {queue_tag, number,
             // queue_id} (visit_confirmation_service) — bridge-cast at the boundary.
@@ -160,12 +160,12 @@ const ConfirmVisitPage = () => {
                 if (status === 404 || status === 400) {
                     // Токен больше не подтверждаем (неизвестен/уже подтверждён/
                     // истек/канал) — терминальный экран с причиной сервера.
-                    setInvalidReason(errorDetail(err) || t('cv_invalid_link'));
+                    setInvalidReason(errorDetail(err) || t('final.cv_invalid_link'));
                     setPhase('invalid');
                     return;
                 }
             }
-            setActionError(errorDetail(err) || t('cv_error'));
+            setActionError(errorDetail(err) || t('final.cv_error'));
         } finally {
             if (aliveRef.current && activeTokenRef.current === token) setConfirming(false);
         }
@@ -182,9 +182,9 @@ const ConfirmVisitPage = () => {
             <section className="cv-card" aria-labelledby="cv-title">
                 <header>
                     <h1 id="cv-title" className="cv-title">
-                        {t('cv_title')}
+                        {t('final.cv_title')}
                     </h1>
-                    <p className="cv-subtitle">{t('cv_subtitle')}</p>
+                    <p className="cv-subtitle">{t('final.cv_subtitle')}</p>
                 </header>
 
                 {visiblePhase === 'checking' && (
@@ -193,7 +193,7 @@ const ConfirmVisitPage = () => {
                             className="cv-status-icon cv-status-icon-muted"
                             aria-hidden="true"
                         />
-                        <p className="cv-status-text">{t('cv_loading')}</p>
+                        <p className="cv-status-text">{t('final.cv_loading')}</p>
                     </div>
                 )}
 
@@ -203,9 +203,9 @@ const ConfirmVisitPage = () => {
                             className="cv-status-icon cv-status-icon-error"
                             aria-hidden="true"
                         />
-                        <p className="cv-status-text">{loadError || t('cv_error')}</p>
+                        <p className="cv-status-text">{loadError || t('final.cv_error')}</p>
                         <Button onClick={() => void loadInfo(token)}>
-                            {t('btn_retry')}
+                            {t('final.cv_btn_retry')}
                         </Button>
                     </div>
                 )}
@@ -217,9 +217,9 @@ const ConfirmVisitPage = () => {
                             aria-hidden="true"
                         />
                         <p className="cv-status-text">
-                            {(stateToken === token && invalidReason) || t('cv_invalid_link')}
+                            {(stateToken === token && invalidReason) || t('final.cv_invalid_link')}
                         </p>
-                        <p className="cv-status-hint">{t('cv_invalid_hint')}</p>
+                        <p className="cv-status-hint">{t('final.cv_invalid_hint')}</p>
                     </div>
                 )}
 
@@ -227,15 +227,15 @@ const ConfirmVisitPage = () => {
                     <>
                         <div className="cv-fields">
                             <div className="cv-field">
-                                <span className="cv-label">{t('cv_patient')}</span>
+                                <span className="cv-label">{t('final.cv_patient')}</span>
                                 <span className="cv-value">{info.patient_name}</span>
                             </div>
                             <div className="cv-field">
-                                <span className="cv-label">{t('cv_doctor')}</span>
+                                <span className="cv-label">{t('final.cv_doctor')}</span>
                                 <span className="cv-value">{info.doctor_name}</span>
                             </div>
                             <div className="cv-field">
-                                <span className="cv-label">{t('cv_datetime')}</span>
+                                <span className="cv-label">{t('final.cv_datetime')}</span>
                                 <span className="cv-value">
                                     <CalendarCheck
                                         className="cv-inline-icon"
@@ -247,7 +247,7 @@ const ConfirmVisitPage = () => {
                             </div>
                             {info.services.length > 0 && (
                                 <div className="cv-field">
-                                    <span className="cv-label">{t('cv_services')}</span>
+                                    <span className="cv-label">{t('final.cv_services')}</span>
                                     <ul className="cv-services">
                                         {info.services.map((service) => (
                                             <li
@@ -264,7 +264,7 @@ const ConfirmVisitPage = () => {
                                 </div>
                             )}
                             <div className="cv-total-row">
-                                <span className="cv-label">{t('cv_total')}</span>
+                                <span className="cv-label">{t('final.cv_total')}</span>
                                 <span className="cv-total-value">{totalLabel}</span>
                             </div>
                         </div>
@@ -277,7 +277,7 @@ const ConfirmVisitPage = () => {
 
                         <div className="cv-actions">
                             <Button onClick={confirm} disabled={confirming}>
-                                {confirming ? t('cv_confirming') : t('cv_confirm')}
+                                {confirming ? t('final.cv_confirming') : t('final.cv_confirm')}
                             </Button>
                         </div>
                     </>
@@ -289,10 +289,10 @@ const ConfirmVisitPage = () => {
                             className="cv-status-icon cv-status-icon-ok"
                             aria-hidden="true"
                         />
-                        <p className="cv-status-text">{doneMessage || t('cv_confirmed')}</p>
+                        <p className="cv-status-text">{doneMessage || t('final.cv_confirmed')}</p>
                         {queueNumbers.length > 0 && (
                             <>
-                                <p className="cv-status-hint">{t('cv_queue_numbers')}</p>
+                                <p className="cv-status-hint">{t('final.cv_queue_numbers')}</p>
                                 <div className="cv-queue-list">
                                     {queueNumbers.map((entry) => (
                                         <div

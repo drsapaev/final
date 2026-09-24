@@ -59,9 +59,24 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:5173',
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      // PR 3390 review P1: split-origin regression server. Serves the SAME
+      // app from a second origin with an explicit VITE_API_BASE_URL pointing
+      // at a separate API origin (http://localhost:5999 — no real server;
+      // responses are fulfilled by page.route in the spec). This mirrors the
+      // documented production deployment (ops/vps/frontend.env.sample:
+      // frontend https://clinic.example.com + API https://api.clinic.example.com
+      // — same-site, cross-origin) where the CSRF double-submit cookie only
+      // travels when XHRs are sent with withCredentials: true.
+      command: 'VITE_API_BASE_URL=http://localhost:5999 npm run dev -- --port 5199 --strictPort',
+      url: 'http://localhost:5199',
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
 });
