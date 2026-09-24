@@ -237,7 +237,9 @@ test.describe('AI Safety Guardrails', () => {
     }
 
     expect(resp.status(), 'valid AI v2 request must reach the response contract').toBe(200);
-    expectSafetyMeta(await resp.json());
+    const body = await resp.json();
+    expect(body.status, 'AI v2 probe must exercise a successful response').toBe('success');
+    expectSafetyMeta(body);
   });
 
   test('non-doctor role cannot call AI endpoints (403)', async ({ request }) => {
