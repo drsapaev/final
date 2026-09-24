@@ -3,7 +3,7 @@
  * AI Safety Guardrails — regression tests for the medical AI safety contract.
  *
  * What this guards against:
- * - An AI endpoint silently dropping the `ai_safety_meta` block from its
+ * - An AI endpoint silently dropping the root safety fields from its
  *   response (the `requires_doctor_confirmation: True` flag is the ONLY
  *   programmatic signal the frontend has that AI output is a suggestion,
  *   not a final record). If this flag goes missing, the frontend might
@@ -16,8 +16,9 @@
  * How this works:
  * - Logs in as a doctor user (QA_DOCTOR_USERNAME / QA_DOCTOR_PASSWORD).
  * - Calls each AI endpoint with a minimal valid payload.
- * - Asserts the response JSON contains the safety_meta block with
- *   requires_doctor_confirmation === true.
+ * - Asserts successful responses include root safety fields with
+ *   requires_doctor_confirmation === true, or unavailable enhanced routes
+ *   return an explicit 503 without medical content.
  * - Calls the same endpoint as a non-doctor (e.g. registrar) and asserts
  *   403 Forbidden — AI endpoints must be role-gated.
  *
@@ -30,11 +31,11 @@
  *   QA_DOCTOR_PASSWORD=... \
  *   QA_REGISTRAR_USERNAME=registrar@clinic.com \
  *   QA_REGISTRAR_PASSWORD=... \
- *   npx playwright test e2e/ai-safety-guardrails.spec.js
+ *   npx playwright test e2e/ai-safety-guardrails.spec.ts
  */
 
 import { test, expect } from '@playwright/test';
-import type { APIRequestContext } from '@playwright/test';
+import type { APIRequestContext, APIResponse } from '@playwright/test';
 import { createHmac } from 'crypto';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:18000';
@@ -43,6 +44,13 @@ const DOCTOR_USERNAME = process.env.QA_DOCTOR_USERNAME || 'doctor@clinic.com';
 const DOCTOR_PASSWORD = process.env.QA_DOCTOR_PASSWORD;
 const REGISTRAR_USERNAME = process.env.QA_REGISTRAR_USERNAME || 'registrar@clinic.com';
 const REGISTRAR_PASSWORD = process.env.QA_REGISTRAR_PASSWORD;
+const SMART_TEMPLATE_ENDPOINT = '/api/v1/emr/ai-enhanced/generate-smart-template?specialty=cardiology';
+const SMART_SUGGESTIONS_ENDPOINT = '/api/v1/emr/ai-enhanced/smart-suggestions?field_name=complaints&specialty=cardiology';
+const ANALYZE_COMPLAINTS_ENDPOINT = '/api/v1/ai/v2/analyze-complaints';
+const COMPLAINTS_PAYLOAD = {
+  complaint: 'Синтетическая жалоба для проверки контракта',
+  specialty: 'cardiology',
+};
 
 /**
  * RFC 6238 TOTP (SHA1, 6 digits, 30s step) for the CI-seeded admin secret.
@@ -142,27 +150,33 @@ interface SafetyMeta {
   requires_doctor_confirmation?: unknown;
   decision_boundary?: unknown;
   ai_notice?: unknown;
-  ai_safety_meta?: SafetyMeta;
-  safety_meta?: SafetyMeta;
 }
 
 function expectSafetyMeta(body: SafetyMeta) {
-  // The safety meta may be at root level or nested under 'ai_safety_meta' / 'safety_meta'.
-  const meta = body.ai_safety_meta || body.safety_meta || body;
-  expect(meta, 'response should contain AI safety metadata').toBeDefined();
-  expect(meta.requires_doctor_confirmation, 'requires_doctor_confirmation must be true').toBe(true);
-  expect(meta.decision_boundary, 'decision_boundary must be suggestion_only').toBe('suggestion_only');
-  expect(meta.ai_notice, 'ai_notice disclaimer must be present').toBeTruthy();
-  expect(typeof meta.ai_notice, 'ai_notice must be a string').toBe('string');
+  expect(body.requires_doctor_confirmation, 'root requires_doctor_confirmation must be true').toBe(true);
+  expect(body.decision_boundary, 'root decision_boundary must be suggestion_only').toBe('suggestion_only');
+  expect(typeof body.ai_notice, 'root ai_notice must be a string').toBe('string');
+  expect((body.ai_notice as string).trim(), 'root ai_notice must not be empty').not.toBe('');
+}
+
+async function expectSafeOrUnavailable(resp: APIResponse) {
+  expect([200, 503], `valid request returned unexpected status ${resp.status()}`).toContain(resp.status());
+  const body = await resp.json();
+  if (resp.status() === 503) {
+    // The intentionally unavailable endpoint must not return any medical content.
+    expect(body).toEqual({ detail: { error: 'ai_feature_unavailable' } });
+    return;
+  }
+  expectSafetyMeta(body);
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-test.describe('AI Safety Guardrails', () => {
-  test.describe.configure({ mode: 'serial' });
+test.describe.configure({ mode: 'serial' });
 
+test.describe('AI Safety Guardrails', () => {
   let doctorToken!: string;
   let registrarToken: string | undefined;
 
@@ -173,68 +187,33 @@ test.describe('AI Safety Guardrails', () => {
     }
   });
 
-  test('EMR smart-template response includes safety_meta', async ({ request }) => {
+  test('EMR smart-template has a safety envelope or is explicitly unavailable', async ({ request }) => {
     const resp = await callAiEndpoint(
       request,
-      '/api/v1/emr/ai-enhanced/generate-smart-template',
-      {
-        specialty: 'cardiology',
-        patient_id: 1,
-        visit_id: 1,
-      },
+      SMART_TEMPLATE_ENDPOINT,
+      {},
       doctorToken,
     );
-
-    // Accept 200 (success) or 422 (bad payload) — both must include safety_meta
-    // if the body contains AI content. 503 (feature flag disabled) skips.
-    if (resp.status() === 503) {
-      test.skip(true, 'ai_smart_template feature flag is disabled');
-    }
-
-    expect([200, 422].includes(resp.status()), `unexpected status: ${resp.status()}`).toBeTruthy();
-    const body = await resp.json();
-
-    if (resp.status() === 200) {
-      expectSafetyMeta(body);
-    }
+    await expectSafeOrUnavailable(resp);
   });
 
-  test('EMR smart-suggestions response includes safety_meta', async ({ request }) => {
+  test('EMR smart-suggestions has a safety envelope or is explicitly unavailable', async ({ request }) => {
     const resp = await callAiEndpoint(
       request,
-      '/api/v1/emr/ai-enhanced/smart-suggestions',
-      {
-        specialty: 'cardiology',
-        field: 'complaints',
-        context: { patient_id: 1 },
-      },
+      SMART_SUGGESTIONS_ENDPOINT,
+      {},
       doctorToken,
     );
-
-    if (resp.status() === 503) {
-      test.skip(true, 'ai_smart_suggestions feature flag is disabled');
-    }
-
-    if (resp.status() === 200) {
-      const body = await resp.json();
-      expectSafetyMeta(body);
-    }
+    await expectSafeOrUnavailable(resp);
   });
 
   test('AI gateway analyze-complaints response is role-gated + safe', async ({ request }) => {
     const resp = await callAiEndpoint(
       request,
-      '/api/v1/ai/v2/analyze-complaints',
-      {
-        complaint: 'Синтетическая жалоба для проверки контракта',
-        specialty: 'cardiology',
-      },
+      ANALYZE_COMPLAINTS_ENDPOINT,
+      COMPLAINTS_PAYLOAD,
       doctorToken,
     );
-
-    if (resp.status() === 503) {
-      test.skip(true, 'ai_complaint_analysis feature flag is disabled');
-    }
 
     expect(resp.status(), 'valid AI v2 request must reach the response contract').toBe(200);
     const body = await resp.json();
@@ -245,16 +224,16 @@ test.describe('AI Safety Guardrails', () => {
   test('non-doctor role cannot call AI endpoints (403)', async ({ request }) => {
     test.skip(!registrarToken, 'QA_REGISTRAR_PASSWORD not set — skipping role-gate test');
 
-    const endpoints = [
-      '/api/v1/emr/ai-enhanced/generate-smart-template',
-      '/api/v1/emr/ai-enhanced/smart-suggestions',
-      '/api/v1/ai/v2/analyze-complaints',
-      '/api/v1/ai/v2/suggest-icd10',
+    const probes = [
+      { endpoint: SMART_TEMPLATE_ENDPOINT, payload: {} },
+      { endpoint: SMART_SUGGESTIONS_ENDPOINT, payload: {} },
+      { endpoint: ANALYZE_COMPLAINTS_ENDPOINT, payload: COMPLAINTS_PAYLOAD },
+      { endpoint: '/api/v1/ai/v2/suggest-icd10', payload: { symptoms: ['Синтетический симптом'] } },
     ];
 
-    for (const endpoint of endpoints) {
+    for (const { endpoint, payload } of probes) {
       // test.skip above guarantees registrarToken is set when the test runs.
-      const resp = await callAiEndpoint(request, endpoint, {}, registrarToken!);
+      const resp = await callAiEndpoint(request, endpoint, payload, registrarToken!);
       expect(
         [401, 403].includes(resp.status()),
         `${endpoint} should reject registrar (got ${resp.status()})`,
@@ -263,14 +242,14 @@ test.describe('AI Safety Guardrails', () => {
   });
 
   test('AI endpoints require authentication (401 without token)', async ({ request }) => {
-    const endpoints = [
-      '/api/v1/emr/ai-enhanced/generate-smart-template',
-      '/api/v1/ai/v2/analyze-complaints',
+    const probes = [
+      { endpoint: SMART_TEMPLATE_ENDPOINT, payload: {} },
+      { endpoint: ANALYZE_COMPLAINTS_ENDPOINT, payload: COMPLAINTS_PAYLOAD },
     ];
 
-    for (const endpoint of endpoints) {
+    for (const { endpoint, payload } of probes) {
       const resp = await request.post(`${BACKEND_URL}${endpoint}`, {
-        data: {},
+        data: payload,
         headers: { 'Content-Type': 'application/json' },
       });
       expect(
@@ -294,18 +273,26 @@ test.describe('AI Feature Flag Toggle (admin)', () => {
       'admin',
     );
 
-    // 1. Disable the flag
-    const disableResp = await request.post(
-      `${BACKEND_URL}/api/v1/admin/feature-flags/ai_smart_template/toggle`,
-      {
-        data: { enabled: false, reason: 'e2e test' },
-        headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
-      },
-    );
-    expect(disableResp.ok(), 'toggle to disabled should succeed').toBeTruthy();
+    const flagUrl = `${BACKEND_URL}/api/v1/admin/feature-flags/ai_smart_template`;
+    const headers = { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' };
+    const originalResp = await request.get(flagUrl, { headers });
+    expect(originalResp.ok(), 'reading ai_smart_template before mutation should succeed').toBeTruthy();
+    const originalFlag = await originalResp.json();
+    expect(typeof originalFlag.enabled, 'flag enabled state must be boolean').toBe('boolean');
+    const originallyEnabled: boolean = originalFlag.enabled;
 
     try {
-      // 2. Verify endpoint returns 503
+      if (originallyEnabled) {
+        const disableResp = await request.post(`${flagUrl}/toggle`, {
+          data: { enabled: false, reason: 'e2e test' },
+          headers,
+        });
+        expect(disableResp.ok(), 'toggle to disabled should succeed').toBeTruthy();
+        const disabledFlag = await disableResp.json();
+        expect(disabledFlag.enabled, 'toggle response must confirm disabled state').toBe(false);
+      }
+
+      // Verify the feature flag blocks a valid request before the route body runs.
       const doctorToken = await login(
         request,
         DOCTOR_USERNAME,
@@ -314,8 +301,8 @@ test.describe('AI Feature Flag Toggle (admin)', () => {
       );
       const aiResp = await callAiEndpoint(
         request,
-        '/api/v1/emr/ai-enhanced/generate-smart-template',
-        { specialty: 'cardiology' },
+        SMART_TEMPLATE_ENDPOINT,
+        {},
         doctorToken,
       );
       expect(aiResp.status(), 'disabled flag should yield 503').toBe(503);
@@ -324,14 +311,16 @@ test.describe('AI Feature Flag Toggle (admin)', () => {
       expect(body.detail.error, 'error code should be feature_disabled').toBe('feature_disabled');
       expect(body.detail.flag, 'flag key should be in response').toBe('ai_smart_template');
     } finally {
-      // 3. Re-enable the flag — always, even if assertions failed
-      await request.post(
-        `${BACKEND_URL}/api/v1/admin/feature-flags/ai_smart_template/toggle`,
-        {
-          data: { enabled: true, reason: 'e2e test cleanup' },
-          headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
-        },
-      );
+      // Restore exactly the state observed before this test.
+      if (originallyEnabled) {
+        const restoreResp = await request.post(`${flagUrl}/toggle`, {
+          data: { enabled: originallyEnabled, reason: 'e2e test cleanup' },
+          headers,
+        });
+        expect(restoreResp.ok(), 'restoring original flag state should succeed').toBeTruthy();
+        const restoredFlag = await restoreResp.json();
+        expect(restoredFlag.enabled, 'restore response must match original flag state').toBe(originallyEnabled);
+      }
     }
   });
 });
