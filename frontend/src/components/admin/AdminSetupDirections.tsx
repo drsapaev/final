@@ -98,6 +98,23 @@ const AdminSetupDirections = () => {
     const [entryMethodsByProfileKey, setEntryMethodsByProfileKey] = useState<
         Record<string, EntryMethodsDto | null>
     >({});
+    // RQ-18 follow-up round-3 (P2): post-provision recheck answers as a
+    // SEPARATE tri-state override (undefined = no recheck answer yet;
+    // boolean = proven; null = recheck failed → honest unknown). Writing
+    // null INTO entryMethodsByProfileKey destroyed the last-known
+    // EntryMethodsDto — a later `true` then hit `!current` and the
+    // checklist row was stuck at unknown forever (only a full page
+    // reload resynced it).
+    const [postProvisionSupportByProfileKey, setPostProvisionSupportByProfileKey] =
+        useState<Record<string, boolean | null | undefined>>({});
+    // RQ-18 follow-up round-4 (P2-2): request generation for the
+    // post-provision recheck. Every full read (loadCore) bumps the
+    // generation; a recheck callback is accepted ONLY when it was issued
+    // in the CURRENT generation — a late answer from a recheck that
+    // started BEFORE the refresh must never overwrite the fresher full
+    // read (the «ложно зелёная строка» race).
+    const supportGenerationRef = useRef(0);
+    const [supportGeneration, setSupportGeneration] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [wizard, setWizard] = useState<WizardState>(emptyWizard);
@@ -115,6 +132,11 @@ const AdminSetupDirections = () => {
 
     const loadCore = useCallback(async () => {
         try {
+            // Round-4 (P2-2): the new full read invalidates every recheck
+            // issued in a previous generation. Bumped BEFORE the awaits so
+            // an in-flight recheck is already stale from this moment.
+            supportGenerationRef.current += 1;
+            setSupportGeneration(supportGenerationRef.current);
             setLoading(true);
             setError(null);
             const [servicesRes, profilesRes, resourcesRows, doctorsRes] = await Promise.all([
@@ -163,6 +185,9 @@ const AdminSetupDirections = () => {
                 }),
             );
             setEntryMethodsByProfileKey(Object.fromEntries(methods));
+            // A fresh FULL read is the new source of truth — any
+            // post-provision override from a previous lifecycle is stale.
+            setPostProvisionSupportByProfileKey({});
         } catch (err) {
             logger.error('Error loading setup directions data:', err);
             setError(tRef.current('admin2.sdx_load_failed'));
@@ -183,8 +208,55 @@ const AdminSetupDirections = () => {
                 resources,
                 entryMethodsByProfileKey,
                 doctors,
+                postProvisionSupportByProfileKey,
             ),
-        [services, profiles, resources, entryMethodsByProfileKey, doctors],
+        [services, profiles, resources, entryMethodsByProfileKey, doctors, postProvisionSupportByProfileKey],
+    );
+
+    // RQ-18 follow-up (P2-4): the permanent address is provisioned PER
+    // PROFILE, while checklist rows are per-tag — a profile carrying
+    // several queue_tags must render its QR block ONCE (the first visible
+    // tag row owns it), not once per tag with independent React states.
+    // Pure derivation — no render-order mutations (StrictMode-safe).
+    const qrRowByProfileKey = useMemo(() => {
+        const first: Record<string, string> = {};
+        for (const row of Object.values(checklist)) {
+            const key = row.owningProfile?.key;
+            if (key && row.owningProfileVisible && !(String(key) in first)) {
+                first[String(key)] = row.tag;
+            }
+        }
+        return first;
+    }, [checklist]);
+
+    // RQ-18 follow-up (P2-3): the QR block re-reads entry-methods after a
+    // provision and reports the fresh permanent_address.supported — the
+    // checklist row status must follow (a freshly provisioned healthy
+    // direction drops the stale «не готово» state; a failed recheck is an
+    // honest unknown, never a confident «недоступно»).
+    const handleQrSupportedChange = useCallback(
+        (profileKey: string, supported: boolean | null, generation?: number) => {
+            // RQ-18 follow-up round-3 (P2): record the recheck answer as a
+            // tri-state OVERRIDE — the last-known EntryMethodsDto is never
+            // destroyed, so the row can move unknown → true (or → false)
+            // when the recheck answers after the pending unknown.
+            // RQ-18 follow-up round-4 (P2-2): the override is accepted only
+            // from a recheck issued in the CURRENT generation — a late
+            // answer from a pre-refresh recheck is dropped (not older than
+            // the last full read, or it never lands).
+            const issuedGeneration =
+                typeof generation === 'number'
+                    ? generation
+                    : supportGenerationRef.current;
+            if (issuedGeneration < supportGenerationRef.current) {
+                return;
+            }
+            setPostProvisionSupportByProfileKey((prev) => ({
+                ...prev,
+                [profileKey]: supported,
+            }));
+        },
+        [],
     );
 
     const wizardTagOptions = useMemo(
@@ -608,11 +680,28 @@ const AdminSetupDirections = () => {
                                                 </tbody>
                                             </table>
                                             {row.owningProfile?.key && row.owningProfileVisible && (
-                                                <PermanentDirectionQr
-                                                    profileKey={String(row.owningProfile.key)}
-                                                    tag={row.tag}
-                                                    supported={row.permanentAddress}
-                                                />
+                                                qrRowByProfileKey[String(row.owningProfile.key)] === row.tag ? (
+                                                    <PermanentDirectionQr
+                                                        profileKey={String(row.owningProfile.key)}
+                                                        tag={row.tag}
+                                                        supported={row.permanentAddress}
+                                                        onSupportedChange={handleQrSupportedChange}
+                                                        supportGeneration={supportGeneration}
+                                                    />
+                                                ) : (
+                                                    /* RQ-18 follow-up (P2-4): sibling tag rows of the
+                                                       SAME profile show a pointer instead of a second,
+                                                       independent QR block — the address belongs to the
+                                                       profile as a whole, not to an individual tag. */
+                                                    <div
+                                                        className="admin-sdx-qr-dedupe-note"
+                                                        data-testid={`setup-qr-dedupe-${row.tag}`}
+                                                    >
+                                                        {t('admin2.qrdx_dedupe_note', {
+                                                            tag: qrRowByProfileKey[String(row.owningProfile.key)],
+                                                        })}
+                                                    </div>
+                                                )
                                             )}
                                         </div>
                                     ))}

@@ -2503,6 +2503,7 @@ const uzLatn = {
         unknown: 'Doimiy QR holati noma‘lum (holatni o‘qishda xatolik)',
         failed: 'Doimiy QR yaratib bo‘lmadi',
         sr_qr: 'Yo‘nalishning doimiy manzili QR kodi',
+        dedupe_note: 'Bu yo‘nalishning doimiy QR’i «{tag}» qatorida ko‘rsatilgan — manzil butun profilga tegishli, alohida tegga emas.',
         },
     qrm_title: 'QueueResource reyestri',
     qrm_subtitle: 'Teglarning resurs egallari. Yaratish — draft; faollashtirish §3.1 invariant gate orqali. code/queue_tag yaratilgandan keyin o\'zgarmaydi (§3.2).',
@@ -7143,6 +7144,27 @@ const uzLatn = {
     qj_retry_btn: 'Qayta urinib ko‘ring',
     qj_home_btn: 'Bosh sahifa',
     qj_direction_unavailable: 'Yo‘nalish mavjud emas',
+    // RQ-18 follow-up round-2 (P1)
+    qj_reconcile_title: 'Oldingi yuborish natijasi noma’lum.',
+    qj_reconcile_hint: 'Birinchi yuborishdagi o‘sha F.I.O. va telefon raqamini kiritib, «Urinishni tekshirish» tugmasini bosing. Natija noma’lum bo‘lganda yangi sessiya yaratilmaydi.',
+    qj_reconcile_check: 'Urinishni tekshirish',
+    qj_reconcile_start_over: 'Qaytadan boshlash',
+    // Round-5 (PR #3362 review, P1-3): the decisive payload-bound
+    // replay conflict — 409 join_session_payload_mismatch.
+    qj_payload_mismatch: 'Bu urinish boshqa ma’lumotlar to‘plamiga tegishli — uning natijasi qayta berilmaydi. Kerak bo‘lsa qaytadan boshlang.',
+    qj_preexec_refusal: 'Sessiya yuborishidan oldin tugadi — yozuv yaratilmadi. Qaytadan boshlash kerakmi?',
+    qj_preexec_not_executed: 'Yuborish bajarilmadi — navbat yozuv yaratilishidan oldin rad etdi. Qaytadan boshlash kerakmi?',
+    qj_attempt_guard_unavailable: 'Brauzer urinish holatini saqlay olmadi — takroriy yozuvning oldini olish uchun yuborish bloklandi. Sayt ma’lumotlariga ruxsat berib, qayta urinib ko‘ring.',
+    // Round-10 (PR #3362 review, P1): fail-closed ambiguity — several
+    // outstanding attempts on this device, no live owner marker.
+    qj_attempt_ambiguity_title: 'Bu qurilmada navbatga yozilishning tugallanmagan bir necha urinishi bor.',
+    qj_attempt_ambiguity_hint: 'Takrorlanishning oldini olish uchun har bir urinishni o‘sha urinish yuborilganda kiritilgan F.I.Sh. va telefon bilan tekshiring. Tekshirish hech narsani bajarmaydi; urinish faqat server yozuv yaratilmaganligini isbotlaganda o‘chiriladi.',
+    qj_attempt_ambiguity_item: '{time} dagi urinish',
+    qj_attempt_ambiguity_not_mine: 'Tekshirildi: ma’lumotlar mos kelmadi',
+    qj_attempt_ambiguity_resolved_hint: 'Tugallanmagan urinishlarning hech biri ma’lumotlaringizga mos kelmadi. Yangi yozuvni boshlash mumkin.',
+    qj_attempt_probe_unbound: 'Tugallanmagan: yozuv yo‘q',
+    qj_attempt_probe_unbound_discard: 'Urinishni o‘chirish',
+    qj_attempt_probe_unknown: 'Bu urinish holati hozircha noma’lum — so‘rov hali qayta ishlanayotgan bo‘lishi mumkin. Keyinroq qayta tekshirib ko‘ring.',
     qj_waiting_title: 'Navbat tez orada ochiladi',
     qj_waiting_will_open_at: 'Navbatga yozilish {time} da ochiladi',
     qj_waiting_until_open: 'yozilish ochilishigacha',

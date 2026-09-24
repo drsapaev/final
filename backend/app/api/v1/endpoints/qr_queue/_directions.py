@@ -158,6 +158,20 @@ class PublicDirectionStartResponse(BaseModel):
     permanent_address: bool = Field(
         ..., description="Always True on this surface (the address is permanent)"
     )
+    # Round-6 (PR #3362 review, P1-3): the attempt-identity horizon (see
+    # JoinSessionStartResponse) — a permanent-address session started
+    # after the cutoff targets TOMORROW, so the client must NOT drop the
+    # attempt envelope after a fixed 24h while the target queue-day is
+    # still running.
+    target_date: str | None = Field(
+        None, description="Целевая дата очереди токена (YYYY-MM-DD)"
+    )
+    attempt_expires_at: str | None = Field(
+        None,
+        description=(
+            "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки"
+        ),
+    )
     direction: PublicDirectionAddressInfo
     queue_info: dict[str, Any] = Field(
         ...,
@@ -436,10 +450,27 @@ def start_public_direction_session(
         profile, info.get("selectable_specialists")
     )
 
+    # RQ-18 follow-up (owner round-1 P1-1): the shared token-info builder
+    # runs the clinic-wide branch for the minted is_clinic_wide token and
+    # emits the CLINIC SENTINEL display fields («Клиника» /
+    # «Все специалисты» / queue_length 0). A direction session must
+    # present the DIRECTION the patient is joining — the routing decision
+    # itself stays untouched in the join path. Live queue statistics are
+    # deliberately NOT synthesized here: resolving the exact (tag, day)
+    # surface at start time would duplicate the join-path routing
+    # resolution (drift hazard); the real numbers arrive with the
+    # join-time result (entries[].queue_length / estimated_wait_time).
+    _direction_title = profile.title_ru or profile.title or profile.key
+    info["department_name"] = _direction_title
+    info["specialist_name"] = None
+    info["queue_length"] = None
+
     return PublicDirectionStartResponse(
         session_token=result["session_token"],
         expires_at=result["expires_at"],
         permanent_address=True,
+        target_date=result.get("target_date"),
+        attempt_expires_at=result.get("attempt_expires_at"),
         direction=PublicDirectionAddressInfo(
             profile_id=profile.id,
             key=profile.key,

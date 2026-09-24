@@ -40,6 +40,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -456,6 +457,20 @@ class QueueJoinSession(Base):
         nullable=True
     )  # ✅ SECURITY: SET NULL to preserve session history
     queue_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # RQ-18 follow-up round-5 (PR #3362 review, P1-3): immutable payload
+    # binding — one session token = one payload. Canonical fingerprint of
+    # the FIRST successful complete (normalized name, digits-only phone,
+    # telegram id, typed specialist selection); a replay whose payload does
+    # not match is refused (join_session_payload_mismatch), never served.
+    payload_fingerprint: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
+    # RQ-18 follow-up round-5 (PR #3362 review, P2-1): the EXACT original
+    # complete response (JSON). The lost-response replay re-serves these
+    # numbers verbatim — recomputing live metrics would show a different
+    # queue picture than the attempt the patient is asking about.
+    response_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Метаданные
     user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
