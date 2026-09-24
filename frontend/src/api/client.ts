@@ -441,9 +441,17 @@ api.interceptors.response.use(
         // session still fails the check and gets cleared.
         const liveToken = tokenManager.getAccessToken();
         if (!liveToken || failedToken === liveToken) {
-          logger.warn('🔒 Token refresh failed — clearing session');
-          tokenManager.clearAll();
-          delete api.defaults.headers.common['Authorization'];
+          // N2-5 review round 3 (P1): a STAFF session whose refresh died is
+          // terminated through the SAME machinery as the access-only path
+          // below — invalidateDeadSession() (the auth-store listener:
+          // auth_token/auth_profile + PHI caches + subscriber notify, so
+          // RouteAccessBoundary redirects at once) plus the idempotent
+          // client-level credential drop. The old manual clearAll() left
+          // auth_profile and the React auth subscribers untouched: the
+          // staff UI (e.g. the Nurse tablet) kept rendering a zombie
+          // logged-in session with no guaranteed redirect.
+          logger.warn('🔒 Token refresh failed — clearing dead session');
+          invalidateDeadSession();
         }
       } else if (hadAuthHeader && !refreshToken) {
         // Access-only session (Patient portal): no refresh token exists, so
