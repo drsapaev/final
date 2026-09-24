@@ -9,7 +9,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import DentistVisitsView from '../views/DentistVisitsView';
-import DentistPhotosView from '../views/DentistPhotosView';
 import DentistAIAssistantView from '../views/DentistAIAssistantView';
 import { dentalCardKeyDown } from '../dentistCardA11y';
 import { useDentistUrlPatient } from '../useDentistUrlPatient';
@@ -64,14 +63,6 @@ describe('dentist views (PR-UI-15-6)', () => {
       />,
     );
     expect(screen.getByTestId('visit-screen')).toHaveTextContent('SYNTHETIC-Selected');
-  });
-
-  it('DentistPhotosView renders the photo archive grid', () => {
-    renderWithProviders(
-      <DentistPhotosView patients={patients} onPhotoArchive={vi.fn()} tI18n={t} />,
-    );
-    expect(screen.getByText('dental.dental_panel_photos_title')).toBeInTheDocument();
-    expect(screen.getAllByText('dental.dental_panel_photos_action')).toHaveLength(2);
   });
 
   it('DentistAIAssistantView renders the dentistry AI assistant surface', () => {

@@ -51,9 +51,11 @@ import { useDentistActions } from './dentist/useDentistActions';
 // cashier 14-5 / doctor 15-2 precedent).
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import DentistVisitsView from './dentist/views/DentistVisitsView';
-import DentistPhotosView from './dentist/views/DentistPhotosView';
 import DentistAIAssistantView from './dentist/views/DentistAIAssistantView';
 import DentistDialogsLayer from './dentist/views/DentistDialogsLayer';
+
+const DENTIST_VALID_TABS = ['queue', 'visit', 'patients', 'ai-assistant'];
+const DENTIST_TAB_ALIASES = { photos: 'patients', visits: 'visit', appointments: 'patients' };
 
 /**
  * Объединенная стоматологическая панель с полным функционалом
@@ -86,16 +88,24 @@ const DentistPanelUnified = () => {
     selectedPatient,
     setSelectedPatient,
   } = useDoctorPanelState({
-    // Phase 4: sidebar reduced to 4 tabs — queue / visit / patients / photos.
+    // Keep only workflows backed by safe, working persistence.
     defaultTab: 'queue',
     visitDeepLinkTab: 'visit',
     patientDeepLinkTab: 'patients',
+    validTabs: DENTIST_VALID_TABS,
+    tabAliases: DENTIST_TAB_ALIASES,
   }) as DoctorPanelState;
 
   // STRAT#34: useTranslation adapter for confirm/notify i18n.
   // PR-UI-15-3: moved above the worklist hook — the hook needs tI18n for the
   // DTO labels (hook order stays consistent across renders).
   const { t: tI18n } = useTranslation();
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('tab') === 'photos') {
+      notify.info(tI18n('dental.dental_panel_photo_archive_unavailable'));
+    }
+  }, [location.search, tI18n]);
 
   // PR-UI-15-6: handleCardKeyDown moved verbatim to ./dentist/dentistCardA11y
   // (shared by the extracted card-grid views).
@@ -235,7 +245,6 @@ const DentistPanelUnified = () => {
     handlePatientSelect,
     handleCompleteVisit,
     handleVisitProtocol,
-    handlePhotoArchive,
     handleProtocolTemplateSelect,
     handleDentalChart,
   } = useDentistActions({
@@ -426,13 +435,6 @@ const DentistPanelUnified = () => {
       }}
       tI18n={tI18n} />;
 
-  // PR-UI-15-6: renderPhotos → views/DentistPhotosView (verbatim JSX).
-  const renderPhotos = () =>
-    <DentistPhotosView
-      patients={patients}
-      onPhotoArchive={handlePhotoArchive}
-      tI18n={tI18n} />;
-
   // Рендер планов лечения
 
 
@@ -462,8 +464,6 @@ const DentistPanelUnified = () => {
         // Phase 4: 'visit' is the new sidebar tab; 'visits' kept as
         // alias for back-compat with deep links and old saved URLs.
         return renderVisits();
-      case 'photos':
-        return renderPhotos();
       case 'ai-assistant':
         return renderAIAssistant();
       default:

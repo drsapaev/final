@@ -1,5 +1,5 @@
 import {
-  AlertTriangle, BarChart3, Bell, Brain, Building2, Calendar, Camera,
+  AlertTriangle, BarChart3, Bell, Brain, Building2, Calendar,
   CircleDollarSign, Compass, CreditCard, FileText, Heart, KeyRound, List, ListOrdered,
   Lock, Monitor, Percent, Phone, Puzzle, Search, Send, Settings, Smile,
   SquareStack, Stethoscope, TestTube2, UserPlus, Users, Wand2,
@@ -160,27 +160,26 @@ export const SIDEBAR_PRESETS = {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'queue',
-    // Phase 4 fix: reduced from 13 tabs in 4 sections to 5 flat tabs.
-    // Goal: dentist workflow is "queue → visit → patient/photos" — everything
+    // Phase 4 fix: reduced from 13 tabs in 4 sections to 4 flat tabs.
+    // Goal: dentist workflow is "queue → visit → patients" — everything
     // else (examinations/diagnoses/dental-chart/treatment-plans/prosthetics/
     // templates/reports) was either dead UI (treatment-plans/prosthetics had
     // 501 backend stubs) or duplicated the visit screen (dental-chart
     // duplicated the chart embedded in the visit; examinations/diagnoses
     // were merged into EMR v2 visit screen).
     //
-    // The 5 remaining tabs:
+    // The 4 remaining tabs:
     //   queue    — вход: вызвать следующего пациента из очереди
     //   visit    — единый экран приёма: анамнез + схема зубов + Дополнительно
     //   patients — поиск/история пациентов
-    //   photos   — фотоархив (рентген + intraoral)
     //   ai-assistant — AI-помощник (draft support, не диагноз)
     //
-    // Muscle memory: 5 flat items, well under Miller's 7±2.
+    // Unsupported photo upload is intentionally absent until protected file
+    // storage is available; the old ?tab=photos link redirects to patients.
     items: [
       { id: 'queue',         labelKey: 'nav.queue',      icon: ListOrdered },
       { id: 'visit',         labelKey: 'nav.visit',        icon: Stethoscope },
       { id: 'patients',      labelKey: 'nav.patients',     icon: Users },
-      { id: 'photos',        labelKey: 'nav.photo_archive',    icon: Camera },
       { id: 'ai-assistant',  labelKey: 'nav.ai_assistant',  icon: Brain, ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },

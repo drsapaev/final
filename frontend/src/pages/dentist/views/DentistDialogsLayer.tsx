@@ -163,6 +163,7 @@ export default function DentistDialogsLayer({
 
       {showVisitProtocol && (selectedPatient || protocolTemplateDraft) &&
       <VisitProtocol
+        temporarilyUnavailable
         patientId={((selectedPatient || protocolTemplateDraft)?.patient_id as string | number | undefined) || selectedPatientId}
         patientName={(selectedPatient || protocolTemplateDraft)?.patient_name || selectedPatientDisplayName}
         visitId={((selectedPatient || protocolTemplateDraft)?.visit_id as string | number | undefined) || (selectedPatient?.visit_id as string | number | undefined)}
