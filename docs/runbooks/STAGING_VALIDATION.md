@@ -549,13 +549,14 @@ use a disposable detached worktree, so even an unexpected successful commit
 cannot move `main` or include a probe file in your PR.
 
 ```bash
+set -euo pipefail
+
 # Install hooks (one-time after clone)
 bash scripts/setup-dev.sh
 
 # Verify hooks are installed
 test -f "$(git rev-parse --git-path hooks)/pre-commit"
 
-set -euo pipefail
 repo_root=$(pwd -P)
 probe_dir=$(mktemp -d "$repo_root/.check8-probe.XXXXXX")
 probe_dir=$(cd "$probe_dir" && pwd -P)
