@@ -91,6 +91,18 @@ class NurseServingEntryResponse(BaseModel):
     served_at: datetime | None = None
     visit_id: int | None = None
     is_my_claim: bool = False
+    # N2-5 owner review round (P1, the D1 handover): populated for the
+    # ACTIVE entries of the station board only — whether the entry's
+    # claim owner (called_by) still holds an ACTIVE assignment on THIS
+    # station, and whether the CURRENT user may act on the entry: her
+    # own claim, or the owner's assignment is gone (the start/terminal
+    # endpoints sanction the takeover; an admin-called entry with no
+    # claim owner is actionable for every assigned nurse). None = the
+    # predicate does not apply (waiting / terminal rows). The UI must
+    # NEVER derive actionability for a foreign entry without these —
+    # a still-assigned owner's work stays read-only.
+    claim_owner_assignment_active: bool | None = None
+    actionable_by_current_user: bool | None = None
     # Populated for the active (called/in_progress) entries: the
     # station-routed services of the entry's visit with their execution
     # state — the tablet's "what is left to perform" list.

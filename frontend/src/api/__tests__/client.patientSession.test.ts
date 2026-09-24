@@ -315,7 +315,13 @@ describe('access-only patient session replacement (P1)', () => {
     await expect(api.get('/api/v1/visits/42')).rejects.toMatchObject({
       response: { status: 401 }
     });
-    expect(tokenState.cleared).toBe(1);
+    // N2-5 review round 3 (P1): the staff dead-session now terminates
+    // through the SAME machinery as the access-only path — the auth-store
+    // listener (clearToken → clearAll) PLUS the idempotent client-level
+    // fallback clear. The clear count is therefore >= 1 (the
+    // belt-and-suspenders double-clear when the store listener is
+    // loaded, as in this suite).
+    expect(tokenState.cleared).toBeGreaterThanOrEqual(1);
     expect(tokenState.access).toBeNull();
   });
 

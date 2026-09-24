@@ -1255,6 +1255,32 @@ export const ROUTE_REGISTRY = [
     layout: layout({ sidebarPreset: 'lab', pageTitle: 'Lab Panel' }),
   },
   {
+    id: 'nurse-serving',
+    path: '/nurse',
+    group: 'clinical',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'app-shell',
+    // NURSE-V2 N2-5: the Nurse-only tablet workspace. Deliberately WITHOUT
+    // Admin (the repo staff-route convention is intentionally not applied
+    // here): the serving plane performs data-level authorization that
+    // requires an ACTIVE NurseWorkplaceAssignment for everyone (N2-3,
+    // superuser included), so an Admin hitting /nurse would render an empty
+    // no-workplace shell at best. No Nurse-to-Doctor alias (ROLE_ALIASES
+    // stays empty), no sidebar preset (no clinical sidebar — a tablet-first
+    // frameless surface, the patient-home precedent), no extra route grants:
+    // this is the ONLY new route of the slice and it grants exactly one role.
+    auth: 'role-scoped',
+    roles: ['Nurse'],
+    homeForRoles: ['nurse'],
+    entry: 'direct',
+    nav: false,
+    title: 'Nurse Serving',
+    owner: 'clinical.nurse',
+    component: 'NurseTabletPage',
+    layout: layout({ hideSidebar: true, pageTitle: 'Nurse Serving' }),
+  },
+  {
     id: 'patient-home',
     path: '/patient',
     group: 'clinical',
@@ -1402,12 +1428,10 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'authenticated',
     roles: [],
-    // NURSE-V2 N2-2 (review P2, PR #3333): the Nurse login landing until
-    // the N2-5 tablet workspace ships. auth:'authenticated' means the page
-    // grants NOTHING role-scoped — privilege-zero is preserved (no clinical
-    // search/patients/EMR); the Nurse simply sees their own profile instead
-    // of an automatic /forbidden bounce after a successful login.
-    homeForRoles: ['nurse'],
+    // NURSE-V2 N2-2 (PR #3333) parked the Nurse login landing here while
+    // the tablet workspace did not exist. N2-5 ships /nurse as the
+    // canonical home, so this route no longer carries homeForRoles —
+    // it stays a plain authenticated self-profile screen.
     entry: 'contextual',
     nav: false,
     title: 'User Profile',

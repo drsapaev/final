@@ -16,7 +16,12 @@ Authorization model (deny-by-default, the §5 contract):
 - the QueueResource registry row's ``active`` flag is NOT re-checked
   here: serving follows the QD-2C deactivation-resilient surface rule
   (an existing station queue remains the serving surface; N2-2 already
-  stops NEW assignments for inactive resources).
+  stops NEW assignments for inactive resources);
+- the D1 handover predicate is OWNER-scoped defense-in-depth (review
+  round 3): an ACTIVE assignment alone does not keep a claim read-only —
+  the owner's ACCOUNT must still be active and Nurse-role (the
+  ``update_user`` lifecycle deactivates/demotes without touching
+  NurseWorkplaceAssignment), otherwise the entry opens for takeover.
 
 State machines this service drives (the N2-3 brief transition matrix):
 
@@ -106,6 +111,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, aliased
 
 from app.core.audit import log_audit_event
+from app.core.roles import Roles, normalize_role_value
 from app.crud import visit as crud_visit
 from app.crud.clinic import clinic_today
 from app.crud.queue_resource_routing import find_active_tag_queue
@@ -140,6 +146,12 @@ def _service_routed_to_station(service: Service, resource: QueueResource) -> boo
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+# N2-5 owner review round 3 (P1): the normalized canonical Nurse spelling
+# the eligible-owner predicate compares against (case/whitespace drift in
+# stored rows is absorbed by normalize_role_value, the roles SSOT).
+_NURSE_ROLE_NORMALIZED = normalize_role_value(Roles.NURSE)
 
 
 class NurseServingApiDomainError(Exception):
@@ -297,6 +309,64 @@ class NurseServingApiService:
         """
         return self._station_services_batch([entry], resource)[entry.id]
 
+    def _eligible_claim_owners(
+        self, claim_owner_ids: set[int], resource: QueueResource
+    ) -> set[int]:
+        """N2-5 owner review round 3 (P1) + round 4 (P2): eligible owners.
+
+        An ACTIVE assignment row alone no longer proves a working owner:
+        the user lifecycle (``update_user``) deactivates or demotes an
+        account WITHOUT touching ``NurseWorkplaceAssignment`` (only the
+        Doctor profile mirror exists there). Such an owner is already
+        locked out of the serving plane by ``require_active_roles("Nurse")``
+        — keeping her entry read-only would strand the patient: the owner
+        can no longer continue, and the colleagues may not take over.
+
+        Round 4 (P2) — the predicate must mirror the gate EXACTLY:
+        ``require_roles()`` admits an ACTIVE superuser regardless of the
+        stored role (the staff bypass pinned by
+        ``test_no_assignment_is_403_even_for_superuser`` — the superuser
+        passes the role gate and is then stopped only by the missing
+        assignment row). ``UserUpdateRequest`` can produce exactly that
+        reachable world: a Nurse with an active assignment is updated to
+        ``role=Admin, is_superuser=true`` — she KEEPS serving access, so
+        the board must keep counting her as a working owner; a role-only
+        predicate would offer her colleagues a takeover on her live claim.
+        The eligible-owner predicate is therefore read-side
+        defense-in-depth mirroring the endpoint authorization: an ACTIVE
+        assignment AND an active account AND (the canonical Nurse role
+        (normalized) OR the superuser bypass) — exactly the world the
+        gate would admit for the owner herself. Still ONE batched query
+        (the join, one column wider) for the whole board — the constant
+        query-budget pin keeps holding.
+        """
+        if not claim_owner_ids:
+            return set()
+        owner_rows = (
+            self.db.query(
+                NurseWorkplaceAssignment.user_id,
+                User.is_active,
+                User.is_superuser,
+                User.role,
+            )
+            .join(User, User.id == NurseWorkplaceAssignment.user_id)
+            .filter(
+                NurseWorkplaceAssignment.user_id.in_(claim_owner_ids),
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+                NurseWorkplaceAssignment.is_active.is_(True),
+            )
+            .all()
+        )
+        return {
+            user_id
+            for user_id, is_active, is_superuser, role in owner_rows
+            if is_active
+            and (
+                bool(is_superuser)
+                or normalize_role_value(role) == _NURSE_ROLE_NORMALIZED
+            )
+        }
+
     def _station_services_batch(
         self, entries: list[OnlineQueueEntry], resource: QueueResource
     ) -> dict[int, list[dict[str, Any]]]:
@@ -392,7 +462,12 @@ class NurseServingApiService:
         resource: QueueResource | None = None,
         with_services: bool = False,
         services: list[dict[str, Any]] | None = None,
+        claim_owner_assignment_active: bool | None = None,
     ) -> dict[str, Any]:
+        is_my_claim = (
+            entry.called_by_user_id == my_user_id
+            and entry.status in _ENTRY_ACTIVE_STATES
+        )
         payload: dict[str, Any] = {
             "id": entry.id,
             "number": entry.number,
@@ -408,12 +483,18 @@ class NurseServingApiService:
             "served_by_user_id": entry.served_by_user_id,
             "served_at": entry.served_at,
             "visit_id": entry.visit_id,
-            "is_my_claim": (
-                entry.called_by_user_id == my_user_id
-                and entry.status in _ENTRY_ACTIVE_STATES
-            ),
+            "is_my_claim": is_my_claim,
             "services": [],
         }
+        if claim_owner_assignment_active is not None:
+            # N2-5 owner review round (P1, the D1 handover): the board's
+            # server-derived actionability. Only get_station_state passes
+            # the fact (for ACTIVE rows) — everywhere else the fields stay
+            # absent (schema default None: the predicate does not apply).
+            payload["claim_owner_assignment_active"] = claim_owner_assignment_active
+            payload["actionable_by_current_user"] = (
+                is_my_claim or not claim_owner_assignment_active
+            )
         if services is not None:
             # Pre-folded by the batch loader (the board path): reuse
             # as-is — no second enrichment pass (codex round-3 P2).
@@ -1043,8 +1124,34 @@ class NurseServingApiService:
         enriched = self._station_services_batch(
             [*active_rows, *late_candidate_rows], resource
         )
+        # N2-5 owner review round (P1, the D1 handover) + review round 3
+        # (P1, eligible owner): which claim owners can REALLY still work
+        # this station — ONE batched query for the whole board (the
+        # constant-budget pin). An owner whose assignment is gone — or
+        # whose ACCOUNT was deactivated/demoted while the assignment row
+        # stayed active — leaves her called/in_progress entry actionable
+        # for the remaining assigned nurses (the exact takeover the
+        # start/terminal endpoints sanction); an owner-less (admin-called)
+        # entry is actionable for every assigned nurse.
+        claim_owner_ids = {
+            e.called_by_user_id for e in active_rows if e.called_by_user_id is not None
+        }
+        owners_with_active_assignment = self._eligible_claim_owners(
+            claim_owner_ids, resource
+        )
         active = [
-            self._entry_payload(e, my_user_id=user_id, services=enriched[e.id])
+            self._entry_payload(
+                e,
+                my_user_id=user_id,
+                services=enriched[e.id],
+                claim_owner_assignment_active=(
+                    e.called_by_user_id is not None
+                    and (
+                        e.called_by_user_id == user_id
+                        or e.called_by_user_id in owners_with_active_assignment
+                    )
+                ),
+            )
             for e in active_rows
         ]
         my_entry = next((item for item in active if item["is_my_claim"]), None)
