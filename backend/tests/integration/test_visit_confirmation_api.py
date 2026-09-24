@@ -52,11 +52,10 @@ class TestVisitConfirmationAPI:
     def test_post_visit_info_matches_legacy_get(self, client, test_visit):
         """The token moves to the request body; the card keeps its fields.
 
-        PR 3390 review P2: the POST is a *patient-safe* card and no longer
-        copies the legacy GET byte-for-byte — the internal ``notes`` field
-        (clinical/admin text) is dropped from the public POST response while
-        the legacy GET keeps its historical shape for already-delivered
-        links.
+        PR 3407 delta review P2: BOTH the POST and the legacy GET are
+        patient-safe now — the card is built without the internal
+        ``notes`` field at the service level, so the two routes publish
+        the identical shape.
         """
         token = test_visit.confirmation_token
         test_visit.notes = "diagnosis: private clinical note"
@@ -64,10 +63,8 @@ class TestVisitConfirmationAPI:
         get_response = client.get(f"/api/v1/visits/info/{token}")
 
         assert post_response.status_code == get_response.status_code == 200
-        assert post_response.json() == {
-            key: value for key, value in get_response.json().items()
-            if key != "notes"
-        }
+        assert post_response.json() == get_response.json()
+        assert "notes" not in get_response.json()
         assert token not in post_response.request.url.path
 
     def test_post_visit_info_omits_internal_notes(self, client, test_visit):
@@ -90,13 +87,35 @@ class TestVisitConfirmationAPI:
         assert "notes" not in response.json()
         assert "private clinical note" not in response.text
 
-        # Documented divergence: the legacy GET keeps its historical shape
-        # (older clients), so the minimal-DTO decision is visible here.
+        # PR 3407 delta review P2: the patient-safe boundary must hold at
+        # the capability level, not per-route — the same bearer token must
+        # not read ``notes`` through the legacy GET either.
         legacy = client.get(
             f"/api/v1/visits/info/{test_visit.confirmation_token}"
         )
         assert legacy.status_code == 200
-        assert legacy.json()["notes"] == "diagnosis: private clinical note"
+        assert "notes" not in legacy.json()
+        assert "private clinical note" not in legacy.text
+
+    def test_legacy_get_visit_info_omits_internal_notes(self, client, test_visit):
+        """PR 3407 delta review P2: legacy GET is patient-safe too.
+
+        The old per-route fix filtered ``notes`` only on the POST via the
+        ``VisitInfoResponse`` model, while the legacy GET still published
+        the raw service card. Any holder of the confirmation token could
+        read the clinical/admin text through the legacy URL, so the field
+        is now dropped from the service card itself (both routes share
+        it) and the GET response is additionally filtered through the
+        same patient-safe model.
+        """
+        test_visit.notes = "diagnosis: private clinical note"
+        response = client.get(
+            f"/api/v1/visits/info/{test_visit.confirmation_token}"
+        )
+
+        assert response.status_code == 200
+        assert "notes" not in response.json()
+        assert "private clinical note" not in response.text
 
     def test_post_visit_info_unknown_token_matches_legacy_get(self, client):
         token = "synthetic-unknown-token"

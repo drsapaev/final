@@ -81,6 +81,12 @@ test.describe('Frontend 10/10 route smoke', () => {
 // declared in playwright.config.ts (app on :5199, API base http://localhost:5999
 // — same-site, cross-origin, like clinic.example.com vs api.clinic.example.com).
 // This spec fails if either public POST of /confirm-visit loses credentials.
+//
+// Scope note (PR 3407 delta review P2): this regression proves the SAME-SITE
+// cross-origin topology only. A true cross-SITE split (different registrable
+// domains, CSRF_COOKIE_SAMESITE=none) additionally depends on the browser's
+// third-party-cookie policy and is documented as best-effort, not guaranteed
+// portable — see ops/vps/backend.env.sample.
 // ---------------------------------------------------------------------------
 const SPLIT_APP_ORIGIN = 'http://localhost:5199';
 const SPLIT_API_ORIGIN = 'http://localhost:5999';

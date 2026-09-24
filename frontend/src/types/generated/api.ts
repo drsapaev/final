@@ -1487,6 +1487,11 @@ export type paths = {
         /**
          * Get Visit Info By Token
          * @description Получение информации о визите по токену (без подтверждения).
+         *
+         *     PR 3407 delta review P2: the legacy GET returns the same patient-safe
+         *     card as the POST — the raw ``dict[str, Any]`` response_model is gone,
+         *     so the shared service projection cannot leak internal fields here
+         *     even if it regresses.
          */
         get: operations["get_visit_info_by_token_api_v1_visits_info__token__get"];
         put?: never;
@@ -39730,14 +39735,15 @@ export type components = {
         };
         /**
          * VisitInfoResponse
-         * @description Patient-safe public visit card (POST /visits/info).
+         * @description Patient-safe public visit card (GET/POST /visits/info).
          *
-         *     PR 3390 review P2: deliberately does NOT include ``notes``. The
-         *     service card still carries it for the legacy GET /visits/info/{token}
-         *     (historical shape for already-delivered links); FastAPI filters the
-         *     response through this model, so the new POST never publishes the
-         *     internal clinical/admin field (``diagnosis: …``, cancel reasons,
-         *     force-reopen audit lines) to bearer-token link holders.
+         *     PR 3390 review P2 + PR 3407 delta review P2: deliberately does NOT
+         *     include ``notes``. The card is bearer-token-addressed and public, so
+         *     the internal clinical/admin field (``diagnosis: …``, cancel reasons,
+         *     force-reopen audit lines) is dropped from the service projection
+         *     itself, and BOTH routes (the new POST and the legacy GET) are
+         *     additionally filtered through this model — defense in depth against
+         *     a future regression re-adding the field to the shared card.
          */
         VisitInfoResponse: {
             /** Success */
@@ -43970,9 +43976,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["VisitInfoResponse"];
                 };
             };
             /** @description Validation Error */

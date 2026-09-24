@@ -27,6 +27,15 @@ Design choices:
   frontend/API split (different registrable domains) opts out of the
   Lax layer explicitly via ``CSRF_COOKIE_SAMESITE=none`` on the API —
   the double-submit check below remains the enforced control there.
+  CONTRACT CAVEAT (PR 3407 delta review P2): ``none`` only relaxes the
+  SameSite attribute; it does NOT guarantee cookie delivery. Credentialed
+  CORS still bows to the browser's third-party-cookie policy — Safari,
+  Firefox and per-user privacy settings may withhold the cookie even
+  with ``SameSite=None; Secure``, which surfaces as 403 missing_cookie.
+  Cross-site splits are therefore best-effort, not a portable
+  deployment guarantee; production should prefer a same-site topology
+  (reverse-proxy ``/api``, ``api.example.com`` next to
+  ``clinic.example.com``) instead of relying on third-party cookies.
 - **Constant-time comparison** via ``hmac.compare_digest`` to avoid
   timing oracles on token equality.
 - **GET / HEAD / OPTIONS / WebSocket upgrade requests are exempt** —
