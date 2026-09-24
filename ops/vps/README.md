@@ -87,7 +87,7 @@ BACKEND_URL=http://127.0.0.1:18000 \
 python3 ops/vps/scripts/health_check.py
 ```
 
-For normal clinic deployments, the frontend should use same-origin runtime resolution for `/api` and `/ws`. Set `VITE_API_BASE_URL` only when you intentionally point the frontend at a separate API origin. A same-site split (e.g. `clinic.example.com` + `api.example.com`) works out of the box; a cross-SITE split (different registrable domains) additionally requires `CSRF_COOKIE_SAMESITE=none` on the backend (see `backend.env.sample`). The smoke scripts now emit:
+For normal clinic deployments, the frontend should use same-origin runtime resolution for `/api` and `/ws`. Set `VITE_API_BASE_URL` only when you intentionally point the frontend at a separate API origin. A same-site split (e.g. `clinic.example.com` + `api.example.com`) works out of the box; a cross-SITE split (different registrable domains) additionally requires `CSRF_COOKIE_SAMESITE=none` on the backend (see `backend.env.sample`). Note that `none` only relaxes the SameSite attribute — cross-site cookie delivery still depends on the browser's third-party-cookie policy (Safari/Firefox and per-user privacy settings may withhold the cookie → 403 missing_cookie), so cross-site is best-effort, not a portable guarantee; production should prefer a same-site topology (reverse-proxy `/api`, `api.example.com`) over third-party cookies. The smoke scripts now emit:
 
 - `CURRENT_ORIGIN=...`
 - `RESOLVED_API_ORIGIN=...`
