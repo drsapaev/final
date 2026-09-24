@@ -13,7 +13,12 @@ Contract after the fix:
   "FCM service not configured", so pushes silently never fire);
 * valid credential file                             -> INFO "FCM credentials
   loaded successfully" (unchanged), and credentials load regardless of the
-  flag so that flipping ``FCM_ENABLED`` stays a restart-only operation.
+  flag so that flipping ``FCM_ENABLED`` stays a restart-only operation;
+* ``FCM_ENABLED=true`` + valid credentials + missing ``FCM_PROJECT_ID``
+  -> exactly one WARNING with remediation (review round 3: without the
+  project id the channel cannot fire — ``active`` is False and every send
+  short-circuits with "FCM service not configured", so a clean
+  "loaded successfully" alone was a silent misconfiguration).
 """
 from __future__ import annotations
 
@@ -150,6 +155,82 @@ def test_disabled_with_existing_invalid_credentials_is_info_not_error(
     infos = [r.getMessage() for r in records if r.levelno == logging.INFO]
     assert any("FCM_ENABLED=false" in m for m in infos)
     assert any("invalid and was ignored" in m for m in infos)
+
+
+def test_enabled_with_valid_credentials_but_missing_project_id_warns_once(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, tmp_path: Path
+) -> None:
+    """Review round 3: flag on + a VALID credential file + no ``FCM_PROJECT_ID``
+    used to be a silent misconfiguration — startup logged only "FCM
+    credentials loaded successfully" while ``service.active`` was False and
+    every send short-circuited with "FCM service not configured". An enabled
+    channel that cannot fire must WARN once at startup, naming the missing
+    setting and attaching remediation."""
+    caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+    cred_file = tmp_path / "service-account.json"
+    cred_file.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(cred_file))
+    monkeypatch.setattr(fcm_module.settings, "FCM_PROJECT_ID", None)
+    sentinel = object()
+
+    def _fake_from_service_account_file(path: str, scopes: list[str]) -> object:
+        return sentinel
+
+    monkeypatch.setattr(
+        fcm_module.service_account.Credentials,
+        "from_service_account_file",
+        _fake_from_service_account_file,
+    )
+    service = _load(monkeypatch, enabled=True)
+
+    assert service.credentials is sentinel
+    assert service.project_id is None
+    assert service.active is False, (
+        "missing FCM_PROJECT_ID must keep the service inactive"
+    )
+    records = _fcm_records(caplog)
+    assert not [r for r in records if r.levelno >= logging.ERROR]
+    warnings = [r for r in records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    message = warnings[0].getMessage()
+    assert "FCM_ENABLED=true" in message
+    assert "FCM_PROJECT_ID" in message
+    assert "not configured" in message or "missing" in message
+    infos = [r.getMessage() for r in records if r.levelno == logging.INFO]
+    assert any("FCM credentials loaded successfully" in m for m in infos)
+
+
+def test_enabled_fully_configured_stays_info(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, tmp_path: Path
+) -> None:
+    """Guard rail: an enabled channel with credentials AND project id must stay
+    calm — the project-id warning fires only when the setting is missing."""
+    caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+    cred_file = tmp_path / "service-account.json"
+    cred_file.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(cred_file))
+    monkeypatch.setattr(fcm_module.settings, "FCM_PROJECT_ID", "test-project")
+    sentinel = object()
+
+    def _fake_from_service_account_file(path: str, scopes: list[str]) -> object:
+        return sentinel
+
+    monkeypatch.setattr(
+        fcm_module.service_account.Credentials,
+        "from_service_account_file",
+        _fake_from_service_account_file,
+    )
+    service = _load(monkeypatch, enabled=True)
+
+    assert service.credentials is sentinel
+    assert service.active is True
+    assert not [r for r in _fcm_records(caplog) if r.levelno >= logging.WARNING]
+    infos = [
+        r.getMessage()
+        for r in _fcm_records(caplog)
+        if r.levelno == logging.INFO
+    ]
+    assert any("FCM credentials loaded successfully" in m for m in infos)
 
 
 def test_enabled_with_existing_invalid_credentials_warns_with_remediation(
