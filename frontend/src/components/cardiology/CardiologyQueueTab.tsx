@@ -4,6 +4,7 @@ import { ArrowRight, RotateCw, UserRound } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 import { queueService } from '../../services/queue';
 import { AppEmpty, AppError, AppLoading, Badge, Button, Card } from '../ui/macos';
+import './CardiologyQueueTab.css';
 
 type QueueAction = 'call' | 'start_visit' | 'complete' | 'send_to_diagnostics' | 'notify_diagnostics_return' | 'mark_incomplete' | 'no_show' | 'restore_next';
 
@@ -122,11 +123,11 @@ export function CardiologyQueueTab({ onStartVisit, onOpenVisit }: CardiologyQueu
 
   return (
     <Card className="cardio-card-fullwidth">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+      <div className="cardio-queue__header">
         <div>
-          <h2 style={{ margin: 0 }}>{t('cardio.cardio_queue_title')}</h2>
+          <h2 className="cardio-queue__title">{t('cardio.cardio_queue_title')}</h2>
           {queue?.doctor?.name && (
-            <p style={{ margin: '6px 0 0', color: 'var(--mac-text-secondary)' }}>{queue.doctor.name}</p>
+            <p className="cardio-queue__doctor">{queue.doctor.name}</p>
           )}
         </div>
         <Button variant="outline" onClick={() => void loadQueue()} disabled={loading} aria-label={t('cardio.cardio_queue_refresh')}>
@@ -148,7 +149,7 @@ export function CardiologyQueueTab({ onStartVisit, onOpenVisit }: CardiologyQueu
       ) : entries.length === 0 && !error ? (
         <AppEmpty title={t('cardio.cardio_queue_empty_title')} description={t('cardio.cardio_queue_empty_desc')} />
       ) : (
-        <div style={{ display: 'grid', gap: 12 }}>
+        <div className="cardio-queue__list">
           {entries.map((entry) => {
             const status = String(entry.status || '').toLowerCase();
             const currentVisit = isCurrentVisit(entry);
@@ -160,23 +161,23 @@ export function CardiologyQueueTab({ onStartVisit, onOpenVisit }: CardiologyQueu
               <article
                 key={entry.id}
                 data-testid={`cardiology-queue-entry-${entry.id}`}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', padding: 16, border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-md)' }}
+                className="cardio-queue__entry"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                  <UserRound size={20} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--mac-text-secondary)' }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                <div className="cardio-queue__patient">
+                  <UserRound size={20} aria-hidden="true" className="cardio-queue__patient-icon" />
+                  <div className="cardio-queue__patient-info">
+                    <div className="cardio-queue__patient-heading">
                       <strong>{entry.number != null ? `${t('cardio.cardio_queue_number')} ${entry.number}` : name}</strong>
                       {entry.number != null && <span>{name}</span>}
                       <Badge variant={completedVisit ? 'success' : currentVisit ? 'primary' : status === 'called' ? 'info' : 'default'}>
                         {statusLabels[status] || status}
                       </Badge>
                     </div>
-                    {entry.phone && <div style={{ color: 'var(--mac-text-secondary)', marginTop: 4 }}>{entry.phone}</div>}
+                    {entry.phone && <div className="cardio-queue__phone">{entry.phone}</div>}
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <div className="cardio-queue__actions">
                   {hasAction(entry, 'call') && (
                     <Button variant="primary" loading={busyEntryId === entry.id} disabled={busyEntryId !== null} onClick={() => void runAction(entry, 'call')}>
                       {t('cardio.cardio_queue_call')}
