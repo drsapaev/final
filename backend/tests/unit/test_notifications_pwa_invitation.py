@@ -64,7 +64,7 @@ def test_settings_normalizes_frontend_url_trailing_slash() -> None:
 
 @pytest.mark.asyncio
 async def test_pwa_invitation_uses_canonical_frontend_url(monkeypatch) -> None:
-    """_send_pwa_invitation must build <FRONTEND_URL>/confirm-visit?token=
+    """_send_pwa_invitation must build <FRONTEND_URL>/confirm-visit#token=
     and hand the phone + link to the SMS transport without AttributeError.
 
     RED on main before the fix: ``settings.PWA_BASE_URL`` does not exist,
@@ -118,7 +118,7 @@ async def test_pwa_invitation_uses_canonical_frontend_url(monkeypatch) -> None:
 
     result = await service._send_pwa_invitation(patient, data)
 
-    expected_url = f"https://clinic.example.com/confirm-visit?token={token}"
+    expected_url = f"https://clinic.example.com/confirm-visit#token={token}"
 
     # (4) no AttributeError swallowed into the result …
     assert result.get("success") is True, (
@@ -127,6 +127,7 @@ async def test_pwa_invitation_uses_canonical_frontend_url(monkeypatch) -> None:
     # (5) … the success contract is the pwa channel with the built link …
     assert result.get("channel") == "pwa"
     assert result.get("pwa_url") == expected_url
+    assert token not in expected_url.split("#", 1)[0]
     # (3) … and the SMS transport got the expected phone and link.
     assert len(sent) == 1, "SMS transport must be called exactly once"
     phone, sms_text = sent[0]

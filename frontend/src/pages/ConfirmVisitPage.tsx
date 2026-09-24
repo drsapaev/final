@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { CalendarCheck, CheckCircle2, RefreshCw, Ticket, XCircle } from 'lucide-react';
 
 import { useTranslation } from '../i18n/useTranslation';
@@ -16,7 +16,7 @@ import './ConfirmVisitPage.css';
  * Публичная страница подтверждения визита по SMS-приглашению (PWA).
  *
  * Ссылка из напоминания (backend notifications_pkg/_formatting.py) ведёт на
- * /confirm-visit?token=…; страница читает карточку визита
+ * /confirm-visit#token=…; страница читает карточку визита
  * (POST /visits/info с токеном в теле) и подтверждает визит
  * (POST /patient/visits/confirm).
  *
@@ -44,8 +44,27 @@ const formatVisitDate = (iso: string): string => {
 
 const ConfirmVisitPage = () => {
     const { t } = useTranslation();
-    const [params] = useSearchParams();
-    const token = (params.get('token') ?? '').trim();
+    const location = useLocation();
+    const token = (
+        new URLSearchParams(location.hash.slice(1)).get('token') ??
+        new URLSearchParams(location.search).get('token') ?? ''
+    ).trim();
+
+    useLayoutEffect(() => {
+        // Remove both new fragment and legacy query tokens before the first
+        // API call. A fragment is also absent from the initial HTTP request.
+        const url = new URL(window.location.href);
+        const fragment = new URLSearchParams(url.hash.slice(1));
+        if (!url.searchParams.has('token') && !fragment.has('token')) return;
+        url.searchParams.delete('token');
+        fragment.delete('token');
+        url.hash = fragment.toString();
+        window.history.replaceState(
+            window.history.state,
+            '',
+            `${url.pathname}${url.search}${url.hash}`,
+        );
+    }, [location.search, location.hash]);
 
     const [phase, setPhase] = useState<Phase>('checking');
     const [info, setInfo] = useState<VisitInfoByTokenDto | null>(null);

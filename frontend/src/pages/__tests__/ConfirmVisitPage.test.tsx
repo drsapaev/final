@@ -1,6 +1,6 @@
 /**
  * ConfirmVisitPage — the destination of the PWA/SMS visit-confirmation
- * deep link /confirm-visit?token=… (PR 3390 review round, P1).
+ * deep link /confirm-visit#token=… (PR 3390 review round, P1).
  *
  * Pins:
  *  - the public /confirm-visit route exists in the registry (the SMS
@@ -14,7 +14,7 @@
  */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, useNavigate } from 'react-router-dom';
 
 const { apiMock } = vi.hoisted(() => ({
   apiMock: vi.fn(),
@@ -81,6 +81,7 @@ const TOKEN = 'visit-confirm-token-123';
 afterEach(() => {
   cleanup();
   apiMock.mockReset();
+  window.history.replaceState(null, '', '/');
 });
 
 const renderAt = (search: string) =>
@@ -158,12 +159,81 @@ describe('ConfirmVisitPage — /confirm-visit public screen', () => {
   ])('retry after %s reads the card once more', async (_cause, error) => {
     apiMock.mockRejectedValueOnce(error).mockResolvedValueOnce(ok(VISIT_INFO));
 
-    renderAt(`?token=${TOKEN}`);
+    renderAt(`#token=${TOKEN}`);
     fireEvent.click(await screen.findByText('btn_retry'));
 
     expect(await screen.findByText('SYNTHETIC Test Doctor')).toBeTruthy();
     expect(apiMock.mock.calls.filter(([url]) => url === '/visits/info')).toHaveLength(2);
     expect(apiMock.mock.calls.every(([url]) => !String(url).includes(TOKEN))).toBe(true);
+  });
+
+  it.each([
+    ['fragment', `#token=${TOKEN}`, '/confirm-visit'],
+    ['fragment with extra parameter', `#token=${TOKEN}&source=sms`, '/confirm-visit#source=sms'],
+    ['legacy query', `?token=${TOKEN}&source=sms`, '/confirm-visit?source=sms'],
+  ])('cleans the %s token from browser history before the first API call', async (
+    _source, suffix, expectedPath,
+  ) => {
+    window.history.replaceState(null, '', `/confirm-visit${suffix}`);
+    apiMock.mockImplementationOnce(async () => {
+      expect(window.location.pathname + window.location.search + window.location.hash)
+        .toBe(expectedPath);
+      expect(window.location.href).not.toContain(TOKEN);
+      return ok(VISIT_INFO);
+    });
+
+    render(<BrowserRouter><ConfirmVisitPage /></BrowserRouter>);
+
+    expect(await screen.findByText('SYNTHETIC Test Doctor')).toBeTruthy();
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock.mock.calls[0]?.[1]).toEqual({ token: TOKEN });
+  });
+
+  it('an empty fragment token stays invalid even beside a legacy query token', () => {
+    window.history.replaceState(null, '', `/confirm-visit?token=${TOKEN}#token=`);
+    render(<BrowserRouter><ConfirmVisitPage /></BrowserRouter>);
+
+    expect(screen.getByText('cv_invalid_link')).toBeTruthy();
+    expect(window.location.pathname + window.location.search + window.location.hash)
+      .toBe('/confirm-visit');
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps BrowserRouter token switches single-read and cleans each address', async () => {
+    const nextToken = 'synthetic-next-fragment-token';
+    window.history.replaceState(null, '', `/confirm-visit#token=${TOKEN}`);
+    apiMock.mockImplementation(async (_url, body) => {
+      expect(window.location.href).not.toContain('token=');
+      return ok({
+        ...VISIT_INFO,
+        doctor_name: body.token === nextToken
+          ? 'SYNTHETIC Second Doctor'
+          : 'SYNTHETIC Test Doctor',
+      });
+    });
+    const NavigateToNextToken = () => {
+      const navigate = useNavigate();
+      return (
+        <button onClick={() => navigate(`/confirm-visit#token=${nextToken}`)}>
+          next fragment
+        </button>
+      );
+    };
+
+    render(
+      <BrowserRouter>
+        <NavigateToNextToken />
+        <ConfirmVisitPage />
+      </BrowserRouter>,
+    );
+    expect(await screen.findByText('SYNTHETIC Test Doctor')).toBeTruthy();
+    fireEvent.click(screen.getByText('next fragment'));
+    expect(await screen.findByText('SYNTHETIC Second Doctor')).toBeTruthy();
+    expect(window.location.pathname + window.location.search + window.location.hash)
+      .toBe('/confirm-visit');
+    expect(apiMock.mock.calls.map(([, body]) => body)).toEqual([
+      { token: TOKEN }, { token: nextToken },
+    ]);
   });
 
   it('ignores an old token response after navigating to a new token', async () => {

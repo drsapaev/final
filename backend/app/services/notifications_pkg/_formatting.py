@@ -181,9 +181,10 @@ class FormattingMixin(NotificationSenderMixinBase):
             # deep-link builders follow the defensive repo convention
             # (see telegram_service) so a stray trailing slash can never
             # yield a "//confirm-visit" path that misses the route.
+            # The fragment never enters the HTTP request target or Referer.
             pwa_url = (
                 f"{settings.FRONTEND_URL.rstrip('/')}"
-                f"/confirm-visit?token={data['confirmation_token']}"
+                f"/confirm-visit#token={data['confirmation_token']}"
             )
             sms_text = self._format_sms_message(data, pwa_url)
 
