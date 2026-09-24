@@ -38,6 +38,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -49,7 +50,14 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-SCRATCH_DB = "schedule_create_lock"
+SCRATCH_DB_PREFIX = "schedule_create_lock"
+# Review round 3 (owner P2): the scratch name must be RUN-UNIQUE. A fixed
+# name with an unconditional pre-drop let two parallel pytest/agent runs on
+# the same PostgreSQL server drop each other's database — and would destroy
+# any unrelated local database carrying the same name. The name is minted
+# once per process (per xdist worker); cleanup drops ONLY the database this
+# run created.
+SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -136,8 +144,10 @@ def pg_engine():
         )
 
     psycopg_dsn, sa_url = _scratch_urls(admin_url)
+    # No pre-drop: the run-unique name cannot pre-exist (a collision would
+    # take 2**48 parallel runs), and dropping a fixed name unconditionally
+    # is exactly the cross-run hazard this fixture used to carry.
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
         c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
     env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
@@ -161,7 +171,13 @@ def pg_engine():
 
     engine.dispose()
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        # Cleanup touches ONLY the run-unique database this process created;
+        # WITH (FORCE) clears lingering connections (PG 13+), falling back
+        # to the plain form on older servers.
+        try:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+        except psycopg.errors.SyntaxError:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
 
 
 @pytest.fixture
@@ -335,6 +351,40 @@ def test_schedule_create_lock_blocks_concurrent_deactivation(
         {"i": seeded_department},
     ).scalar()
     assert active_now is False
+
+    # ------------------------------------------------------------------
+    # Review round 3 (owner P2): the row lock serialized the CREATE, but
+    # it cannot outlive its transaction — this deactivation commit is the
+    # review's exact demo: ScheduleTemplate.active stays True behind an
+    # inactive department. The ADVERTISING read must now answer empty
+    # (slots the booking contract would refuse must not be listed), while
+    # the template row itself survives; reactivating the department
+    # restores the slots (the read-side exclusion is non-destructive).
+    # ------------------------------------------------------------------
+    from datetime import date, timedelta
+
+    from app.crud.schedule import get_available_slots
+
+    target = date.today() + timedelta(days=(1 - date.today().weekday()) % 7)
+    assert (
+        get_available_slots(session_b, target_date=target, department="sched-lock")
+        == []
+    )
+    template_still_active = session_b.execute(
+        text("SELECT active FROM schedule_templates WHERE id = :i"),
+        {"i": int(row.id)},
+    ).scalar()
+    assert template_still_active is True
+
+    session_b.execute(
+        text("UPDATE departments SET active = TRUE WHERE id = :i"),
+        {"i": seeded_department},
+    )
+    session_b.commit()
+    restored = get_available_slots(
+        session_b, target_date=target, department="sched-lock"
+    )
+    assert [s["time"] for s in restored] == ["08:00", "09:00"]
 
 
 def test_schedule_create_refuses_deactivation_committed_before_lock(

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 import sys
+import uuid
 from pathlib import Path
 
 import psycopg
@@ -35,7 +36,14 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-SCRATCH_DB = "portal_dept_lock"
+SCRATCH_DB_PREFIX = "portal_dept_lock"
+# Review round 3 (owner P2): the scratch name must be RUN-UNIQUE. A fixed
+# name with an unconditional pre-drop let two parallel pytest/agent runs on
+# the same PostgreSQL server drop each other's database — and would destroy
+# any unrelated local database carrying the same name. The name is minted
+# once per process (per xdist worker); cleanup drops ONLY the database this
+# run created.
+SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -122,8 +130,10 @@ def pg_engine():
         )
 
     psycopg_dsn, sa_url = _scratch_urls(admin_url)
+    # No pre-drop: the run-unique name cannot pre-exist (a collision would
+    # take 2**48 parallel runs), and dropping a fixed name unconditionally
+    # is exactly the cross-run hazard this fixture used to carry.
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
         c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
     env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
@@ -147,7 +157,13 @@ def pg_engine():
 
     engine.dispose()
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        # Cleanup touches ONLY the run-unique database this process created;
+        # WITH (FORCE) clears lingering connections (PG 13+), falling back
+        # to the plain form on older servers.
+        try:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+        except psycopg.errors.SyntaxError:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
 
 
 @pytest.fixture
@@ -272,8 +288,9 @@ def test_department_row_lock_serializes_deactivation_behind_booking(
     BLOCK (lock_timeout proof) and only proceed after the booking
     transaction finishes — deactivate/delete serialize BEHIND the booking
     instead of racing it."""
-    from app.models.department import Department
     from sqlalchemy.exc import OperationalError
+
+    from app.models.department import Department
     from app.services.appointment_slot_guard import lock_department_for_booking
 
     session_a, session_b = two_sessions
