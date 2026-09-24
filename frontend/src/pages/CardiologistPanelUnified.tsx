@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
@@ -16,14 +16,10 @@ import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './cardiology.css';
 import BloodTestsTab from '../components/cardiology/BloodTestsTab';
-import EcgTab from '../components/cardiology/EcgTab';
 import HistoryTab from '../components/cardiology/HistoryTab';
 import ServicesTab from '../components/cardiology/ServicesTab';
 import AiTab from '../components/cardiology/AiTab';
-import AppointmentsTab from '../components/cardiology/AppointmentsTab';
-import VisitTab from '../components/cardiology/VisitTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
-import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
 import { printPanelTicket } from '../services/panelPrint';
 import QueueIntegration from '../components/QueueIntegration';
@@ -40,6 +36,16 @@ import tokenManager from '../utils/tokenManager';
 import { countAppointmentsByStatuses, SPECIALTY_KEYS, getAllPatientServices, makeEnsureCanonicalVisitId } from '../utils/doctorPanelShared';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 import { Download, Settings } from 'lucide-react';
+
+const AppointmentsTab = lazy(() => import('../components/cardiology/AppointmentsTab'));
+const loadVisitTab = () => import('../components/cardiology/VisitTab');
+const VisitTab = lazy(loadVisitTab);
+const EcgTab = lazy(() => import('../components/cardiology/EcgTab'));
+const EditPatientModal = lazy(() => import('../components/common/EditPatientModal'));
+
+function preloadVisitTab(): void {
+  void loadVisitTab().catch(() => undefined);
+}
 
 const API_V1_BASE = getApiBaseUrl();
 const CARDIOLOGY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
@@ -485,6 +491,10 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   }, [location.search, activeTab, setActiveTab]);
 
   useEffect(() => {
+    if (visitIdFromUrl) preloadVisitTab();
+  }, [visitIdFromUrl]);
+
+  useEffect(() => {
     const handleAuthLikeRefresh = () => {
       setAuthRefreshTick((prev) => prev + 1);
     };
@@ -919,6 +929,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   const handleAppointmentRowClick = async (row: Record<string, unknown>) => {
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
+      preloadVisitTab();
       const appointmentId = row.appointment_id || null;
       const visitId = await ensureCanonicalVisitId(row);
       if (!visitId) {
@@ -1009,6 +1020,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         await handleAppointmentRowClick(row);
         break;
       case 'view_emr':{
+          preloadVisitTab();
           // Просмотр EMR для завершённой записи
           const appointmentId = row.appointment_id || null;
           const visitId = await ensureCanonicalVisitId(row);
@@ -1089,6 +1101,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         }
         break;
       case 'complete':{
+          preloadVisitTab();
           // Завершить приём
           try {
             const visitId = await ensureCanonicalVisitId(row);
@@ -1731,6 +1744,11 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   const queuePanel: any = activeTab === 'queue' ? (
     <QueueIntegration specialty="cardiology" />
   ) : null;
+  const tabLoadingFallback = (
+    <Card role="status" aria-live="polite" className="cardio-card-fullwidth">
+      {tI18n('common.loading')}
+    </Card>
+  );
 
   return (
     <div className="cardio-root-container">
@@ -1745,16 +1763,18 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
               Back-compat: 'appointments' and 'history' cases still render for
               old deep links. */}
           {(activeTab === 'patients' || activeTab === 'appointments') &&
-            <AppointmentsTab
-              appointments={appointments}
-              appointmentsLoading={appointmentsLoading}
-              appointmentSummaryItems={appointmentSummaryItems}
-              onRefresh={loadMacOSCardiologyAppointments}
-              onRowClick={(row) => { void handleAppointmentRowClick(row as Record<string, unknown>); }}
-              onActionClick={(action, row) => { void handleAppointmentActionClick(action, row as Record<string, unknown>); }}
-              services={services}
-              isDark={isDark}
-            />
+            <Suspense fallback={tabLoadingFallback}>
+              <AppointmentsTab
+                appointments={appointments}
+                appointmentsLoading={appointmentsLoading}
+                appointmentSummaryItems={appointmentSummaryItems}
+                onRefresh={loadMacOSCardiologyAppointments}
+                onRowClick={(row) => { void handleAppointmentRowClick(row as Record<string, unknown>); }}
+                onActionClick={(action, row) => { void handleAppointmentActionClick(action, row as Record<string, unknown>); }}
+                services={services}
+                isDark={isDark}
+              />
+            </Suspense>
           }
 
           {/* Прием пациента */}
@@ -1763,36 +1783,40 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
 
           {/* Приём пациента — R-15: extracted to VisitTab component */}
           {activeTab === 'visit' &&
-            <VisitTab
-              selectedPatient={selectedPatient as unknown as {
-                patient_name?: string;
-                patient?: { full_name?: string; id?: number };
-                patient_id?: number;
-                number?: string | number;
-                phone?: string;
-                visit_id?: number | string;
-              } | null}
-              emr={emr}
-              loading={loading}
-              onCancel={() => {
-                setSelectedPatient(null);
-                setActiveTab('queue');
-              }}
-              onComplete={handleCompleteVisitFromEMR}
-              onGoToAppointments={() => goToTab('patients')}
-              getColor={getColor}
-              getFontSize={getFontSize}
-            />
+            <Suspense fallback={tabLoadingFallback}>
+              <VisitTab
+                selectedPatient={selectedPatient as unknown as {
+                  patient_name?: string;
+                  patient?: { full_name?: string; id?: number };
+                  patient_id?: number;
+                  number?: string | number;
+                  phone?: string;
+                  visit_id?: number | string;
+                } | null}
+                emr={emr}
+                loading={loading}
+                onCancel={() => {
+                  setSelectedPatient(null);
+                  setActiveTab('queue');
+                }}
+                onComplete={handleCompleteVisitFromEMR}
+                onGoToAppointments={() => goToTab('patients')}
+                getColor={getColor}
+                getFontSize={getFontSize}
+              />
+            </Suspense>
           }
 
           {/* ЭКГ — R-15: extracted to EcgTab component */}
           {activeTab === 'ecg' &&
-            <EcgTab
-              selectedPatient={selectedPatient}
-              onAddEcg={() => setShowForm({ open: true, type: 'ecg' })}
-              onDataUpdate={loadPatientData}
-              getSpacing={getSpacing}
-            />
+            <Suspense fallback={tabLoadingFallback}>
+              <EcgTab
+                selectedPatient={selectedPatient}
+                onAddEcg={() => setShowForm({ open: true, type: 'ecg' })}
+                onDataUpdate={loadPatientData}
+                getSpacing={getSpacing}
+              />
+            </Suspense>
           }
 
           {/* C-4 fix: 'Добавить ЭКГ' button now opens a simple ECG entry form.
@@ -1929,16 +1953,22 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
 
         {/* Модальное окно редактирования пациента */}
         {editPatientModal.open &&
-        <EditPatientModal
-          isOpen={editPatientModal.open}
-          onClose={() => setEditPatientModal({ open: false, patient: null, loading: false })}
-          patient={editPatientModal.patient ?? undefined}
-          onSave={async () => {
-            await loadMacOSCardiologyAppointments();
-            setEditPatientModal({ open: false, patient: null, loading: false });
-          }}
-          loading={editPatientModal.loading}
-          theme={{ isDark, getColor, getSpacing, getFontSize }} />
+        <Suspense fallback={
+          <div className="cardio-modal-overlay" role="status" aria-live="polite">
+            <div className="cardio-modal-card">{tI18n('common.loading')}</div>
+          </div>
+        }>
+          <EditPatientModal
+            isOpen={editPatientModal.open}
+            onClose={() => setEditPatientModal({ open: false, patient: null, loading: false })}
+            patient={editPatientModal.patient ?? undefined}
+            onSave={async () => {
+              await loadMacOSCardiologyAppointments();
+              setEditPatientModal({ open: false, patient: null, loading: false });
+            }}
+            loading={editPatientModal.loading}
+            theme={{ isDark, getColor, getSpacing, getFontSize }} />
+        </Suspense>
 
         }
 
