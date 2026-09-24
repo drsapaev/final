@@ -65,9 +65,10 @@ This is a **Medical Clinic Management System** built with FastAPI (Python backen
 Before executing any task, choose exactly one:
 
 1. **`direct_execute`**: Local narrow task, root cause known, likely one file, no risky domain, no ownership ambiguity
-2. **`gate`**: Risky task, unclear root cause, multi-file impact, ownership ambiguity, scope-creep risk
-3. **`gate_known_root_cause`**: Risky task with confirmed root-cause file
-4. **`narrow_override`**: Only after gate misroutes twice with explicit basis
+2. **`advisory_gate`**: GPT-6 UI/API work within the exception defined in `AGENTS.md`; optional context, not a blocker
+3. **`gate`**: Mandatory high-risk task, unclear root cause, or ownership ambiguity outside the GPT-6 exception
+4. **`gate_known_root_cause`**: Mandatory high-risk task with confirmed root-cause file
+5. **`narrow_override`**: Only after a mandatory gate misroutes and an explicit basis exists
 
 ### Automatic Strict Mode Triggers
 
@@ -81,7 +82,7 @@ Before executing any task, choose exactly one:
 
 ### Pre-Execute Gate (for risky tasks)
 
-For `gate` or `gate_known_root_cause` modes, run:
+For mandatory `gate` or `gate_known_root_cause` modes, run:
 
 ```powershell
 cd C:\final\ai\langgraph
@@ -92,14 +93,13 @@ cd C:\final\ai\langgraph
 ```
 
 Use `scripts\run_agent_gate.ps1` instead of bare `python` or `py`; it validates Python 3.11+ and falls back around broken `.venv`/PATH launcher state.
+For GPT-6 UI/API work that does not change DB schema/migrations, authentication/RBAC/security, production configuration/deployment, queue ownership/fairness, or clinical lifecycle/signature rules, gate use is optional and advisory. Canonical source, tests, user scope, and explicit patch boundaries control the work; a gate misroute alone is not a blocker.
 For other local Python commands in this Windows checkout, prefer `C:\final\scripts\run_python.ps1` over bare `python` or `py`.
 For backend pytest in this Windows checkout, prefer `C:\final\scripts\run_backend_pytest.ps1 <tests...>`.
 
 **Gate Rules:**
-- Execute only inside `First-touch files` from gate output
-- Treat `Stop conditions` as hard stops
-- If gate fails, stop and report instead of editing
-- If gate misroutes, retry once with `--known-root-cause`
+- For mandatory gate runs, execute only inside `First-touch files`, treat `Stop conditions` as hard stops, stop if the gate fails, and retry one misroute with `--known-root-cause`.
+- In GPT-6 advisory mode, the gate is optional context; its file list and stop conditions do not override canonical source, tests, user scope, or the manually declared patch boundary.
 - Treat `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md` as a historical log; do not append routine entries unless explicitly evaluating LightRAG/dev-brain quality.
 
 ## Canonical First Discipline
@@ -579,6 +579,6 @@ Use `handoff` as the default input contract for the next agent when a real code 
 - Frontend dev server runs on port 5173, backend on 18000
 - Database source of truth: PostgreSQL + Alembic (never SQLite)
 - **Execution discipline:** Follow AGENTS.md for canonical-first, safe patch slice, and stop conditions
-- **For risky tasks:** Use `agent_gate.py` before editing
+- **For mandatory high-risk tasks:** Use `agent_gate.py` before editing; follow the GPT-6 advisory exception above for eligible UI/API work.
 - **LightRAG evidence:** Treat `ai/langgraph/EVIDENCE_LIGHTRAG_READINESS.md` as historical; do not append routine risky-task entries.
 - Recent work: Service management enhancements (audit log, batch ops, optimistic updates, change preview)
