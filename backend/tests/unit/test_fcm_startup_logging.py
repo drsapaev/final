@@ -127,3 +127,48 @@ def test_valid_credentials_load_even_when_disabled(
     ]
     assert any("FCM credentials loaded successfully" in m for m in infos)
     assert not [r for r in _fcm_records(caplog) if r.levelno >= logging.WARNING]
+
+
+def test_disabled_with_existing_invalid_credentials_is_info_not_error(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, tmp_path: Path
+) -> None:
+    """Review round 2: a STALE/corrupt credential file on disk used to hit the
+    blanket ``logger.error`` even with the channel intentionally off — an
+    ERROR on every valid dev startup. An off channel stays calm: INFO only,
+    with an honest note that the invalid file was ignored."""
+    caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+    broken_file = tmp_path / "stale-service-account.json"
+    broken_file.write_text("{ not valid json", encoding="utf-8")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(broken_file))
+    service = _load(monkeypatch, enabled=False)
+
+    records = _fcm_records(caplog)
+    assert service.credentials is None
+    assert not [r for r in records if r.levelno >= logging.WARNING], (
+        "broken file + FCM_ENABLED=false must not WARN/ERROR"
+    )
+    infos = [r.getMessage() for r in records if r.levelno == logging.INFO]
+    assert any("FCM_ENABLED=false" in m for m in infos)
+    assert any("invalid and was ignored" in m for m in infos)
+
+
+def test_enabled_with_existing_invalid_credentials_warns_with_remediation(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, tmp_path: Path
+) -> None:
+    """Mirror quadrant: flag on + unloadable file is a real misconfiguration
+    — WARNING with remediation, never a silent INFO."""
+    caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+    broken_file = tmp_path / "stale-service-account.json"
+    broken_file.write_text("{ not valid json", encoding="utf-8")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(broken_file))
+    service = _load(monkeypatch, enabled=True)
+
+    records = _fcm_records(caplog)
+    assert service.credentials is None
+    warnings = [r for r in records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    message = warnings[0].getMessage()
+    assert "could not be loaded" in message
+    assert "Regenerate" in message
+    assert "FCM_PROJECT_ID" in message
+    assert not [r for r in records if r.levelno >= logging.ERROR]
