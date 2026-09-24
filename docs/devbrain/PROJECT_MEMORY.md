@@ -34,9 +34,10 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 
 - Use direct execution only for narrow known-root-cause tasks with no risky domain or ownership ambiguity.
 - Use dossier or handoff for graph-heavy, mixed-contract, or ownership-sensitive work.
-- Use gate or gate-known-root-cause for DB, RBAC, payment, queue, Telegram security/storage, EMR/lab, CI/CD, deploy, and frontend/backend contract work.
-- If the gate misroutes, retry once with `--known-root-cause`; if it still misses the confirmed file, use narrow override and report it.
-- Do not silently expand scope. Stop when the required file set exceeds the declared first-touch boundary.
+- GPT-6 may use `advisory_gate` for UI/API work that does not change DB schema/migrations, authentication/RBAC/security, production configuration/deployment, queue ownership/fairness, or clinical lifecycle/signature rules. In that mode, the gate is optional context; source, tests, user scope, and explicit boundaries decide the patch.
+- Keep mandatory gate use for DB schema/migrations, authentication/RBAC/security, production configuration/deployment, and queue ownership/fairness or clinical lifecycle/signature changes. Other agent models follow the existing gate process.
+- For mandatory gate work, if the gate misroutes, retry once with `--known-root-cause`; if it still misses the confirmed file, use a narrow override only with an approved basis and report it. Advisory-mode misroutes do not block a well-grounded task.
+- Do not silently expand scope. Stop when the required file set exceeds the manually declared patch boundary; for GPT-6 advisory work, the gate's first-touch list is not that boundary.
 - Every PR needs evidence: local validation, `git diff --check`, PR scope/impact notes, and green GitHub checks when opened.
 
 ## Local Dev Runtime Contour

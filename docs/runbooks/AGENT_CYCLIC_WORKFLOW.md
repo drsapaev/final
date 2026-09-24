@@ -10,7 +10,7 @@ Core formula:
 Fresh main.
 Clean branch.
 Small scope.
-Explicit gate.
+Explicit scope and validation; use a blocking gate when required by `AGENTS.md`.
 Evidence before merge.
 Green before next.
 No silent scope creep.
@@ -260,6 +260,8 @@ Skills and dev-brain are guardrails, not substitutes for judgment.
 
 - Use project-specific skills first when a task matches them.
 - Use `agent_gate.py` only for risky execution tasks or when `AGENTS.md` requires it.
+- GPT-6 may use the gate as optional context for eligible UI/API work; it must not block that work or override canonical source, tests, user scope, and explicit patch boundaries.
+- Keep the gate mandatory for DB/schema migrations, authentication/RBAC/security, production configuration/deployment, and changes to queue ownership/fairness or clinical lifecycle/signature rules. Other agent models follow `AGENTS.md` without the GPT-6 exception.
 - If the gate misroutes twice, treat that as a rule bug and use a narrow override only when the root-cause file and scope are confirmed.
 - Do not let generic skills override clinic safety, RBAC, migration ownership, payment/queue semantics, or existing design-system rules.
 
