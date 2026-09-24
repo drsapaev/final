@@ -369,6 +369,29 @@ export const ROUTE_REGISTRY = [
     layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Join Queue' }),
   },
   {
+    // PR 3390 review round (P1): the PWA/SMS visit-confirmation invitation
+    // (backend notifications_pkg/_formatting.py) deep-links patients to
+    // /confirm-visit?token=… — this public screen consumes the existing
+    // visit-confirmation API (GET /visits/info/{token}, POST
+    // /patient/visits/confirm). Without it the App wildcard redirected the
+    // invitation link to /not-found while the reminder was stamped as sent.
+    id: 'confirm-visit',
+    path: '/confirm-visit',
+    group: 'public',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'fullscreen',
+    auth: 'public',
+    roles: [],
+    entry: 'direct',
+    nav: false,
+    title: 'Confirm Visit',
+    owner: 'clinical.patient',
+    component: 'ConfirmVisitPage',
+    legacyRedirectFrom: [],
+    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Confirm Visit' }),
+  },
+  {
     id: 'telegram-mini-app-patient',
     path: '/telegram/mini-app/patient',
     group: 'public',

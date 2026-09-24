@@ -36,6 +36,11 @@ services:
       CORS_ALLOW_ALL: 0
       CORS_ORIGINS: ${CORS_ORIGINS}
       CORS_DISABLE: 0
+      # PR 3390 review round (P1): canonical public frontend origin for
+      # user-facing deep links (password reset, PWA invitations). Without
+      # this the Settings default (http://192.168.1.9:5173) leaks into links
+      # sent to patients on staging.
+      FRONTEND_URL: ${STAGING_PUBLIC_BASE_URL}
       TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
       HOST: 0.0.0.0
       PORT: 18000
@@ -58,6 +63,8 @@ services:
       ENABLE_DEV_AUTH: false
       LOG_LEVEL: INFO
       LOG_STRUCTURED: 1
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENV: staging
       # Codex R2 #3092 (P1): the backend itself must reach Redis for the
       # distributed idempotency claim. Without these vars the backend falls
       # back to redis://localhost:6379/0 inside its own container, the ping
@@ -95,6 +102,8 @@ services:
         VITE_API_BASE_URL: ${STAGING_PUBLIC_BASE_URL}
         VITE_WS_URL: ${STAGING_PUBLIC_WS_URL}
         VITE_WS_HOST: ${STAGING_PUBLIC_WS_HOST}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_ENV: staging
     restart: unless-stopped
     ports:
       - "${STAGING_FRONTEND_PORT:-18080}:80"
@@ -141,9 +150,13 @@ services:
       ENV: staging
       SECRET_KEY: ${SECRET_KEY}
       TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
-      # Sentry DSN — public send-only key. Override in .env if you want to
-      # send staging events to a different Sentry project.
-      SENTRY_DSN: ${SENTRY_DSN:-https://65b5195082de2f0522c27dd6695536b7@o4511673323749376.ingest.us.sentry.io/4511673347670016}
+      # PR 3390 review round (P1): the reminder worker builds the PWA/SMS
+      # visit-confirmation deep link from settings.FRONTEND_URL. Without
+      # this var the worker fell back to the Settings default
+      # (http://192.168.1.9:5173) instead of the actual staging frontend
+      # origin — patients would receive an unreachable link.
+      FRONTEND_URL: ${STAGING_PUBLIC_BASE_URL}
+      SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_ENV: staging
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.05}
       APP_VERSION: ${APP_VERSION:-0.9.0}

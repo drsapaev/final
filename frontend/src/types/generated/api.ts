@@ -1497,6 +1497,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/visits/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Visit Info By Token
+         * @description Read a public visit card without putting its bearer token in the URL.
+         */
+        post: operations["post_visit_info_by_token_api_v1_visits_info_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/visits/{visit_id}": {
         parameters: {
             query?: never;
@@ -22997,6 +23017,23 @@ export type components = {
              */
             warnings?: string[];
             /**
+             * Requires Doctor Confirmation
+             * @description Врач должен подтвердить предложение AI перед внесением в ЭМК
+             * @constant
+             */
+            requires_doctor_confirmation: true;
+            /**
+             * Decision Boundary
+             * @description Ответ AI является только предложением
+             * @constant
+             */
+            decision_boundary: "suggestion_only";
+            /**
+             * Ai Notice
+             * @description Предупреждение о роли AI
+             */
+            ai_notice: string;
+            /**
              * Disclaimer
              * @description Медицинский дисклеймер
              * @default AI suggestions are advisory only. Final decisions must be made by licensed medical professionals.
@@ -39499,6 +39536,55 @@ export type components = {
              */
             source: string | null;
         };
+        /** VisitInfoRequest */
+        VisitInfoRequest: {
+            /** Token */
+            token: string;
+        };
+        /** VisitInfoResponse */
+        VisitInfoResponse: {
+            /** Success */
+            success: boolean;
+            /** Visit Id */
+            visit_id: number;
+            /** Status */
+            status: string;
+            /** Patient Name */
+            patient_name: string;
+            /** Doctor Name */
+            doctor_name: string;
+            /** Visit Date */
+            visit_date: string;
+            /** Visit Time */
+            visit_time: string | null;
+            /** Department */
+            department: string | null;
+            /** Discount Mode */
+            discount_mode: string | null;
+            /** Services */
+            services: components["schemas"]["VisitInfoServiceItem"][];
+            /** Total Amount */
+            total_amount: number;
+            /** Currency */
+            currency: string;
+            /** Confirmation Expires At */
+            confirmation_expires_at: string | null;
+            /** Notes */
+            notes: string | null;
+        };
+        /** VisitInfoServiceItem */
+        VisitInfoServiceItem: {
+            /** Name */
+            name: string;
+            /** Code */
+            code: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Price */
+            price: number;
+            /** Total */
+            total: number;
+        };
         /** VisitOut */
         VisitOut: {
             /** Id */
@@ -43692,6 +43778,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_visit_info_by_token_api_v1_visits_info_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VisitInfoRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitInfoResponse"];
                 };
             };
             /** @description Validation Error */

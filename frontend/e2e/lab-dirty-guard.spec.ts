@@ -1,6 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
-import type { Page, Route } from '@playwright/test';
+import type { Page, Response, Route } from '@playwright/test';
 
 /**
  * PR5 (lab workflow hardening plan): mocked workflow spec.
@@ -162,6 +162,15 @@ let history101ResponseGate: Promise<void> | null = null;
 let releaseHistory101Response: (() => void) | null = null;
 let history102ResponseGate: Promise<void> | null = null;
 let releaseHistory102Response: (() => void) | null = null;
+// Follow-up PR (deferred handoff items of PR 3351): request epoch недавних
+// бланков. Гейт удерживает ВСЕ mount-запросы списка (React StrictMode в dev
+// выполняет эффекты дважды) — отпущенные ответы приходят последними и
+// обязаны отбрасываться по request epoch (latest-wins).
+let recentReportsListRequestCount = 0;
+let holdRecentResponses = false;
+let heldRecentReportsRequests = 0;
+let recentReportsHoldGate: Promise<void> | null = null;
+let releaseRecentReportsHold: (() => void) | null = null;
 
 // Скрытый locator карточки пациента очереди: tabpanel очереди смонтирован
 // всегда (hidden-секции), а getByRole исключает скрытые элементы из a11y
@@ -171,6 +180,18 @@ let releaseHistory102Response: (() => void) | null = null;
 // не требует видимости. Карточка пациента — div[role="button"], не <button>.
 function queuePatientButton(page: Page, name: string) {
   return page.locator('#lab-panel-tabpanel-queue [role="button"]', { hasText: name }).first();
+}
+
+// Follow-up PR: общий JSON-ответчик для тестовых route-оверрайдов — они
+// регистрируются ПОСЛЕ installApiMocks и потому имеют приоритет над
+// базовыми моками (последний зарегистрированный route обрабатывает запрос).
+function apiJson(route: Route, payload: unknown, headers: Record<string, string> = {}) {
+  return route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    headers,
+    body: JSON.stringify(payload),
+  });
 }
 
 async function installSession(page: Page) {
@@ -186,6 +207,86 @@ async function waitForReactToSettle(page: Page) {
   await page.evaluate(() => new Promise<void>((resolve) => {
     window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
   }));
+}
+
+// Follow-up PR, review round 2 (P2): событийный зонд завершения КЛИЕНТСКОЙ
+// обработки recent-reports ответов. Доставка ответа до браузера
+// (Network.responseReceived — то, что фиксирует page.on('response')) — это
+// только статус+заголовки: тело может ещё не получено, а обработчик
+// приложения (гвард request-epoch + setRecentReports) исполняется ПОЗЖЕ
+// любых кадровых ожиданий. Зонд ставится ДО старта приложения
+// (addInitScript) и оборачивает window.fetch: для ответов с
+// marker-заголовком оборачивается json() — «consumed» фиксирует, что
+// приложение РАЗОБРАЛО тело ответа; «settled» планируется макрозадачей
+// (setTimeout 0) ПОСЛЕ полного дрейна микрозадач — то есть ПОСЛЕ
+// исполнения синхронного продолжения loadRecentReports через всю цепочку
+// await-ов (request() → listInstances → гвард + setRecentReports).
+// Это событийный барьер завершения обработки, а не ожидание кадров.
+async function installRecentReportsProcessingProbe(page: Page) {
+  await page.addInitScript(() => {
+    const log: Array<{ marker: string; phase: string }> = [];
+    (window as unknown as { __rrProcessing: typeof log }).__rrProcessing = log;
+    const origFetch = window.fetch.bind(window);
+    window.fetch = async (...args: Parameters<typeof fetch>) => {
+      const response = await origFetch(...args);
+      try {
+        const marker = response.headers.get('x-test-recent-reports');
+        if (marker === 'fresh' || marker === 'stale') {
+          const origJson = response.json.bind(response);
+          response.json = async () => {
+            const body = await origJson();
+            log.push({ marker, phase: 'consumed' });
+            // Макрозадача: срабатывает только после дрейна ВСЕХ ожидающих
+            // микрозадач — включая продолжение обработчика приложения.
+            setTimeout(() => { log.push({ marker, phase: 'settled' }); }, 0);
+            return body;
+          };
+        }
+      } catch {
+        // Зонд не имеет права ломать приложение.
+      }
+      return response;
+    };
+  });
+}
+
+async function recentReportsPhaseCount(
+  page: Page,
+  marker: 'fresh' | 'stale',
+  phase: 'consumed' | 'settled',
+) {
+  return page.evaluate(({ marker, phase }) => {
+    const log = (window as unknown as {
+      __rrProcessing?: Array<{ marker: string; phase: string }>;
+    }).__rrProcessing || [];
+    return log.filter((entry) => entry.marker === marker && entry.phase === phase).length;
+  }, { marker, phase });
+}
+
+// Follow-up PR, review round 2 (P2): отрицательный ассерт («stale НЕ
+// применён») принципиально не имеет события — рабочий epoch-guard
+// отбрасывает ответ МОЛЧА, без какого-либо наблюдаемого эффекта.
+// Наблюдатель мутаций под вкладкой reports даёт «окно тишины»: bounded-
+// гарантия, что после последней мутации список не менялся quietMs.
+// Размер окна покрывает класс «обработчик завершается заметно позже
+// барьера» (вердикт→применение) и валидирован негативной мутацией с
+// контролируемой задержкой 300 мс перед setRecentReports (см. PR body).
+async function armReportsPanelQuietProbe(page: Page) {
+  await page.evaluate(() => {
+    const state = { last: performance.now() };
+    (window as unknown as { __rrQuiet: typeof state }).__rrQuiet = state;
+    const panel = document.getElementById('lab-panel-tabpanel-reports');
+    if (!panel) return;
+    new MutationObserver(() => { state.last = performance.now(); })
+      .observe(panel, { childList: true, subtree: true, characterData: true });
+  });
+}
+
+async function awaitReportsPanelQuiet(page: Page, quietMs: number) {
+  await page.waitForFunction((quietMs: number) => {
+    const state = (window as unknown as { __rrQuiet?: { last: number } }).__rrQuiet;
+    return state !== undefined && performance.now() - state.last >= quietMs;
+  }, quietMs, { timeout: quietMs + 10000 });
 }
 
 async function installApiMocks(page: Page) {
@@ -424,6 +525,11 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     releaseHistory101Response = null;
     history102ResponseGate = null;
     releaseHistory102Response = null;
+    recentReportsListRequestCount = 0;
+    holdRecentResponses = false;
+    heldRecentReportsRequests = 0;
+    recentReportsHoldGate = null;
+    releaseRecentReportsHold = null;
     await installSession(page);
     await installApiMocks(page);
   });
@@ -2453,5 +2559,326 @@ test.describe('Lab dirty-state guard (PR5, mocked)', () => {
     await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
     await expect(page.getByText('Отчёт #88').first()).toBeVisible();
     await expect(fieldInput).toHaveValue('7.2');
+  });
+
+  // =========================================================================
+  // Follow-up PR (deferred items of the PR 3351 handoff): gated cold-link
+  // тесты привязки очереди к холодной ссылке + deferred latest-wins тест
+  // request epoch недавних бланков. Все сценарии детерминированы
+  // request-gate-ами (waitForRequest/waitForResponse + счётчики запросов),
+  // без timeout-стабилизаций.
+  // =========================================================================
+
+  test('a cold deep link binds the queue appointment of the first page and selects it (gated cold-link)', async ({ page }) => {
+    // Cold deep-link ?instance=88: бланк открывается из URL, загрузка очереди
+    // привязывает запись пациента (report_instance_id=88, первая страница) —
+    // карточка выбирается, контекст пациента попадает в адрес.
+    const queueLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    const instanceLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/report-instances/88'));
+    await page.goto('/lab?instance=88');
+    await queueLoaded;
+    await instanceLoaded;
+
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('88');
+    // Привязка записи очереди доказывается resolve-запросом пациента 101:
+    // template-resolution срабатывает только от bound selectedAppointment.
+    await expect.poll(() => templateResolutionPatientRequests.includes('101')).toBe(true);
+    await expect.poll(() => new URL(page.url()).searchParams.get('patient')).toBe('101');
+
+    await page.getByRole('tab').first().click();
+    const oneCard = page.locator('#lab-panel-tabpanel-queue .lqw-queue-card', { hasText: 'Пациент Один' }).first();
+    await expect(oneCard).toBeVisible();
+    await expect(oneCard).toHaveClass(/lqw-queue-card-selected/);
+    const twoCard = page.locator('#lab-panel-tabpanel-queue .lqw-queue-card', { hasText: 'Пациент Два' }).first();
+    await expect(twoCard).not.toHaveClass(/lqw-queue-card-selected/);
+  });
+
+  test('a cold deep link to a sibling report of the same visit binds the visit appointment (gated cold-link)', async ({ page }) => {
+    // У записи очереди пациента Один report_instance_id=88 — ДРУГОЙ бланк
+    // того же визита 701. Прямого совпадения по id нет: привязка проходит
+    // только по visit_id-фолбэку appointmentMatchesInstance (patient+visit).
+    const SIBLING_QUEUE_ENTRIES = [
+      { id: 1, appointment_id: 'a-1', visit_id: 701, patient_id: 101, patient_fio: 'Пациент Один', patient_phone: '', status: 'waiting', report_instance_id: 88, services: [], service_codes: [], service_details: [] },
+      { id: 2, appointment_id: 'a-2', visit_id: 702, patient_id: 102, patient_fio: 'Пациент Два', patient_phone: '', status: 'waiting', report_instance_id: 89, services: [], service_codes: [], service_details: [] },
+    ];
+    await page.route('**/api/v1/lab/queue/today**', (route) => apiJson(route, {
+      entries: SIBLING_QUEUE_ENTRIES,
+      total: SIBLING_QUEUE_ENTRIES.length,
+      date: '2026-09-13',
+      timezone: 'Asia/Tashkent',
+    }));
+    // Сиблинг-бланк #91: тот же пациент 101 и тот же визит 701, что и #88.
+    const INSTANCE_SIBLING = { ...INSTANCE_A, id: 91 };
+    await page.route('**/api/v1/lab/report-instances/91', (route) => apiJson(route, INSTANCE_SIBLING));
+
+    const queueLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    const siblingLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/report-instances/91'));
+    await page.goto('/lab?instance=91');
+    await queueLoaded;
+    await siblingLoaded;
+
+    await expect(page.getByText('Отчёт #91').first()).toBeVisible();
+    await expect.poll(() => templateResolutionPatientRequests.includes('101')).toBe(true);
+    await expect.poll(() => new URL(page.url()).searchParams.get('patient')).toBe('101');
+
+    await page.getByRole('tab').first().click();
+    const oneCard = page.locator('#lab-panel-tabpanel-queue .lqw-queue-card', { hasText: 'Пациент Один' }).first();
+    await expect(oneCard).toBeVisible();
+    await expect(oneCard).toHaveClass(/lqw-queue-card-selected/);
+    const twoCard = page.locator('#lab-panel-tabpanel-queue .lqw-queue-card', { hasText: 'Пациент Два' }).first();
+    await expect(twoCard).not.toHaveClass(/lqw-queue-card-selected/);
+  });
+
+  test('a canonical /lab null intent releases the queue selection and the instance together; the gated queue refresh does not resurrect them', async ({ page }) => {
+    // Cold-link привязал запись очереди и открыл бланк. Внешний canonical
+    // intent /lab (без параметров) освобождает ОБОИХ одновременно; повторная
+    // загрузка очереди (возврат на вкладку queue) не должна воскрешать
+    // ни привязку, ни resolve-цепочку контекста.
+    const queueLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    await page.goto('/lab?instance=88');
+    await queueLoaded;
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await expect.poll(() => templateResolutionPatientRequests.includes('101')).toBe(true);
+    await expect.poll(() => new URL(page.url()).searchParams.get('patient')).toBe('101');
+
+    // Delivery-гейт refresh-ответа (review P2): canonical-переход перезагружает
+    // очередь; утверждение «refresh не воскресил selection» обязано
+    // проверяться ПОСЛЕ фактической доставки и применения ответа.
+    // waitForRequest доказывает только отправку запроса — ответ мог бы
+    // примениться уже после ассертов, и воскрешение осталось бы незамеченным.
+    const queueRefreshed = page.waitForResponse((response) => response.url().includes('/api/v1/lab/queue/today'));
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await queueRefreshed;
+    await waitForReactToSettle(page);
+
+    // Одновременное освобождение: адрес строго /lab (воскрешение привязки
+    // вернуло бы ?patient=101 — контракт canonical home), вкладка Queue, ни
+    // выбранной записи, ни открытого бланка, без guard-диалога.
+    await expect.poll(() => new URL(page.url()).search).toBe('');
+    await expect(page.getByText('Отчёт #88')).toHaveCount(0);
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await expect(panelTabs.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
+    const oneCard = page.locator('#lab-panel-tabpanel-queue .lqw-queue-card', { hasText: 'Пациент Один' }).first();
+    await expect(oneCard).toBeVisible();
+    await expect(oneCard).not.toHaveClass(/lqw-queue-card-selected/);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
+  test('a cold deep link binds a queue entry from the second page only after load-more (gated cold-link)', async ({ page }) => {
+    // Серверная пагинация очереди: 60 записей при LAB_QUEUE_PAGE_SIZE=50.
+    // Целевая запись (Пациент Два, report_instance_id=89) — на ВТОРОЙ
+    // странице: до load-more привязки нет; «Показать ещё» догружает страницу
+    // 2 — и привязка закрывается отложенно, ровно одним запросом.
+    const PAGINATED_QUEUE = Array.from({ length: 60 }, (_, index) => ({
+      id: index + 1,
+      appointment_id: `a-${index + 1}`,
+      visit_id: 800 + index,
+      patient_id: index === 55 ? 102 : 200 + index,
+      patient_fio: index === 55 ? 'Пациент Два' : `Пациент Заполнитель ${String(index + 1).padStart(2, '0')}`,
+      patient_phone: '',
+      status: 'waiting',
+      report_instance_id: index === 55 ? 89 : null,
+      services: [],
+      service_codes: [],
+      service_details: [],
+    }));
+    let secondPageRequests = 0;
+    await page.route('**/api/v1/lab/queue/today**', (route) => {
+      const requestUrl = new URL(route.request().url());
+      const limit = Number(requestUrl.searchParams.get('limit') ?? '50');
+      const offset = Number(requestUrl.searchParams.get('offset') ?? '0');
+      if (offset > 0) secondPageRequests += 1;
+      return apiJson(route, {
+        entries: PAGINATED_QUEUE.slice(offset, offset + limit),
+        total: PAGINATED_QUEUE.length,
+        date: '2026-09-13',
+        timezone: 'Asia/Tashkent',
+      });
+    });
+
+    const firstPageLoaded = page.waitForResponse((response) => (
+      response.url().includes('/api/v1/lab/queue/today') && response.url().includes('offset=0')
+    ));
+    const instanceLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/lab/report-instances/89'));
+    await page.goto('/lab?instance=89');
+    await firstPageLoaded;
+    await instanceLoaded;
+
+    // Бланк #89 открыт из URL, но его записи нет на первой странице:
+    // привязки нет (resolve по пациенту 102 не срабатывает).
+    await expect(page.getByText('Отчёт #89').first()).toBeVisible();
+    await waitForReactToSettle(page);
+    expect(templateResolutionPatientRequests).not.toContain('102');
+
+    // Вкладка очереди: дождаться refresh повторного входа (замещает список)
+    // — только затем load-more, без гонки двух ответов.
+    const queueRefreshed = page.waitForResponse((response) => (
+      response.url().includes('/api/v1/lab/queue/today') && response.url().includes('offset=0')
+    ));
+    await page.getByRole('tab').first().click();
+    await queueRefreshed;
+    const loadMoreButton = page.locator('#lab-panel-tabpanel-queue').getByRole('button', { name: /Загрузить ещё записи/ });
+    await expect(loadMoreButton).toBeVisible();
+
+    // Gate: запрос второй страницы; программный клик без scroll-событий —
+    // infinite-scroll-обработчик не срабатывает, запрос ровно один.
+    const secondPageRequested = page.waitForRequest((request) => (
+      request.url().includes('/api/v1/lab/queue/today') && request.url().includes('offset=50')
+    ));
+    await loadMoreButton.evaluate((el) => { (el as HTMLElement).click(); });
+    await secondPageRequested;
+    await waitForReactToSettle(page);
+    expect(secondPageRequests).toBe(1);
+
+    // Отложенная привязка: resolve пациента 102 + контекст в адресе.
+    await expect.poll(() => templateResolutionPatientRequests.includes('102')).toBe(true);
+    await expect.poll(() => new URL(page.url()).searchParams.get('patient')).toBe('102');
+
+    // Карточка на второй странице виртуализированного списка: скролл к
+    // нижнему окну, затем — проверка выбранного класса.
+    const scrollContainer = page.locator('#lab-panel-tabpanel-queue .lqw-virtualized-list');
+    await scrollContainer.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    await waitForReactToSettle(page);
+    const targetCard = page.locator('#lab-panel-tabpanel-queue .lqw-queue-card', { hasText: 'Пациент Два' }).first();
+    await expect(targetCard).toBeVisible();
+    await expect(targetCard).toHaveClass(/lqw-queue-card-selected/);
+  });
+
+  test('a deferred stale recent-reports response cannot overwrite the fresh list (request epoch latest-wins)', async ({ page }) => {
+    // Request epoch недавних бланков: поздний (отложенный) ответ mount-цепочки
+    // не должен затирать свежий список, полученный refresh-ом после CREATE.
+    // Гейт удерживает ВСЕ mount-запросы (StrictMode в dev удваивает эффекты);
+    // отпущенные STALE-ответы приходят ПОСЛЕ свежего — и отбрасываются.
+    const STALE_RECENT_REPORTS = [{
+      id: 88, patient_id: 101, visit_id: 701, status: 'DRAFT',
+      created_at: '2026-09-13T08:00:00.000Z',
+      template: { name: 'Устаревший бланк' },
+      patient_snapshot: { patient_id: 101, full_name: 'Пациент Один' },
+    }];
+    const FRESH_RECENT_REPORTS = [{
+      id: 90, patient_id: 101, visit_id: 701, status: 'DRAFT',
+      created_at: '2026-09-13T08:05:00.000Z',
+      template: { name: 'Свежий бланк' },
+      patient_snapshot: { patient_id: 101, full_name: 'Пациент Один' },
+    }];
+    holdRecentResponses = true;
+    recentReportsHoldGate = new Promise<void>((resolve) => {
+      releaseRecentReportsHold = resolve;
+    });
+    // Зонд клиентской обработки (review round 2, P2): page.on('response')
+    // (Network.responseReceived) — только статус+заголовки; тело и обработка
+    // завершаются позже. Зонд даёт событийные фазы consumed/settled
+    // (см. installRecentReportsProcessingProbe) — явный барьер завершения
+    // клиентской обработки, а не ожидание кадров.
+    await installRecentReportsProcessingProbe(page);
+    // Конкретные объекты ответов (review round 2, P2): сохраняются Response-
+    // объекты, а не только счётчики доставки — response.finished() закрывает
+    // сетевую фазу (тело получено браузером ЦЕЛИКОМ) до любых ассертов.
+    const freshResponses: Response[] = [];
+    const staleResponses: Response[] = [];
+    page.on('response', (response: Response) => {
+      const marker = response.headers()['x-test-recent-reports'];
+      if (marker === 'fresh') freshResponses.push(response);
+      else if (marker === 'stale') staleResponses.push(response);
+    });
+    await page.route('**/api/v1/lab/report-instances?limit=50', async (route) => {
+      recentReportsListRequestCount += 1;
+      if (holdRecentResponses) {
+        heldRecentReportsRequests += 1;
+        await recentReportsHoldGate;
+        await apiJson(route, STALE_RECENT_REPORTS, { 'x-test-recent-reports': 'stale' });
+        return;
+      }
+      await apiJson(route, FRESH_RECENT_REPORTS, { 'x-test-recent-reports': 'fresh' });
+    });
+
+    // Cold mount на вкладке reports: mount-запросы недавних удержаны гейтом.
+    await page.goto('/lab?tab=reports');
+    await expect.poll(() => recentReportsListRequestCount).toBeGreaterThanOrEqual(1);
+    await waitForReactToSettle(page);
+    holdRecentResponses = false;
+
+    // CREATE-цепочка: бланк #90 создан, onRefreshRecentReports получил
+    // СВЕЖИЙ список (гейт уже снят) — mount-запросы ещё висят удержанными.
+    await page.getByRole('tab').first().click();
+    await page.getByRole('button', { name: /Пациент Один/ }).first().click();
+    await expect(page.getByText('Отчёт #88').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Добавить бланк' }).click();
+    await expect.poll(() => reportInstanceCreatePostCount).toBe(1);
+    await expect(page.getByText('Отчёт #90').first()).toBeVisible();
+    await expect.poll(() => recentReportsListRequestCount).toBeGreaterThanOrEqual(2);
+
+    // FRESH-барьер (review round 2, P2): сетевая фаза закрыта — тело свежего
+    // ответа получено браузером ЦЕЛИКОМ (response.finished()), приложение
+    // разобрало его (consumed) и вердикт обработки исполнен (settled: гвард
+    // request-epoch прошёл, setRecentReports вызван). Без этого гейта в
+    // runtime без epoch-guard STALE мог бы примениться раньше FRESH —
+    // финальное состояние осталось бы свежим, и сломанный код прошёл бы тест.
+    await expect.poll(() => freshResponses.length).toBeGreaterThanOrEqual(1);
+    await Promise.all([...freshResponses].map((response) => response.finished()));
+    await expect.poll(() => recentReportsPhaseCount(page, 'fresh', 'consumed')).toBeGreaterThanOrEqual(1);
+    await expect.poll(() => recentReportsPhaseCount(page, 'fresh', 'settled')).toBeGreaterThanOrEqual(1);
+
+    // Гейт полного успокоения CREATE-механики: отложенная (round 8) WF-15
+    // запись ?instance=90 приземляется ТОЛЬКО после снятия pending-реестров и
+    // disarm sentinel-а — popstate раньше неё ловил бы intent в полёте
+    // (missed-flip defer/retry) и canonical-освобождение терялось.
+    await expect.poll(() => new URL(page.url()).searchParams.get('instance')).toBe('90');
+
+    // Canonical-переход снимает контекст пациента; вкладка reports снова
+    // показывает список недавних — только СВЕЖИЙ бланк, stale отброшен.
+    await page.evaluate(() => {
+      window.history.pushState({}, '', '/lab');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    // Гейт завершения canonical-приземления: ветка переключает вкладку на
+    // Queue и очищает контекст; клик по reports ДО этой точки обогнал бы
+    // POP-переход роутера и подменил intent tab-holding-семантикой (round 9).
+    const panelTabs = page.getByRole('tablist', { name: 'Панель лаборатории' });
+    await expect(panelTabs.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByText('Отчёт #90')).toHaveCount(0);
+
+    // FRESH применён ДО отпускания STALE (review round 2, P2): вкладка
+    // reports рендерит список недавних — «Свежий бланк» ВИДЕН в DOM ещё ДО
+    // релиза STALE. Клик по вкладке НЕ пере-запрашивает список
+    // (loadRecentReports вызывается только mount-эффектом и
+    // onRefreshRecentReports после CREATE) — эта видимость доказывает, что
+    // применён именно CREATE-refresh список, и делает порядок «fresh
+    // применён → stale приходит позже» наблюдаемым, а не предполагаемым.
+    await panelTabs.getByRole('tab').nth(2).click();
+    const recentPanel = page.locator('#lab-panel-tabpanel-reports');
+    await expect(recentPanel.getByText('Свежий бланк').first()).toBeVisible();
+
+    // Зонд тишины DOM (review round 2, P2): дискард STALE — принципиально НЕ
+    // событие (рабочий гвард отбрасывает ответ молча). Наблюдатель мутаций
+    // под вкладкой reports даст окно тишины ПОСЛЕ барьеров ниже —
+    // ограниченная гарантия для отрицательного ассерта.
+    await armReportsPanelQuietProbe(page);
+
+    // STALE-барьер (review round 2, P2): отпускаем удержанные ответы; КАЖДЫЙ
+    // доставлен до конца (response.finished() — тело ЦЕЛИКОМ), КАЖДЫЙ
+    // разобран приложением (consumed) и обработан (settled — вердикт гварда
+    // исполнен) ДО финальных ассертов.
+    const expectedStaleDeliveries = heldRecentReportsRequests;
+    releaseRecentReportsHold?.();
+    await expect.poll(() => staleResponses.length).toBe(expectedStaleDeliveries);
+    await Promise.all([...staleResponses].map((response) => response.finished()));
+    await expect.poll(() => recentReportsPhaseCount(page, 'stale', 'consumed')).toBe(expectedStaleDeliveries);
+    await expect.poll(() => recentReportsPhaseCount(page, 'stale', 'settled')).toBe(expectedStaleDeliveries);
+    // Флаш коммита React (НЕ барьер обработки — барьер выше): 2×RAF даёт
+    // планировщику React завершить commit, запланированный макрозадачей.
+    await waitForReactToSettle(page);
+    // Окно тишины: 500 мс без мутаций списка недавних — покрывает класс
+    // «обработчик завершается позже барьера» (вердикт→применение);
+    // валидировано негативной мутацией (гвард off + 300 мс перед применением).
+    await awaitReportsPanelQuiet(page, 500);
+
+    // Только СВЕЖИЙ бланк: stale отброшен epoch-guard-ом.
+    await expect(recentPanel.getByText('Свежий бланк').first()).toBeVisible();
+    await expect(recentPanel.getByText('Устаревший бланк')).toHaveCount(0);
   });
 });

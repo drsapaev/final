@@ -30,6 +30,38 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
     assert len(schema["paths"]) >= 100
 
 
+def test_openapi_ai_v2_medical_responses_require_doctor_confirmation(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    response = schema["components"]["schemas"]["AIResponse"]
+    assert {
+        "requires_doctor_confirmation",
+        "decision_boundary",
+        "ai_notice",
+    }.issubset(response["required"])
+    assert response["properties"]["requires_doctor_confirmation"]["const"] is True
+    assert response["properties"]["decision_boundary"]["const"] == "suggestion_only"
+    assert response["properties"]["ai_notice"]["minLength"] == 1
+
+    for path in (
+        "analyze-complaints",
+        "suggest-icd10",
+        "differential-diagnosis",
+        "interpret-lab",
+        "analyze-skin",
+        "analyze-ecg",
+        "symptom-check",
+        "analyze-document",
+        "drug-interaction",
+    ):
+        operation = schema["paths"][f"/api/v1/ai/v2/{path}"]["post"]
+        model_ref = operation["responses"]["200"]["content"]["application/json"][
+            "schema"
+        ]["$ref"]
+        assert model_ref == "#/components/schemas/AIResponse"
+
+
 @pytest.mark.parametrize(
     ("path", "method"),
     [

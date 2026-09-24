@@ -303,6 +303,14 @@ export const normalizePatientGender = (record: RegistrarRecordLike | null | unde
 );
 
 export const hasBackendPatientGenderContract = (record: RegistrarRecordLike | null | undefined) => {
+  if (!record) return false;
+  // Adapted legacy rows contain a synthesized patient_gender:null. Only the
+  // adapter's presence marker makes a nullable backend value authoritative.
+  if (hasOwn(record, '__patient_gender_contract_present')) {
+    if (record.__patient_gender_contract_present === true) return true;
+  } else if (hasOwn(record, 'patient_gender') && record.patient_gender !== undefined) {
+    return true;
+  }
   const gender = normalizePatientGender(record);
   return gender !== null && gender !== undefined && String(gender).trim() !== '';
 };

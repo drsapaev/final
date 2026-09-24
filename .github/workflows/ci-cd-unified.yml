@@ -763,7 +763,11 @@ jobs:
   frontend-e2e:
     name: Frontend e2e
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # PR #3368 review P1: был 15 — job уже занимал ~10m (npm ci + install
+    # chromium + 128 тестов); добавленный блокирующий lab-dirty-guard suite
+    # (61 тест, workers=1 на CI) требует запаса, чтобы timeout не убивал
+    # валидный прогон на медленных раннерах.
+    timeout-minutes: 25
     needs: [ci-scope]
     if: |
       needs.ci-scope.outputs.frontend_e2e_required == 'true' &&
@@ -889,6 +893,58 @@ jobs:
           exit 1
         fi
         echo "✓ UX/Visual E2E count invariant intact: $PASSED passed, $SKIPPED skipped, $FAILED failed (expected ≥ $EXPECTED_COUNT)."
+
+    - name: 🧪 Lab dirty-guard e2e (Chromium)
+      run: |
+        cd frontend
+        # PR #3368 review P1: regression-пины lab dirty-navigation обязаны быть
+        # CI-инвариантом required-job. До этого шага spec был только
+        # type-checked (tsc --noEmit выше) и никогда не исполнялся: регрессия
+        # в bindAppointmentForActiveInstance, appointmentMatchesInstance или
+        # request-epoch недавних бланков сливалась бы зелёной.
+        # Отдельный блокирующий шаг по прецеденту registrar-time (не в
+        # UX-батч: у того свой 127-count invariant, который не должен меняться).
+        # --retries=0: regression-пины обязаны проходить с первой попытки —
+        # та же политика, что у UX/Visual батча; suite провалидирован 61/61
+        # с retries=0 (см. PR #3368).
+        set -o pipefail
+        npx playwright test e2e/lab-dirty-guard.spec.ts --project=chromium --retries=0 2>&1 | tee lab-dirty-guard-output.txt
+
+    - name: 🔒 Lab dirty-guard E2E test count invariant
+      run: |
+        cd frontend
+        # Тот же контракт, что у UX/Visual count invariant выше: suite реально
+        # исполнил все 61 теста — никаких тихих пропусков (философия инцидента
+        # PR #2715). Обновляйте EXPECTED_COUNT при осознанном добавлении/
+        # удалении тестов.
+        EXPECTED_COUNT=61
+        if [ ! -f lab-dirty-guard-output.txt ]; then
+          echo "ERROR: lab-dirty-guard-output.txt not found. The Lab dirty-guard step may not have run."
+          exit 1
+        fi
+        FAILED_SUMMARY=$(grep -E "^\s+[0-9]+ failed" lab-dirty-guard-output.txt | tail -1 || echo "0 failed")
+        PASSED_SUMMARY=$(grep -E "^\s+[0-9]+ passed" lab-dirty-guard-output.txt | tail -1 || echo "0 passed")
+        SKIPPED_SUMMARY=$(grep -E "^\s+[0-9]+ skipped" lab-dirty-guard-output.txt | tail -1 || echo "0 skipped")
+        echo "Playwright summary: $FAILED_SUMMARY $PASSED_SUMMARY $SKIPPED_SUMMARY"
+        PASSED=$(echo "$PASSED_SUMMARY" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "0")
+        SKIPPED=$(echo "$SKIPPED_SUMMARY" | grep -oE "[0-9]+ skipped" | grep -oE "[0-9]+" || echo "0")
+        FAILED=$(echo "$FAILED_SUMMARY" | grep -oE "[0-9]+ failed" | grep -oE "[0-9]+" || echo "0")
+        echo "Parsed: passed=$PASSED skipped=$SKIPPED failed=$FAILED"
+        if [ "$FAILED" != "0" ]; then
+          echo "ERROR: $FAILED test(s) failed. Lab dirty-guard E2E must have 0 failures."
+          exit 1
+        fi
+        if [ "$SKIPPED" != "0" ]; then
+          echo "ERROR: $SKIPPED test(s) skipped. Lab dirty-guard E2E must have 0 skipped (no test.fixme/test.skip allowed)."
+          echo "If a test was intentionally skipped, remove the skip and fix the test, or update EXPECTED_COUNT."
+          exit 1
+        fi
+        if [ "$PASSED" -lt "$EXPECTED_COUNT" ]; then
+          echo "ERROR: Only $PASSED tests passed, expected at least $EXPECTED_COUNT."
+          echo "This means some tests were silently excluded. Check for test.fixme/test.skip."
+          exit 1
+        fi
+        echo "✓ Lab dirty-guard E2E count invariant intact: $PASSED passed, $SKIPPED skipped, $FAILED failed (expected ≥ $EXPECTED_COUNT)."
 
     - name: 📸 Update visual regression baseline snapshots (manual only)
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_snapshots == 'true'

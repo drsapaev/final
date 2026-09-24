@@ -90,7 +90,7 @@ async def get_roles(
 
 
 @router.get("/options", response_model=RoleOptionsListResponse)
-async def get_role_options(
+def get_role_options(
     include_all: bool = Query(
         False, description="Include 'All roles' option for filters"
     ),

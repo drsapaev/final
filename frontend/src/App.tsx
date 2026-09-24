@@ -54,6 +54,7 @@ const LabPanel = lazy(() => import('./pages/LabPanel'));
 const UserSelect = lazy(() => import('./pages/UserSelect'));
 const Search = lazy(() => import('./pages/Search'));
 const QueueJoin = lazy(() => import('./pages/QueueJoin'));
+const ConfirmVisitPage = lazy(() => import('./pages/ConfirmVisitPage'));
 const PatientPanel = lazy(() => import('./pages/PatientPanel'));
 const DisplayBoardUnified = lazy(() => import('./pages/DisplayBoardUnified'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
@@ -108,6 +109,7 @@ const ROUTE_COMPONENTS = {
   PatientActivatePage,
   Health,
   QueueJoin,
+  ConfirmVisitPage,
   PaymentSuccess,
   PaymentCancel,
   DisplayBoardUnified,
