@@ -44,14 +44,15 @@ class VisitInfoServiceItem(BaseModel):
 
 
 class VisitInfoResponse(BaseModel):
-    """Patient-safe public visit card (POST /visits/info).
+    """Patient-safe public visit card (GET/POST /visits/info).
 
-    PR 3390 review P2: deliberately does NOT include ``notes``. The
-    service card still carries it for the legacy GET /visits/info/{token}
-    (historical shape for already-delivered links); FastAPI filters the
-    response through this model, so the new POST never publishes the
-    internal clinical/admin field (``diagnosis: …``, cancel reasons,
-    force-reopen audit lines) to bearer-token link holders.
+    PR 3390 review P2 + PR 3407 delta review P2: deliberately does NOT
+    include ``notes``. The card is bearer-token-addressed and public, so
+    the internal clinical/admin field (``diagnosis: …``, cancel reasons,
+    force-reopen audit lines) is dropped from the service projection
+    itself, and BOTH routes (the new POST and the legacy GET) are
+    additionally filtered through this model — defense in depth against
+    a future regression re-adding the field to the shared card.
     """
 
     success: bool
@@ -139,9 +140,15 @@ def confirm_visit_by_pwa(
         _raise_http_error(exc)
 
 
-@router.get("/visits/info/{token}", response_model=dict[str, Any])
+@router.get("/visits/info/{token}", response_model=VisitInfoResponse)
 def get_visit_info_by_token(token: str, db: Session = Depends(get_db)):
-    """Получение информации о визите по токену (без подтверждения)."""
+    """Получение информации о визите по токену (без подтверждения).
+
+    PR 3407 delta review P2: the legacy GET returns the same patient-safe
+    card as the POST — the raw ``dict[str, Any]`` response_model is gone,
+    so the shared service projection cannot leak internal fields here
+    even if it regresses.
+    """
     service = VisitConfirmationService(db)
 
     try:

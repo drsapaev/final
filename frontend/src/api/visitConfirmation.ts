@@ -5,7 +5,9 @@
  *   POST /visits/info {token}
  *     Public visit card for the invitation link (no confirmation side
  *     effects). The legacy GET /visits/info/{token} remains for older
- *     clients; this page keeps the bearer token out of request URLs.
+ *     clients and returns the same patient-safe card (no internal
+ *     Visit.notes on either route — PR 3407 delta review P2); this
+ *     page keeps the bearer token out of request URLs.
  *     404 = token unknown, 400 = already processed / expired.
  *   POST /patient/visits/confirm
  *     Confirms the pending visit for the token. Same-day confirmations
@@ -31,7 +33,8 @@ export interface VisitQueueNumberDto {
 }
 
 /** POST /visits/info response; mirrors the published VisitInfoResponse
- * schema (patient-safe: no internal Visit.notes — PR 3390 review P2). */
+ * schema (patient-safe: no internal Visit.notes on any token-addressed
+ * route — PR 3390 review P2 + PR 3407 delta review P2). */
 export interface VisitInfoByTokenDto {
     success: boolean;
     visit_id: number;

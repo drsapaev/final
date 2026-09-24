@@ -194,6 +194,13 @@ async def get_csrf_token(request: Request, response: Response) -> CSRFTokenRespo
     # so every mutating request would fail with 403 missing_cookie. Ops can
     # opt that topology in via CSRF_COOKIE_SAMESITE=none; the spec requires
     # SameSite=None to carry Secure, so the flag is forced on in that mode.
+    # PR 3407 delta review P2 contract caveat: `none` only relaxes the
+    # SameSite attribute — credentialed CORS does not bypass the browser's
+    # third-party-cookie policy (Safari/Firefox and per-user privacy
+    # settings may still withhold the cookie → 403 missing_cookie), so a
+    # cross-site split is best-effort, not guaranteed portable. Production
+    # deployments should prefer a same-site topology (reverse-proxy /api,
+    # api.example.com) instead of depending on third-party cookies.
     # Security-relevant setting: refuse to guess on a typo (loud 500) instead
     # of silently weakening the cookie.
     samesite = (os.getenv("CSRF_COOKIE_SAMESITE") or "lax").strip().lower()
