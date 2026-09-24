@@ -208,7 +208,7 @@ function buildQaApiPayload(pathname: string, profile: QaProfile, method: string)
     return {
       doctor: {
         id: 98001,
-        name: 'QA Doctor',
+        name: 'SYNTHETIC-QA Doctor',
       },
     };
   }
@@ -218,7 +218,7 @@ function buildQaApiPayload(pathname: string, profile: QaProfile, method: string)
       queue_exists: true,
       doctor: {
         id: 98001,
-        name: 'QA Doctor',
+        name: 'SYNTHETIC-QA Doctor',
       },
       entries: [],
     };
