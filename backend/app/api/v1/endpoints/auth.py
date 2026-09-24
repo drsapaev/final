@@ -185,6 +185,24 @@ async def get_csrf_token(request: Request, response: Response) -> CSRFTokenRespo
 
     is_prod = os.getenv("ENV", "dev").lower() in ("prod", "production")
 
+    # PR #3407 (2a64f6d02 review follow-up): SameSite policy for the CSRF
+    # cookie. The documented split-origin deployment (ops/vps, VITE_API_BASE_URL)
+    # is same-site — e.g. frontend clinic.example.com + API api.example.com —
+    # where Lax + withCredentials delivers the cookie on cross-origin POSTs.
+    # A cross-SITE split (different registrable domains, e.g. a *.vercel.app
+    # frontend against this API) never sends Lax cookies on cross-site POSTs,
+    # so every mutating request would fail with 403 missing_cookie. Ops can
+    # opt that topology in via CSRF_COOKIE_SAMESITE=none; the spec requires
+    # SameSite=None to carry Secure, so the flag is forced on in that mode.
+    # Security-relevant setting: refuse to guess on a typo (loud 500) instead
+    # of silently weakening the cookie.
+    samesite = (os.getenv("CSRF_COOKIE_SAMESITE") or "lax").strip().lower()
+    if samesite not in ("lax", "strict", "none"):
+        raise HTTPException(
+            status_code=500,
+            detail="CSRF_COOKIE_SAMESITE must be one of: lax, strict, none",
+        )
+
     # SECURITY (CodeQL #1200): validate the existing cookie matches the
     # server-minted format before reusing it. An attacker could plant a
     # cookie via subdomain cookie injection (e.g. on a shared parent domain)
@@ -200,8 +218,8 @@ async def get_csrf_token(request: Request, response: Response) -> CSRFTokenRespo
         key="csrf_token",
         value=token,
         httponly=False,
-        secure=is_prod,
-        samesite="lax",
+        secure=is_prod or samesite == "none",
+        samesite=samesite,
         path="/",
         max_age=60 * 60 * 8,
     )

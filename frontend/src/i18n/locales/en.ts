@@ -10093,6 +10093,7 @@ const en = {
     cv_confirmed: 'Visit confirmed!',
     cv_queue_numbers: 'Your queue number',
     cv_error: 'Confirmation error. Please try again.',
+    cv_btn_retry: 'Retry',
     // ─── ForgotPassword.jsx — password strength labels ────────────────────
     fp_strength_very_weak: 'Очень слабый',
     fp_strength_weak: 'Слабый',

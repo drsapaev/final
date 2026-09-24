@@ -10094,6 +10094,7 @@ const uzLatn = {
     cv_confirmed: 'Tashrif tasdiqlandi!',
     cv_queue_numbers: 'Navbatdagi raqamingiz',
     cv_error: 'Tasdiqlash xatosi. Yana urinib ko\'ring.',
+    cv_btn_retry: 'Qayta urinish',
     // ─── ForgotPassword.jsx — password strength labels ────────────────────
     fp_strength_very_weak: 'Juda kuchsiz',
     fp_strength_weak: 'Kuchsiz',

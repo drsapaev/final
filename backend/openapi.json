@@ -112351,17 +112351,6 @@
               }
             ],
             "title": "Confirmation Expires At"
-          },
-          "notes": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notes"
           }
         },
         "type": "object",
@@ -112378,10 +112367,10 @@
           "services",
           "total_amount",
           "currency",
-          "confirmation_expires_at",
-          "notes"
+          "confirmation_expires_at"
         ],
-        "title": "VisitInfoResponse"
+        "title": "VisitInfoResponse",
+        "description": "Patient-safe public visit card (POST /visits/info).\n\nPR 3390 review P2: deliberately does NOT include ``notes``. The\nservice card still carries it for the legacy GET /visits/info/{token}\n(historical shape for already-delivered links); FastAPI filters the\nresponse through this model, so the new POST never publishes the\ninternal clinical/admin field (``diagnosis: …``, cancel reasons,\nforce-reopen audit lines) to bearer-token link holders."
       },
       "VisitInfoServiceItem": {
         "properties": {

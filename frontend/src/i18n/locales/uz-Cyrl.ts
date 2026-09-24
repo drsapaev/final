@@ -10104,6 +10104,7 @@ const uzCyrl = {
     cv_confirmed: 'Ташриф тасдиқланди!',
     cv_queue_numbers: 'Навбатдаги рақамингиз',
     cv_error: 'Тасдиқлаш хатоси. Яна уриниб кўринг.',
+    cv_btn_retry: 'Қайта уриниш',
     // ─── ForgotPassword.jsx — password strength labels ────────────────────
     fp_strength_very_weak: 'Очень слабый',
     fp_strength_weak: 'Слабый',

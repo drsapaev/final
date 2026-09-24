@@ -44,6 +44,16 @@ class VisitInfoServiceItem(BaseModel):
 
 
 class VisitInfoResponse(BaseModel):
+    """Patient-safe public visit card (POST /visits/info).
+
+    PR 3390 review P2: deliberately does NOT include ``notes``. The
+    service card still carries it for the legacy GET /visits/info/{token}
+    (historical shape for already-delivered links); FastAPI filters the
+    response through this model, so the new POST never publishes the
+    internal clinical/admin field (``diagnosis: …``, cancel reasons,
+    force-reopen audit lines) to bearer-token link holders.
+    """
+
     success: bool
     visit_id: int
     status: str
@@ -57,7 +67,6 @@ class VisitInfoResponse(BaseModel):
     total_amount: float
     currency: str
     confirmation_expires_at: str | None
-    notes: str | None
 
 
 class ConfirmationResponse(BaseModel):
