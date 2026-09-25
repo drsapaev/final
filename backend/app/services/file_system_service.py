@@ -68,17 +68,17 @@ class FileSystemService:
         )
         self.max_import_files = int(os.getenv("MAX_IMPORT_FILES", 1000))
         self.allowed_extensions = {
-            FileType.DOCUMENT: ['.pdf', '.doc', '.docx', '.txt', '.rtf', '.odt'],
-            FileType.IMAGE: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'],
-            FileType.VIDEO: ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm'],
-            FileType.AUDIO: ['.mp3', '.wav', '.flac', '.aac', '.ogg'],
-            FileType.ARCHIVE: ['.zip', '.rar', '.7z', '.tar', '.gz'],
-            FileType.MEDICAL_RECORD: ['.pdf', '.doc', '.docx', '.xml'],
-            FileType.LAB_RESULT: ['.pdf', '.xlsx', '.csv', '.xml'],
-            FileType.XRAY: ['.dcm', '.dicom', '.jpg', '.jpeg', '.png'],
-            FileType.PRESCRIPTION: ['.pdf', '.xml', '.json'],
-            FileType.REPORT: ['.pdf', '.doc', '.docx', '.xlsx'],
-            FileType.BACKUP: ['.zip', '.sql', '.bak'],
+            FileType.DOCUMENT: [".pdf", ".doc", ".docx", ".txt", ".rtf", ".odt"],
+            FileType.IMAGE: [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"],
+            FileType.VIDEO: [".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm"],
+            FileType.AUDIO: [".mp3", ".wav", ".flac", ".aac", ".ogg"],
+            FileType.ARCHIVE: [".zip", ".rar", ".7z", ".tar", ".gz"],
+            FileType.MEDICAL_RECORD: [".pdf", ".doc", ".docx", ".xml"],
+            FileType.LAB_RESULT: [".pdf", ".xlsx", ".csv", ".xml"],
+            FileType.XRAY: [".dcm", ".dicom", ".jpg", ".jpeg", ".png"],
+            FileType.PRESCRIPTION: [".pdf", ".xml", ".json"],
+            FileType.REPORT: [".pdf", ".doc", ".docx", ".xlsx"],
+            FileType.BACKUP: [".zip", ".sql", ".bak"],
             FileType.OTHER: [],
         }
 
@@ -127,15 +127,15 @@ class FileSystemService:
                 return file_type
 
         # Дополнительная проверка по MIME типу
-        if mime_type.startswith('image/'):
+        if mime_type.startswith("image/"):
             return FileType.IMAGE
-        elif mime_type.startswith('video/'):
+        elif mime_type.startswith("video/"):
             return FileType.VIDEO
-        elif mime_type.startswith('audio/'):
+        elif mime_type.startswith("audio/"):
             return FileType.AUDIO
-        elif mime_type == 'application/pdf':
+        elif mime_type == "application/pdf":
             return FileType.DOCUMENT
-        elif mime_type in ['application/zip', 'application/x-rar-compressed']:
+        elif mime_type in ["application/zip", "application/x-rar-compressed"]:
             return FileType.ARCHIVE
 
         return FileType.OTHER
@@ -240,7 +240,12 @@ class FileSystemService:
         name, ext = os.path.splitext(filename)
         # Sanitize: remove path separators, dots-only names, null bytes
         safe_name = os.path.basename(name)  # strips directory components
-        safe_name = safe_name.replace("..", "").replace("/", "").replace("\\", "").replace("\x00", "")
+        safe_name = (
+            safe_name.replace("..", "")
+            .replace("/", "")
+            .replace("\\", "")
+            .replace("\x00", "")
+        )
         if not safe_name or safe_name.startswith("."):
             safe_name = "file"
         safe_ext = os.path.splitext(ext)[1]  # just the extension
@@ -308,10 +313,7 @@ class FileSystemService:
                     detail="EMR appointment not found",
                 )
             context_patient_ids["emr_id"] = int(appointment.patient_id)
-            if (
-                appointment_id is not None
-                and int(emr.appointment_id) != appointment_id
-            ):
+            if appointment_id is not None and int(emr.appointment_id) != appointment_id:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="EMR does not belong to selected appointment",
@@ -365,7 +367,7 @@ class FileSystemService:
             mime_type = (
                 upload_file.content_type
                 or mimetypes.guess_type(upload_file.filename)[0]
-                or 'application/octet-stream'
+                or "application/octet-stream"
             )
             _file_type = self._get_file_type(upload_file.filename, mime_type)
 
@@ -395,7 +397,7 @@ class FileSystemService:
                 os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
                 # Сохраняем файл
-                with open(file_path, 'wb') as f:
+                with open(file_path, "wb") as f:
                     f.write(file_content)
                 logger.info(f"Создан новый файл: {file_path}")
 
@@ -539,7 +541,7 @@ class FileSystemService:
             )
 
         # Читаем файл
-        with open(db_file.file_path, 'rb') as f:
+        with open(db_file.file_path, "rb") as f:
             file_content = f.read()
 
         # Логируем скачивание
@@ -635,7 +637,7 @@ class FileSystemService:
         os.makedirs(os.path.dirname(new_file_path), exist_ok=True)
 
         # Сохраняем новый файл
-        with open(new_file_path, 'wb') as f:
+        with open(new_file_path, "wb") as f:
             f.write(new_content)
 
         # Обновляем запись файла
@@ -678,9 +680,12 @@ class FileSystemService:
         # Мягкое удаление
         result = file.delete(db, id=file_id)
         if result:
-            # Обновляем квоту пользователя
+            # Учитываем квоту владельца файла, в том числе при удалении администратором.
             file_quota.update_usage(
-                db, user_id=user_id, size_delta=-db_file.file_size, files_delta=-1
+                db,
+                user_id=db_file.owner_id,
+                size_delta=-db_file.file_size,
+                files_delta=-1,
             )
 
             # Логируем удаление
@@ -734,7 +739,7 @@ class FileSystemService:
         )
 
         try:
-            with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zipf:
                 for db_file in files_to_export:
                     if os.path.exists(db_file.file_path):
                         # Добавляем файл в архив
@@ -789,7 +794,7 @@ class FileSystemService:
                     detail="Import archive is too large",
                 )
 
-            with zipfile.ZipFile(io.BytesIO(import_request.import_data), 'r') as zipf:
+            with zipfile.ZipFile(io.BytesIO(import_request.import_data), "r") as zipf:
                 self._safe_extract_zip(zipf, extracted_path)
 
             processed_files = 0
@@ -798,20 +803,20 @@ class FileSystemService:
             # Обрабатываем извлеченные файлы
             for root, _dirs, files in os.walk(extracted_path):
                 for filename in files:
-                    if filename.endswith('.metadata.json'):
+                    if filename.endswith(".metadata.json"):
                         continue  # Пропускаем файлы метаданных
 
                     file_path = os.path.join(root, filename)
 
                     try:
                         # Читаем файл
-                        with open(file_path, 'rb') as f:
+                        with open(file_path, "rb") as f:
                             file_content = f.read()
 
                         # Определяем тип файла
                         mime_type = (
                             mimetypes.guess_type(filename)[0]
-                            or 'application/octet-stream'
+                            or "application/octet-stream"
                         )
                         file_type = self._get_file_type(filename, mime_type)
 
