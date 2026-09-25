@@ -462,6 +462,7 @@ test.describe('Visual regression — registrar EAT', () => {
   // Locks horizontal-scroll as the canonical mobile behavior (per ruling P7).
   // If a follow-up sub-PR (09b–09e) accidentally switches to cards-layout,
   // this snapshot will differ — Rule 13 causality investigation triggers.
+  // The named doctor queue tab is an intentional registrar workflow change.
   test('Surface 4: registrar EAT — mobile 375×720 (scroll lock)', async ({ page }) => {
     // Override the project's default desktop viewport for this test only.
     await page.setViewportSize({ width: 375, height: 720 });
