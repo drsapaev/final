@@ -97,6 +97,7 @@ interface EMRContainerV2Props {
     specialty?: string;
     patientName?: string;
     ICD10Component?: React.ComponentType<Record<string, unknown>> | null;
+    onPersisted?: () => void | Promise<void>;
 }
 
 interface EMRDataShape {
@@ -149,10 +150,27 @@ function getSavedRowVersion(value: unknown): number | null {
     return Number.isInteger(rowVersion) && rowVersion > 0 ? rowVersion : null;
 }
 
+export async function persistEMRAndRefresh(
+    save: (options: Record<string, unknown>) => Promise<unknown>,
+    onPersisted?: () => void | Promise<void>,
+    options: Record<string, unknown> = {},
+): Promise<unknown> {
+    const result = await save(options);
+    if (!isRejectedEMRWrite(result)) {
+        try {
+            await onPersisted?.();
+        } catch {
+            // A parent refresh failure must not turn a successful save into a failure.
+        }
+    }
+    return result;
+}
+
 export async function persistAndSignEMR(actions: {
     confirm: () => Promise<boolean>;
     save: (options: Record<string, unknown>) => Promise<unknown>;
     sign: (options: { rowVersion: number }) => Promise<unknown>;
+    onPersisted?: () => void | Promise<void>;
 }): Promise<PersistAndSignResult> {
     let confirmed: boolean;
     try {
@@ -172,10 +190,20 @@ export async function persistAndSignEMR(actions: {
     const rowVersion = getSavedRowVersion(saved);
     if (rowVersion === null) return 'save_failed';
 
+    const refreshStatus = async () => {
+        try {
+            await actions.onPersisted?.();
+        } catch {
+            // Parent refresh failures must not change the EMR persistence result.
+        }
+    };
+
     try {
         const signed = await actions.sign({ rowVersion });
+        await refreshStatus();
         return isRejectedEMRWrite(signed) ? 'sign_failed' : 'sign_attempted';
     } catch {
+        await refreshStatus();
         return 'sign_failed';
     }
 }
@@ -206,7 +234,7 @@ interface EMRHookResult {
     forceOverwrite: () => Promise<unknown>;
 }
 
-export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null }: EMRContainerV2Props) {
+export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null, onPersisted }: EMRContainerV2Props) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
     const { t: rawT } = useTranslation();
@@ -561,6 +589,18 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         setField(field, value);
     }, [setField]);
 
+    const refreshParentStatus = useCallback(async () => {
+        try {
+            await onPersisted?.();
+        } catch {
+            logger.warn('[EMR] Parent status refresh failed after persistence');
+        }
+    }, [onPersisted]);
+
+    const saveManually = useCallback(async (options: Record<string, unknown> = {}) => {
+        return persistEMRAndRefresh(saveEMR, refreshParentStatus, options);
+    }, [refreshParentStatus, saveEMR]);
+
     // Actions
     const handleSign = useCallback(async () => {
         const result = await persistAndSignEMR({
@@ -574,17 +614,18 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             }),
             save: saveEMR,
             sign: signEMR,
+            onPersisted: refreshParentStatus,
         });
         if (result === 'save_failed') {
             logger.error('[EMR] Save-and-sign stopped because the save did not return a valid non-draft version');
         } else if (result === 'sign_failed') {
             logger.error('[EMR] Save-and-sign stopped because signing failed');
         }
-    }, [saveEMR, signEMR, confirm, t]);
+    }, [saveEMR, signEMR, confirm, refreshParentStatus, t]);
 
     // Keyboard shortcuts (must be after handleSign declaration)
     useEMRKeyboard({
-        onSave: () => saveEMR(),
+        onSave: () => saveManually(),
         onUndo: undo,
         onRedo: redo,
         onSign: handleSign,
@@ -956,7 +997,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                         <>
                             <button
                                 className="emr-v2-btn emr-v2-btn--primary"
-                                onClick={() => saveEMR({ isDraft: false })}
+                                onClick={() => saveManually({ isDraft: false })}
                             disabled={isSaving || !isDirty || accessDenied}
                             aria-label={isSaving ? t('misc.emr_saving_aria') : t('misc.emr_save_aria')}
                         >
