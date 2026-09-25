@@ -14,9 +14,8 @@ vi.mock('../../../utils/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock('../../../i18n/useTranslation', () => {
-  const t = (key: string) => key;
   return {
-    useTranslation: () => ({ t }),
+    useTranslation: () => ({ t: (key: string) => key }),
     TranslationProvider: ({ children }: { children: unknown }) => children,
   };
 });
@@ -60,6 +59,17 @@ beforeEach(() => {
 });
 
 describe('DentalVisitScreen EMR persistence', () => {
+  it('does not refetch the visit EMR when a render receives a fresh translation function', async () => {
+    renderVisit();
+    const textarea = await screen.findByRole('textbox', { name: TEXTAREA_NAME });
+    fireEvent.change(textarea, { target: { value: 'rerender with stable EMR read' } });
+
+    await waitFor(() => {
+      const visitReads = vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === '/v2/emr/41');
+      expect(visitReads).toHaveLength(1);
+    });
+  });
+
   it('keeps completion unavailable without a visit id and offers retry', async () => {
     const onCompleteVisit = vi.fn();
     render(<DentalVisitScreen patient={{ patient_id: 7 }} onCompleteVisit={onCompleteVisit} />);
@@ -175,6 +185,78 @@ describe('DentalVisitScreen EMR persistence', () => {
     }));
     await act(async () => { resolveSecond?.({ data: { row_version: 3 } }); });
   }, 10000);
+
+  it('edits the existing specialty visit_protocol in the EMR draft', async () => {
+    const existingProtocol = {
+      procedures: [{ name: 'initial procedure', teeth: '16', description: 'existing note' }],
+      photos: { before: [{ filename: 'legacy image' }], during: [], after: [] },
+      recommendations: 'keep existing recommendations',
+    };
+    vi.mocked(apiClient.get).mockImplementation((url: string) => Promise.resolve(
+      url.includes('/patient/')
+        ? { status: 404, data: null }
+        : loadedEMR({ specialty_data: { visit_protocol: existingProtocol } }),
+    ) as never);
+    const { onCompleteVisit } = renderVisit();
+
+    fireEvent.click(await screen.findByText('dental.dental_vp_tab_procedures'));
+    const procedureName = await screen.findByRole('textbox', {
+      name: 'dental.dental_vp_proc_label_name 1',
+    });
+    fireEvent.change(procedureName, { target: { value: 'updated procedure' } });
+    fireEvent.click(getCompleteButton());
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/v2/emr/41', expect.objectContaining({
+      data: expect.objectContaining({
+        specialty_data: expect.objectContaining({
+          visit_protocol: expect.objectContaining({
+            procedures: [expect.objectContaining({ name: 'updated procedure', teeth: '16' })],
+            photos: existingProtocol.photos,
+            recommendations: existingProtocol.recommendations,
+          }),
+        }),
+      }),
+    })));
+    await waitFor(() => expect(onCompleteVisit).toHaveBeenCalledWith(expect.objectContaining({
+      specialty_data: expect.objectContaining({
+        visit_protocol: expect.objectContaining({
+          procedures: [expect.objectContaining({ name: 'updated procedure' })],
+          photos: existingProtocol.photos,
+        }),
+      }),
+    })));
+  });
+
+  it('saves the latest draft before returning to the queue without completing it', async () => {
+    let resolveSave: ((response: SaveResponse) => void) | undefined;
+    vi.mocked(apiClient.post).mockReturnValueOnce(new Promise((resolve) => {
+      resolveSave = resolve;
+    }) as never);
+    const onCompleteVisit = vi.fn();
+    const onBackToQueue = vi.fn();
+    render(
+      <DentalVisitScreen
+        patient={patient(41)}
+        onCompleteVisit={onCompleteVisit}
+        onBackToQueue={onBackToQueue}
+      />,
+    );
+    const textarea = await screen.findByRole('textbox', { name: TEXTAREA_NAME });
+    fireEvent.change(textarea, { target: { value: 'draft before queue navigation' } });
+    fireEvent.click(screen.getByRole('button', { name: 'doctor.tab_queue' }));
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/v2/emr/41', expect.objectContaining({
+      row_version: 1,
+      is_draft: true,
+      data: expect.objectContaining({ anamnesis_morbi: 'draft before queue navigation' }),
+    })));
+    expect(onBackToQueue).not.toHaveBeenCalled();
+    expect(onCompleteVisit).not.toHaveBeenCalled();
+
+    await act(async () => { resolveSave?.({ data: { row_version: 2 } }); });
+    await waitFor(() => expect(onBackToQueue).toHaveBeenCalledTimes(1));
+    expect(onCompleteVisit).not.toHaveBeenCalled();
+  });
 
   it('does not carry a previous patient draft across a patient switch', async () => {
     vi.mocked(apiClient.get).mockImplementation((url: string) => {

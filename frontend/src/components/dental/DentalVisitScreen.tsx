@@ -39,8 +39,8 @@ import {
   Typography, Box, Alert, Skeleton,
 } from '../ui/macos';
 import {
-  Stethoscope, CheckCircle, ChevronDown, ChevronUp,
-  Brain,
+  ArrowLeft, Stethoscope, CheckCircle, ChevronDown, ChevronUp,
+  Brain, Plus, Trash2,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import logger from '../../utils/logger';
@@ -71,6 +71,7 @@ const EMPTY_EMR_DATA = {
     periodontal_pockets: {},
     measurements: {},
     radiographs: {},
+    visit_protocol: {},
   },
   recommendations: '',
   notes: '',
@@ -111,10 +112,12 @@ const getHttpStatus = (error: unknown): number | undefined => {
 interface PatientHeaderProps {
   patient: Record<string, unknown> | null;
   onCompleteVisit: () => void | Promise<void>;
+  onBackToQueue?: () => void | Promise<void>;
+  backDisabled?: boolean;
   loading?: boolean;
 }
 
-const PatientHeader = ({ patient, onCompleteVisit, loading }: PatientHeaderProps) => {
+const PatientHeader = ({ patient, onCompleteVisit, onBackToQueue, backDisabled, loading }: PatientHeaderProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const patientName =
@@ -147,14 +150,26 @@ const PatientHeader = ({ patient, onCompleteVisit, loading }: PatientHeaderProps
           )}
         </div>
       </div>
-      <Button
-        variant="primary"
-        onClick={() => { void onCompleteVisit(); }}
-        disabled={loading}
-        aria-label={t('dental.dental_dvs_aria_complete')}>
-        <CheckCircle size={16} style={{ marginRight: 6 }} aria-hidden="true" />
-        {loading ? t('dental.dental_dvs_saving') : t('dental.dental_dvs_complete_visit')}
-      </Button>
+      <div className="dental-flex dental-gap-12">
+        {onBackToQueue && (
+          <Button
+            variant="outline"
+            onClick={() => { void onBackToQueue(); }}
+            disabled={backDisabled}
+            aria-label={t('doctor.tab_queue')}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            {t('doctor.tab_queue')}
+          </Button>
+        )}
+        <Button
+          variant="primary"
+          onClick={() => { void onCompleteVisit(); }}
+          disabled={loading}
+          aria-label={t('dental.dental_dvs_aria_complete')}>
+          <CheckCircle size={16} style={{ marginRight: 6 }} aria-hidden="true" />
+          {loading ? t('dental.dental_dvs_saving') : t('dental.dental_dvs_complete_visit')}
+        </Button>
+      </div>
     </div>
   );
 };
@@ -407,6 +422,279 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }: Collap
 };
 
 
+type VisitProtocolRecord = Record<string, unknown>;
+type VisitProtocolUpdater = (current: VisitProtocolRecord) => VisitProtocolRecord;
+type VisitProtocolUpdate = (update: VisitProtocolUpdater) => void;
+
+const protocolRecord = (value: unknown): VisitProtocolRecord =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as VisitProtocolRecord
+    : {};
+
+const VisitProtocolSections = ({
+  value,
+  onUpdate,
+  disabled,
+}: {
+  value: VisitProtocolRecord;
+  onUpdate: VisitProtocolUpdate;
+  disabled?: boolean;
+}) => {
+  const { t: rawT } = useTranslation();
+  const t = rawT;
+  const entries = (field: string) => Array.isArray(value[field])
+    ? (value[field] as unknown[]).map(protocolRecord)
+    : [];
+  const updateField = (field: string, nextValue: unknown) => {
+    onUpdate((current) => ({ ...current, [field]: nextValue }));
+  };
+  const updateArrayItem = (field: string, index: number, patch: VisitProtocolRecord) => {
+    onUpdate((current) => {
+      const currentItems = Array.isArray(current[field])
+        ? current[field] as unknown[]
+        : [];
+      return {
+        ...current,
+        [field]: currentItems.map((item, itemIndex) => itemIndex === index
+          ? { ...protocolRecord(item), ...patch }
+          : item),
+      };
+    });
+  };
+  const addArrayItem = (field: string, item: VisitProtocolRecord) => {
+    onUpdate((current) => ({
+      ...current,
+      [field]: [...(Array.isArray(current[field]) ? current[field] as unknown[] : []), item],
+    }));
+  };
+  const removeArrayItem = (field: string, index: number) => {
+    onUpdate((current) => {
+      const currentItems = Array.isArray(current[field])
+        ? current[field] as unknown[]
+        : [];
+      return { ...current, [field]: currentItems.filter((_, itemIndex) => itemIndex !== index) };
+    });
+  };
+  const inputValue = (item: VisitProtocolRecord, field: string) => String(item[field] ?? '');
+  const procedures = entries('procedures');
+  const materials = entries('materials');
+  const anesthesia = entries('anesthesia');
+  const radiographs = entries('radiographs');
+  const prescriptions = entries('prescriptions');
+  const nextVisit = protocolRecord(value.nextVisit);
+
+  return (
+    <section className="dental-flex-col dental-gap-12" aria-labelledby="dental-visit-protocol-title">
+      <div>
+        <h3 id="dental-visit-protocol-title" className="dental-text-primary">
+          {t('dental.dental_vp_title')}
+        </h3>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_subtitle')}</p>
+      </div>
+
+      <details>
+        <summary>{t('dental.dental_vp_tab_procedures')}</summary>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_proc_subtitle')}</p>
+        <div className="dental-flex-col dental-gap-12">
+          {procedures.map((procedure, index) => (
+            <div className="dental-flex-col dental-gap-12" key={`procedure-${index}`}>
+              <Input
+                aria-label={`${t('dental.dental_vp_proc_label_name')} ${index + 1}`}
+                value={inputValue(procedure, 'name')}
+                onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('procedures', index, { name: event.target.value })}
+                disabled={disabled}
+              />
+              <Input
+                type="time"
+                aria-label={t('dental.dental_vp_proc_aria_start', { index: index + 1 })}
+                value={inputValue(procedure, 'startTime')}
+                onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('procedures', index, { startTime: event.target.value })}
+                disabled={disabled}
+              />
+              <Input
+                type="time"
+                aria-label={t('dental.dental_vp_proc_aria_end', { index: index + 1 })}
+                value={inputValue(procedure, 'endTime')}
+                onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('procedures', index, { endTime: event.target.value })}
+                disabled={disabled}
+              />
+              <Input
+                aria-label={t('dental.dental_vp_proc_aria_teeth', { index: index + 1 })}
+                value={inputValue(procedure, 'teeth')}
+                placeholder={t('dental.dental_vp_proc_ph_teeth')}
+                onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('procedures', index, { teeth: event.target.value })}
+                disabled={disabled}
+              />
+              <Textarea
+                aria-label={t('dental.dental_vp_proc_aria_desc', { index: index + 1 })}
+                value={inputValue(procedure, 'description')}
+                placeholder={t('dental.dental_vp_proc_ph_desc')}
+                onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('procedures', index, { description: event.target.value })}
+                disabled={disabled}
+              />
+              <label className="dental-flex dental-gap-12">
+                <input
+                  type="checkbox"
+                  aria-label={t('dental.dental_vp_proc_aria_completed', { index: index + 1 })}
+                  checked={Boolean(procedure.completed)}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateArrayItem('procedures', index, { completed: event.target.checked })}
+                  disabled={disabled}
+                />
+                {t('dental.dental_vp_proc_chk_completed')}
+              </label>
+              <label className="dental-flex dental-gap-12">
+                <input
+                  type="checkbox"
+                  aria-label={t('dental.dental_vp_proc_aria_complications', { index: index + 1 })}
+                  checked={Boolean(procedure.complications)}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateArrayItem('procedures', index, { complications: event.target.checked })}
+                  disabled={disabled}
+                />
+                {t('dental.dental_vp_proc_chk_complications')}
+              </label>
+              <Button variant="outline" size="small" onClick={() => removeArrayItem('procedures', index)} disabled={disabled}>
+                <Trash2 size={14} aria-hidden="true" />
+                {t('dental.dental_vp_proc_aria_remove', { index: index + 1 })}
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="small" onClick={() => addArrayItem('procedures', { name: '', teeth: '', description: '' })} disabled={disabled}>
+            <Plus size={14} aria-hidden="true" />
+            {t('dental.dental_vp_proc_btn_add')}
+          </Button>
+        </div>
+      </details>
+
+      <details>
+        <summary>{t('dental.dental_vp_tab_materials')}</summary>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_mat_subtitle')}</p>
+        <div className="dental-flex-col dental-gap-12">
+          {materials.map((material, index) => (
+            <div className="dental-flex-col dental-gap-12" key={`material-${index}`}>
+              <Input aria-label={t('dental.dental_vp_mat_aria_name', { index: index + 1 })} value={inputValue(material, 'name')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('materials', index, { name: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_mat_aria_quantity', { index: index + 1 })} value={inputValue(material, 'quantity')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('materials', index, { quantity: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_mat_aria_batch', { index: index + 1 })} value={inputValue(material, 'batch')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('materials', index, { batch: event.target.value })} disabled={disabled} />
+              <Textarea aria-label={t('dental.dental_vp_mat_aria_notes', { index: index + 1 })} value={inputValue(material, 'notes')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('materials', index, { notes: event.target.value })} disabled={disabled} />
+              <Button variant="outline" size="small" onClick={() => removeArrayItem('materials', index)} disabled={disabled}>
+                <Trash2 size={14} aria-hidden="true" />
+                {t('dental.dental_vp_mat_aria_remove', { index: index + 1 })}
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="small" onClick={() => addArrayItem('materials', { name: '', quantity: '', batch: '', notes: '' })} disabled={disabled}>
+            <Plus size={14} aria-hidden="true" />
+            {t('dental.dental_vp_mat_btn_add')}
+          </Button>
+        </div>
+      </details>
+
+      <details>
+        <summary>{t('dental.dental_vp_tab_anesthesia')}</summary>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_anes_subtitle')}</p>
+        <div className="dental-flex-col dental-gap-12">
+          {anesthesia.map((item, index) => (
+            <div className="dental-flex-col dental-gap-12" key={`anesthesia-${index}`}>
+              <Input aria-label={t('dental.dental_vp_anes_aria_drug', { index: index + 1 })} value={inputValue(item, 'drug')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('anesthesia', index, { drug: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_anes_aria_dose', { index: index + 1 })} value={inputValue(item, 'dose')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('anesthesia', index, { dose: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_anes_label_method')} value={inputValue(item, 'method')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('anesthesia', index, { method: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_anes_aria_area', { index: index + 1 })} value={inputValue(item, 'area')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('anesthesia', index, { area: event.target.value })} disabled={disabled} />
+              <label className="dental-flex dental-gap-12">
+                <input
+                  type="checkbox"
+                  aria-label={t('dental.dental_vp_anes_aria_effective', { index: index + 1 })}
+                  checked={Boolean(item.effective)}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateArrayItem('anesthesia', index, { effective: event.target.checked })}
+                  disabled={disabled}
+                />
+                {t('dental.dental_vp_anes_chk_effective')}
+              </label>
+              <label className="dental-flex dental-gap-12">
+                <input
+                  type="checkbox"
+                  aria-label={t('dental.dental_vp_anes_aria_complications', { index: index + 1 })}
+                  checked={Boolean(item.complications)}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateArrayItem('anesthesia', index, { complications: event.target.checked })}
+                  disabled={disabled}
+                />
+                {t('dental.dental_vp_anes_chk_complications')}
+              </label>
+              <Button variant="outline" size="small" onClick={() => removeArrayItem('anesthesia', index)} disabled={disabled}>
+                <Trash2 size={14} aria-hidden="true" />
+                {t('dental.dental_vp_anes_aria_remove', { index: index + 1 })}
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="small" onClick={() => addArrayItem('anesthesia', { drug: '', dose: '', method: '', area: '' })} disabled={disabled}>
+            <Plus size={14} aria-hidden="true" />
+            {t('dental.dental_vp_anes_btn_add')}
+          </Button>
+        </div>
+      </details>
+
+      <details>
+        <summary>{t('dental.dental_vp_tab_radiographs')}</summary>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_radio_subtitle')}</p>
+        <div className="dental-flex-col dental-gap-12">
+          {radiographs.map((item, index) => (
+            <div className="dental-flex-col dental-gap-12" key={`radiograph-${index}`}>
+              <Input aria-label={t('dental.dental_vp_radio_label_type')} value={inputValue(item, 'type')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('radiographs', index, { type: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_radio_aria_area', { index: index + 1 })} value={inputValue(item, 'area')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('radiographs', index, { area: event.target.value })} disabled={disabled} />
+              <Textarea aria-label={t('dental.dental_vp_radio_aria_findings', { index: index + 1 })} value={inputValue(item, 'findings')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('radiographs', index, { findings: event.target.value })} disabled={disabled} />
+              <Button variant="outline" size="small" onClick={() => removeArrayItem('radiographs', index)} disabled={disabled}>
+                <Trash2 size={14} aria-hidden="true" />
+                {t('dental.dental_vp_radio_aria_remove', { index: index + 1 })}
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="small" onClick={() => addArrayItem('radiographs', { type: '', area: '', findings: '' })} disabled={disabled}>
+            <Plus size={14} aria-hidden="true" />
+            {t('dental.dental_vp_radio_btn_add')}
+          </Button>
+        </div>
+      </details>
+
+      <details>
+        <summary>{t('dental.dental_vp_tab_prescriptions')}</summary>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_rx_subtitle')}</p>
+        <div className="dental-flex-col dental-gap-12">
+          {prescriptions.map((item, index) => (
+            <div className="dental-flex-col dental-gap-12" key={`prescription-${index}`}>
+              <Input aria-label={t('dental.dental_vp_rx_aria_medication', { index: index + 1 })} value={inputValue(item, 'medication')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('prescriptions', index, { medication: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_rx_aria_dosage', { index: index + 1 })} value={inputValue(item, 'dosage')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('prescriptions', index, { dosage: event.target.value })} disabled={disabled} />
+              <Textarea aria-label={t('dental.dental_vp_rx_aria_instructions', { index: index + 1 })} value={inputValue(item, 'instructions')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('prescriptions', index, { instructions: event.target.value })} disabled={disabled} />
+              <Button variant="outline" size="small" onClick={() => removeArrayItem('prescriptions', index)} disabled={disabled}>
+                <Trash2 size={14} aria-hidden="true" />
+                {t('dental.dental_vp_rx_aria_remove', { index: index + 1 })}
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="small" onClick={() => addArrayItem('prescriptions', { medication: '', dosage: '', instructions: '' })} disabled={disabled}>
+            <Plus size={14} aria-hidden="true" />
+            {t('dental.dental_vp_rx_btn_add')}
+          </Button>
+          <Textarea
+            aria-label={t('dental.dental_vp_aria_recommendations')}
+            value={String(value.recommendations ?? '')}
+            placeholder={t('dental.dental_vp_ph_recommendations')}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateField('recommendations', event.target.value)}
+            disabled={disabled}
+          />
+        </div>
+      </details>
+
+      <details>
+        <summary>{t('dental.dental_vp_next_visit_title')}</summary>
+        <div className="dental-flex-col dental-gap-12">
+          <Input type="date" aria-label={t('dental.dental_vp_next_visit_aria_date')} value={String(nextVisit.date ?? '')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...protocolRecord(current.nextVisit), date: event.target.value } }))} disabled={disabled} />
+          <Input type="time" aria-label={t('dental.dental_vp_next_visit_aria_time')} value={String(nextVisit.time ?? '')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...protocolRecord(current.nextVisit), time: event.target.value } }))} disabled={disabled} />
+          <Input aria-label={t('dental.dental_vp_next_visit_aria_purpose')} value={String(nextVisit.purpose ?? '')} placeholder={t('dental.dental_vp_next_visit_ph_purpose')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...protocolRecord(current.nextVisit), purpose: event.target.value } }))} disabled={disabled} />
+        </div>
+      </details>
+    </section>
+  );
+};
+
+
 interface VisitHistoryProps {
   history: Array<Record<string, unknown>>;
   loading?: boolean;
@@ -526,15 +814,24 @@ const AISuggestionDialog = ({ open, onClose, onApply, anamnesis }: AISuggestionD
 const DentalVisitScreen = ({
   patient,
   onCompleteVisit,
+  onBackToQueue,
   loading: parentLoading,
 }: {
   patient?: { visit_id?: string | number; patient_id?: string | number; id?: string | number; patient?: { id?: string | number } };
   onCompleteVisit?: (latestDraft: Record<string, unknown>) => void | Promise<void>;
+  onBackToQueue?: () => void | Promise<void>;
   loading?: boolean;
   [k: string]: unknown;
 }) => {
   const { t: rawT } = useTranslation();
-  const t = rawT;
+  // The project adapter creates a new t wrapper on every render. Keep the
+  // loader callbacks stable while still using the current locale function.
+  const translationRef = useRef(rawT);
+  translationRef.current = rawT;
+  const t = useCallback(
+    (key: string, params?: Record<string, unknown>) => translationRef.current(key, params),
+    [],
+  );
   const [emrData, setEmrData] = useState(EMPTY_EMR_DATA);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -600,12 +897,15 @@ const DentalVisitScreen = ({
       }
 
       const data = (existing?.data || EMPTY_EMR_DATA) as typeof EMPTY_EMR_DATA;
+      const specialtyData = data.specialty_data || EMPTY_EMR_DATA.specialty_data;
+      const protocolData = specialtyData.visit_protocol || (data as Record<string, unknown>).visit_protocol;
       const nextDraft = {
         ...EMPTY_EMR_DATA,
         ...data,
         specialty_data: {
           ...EMPTY_EMR_DATA.specialty_data,
-          ...(data.specialty_data || {}),
+          ...specialtyData,
+          visit_protocol: protocolData || EMPTY_EMR_DATA.specialty_data.visit_protocol,
         },
       };
       latestDraftRef.current = nextDraft;
@@ -730,6 +1030,11 @@ const DentalVisitScreen = ({
     scheduleAutosave(next);
   }, [scheduleAutosave]);
 
+  const updateVisitProtocol = useCallback((update: VisitProtocolUpdater) => {
+    const current = protocolRecord(latestDraftRef.current.specialty_data.visit_protocol);
+    updateSpecialtyData('visit_protocol', update(current));
+  }, [updateSpecialtyData]);
+
   const handleCompleteVisit = useCallback(async () => {
     const targetVisitId = visitId;
     if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') {
@@ -772,6 +1077,41 @@ const DentalVisitScreen = ({
     }
     setCompleting(false);
   }, [onCompleteVisit, persistDraft, t, visitId]);
+
+  const handleBackToQueue = useCallback(async () => {
+    if (!onBackToQueue) return;
+    const targetVisitId = visitId;
+    if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') {
+      await onBackToQueue();
+      return;
+    }
+    if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+      await onBackToQueue();
+      return;
+    }
+
+    const snapshot = latestDraftRef.current;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setCompleting(true);
+    setSaveError(null);
+    try {
+      await persistDraft(targetVisitId, snapshot);
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        await onBackToQueue();
+      }
+    } catch (error: unknown) {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        setSaveError(getHttpStatus(error) === 409 ? 'conflict' : 'save');
+        logger.warn('[DentalVisitScreen] save before queue navigation failed');
+        notify.error(t('dental2.visit_protocol_save_failed'));
+      }
+    } finally {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) setCompleting(false);
+    }
+  }, [onBackToQueue, persistDraft, t, visitId]);
 
   const handleRetrySave = useCallback(async () => {
     if (retryCompletionRef.current) {
@@ -845,6 +1185,8 @@ const DentalVisitScreen = ({
         <PatientHeader
           patient={patient as Record<string, unknown> | null}
           onCompleteVisit={handleCompleteVisit}
+          onBackToQueue={onBackToQueue ? handleBackToQueue : undefined}
+          backDisabled={completing || Boolean(parentLoading) || (loading && !loadError)}
           loading={saving || completing || parentLoading || !isEMRLoaded || Boolean(loadError)}
         />
 
@@ -917,6 +1259,12 @@ const DentalVisitScreen = ({
                 ...(emrData.specialty_data?.hygiene_indices || {}),
                 [field]: value,
               })}
+              disabled={fieldsDisabled}
+            />
+
+            <VisitProtocolSections
+              value={protocolRecord(emrData.specialty_data?.visit_protocol)}
+              onUpdate={updateVisitProtocol}
               disabled={fieldsDisabled}
             />
 

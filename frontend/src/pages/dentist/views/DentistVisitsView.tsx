@@ -8,15 +8,15 @@ import { dentalCardKeyDown } from '../dentistCardA11y';
  * DentistPanelUnified.renderVisits (registrar/cashier/doctor views
  * decomposition precedent).
  *
- * Queue-selected patient → the minimal DentalVisitScreen; otherwise the
- * patient-pick grid that opens the EMR v2 visit protocol.
+ * Queue-selected patient → the single DentalVisitScreen; otherwise the
+ * existing patient selection path.
  */
 export default function DentistVisitsView({
   selectedPatient,
   patients,
   loading,
   onCompleteVisit,
-  onVisitProtocol,
+  onPatientSelect,
   onBackToQueue,
   tI18n,
 }: {
@@ -24,7 +24,7 @@ export default function DentistVisitsView({
   patients: SelectedPatient[];
   loading: boolean;
   onCompleteVisit: () => void;
-  onVisitProtocol: (patient: SelectedPatient | Record<string, unknown> | null) => void;
+  onPatientSelect: (patient: SelectedPatient | Record<string, unknown> | null) => void;
   onBackToQueue: () => void;
   tI18n: (key: string, params?: Record<string, unknown>) => string;
 }) {
@@ -57,8 +57,8 @@ export default function DentistVisitsView({
             tabIndex={0}
             aria-label={tI18n('dental.dental_panel_aria_visit')}
             className="dental-card-btn"
-            onClick={() => onVisitProtocol(patient)}
-            onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => dentalCardKeyDown(event, () => onVisitProtocol(patient))}
+            onClick={() => onPatientSelect(patient)}
+            onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => dentalCardKeyDown(event, () => onPatientSelect(patient))}
             onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
               e.currentTarget.style.background = 'var(--mac-bg-secondary)';
             }}

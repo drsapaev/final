@@ -33,19 +33,21 @@ describe('dentist views (PR-UI-15-6)', () => {
   ];
 
   it('DentistVisitsView renders the pick grid without a selected patient', () => {
+    const onPatientSelect = vi.fn();
     renderWithProviders(
       <DentistVisitsView
         selectedPatient={null}
         patients={patients}
         loading={false}
         onCompleteVisit={vi.fn()}
-        onVisitProtocol={vi.fn()}
+        onPatientSelect={onPatientSelect}
         onBackToQueue={vi.fn()}
         tI18n={t}
       />,
     );
     expect(screen.getByText('dental.dental_panel_visits_title')).toBeInTheDocument();
-    expect(screen.getByText('SYNTHETIC-Patient-One')).toBeInTheDocument();
+    screen.getByText('SYNTHETIC-Patient-One').click();
+    expect(onPatientSelect).toHaveBeenCalledWith(patients[0]);
     expect(screen.getByText('SYNTHETIC-Patient-Two')).toBeInTheDocument();
     expect(screen.queryByTestId('visit-screen')).not.toBeInTheDocument();
   });
@@ -57,7 +59,7 @@ describe('dentist views (PR-UI-15-6)', () => {
         patients={patients}
         loading={false}
         onCompleteVisit={vi.fn()}
-        onVisitProtocol={vi.fn()}
+        onPatientSelect={vi.fn()}
         onBackToQueue={vi.fn()}
         tI18n={t}
       />,
