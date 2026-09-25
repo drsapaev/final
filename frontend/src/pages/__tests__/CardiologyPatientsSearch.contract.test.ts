@@ -37,15 +37,15 @@ describe('Cardiology Patients & AI contract', () => {
   });
 
   it('selects the picked patient for the panel without visit or queue context', () => {
-    expect(panelSource).toContain("source: 'patient_search'");
-    const pickHandler = panelSource.match(/const handlePatientSearchPick = [\s\S]*?\n  };/);
+    expect(panelSource).toContain('source: \'patient_search\'');
+    const pickHandler = panelSource.match(/const handlePatientSearchPick = [\s\S]*?\n {2};/);
     expect(pickHandler).not.toBeNull();
     expect(pickHandler?.[0]).toContain('visit_id: null');
     expect(pickHandler?.[0]).not.toContain('doctor_queue_entry_id');
   });
 
   it('loads visit history through the doctor-owned visits endpoint', () => {
-    expect(panelSource).toContain("apiClient.get('/visits/visits'");
+    expect(panelSource).toContain('apiClient.get(\'/visits/visits\'');
     const visitsCall = panelSource.match(/apiClient\.get\('\/visits\/visits'[\s\S]*?\}\)/);
     expect(visitsCall).not.toBeNull();
     expect(visitsCall?.[0]).toContain('patient_id: patientId');
@@ -64,6 +64,6 @@ describe('Cardiology Patients & AI contract', () => {
 
   it('guards the search query on the client at 2 characters', () => {
     expect(patientSearchSource).toContain('PATIENT_SEARCH_MIN_CHARS = 2');
-    expect(patientSearchSource).toContain("trimmed.length < PATIENT_SEARCH_MIN_CHARS");
+    expect(patientSearchSource).toContain('trimmed.length < PATIENT_SEARCH_MIN_CHARS');
   });
 });
