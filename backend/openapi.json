@@ -329,7 +329,7 @@
           "patients"
         ],
         "summary": "Create Patient Portal Booking",
-        "description": "Create one trusted patient-portal appointment (own scope only).\n\nMirrors the Mini App creation contract: same draft validation, same\nper-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same\n409 on occupied slots, same lifecycle eligibility for the doctor.\n\nP2 (round 2): the `Idempotency-Key` header is REQUIRED. The global\nidempotency middleware only protects requests that carry a key —\nwithout a mandated key a lost response + automatic browser retry of a\ndate-only/department-only request (no doctor slot lock applies) would\ncreate duplicate appointments. Same key + same payload replays the\ncommitted 201; same key + changed payload is a 409.\n\nP2 (round 3): creation goes through the portal-INTERNAL\n`PatientPortalAppointmentCreate` — the persisted `department_id` is the\nserver-resolved FK from `_resolve_portal_department`, never a\nclient-owned field (the shared `AppointmentCreate` no longer accepts\none, closing the legacy-endpoint bypass).",
+        "description": "Create one trusted patient-portal appointment (own scope only).\n\nMirrors the Mini App creation contract: same draft validation, same\nper-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same\n409 on occupied slots, same lifecycle eligibility for the doctor.\n\nMerged-#3340 follow-up (P1): the FINAL routing department is re-read\nwith ``populate_existing().with_for_update()`` in THIS transaction and\nits ``active`` re-validated before the INSERT — the persisted routing\ncontext can no longer reference a department that a concurrently\ncommitted admin transaction deactivated (or deleted).\n\nP2 (round 2): the `Idempotency-Key` header is REQUIRED. The global\nidempotency middleware only protects requests that carry a key —\nwithout a mandated key a lost response + automatic browser retry of a\ndate-only/department-only request (no doctor slot lock applies) would\ncreate duplicate appointments. Same key + same payload replays the\ncommitted 201; same key + changed payload is a 409.\n\nP2 (round 3): creation goes through the portal-INTERNAL\n`PatientPortalAppointmentCreate` — the persisted `department_id` is the\nserver-resolved FK from `_resolve_portal_department`, never a\nclient-owned field (the shared `AppointmentCreate` no longer accepts\none, closing the legacy-endpoint bypass).",
         "operationId": "create_patient_portal_booking_api_v1_patients_booking_post",
         "security": [
           {
@@ -42146,6 +42146,50 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Telegram Mini App Patient Sessions Revoke All"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/telegram/mini-app/booking/departments": {
+      "post": {
+        "tags": [
+          "telegram-webhook"
+        ],
+        "summary": "List Mini App Booking Departments",
+        "description": "Round-12 (owner P1, PR #3386 review): ACTIVE departments for the\nMini App booking form's department selector.\n\nThe form submits the canonical `Department.key` picked from THIS list —\na localized free-text label (\"Кардиология\") is not a `Department.key`\nand would be refused with 400 `department_unknown` by the routing\ncontract. Same authenticated identity surface as the booking endpoints\nthemselves (initData primary, entry token allowed); no PHI is returned.",
+        "operationId": "telegram_mini_app_list_booking_departments",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramMiniAppBookingDepartmentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Telegram Mini App List Booking Departments"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -108772,6 +108816,46 @@
           "appointmentDate"
         ],
         "title": "TelegramMiniAppAppointmentPreviewRequest"
+      },
+      "TelegramMiniAppBookingDepartmentsRequest": {
+        "properties": {
+          "initData": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initdata"
+          },
+          "entryToken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entrytoken"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          }
+        },
+        "type": "object",
+        "title": "TelegramMiniAppBookingDepartmentsRequest",
+        "description": "Round-12 (owner P1, PR #3386 review): auth shape for the booking\ndepartments reference endpoint.\n\nThe Mini App booking form no longer free-types a department name (a\nlocalized label like \"Кардиология\" is NOT the canonical `Department.key`\nthe routing contract resolves); it picks from THIS endpoint's list, so\nthe submitted value is always a canonical key. Same identity contract\nas the booking endpoints themselves (initData primary, entry token\nallowed) — the reference data rides the SAME authenticated surface it\nfeeds, and the error reasons match the booking scope contract."
       },
       "TelegramMiniAppPatientCabinetSummaryRequest": {
         "properties": {

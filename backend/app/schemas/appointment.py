@@ -42,14 +42,16 @@ class AppointmentCreate(AppointmentBase):
 
 
 class PatientPortalAppointmentCreate(AppointmentCreate):
-    """Round-3 (owner P2): portal-INTERNAL creation schema.
+    """Protected patient booking creation schema (portal-INTERNAL).
 
     `department_id` is the SERVER-RESOLVED routing FK. It exists ONLY on
-    this internal portal schema so `POST /patients/booking` can persist the
-    canonical `departments.id` it resolved and validated itself
-    (`_resolve_portal_department`: unknown key / inactive row → 400). It is
-    deliberately absent from the shared `AppointmentCreate` (public
-    `POST /appointments/` contract): a client-supplied value on the legacy
+    this internal schema so the protected patient booking endpoints can
+    persist the canonical `departments.id` they resolved and validated
+    themselves (`resolve_booking_department`: unknown key / inactive row →
+    400): `POST /patients/booking` (JWT portal) and — round-11, PR #3340
+    parity — the Telegram Mini App booking endpoints. It is deliberately
+    absent from the shared `AppointmentCreate` (public `POST
+    /appointments/` contract): a client-supplied value on the legacy
     endpoint would bypass that validation entirely (inactive/arbitrary
     department ids, nonexistent FK → IntegrityError/500). The general
     endpoint keeps its pre-#3340 contract — no client-owned routing FK.

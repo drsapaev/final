@@ -3,12 +3,16 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.roles import DOCTOR_ROLE_SPELLINGS
+from app.core.specialties import INCOMPLETE_DOCTOR_SPECIALTY
 from app.models.appointment import Appointment
+from app.models.clinic import Doctor
 from app.models.department import Department
 from app.models.schedule import ScheduleTemplate
+from app.models.user import User
 
 
 def _resolve_department_id(db: Session, department: str | None) -> int | None:
@@ -23,6 +27,53 @@ def _resolve_department_id(db: Session, department: str | None) -> int | None:
     if not department:
         return None
     return db.scalar(select(Department.id).where(Department.key == department))
+
+
+# ---------------------------------------------------------------------------
+# Review round 3 (owner P2, #3402): READ-side schedule/department consistency.
+#
+# The CREATE boundary validates department activity and doctor eligibility
+# under row locks, but a row lock cannot outlive its transaction: an admin
+# deactivation committed AFTER a template was created must be reflected by
+# the READS, otherwise the schedule keeps advertising slots the booking
+# contract would refuse (their own PG pin leaves ScheduleTemplate.active=True
+# behind a deactivated department). The advertising surfaces therefore
+# exclude templates whose Department is inactive or whose Doctor is
+# ineligible — WITHOUT touching the template rows (deactivation must stay
+# reversible: reactivating the department brings the slots back).
+#
+# Deliberately NOT filtered (management views, staff-only routes):
+# list_schedules, get_weekly_schedule, get_daily_schedule — admins must
+# still SEE templates of a deactivated department to manage/re-enable them.
+# ---------------------------------------------------------------------------
+
+
+def _eligible_doctor_clause():
+    """SQL filter: template's Doctor (if any) must be booking-eligible.
+
+    SQL mirror of ``ensure_doctor_eligible_for_appointment()`` (the booking
+    contract's SSOT): active Doctor, completed specialty (not blank / not
+    the "general" placeholder), existing active owner account carrying a
+    doctor-family role. doctor_id IS NULL (department-wide template) has no
+    doctor to validate — mirrors the helper's None short-circuit."""
+    return or_(
+        ScheduleTemplate.doctor_id.is_(None),
+        ScheduleTemplate.doctor_id.in_(
+            select(Doctor.id).where(
+                Doctor.active.is_(True),
+                # is_doctor_profile_incomplete(): blank or placeholder
+                # specialty is INCOMPLETE (Codex round-9 P2).
+                Doctor.specialty.isnot(None),
+                func.trim(Doctor.specialty) != "",
+                func.trim(Doctor.specialty) != INCOMPLETE_DOCTOR_SPECIALTY,
+                Doctor.user_id.isnot(None),
+                User.id == Doctor.user_id,
+                User.is_active.is_(True),
+                # is_doctor_role_spelling(): normalize = strip + lower.
+                func.lower(func.trim(User.role)).in_(DOCTOR_ROLE_SPELLINGS),
+            )
+        ),
+    )
 
 
 def list_schedules(
@@ -306,12 +357,25 @@ def get_available_slots(
     if dept_id is None:
         return []
 
-    # Получаем шаблоны расписания для этого дня
+    # Review round 3 (owner P2): the resolved department must STILL be
+    # active — a template created before an admin deactivation must not
+    # keep advertising slots the booking boundary would refuse. A column
+    # select (not db.get) deliberately bypasses the identity map, the same
+    # stale-snapshot class the booking lock's populate_existing() fixed.
+    dept_active = db.scalar(
+        select(Department.active).where(Department.id == dept_id)
+    )
+    if dept_active is not True:
+        return []
+
+    # Получаем шаблоны расписания для этого дня (+ doctor leg: a template
+    # pinned to an ineligible doctor must not advertise bookable slots).
     stmt = select(ScheduleTemplate).where(
         and_(
             ScheduleTemplate.weekday == weekday,
             ScheduleTemplate.active,
             ScheduleTemplate.department_id == dept_id,
+            _eligible_doctor_clause(),
         )
     )
 
@@ -395,8 +459,14 @@ def get_doctors_by_department(
         select(ScheduleTemplate.department_id).distinct().where(ScheduleTemplate.active)
     )
     dept_ids = [r[0] for r in db.execute(dept_stmt).all() if r[0]]
+    # Review round 3 (owner P2): only still-ACTIVE departments are
+    # advertised — an inactive department's templates must not surface it
+    # (the listing is derived from active templates, which outlive a
+    # deactivation).
     dept_rows = (
-        db.query(Department).filter(Department.id.in_(dept_ids)).all()
+        db.query(Department)
+        .filter(Department.id.in_(dept_ids), Department.active.is_(True))
+        .all()
         if dept_ids
         else []
     )
@@ -417,7 +487,8 @@ def get_doctors_by_department(
         if department and int(dept_id) != int(filtered_id):
             continue
 
-        # Получаем врачей для этого отделения
+        # Получаем врачей для этого отделения (+ review round 3: only
+        # booking-eligible doctors are advertised).
         doctors_stmt = (
             select(ScheduleTemplate.doctor_id)
             .distinct()
@@ -426,6 +497,7 @@ def get_doctors_by_department(
                     ScheduleTemplate.department_id == int(dept_id),
                     ScheduleTemplate.active,
                     ScheduleTemplate.doctor_id.isnot(None),
+                    _eligible_doctor_clause(),
                 )
             )
         )
@@ -457,8 +529,13 @@ def get_departments(db: Session) -> list[dict[str, Any]]:
         select(ScheduleTemplate.department_id).distinct().where(ScheduleTemplate.active)
     )
     dept_ids = [r[0] for r in db.execute(dept_stmt).all() if r[0]]
+    # Review round 3 (owner P2): same active-department rule as
+    # get_doctors_by_department — templates outliving a deactivation must
+    # not advertise the department they belonged to.
     dept_rows = (
-        db.query(Department).filter(Department.id.in_(dept_ids)).all()
+        db.query(Department)
+        .filter(Department.id.in_(dept_ids), Department.active.is_(True))
+        .all()
         if dept_ids
         else []
     )

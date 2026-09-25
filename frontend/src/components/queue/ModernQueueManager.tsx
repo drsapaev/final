@@ -17,6 +17,7 @@ import {
   Input } from '../ui/macos';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
+import type { QueueActionResponse } from '../../types/domain/queue';
 // UX Audit Stage 3 (Queue issue 7.1):
 // WebSocket подписка для мгновенных обновлений очереди вместо 30s polling.
 import { useQueueWebSocket } from '../../hooks/useQueueWebSocket';
@@ -54,6 +55,8 @@ export interface ModernQueueManagerProps {
   selectedDoctor?: string | number;
   /** Called when the queue snapshot needs to be reloaded. */
   onQueueUpdate?: () => void | Promise<void>;
+  /** Called after a doctor explicitly starts a patient returned by call-next. */
+  onStartVisit?: (patient: NonNullable<QueueActionResponse['patient']>) => boolean | void | Promise<boolean | void>;
   /** Active UI language. */
   language?: string;
   /** Doctor lookup array (passed from parent). */
@@ -74,6 +77,7 @@ const ModernQueueManager = ({
   selectedDate = getLocalDateString(),
   selectedDoctor = '',
   onQueueUpdate,
+  onStartVisit,
   language = 'ru',
   doctors = [],
   onDoctorChange,
@@ -101,6 +105,8 @@ const ModernQueueManager = ({
   const effectiveDate = selectedDate !== undefined && selectedDate !== '' ? selectedDate : internalDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [calledPatients, setCalledPatients] = useState<NonNullable<QueueActionResponse['patient']>[]>([]);
+  const [startingQueueEntryId, setStartingQueueEntryId] = useState<string | number | null>(null);
 
   // RQ-11 (F-10): классификация срока из серверного expires_at (valid/expired/
   // unspecified). Пересчитывается при открытии диалога, чтобы истекший код
@@ -348,6 +354,13 @@ const ModernQueueManager = ({
       });
 
       if (result?.success && result?.patient) {
+        if (onStartVisit && result.patient.id !== null && result.patient.id !== undefined) {
+          setCalledPatients((current) => current.some((patient) => String(patient.id) === String(result.patient?.id))
+            ? current
+            : [...current, result.patient!]);
+        } else if (onStartVisit) {
+          toast.error(t('dental.dental_panel_start_visit_failed'));
+        }
         toast.success(
           t('misc.mqm_patient_called', { name: result.patient.name, number: result.patient.number })
         );
@@ -358,6 +371,22 @@ const ModernQueueManager = ({
       await loadQueue();
     } catch (error) {
       toast.error(getErrorMessage(error) || t('misc.mqm_call_patient_error'));
+    }
+  };
+
+  const startCalledPatientVisit = async (patient: NonNullable<QueueActionResponse['patient']>) => {
+    if (!onStartVisit || patient.id === null || patient.id === undefined) return;
+
+    setStartingQueueEntryId(patient.id);
+    try {
+      const started = await onStartVisit(patient);
+      if (started !== false) {
+        setCalledPatients((current) => current.filter((candidate) => String(candidate.id) !== String(patient.id)));
+      }
+    } catch {
+      toast.error(t('dental.dental_panel_start_visit_failed'));
+    } finally {
+      setStartingQueueEntryId(null);
     }
   };
 
@@ -724,6 +753,32 @@ const ModernQueueManager = ({
             </div>
           </div>
         </div>
+        {!isRegistrarMode && onStartVisit && calledPatients.length > 0 && (
+          <section className="mqm-called-visits" aria-label={t('dental.dental_panel_called_waiting')}>
+            <h4 className="mqm-called-visits-title">{t('dental.dental_panel_called_waiting')}</h4>
+            <ul className="mqm-called-visits-list">
+              {calledPatients.map((patient) => {
+                const patientName = patient.name || t('dental.dental_panel_patient_default');
+                const ticketNumber = patient.number === null || patient.number === undefined ? '—' : String(patient.number);
+                return (
+                  <li key={String(patient.id)} className="mqm-called-visit-item">
+                    <span className="mqm-called-visit-name">{patientName} · №{ticketNumber}</span>
+                    <Button
+                      variant="primary"
+                      size="default"
+                      className="mqm-button-icon"
+                      aria-label={t('dental.dental_panel_start_visit_for', { name: patientName, number: ticketNumber })}
+                      disabled={startingQueueEntryId !== null}
+                      onClick={() => { void startCalledPatientVisit(patient); }}
+                    >
+                      {t('dental.dental_panel_start_visit')}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
       </div>
 
       {/* Текущая очередь */}
