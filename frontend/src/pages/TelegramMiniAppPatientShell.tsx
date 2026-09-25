@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Alert, Badge, Button, Card, CardContent, Input, Textarea,
+  Alert, Badge, Button, Card, CardContent, Input, Select, Textarea,
   Checkbox } from '../components/ui/macos';
 import { api } from '../api/client';
 
@@ -225,6 +225,17 @@ function createMiniAppAppointmentPreviewForm() {
   };
 }
 
+// Round-14 (owner P1, PR #3386 merge review): reference rows for the
+// department selector on THIS shell — the actual Telegram /book surface
+// (PATIENT_BOOKING_ENTRY_ROUTE → /telegram/mini-app/patient?section=appointments).
+interface MiniAppDepartmentOption {
+  key: string;
+  name: string;
+}
+
+// Round-14: form.department now holds the canonical Department.key picked
+// from the /booking/departments selector (e.g. "cardio"), never a free-text
+// label — the routing contract resolves exactly this key.
 function buildMiniAppAppointmentRequestBody(authPayload: Record<string, any>, form: Record<string, any>) {
   return {
     ...authPayload,
@@ -235,13 +246,23 @@ function buildMiniAppAppointmentRequestBody(authPayload: Record<string, any>, fo
   };
 }
 
-function buildMiniAppOnboardingRequestBody(authPayload: Record<string, any>, form: Record<string, any>, languageCode: string) {
+// Round-14: departmentOptions resolve the selected canonical key back to the
+// human-readable department name — the onboarding request's desiredService is
+// registrar-facing text, so it must keep saying "Кардиология", not "cardio".
+function buildMiniAppOnboardingRequestBody(
+  authPayload: Record<string, any>,
+  form: Record<string, any>,
+  languageCode: string,
+  departmentOptions: MiniAppDepartmentOption[] = [],
+) {
+  const departmentKey = form.department.trim();
+  const departmentName = departmentOptions.find((row) => row.key === departmentKey)?.name || departmentKey;
   return {
     ...authPayload,
     languageCode,
     contactName: form.contactName.trim() || undefined,
     contactPhone: form.contactPhone.trim() || undefined,
-    desiredService: form.desiredService.trim() || form.department.trim() || undefined,
+    desiredService: form.desiredService.trim() || departmentName || undefined,
     desiredBranch: form.desiredBranch.trim() || undefined,
     desiredDate: form.appointmentDate || undefined,
     desiredTime: form.appointmentTime || undefined,
@@ -321,6 +342,40 @@ function getMiniAppApiErrorReason(error: any, fallback: string) {
   }
   const reason = error?.response?.data?.reason;
   return typeof reason === 'string' ? reason : fallback;
+}
+
+// Round-14 (owner P2, PR #3386 merge review): booking errors arrive as
+// machine reason codes (department_unknown, doctor_not_eligible, ...).
+// THIS shell is the actual /book surface, so it must explain them with
+// patient-safe wording — not splice the raw code into
+// 'Черновик записи не подтвержден: {reason}'. Known reasons map to
+// dedicated tgs_booking_reason_* copy (ru + uz-Latn); identity/session
+// reasons reuse the existing expired-link copy; UNKNOWN reasons keep the
+// {reason} template so genuinely new backend codes stay diagnosable.
+const MINI_APP_BOOKING_REASON_I18N_KEYS: Record<string, string> = {
+  department_unknown: 'bookingReasonDepartmentUnknown',
+  department_inactive: 'bookingReasonDepartmentInactive',
+  doctor_department_missing: 'bookingReasonDoctorDepartmentMissing',
+  doctor_department_mismatch: 'bookingReasonDoctorDepartmentMismatch',
+  doctor_not_eligible: 'bookingReasonDoctorNotEligible',
+  appointment_date_in_past: 'bookingReasonDateInPast',
+  appointment_date_invalid: 'bookingReasonDateInvalid',
+  appointment_time_invalid: 'bookingReasonTimeInvalid',
+  appointment_time_slot_occupied: 'bookingReasonTimeSlotOccupied',
+  patient_scope_mismatch: 'bookingReasonScopeMismatch',
+  patient_scope_required: 'bookingReasonScopeRequired',
+  telegram_link_required: 'bookingReasonScopeRequired',
+  bot_token_required: 'bookingReasonBotTokenRequired',
+  auth_date_expired: 'sessionExpired',
+  hash_mismatch: 'sessionExpired',
+  init_data_replayed: 'sessionExpired',
+  entry_token_invalid: 'sessionExpired',
+  entry_token_expired: 'sessionExpired',
+};
+
+function describeMiniAppBookingError(languageCode: string, reason: string) {
+  const reasonKey = MINI_APP_BOOKING_REASON_I18N_KEYS[reason];
+  return reasonKey ? translateMiniAppText(languageCode, reasonKey) : '';
 }
 
 // TECH-DEBT(tma-session-err-any): error is `any` — multiple error shapes
@@ -423,6 +478,12 @@ function TelegramMiniAppPatientShell() {
     error: null,
   });
   const [appointmentPreviewForm, setAppointmentPreviewForm] = useState<Record<string, any>>(createMiniAppAppointmentPreviewForm);
+  // Round-14 (owner P1): canonical department options for THIS shell's
+  // booking form (the real /book surface). Like PatientBookingPanel, but
+  // loaded through getTelegramMiniAppAuthPayload so BOTH allowed identity
+  // modes work: initData AND entryToken.
+  const [bookingDepartmentOptions, setBookingDepartmentOptions] = useState<MiniAppDepartmentOption[]>([]);
+  const [bookingDepartmentsUnavailable, setBookingDepartmentsUnavailable] = useState(false);
   const [appointmentPreview, setAppointmentPreview] = useState<{
     status: string;
     payload: Record<string, any> | null;
@@ -695,6 +756,46 @@ function TelegramMiniAppPatientShell() {
     };
   }, [location.search, selectedSection]);
 
+  // Round-14 (owner P1, PR #3386 merge review): the booking form on THIS
+  // shell submits canonical Department.key values, so it loads the same
+  // authenticated ACTIVE-departments reference PatientBookingPanel uses
+  // (POST /telegram/mini-app/booking/departments). The auth payload comes
+  // from getTelegramMiniAppAuthPayload(...) — initData (primary) OR
+  // entryToken (second allowed mode). On failure the selector degrades to
+  // the "без отделения" escape hatch; it never falls back to free text.
+  useEffect(() => {
+    if (selectedSection !== 'appointments') {
+      return;
+    }
+    if (!state.manifest?.capabilities?.appointments?.preview_enabled) {
+      return;
+    }
+    const authPayload = getTelegramMiniAppAuthPayload(location.search, 'appointments');
+    if (!authPayload) {
+      return;
+    }
+    let isMounted = true;
+    setBookingDepartmentsUnavailable(false);
+    api.post('/telegram/mini-app/booking/departments', authPayload, MINI_APP_HANDLED_ERROR_REQUEST_CONFIG)
+      .then((response) => {
+        if (!isMounted) return;
+        const rows = response.data?.departments;
+        setBookingDepartmentOptions(
+          Array.isArray(rows)
+            ? rows.filter((row: MiniAppDepartmentOption) => row && typeof row.key === 'string' && row.key)
+            : [],
+        );
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setBookingDepartmentOptions([]);
+        setBookingDepartmentsUnavailable(true);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [location.search, selectedSection, state.manifest]);
+
   const capabilities = state.manifest?.capabilities || {};
   const capabilityLabels = MINI_APP_CAPABILITY_SECTIONS.reduce<Record<string, string>>((acc, section) => {
     acc[section] = translateMiniAppText(languageCode, `capabilities.${section}`);
@@ -831,7 +932,9 @@ function TelegramMiniAppPatientShell() {
         setAppointmentPreview({
           status: 'error',
           payload: null,
-          error: t('appointmentPreviewFailed', { reason }),
+          // Round-14 (owner P2): patient-safe wording for known booking
+          // reasons; unknown ones keep the diagnosable {reason} template.
+          error: describeMiniAppBookingError(languageCode, reason) || t('appointmentPreviewFailed', { reason }),
         });
       });
   };
@@ -875,7 +978,8 @@ function TelegramMiniAppPatientShell() {
         setAppointmentCreate({
           status: 'error',
           payload: null,
-          error: t('appointmentCreateFailed', { reason }),
+          // Round-14 (owner P2): same patient-safe reason mapper as preview.
+          error: describeMiniAppBookingError(languageCode, reason) || t('appointmentCreateFailed', { reason }),
         });
       });
   };
@@ -896,7 +1000,8 @@ function TelegramMiniAppPatientShell() {
     const requestBody = buildMiniAppOnboardingRequestBody(
       authPayload,
       appointmentPreviewForm,
-      languageCode
+      languageCode,
+      bookingDepartmentOptions,
     );
 
     setOnboardingSubmit({
@@ -1746,12 +1851,19 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                         onChange={handleAppointmentPreviewFieldChange('appointmentTime')}
                         style={miniAppAppointmentInputStyle}
                       />
-                      <Input
+                      <Select
                         label={t('department')}
                         value={appointmentPreviewForm.department}
-                        onChange={handleAppointmentPreviewFieldChange('department')}
                         placeholder={t('optional')}
-                        maxLength={64}
+                        options={[
+                          { value: '', label: t('departmentNone') },
+                          ...bookingDepartmentOptions.map((department) => ({
+                            value: department.key,
+                            label: department.name,
+                          })),
+                        ]}
+                        onValueChange={(value) => handleAppointmentPreviewFieldChange('department')({ target: { value: String(value) } })}
+                        disabled={appointmentPreview.status === 'loading'}
                         style={miniAppAppointmentInputStyle}
                       />
                     </div>
@@ -1773,6 +1885,12 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                       {t('checkDraft')}
                     </Button>
                   </form>
+
+                  {bookingDepartmentsUnavailable && (
+                    <Alert severity="info" style={miniAppNoticeStyle}>
+                      {t('departmentsUnavailable')}
+                    </Alert>
+                  )}
 
                   {appointmentPreview.status === 'error' && (
                     <Alert severity="error" style={miniAppNoticeStyle}>
