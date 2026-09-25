@@ -2413,6 +2413,10 @@ const ru = {
     dental_ra_tab_procedures: 'Процедуры',
 
     // ─── DentistPanelUnified.jsx (dental_panel_*) ───────────────────────────
+    dental_panel_called_waiting: 'Вызванные пациенты',
+    dental_panel_start_visit: 'Начать приём',
+    dental_panel_start_visit_for: 'Начать приём: {name}, талон №{number}',
+    dental_panel_start_visit_failed: 'Не удалось начать приём. Повторите попытку или проверьте состояние очереди.',
     dental_panel_patient_default: 'Пациент',
     dental_panel_discount_repeat: 'Повторный',
     dental_panel_discount_benefit: 'Льготный',

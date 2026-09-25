@@ -2302,6 +2302,10 @@ const uzLatn = {
     dental_ra_tab_procedures: 'Protseduralar',
 
     // ─── DentistPanelUnified.jsx (dental_panel_*) ───────────────────────────
+    dental_panel_called_waiting: 'Chaqirilgan bemorlar',
+    dental_panel_start_visit: 'Qabulni boshlash',
+    dental_panel_start_visit_for: 'Qabulni boshlash: {name}, talon №{number}',
+    dental_panel_start_visit_failed: 'Qabulni boshlab bo‘lmadi. Qayta urinib ko‘ring yoki navbat holatini tekshiring.',
     dental_panel_patient_default: 'Bemor',
     dental_panel_discount_repeat: 'Takroriy',
     dental_panel_discount_benefit: 'Imtiyozli',
