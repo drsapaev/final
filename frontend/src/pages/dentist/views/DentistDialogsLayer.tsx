@@ -147,13 +147,10 @@ export default function DentistDialogsLayer({
 
       {showPhotoArchive && selectedPatient &&
       <PhotoArchive
-        patientId={selectedPatientId as string | number}
+        patientId={(selectedPatient.patient_id || selectedPatient.patient?.id) as string | number | undefined}
+        visitId={selectedPatient.visit_id}
         patientName={selectedPatientDisplayName}
-        initialData={selectedPatient.photoArchive}
-        onSave={(archiveData: unknown) => {
-          logger.info('Сохранение фото архива:', archiveData);
-          setShowPhotoArchive(false);
-        }}
+        presentation="dialog"
         onClose={() => setShowPhotoArchive(false)} />
 
       }

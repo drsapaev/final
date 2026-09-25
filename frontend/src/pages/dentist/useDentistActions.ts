@@ -34,8 +34,7 @@ import {
  *  - protocol-template drafting: buildVisitProtocolDraftFromTemplate +
  *    handleProtocolTemplateSelect
  *
- * NOT extracted (remain in the panel): handleCardKeyDown (render-adjacent),
- * the URL deep-link patient effect (location-bound), session warning /
+ * NOT extracted (remain in the panel): the URL deep-link patient effect (location-bound), session warning /
  * hotkeys wiring, stats and render functions (PR-UI-15-6 surface).
  */
 

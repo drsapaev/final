@@ -7,8 +7,8 @@ import { renderWithProviders } from '../../test/renderWithProviders';
 import { DERMATOLOGY_PANEL_TABS, getDermatologyTabAliases } from '../../pages/dermatologyTabAliases';
 import { useDoctorPanelState } from '../useDoctorPanelState';
 
-const validTabs = ['queue', 'visit', 'patients', 'ai-assistant'];
-const tabAliases = { photos: 'patients', visits: 'visit', appointments: 'patients' };
+const validTabs = ['queue', 'visit', 'patients', 'photos'];
+const tabAliases = { visits: 'visit', appointments: 'patients', 'ai-assistant': 'visit' };
 
 function PanelStateProbe() {
   const { activeTab, handleTabChange } = useDoctorPanelState({
@@ -47,9 +47,10 @@ function DermatologyPanelStateProbe() {
 
 describe('useDoctorPanelState dentist legacy tabs', () => {
   it.each([
-    ['/doctor/dentistry?tab=photos', 'patients'],
+    ['/doctor/dentistry?tab=photos', 'photos'],
     ['/doctor/dentistry?tab=appointments', 'patients'],
     ['/doctor/dentistry?tab=visits', 'visit'],
+    ['/doctor/dentistry?tab=ai-assistant', 'visit'],
     ['/doctor/dentistry?tab=unknown', 'queue'],
   ])('normalizes %s to %s and replaces the URL', async (entry, expectedTab) => {
     renderWithProviders(<PanelStateProbe />, {
@@ -68,9 +69,7 @@ describe('useDoctorPanelState dentist legacy tabs', () => {
 
     screen.getByRole('button', { name: 'legacy photo action' }).click();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('panel-state')).toHaveTextContent('patients|?tab=patients');
-    });
+    await waitFor(() => expect(screen.getByTestId('panel-state')).toHaveTextContent('photos|?tab=photos'));
   });
 });
 
