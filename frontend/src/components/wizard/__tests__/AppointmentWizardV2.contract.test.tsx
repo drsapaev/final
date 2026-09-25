@@ -48,7 +48,9 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
       'useEffect(() => {',
     );
 
-    expect(servicesLoadBlock).toContain('await fetchRegistrarServices()');
+    // PR #3438 round-2 P2: каталог запрашивается для дня записи
+    // (catalogTargetDate), а не для серверного дефолта «сегодня».
+    expect(servicesLoadBlock).toContain('await fetchRegistrarServices(catalogTargetDate)');
     expect(doctorsLoadBlock).toContain('await fetchRegistrarDoctors()');
     expect(doctorsLoadBlock).toContain('setDoctorsData(doctors.map(');
     // RQ-05.b (codex P2 PR 3309): каталог идёт через типизированный wrapper

@@ -436,58 +436,110 @@ def _assert_cart_doctor_eligibility(
             )
 
 
-def _revalidate_cart_doctor_eligibility_locked(db: Session, visits: list[Any]) -> None:
-    """PR #3438 review P1-2: атомарная eligibility выбранного врача.
+def _revalidate_cart_doctor_eligibility_locked(
+    db: Session, visits: list[Any], *, max_attempts: int = 3
+) -> None:
+    """PR #3438 review P1-2 (+ round-2 P1): атомарная eligibility врача.
 
     Первый вызов ``_assert_cart_doctor_eligibility`` читает Doctor/User
     обычным SELECT — между проверкой и единственным коммитом корзины
     успевает закоммититься деактивация/понижение врача (admin), и корзина
     создаёт Visit/QueueEntry уже неактивному или переведённому врачу.
 
-    Фикс — глобальный lock order сохраняется: ПОСЛЕ (day, tag) prelock-ов
-    и ДО первого INSERT все выбранные строки Doctor перечитываются
-    ``FOR SHARE`` (sorted doctor_id) + их владельцы User ``FOR SHARE``
-    (sorted user_id), и eligibility повторяется НА ЗАБЛОКИРОВАННОМ
-    снапшоте:
+    Фикс — перечитывание под row-lock'ами ПОСЛЕ (day, tag) prelock-ов и ДО
+    первого INSERT, в ГЛОБАЛЬНОМ порядке ``User → Doctor``:
+
+    1. pre-read связки ``Doctor.id → Doctor.user_id`` (без локов — набор
+       владельцев для User-лока можно вычислить только по текущей карте);
+    2. ``User FOR SHARE`` (sorted user_id);
+    3. ``Doctor FOR SHARE`` (sorted doctor_id);
+    4. re-check связки под Doctor-локом.
+
+    Round-2 P1 (AB-BA): порядок обязан совпадать с каноническим
+    ``UserManagementService.update_user`` — ``lock_user_candidate_state``
+    берёт ``users FOR UPDATE``, затем деактивация/понижение зеркалируется
+    ``_sync_doctor_active`` в ``UPDATE doctors``. Прежний порядок
+    ``Doctor → User`` давал живой deadlock: корзина держит Doctor FOR
+    SHARE и ждёт User FOR SHARE, admin держит User FOR UPDATE и ждёт
+    UPDATE doctors → SQLSTATE 40P01. Порядок ``users → user_profiles →
+    phone advisory`` из patient_phone_scope остаётся префиксом: наш User
+    FOR SHARE следует тому же users-первым правилу.
+
+    Re-check связки: re-link владельца (``doctors.user_id`` сменился
+    между pre-read и Doctor-локом, напр. detach_owner при удалении
+    аккаунта) оставил бы НОВОГО владельца незаблокированным — даём
+    ограниченное число повторов на свежей карте; при исчерпании — 409
+    (регистратор просто повторяет сохранение).
 
     - concurrent eligibility-changing UPDATE (Doctor.active/specialty,
       User.is_active/role) блокируется до коммита корзины;
     - уже закоммиченное изменение ВИДИМО ревалидации → корзина
       отклонена, ни одного Visit/Invoice/QueueEntry;
-    - FOR SHARE совместим с FK KEY-SHARE визитов и с Doctor FOR SHARE
-      GraphQL joinQueue (advisory → Doctor — тот же порядок), т.е.
-    новый инверсии lock-order не появляется.
+    - FOR SHARE совместим с FK KEY-SHARE визитов; advisory (day, tag)
+      prelock'и остаются ПЕРВЫМИ — инверсии против GraphQL joinQueue нет.
 
     SQLite (тесты): with_for_update — no-op, семантика sequential.
     """
     doctor_ids = sorted({visit.doctor_id for visit in visits if visit.doctor_id})
     if not doctor_ids:
         return
-    doctors = (
-        db.query(Doctor)
-        .filter(Doctor.id.in_(doctor_ids))
-        .with_for_update(read=True)
-        .populate_existing()
-        .all()
-    )
-    owner_ids = sorted({doctor.user_id for doctor in doctors if doctor.user_id})
-    owners: dict[int, User] = {}
-    if owner_ids:
-        locked_users = (
-            db.query(User)
-            .filter(User.id.in_(owner_ids))
+
+    for attempt in range(1, max_attempts + 1):
+        # Phase 1 — unlocked pre-read of the owner linkage (tuple columns:
+        # no identity-map pollution, always a fresh READ COMMITTED
+        # snapshot on retry).
+        linkage: dict[int, int | None] = dict(
+            db.query(Doctor.id, Doctor.user_id).filter(Doctor.id.in_(doctor_ids)).all()
+        )
+        owner_ids = sorted({uid for uid in linkage.values() if uid is not None})
+
+        # Phase 2 — owner User rows FOR SHARE FIRST (sorted user_id): the
+        # users -> doctors order of the canonical update_user(); locking
+        # doctors first deadlocks against a concurrent deactivate/demote.
+        owners: dict[int, User] = {}
+        if owner_ids:
+            locked_users = (
+                db.query(User)
+                .filter(User.id.in_(owner_ids))
+                .order_by(User.id)
+                .with_for_update(read=True)
+                .populate_existing()
+                .all()
+            )
+            owners = {user.id: user for user in locked_users}
+
+        # Phase 3 — Doctor rows FOR SHARE (sorted doctor_id).
+        doctors = (
+            db.query(Doctor)
+            .filter(Doctor.id.in_(doctor_ids))
+            .order_by(Doctor.id)
             .with_for_update(read=True)
             .populate_existing()
             .all()
         )
-        owners = {user.id: user for user in locked_users}
-    # Pin the relationship to the locked instances so the revalidation
-    # below reads exactly the locked snapshot, not a lazy re-load.
-    for doctor in doctors:
-        if doctor.user_id in owners:
-            doctor.user = owners[doctor.user_id]
-    locked_map = {doctor.id: doctor for doctor in doctors}
-    _assert_cart_doctor_eligibility(db, visits, doctor_map=locked_map)
+
+        # Phase 4 — linkage re-check under the Doctor lock: a relink
+        # committed between phases 1 and 3 leaves the NEW owner unlocked.
+        if any(doctor.user_id != linkage.get(doctor.id) for doctor in doctors):
+            if attempt < max_attempts:
+                continue
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Связка врача с учётной записью изменилась во время "
+                    "сохранения: обновите страницу и повторите запись"
+                ),
+            )
+
+        # Pin the relationship to the locked instances so the
+        # revalidation below reads exactly the locked snapshot, not a
+        # lazy re-load.
+        for doctor in doctors:
+            if doctor.user_id in owners:
+                doctor.user = owners[doctor.user_id]
+        locked_map = {doctor.id: doctor for doctor in doctors}
+        _assert_cart_doctor_eligibility(db, visits, doctor_map=locked_map)
+        return
 
 
 def _check_repeat_visit_eligibility(

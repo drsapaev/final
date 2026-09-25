@@ -95,7 +95,21 @@ describe('RQ-05.b: wizard consumes the typed catalog (end-to-end linkage)', () =
   };
 
   it('loads the catalog through the typed wrapper fetchRegistrarServices', () => {
-    expect(loadServicesBlock()).toContain('await fetchRegistrarServices()');
+    expect(loadServicesBlock()).toContain('await fetchRegistrarServices(catalogTargetDate)');
+  });
+
+  it('asks the catalog for the BOOKING day (PR #3438 round-2 P2: read/write drift)', () => {
+    const source = readWizard();
+    // The catalog target day is the edit record day (same SSOT as the
+    // edit quote/submit) with a today fallback — without it the catalog
+    // classifies for the server default day and the save gate 400s.
+    expect(source).toContain(
+      'const catalogTargetDate = useMemo('
+    );
+    expect(source).toContain(
+      '(editMode ? resolveEditRecordDate(initialData) : null) ?? getLocalISODate()'
+    );
+    expect(source).toContain('}, [catalogTargetDate]);');
   });
 
   it('maps catalog groups through the typed SSOT adapter', () => {
@@ -145,6 +159,16 @@ describe('RQ-05.b: api/registrar.ts types the catalog DTO', () => {
     expect(block).toContain('services_by_group?: Record<string, RegistrarCatalogService[]>');
   });
 
+  it('threads the booking day through to GET /registrar/services (PR #3438 round-2 P2)', () => {
+    const source = readApi();
+    const block = source.slice(
+      source.indexOf('export async function fetchRegistrarServices'),
+      source.indexOf('// =====================================================================\n// DEFAULT EXPORT')
+    );
+    expect(block).toContain('targetDate?: string | null');
+    expect(block).toContain("params: targetDate ? { target_date: targetDate } : undefined");
+  });
+
   it('documents requires_doctor as the mandatory-doctor flag (RQ-05 F-04 traceability)', () => {
     const source = readApi();
     expect(source).toContain('RQ-05');
@@ -173,6 +197,12 @@ describe('RQ-08.a: backend emits doctor eligibility from the shared policy', () 
 
   it('keeps the RQ-08.a traceability marker', () => {
     expect(readSerializer()).toContain('RQ-08.a');
+  });
+
+  it('defaults the booking day to the clinic-day SSOT, not the host date (PR #3438 round-2 P2)', () => {
+    const source = readSerializer();
+    expect(source).toContain('booking_day = target_date or crud_clinic.clinic_today(db)');
+    expect(source).not.toContain('booking_day = target_date or date.today()');
   });
 });
 

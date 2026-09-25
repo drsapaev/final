@@ -898,13 +898,27 @@ const AppointmentWizardV2 = ({
 
   // ===================== ЗАГРУЗКА ДАННЫХ =====================
 
+  // PR #3438 review round-2 P2: каталог услуг запрашивается ДЛЯ ДНЯ ЗАПИСИ.
+  // Владелец очереди услуги (doctor_selection_required /
+  // doctor_booking_available) вычисляется backend'ом date-aware: в edit-
+  // режиме это день редактируемой записи (resolveEditRecordDate — тот же
+  // SSOT, что edit-квота/сабмит), в новой записи — сегодняшний локальный
+  // день, которым addToCart штампует visit_date. Без target_date каталог
+  // отвечал бы для серверного «сегодня» независимо от даты записи —
+  // read/write drift: каталог обещает resource-owned без врача, а
+  // save-гейт на другой день требует врача → 400 на сохранении.
+  const catalogTargetDate = useMemo(
+    () => (editMode ? resolveEditRecordDate(initialData) : null) ?? getLocalISODate(),
+    [editMode, initialData]
+  );
+
   const loadServices = useCallback(async () => {
     try {
       // Codex P2 PR 3309 / RQ-05.b: каталог идёт через типизированный
       // wrapper — RegistrarCatalogService доезжает до потребителя, и
       // переименование/удаление doctor_selection_required в DTO ломает
       // компиляцию, а не молча пропускает шаг 2 без врача.
-      const data = await fetchRegistrarServices();
+      const data = await fetchRegistrarServices(catalogTargetDate);
 
         // Извлекаем все услуги из групп — конверсия из типизированного DTO
         // через SSOT-адаптер wizardServiceFromCatalogEntry (codex P2 PR 3309).
@@ -924,7 +938,7 @@ const AppointmentWizardV2 = ({
     } catch (error: unknown) {
       logger.error('Ошибка загрузки услуг:', error);
     }
-  }, []);
+  }, [catalogTargetDate]);
 
   // ===================== РЕЗОЛВИНГ УСЛУГ (SSOT) =====================
 

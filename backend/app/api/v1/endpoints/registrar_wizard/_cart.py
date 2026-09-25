@@ -117,18 +117,18 @@ def create_cart_appointments(
             target_day=today,
         )
 
-        # PR #3438 review P1-2: revalidate doctor eligibility ON THE LOCKED
-        # snapshot, after the (day, tag) prelocks and BEFORE the first
-        # visit INSERT. The unlocked gate above can race a concurrent
-        # admin deactivation/demotion that commits between the check and
-        # this cart's single commit — the cart would then create a new
-        # visit and queue entry for an ineligible doctor. The locked
-        # re-read (Doctor FOR SHARE + owner User FOR SHARE, sorted ids)
-        # keeps the global lock order (tag prelocks -> doctor rows -> user
-        # rows) and holds the row locks until the commit below, so an
-        # eligibility-changing UPDATE either blocks (revalidated snapshot
-        # stays valid) or is already visible here (cart rejected before
-        # any write).
+        # PR #3438 review P1-2 (+ round-2 P1): revalidate doctor eligibility
+        # ON THE LOCKED snapshot, after the (day, tag) prelocks and BEFORE
+        # the first visit INSERT. The unlocked gate above can race a
+        # concurrent admin deactivation/demotion that commits between the
+        # check and this cart's single commit — the cart would then create
+        # a new visit and queue entry for an ineligible doctor. The locked
+        # re-read keeps the global lock order (tag prelocks -> User FOR
+        # SHARE -> Doctor FOR SHARE; users-first mirrors update_user's
+        # lock_user_candidate_state -> _sync_doctor_active) and holds the
+        # row locks until the commit below, so an eligibility-changing
+        # UPDATE either blocks (revalidated snapshot stays valid) or is
+        # already visible here (cart rejected before any write).
         _revalidate_cart_doctor_eligibility_locked(db, cart_data.visits)
 
         created_visits = []

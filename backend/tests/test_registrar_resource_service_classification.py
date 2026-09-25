@@ -38,7 +38,8 @@ from datetime import date, timedelta
 
 import pytest
 
-from app.models.clinic import Doctor
+from app.crud.clinic import clinic_today
+from app.models.clinic import ClinicSettings, Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.payment_invoice import PaymentInvoice
 from app.models.service import Service
@@ -328,12 +329,14 @@ def test_deactivated_registry_with_existing_day_queue_keeps_resource_class(
     ``doctor_booking_available=true`` → the registrar picked a doctor and
     the save-time gate 409-rejected (the day's resource queue IS the
     surface). The catalog now uses the same deactivation-proof routing
-    truth for the default booking day (today).
+    truth for the default booking day. The day follows the clinic-day
+    SSOT (``clinic_today``) — the same day the default (no-target_date)
+    request resolves to, whatever the host timezone is.
     """
     service, resource = _resource_service(db_session, code="RRC08", queue_tag="rrc_ecg")
     db_session.add(
         DailyQueue(
-            day=date.today(),
+            day=clinic_today(db_session),
             queue_tag=service.queue_tag,
             queue_resource_id=resource.id,
             active=True,
@@ -346,6 +349,61 @@ def test_deactivated_registry_with_existing_day_queue_keeps_resource_class(
 
     row = _rows(client, _headers(admin_user))[service.id]
     assert row["doctor_selection_required"] is False
+    assert row["doctor_booking_available"] is False
+
+
+def test_default_booking_day_is_the_clinic_day_not_the_host_date(
+    client, db_session, admin_user
+):
+    """PR #3438 review round-2 P2: the no-``target_date`` default is
+    ``clinic_today`` (queue-timezone SSOT), not the host ``date.today()``.
+
+    The clinic timezone is pinned to a far-east fixed offset (UTC+14):
+    its calendar day is ahead of almost every host clock. The day's
+    resource queue is created for the CLINIC day and the registry is
+    deactivated — only a clinic-day default still sees the day surface
+    (resource class); a host-date default would compute another day,
+    find no queue and no active registry row, and re-classify the service
+    doctor-owned. When the host itself happens to sit at the far-east
+    date, the pin flips to the opposite extreme (UTC-12 — 26 hours
+    behind, never equal to a UTC+14 date) so the two can never collide.
+    """
+    db_session.add(ClinicSettings(key="timezone", value="Etc/GMT-14", category="queue"))
+    db_session.commit()
+
+    service, resource = _resource_service(db_session, code="RRC11", queue_tag="rrc_ecg")
+    clinic_day = clinic_today(db_session)
+    host_day = date.today()
+    if clinic_day == host_day:
+        # The host itself is on the far-east date — re-pin to the western
+        # extreme; a UTC+14 date and a UTC-12 date are 26h apart and can
+        # never both equal the host date.
+        db_session.query(ClinicSettings).filter(
+            ClinicSettings.key == "timezone",
+            ClinicSettings.category == "queue",
+        ).update({"value": "Etc/GMT+12"})
+        db_session.commit()
+        clinic_day = clinic_today(db_session)
+        assert clinic_day != host_day
+
+    db_session.add(
+        DailyQueue(
+            day=clinic_day,
+            queue_tag=service.queue_tag,
+            queue_resource_id=resource.id,
+            active=True,
+        )
+    )
+    db_session.commit()
+    resource.active = False
+    db_session.commit()
+
+    row = _rows(client, _headers(admin_user))[service.id]
+    assert row["doctor_selection_required"] is False, (
+        "the default (no target_date) booking day did not follow the "
+        "clinic-day SSOT: the day's resource surface was computed for "
+        "another day (host date)"
+    )
     assert row["doctor_booking_available"] is False
 
 

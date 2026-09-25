@@ -213,10 +213,25 @@ export interface RegistrarServicesResponse {
 
 /**
  * Загрузить справочник услуг регистратуры, сгруппированный по specialty/group.
+ *
+ * PR #3438 review round-2 P2: `targetDate` — день записи ('YYYY-MM-DD'),
+ * для которого backend вычисляет владельца очереди каждой услуги
+ * (`doctor_selection_required` / `doctor_booking_available`). Без него
+ * backend отвечает для дня по умолчанию (клиник-день «сегодня») — каталог
+ * и write-gate расходятся, если регистратор оформляет запись на другой
+ * день (правка существующей/будущей записи): каталог обещает resource-
+ * owned без врача, а save-гейт требует врача → 400 на сохранении.
+ *
+ * @param targetDate День записи ('YYYY-MM-DD') или null/undefined —
+ *                  день по умолчанию на стороне сервера.
  * @returns {Promise<RegistrarServicesResponse>}
  */
-export async function fetchRegistrarServices(): Promise<RegistrarServicesResponse> {
-  const response = await api.get('/registrar/services');
+export async function fetchRegistrarServices(
+  targetDate?: string | null
+): Promise<RegistrarServicesResponse> {
+  const response = await api.get('/registrar/services', {
+    params: targetDate ? { target_date: targetDate } : undefined,
+  });
   return response.data as RegistrarServicesResponse;
 }
 

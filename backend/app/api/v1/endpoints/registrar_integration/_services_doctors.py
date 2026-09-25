@@ -67,7 +67,12 @@ def get_registrar_services(
         # target_date the registrar surface books for TODAY, so the default
         # is today: a registry row deactivated mid-day cannot make the
         # catalog promise a doctor booking the write gate will 409.
-        booking_day = target_date or date.today()
+        # PR #3438 review round-2 P2: "today" is the CLINIC day (queue
+        # timezone SSOT, clinic_today) — the host process date.today()
+        # drifts from Asia/Tashkent between 19:00Z and midnight, silently
+        # re-classifying the default-day catalog for a different day than
+        # the one the registrar is booking.
+        booking_day = target_date or crud_clinic.clinic_today(db)
         routed_resource_tags = resource_routed_tags_for_day(db, booking_day)
 
         # Получаем маппинг услуг к отделениям
