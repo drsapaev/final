@@ -45,9 +45,10 @@ the end; skips (NOT_RUN, plan P0) when no disposable PostgreSQL server
 is reachable. ``DATABASE_URL`` is accepted for automatic provisioning
 only for local servers — an explicit loopback host, a hostless
 unix-socket DSN, or a ``?host=`` that is a socket-directory path or a
-loopback name; a remote admin DSN (including a plain ``DATABASE_URL``
-with a remote ``?host=``) must be passed explicitly via the test-owned
-``RQ26B_PG_ADMIN_URL``. SQLite is never a substitute here.
+loopback name; address-altering parameters (``?hostaddr=``, or a
+remote ``?host=``) are rejected, so a remote admin DSN must be passed
+explicitly via the test-owned ``RQ26B_PG_ADMIN_URL``. SQLite is never
+a substitute here.
 
 Determinism: the anonymous start-session leg goes through the queue
 time gate (``ONLINE_QUEUE_START_TIME`` 07:00 Asia/Tashkent), so the
@@ -141,9 +142,11 @@ def _candidate_admin_urls() -> list[str]:
     by the address libpq actually dials, not by the URL spelling. A
     ``?host=`` query parameter overrides the authority host, so a remote
     value there (``postgresql://u:p@/postgres?host=db.internal``,
-    review P1) is rejected even though the authority is empty. A remote
-    admin DSN must be passed explicitly via the test-owned
-    ``RQ26B_PG_ADMIN_URL``.
+    review P1) is rejected even though the authority is empty; the
+    address-altering ``?hostaddr=`` is rejected outright (round-2 review
+    P1) — it dials a remote address even when the authority spells a
+    loopback. A remote admin DSN must be passed explicitly via the
+    test-owned ``RQ26B_PG_ADMIN_URL``.
     """
     urls: list[str] = []
 
@@ -151,7 +154,7 @@ def _candidate_admin_urls() -> list[str]:
         return raw.replace("postgresql+psycopg://", "postgresql://", 1)
 
     def _is_local(url: str) -> bool:
-        """True only for addresses libpq dials locally (review P1)."""
+        """True only for addresses libpq dials locally (review P1, r1+r2)."""
         try:
             u = make_url(url)
         except Exception:  # noqa: BLE001 — a malformed env DSN (e.g. a
@@ -160,14 +163,33 @@ def _candidate_admin_urls() -> list[str]:
             return False
         if not u.drivername.startswith("postgresql"):
             return False  # a sqlite fallback URL is never a PG candidate
-        # ``?host=`` overrides the authority host in libpq URIs — check
-        # it first: a socket-directory path is local, a loopback name is
-        # local, any other value (``db.internal``) is REMOTE.
-        qhost = u.query.get("host") or ""
-        if qhost:
-            if qhost.startswith("/"):
-                return True
-            return qhost in {"localhost", "127.0.0.1", "::1"}
+        # Normalize query params once: libpq matches conninfo parameter
+        # names case-insensitively, and SQLAlchemy parses repeated keys
+        # into sequences — the guard must not be bypassable by spelling
+        # (``?HOSTADDR=``) or duplication (round-2 review P1).
+        qvals: dict[str, list[str]] = {}
+        for k, v in (u.query or {}).items():
+            vals = v if isinstance(v, (list, tuple)) else [v]
+            qvals.setdefault(str(k).lower(), []).extend(str(x) for x in vals)
+        # ``?hostaddr=`` overrides the dialed network address even when
+        # the authority / ``?host=`` spell a loopback (round-2 review
+        # P1): ANY value there is an address-altering parameter — a
+        # non-loopback one dials a remote server, and even a loopback
+        # literal cannot be reproduced by ``_scratch_urls()`` (it
+        # preserves authority / ``?host=`` forms only) — so the guard
+        # rejects the parameter outright (fail-closed).
+        if qvals.get("hostaddr"):
+            return False
+        # ``?host=`` overrides the authority host — a socket-directory
+        # path is local, a loopback name is local, any other value
+        # (``db.internal``) is REMOTE; a repeated key must be local in
+        # EVERY value to pass (fail-closed).
+        hosts = qvals.get("host") or []
+        if hosts:
+            return all(
+                h.startswith("/") or h in {"localhost", "127.0.0.1", "::1"}
+                for h in hosts
+            )
         if u.host is not None:
             return u.host in {"localhost", "127.0.0.1", "::1"}
         # Hostless DSN (``postgresql:///db``): libpq dials the default
@@ -883,3 +905,128 @@ def test_admin_department_create_key_enters_csv_round_trip(
     assert body["department_key"] == source["department_key"]
     assert body["is_active"] == source["is_active"]
     assert body["show_on_qr_page"] == source["show_on_qr_page"]
+
+
+# ------------------------------------------------------------------
+# Review-round pins (rounds 1-2): the candidate-DSN guard and the
+# scratch-DSN address forms are pure functions of their inputs — these
+# pins run WITHOUT a PostgreSQL server and must stay green everywhere.
+# ------------------------------------------------------------------
+
+
+def _harness_env(monkeypatch, database_url: str | None) -> None:
+    """Isolate the guard from the host environment."""
+    monkeypatch.delenv("RQ26B_PG_ADMIN_URL", raising=False)
+    monkeypatch.delenv("LOCAL_PG_SUPERUSER_PASSWORD", raising=False)
+    if database_url is None:
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+    else:
+        monkeypatch.setenv("DATABASE_URL", database_url)
+
+
+def test_env_dsn_with_remote_query_host_is_rejected(monkeypatch):
+    """Round-1 P1: a remote query host must never auto-provision."""
+    _harness_env(monkeypatch, "postgresql://u:p@/postgres?host=db.internal")
+    assert _candidate_admin_urls() == []
+
+
+def test_env_dsn_with_remote_hostaddr_is_rejected(monkeypatch):
+    """Round-2 P1: hostaddr overrides the dialed address — REMOTE."""
+    _harness_env(
+        monkeypatch, "postgresql://u:p@localhost/postgres?hostaddr=10.20.30.40"
+    )
+    assert _candidate_admin_urls() == []
+
+
+def test_env_dsn_with_loopback_hostaddr_is_rejected_too(monkeypatch):
+    """Round-2 P1, fail-closed leg: even a loopback hostaddr is an
+    address-altering parameter the scratch DSN cannot reproduce."""
+    _harness_env(monkeypatch, "postgresql://u:p@/postgres?hostaddr=127.0.0.1")
+    assert _candidate_admin_urls() == []
+
+
+def test_env_dsn_with_uppercase_hostaddr_cannot_bypass(monkeypatch):
+    """Round-2 P1: libpq conninfo parameter names are case-insensitive."""
+    _harness_env(monkeypatch, "postgresql://u:p@/postgres?HOSTADDR=10.20.30.40")
+    assert _candidate_admin_urls() == []
+
+
+def test_env_dsn_hostless_unix_socket_is_accepted(monkeypatch):
+    """Round-1 P2: a hostless DSN dials the default socket — a candidate."""
+    _harness_env(monkeypatch, "postgresql:///clinic")
+    assert _candidate_admin_urls() == ["postgresql:///clinic"]
+
+
+def test_env_dsn_socket_directory_query_is_accepted(monkeypatch):
+    """Round-1 shape: a query host that is a socket-directory path."""
+    _harness_env(monkeypatch, "postgresql://u:p@/postgres?host=/var/run/postgresql")
+    assert _candidate_admin_urls() == [
+        "postgresql://u:p@/postgres?host=/var/run/postgresql"
+    ]
+
+
+def test_env_dsn_sqlite_and_malformed_degrade_to_no_candidates(monkeypatch):
+    """Non-PG and unparseable DSNs must never crash auto-detection."""
+    _harness_env(monkeypatch, "sqlite:///local_test.db")
+    assert _candidate_admin_urls() == []
+    monkeypatch.setenv("DATABASE_URL", "file:///tmp/not-a-pg-dsn")
+    assert _candidate_admin_urls() == []
+
+
+def test_explicit_admin_env_is_included_unconditionally(monkeypatch):
+    """The documented opt-in boundary: an explicit admin DSN may be remote."""
+    monkeypatch.setenv(
+        "RQ26B_PG_ADMIN_URL", "postgresql://u:p@db.internal:5432/postgres"
+    )
+    monkeypatch.delenv("LOCAL_PG_SUPERUSER_PASSWORD", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    assert _candidate_admin_urls() == ["postgresql://u:p@db.internal:5432/postgres"]
+
+
+def test_scratch_urls_preserve_hostless_socket_form():
+    """Round-1 P2: hostless stays hostless — no silent TCP re-typing."""
+    psycopg_dsn, sa_url = _scratch_urls("postgresql://postgres:pw@/postgres")
+    assert psycopg_dsn == f"postgresql://postgres:pw@/{SCRATCH_DB}"
+    assert sa_url == f"postgresql+psycopg://postgres:pw@/{SCRATCH_DB}"
+
+
+def test_scratch_urls_preserve_query_host_forms():
+    """Socket-dir and explicit query-host forms repeat verbatim."""
+    psycopg_dsn, _ = _scratch_urls(
+        "postgresql://postgres:pw@/postgres?host=/var/run/postgresql"
+    )
+    assert psycopg_dsn == (
+        f"postgresql://postgres:pw@/{SCRATCH_DB}?host=/var/run/postgresql"
+    )
+    psycopg_dsn, _ = _scratch_urls("postgresql://postgres:pw@/postgres?host=localhost")
+    assert psycopg_dsn == (f"postgresql://postgres:pw@/{SCRATCH_DB}?host=localhost")
+
+
+def test_scratch_urls_preserve_authority_host_and_port():
+    """An authority host:port is kept as-is (explicit local TCP form)."""
+    psycopg_dsn, sa_url = _scratch_urls(
+        "postgresql://postgres:pw@localhost:55432/postgres"
+    )
+    assert psycopg_dsn == (f"postgresql://postgres:pw@localhost:55432/{SCRATCH_DB}")
+    assert sa_url == (f"postgresql+psycopg://postgres:pw@localhost:55432/{SCRATCH_DB}")
+
+
+def test_pg_engine_teardown_is_setup_failure_safe_source_pin():
+    """Round-1 P2: everything after CREATE DATABASE is try/finally-wrapped.
+
+    pytest skips the post-yield teardown when fixture setup fails BEFORE
+    the yield; with run-unique scratch names a leaked database would
+    never be reclaimed by a later run. This source-level pin keeps the
+    structural guarantee (no server needed to run it).
+    """
+    import inspect
+
+    src = inspect.getsource(pg_engine)
+    assert "CREATE DATABASE" in src
+    create_at = src.index("CREATE DATABASE")
+    try_at = src.index("try:", create_at)
+    yield_at = src.index("yield engine", create_at)
+    finally_at = src.index("finally:", create_at)
+    assert create_at < try_at < yield_at < finally_at
+    teardown = src[finally_at:]
+    assert "DROP DATABASE IF EXISTS" in teardown

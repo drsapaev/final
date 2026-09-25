@@ -2809,6 +2809,7 @@ const uzLatn = {
     dept_err_name_required: "Nomi majburiy va 2 ta belgidan uzun bo'lishi kerak",
     dept_err_key_required: 'Kalit majburiy (minimum 2 ta belgi)',
     dept_err_key_duplicate: "Bu kalitli bo'lim allaqachon mavjud",
+    dept_err_key_pattern: "Kalit faqat kichik lotin harflari, raqamlar va pastki chiziqdan iborat bo'lishi, harf bilan boshlanishi va 50 belgidan oshmasligi kerak",
     dept_err_fix_form: "Formadagi xatolarni tuzating",
     dept_created_synced: "Bo'lim yaratildi va sinxronlashtirildi",
     dept_create_failed: "Bo'limni yaratib bo'lmadi",
