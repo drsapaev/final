@@ -13,7 +13,7 @@ const kk = {
     section_clinic_queue: 'Клиника және кезек',
     section_communications: 'Коммуникациялар',
     section_patients_booking: 'Пациенттер мен жазылым',
-    ai_disclaimer_badge: 'Қаралама · медициналық қорытынды емес',
+    ai_disclaimer_badge: 'Қаралама · диагноз емес',
     ai_disclaimer_aria: 'AI-көмекші: қаралама, диагноз емес, медициналық қорытынды емес',
     overview: 'Шолу',
     queue: 'Кезек',

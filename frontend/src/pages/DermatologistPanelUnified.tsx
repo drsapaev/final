@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
+import { DERMATOLOGY_PANEL_TABS, getDermatologyTabAliases } from './dermatologyTabAliases';
 // S-M-2 (история, ОТМЕНЕНО Track 3-2): macos-Icon обёртка → lucide refs (§3.3)
 import { Button, Card, Badge, Input, AppEmpty } from '../components/ui/macos';
 
@@ -346,6 +347,10 @@ const DermatologistPanelUnified = () => {
   });
   const location = useLocation();
   // P-009: navigate removed — useDoctorPanelState handles tab URL sync
+  const dermatologyTabAliases = useMemo(
+    () => getDermatologyTabAliases(location.search),
+    [location.search]
+  );
 
   // P-009 fix: use shared useDoctorPanelState hook for tab/URL/patient state.
   const {
@@ -357,10 +362,12 @@ const DermatologistPanelUnified = () => {
     selectedPatient,
     setSelectedPatient,
   } = useDoctorPanelState({
-    // Phase 4+: sidebar reduced to 4 tabs — queue / visit / patients / ai.
+    // Phase 4+: the sidebar has three destinations — queue / visit / patients.
     defaultTab: 'queue',
     visitDeepLinkTab: 'visit',
     patientDeepLinkTab: 'patients',
+    validTabs: [...DERMATOLOGY_PANEL_TABS],
+    tabAliases: dermatologyTabAliases,
   }) as {
     activeTab: string;
     setActiveTab: (tab: string) => void;
@@ -1097,7 +1104,7 @@ const DermatologistPanelUnified = () => {
           };
           setSelectedPatient(nextPatient);
           setCurrentAppointment(nextPatient);
-          setActiveTab(visitIdFromUrl ? 'visit' : 'appointments');
+          setActiveTab(visitIdFromUrl ? 'visit' : 'queue');
           urlResolutionRef.current.notified = false;
           notify.info(t('derma.derma_panel_patient_loaded', { name: patientObj.patient_name }));
           return true;
@@ -1142,7 +1149,7 @@ const DermatologistPanelUnified = () => {
 
           setSelectedPatient(fallbackPatient);
           setCurrentAppointment(fallbackPatient);
-          setActiveTab(visitIdFromUrl ? 'visit' : 'appointments');
+          setActiveTab(visitIdFromUrl ? 'visit' : 'queue');
           urlResolutionRef.current.notified = false;
           logger.info('[Dermatology] Пациент из URL не найден в очереди, использую безопасный URL-fallback', {
             visitId: visitIdFromUrl,

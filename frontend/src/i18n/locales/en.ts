@@ -13,7 +13,7 @@ const en = {
     section_clinic_queue: 'Clinic & Queue',
     section_communications: 'Communications',
     section_patients_booking: 'Patients & Booking',
-    ai_disclaimer_badge: 'Draft · not a medical conclusion',
+    ai_disclaimer_badge: 'Draft · not a diagnosis',
     ai_disclaimer_aria: 'AI assistant: draft, not a diagnosis, not a medical conclusion',
     overview: 'Overview',
     queue: 'Queue',
