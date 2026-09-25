@@ -156,19 +156,19 @@ describe('RQ-05.b: api/registrar.ts types the catalog DTO', () => {
 // 4. RQ-08.a: серверная eligibility в каталоге (UI не требует alias-списков)
 // =====================================================================
 
-describe('RQ-08.a: backend emits accepted_specialties computed by the RQ-05.a gate helper', () => {
+describe('RQ-08.a: backend emits doctor eligibility from the shared policy', () => {
   const readSerializer = () => fs.readFileSync(backendSerializerPath, 'utf8');
 
-  it('imports the SAME helper the cart gate uses (literal UI/server parity)', () => {
+  it('imports the canonical eligibility helper shared with the cart gate', () => {
     const source = readSerializer();
-    expect(source).toContain('from app.api.v1.endpoints.registrar_wizard._helpers import');
-    expect(source).toContain('_accepted_specialty_variants_for_department_key');
+    expect(source).toContain('from app.services.registrar_doctor_eligibility import');
+    expect(source).toContain('accepted_specialty_variants_for_department_key');
   });
 
   it('emits per-service accepted_specialties from the department_key', () => {
     const source = readSerializer();
     expect(source).toContain('service_data["accepted_specialties"] =');
-    expect(source).toContain('_accepted_specialty_variants_for_department_key(');
+    expect(source).toContain('accepted_specialty_variants_for_department_key(');
   });
 
   it('keeps the RQ-08.a traceability marker', () => {
@@ -203,15 +203,16 @@ describe('RQ-08.a: frontend consumes the server eligibility set', () => {
     expect(utils).toContain('if (serverAccepted === null) return all;');
   });
 
-  it('wires the server entry (not the raw key) into filterDoctorsForService in CartStepV2', () => {
+  it('renders eligible services inside each named doctor card without a doctor dropdown', () => {
     const cartPath = path.resolve(
       __dirname,
       '../../components/wizard/CartStepV2.tsx',
     );
     const cart = fs.readFileSync(cartPath, 'utf8');
-    expect(cart).toContain('filterDoctorsForService(normalizedDoctorsData, service)');
-    expect(cart).not.toContain(
-      'filterDoctorsForService(normalizedDoctorsData, serviceDepartmentKey)',
-    );
+    expect(cart).toContain('.map((doctor) => {');
+    expect(cart).toContain('services: candidateServices.filter((service) => filterDoctorsForService([doctor], service).length > 0)');
+    expect(cart).toContain('className="cart-step-v2__doctor-card"');
+    expect(cart).toContain('className="cart-step-v2__doctor-name"');
+    expect(cart).not.toContain('<select');
   });
 });
