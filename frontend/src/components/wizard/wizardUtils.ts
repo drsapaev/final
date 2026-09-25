@@ -819,7 +819,12 @@ export const addServiceToWizardCart = (
   itemId: string,
   visitDate: string,
 ): WizardCartSelectionItem[] => {
-  if (service.id == null || service.doctor_booking_available === false ||
+  // PR #3438 review P1-1: doctor_booking_available=false блокирует только
+  // запись К ВРАЧУ (флаг — про doctor-owned очередь услуги). Ресурсная
+  // услуга (doctor_selection_required=false, напр. K10/ecg) легально
+  // добавляется в корзину БЕЗ врача — общий список остаётся кликабельным.
+  if (service.id == null ||
+    (doctor?.id != null && service.doctor_booking_available === false) ||
     (service.doctor_selection_required && doctor?.id == null)) return items;
   const doctorId = doctor?.id ?? null;
   const existingIndex = items.findIndex((item) =>

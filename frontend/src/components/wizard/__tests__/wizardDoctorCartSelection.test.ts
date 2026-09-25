@@ -75,6 +75,37 @@ describe('wizard doctor and service cart identity', () => {
       'unbookable', '2026-09-25')).toEqual([]);
   });
 
+  // PR #3438 review P1-1: ресурсная услуга (doctor_selection_required=false,
+  // очередь тега — QueueResource) не doctor-performed:doctor_booking_available=false
+  // блокирует ТОЛЬКО запись к врачу, общий список остаётся кликабельным.
+  it('adds a resource-owned service without a doctor even when doctor booking is unavailable', () => {
+    const ecg = {
+      id: 11,
+      name: 'ЭКГ',
+      price: 25000,
+      service_code: 'K10',
+      requires_doctor: true,
+      doctor_selection_required: false,
+      doctor_booking_available: false,
+    };
+    expect(addServiceToWizardCart([], ecg, null, 'ecg-row', '2026-09-25'))
+      .toHaveLength(1);
+  });
+
+  it('still refuses a resource-owned service when a doctor is explicitly supplied', () => {
+    const ecg = {
+      id: 11,
+      name: 'ЭКГ',
+      price: 25000,
+      service_code: 'K10',
+      requires_doctor: true,
+      doctor_selection_required: false,
+      doctor_booking_available: false,
+    };
+    expect(addServiceToWizardCart([], ecg, ivanov, 'ecg-doctor-row', '2026-09-25'))
+      .toEqual([]);
+  });
+
   it('locks QR edits to the adapted entry owner, never to the specialty bucket doctor', () => {
     const bucket = { queue_tag: 'cardiology', specialist_id: 99 };
     const data = { date: '2026-09-25' };

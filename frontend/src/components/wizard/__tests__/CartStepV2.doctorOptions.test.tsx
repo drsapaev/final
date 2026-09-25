@@ -78,6 +78,41 @@ describe('CartStepV2 doctor cards', () => {
     expect(props.onAddToCart).not.toHaveBeenCalled();
   });
 
+  // PR 3438 review P1-1 (canonical K10/ecg): серверная классификация
+  // doctor_selection_required=false (тег ресурсной очереди) держит услугу
+  // в ОБЩЕМ списке — не в карточках врачей и не «исчезнувшей», неважно
+  // что сырой флаг requires_doctor=true.
+  it('renders a server-classified resource service in the regular list, outside doctor cards', () => {
+    const ecg = {
+      ...consultation,
+      id: 11,
+      name: 'ЭКГ',
+      service_code: 'K10',
+      category_code: 'K',
+      is_consultation: false,
+      requires_doctor: true,
+      doctor_selection_required: false,
+      doctor_booking_available: false,
+      department_key: 'echokg',
+      accepted_specialties: ['echokg'],
+    };
+    const props = buildProps();
+    render(<CartStepV2 {...props} servicesData={[ecg]} />);
+
+    // не в карточках врачей (карточки пустые — услуга не doctor-performed)
+    const ivanov = screen.getByRole('region', { name: 'Иванов Иван' });
+    expect(within(ivanov).getByText('Услуги не найдены')).toBeInTheDocument();
+    expect(within(ivanov).queryByRole('button', { name: /ЭКГ/ })).not.toBeInTheDocument();
+    // ...и видима в общем списке с рабочим чекбоксом
+    const regularCard = screen.getByText('ЭКГ').closest('label');
+    expect(regularCard).not.toBeNull();
+    expect(regularCard).toHaveClass('compact-service-card');
+    const checkbox = within(regularCard as HTMLElement).getByRole('checkbox');
+    expect(checkbox).not.toBeDisabled();
+    fireEvent.click(checkbox);
+    expect(props.onAddToCart).toHaveBeenCalledWith(ecg, null);
+  });
+
   it('locks QR edits to the original doctor and keeps the cart assignment read-only', () => {
     render(<ThemeProvider><CartStepV2 {...buildProps()} lockedDoctorId={7} cart={{
       items: [{ id: 'original', service_id: 10, service_name: consultation.name, doctor_id: 7, quantity: 1 }],

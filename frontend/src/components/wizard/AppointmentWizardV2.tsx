@@ -2827,7 +2827,15 @@ const AppointmentWizardV2 = ({
 
   const getResourceQueueTagByService = (serviceId: string | number): string | null => {
     const service = servicesData.find((candidate) => candidate.id === serviceId);
-    if (!service || service.requires_doctor) return null;
+    if (!service) return null;
+    // PR 3438 review P1-1: серверное решение владеет классификацией —
+    // ресурсная услуга (doctor_selection_required=false, напр. K10/ecg)
+    // группируется по её resource-тегу; fallback для легаси-ответов без
+    // поля — прежняя семантика по сырому requires_doctor.
+    const doctorPerformed = typeof service.doctor_selection_required === 'boolean'
+      ? service.doctor_selection_required
+      : Boolean(service.requires_doctor);
+    if (doctorPerformed) return null;
     const queueTag = String(service.queue_tag || '').trim();
     return queueTag || null;
   };

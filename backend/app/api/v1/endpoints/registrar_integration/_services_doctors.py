@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
 from app.models.clinic import Schedule
-from app.models.online_queue import QueueResource
 from app.services.registrar_doctor_eligibility import (
     accepted_specialty_variants_for_department_key,
     doctor_booking_unavailable_reason,
+    doctor_selection_required_for_surface,
     is_named_eligible_real_doctor,
-    service_requires_doctor_selection,
+    resource_routed_tags_for_day,
 )
 
 
@@ -17,6 +18,15 @@ from app.services.registrar_doctor_eligibility import (
 def get_registrar_services(
     specialty: str | None = Query(None, description="Фильтр по специальности"),
     active_only: bool = Query(True, description="Только активные услуги"),
+    target_date: date | None = Query(
+        None,
+        description=(
+            "День, для которого вычисляется владелец очереди каждой услуги "
+            "(resource-routing truth); по умолчанию — сегодня. Дата важна "
+            "для деактивационно-устойчивой поверхности: уже открытая "
+            "ресурсная очередь дня остаётся владельцем тега"
+        ),
+    ),
     db: Session = Depends(get_db),
     # Разрешаем доступ также профильным ролям врачей
     current_user: User = Depends(
@@ -50,16 +60,15 @@ def get_registrar_services(
 
         services = query.all()
 
-        # One registry read for the whole catalog; exact active tags are the
-        # same routing truth the cart command checks before saving.
-        active_resource_tags = {
-            tag
-            for (tag,) in (
-                db.query(QueueResource.queue_tag)
-                .filter(QueueResource.active.is_(True))
-                .all()
-            )
-        }
+        # One routing-truth read for the whole catalog. PR #3438 review
+        # P1-1/P2: the same ownership rule the cart command gate checks at
+        # save time — an ACTIVE registry row for the exact tag OR the day's
+        # existing resource-owned surface (deactivation-proof). Without a
+        # target_date the registrar surface books for TODAY, so the default
+        # is today: a registry row deactivated mid-day cannot make the
+        # catalog promise a doctor booking the write gate will 409.
+        booking_day = target_date or date.today()
+        routed_resource_tags = resource_routed_tags_for_day(db, booking_day)
 
         # Получаем маппинг услуг к отделениям
         dept_services = (
@@ -122,15 +131,17 @@ def get_registrar_services(
                 # RQ-05 (F-04): каталог регистратуры обязан передавать
                 # requires_doctor, чтобы выбор врача был обязательным ровно
                 # там, где его требует сервер (S-03).
-                "requires_doctor": bool(
-                    getattr(service, 'requires_doctor', False)
-                ),
-                "doctor_selection_required": service_requires_doctor_selection(
-                    service
+                "requires_doctor": bool(getattr(service, 'requires_doctor', False)),
+                "doctor_selection_required": doctor_selection_required_for_surface(
+                    db,
+                    service,
+                    booking_day,
+                    resource_routed_tags=routed_resource_tags,
                 ),
                 "doctor_booking_available": doctor_booking_unavailable_reason(
-                    service, active_resource_tags
-                ) is None,
+                    service, routed_resource_tags
+                )
+                is None,
                 "group": None,  # Добавим группу для frontend
             }
 

@@ -2,6 +2,7 @@
 
 Split from registrar_wizard.py (3533 LOC → modular).
 """
+
 from __future__ import annotations
 
 """
@@ -92,6 +93,7 @@ def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user: User) -
 
     raise HTTPException(status_code=403, detail="Access denied")
 
+
 # ===================== СХЕМЫ ДЛЯ КОРЗИНЫ =====================
 
 
@@ -139,9 +141,7 @@ class CartResponse(BaseModel):
         int, list[dict]
     ]  # visit_id -> [{"queue_tag": str, "number": int, "queue_id": int}]
     print_tickets: list[dict[str, Any]]
-    created_visits: list[dict[str, Any]] | None = (
-        None  # Информация о созданных визитах
-    )
+    created_visits: list[dict[str, Any]] | None = None  # Информация о созданных визитах
 
 
 class EditDeltaPatientData(BaseModel):
@@ -189,6 +189,7 @@ class EditDeltaRequest(BaseModel):
     # сумма не может «тихо» разойтись с фактическим начислением.
     quote_token: str | None = None
 
+
 class EditDeltaResponse(BaseModel):
     success: bool
     message: str
@@ -206,7 +207,9 @@ class EditDeltaResponse(BaseModel):
 
 class MarkPaidRequest(BaseModel):
     # REG-AUDIT-28 P0-2: validate amount is positive and reasonable
-    amount: Decimal | None = Field(None, gt=0, le=Decimal("1000000000"), decimal_places=2)
+    amount: Decimal | None = Field(
+        None, gt=0, le=Decimal("1000000000"), decimal_places=2
+    )
     method: str | None = Field(default="cash")
     payment_snapshot: str | None = Field(default=None, max_length=64)
 
@@ -223,7 +226,9 @@ class RegistrarRecordActionRequest(BaseModel):
     records: list[RegistrarRecordRef] | None = None
     reason: str | None = None
     # REG-AUDIT-28 P0-2: validate amount is positive and reasonable
-    amount: Decimal | None = Field(None, gt=0, le=Decimal("1000000000"), decimal_places=2)
+    amount: Decimal | None = Field(
+        None, gt=0, le=Decimal("1000000000"), decimal_places=2
+    )
     method: str | None = Field(default="cash")
     payment_snapshot: str | None = Field(default=None, max_length=64)
 
@@ -374,7 +379,9 @@ class CartQuoteResponse(BaseModel):
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 
-def _assert_cart_doctor_eligibility(db: Session, visits: list[Any]) -> None:
+def _assert_cart_doctor_eligibility(
+    db: Session, visits: list[Any], *, doctor_map: dict[int, Doctor] | None = None
+) -> None:
     """RQ-05.a: серверная валидация допустимости врача при записи в корзину.
 
     E-023 трассировка: requires_doctor на пути сохранения корзины не
@@ -391,6 +398,10 @@ def _assert_cart_doctor_eligibility(db: Session, visits: list[Any]) -> None:
     - при наличии у услуги department_key специальность врача сверяется
       с SSOT-таблицей вариантов; услуги без department_key специальность
       не проверяют (существующие тесты/данные key не заполняют).
+
+    ``doctor_map`` — внешний снапшот докторов (используется locked-
+    ревалидацией P1-2 ниже); отсутствие id в мапе трактуется как 404 —
+    между первой проверкой и ревалидацией строка могла быть удалена.
     """
     service_ids = sorted(
         {item.service_id for visit in visits for item in visit.services}
@@ -401,10 +412,10 @@ def _assert_cart_doctor_eligibility(db: Session, visits: list[Any]) -> None:
     service_map = {service.id: service for service in services}
 
     doctor_ids = sorted({visit.doctor_id for visit in visits if visit.doctor_id})
-    doctor_map: dict[int, Doctor] = {}
-    if doctor_ids:
+    resolved_map: dict[int, Doctor] = doctor_map or {}
+    if doctor_ids and doctor_map is None:
         doctors = db.query(Doctor).filter(Doctor.id.in_(doctor_ids)).all()
-        doctor_map = {doctor.id: doctor for doctor in doctors}
+        resolved_map = {doctor.id: doctor for doctor in doctors}
 
     for visit in visits:
         required = [
@@ -420,9 +431,63 @@ def _assert_cart_doctor_eligibility(db: Session, visits: list[Any]) -> None:
                 db,
                 service,
                 visit.doctor_id,
-                doctor_map=doctor_map,
+                doctor_map=resolved_map,
                 target_date=visit.visit_date,
             )
+
+
+def _revalidate_cart_doctor_eligibility_locked(db: Session, visits: list[Any]) -> None:
+    """PR #3438 review P1-2: атомарная eligibility выбранного врача.
+
+    Первый вызов ``_assert_cart_doctor_eligibility`` читает Doctor/User
+    обычным SELECT — между проверкой и единственным коммитом корзины
+    успевает закоммититься деактивация/понижение врача (admin), и корзина
+    создаёт Visit/QueueEntry уже неактивному или переведённому врачу.
+
+    Фикс — глобальный lock order сохраняется: ПОСЛЕ (day, tag) prelock-ов
+    и ДО первого INSERT все выбранные строки Doctor перечитываются
+    ``FOR SHARE`` (sorted doctor_id) + их владельцы User ``FOR SHARE``
+    (sorted user_id), и eligibility повторяется НА ЗАБЛОКИРОВАННОМ
+    снапшоте:
+
+    - concurrent eligibility-changing UPDATE (Doctor.active/specialty,
+      User.is_active/role) блокируется до коммита корзины;
+    - уже закоммиченное изменение ВИДИМО ревалидации → корзина
+      отклонена, ни одного Visit/Invoice/QueueEntry;
+    - FOR SHARE совместим с FK KEY-SHARE визитов и с Doctor FOR SHARE
+      GraphQL joinQueue (advisory → Doctor — тот же порядок), т.е.
+    новый инверсии lock-order не появляется.
+
+    SQLite (тесты): with_for_update — no-op, семантика sequential.
+    """
+    doctor_ids = sorted({visit.doctor_id for visit in visits if visit.doctor_id})
+    if not doctor_ids:
+        return
+    doctors = (
+        db.query(Doctor)
+        .filter(Doctor.id.in_(doctor_ids))
+        .with_for_update(read=True)
+        .populate_existing()
+        .all()
+    )
+    owner_ids = sorted({doctor.user_id for doctor in doctors if doctor.user_id})
+    owners: dict[int, User] = {}
+    if owner_ids:
+        locked_users = (
+            db.query(User)
+            .filter(User.id.in_(owner_ids))
+            .with_for_update(read=True)
+            .populate_existing()
+            .all()
+        )
+        owners = {user.id: user for user in locked_users}
+    # Pin the relationship to the locked instances so the revalidation
+    # below reads exactly the locked snapshot, not a lazy re-load.
+    for doctor in doctors:
+        if doctor.user_id in owners:
+            doctor.user = owners[doctor.user_id]
+    locked_map = {doctor.id: doctor for doctor in doctors}
+    _assert_cart_doctor_eligibility(db, visits, doctor_map=locked_map)
 
 
 def _check_repeat_visit_eligibility(
@@ -476,7 +541,9 @@ def _resolve_effective_discount_mode(cart_data: Any) -> str:
     return cart_data.discount_mode or "none"
 
 
-def _load_registration_discount_settings(db: Session, lock_rows: bool = False) -> dict[str, Any]:
+def _load_registration_discount_settings(
+    db: Session, lock_rows: bool = False
+) -> dict[str, Any]:
     """Load repeat/benefit settings with safe defaults.
 
     Codex R4 #3095 (P1): lock_rows=True (save-time revalidation) takes row
@@ -518,7 +585,12 @@ def _load_registration_discount_settings(db: Session, lock_rows: bool = False) -
             # молча включала настройку (например, all_free_auto_approve),
             # и квота/invoice расходились в approval-статусе. Детерминированный
             # список truthy-значений.
-            settings[row.key] = str(row.value).strip().lower() in {"1", "true", "yes", "on"}
+            settings[row.key] = str(row.value).strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
 
     return settings
 
@@ -536,9 +608,9 @@ def _apply_service_discount(
     if discount_mode == "repeat" and is_consultation:
         repeat_discount = Decimal(str(settings.get("repeat_visit_discount", 0) or 0))
         repeat_discount = max(Decimal("0"), min(repeat_discount, Decimal("100")))
-        return (base_price * (Decimal("100") - repeat_discount) / Decimal("100")).quantize(
-            Decimal("0.01")
-        )
+        return (
+            base_price * (Decimal("100") - repeat_discount) / Decimal("100")
+        ).quantize(Decimal("0.01"))
 
     if discount_mode == "benefit" and is_consultation:
         if settings.get("benefit_consultation_free", True):

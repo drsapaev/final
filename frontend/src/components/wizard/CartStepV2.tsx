@@ -164,8 +164,17 @@ const CartStepV2 = ({
   // Categories are now defined globally at the top of the file
 
 
-  const isDoctorPerformed = (service: CartService) =>
-    Boolean(service.is_consultation || service.requires_doctor || service.doctor_selection_required);
+  // PR 3438 review P1-1: классификация doctor-card — ТОЛЬКО серверное
+  // решение doctor_selection_required (учитывает queue ownership: тег
+  // ресурсной очереди владеет записью, K10/ecg-подобные услуги НЕ
+  // doctor-performed и остаются в общем списке). Fallback на прежнюю
+  // формулу по сырым флагам — только для легаси-ответов каталога без
+  // поля (DTO RQ-05.b делает его обязательным).
+  const isDoctorPerformed = (service: CartService) => {
+    const serverDecision = service.doctor_selection_required;
+    if (typeof serverDecision === 'boolean') return serverDecision;
+    return Boolean(service.is_consultation || service.requires_doctor);
+  };
 
   // Фильтрация и группировка услуг
   const getDisplayedServices = () => {

@@ -11,6 +11,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
     _check_repeat_visit_eligibility,
     _load_registration_discount_settings,
     _resolve_effective_discount_mode,
+    _revalidate_cart_doctor_eligibility_locked,
 )  # noqa: F401
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.online_queue import DailyQueue
@@ -115,6 +116,20 @@ def create_cart_appointments(
             cart_data.visits,
             target_day=today,
         )
+
+        # PR #3438 review P1-2: revalidate doctor eligibility ON THE LOCKED
+        # snapshot, after the (day, tag) prelocks and BEFORE the first
+        # visit INSERT. The unlocked gate above can race a concurrent
+        # admin deactivation/demotion that commits between the check and
+        # this cart's single commit — the cart would then create a new
+        # visit and queue entry for an ineligible doctor. The locked
+        # re-read (Doctor FOR SHARE + owner User FOR SHARE, sorted ids)
+        # keeps the global lock order (tag prelocks -> doctor rows -> user
+        # rows) and holds the row locks until the commit below, so an
+        # eligibility-changing UPDATE either blocks (revalidated snapshot
+        # stays valid) or is already visible here (cart rejected before
+        # any write).
+        _revalidate_cart_doctor_eligibility_locked(db, cart_data.visits)
 
         created_visits = []
         created_visit_amounts: dict[int, Decimal] = {}
