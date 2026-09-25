@@ -45,11 +45,16 @@ export const useCardiologistHotkeys = ({
       // Tab switching: Ctrl+1 through Ctrl+5
       if (isCtrl && ['1', '2', '3', '4', '5'].includes(e.key)) {
         e.preventDefault();
+        // Cardioplan slice 5: hotkeys now match the four visible sidebar
+        // sections (queue, visit, patients, ai). Ctrl+5 keeps the former
+        // blood view reachable as a legacy-compatible transition; the old
+        // tabs (appointments/ecg/history) still render via back-compat
+        // branches, so deep links and muscle memory keep working.
         const tabMap = {
           '1': 'queue',
-          '2': 'appointments',
-          '3': 'visit',
-          '4': 'ecg',
+          '2': 'visit',
+          '3': 'patients',
+          '4': 'ai',
           '5': 'blood',
         };
         const tab = tabMap[e.key as keyof typeof tabMap];

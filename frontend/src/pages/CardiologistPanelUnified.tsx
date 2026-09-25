@@ -2,15 +2,16 @@ import { createElement, lazy, Suspense, useState, useEffect, useCallback, useRef
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
-// P-016 (UX audit): persist cardiologist settings (ldlThreshold,
-// showEcgEchoTogether) in localStorage so they survive page reloads.
+// P-016 (UX audit): persist cardiologist settings (ldlThreshold) in
+// localStorage so they survive page reloads. Cardioplan slice 5: the
+// unused ECG/Echo layout toggle and the floating settings menu are gone.
 import { useLocalStorage } from '../hooks/useLocalStorage';
 // P-021 (UX audit): warn the doctor 5 minutes before session expiry
 // so they can save their work instead of losing it to a silent 401.
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useCardiologistHotkeys } from '../hooks/useCardiologistHotkeys';
 // S-M-2 (история, ОТМЕНЕО Track 3-2): macos-Icon обёртка → lucide refs (§3.3)
-import { Card, Button, Checkbox, Input } from '../components/ui/macos';
+import { Card, Button } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './cardiology.css';
@@ -38,7 +39,7 @@ import { countAppointmentsByStatuses, SPECIALTY_KEYS, getAllPatientServices, mak
 import { selectEntriesForSpecialist } from '../utils/cardiologyQueue';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 import { emrTextValue } from '../components/emr-v2/emrCompletion';
-import { Download, Settings } from 'lucide-react';
+
 
 const AppointmentsTab = lazy(() => import('../components/cardiology/AppointmentsTab'));
 const loadVisitTab = () => import('../components/cardiology/VisitTab');
@@ -151,12 +152,14 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   tI18nRef.current = tI18n;
   const [scheduleNextModal, setScheduleNextModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null }>({ open: false, patient: null });
   const [editPatientModal, setEditPatientModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null; loading: boolean }>({ open: false, patient: null, loading: false });
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  // P-016 (UX audit): settings now persist in localStorage. The doctor's
-  // LDL threshold and ECG/Echo layout preference survive page reloads.
+  // P-016 (UX audit): settings persist in localStorage across reloads.
+  // Cardioplan slice 5: only the LDL threshold remains — it is the single
+  // setting actually consumed by the panel (blood-tab critical values).
+  // The unused "show ECG and Echo together" toggle and the floating
+  // settings menu were removed with this slice; stale stored keys are
+  // simply ignored.
   const [settings, setSettings] = useLocalStorage('cardio.settings', {
     ldlThreshold: 100,
-    showEcgEchoTogether: true,
   });
   const [emr, setEmr] = useState<Record<string, unknown> | null>(null);
 
@@ -1944,6 +1947,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
               getFieldRangeWarning={getFieldRangeWarning}
               isLdlCritical={isLdlCritical}
               settings={settings}
+              onLdlThresholdChange={(value: number) => setSettings({ ...settings, ldlThreshold: value })}
               getColor={getColor}
               getFontSize={getFontSize}
               getSpacing={getSpacing}
@@ -2062,49 +2066,6 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
           </div>
         )}
 
-        {/* Настройки кардиолога: плавающая кнопка и панель */}
-        <button
-          onClick={() => setSettingsOpen(true)}
-          className="cardio-settings-fab"
-          aria-label={tI18n('cardio.cardio_panel_settings_open_aria')}>
-
-          <Settings size={18} aria-hidden="true" />
-        </button>
-        {(activeTab === 'visit' || activeTab === 'blood') && settingsOpen &&
-        <Card className="cardio-settings-card">
-            <h3 className="cardio-settings-title">{tI18n('cardio.cardio_panel_settings_title')}</h3>
-            <div className="cardio-flex-col">
-              <label className="flex items-center cardio-settings-label">
-                <Checkbox
-                checked={settings.showEcgEchoTogether}
-                onChange={(checked: boolean) => setSettings({ ...settings, showEcgEchoTogether: checked })} />
-
-                {tI18n('cardio.cardio_panel_settings_show_ecg_echo')}
-              </label>
-              <div>
-                <div className="text-sm cardio-ldl-label">{tI18n('cardio.cardio_panel_settings_ldl_threshold')}</div>
-                <Input
-                type="number"
-                aria-label={tI18n('cardio.cardio_panel_settings_ldl_threshold_aria')}
-                value={settings.ldlThreshold}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSettings({ ...settings, ldlThreshold: Number(e.target.value) })}
-                className="cardio-settings-input" />
-
-              </div>
-            </div>
-            <div className="flex justify-end cardio-settings-actions">
-              <Button variant="outline" onClick={() => setSettingsOpen(false)}>{tI18n('cardio.cardio_panel_close')}</Button>
-              <Button onClick={() => {
-                // P-016 (UX audit): settings are already persisted to
-                // localStorage on every change via useLocalStorage. The
-                // "Save" button gives the doctor explicit feedback that
-                // the values are stored.
-                notify.success(tI18n('cardio.settings_saved'));
-                setSettingsOpen(false);
-              }}><Download size={16} className="cardio-icon-mr" aria-hidden="true" />{tI18n('cardio.cardio_panel_save')}</Button>
-            </div>
-          </Card>
-        }
       {/* X-13: AIChatWidget removed — AiTab in sidebar provides the same functionality */}
 
       </div>

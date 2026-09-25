@@ -17,7 +17,7 @@
  */
 
 import { TestTube, Plus, Save } from 'lucide-react';
-import { Button, Textarea, Badge, Card } from '../ui/macos';
+import { Button, Input, Textarea, Badge, Card } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface BloodTest {
@@ -65,6 +65,7 @@ interface BloodTestsTabProps {
   getFieldRangeWarning: (field: string, value: unknown) => FieldRangeWarning | undefined;
   isLdlCritical: (value: number | string | undefined) => boolean;
   settings?: { ldlThreshold?: number; [key: string]: unknown };
+  onLdlThresholdChange?: (value: number) => void;
   getColor: (key: string, shade?: number) => string;
   getFontSize: (key: string) => string;
   getSpacing: (key: string) => string;
@@ -83,6 +84,7 @@ interface BloodTestsTabProps {
  * @param {Function} props.getFieldRangeWarning - Range validation helper
  * @param {Function} props.isLdlCritical - LDL critical check
  * @param {Object} props.settings - User settings (ldlThreshold, etc.)
+ * @param {Function} props.onLdlThresholdChange - Persist a new LDL critical threshold
  * @param {Function} props.getColor - Theme color getter
  * @param {Function} props.getFontSize - Theme font size getter
  * @param {Function} props.getSpacing - Theme spacing getter
@@ -99,6 +101,7 @@ export function BloodTestsTab({
   getFieldRangeWarning,
   isLdlCritical,
   settings,
+  onLdlThresholdChange,
   getColor,
   getFontSize,
   getSpacing,
@@ -184,6 +187,30 @@ export function BloodTestsTab({
             <Plus size={16} className="cardio-icon-mr" />
             {t('cardio.cardio_blood_manual_input')}
           </Button>
+        </div>
+
+        {/* Cardioplan slice 5: the LDL threshold lives here — the only place
+            that consumes it (critical values in stats, list and warnings).
+            The former floating settings menu was removed. */}
+        <div className="cardio-ldl-editor" style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm'), marginBottom: getSpacing('md') }}>
+          <label className="cardio-ldl-label" htmlFor="cardio-ldl-threshold-input">
+            {t('cardio.cardio_panel_settings_ldl_threshold')}
+          </label>
+          <Input
+            id="cardio-ldl-threshold-input"
+            type="number"
+            min={50}
+            max={300}
+            aria-label={t('cardio.cardio_panel_settings_ldl_threshold_aria')}
+            value={settings?.ldlThreshold ?? 100}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+              const next = Number(e.target.value);
+              if (Number.isFinite(next) && next > 0 && onLdlThresholdChange) {
+                onLdlThresholdChange(next);
+              }
+            }}
+            style={{ maxWidth: 120 }}
+          />
         </div>
 
         {/* Stats cards */}
