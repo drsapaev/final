@@ -6,17 +6,93 @@
 - Контроль доступа по ролям
 """
 
-import pytest
+import secrets
+from datetime import date
+from io import BytesIO
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from io import BytesIO
-from datetime import date
 
+from app.core.security import get_password_hash
 from app.models.appointment import Appointment
+from app.models.clinic import Doctor
 from app.models.file_system import File, FileStatus, FileVersion
 from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit
+
+
+def _create_file_access_actor(db_session, client, patient, *, role, suffix):
+    password = secrets.token_urlsafe(24)
+    user = User(
+        username=f"file_access_{suffix}",
+        email=f"file_access_{suffix}@example.test",
+        full_name="Test File Access Doctor",
+        hashed_password=get_password_hash(password),
+        role=role,
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    specialty = "dermatology" if role == "derma" else "general"
+    doctor = Doctor(
+        user_id=user.id,
+        specialty=specialty,
+        active=True,
+        cabinet="405",
+    )
+    db_session.add(doctor)
+    db_session.flush()
+
+    visit = Visit(
+        patient_id=patient.id,
+        doctor_id=doctor.id,
+        visit_date=date.today(),
+        status="in_progress",
+    )
+    db_session.add(visit)
+    db_session.commit()
+    db_session.refresh(user)
+    db_session.refresh(doctor)
+    db_session.refresh(visit)
+
+    login_response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": user.username, "password": password},
+    )
+    assert login_response.status_code == 200
+    headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+    return user, doctor, visit, headers
+
+
+def _upload_test_photo(
+    client,
+    *,
+    headers,
+    patient_id: int | None,
+    visit_id: int | None,
+    permission="private",
+):
+    file_data = {"file_type": "image", "permission": permission}
+    if patient_id is not None:
+        file_data["patient_id"] = str(patient_id)
+    if visit_id is not None:
+        file_data["visit_id"] = str(visit_id)
+
+    return client.post(
+        "/api/v1/files/upload",
+        files={
+            "file": (
+                "dermatology-photo.jpg",
+                BytesIO(b"\xff\xd8\xffsynthetic dermatology photo"),
+                "image/jpeg",
+            )
+        },
+        data=file_data,
+        headers=headers,
+    )
 
 
 class TestFileSecurity:
@@ -30,7 +106,9 @@ class TestFileSecurity:
         from app.core.security import get_password_hash
         from app.models.user import User
 
-        doctor_user = db_session.query(User).filter(User.username == "doctor_file_test").first()
+        doctor_user = (
+            db_session.query(User).filter(User.username == "doctor_file_test").first()
+        )
         if not doctor_user:
             doctor_user = User(
                 username="doctor_file_test",
@@ -86,7 +164,9 @@ class TestFileSecurity:
         from app.core.security import get_password_hash
         from app.models.user import User
 
-        doctor_user = db_session.query(User).filter(User.username == "doctor_file_test2").first()
+        doctor_user = (
+            db_session.query(User).filter(User.username == "doctor_file_test2").first()
+        )
         if not doctor_user:
             doctor_user = User(
                 username="doctor_file_test2",
@@ -279,15 +359,15 @@ class TestFileSecurity:
         )
         assert appointment_files.count() == 0
 
-    def test_file_hash_consistency(
-        self, client: TestClient, db_session: Session
-    ):
+    def test_file_hash_consistency(self, client: TestClient, db_session: Session):
         """✅ CERTIFICATION: Одинаковые файлы имеют одинаковый хеш"""
         # Создаем пользователя с ролью Doctor
         from app.core.security import get_password_hash
         from app.models.user import User
 
-        doctor_user = db_session.query(User).filter(User.username == "doctor_file_test3").first()
+        doctor_user = (
+            db_session.query(User).filter(User.username == "doctor_file_test3").first()
+        )
         if not doctor_user:
             doctor_user = User(
                 username="doctor_file_test3",
@@ -338,15 +418,15 @@ class TestFileSecurity:
         # Хеши должны совпадать
         assert hash_1 == hash_2
 
-    def test_file_version_hash_required(
-        self, client: TestClient, db_session: Session
-    ):
+    def test_file_version_hash_required(self, client: TestClient, db_session: Session):
         """✅ CERTIFICATION: Версия файла содержит file_hash"""
         # Создаем пользователя с ролью Doctor
         from app.core.security import get_password_hash
         from app.models.user import User
 
-        doctor_user = db_session.query(User).filter(User.username == "doctor_file_test4").first()
+        doctor_user = (
+            db_session.query(User).filter(User.username == "doctor_file_test4").first()
+        )
         if not doctor_user:
             doctor_user = User(
                 username="doctor_file_test4",
@@ -397,9 +477,7 @@ class TestFileSecurity:
 
         # Проверяем версию
         version = (
-            db_session.query(FileVersion)
-            .filter(FileVersion.file_id == file_id)
-            .first()
+            db_session.query(FileVersion).filter(FileVersion.file_id == file_id).first()
         )
         assert version is not None
         assert version.file_hash is not None
@@ -470,3 +548,203 @@ class TestFileSecurity:
         )
         assert second_delete_response.status_code == 404
 
+    def test_dermatology_user_can_access_photo_on_owned_visit(
+        self, client: TestClient, db_session: Session, test_patient
+    ):
+        _, _, visit, headers = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="derma",
+            suffix=secrets.token_hex(8),
+        )
+
+        upload_response = _upload_test_photo(
+            client,
+            headers=headers,
+            patient_id=test_patient.id,
+            visit_id=visit.id,
+        )
+        assert upload_response.status_code == 200
+        file_id = upload_response.json()["id"]
+
+        list_response = client.get(
+            "/api/v1/files/",
+            params={"patient_id": test_patient.id, "visit_id": visit.id},
+            headers=headers,
+        )
+        assert list_response.status_code == 200
+        assert [item["id"] for item in list_response.json()["files"]] == [file_id]
+
+        assert (
+            client.get(f"/api/v1/files/{file_id}", headers=headers).status_code == 200
+        )
+        preview_response = client.get(
+            f"/api/v1/files/{file_id}/preview", headers=headers
+        )
+        assert preview_response.status_code == 200
+        assert preview_response.content.startswith(b"\xff\xd8\xff")
+
+        download_response = client.get(
+            f"/api/v1/files/{file_id}/download", headers=headers
+        )
+        assert download_response.status_code == 200
+        assert download_response.content.startswith(b"\xff\xd8\xff")
+
+        search_response = client.post(
+            "/api/v1/files/search",
+            json={"query": "dermatology-photo"},
+            headers=headers,
+        )
+        assert search_response.status_code == 403
+
+        public_upload_response = _upload_test_photo(
+            client,
+            headers=headers,
+            patient_id=test_patient.id,
+            visit_id=visit.id,
+            permission="public",
+        )
+        assert public_upload_response.status_code == 403
+
+        delete_response = client.delete(f"/api/v1/files/{file_id}", headers=headers)
+        assert delete_response.status_code == 200
+
+    def test_dermatology_file_list_requires_patient_and_visit_filters(
+        self, client: TestClient, db_session: Session, test_patient
+    ):
+        _, _, visit, headers = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="derma",
+            suffix=secrets.token_hex(8),
+        )
+
+        assert client.get("/api/v1/files/", headers=headers).status_code == 400
+        assert (
+            client.get(
+                "/api/v1/files/",
+                params={"patient_id": test_patient.id},
+                headers=headers,
+            ).status_code
+            == 400
+        )
+        assert (
+            client.get(
+                "/api/v1/files/",
+                params={"visit_id": visit.id},
+                headers=headers,
+            ).status_code
+            == 400
+        )
+
+    def test_dermatology_upload_rejects_mismatched_patient_and_visit(
+        self, client: TestClient, db_session: Session, test_patient
+    ):
+        _, _, visit, headers = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="derma",
+            suffix=secrets.token_hex(8),
+        )
+        missing_context_response = _upload_test_photo(
+            client,
+            headers=headers,
+            patient_id=None,
+            visit_id=None,
+        )
+        assert missing_context_response.status_code == 400
+
+        other_patient = Patient(
+            first_name="Test",
+            last_name="Alternate",
+            phone="+998900000999",
+            birth_date=date(1988, 1, 1),
+        )
+        db_session.add(other_patient)
+        db_session.commit()
+        db_session.refresh(other_patient)
+
+        response = _upload_test_photo(
+            client,
+            headers=headers,
+            patient_id=other_patient.id,
+            visit_id=visit.id,
+        )
+
+        assert response.status_code == 404
+        assert db_session.query(File).filter(File.visit_id == visit.id).count() == 0
+
+    def test_dermatology_user_cannot_access_another_doctors_visit_file(
+        self, client: TestClient, db_session: Session, test_patient
+    ):
+        _, _, own_visit, derma_headers = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="derma",
+            suffix=secrets.token_hex(8),
+        )
+        _, _, other_visit, other_doctor_headers = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="Doctor",
+            suffix=secrets.token_hex(8),
+        )
+
+        same_visit_private_upload = _upload_test_photo(
+            client,
+            headers=other_doctor_headers,
+            patient_id=test_patient.id,
+            visit_id=own_visit.id,
+        )
+        assert same_visit_private_upload.status_code == 200
+        private_file_id = same_visit_private_upload.json()["id"]
+        assert (
+            client.get(
+                f"/api/v1/files/{private_file_id}", headers=derma_headers
+            ).status_code
+            == 404
+        )
+
+        upload_response = _upload_test_photo(
+            client,
+            headers=other_doctor_headers,
+            patient_id=test_patient.id,
+            visit_id=other_visit.id,
+            permission="public",
+        )
+        assert upload_response.status_code == 200
+        file_id = upload_response.json()["id"]
+
+        assert (
+            client.get(f"/api/v1/files/{file_id}", headers=derma_headers).status_code
+            == 404
+        )
+        assert (
+            client.get(
+                f"/api/v1/files/{file_id}/preview", headers=derma_headers
+            ).status_code
+            == 404
+        )
+        assert (
+            client.get(
+                f"/api/v1/files/{file_id}/download", headers=derma_headers
+            ).status_code
+            == 404
+        )
+        assert (
+            client.delete(f"/api/v1/files/{file_id}", headers=derma_headers).status_code
+            == 404
+        )
+
+        own_visit_list = client.get(
+            "/api/v1/files/",
+            params={"patient_id": test_patient.id, "visit_id": own_visit.id},
+            headers=derma_headers,
+        )
+        assert own_visit_list.status_code == 200
+        assert file_id not in {item["id"] for item in own_visit_list.json()["files"]}
