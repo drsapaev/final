@@ -10654,7 +10654,12 @@ const uzLatn = {
     pat_book_label_date: 'Sana',
     pat_book_label_time: 'Afzal qilingan vaqt',
     pat_book_label_department: 'Boʻlim',
-    pat_book_placeholder_department: 'Masalan: Kardiologiya',
+    // Round-12 (PR #3386): the department is a SELECTOR fed by the
+    // booking/departments reference endpoint — the form submits the
+    // canonical Department.key, never a free-text localized label.
+    pat_book_placeholder_department: 'Boʻlimni tanlang',
+    pat_book_option_no_department: 'Boʻlimsiz',
+    pat_book_departments_unavailable: 'Boʻlimlar roʻyxati hozir mavjud emas — arizani boʻlimsiz yuborish mumkin.',
     pat_book_label_services: 'Xizmatlar',
     pat_book_placeholder_services: 'Konsultatsiya, tahlillar',
     pat_book_label_notes: 'Izoh',

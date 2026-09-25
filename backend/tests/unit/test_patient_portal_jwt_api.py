@@ -1594,6 +1594,134 @@ class TestClinicCalendarDateValidation:
         assert created.status_code == 201, created.json()
 
 
+class TestPortalBookingRound12:
+    """Round-12 (PR #3386 review): atomic routing + contract ordering on the
+    JWT portal surface. The FINAL department row is re-validated under FOR
+    UPDATE next to the INSERT (an admin deactivate/delete racing the
+    booking cannot persist a routing context pointing at a non-active
+    department). Rebased onto #3402: the portal keeps the owner-reviewed
+    up-front submitted-key resolution (a request-shaped routing 400
+    outranks the doctor_not_eligible 409); the Mini App surface keeps its
+    eligibility-first ordering — an intentional, flagged divergence."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def test_create_revalidates_department_under_lock(
+        self,
+        client: TestClient,
+        linked_patient_headers,
+        db_session: Session,
+        test_patient,
+        test_doctor,
+        portal_department,
+        monkeypatch,
+    ):
+        # P1: the create path calls the lock_department_for_booking
+        # re-validation and answers the SAME department_inactive contract
+        # instead of persisting a stale routing context. NOTE: this
+        # sqlite harness runs the "admin" mutation on the SAME session —
+        # commit() expires the identity map, so this pin proves the
+        # WIRING, not the two-session race. The real cross-transaction
+        # identity-map proof (stale active=True surviving FOR UPDATE
+        # without populate_existing) lives in
+        # tests/integration/test_booking_department_lock_pg.py.
+        import app.api.v1.endpoints.patient_portal as portal_module
+
+        test_doctor.department_id = portal_department.id
+        db_session.commit()
+        db_session.refresh(test_doctor)
+
+        real_routing = portal_module._resolve_doctor_routing_department
+
+        def racing_admin_deactivation(doctor_row, submitted_row):
+            resolved = real_routing(doctor_row, submitted_row)
+            portal_department.active = False
+            db_session.commit()
+            return resolved
+
+        monkeypatch.setattr(
+            portal_module,
+            "_resolve_doctor_routing_department",
+            racing_admin_deactivation,
+        )
+
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "r12-lock-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": portal_department.key,
+            },
+        )
+        assert response.status_code == 400, response.json()
+        assert response.json()["detail"]["reason"] == "department_inactive"
+        assert db_session.query(Appointment).count() == 0, (
+            "a raced deactivation never materializes an appointment with a "
+            "stale routing context"
+        )
+
+    def test_create_submitted_key_resolve_precedes_eligibility(
+        self,
+        client: TestClient,
+        linked_patient_headers,
+        db_session: Session,
+        test_patient,
+        test_doctor,
+    ):
+        # Merge-parity note (PR #3386 rebased onto #3402): the portal keeps
+        # the owner-reviewed #3402 order — the submitted department key is
+        # resolved UP FRONT ("P1 (round 2): resolve BEFORE any mutation"),
+        # so a request that is both ineligible-doctor AND bad-department
+        # answers the request-shaped 400 department_unknown. The Mini App
+        # surface keeps its eligibility-first ordering (intentional
+        # divergence between the two surfaces, flagged for review).
+        # Either way nothing persists.
+        test_doctor.active = False
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "r12-order-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": "nonexistent-department",
+            },
+        )
+        assert response.status_code == 400, response.json()
+        assert response.json()["detail"]["reason"] == "department_unknown"
+        assert db_session.query(Appointment).count() == 0
+
+    def test_lock_department_for_booking_semantics(
+        self, db_session: Session, portal_department, monkeypatch
+    ):
+        # Unit contract of the atomic re-validation helper itself: an active
+        # row passes through, a deactivated row is a controlled 400, a
+        # deleted row is department_unknown (never an IntegrityError/500),
+        # None passes through (departmentless booking).
+        from fastapi import HTTPException
+
+        from app.services.appointment_booking_routing import lock_department_for_booking
+
+        assert lock_department_for_booking(db_session, None) is None
+
+        locked = lock_department_for_booking(db_session, portal_department)
+        assert int(locked.id) == int(portal_department.id)
+
+        portal_department.active = False
+        db_session.commit()
+        with pytest.raises(HTTPException) as inactive_exc:
+            lock_department_for_booking(db_session, portal_department)
+        assert inactive_exc.value.detail == {"reason": "department_inactive"}
+
+        db_session.delete(portal_department)
+        db_session.commit()
+        with pytest.raises(HTTPException) as deleted_exc:
+            lock_department_for_booking(db_session, portal_department)
+        assert deleted_exc.value.detail == {"reason": "department_unknown"}
+
+
 class TestInactiveCanonicalDepartmentRouting:
     """Round-10 owner P1 (PR #3340): `_resolve_doctor_routing_department`
     returned the doctor's canonical department WITHOUT an `active` check —

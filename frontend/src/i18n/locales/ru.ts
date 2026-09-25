@@ -10800,7 +10800,12 @@ const ru = {
     pat_book_label_date: 'Дата',
     pat_book_label_time: 'Предпочтительное время',
     pat_book_label_department: 'Отделение',
-    pat_book_placeholder_department: 'Например: Кардиология',
+    // Round-12 (PR #3386): the department is a SELECTOR fed by the
+    // booking/departments reference endpoint — the form submits the
+    // canonical Department.key, never a free-text localized label.
+    pat_book_placeholder_department: 'Выберите отделение',
+    pat_book_option_no_department: 'Без отделения',
+    pat_book_departments_unavailable: 'Список отделений сейчас недоступен — можно отправить заявку без отделения.',
     pat_book_label_services: 'Услуги',
     pat_book_placeholder_services: 'Консультация, анализы',
     pat_book_label_notes: 'Комментарий',
