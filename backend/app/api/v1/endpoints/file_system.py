@@ -545,6 +545,11 @@ async def update_file(
                 detail="Нет прав для изменения файла",
             )
 
+        # Protected-domain boundary (dental-media etc.): metadata/permission/tag
+        # changes must go through the owning specialty surface, otherwise a
+        # generic update could retag or unprotect a clinical file.
+        get_file_system_service().ensure_generic_surface_allowed(db_file)
+
         # Парсим теги
         tags_list = None
         if tags is not None:
@@ -713,6 +718,10 @@ async def get_file_shares(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Нет прав для просмотра совместных использований",
             )
+
+        # Protected-domain boundary (dental-media etc.): share management of
+        # clinical files must go through the owning specialty surface.
+        get_file_system_service().ensure_generic_surface_allowed(db_file)
 
         shares = file_share.get_file_shares(db, file_id=file_id)
 

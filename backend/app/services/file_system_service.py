@@ -52,6 +52,15 @@ logger = logging.getLogger(__name__)
 
 FILE_READ_CHUNK_BYTES = 1024 * 1024
 
+# Protected-domain file boundary (PR #3439 corrective follow-up).
+# Files tagged with one of these tags carry clinical references (patient/visit)
+# and MUST be served only by the owning specialty surface (e.g. the dental
+# media endpoints), which enforces visit-relationship + specialty checks that
+# the generic /files surface cannot perform. Owner- or share-based access in
+# the generic surface is NOT a valid authorization for such files.
+DENTAL_MEDIA_TAG = "dental-media:v1"
+PROTECTED_FILE_DOMAIN_TAGS: frozenset[str] = frozenset({DENTAL_MEDIA_TAG})
+
 
 class FileSystemService:
     """Сервис файловой системы"""
@@ -482,6 +491,10 @@ class FileSystemService:
         if not self._check_file_access(db, db_file, user_id):
             return None
 
+        # Protected-domain boundary: even a legitimate generic-surface owner or
+        # share holder must use the owning specialty surface for tagged files.
+        self.ensure_generic_surface_allowed(db_file)
+
         # Логируем доступ
         if user_id:
             file_access_log.create(db, file_id=file_id, user_id=user_id, action="view")
@@ -491,6 +504,46 @@ class FileSystemService:
     def _is_deleted_file(self, file_obj: File) -> bool:
         """Soft-deleted files must be hidden from normal file access paths."""
         return file_obj.status == FileStatusEnum.DELETED
+
+    @staticmethod
+    def _parse_file_tags(file_obj: File) -> list[str]:
+        tags = file_obj.tags
+        if isinstance(tags, str):
+            try:
+                tags = json.loads(tags)
+            except (json.JSONDecodeError, TypeError):
+                return []
+        if not isinstance(tags, list):
+            return []
+        return [str(tag) for tag in tags if isinstance(tag, str)]
+
+    @classmethod
+    def protected_domain_tag(cls, file_obj: File) -> str | None:
+        """Return the protected-domain tag carried by the file, if any."""
+        for tag in cls._parse_file_tags(file_obj):
+            if tag in PROTECTED_FILE_DOMAIN_TAGS:
+                return tag
+        return None
+
+    def ensure_generic_surface_allowed(self, file_obj: File) -> None:
+        """Fail-closed boundary for protected-domain files on the generic surface.
+
+        The generic /files API authorizes by ownership or file shares only; it has
+        no knowledge of the clinical relationship (visit ownership, doctor
+        specialty, patient binding) that the owning specialty surface enforces.
+        A tagged file therefore must not be readable, mutable, shareable, or
+        exportable here — including by its own generic-surface owner — and must
+        be served through the specialty endpoints instead.
+        """
+        tag = self.protected_domain_tag(file_obj)
+        if tag:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "Файл защищён специализированным клиническим архивом "
+                    f"(тег {tag}) и доступен только через его API"
+                ),
+            )
 
     def _check_file_access(
         self, db: Session, file_obj: File, user_id: int | None
@@ -601,6 +654,10 @@ class FileSystemService:
                 detail="Нет прав для замены содержимого файла",
             )
 
+        # Protected-domain boundary: content replacement must go through the
+        # owning specialty surface (e.g. dental media re-upload policy).
+        self.ensure_generic_surface_allowed(db_file)
+
         new_content, new_size = self._read_upload_file_limited(
             new_file, self.max_file_size
         )
@@ -667,11 +724,28 @@ class FileSystemService:
 
         return db_file
 
-    def delete_file(self, db: Session, file_id: int, user_id: int) -> bool:
-        """Удалить файл"""
+    def delete_file(
+        self,
+        db: Session,
+        file_id: int,
+        user_id: int,
+        *,
+        allow_protected_domain: bool = False,
+    ) -> bool:
+        """Удалить файл.
+
+        Protected-domain files (e.g. dental media) are rejected here unless the
+        caller is the owning specialty surface passing
+        ``allow_protected_domain=True`` — the specialty surface enforces its own
+        editor policy before delegating the mechanical soft-delete + quota
+        update to this method.
+        """
         db_file = file.get(db, id=file_id)
         if not db_file or self._is_deleted_file(db_file):
             return False
+
+        if not allow_protected_domain:
+            self.ensure_generic_surface_allowed(db_file)
 
         # Проверяем права доступа
         if db_file.owner_id != user_id and not self._is_admin(db, user_id):
@@ -706,6 +780,10 @@ class FileSystemService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Нет прав для создания совместного использования",
             )
+
+        # Protected-domain boundary: clinical files must not be shared through
+        # the generic surface — sharing bypasses the specialty visit checks.
+        self.ensure_generic_surface_allowed(db_file)
 
         from app.schemas.file_system import FileShareCreate
 

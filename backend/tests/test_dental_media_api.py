@@ -403,3 +403,308 @@ def test_dental_media_view_rejects_storage_paths_outside_configured_root(
     )
     assert response.status_code == 404
     assert response.content != b"synthetic outside file"
+
+
+# ---------------------------------------------------------------------------
+# PR #3439 corrective follow-up regression block (P1-1 / P1-2 / P2 verdict).
+# ---------------------------------------------------------------------------
+
+
+def _make_bare_user(
+    db_session: Session,
+    *,
+    role: str = "dentist",
+    is_superuser: bool = False,
+) -> User:
+    """A clinician-role user WITHOUT any Doctor profile (legacy-fallback world)."""
+    suffix = secrets.token_hex(6)
+    user = User(
+        username=f"dental_bare_{suffix}",
+        email=f"dental_bare_{suffix}@example.test",
+        full_name="Synthetic Bare Clinician",
+        hashed_password=get_password_hash("not-a-real-user-password"),
+        role=role,
+        is_active=True,
+        is_superuser=is_superuser,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+def _make_colliding_victim_doctor(
+    db_session: Session, *, doctor_id: int
+) -> tuple[User, Doctor]:
+    """Victim clinician whose Doctor.id equals an unrelated User.id."""
+    suffix = secrets.token_hex(6)
+    victim_user = User(
+        username=f"dental_victim_{suffix}",
+        email=f"dental_victim_{suffix}@example.test",
+        full_name="Synthetic Victim Dentist",
+        hashed_password=get_password_hash("not-a-real-user-password"),
+        role="dentist",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(victim_user)
+    db_session.flush()
+    victim_doctor = Doctor(
+        id=doctor_id,
+        user_id=victim_user.id,
+        specialty="dentistry",
+        active=True,
+        cabinet="406",
+    )
+    db_session.add(victim_doctor)
+    db_session.commit()
+    db_session.refresh(victim_user)
+    db_session.refresh(victim_doctor)
+    return victim_user, victim_doctor
+
+
+def test_legacy_user_id_fallback_cannot_open_foreign_dental_archive(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """P1-1: Visit.doctor_id stores Doctor.id, never User.id — the legacy
+    `visit.doctor_id == user.id` fallback must not authorize a dentist whose
+    bare User.id collides with another clinician's Doctor.id."""
+    attacker = _make_bare_user(db_session, role="dentist")
+    attacker_id = attacker.id
+    db_session.expunge(attacker)
+
+    victim_user, victim_doctor = _make_colliding_victim_doctor(
+        db_session, doctor_id=attacker_id
+    )
+    victim_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=victim_doctor.id
+    )
+    upload = _upload(
+        client,
+        headers=_headers(victim_user),
+        patient_id=test_patient.id,
+        visit_id=victim_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+    media_id = upload.json()["id"]
+
+    list_response = client.get(
+        "/api/v1/dental/media",
+        params={"patient_id": test_patient.id, "visit_id": victim_visit.id},
+        headers=_headers(attacker),
+    )
+    assert list_response.status_code == 404, list_response.text
+
+    content_response = client.get(
+        f"/api/v1/dental/media/{media_id}/content",
+        params={"visit_id": victim_visit.id},
+        headers=_headers(attacker),
+    )
+    assert content_response.status_code == 404, content_response.text
+
+    edit_response = client.patch(
+        f"/api/v1/dental/media/{media_id}",
+        json={"title": "attacker rename"},
+        headers=_headers(attacker),
+    )
+    assert edit_response.status_code == 403, edit_response.text
+
+    delete_response = client.delete(
+        f"/api/v1/dental/media/{media_id}",
+        headers=_headers(attacker),
+    )
+    assert delete_response.status_code == 403, delete_response.text
+
+    # The legitimate treating clinician keeps full access.
+    victim_list = client.get(
+        "/api/v1/dental/media",
+        params={"patient_id": test_patient.id, "visit_id": victim_visit.id},
+        headers=_headers(victim_user),
+    )
+    assert victim_list.status_code == 200, victim_list.text
+    assert {item["id"] for item in victim_list.json()["items"]} == {media_id}
+
+
+def test_generic_file_surface_fail_closed_for_dental_media(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """P1-2: a dental-media tagged file must be unreachable through the
+    generic /files surface — including for its own generic-surface owner —
+    and must remain reachable through the dental surface. The owner uses the
+    canonical "Doctor" role spelling (explicitly allowed by #3439): that is
+    exactly the identity the generic endpoints' role gates let through."""
+    owner, owner_doctor = _make_actor(db_session, role="Doctor")
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+    upload = _upload(
+        client,
+        headers=_headers(owner),
+        patient_id=test_patient.id,
+        visit_id=owner_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+    media_id = upload.json()["id"]
+
+    outsider, _outsider_doctor = _make_actor(db_session)
+
+    generic_get = client.get(f"/api/v1/files/{media_id}", headers=_headers(owner))
+    assert generic_get.status_code == 403, generic_get.text
+
+    generic_download = client.get(
+        f"/api/v1/files/{media_id}/download", headers=_headers(owner)
+    )
+    assert generic_download.status_code == 403, generic_download.text
+
+    generic_preview = client.get(
+        f"/api/v1/files/{media_id}/preview", headers=_headers(owner)
+    )
+    assert generic_preview.status_code == 403, generic_preview.text
+
+    generic_shares = client.get(
+        f"/api/v1/files/{media_id}/shares", headers=_headers(owner)
+    )
+    assert generic_shares.status_code == 403, generic_shares.text
+
+    generic_share = client.post(
+        f"/api/v1/files/{media_id}/share",
+        json={
+            "shared_with_user_id": outsider.id,
+            "permission": "private",
+        },
+        headers=_headers(owner),
+    )
+    assert generic_share.status_code == 403, generic_share.text
+
+    generic_update = client.put(
+        f"/api/v1/files/{media_id}",
+        data={"title": "generic rename"},
+        headers=_headers(owner),
+    )
+    assert generic_update.status_code == 403, generic_update.text
+
+    generic_replace = client.put(
+        f"/api/v1/files/{media_id}/content",
+        files={
+            "file": (
+                "replacement.jpg",
+                BytesIO(b"\xff\xd8\xffreplacement image"),
+                "image/jpeg",
+            )
+        },
+        headers=_headers(owner),
+    )
+    assert generic_replace.status_code == 403, generic_replace.text
+
+    generic_delete = client.delete(
+        f"/api/v1/files/{media_id}", headers=_headers(owner)
+    )
+    assert generic_delete.status_code == 403, generic_delete.text
+
+    generic_export = client.post(
+        "/api/v1/files/export",
+        json={"file_ids": [media_id], "format": "zip"},
+        headers=_headers(owner),
+    )
+    assert generic_export.status_code == 403, generic_export.text
+
+    # A share-based stranger cannot reach the file through the generic surface.
+    stranger_get = client.get(f"/api/v1/files/{media_id}", headers=_headers(outsider))
+    assert stranger_get.status_code in {403, 404}, stranger_get.text
+
+    # The dental surface keeps serving and editing the same record.
+    dental_content = client.get(
+        f"/api/v1/dental/media/{media_id}/content",
+        params={"visit_id": owner_visit.id},
+        headers=_headers(owner),
+    )
+    assert dental_content.status_code == 200, dental_content.text
+    assert dental_content.content == b"\xff\xd8\xffsynthetic dental image"
+
+    dental_edit = client.patch(
+        f"/api/v1/dental/media/{media_id}",
+        json={"title": "dental surface rename"},
+        headers=_headers(owner),
+    )
+    assert dental_edit.status_code == 200, dental_edit.text
+
+    dental_delete = client.delete(
+        f"/api/v1/dental/media/{media_id}", headers=_headers(owner)
+    )
+    assert dental_delete.status_code == 200, dental_delete.text
+
+    db_session.expire_all()
+    deleted_row = db_session.query(File).filter(File.id == media_id).one()
+    assert deleted_row.status == FileStatus.DELETED
+
+
+def test_dentistry_role_spelling_reaches_specialty_check(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """P2: doctor-family spellings from the IAM SSOT must not be rejected by
+    the local hardcode before the dental specialty check."""
+    clinician = _make_bare_user(db_session, role="dentistry")
+    suffix = secrets.token_hex(6)
+    doctor = Doctor(
+        user_id=clinician.id,
+        specialty="dentistry",
+        active=True,
+        cabinet=f"4{secrets.randbelow(90) + 10}",
+    )
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+    visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=doctor.id
+    )
+
+    response = client.get(
+        "/api/v1/dental/media",
+        params={"patient_id": test_patient.id, "visit_id": visit.id},
+        headers=_headers(clinician),
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_superadmin_role_passes_admin_gate_on_dental_visit(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """P2: a superuser whose role string is the canonical SuperAdmin must not
+    fall through the literal Admin check into a 403 on a dental visit."""
+    suffix = secrets.token_hex(6)
+    superadmin = User(
+        username=f"dental_superadmin_{suffix}",
+        email=f"dental_superadmin_{suffix}@example.test",
+        full_name="Synthetic Super Admin",
+        hashed_password=get_password_hash("not-a-real-user-password"),
+        role="SuperAdmin",
+        is_active=True,
+        is_superuser=True,
+    )
+    db_session.add(superadmin)
+    db_session.commit()
+    db_session.refresh(superadmin)
+
+    owner, owner_doctor = _make_actor(db_session)
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+
+    response = client.get(
+        "/api/v1/dental/media",
+        params={"patient_id": test_patient.id, "visit_id": owner_visit.id},
+        headers=_headers(superadmin),
+    )
+    assert response.status_code == 200, response.text
