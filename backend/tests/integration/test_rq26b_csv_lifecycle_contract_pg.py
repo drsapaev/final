@@ -45,8 +45,10 @@ the end; skips (NOT_RUN, plan P0) when no disposable PostgreSQL server
 is reachable. ``DATABASE_URL`` is accepted for automatic provisioning
 only for local servers — an explicit loopback host, a hostless
 unix-socket DSN, or a ``?host=`` that is a socket-directory path or a
-loopback name; address-altering parameters (``?hostaddr=``, or a
-remote ``?host=``) are rejected, so a remote admin DSN must be passed
+loopback name; address-altering parameters (``?hostaddr=``, a remote
+``?host=`` entry — including inside a comma-separated fallback list —
+or an address-overriding ``PGHOSTADDR``/remote-``PGHOST`` environment)
+are rejected, so a remote admin DSN must be passed
 explicitly via the test-owned ``RQ26B_PG_ADMIN_URL``. SQLite is never
 a substitute here.
 
@@ -142,11 +144,12 @@ def _candidate_admin_urls() -> list[str]:
     by the address libpq actually dials, not by the URL spelling. A
     ``?host=`` query parameter overrides the authority host, so a remote
     value there (``postgresql://u:p@/postgres?host=db.internal``,
-    review P1) is rejected even though the authority is empty; the
+    review P1) is rejected even though the authority is empty — including
+    remote entries inside a comma-separated fallback list; the
     address-altering ``?hostaddr=`` is rejected outright (round-2 review
-    P1) — it dials a remote address even when the authority spells a
-    loopback. A remote admin DSN must be passed explicitly via the
-    test-owned ``RQ26B_PG_ADMIN_URL``.
+    P1), as is an address-overriding ``PGHOSTADDR``/remote-``PGHOST``
+    environment (round-3 review P1). A remote admin DSN must be passed
+    explicitly via the test-owned ``RQ26B_PG_ADMIN_URL``.
     """
     urls: list[str] = []
 
@@ -154,7 +157,7 @@ def _candidate_admin_urls() -> list[str]:
         return raw.replace("postgresql+psycopg://", "postgresql://", 1)
 
     def _is_local(url: str) -> bool:
-        """True only for addresses libpq dials locally (review P1, r1+r2)."""
+        """True only for addresses libpq dials locally (review P1, r1-r3)."""
         try:
             u = make_url(url)
         except Exception:  # noqa: BLE001 — a malformed env DSN (e.g. a
@@ -163,6 +166,15 @@ def _candidate_admin_urls() -> list[str]:
             return False
         if not u.drivername.startswith("postgresql"):
             return False  # a sqlite fallback URL is never a PG candidate
+
+        def _host_elem_local(h: str) -> bool:
+            # An empty element is libpq's "default unix-socket directory".
+            return (
+                h == ""
+                or h.startswith("/")
+                or h in {"localhost", "127.0.0.1", "::1"}
+            )
+
         # Normalize query params once: libpq matches conninfo parameter
         # names case-insensitively, and SQLAlchemy parses repeated keys
         # into sequences — the guard must not be bypassable by spelling
@@ -180,21 +192,35 @@ def _candidate_admin_urls() -> list[str]:
         # rejects the parameter outright (fail-closed).
         if qvals.get("hostaddr"):
             return False
-        # ``?host=`` overrides the authority host — a socket-directory
-        # path is local, a loopback name is local, any other value
-        # (``db.internal``) is REMOTE; a repeated key must be local in
-        # EVERY value to pass (fail-closed).
-        hosts = qvals.get("host") or []
+        # libpq fills omitted connection fields from the process
+        # environment (round-3 review P1): ``PGHOSTADDR`` supplies the
+        # dialed address even when the DSN spells a loopback or a socket
+        # directory, and ``PGHOST`` supplies the host for a hostless DSN
+        # — the probe, provisioning, teardown, and the Alembic
+        # subprocess all inherit them. Fail-closed: any ``PGHOSTADDR``
+        # presence rejects (symmetric with the DSN policy above).
+        if os.getenv("PGHOSTADDR", "").strip():
+            return False
+        # ``?host=`` overrides the authority host — and libpq accepts
+        # comma-separated FALLBACK hosts there (round-3 review P1):
+        # ``?host=/var/run/postgresql,db.internal`` is REMOTE, because
+        # the fallback is dialed when the socket fails. Every element of
+        # every value must be a socket-directory path, an empty default,
+        # or a loopback name (fail-closed).
+        hosts: list[str] = []
+        for h in qvals.get("host") or []:
+            hosts.extend(h.split(","))
         if hosts:
-            return all(
-                h.startswith("/") or h in {"localhost", "127.0.0.1", "::1"}
-                for h in hosts
-            )
+            return all(_host_elem_local(h) for h in hosts)
         if u.host is not None:
-            return u.host in {"localhost", "127.0.0.1", "::1"}
-        # Hostless DSN (``postgresql:///db``): libpq dials the default
-        # unix-socket directory — local by definition (review P2: this
-        # must not silently skip a reachable local server).
+            return all(_host_elem_local(h) for h in u.host.split(","))
+        env_host = os.getenv("PGHOST", "")
+        if env_host:
+            return all(_host_elem_local(h) for h in env_host.split(","))
+        # Hostless DSN (``postgresql:///db``) with no ``PGHOST``: libpq
+        # dials the default unix-socket directory — local by definition
+        # (review P2: this must not silently skip a reachable local
+        # server).
         return True
 
     explicit = os.getenv("RQ26B_PG_ADMIN_URL", "").strip()
@@ -918,6 +944,10 @@ def _harness_env(monkeypatch, database_url: str | None) -> None:
     """Isolate the guard from the host environment."""
     monkeypatch.delenv("RQ26B_PG_ADMIN_URL", raising=False)
     monkeypatch.delenv("LOCAL_PG_SUPERUSER_PASSWORD", raising=False)
+    # libpq reads PGHOST/PGHOSTADDR from the environment (round-3 review
+    # P1) — the pins must judge the guard, not whatever the host exports.
+    monkeypatch.delenv("PGHOSTADDR", raising=False)
+    monkeypatch.delenv("PGHOST", raising=False)
     if database_url is None:
         monkeypatch.delenv("DATABASE_URL", raising=False)
     else:
@@ -1030,3 +1060,53 @@ def test_pg_engine_teardown_is_setup_failure_safe_source_pin():
     assert create_at < try_at < yield_at < finally_at
     teardown = src[finally_at:]
     assert "DROP DATABASE IF EXISTS" in teardown
+
+
+def test_env_dsn_with_remote_fallback_in_host_list_is_rejected(monkeypatch):
+    """Round-3 P1: libpq dials comma-separated fallback hosts too."""
+    _harness_env(
+        monkeypatch,
+        "postgresql://u:p@/postgres?host=/var/run/postgresql,db.internal",
+    )
+    assert _candidate_admin_urls() == []
+
+
+def test_env_dsn_with_all_local_fallback_hosts_is_accepted(monkeypatch):
+    """Round-3 P1 positive: every fallback entry local → a candidate."""
+    _harness_env(
+        monkeypatch,
+        "postgresql://u:p@/postgres?host=/var/run/postgresql,/var/run/postgresql",
+    )
+    expected = (
+        "postgresql://u:p@/postgres?host=/var/run/postgresql,"
+        "/var/run/postgresql"
+    )
+    assert _candidate_admin_urls() == [expected]
+
+
+def test_pghostaddr_env_overriding_the_dsn_is_rejected(monkeypatch):
+    """Round-3 P1: PGHOSTADDR fills the address libpq dials — reject."""
+    _harness_env(monkeypatch, "postgresql://u:p@localhost/postgres")
+    monkeypatch.setenv("PGHOSTADDR", "10.20.30.40")
+    assert _candidate_admin_urls() == []
+
+
+def test_pghostaddr_env_with_hostless_dsn_is_rejected_too(monkeypatch):
+    """Round-3 P1, fail-closed leg: any PGHOSTADDR presence rejects."""
+    _harness_env(monkeypatch, "postgresql:///clinic")
+    monkeypatch.setenv("PGHOSTADDR", "127.0.0.1")
+    assert _candidate_admin_urls() == []
+
+
+def test_pghost_env_with_remote_host_is_rejected_for_hostless_dsn(monkeypatch):
+    """Round-3 P1: a hostless DSN inherits the PGHOST address."""
+    _harness_env(monkeypatch, "postgresql://u:p@/postgres")
+    monkeypatch.setenv("PGHOST", "db.internal")
+    assert _candidate_admin_urls() == []
+
+
+def test_pghost_env_with_local_socket_dir_keeps_hostless_accepted(monkeypatch):
+    """Round-3 P1 positive: PGHOST at a local socket dir stays a candidate."""
+    _harness_env(monkeypatch, "postgresql:///clinic")
+    monkeypatch.setenv("PGHOST", "/var/run/postgresql")
+    assert _candidate_admin_urls() == ["postgresql:///clinic"]
