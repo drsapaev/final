@@ -8,7 +8,6 @@ import PatientCard from '../../../components/dental/PatientCard';
 import type { PatientFormData } from '../../../components/dental/PatientCard';
 import DentalPriceManager from '../../../components/dental/DentalPriceManager';
 import DiagnosisForm from '../../../components/dental/DiagnosisForm';
-import VisitProtocol from '../../../components/dental/VisitProtocol';
 import PhotoArchive from '../../../components/dental/PhotoArchive';
 import ProtocolTemplates from '../../../components/dental/ProtocolTemplates';
 import ScheduleNextModal from '../../../components/common/ScheduleNextModal';
@@ -37,7 +36,6 @@ export type DentistDialogsLayerProps = {
   tI18n: (key: string, params?: Record<string, unknown>) => string;
   user: Record<string, unknown> | null | undefined;
   selectedPatient: SelectedPatient | null;
-  protocolTemplateDraft: SelectedPatient | null;
   dentalChartData: Record<string, unknown> | null;
   selectedTooth: { number: string | number; data: unknown } | string | number | null;
   selectedServiceForPrice: { id?: string | number; name?: string; price?: number; [key: string]: unknown } | null;
@@ -46,7 +44,6 @@ export type DentistDialogsLayerProps = {
   confirmDialog: React.ReactNode;
   showPatientCard: boolean;
   showDiagnosisForm: boolean;
-  showVisitProtocol: boolean;
   showPhotoArchive: boolean;
   showProtocolTemplates: boolean;
   showReports: boolean;
@@ -56,7 +53,6 @@ export type DentistDialogsLayerProps = {
   toothModalOpen: boolean;
   setShowPatientCard: (value: boolean) => void;
   setShowDiagnosisForm: (value: boolean) => void;
-  setShowVisitProtocol: (value: boolean) => void;
   setShowPhotoArchive: (value: boolean) => void;
   setShowProtocolTemplates: (value: boolean) => void;
   setShowReports: (value: boolean) => void;
@@ -71,12 +67,6 @@ export type DentistDialogsLayerProps = {
     React.SetStateAction<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null }>
   >;
   setSessionWarning: (value: { active: boolean } | null) => void;
-  setProtocolTemplateDraft: (value: SelectedPatient | null) => void;
-  persistVisitProtocol: (
-    patient: SelectedPatient | Record<string, unknown> | null,
-    visitData: Record<string, unknown>,
-  ) => Promise<Record<string, unknown> | undefined>;
-  handleCompleteVisit: () => void;
   handleProtocolTemplateSelect: (template: Record<string, unknown> | null) => void;
 };
 
@@ -84,7 +74,6 @@ export default function DentistDialogsLayer({
   tI18n,
   user,
   selectedPatient,
-  protocolTemplateDraft,
   dentalChartData,
   selectedTooth,
   selectedServiceForPrice,
@@ -93,7 +82,6 @@ export default function DentistDialogsLayer({
   confirmDialog,
   showPatientCard,
   showDiagnosisForm,
-  showVisitProtocol,
   showPhotoArchive,
   showProtocolTemplates,
   showReports,
@@ -103,7 +91,6 @@ export default function DentistDialogsLayer({
   toothModalOpen,
   setShowPatientCard,
   setShowDiagnosisForm,
-  setShowVisitProtocol,
   setShowPhotoArchive,
   setShowProtocolTemplates,
   setShowReports,
@@ -116,9 +103,6 @@ export default function DentistDialogsLayer({
   setSelectedServiceForPrice,
   setScheduleNextModal,
   setSessionWarning,
-  setProtocolTemplateDraft,
-  persistVisitProtocol,
-  handleCompleteVisit,
   handleProtocolTemplateSelect,
 }: DentistDialogsLayerProps) {
   const {
@@ -158,27 +142,6 @@ export default function DentistDialogsLayer({
           setShowDiagnosisForm(false);
         }}
         onClose={() => setShowDiagnosisForm(false)} />
-
-      }
-
-      {showVisitProtocol && (selectedPatient || protocolTemplateDraft) &&
-      <VisitProtocol
-        temporarilyUnavailable
-        patientId={((selectedPatient || protocolTemplateDraft)?.patient_id as string | number | undefined) || selectedPatientId}
-        patientName={(selectedPatient || protocolTemplateDraft)?.patient_name || selectedPatientDisplayName}
-        visitId={((selectedPatient || protocolTemplateDraft)?.visit_id as string | number | undefined) || (selectedPatient?.visit_id as string | number | undefined)}
-        initialData={((selectedPatient || protocolTemplateDraft)?.visitData as Record<string, unknown> | null | undefined) || (selectedPatient?.visitData as Record<string, unknown> | null | undefined)}
-        onSave={async (visitData: unknown) => {
-          logger.info('Сохранение протокола визита:', visitData);
-          await persistVisitProtocol(selectedPatient || protocolTemplateDraft, visitData as Record<string, unknown>);
-          setShowVisitProtocol(false);
-          setProtocolTemplateDraft(null);
-        }}
-        onComplete={handleCompleteVisit}
-        onClose={() => {
-          setShowVisitProtocol(false);
-          setProtocolTemplateDraft(null);
-        }} />
 
       }
 

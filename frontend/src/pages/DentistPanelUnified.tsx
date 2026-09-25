@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import './dentistry.css';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
@@ -99,7 +99,15 @@ const DentistPanelUnified = () => {
   // STRAT#34: useTranslation adapter for confirm/notify i18n.
   // PR-UI-15-3: moved above the worklist hook — the hook needs tI18n for the
   // DTO labels (hook order stays consistent across renders).
-  const { t: tI18n } = useTranslation();
+  const { t: rawTI18n } = useTranslation();
+  // The worklist loader is an effect dependency, so keep its translation
+  // callback stable while reading the latest locale after a language change.
+  const translationRef = useRef(rawTI18n);
+  translationRef.current = rawTI18n;
+  const tI18n = useCallback(
+    (key: string, params?: Record<string, unknown>) => translationRef.current(key, params),
+    [],
+  );
 
   useEffect(() => {
     if (new URLSearchParams(location.search).get('tab') === 'photos') {
@@ -138,7 +146,7 @@ const DentistPanelUnified = () => {
     showTreatmentPlanner, setShowTreatmentPlanner,
     showPatientCard, setShowPatientCard,
     showDiagnosisForm, setShowDiagnosisForm,
-    showVisitProtocol, setShowVisitProtocol,
+    setShowVisitProtocol,
     showPhotoArchive, setShowPhotoArchive,
     showProtocolTemplates, setShowProtocolTemplates,
     showReports, setShowReports,
@@ -147,7 +155,7 @@ const DentistPanelUnified = () => {
     selectedServiceForPrice, setSelectedServiceForPrice,
     selectedTooth, setSelectedTooth,
     toothModalOpen, setToothModalOpen,
-    protocolTemplateDraft, setProtocolTemplateDraft,
+    setProtocolTemplateDraft,
     scheduleNextModal, setScheduleNextModal,
   } = useDentistDialogs();
 
@@ -199,14 +207,11 @@ const DentistPanelUnified = () => {
   // исходной панели (effect-ordering: сначала инвалидация кэшей BS-42,
   // затем hydrate-эффект; иначе протоколы могли бы читаться из устаревшего
   // кэша при быстром переключении пациентов).
-  // PR-UI-15-6: savedVisitProtocols / reopenVisitProtocol are no longer
-  // destructured here — their only panel consumer was the unreachable
-  // reports render removed this increment (the EMR v2 protocol surface
-  // stays alive via persistVisitProtocol + the VisitProtocol modal, and the
-  // loaders stay available on the hook API).
+  // Saved-protocol browsing and the old protocol modal were removed from the
+  // visit flow. Keep the loader for legacy protocol hydration and cache
+  // invalidation until that compatibility path is retired separately.
   const {
     loadDentistVisitProtocolByVisitId,
-    persistVisitProtocol,
   } = useDentistVisitProtocols({
     tI18n,
     selectedPatient,
@@ -244,7 +249,6 @@ const DentistPanelUnified = () => {
   const {
     handlePatientSelect,
     handleCompleteVisit,
-    handleVisitProtocol,
     handleProtocolTemplateSelect,
     handleDentalChart,
   } = useDentistActions({
@@ -428,7 +432,7 @@ const DentistPanelUnified = () => {
       patients={patients}
       loading={loading}
       onCompleteVisit={handleCompleteVisit}
-      onVisitProtocol={handleVisitProtocol}
+      onPatientSelect={handlePatientSelect}
       onBackToQueue={() => {
         setSelectedPatient(null);
         handleTabChange('queue');
@@ -509,7 +513,6 @@ const DentistPanelUnified = () => {
         tI18n={tI18n}
         user={user as Record<string, unknown> | null | undefined}
         selectedPatient={selectedPatient}
-        protocolTemplateDraft={protocolTemplateDraft}
         dentalChartData={dentalChartData}
         selectedTooth={selectedTooth}
         selectedServiceForPrice={selectedServiceForPrice}
@@ -518,7 +521,6 @@ const DentistPanelUnified = () => {
         confirmDialog={confirmDialog}
         showPatientCard={showPatientCard}
         showDiagnosisForm={showDiagnosisForm}
-        showVisitProtocol={showVisitProtocol}
         showPhotoArchive={showPhotoArchive}
         showProtocolTemplates={showProtocolTemplates}
         showReports={showReports}
@@ -528,7 +530,6 @@ const DentistPanelUnified = () => {
         toothModalOpen={toothModalOpen}
         setShowPatientCard={setShowPatientCard}
         setShowDiagnosisForm={setShowDiagnosisForm}
-        setShowVisitProtocol={setShowVisitProtocol}
         setShowPhotoArchive={setShowPhotoArchive}
         setShowProtocolTemplates={setShowProtocolTemplates}
         setShowReports={setShowReports}
@@ -541,9 +542,6 @@ const DentistPanelUnified = () => {
         setSelectedServiceForPrice={setSelectedServiceForPrice}
         setScheduleNextModal={setScheduleNextModal}
         setSessionWarning={setSessionWarning}
-        setProtocolTemplateDraft={setProtocolTemplateDraft}
-        persistVisitProtocol={persistVisitProtocol}
-        handleCompleteVisit={handleCompleteVisit}
         handleProtocolTemplateSelect={handleProtocolTemplateSelect}
       />
     </div>);
