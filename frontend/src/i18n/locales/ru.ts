@@ -50,7 +50,7 @@ const ru = {
     section_clinic_queue: 'Клиника и очередь',
     section_communications: 'Коммуникации',
     section_patients_booking: 'Пациенты и запись',
-    ai_disclaimer_badge: 'Черновик · не медицинское заключение',
+    ai_disclaimer_badge: 'Черновик · не диагноз',
     ai_disclaimer_aria: 'AI-помощник: черновик, не диагноз, не медицинское заключение',
     overview: 'Обзор',
     queue: 'Очередь',

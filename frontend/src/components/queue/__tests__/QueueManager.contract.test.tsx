@@ -58,6 +58,23 @@ describe('Queue manager command contract', () => {
     expect(tableSource).toContain('t?.selectDoctor || \'Выберите специалиста\'');
   });
 
+  it('separates doctor queue controls from registrar QR and reception controls', () => {
+    const integrationSource = read('components/QueueIntegration.tsx');
+    const registrarQueueSource = read('pages/registrar/views/QueueView.tsx');
+    const managerSource = read('components/queue/ModernQueueManager.tsx');
+
+    expect(integrationSource).toContain('mode="doctor"');
+    expect(registrarQueueSource).toContain('mode="registrar"');
+    expect(managerSource).toContain('mode: \'doctor\' | \'registrar\'');
+    expect(managerSource).toContain('const isRegistrarMode = mode === \'registrar\'');
+    expect(managerSource).toContain('id="modern-queue-date"');
+    expect(managerSource).toContain('onClick={loadQueue}');
+    expect(managerSource).toContain('onClick={callPatient}');
+    expect(managerSource).toContain('{isRegistrarMode && <div className="mqm-actions">');
+    expect(managerSource).toContain('{isRegistrarMode && queueData?.is_open && (');
+    expect(managerSource).toContain('onGenerateQR={isRegistrarMode ? generateQR : undefined}');
+  });
+
   // RQ-11 (F-10): скачанный QR воспринимался как плакат, но токен имеет
   // ограниченный срок. Диалог обязан различать valid/expired/unspecified,
   // а скачиваемый PNG — нести подпись срока и пометку временного кода.

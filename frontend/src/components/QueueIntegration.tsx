@@ -140,6 +140,7 @@ const QueueIntegration = ({
 
   return (
     <ModernQueueManager
+      mode="doctor"
       selectedDoctor={resolvedSpecialist?.id ? String(resolvedSpecialist.id) : ''}
       doctors={queueDoctors}
       onQueueUpdate={handleQueueUpdate}

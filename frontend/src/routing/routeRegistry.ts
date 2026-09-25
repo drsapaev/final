@@ -138,22 +138,20 @@ export const SIDEBAR_PRESETS = {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'queue',
-    // Phase 4+ fix: reduced from 9 tabs to 4 flat tabs.
+    // Phase 4+ fix: reduced from 9 tabs to 3 flat tabs.
     // Goal: dermatologist workflow is "queue → visit" — everything else
     // (photos/skin/cosmetic/ai/services/history) was either a separate tab
     // for a tool that belongs inside the visit (photos, skin, cosmetic),
     // or admin/lookup that doesn't belong in the clinical workflow.
     //
-    // The 4 remaining tabs:
+    // The 3 remaining tabs:
     //   queue    — вход: вызвать следующего пациента из очереди
     //   visit    — единый экран приёма: анамнез + фото + осмотр кожи + диагноз + AI inline
     //   patients — поиск/история пациентов (включая бывший 'history' tab)
-    //   ai       — AI-помощник (draft support, не диагноз)
     items: [
       { id: 'queue',    labelKey: 'nav.queue',     icon: Users },
       { id: 'visit',    labelKey: 'nav.visit',       icon: Stethoscope },
       { id: 'patients', labelKey: 'nav.patients',    icon: Users },
-      { id: 'ai',       labelKey: 'nav.ai_assistant', icon: Brain, ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },
   dentistry: {

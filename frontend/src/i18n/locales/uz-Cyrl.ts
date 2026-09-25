@@ -17,7 +17,7 @@ const uzCyrl = {
     section_clinic_queue: 'Клиника ва навбат',
     section_communications: 'Коммуникациялар',
     section_patients_booking: 'Беморлар ва ёзилиш',
-    ai_disclaimer_badge: 'Қоралама · тиббий хулоса эмас',
+    ai_disclaimer_badge: 'Қоралама · ташхис эмас',
     ai_disclaimer_aria: 'AI ёрдамчи: қоралама, ташхис эмас, тиббий хулоса эмас',
     overview: 'Кўрик',
     queue: 'Навбат',

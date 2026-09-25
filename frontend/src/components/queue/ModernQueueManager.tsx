@@ -46,6 +46,8 @@ export interface ModernQueueManagerDoctor {
 }
 
 export interface ModernQueueManagerProps {
+  /** The caller's workflow controls which queue-management actions are visible. */
+  mode: 'doctor' | 'registrar';
   /** Currently selected date (YYYY-MM-DD). */
   selectedDate?: string;
   /** Currently selected doctor id. */
@@ -68,6 +70,7 @@ export interface ModernQueueManagerProps {
 }
 
 const ModernQueueManager = ({
+  mode,
   selectedDate = getLocalDateString(),
   selectedDoctor = '',
   onQueueUpdate,
@@ -76,6 +79,7 @@ const ModernQueueManager = ({
   onDoctorChange,
   onDateChange
 }: ModernQueueManagerProps) => {
+  const isRegistrarMode = mode === 'registrar';
   const {
     loading,
     queueData,
@@ -507,7 +511,7 @@ const ModernQueueManager = ({
       <div className="mqm-card mqm-controls-card">
         <div className="mqm-controls-header">
           <h3 className="mqm-title">
-            {t('misc.mqm_title')}
+            {mode === 'doctor' ? t('nav.queue') : t('misc.mqm_title')}
           </h3>
 
           <div className="mqm-controls-grid">
@@ -536,6 +540,7 @@ const ModernQueueManager = ({
 
             </div>
 
+            {isRegistrarMode && (
             <div className="mqm-input-group">
               <label className="mqm-label" htmlFor="modern-queue-doctor">
                 {t('misc.mqm_label_doctor')}
@@ -563,8 +568,9 @@ const ModernQueueManager = ({
                 ]}
                 className="mqm-select mqm-select-full"></Select>
             </div>
+            )}
 
-            <div className="mqm-actions">
+            {isRegistrarMode && <div className="mqm-actions">
               <Button
                 variant="primary"
                 size="default"
@@ -588,9 +594,9 @@ const ModernQueueManager = ({
                 <Building2 size={16} className="mqm-icon-primary" aria-hidden="true" />
                 {t('misc.mqm_clinic_qr')}
               </Button>
-            </div>
+            </div>}
 
-            {(() => {
+            {isRegistrarMode && (() => {
               const isDisabled = !effectiveDoctor || loading || queueData?.is_open;
               return (
                 <Button
@@ -616,7 +622,7 @@ const ModernQueueManager = ({
             {/* UX Audit Registrar #7: «Закрыть приём» кнопка.
                 Раньше не было в UI — только «Открыть».
                 Показывается когда приём открыт (queueData.is_open === true). */}
-            {queueData?.is_open && (
+            {isRegistrarMode && queueData?.is_open && (
               <Button
                 variant="outline"
                 size="default"
@@ -737,7 +743,7 @@ const ModernQueueManager = ({
           <QueueTable
             queueData={queueData as unknown as QueueTableData | null}
             effectiveDoctor={String(effectiveDoctor ?? '')}
-            onGenerateQR={generateQR}
+            onGenerateQR={isRegistrarMode ? generateQR : undefined}
             loading={loading}
             t={queueTableT} />
 
@@ -745,7 +751,7 @@ const ModernQueueManager = ({
       </div>
 
       {/* Диалог QR кода */}
-      <ModernDialog
+      {isRegistrarMode && <ModernDialog
         isOpen={showQrDialog}
         onClose={() => setShowQrDialog(false)}
         title={qrData?.is_clinic_wide ? t('misc.mqm_dialog_title_clinic_qr') : t('misc.mqm_dialog_title_doctor_qr')}
@@ -862,7 +868,7 @@ const ModernQueueManager = ({
             </Button>
           </div>
         </div>
-      </ModernDialog>
+      </ModernDialog>}
 
       {/* UX Audit Registrar #2: ConfirmDialog (useConfirm hook). */}
       {confirmDialog}
