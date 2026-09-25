@@ -708,3 +708,119 @@ def test_superadmin_role_passes_admin_gate_on_dental_visit(
         headers=_headers(superadmin),
     )
     assert response.status_code == 200, response.text
+
+
+def test_generic_list_and_search_exclude_protected_dental_media(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """Owner verdict on a7ec002e (P1): the generic reader surfaces —
+    GET /files/ (list) and POST /files/search — must exclude protected-domain
+    rows at the query level (before pagination/count/facets), the same way the
+    item-level surfaces fail closed via ensure_generic_surface_allowed().
+    A dental-media tagged file must not be listed or searchable by its own
+    generic-surface owner, while ordinary files of the same owner stay
+    visible (the exclusion must not over-filter)."""
+    owner, owner_doctor = _make_actor(db_session, role="Doctor")
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+
+    upload = _upload(
+        client,
+        headers=_headers(owner),
+        patient_id=test_patient.id,
+        visit_id=owner_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+    media_id = upload.json()["id"]
+
+    control = client.post(
+        "/api/v1/files/upload",
+        files={
+            "file": (
+                "control-note.txt",
+                BytesIO(b"plain control document"),
+                "text/plain",
+            )
+        },
+        data={"file_type": "document", "title": "control document"},
+        headers=_headers(owner),
+    )
+    assert control.status_code in (200, 201), control.text
+    control_id = control.json()["id"]
+
+    # LIST surface: the protected row must not appear (owner scope).
+    listing = client.get("/api/v1/files/", headers=_headers(owner))
+    assert listing.status_code == 200, listing.text
+    listed_ids = {f["id"] for f in listing.json()["files"]}
+    assert media_id not in listed_ids, (
+        "protected dental media leaked through generic list"
+    )
+    assert control_id in listed_ids, "control file must stay listed"
+
+    # SEARCH surface (owner scope => strict equality is meaningful).
+    search = client.post("/api/v1/files/search", json={}, headers=_headers(owner))
+    assert search.status_code == 200, search.text
+    searched_ids = {f["id"] for f in search.json()["files"]}
+    assert media_id not in searched_ids, (
+        "protected dental media leaked through generic search"
+    )
+    assert control_id in searched_ids, "control file must stay searchable"
+
+    # An admin reader must not pull the protected row through search either.
+    admin, _admin_doctor = _make_actor(db_session, role="Admin")
+    admin_search = client.post(
+        "/api/v1/files/search", json={}, headers=_headers(admin)
+    )
+    assert admin_search.status_code == 200, admin_search.text
+    admin_ids = {f["id"] for f in admin_search.json()["files"]}
+    assert media_id not in admin_ids, (
+        "protected dental media leaked through admin generic search"
+    )
+
+
+def test_superadmin_can_delete_dental_media_without_ownership(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """Owner verdict on a7ec002e (P2): a SuperAdmin passes the dental editor
+    gate via the IAM SSOT (is_admin_role), so the service-level
+    owner-or-Admin check (literal role == "Admin" in _is_admin) must not fall
+    through to a 404 for a non-owning SuperAdmin deleting a dental media
+    record."""
+    owner, owner_doctor = _make_actor(db_session)
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+    upload = _upload(
+        client,
+        headers=_headers(owner),
+        patient_id=test_patient.id,
+        visit_id=owner_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+    media_id = upload.json()["id"]
+
+    suffix = secrets.token_hex(6)
+    superadmin = User(
+        username=f"dental_superadmin_del_{suffix}",
+        email=f"dental_superadmin_del_{suffix}@example.test",
+        full_name="Synthetic Super Admin Deleter",
+        hashed_password=get_password_hash("not-a-real-user-password"),
+        role="SuperAdmin",
+        is_active=True,
+        is_superuser=True,
+    )
+    db_session.add(superadmin)
+    db_session.commit()
+    db_session.refresh(superadmin)
+
+    response = client.delete(
+        f"/api/v1/dental/media/{media_id}", headers=_headers(superadmin)
+    )
+    assert response.status_code == 200, response.text

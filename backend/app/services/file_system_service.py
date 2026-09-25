@@ -613,14 +613,30 @@ class FileSystemService:
         if not self._is_admin(db, user_id):
             search_request.owner_id = user_id
 
-        return file.search(db, search_request=search_request)
+        # Protected-domain boundary: tagged clinical files (e.g. dental-media)
+        # never surface through generic search — they are reachable only via
+        # the owning specialty surface. The exclusion happens at the query
+        # level (BEFORE count/pagination/facets), so totals and facets stay
+        # consistent with the boundary instead of drifting from the page.
+        return file.search(
+            db,
+            search_request=search_request,
+            exclude_tags=sorted(PROTECTED_FILE_DOMAIN_TAGS),
+        )
 
     def _is_admin(self, db: Session, user_id: int) -> bool:
-        """Проверить, является ли пользователь администратором"""
+        """Проверить, является ли пользователь администратором (IAM SSOT).
+
+        Role decisions must come from the role SSOT (``is_admin_role``), not a
+        literal spelling — otherwise SuperAdmin passes the specialty RBAC
+        gates (dental editor policy) yet falls through the service-level
+        owner-or-Admin checks into misleading 403/404 responses.
+        """
+        from app.core.roles import is_admin_role
         from app.models.user import User
 
         user = db.query(User).filter(User.id == user_id).first()
-        return user and user.role == "Admin"
+        return bool(user and is_admin_role(user.role))
 
     def replace_file_content(
         self,

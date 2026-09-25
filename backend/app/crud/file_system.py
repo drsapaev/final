@@ -4,6 +4,7 @@ CRUD операции для файловой системы
 
 import json
 import os
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -82,6 +83,7 @@ class CRUDFile:
         emr_id: int | None = None,
         emr_record_id: int | None = None,
         folder_id: int | None = None,
+        exclude_tags: Sequence[str] | None = None,
     ) -> list[File]:
         """Получить список файлов с фильтрацией"""
         query = db.query(File)
@@ -106,11 +108,20 @@ class CRUDFile:
             query = query.filter(File.emr_record_id == emr_record_id)
         if folder_id:
             query = query.filter(File.folder_id == folder_id)
+        # Protected-domain boundary: tagged clinical rows (e.g. dental-media)
+        # are excluded at the query level — BEFORE pagination — so the page,
+        # and any consumer-side totals, stay consistent with the boundary.
+        for tag in exclude_tags or ():
+            query = query.filter(or_(File.tags.is_(None), ~File.tags.contains(tag)))
 
         return query.order_by(desc(File.created_at)).offset(skip).limit(limit).all()
 
     def search(
-        self, db: Session, *, search_request: FileSearchRequest
+        self,
+        db: Session,
+        *,
+        search_request: FileSearchRequest,
+        exclude_tags: Sequence[str] | None = None,
     ) -> tuple[list[File], int, dict[str, Any]]:
         """Поиск файлов с фильтрацией"""
         query = db.query(File).filter(File.status != FileStatus.DELETED)
@@ -147,6 +158,12 @@ class CRUDFile:
         if search_request.owner_id:
             query = query.filter(File.owner_id == search_request.owner_id)
 
+        # Protected-domain boundary: tagged clinical rows (e.g. dental-media)
+        # are excluded at the query level — BEFORE count/pagination/facets —
+        # so total/pages stay consistent with the generic-surface boundary.
+        for tag in exclude_tags or ():
+            query = query.filter(or_(File.tags.is_(None), ~File.tags.contains(tag)))
+
         # Фильтр по дате
         if search_request.date_from:
             query = query.filter(File.created_at >= search_request.date_from)
@@ -175,16 +192,29 @@ class CRUDFile:
             .all()
         )
 
-        # Фасеты для фильтрации
+        # Фасеты для фильтрации. Rows must be converted to plain serializable
+        # values: raw sqlalchemy.engine.row.Row objects break pydantic response
+        # serialization of FileSearchResponse whenever any non-deleted file
+        # exists (pre-existing latent 400 on /files/search with data present).
         facets = {
-            "file_types": db.query(File.file_type, func.count(File.id))
-            .filter(File.status != FileStatus.DELETED)
-            .group_by(File.file_type)
-            .all(),
-            "permissions": db.query(File.permission, func.count(File.id))
-            .filter(File.status != FileStatus.DELETED)
-            .group_by(File.permission)
-            .all(),
+            "file_types": [
+                {"file_type": row[0], "count": row[1]}
+                for row in (
+                    db.query(File.file_type, func.count(File.id))
+                    .filter(File.status != FileStatus.DELETED)
+                    .group_by(File.file_type)
+                    .all()
+                )
+            ],
+            "permissions": [
+                {"permission": row[0], "count": row[1]}
+                for row in (
+                    db.query(File.permission, func.count(File.id))
+                    .filter(File.status != FileStatus.DELETED)
+                    .group_by(File.permission)
+                    .all()
+                )
+            ],
             "size_ranges": self._get_size_ranges(db, query),
         }
 
