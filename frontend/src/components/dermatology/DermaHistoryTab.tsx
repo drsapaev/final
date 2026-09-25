@@ -94,9 +94,6 @@ export function DermaHistoryTab({
                   <article key={procedure.id} className="derma-card-p12-bg2-13">
                     <div className="derma-flex-between-top">
                       <Badge variant="info">{procedure.procedure_date}</Badge>
-                      <span className="derma-history-cost">
-                        {Number(procedure.total_cost || 0).toLocaleString()} UZS
-                      </span>
                     </div>
                     {procedure.procedure_type && (
                       <p className="derma-p-14-secondary">

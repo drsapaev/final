@@ -948,8 +948,12 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                         <DermatologySection
                             photos={(data?.specialty_data?.photos as DermatologyPhoto[]) || []}
                             skinType={(data?.specialty_data?.skin_type as string) || ''}
-                            conditions={(data?.specialty_data?.conditions as unknown[]) || []}
+                            skinCondition={(data?.specialty_data?.skin_condition as string) || ''}
                             localization={(data?.specialty_data?.localization as Record<string, unknown>) || {}}
+                            lesions={(data?.specialty_data?.lesions as string) || ''}
+                            distribution={(data?.specialty_data?.distribution as string) || ''}
+                            symptoms={(data?.specialty_data?.symptoms as string) || ''}
+                            treatmentPlan={(data?.specialty_data?.treatment_plan as string) || ''}
                             onChange={(field, value) => handleFieldChange('specialty_data')({
                                 ...(data?.specialty_data || {}),
                                 [field]: value

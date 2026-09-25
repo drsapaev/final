@@ -1,6 +1,6 @@
 /**
  * DermatologySection - Специализированная секция для дерматологии
- * 
+ *
  * Интегрирует:
  * - Фото-галерею до/после
  * - Тип кожи и состояние
@@ -18,8 +18,6 @@ import { useEMRAI } from '@/hooks/useEMRAI';
 import { MCP_PROVIDERS } from '@/constants/ai';
 import logger from '@/utils/logger';
 import './DermatologySection.css';
-import { Checkbox } from '@/components/ui/macos';
-import { useTranslation } from '@/i18n/useTranslation';
 import i18n from '@/i18n';
 const i18nT = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
@@ -47,8 +45,12 @@ export interface DermatologyPhoto {
 interface DermatologySectionProps {
   photos?: DermatologyPhoto[];
   skinType?: string;
-  conditions?: unknown[];
+  skinCondition?: string;
   localization?: Record<string, unknown>;
+  lesions?: string;
+  distribution?: string;
+  symptoms?: string;
+  treatmentPlan?: string;
   onChange?: ((field: string, value: unknown) => void) | undefined;
   disabled?: boolean;
   visitId?: string | number | null | undefined;
@@ -59,8 +61,12 @@ interface DermatologySectionProps {
 export function DermatologySection({
   photos = [],
   skinType = '',
-  conditions = [],
+  skinCondition = '',
   localization = {} as Record<string, unknown>,
+  lesions = '',
+  distribution = '',
+  symptoms = '',
+  treatmentPlan = '',
   onChange,
   disabled = false
 }: DermatologySectionProps) {
@@ -122,16 +128,6 @@ export function DermatologySection({
     onChange?.('skin_type', value);
   }, [onChange]);
 
-  const handleConditionAdd = useCallback((condition: unknown) => {
-    if (!conditions.includes(condition)) {
-      onChange?.('conditions', [...conditions, condition]);
-    }
-  }, [conditions, onChange]);
-
-  const handleConditionRemove = useCallback((condition: unknown) => {
-    onChange?.('conditions', conditions.filter((c) => c !== condition));
-  }, [conditions, onChange]);
-
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -146,13 +142,51 @@ export function DermatologySection({
     }
   };
 
+  const skinExamFields = [
+    {
+      field: 'skin_condition',
+      id: 'dermatology-skin-condition',
+      label: i18nT('derma.derma_exams_skin_condition'),
+      value: skinCondition,
+      placeholder: i18nT('derma.derma_exams_ph_skin_condition'),
+    },
+    {
+      field: 'lesions',
+      id: 'dermatology-lesions',
+      label: i18nT('derma.derma_exams_lesions'),
+      value: lesions,
+      placeholder: i18nT('derma.derma_exams_ph_lesions'),
+    },
+    {
+      field: 'distribution',
+      id: 'dermatology-distribution',
+      label: i18nT('derma.derma_exams_distribution'),
+      value: distribution,
+      placeholder: i18nT('derma.derma_exams_ph_face_neck'),
+    },
+    {
+      field: 'symptoms',
+      id: 'dermatology-symptoms',
+      label: i18nT('derma.derma_exams_symptoms'),
+      value: symptoms,
+      placeholder: i18nT('derma.derma_exams_ph_symptoms'),
+    },
+    {
+      field: 'treatment_plan',
+      id: 'dermatology-treatment-plan',
+      label: i18nT('derma.derma_exams_treatment_plan'),
+      value: treatmentPlan,
+      placeholder: i18nT('derma.derma_exams_treatment_plan'),
+    },
+  ];
+
   return (
     <EMRSection
       title={i18nT('misc.ds_dermatologicheskie_dannye')}
       icon=""
       disabled={disabled}
       defaultOpen={true}>
-      
+
             {/* Skin Type */}
             <div className="dermatology-field-group">
                 <label className="dermatology-label">{i18nT('misc.ds_tip_kozhi')}</label>
@@ -161,7 +195,7 @@ export function DermatologySection({
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleSkinTypeChange(e.target.value)}
           disabled={disabled}
           className="dermatology-select">
-          
+
                     <option value="">{i18nT('misc.ds_ne_ukazan')}</option>
                     <option value="normal">{i18nT('misc.ds_normalnaya')}</option>
                     <option value="dry">{i18nT('misc.ds_suhaya')}</option>
@@ -171,26 +205,39 @@ export function DermatologySection({
                 </select>
             </div>
 
-            {/* Conditions */}
+            {/* Unified skin examination: diagnosis remains in the main EMR field. */}
             <div className="dermatology-field-group">
-                <label className="dermatology-label">{i18nT('misc.ds_sostoyaniya')}</label>
-                <div className="dermatology-conditions">
-                    {[i18nT('misc.ds_akne'), i18nT('misc.ds_rozatsea'), i18nT('misc.ds_ekzema'), i18nT('misc.ds_psoriaz'), i18nT('misc.ds_pigmentatsiya'), i18nT('misc.ds_morschiny')].map((condition) =>
-          <label key={condition} className="dermatology-checkbox">
-                            <Checkbox aria-label={i18nT('misc.ds_sostoyanie_kozhi_condition', { condition: condition })} checked={conditions.includes(condition)} onChange={(checked: boolean) => {
-                if (checked) {
-                  handleConditionAdd(condition);
-                } else {
-                  handleConditionRemove(condition);
-                }
-              }}
-              disabled={disabled} />
-            
-                            <span>{condition}</span>
-                        </label>
-          )}
-                </div>
+                <label className="dermatology-label" htmlFor="dermatology-localization">
+                  {i18nT('misc.ds_lokalizatsiya_porazheniy')}
+                </label>
+                <EMRSmartFieldV2
+                  id="dermatology-localization"
+                  value={String(localization?.description ?? '')}
+                  onChange={(value: string) => onChange?.('localization', {
+                    ...localization,
+                    description: value
+                  })}
+                  placeholder={i18nT('misc.ds_opishite_lokalizatsiyu_poraz')}
+                  multiline
+                  rows={2}
+                  showAIButton={false}
+                  disabled={disabled} />
             </div>
+
+            {skinExamFields.map(({ field, id, label, value, placeholder }) => (
+              <div className="dermatology-field-group" key={field}>
+                <label className="dermatology-label" htmlFor={id}>{label}</label>
+                <EMRSmartFieldV2
+                  id={id}
+                  value={value}
+                  onChange={(nextValue: string) => onChange?.(field, nextValue)}
+                  placeholder={placeholder}
+                  multiline
+                  rows={2}
+                  showAIButton={false}
+                  disabled={disabled} />
+              </div>
+            ))}
 
             {/* Photo Gallery */}
             <div className="dermatology-field-group">
@@ -202,7 +249,7 @@ export function DermatologySection({
             onClick={() => fileInputRef.current?.click()}
             className="dermatology-upload-btn"
             disabled={analyzingPhoto}>
-            
+
                             <Camera size={16} />
                             {analyzingPhoto ? i18nT('misc.ds_analiz') : i18nT('misc.ds_zagruzit_foto')}
                         </button>
@@ -215,7 +262,7 @@ export function DermatologySection({
           accept="image/*"
           onChange={handleFileSelect}
           style={{ display: 'none' }} />
-        
+
 
                 {photos.length === 0 ?
         <div className="dermatology-empty-photos">
@@ -234,7 +281,7 @@ export function DermatologySection({
               tabIndex={0}
               onClick={() => setSelectedPhoto(photo)}
               onKeyDown={(event) => handleActivationKeyDown(event, () => setSelectedPhoto(photo))} />
-            
+
                                 {Boolean(photo.analysis) &&
             <div className="dermatology-photo-analysis">
                                         <Sparkles size={12} />
@@ -247,7 +294,7 @@ export function DermatologySection({
               onClick={() => handlePhotoDelete(photo.id)}
               aria-label={i18nT('misc.ds_udalit_foto_photo_category', { category: photo.category })}
               className="dermatology-photo-delete">
-              
+
                                         <X size={14} />
                                     </button>
             }
@@ -255,22 +302,6 @@ export function DermatologySection({
           )}
                     </div>
         }
-            </div>
-
-            {/* Localization */}
-            <div className="dermatology-field-group">
-                <label className="dermatology-label">{i18nT('misc.ds_lokalizatsiya_porazheniy')}</label>
-                <EMRSmartFieldV2
-          value={String(localization?.description ?? '')}
-          onChange={(value: string) => onChange?.('localization', {
-            ...localization,
-            description: value
-          })}
-          placeholder={i18nT('misc.ds_opishite_lokalizatsiyu_poraz')}
-          multiline
-          rows={3}
-          disabled={disabled} />
-        
             </div>
 
             {/* Photo Modal */}
@@ -281,7 +312,7 @@ export function DermatologySection({
         tabIndex={0}
         onClick={() => setSelectedPhoto(null)}
         onKeyDown={(event) => handleActivationKeyDown(event, () => setSelectedPhoto(null))}>
-        
+
                     <div className="dermatology-photo-modal-content" onClickCapture={(e) => e.stopPropagation()}>
                         <img src={selectedPhoto.url} alt={i18nT('misc.ds_uvelichennoe_foto')} />
                         {Boolean(selectedPhoto.analysis) &&
@@ -295,7 +326,7 @@ export function DermatologySection({
             onClick={() => setSelectedPhoto(null)}
             aria-label={i18nT('misc.ds_zakryt_prosmotr_foto')}
             className="dermatology-photo-modal-close">
-            
+
                             <X size={20} />
                         </button>
                     </div>
@@ -306,4 +337,3 @@ export function DermatologySection({
 }
 
 export default DermatologySection;
-
