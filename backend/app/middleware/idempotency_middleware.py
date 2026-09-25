@@ -141,7 +141,15 @@ def _bridge_anchor() -> float:
     fallback stays the process-start epoch (the bridge's distributed
     operations are inert without Redis anyway). Once the store answers —
     in this or any future process — the SHARED anchor governs and a
-    restart can never re-open the window."""
+    restart can never re-open the window.
+
+    Merged-#3340 follow-up (owner P2): the cache is written ONLY after the
+    shared store PROVED an anchor. ``bridge_anchor`` now answers ``None``
+    when Redis could not prove one (transient failure at any of its
+    GET/SET/GET steps) — a ``None`` is NEVER cached as resolved, so the
+    next dispatch re-probes and, once Redis recovers, the process adopts
+    the REAL deployment-wide anchor instead of keeping a process-local
+    ``now`` fallback alive for the worker's lifetime."""
     global _BRIDGE_ANCHOR_CACHE
     resolved, value = _BRIDGE_ANCHOR_CACHE
     if resolved:
@@ -149,8 +157,10 @@ def _bridge_anchor() -> float:
     claim = get_distributed_claim()
     if claim is not None and claim.try_available():
         value = claim.bridge_anchor(time.time())
-        _BRIDGE_ANCHOR_CACHE = (True, value)
-        return value
+        if value is not None:
+            # Cache only a PROVEN shared-store anchor — never the fallback.
+            _BRIDGE_ANCHOR_CACHE = (True, value)
+            return value
     return _LEGACY_BRIDGE_EPOCH
 
 
@@ -1328,7 +1338,7 @@ class DistributedIdempotencyClaim:
             token,
         )
 
-    def bridge_anchor(self, now: float) -> float:
+    def bridge_anchor(self, now: float) -> float | None:
         """Round-9 (codex P2, PR #3340 follow-up): the DEPLOYMENT-WIDE
         legacy-bridge anchor, persisted ONCE in the shared store (SETNX,
         no TTL).
@@ -1336,8 +1346,17 @@ class DistributedIdempotencyClaim:
         The first worker that starts the rollout anchors the migration
         window; every other worker — and every RESTART of every worker —
         reads the same value instead of re-arming its own process-start
-        window. Returns the anchor epoch (``now`` only when the store is
-        unreachable, where the bridge is inert anyway)."""
+        window.
+
+        Merged-#3340 follow-up (owner P2): returns ``None`` when the
+        shared store did NOT PROVE an anchor — a failed GET, a failed
+        SETNX, or a failed read-back (any transient Redis failure inside
+        this method). The previous unconditional ``return now`` fallback
+        was INDISTINGUISHABLE from a proven anchor, and the caller cached
+        it process-wide for the worker's lifetime — after Redis recovered
+        the worker never re-read the real deployment-wide anchor and kept
+        a process-local bridge open for ~25 hours. ``None`` tells the
+        caller to stay unresolved and re-probe on a later dispatch."""
         raw = self._run(self._client.get, _BRIDGE_ANCHOR_KEY)
         if raw:
             try:
@@ -1356,7 +1375,7 @@ class DistributedIdempotencyClaim:
                 return float(raw)
             except (TypeError, ValueError):
                 pass
-        return now
+        return None
 
     def load_response(self, user_id: int | str, key: str) -> tuple[Response | None, str | None, str | None]:
         """Return (replay_response, stored_payload_hash, bound_principal_role)."""
@@ -2777,6 +2796,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     # released fence can never expose an empty legacy picture
                     # to an old worker.
                     _release_legacy_fence()
+                    # Merged-#3340 follow-up (owner P2): this race exit hands
+                    # out the STORED patient response and the endpoint never
+                    # runs — the per-patient trail records THIS attempt here,
+                    # same contract as the two ordinary replay branches.
+                    if patient_scope:
+                        _audit_patient_replay(request, patient_scope)
                     return replayed
                 logger.warning(
                     "Idempotency conflict: key=%s user=%s is in flight on another worker",
@@ -2845,6 +2870,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     )
                     claim.release(user_id, idempotency_key, claim_token)
                     _release_legacy_fence()
+                    # Merged-#3340 follow-up (owner P2): same audit contract
+                    # as every other replay exit — a stored patient response
+                    # leaves the per-patient trail even though the endpoint
+                    # never runs.
+                    if patient_scope:
+                        _audit_patient_replay(request, patient_scope)
                     return replayed
                 if permitted is False:
                     # Политика эндпоинта отказывает текущей роли — require_roles
@@ -3105,6 +3136,13 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                                     "Idempotency replay after lease lapse (outcome stored by the new owner): user=%s key=%s path=%s",
                                     user_id, idempotency_key, request.url.path,
                                 )
+                                # Merged-#3340 follow-up (owner P2): the
+                                # lease-lapse replay serves the stored patient
+                                # response with the endpoint never running —
+                                # same per-patient trail contract as the
+                                # ordinary replay branches.
+                                if patient_scope:
+                                    _audit_patient_replay(request, patient_scope)
                                 return replayed
                         logger.warning(
                             "Idempotency lease lapsed before execution (ownership lost): user=%s key=%s path=%s",

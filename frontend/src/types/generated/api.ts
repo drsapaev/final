@@ -173,6 +173,12 @@ export type paths = {
          *     per-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same
          *     409 on occupied slots, same lifecycle eligibility for the doctor.
          *
+         *     Merged-#3340 follow-up (P1): the FINAL routing department is re-read
+         *     with ``populate_existing().with_for_update()`` in THIS transaction and
+         *     its ``active`` re-validated before the INSERT — the persisted routing
+         *     context can no longer reference a department that a concurrently
+         *     committed admin transaction deactivated (or deleted).
+         *
          *     P2 (round 2): the `Idempotency-Key` header is REQUIRED. The global
          *     idempotency middleware only protects requests that carry a key —
          *     without a mandated key a lost response + automatic browser retry of a
