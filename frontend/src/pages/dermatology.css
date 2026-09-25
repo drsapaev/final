@@ -278,6 +278,7 @@
 /* ─── Batch: Flex utilities (composed) ─── */
 .derma-flex-1 { flex: 1; }
 .derma-flex-gap-16 { display: flex; gap: 16px; }
+.derma-flex-gap-16-wrap { display: flex; gap: 16px; flex-wrap: wrap; }
 .derma-flex-gap-8 { display: flex; gap: 8px; }
 .derma-flex-end-gap12 { display: flex; justify-content: flex-end; gap: 12px; }
 .derma-flex-between-top { display: flex; justify-content: space-between; align-items: flex-start; }

@@ -37,6 +37,7 @@ vi.mock('../../../utils/tokenManager', () => ({
 }));
 vi.mock('../../../services/queue', () => ({
   queueService: {
+    startVisit: vi.fn(async () => ({ success: true, patient_id: 23, visit_id: 77, status: 'in_progress' })),
     completeVisit: vi.fn(async () => ({ success: true })),
     callNextWaiting: vi.fn(async () => ({ success: true, entry: { number: 7 } })),
   },
@@ -121,6 +122,65 @@ describe('useDentistActions (PR-UI-15-5) — handlePatientSelect routing', () =>
   });
 });
 
+describe('useDentistActions — start a called queue patient', () => {
+  it('starts the canonical queue entry, opens its returned visit, and keeps the queue entry id for completion', async () => {
+    const deps = makeDeps();
+    const { result } = renderHook(() => useDentistActions(deps));
+
+    let started = false;
+    await act(async () => {
+      started = await result.current.handleStartQueueVisit({ id: 91, name: 'Synthetic', number: 8 });
+    });
+
+    expect(queueService.startVisit).toHaveBeenCalledWith(91);
+    expect(started).toBe(true);
+    expect(deps.setSelectedPatient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 23,
+        patient_id: 23,
+        visit_id: 77,
+        doctor_queue_entry_id: 91,
+        queue_entry_id: 91,
+        patient_name: 'Synthetic',
+        source: 'queue',
+      }),
+    );
+    expect(deps.handleTabChange).toHaveBeenCalledWith('visit');
+    expect(notify.error).not.toHaveBeenCalled();
+  });
+
+  it('does not call the backend when the queue entry id is missing', async () => {
+    const deps = makeDeps();
+    const { result } = renderHook(() => useDentistActions(deps));
+
+    let started = true;
+    await act(async () => {
+      started = await result.current.handleStartQueueVisit({ name: 'Synthetic' });
+    });
+
+    expect(started).toBe(false);
+    expect(queueService.startVisit).not.toHaveBeenCalled();
+    expect(deps.setSelectedPatient).not.toHaveBeenCalled();
+    expect(notify.error).toHaveBeenCalledWith('dental.no_queue_id_for_visit');
+  });
+
+  it('keeps the queue open and reports incomplete start responses', async () => {
+    vi.mocked(queueService.startVisit).mockResolvedValueOnce({ success: true, patient_id: 23 } as never);
+    const deps = makeDeps();
+    const { result } = renderHook(() => useDentistActions(deps));
+
+    let started = true;
+    await act(async () => {
+      started = await result.current.handleStartQueueVisit({ id: 91, name: 'Synthetic' });
+    });
+
+    expect(started).toBe(false);
+    expect(deps.setSelectedPatient).not.toHaveBeenCalled();
+    expect(deps.handleTabChange).not.toHaveBeenCalledWith('visit');
+    expect(notify.error).toHaveBeenCalledWith('dental.dental_panel_start_visit_failed');
+  });
+});
+
 describe('useDentistActions (PR-UI-15-5) — C-3 critical ICD-10 gate', () => {
   it('matches critical dental codes by prefix (case-insensitive)', () => {
     const { result } = renderHook(() => useDentistActions(makeDeps()));
@@ -163,11 +223,20 @@ describe('useDentistActions (PR-UI-15-5) — handleCompleteVisit C-1 tiered conf
     expect(queueService.completeVisit).not.toHaveBeenCalled();
   });
 
+  it('refuses to complete without the saved latest EMR draft', async () => {
+    const deps = makeDeps({ selectedPatient: patientWith({}) });
+    const { result } = renderHook(() => useDentistActions(deps));
+    await result.current.handleCompleteVisit();
+    expect(notify.error).toHaveBeenCalledWith('dental2.visit_protocol_save_failed');
+    expect(deps.confirm).not.toHaveBeenCalled();
+    expect(queueService.completeVisit).not.toHaveBeenCalled();
+  });
+
   it('aborts when the user rejects the confirm dialog', async () => {
     const confirm = vi.fn(async (_options: Record<string, unknown>) => false);
     const deps = makeDeps({ confirm, selectedPatient: patientWith({}) });
     const { result } = renderHook(() => useDentistActions(deps));
-    await result.current.handleCompleteVisit();
+    await result.current.handleCompleteVisit({});
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(queueService.completeVisit).not.toHaveBeenCalled();
     expect(deps.handleTabChange).not.toHaveBeenCalled();
@@ -177,10 +246,10 @@ describe('useDentistActions (PR-UI-15-5) — handleCompleteVisit C-1 tiered conf
     const confirm = vi.fn(async (_options: Record<string, unknown>) => false);
     const deps = makeDeps({
       confirm,
-      selectedPatient: patientWith({ visitData: { icd10: 'K04.7' } }),
+      selectedPatient: patientWith({ visitData: { icd10: 'K02.1' } }),
     });
     const { result } = renderHook(() => useDentistActions(deps));
-    await result.current.handleCompleteVisit();
+    await result.current.handleCompleteVisit({ icd10_code: 'K04.7' });
     const options = confirm.mock.calls[0][0] as Record<string, unknown>;
     expect(options.intent).toBe('danger');
     expect(options.title).toContain('dental.dental_panel_critical_title');
@@ -190,31 +259,47 @@ describe('useDentistActions (PR-UI-15-5) — handleCompleteVisit C-1 tiered conf
     const confirm = vi.fn(async (_options: Record<string, unknown>) => false);
     const deps = makeDeps({
       confirm,
+      selectedPatient: patientWith({ visitData: { icd10: 'K04.7' } }),
+    });
+    const { result } = renderHook(() => useDentistActions(deps));
+    await result.current.handleCompleteVisit({ icd10_code: 'K02.1' });
+    const options = confirm.mock.calls[0][0] as Record<string, unknown>;
+    expect(options.intent).toBe('primary');
+  });
+
+  it('uses danger intent for an AI-applied K10 code in the latest draft', async () => {
+    const confirm = vi.fn(async (_options: Record<string, unknown>) => false);
+    const deps = makeDeps({
+      confirm,
       selectedPatient: patientWith({ visitData: { icd10: 'K02.1' } }),
     });
     const { result } = renderHook(() => useDentistActions(deps));
-    await result.current.handleCompleteVisit();
-    const options = confirm.mock.calls[0][0] as Record<string, unknown>;
-    expect(options.intent).toBe('primary');
+    await result.current.handleCompleteVisit({ icd10_code: 'K10.2' });
+    expect((confirm.mock.calls[0][0] as Record<string, unknown>).intent).toBe('danger');
   });
 
   it('completes the visit, resets state and auto-invites the next patient', async () => {
     const deps = makeDeps({
       selectedPatient: patientWith({
         patient_id: 42,
-        visitData: { diagnosis: 'caries', icd10: 'K02.1', complaint: 'pain' },
+        visitData: { diagnosis: 'stale diagnosis', icd10: 'K04.7', complaint: 'stale complaint' },
       }),
     });
     const { result } = renderHook(() => useDentistActions(deps));
-    await result.current.handleCompleteVisit();
+    await result.current.handleCompleteVisit({
+      diagnosis: 'latest diagnosis',
+      icd10_code: 'K02.1',
+      anamnesis_morbi: 'latest complaint',
+      recommendations: 'latest notes',
+    });
 
     expect(queueService.completeVisit).toHaveBeenCalledWith(99, {
       patient_id: 42,
-      complaint: 'pain',
-      diagnosis: 'caries',
+      complaint: 'latest complaint',
+      diagnosis: 'latest diagnosis',
       icd10: 'K02.1',
       services: [],
-      notes: '',
+      notes: 'latest notes',
     });
     expect(deps.setSelectedPatient).toHaveBeenCalledWith(null);
     expect(deps.setShowVisitProtocol).toHaveBeenCalledWith(false);
@@ -229,7 +314,7 @@ describe('useDentistActions (PR-UI-15-5) — handleCompleteVisit C-1 tiered conf
     vi.mocked(queueService.callNextWaiting).mockRejectedValueOnce(new Error('boom'));
     const deps = makeDeps({ selectedPatient: patientWith({}) });
     const { result } = renderHook(() => useDentistActions(deps));
-    await result.current.handleCompleteVisit();
+    await result.current.handleCompleteVisit({});
     expect(queueService.completeVisit).toHaveBeenCalledTimes(1);
     expect(deps.handleTabChange).toHaveBeenCalledWith('queue');
     expect(logger.warn).toHaveBeenCalled();
@@ -282,7 +367,7 @@ describe('useDentistActions (PR-UI-15-5) — appointment table actions', () => {
     const { result } = renderHook(() => useDentistActions(deps));
     await result.current.handleAppointmentRowClick({ patient_fio: 'Q' } as never);
     expect(deps.setSelectedPatient).not.toHaveBeenCalled();
-    expect(logger.error).toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalled();
   });
 
   it('row click switches to the visit tab once the visit id resolves', async () => {
@@ -429,7 +514,7 @@ describe('useDentistActions (PR-UI-15-5) — source boundary', () => {
       selectedPatient: { doctor_queue_entry_id: 5 } as SelectedPatient,
     });
     const { result } = renderHook(() => useDentistActions(deps));
-    await result.current.handleCompleteVisit();
+    await result.current.handleCompleteVisit({});
     const posted = vi.mocked(apiClient.post).mock.calls.map((c) => c[0]);
     expect(posted).toHaveLength(0); // completeVisit goes through queueService, not apiClient
     expect(queueService.completeVisit).toHaveBeenCalledWith(5, expect.anything());

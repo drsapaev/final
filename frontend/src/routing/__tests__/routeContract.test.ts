@@ -137,6 +137,20 @@ function assertRouteSpecificChromeHeadings(routeHeadingContract: RouteHeadingCon
 }
 
 describe('route contract invariants', () => {
+  it('keeps the dermatologist sidebar focused on queue, visit, and patients', () => {
+    expect(SIDEBAR_PRESETS.dermatology.items.map((item) => item.id)).toEqual([
+      'queue',
+      'visit',
+      'patients',
+    ]);
+  });
+
+  it('keeps the dentist navigation focused on queue, visit, patients, and protected photos', () => {
+    expect(SIDEBAR_PRESETS.dentistry.items.map((item) => item.id)).toEqual([
+      'queue', 'visit', 'patients', 'photos',
+    ]);
+  });
+
   it('hides the sidebar chrome on registrar routes while keeping the preset resolvable (REG-NS-1)', () => {
     // REG-NS-1: the registrar panel is self-sufficient (in-panel breadcrumb,
     // worklist Tabs, WelcomeView queue link, hotkeys), so the shell column is

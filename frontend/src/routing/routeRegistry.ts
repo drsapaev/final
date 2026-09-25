@@ -138,50 +138,44 @@ export const SIDEBAR_PRESETS = {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'queue',
-    // Phase 4+ fix: reduced from 9 tabs to 4 flat tabs.
+    // Phase 4+ fix: reduced from 9 tabs to 3 flat tabs.
     // Goal: dermatologist workflow is "queue → visit" — everything else
     // (photos/skin/cosmetic/ai/services/history) was either a separate tab
     // for a tool that belongs inside the visit (photos, skin, cosmetic),
     // or admin/lookup that doesn't belong in the clinical workflow.
     //
-    // The 4 remaining tabs:
+    // The 3 remaining tabs:
     //   queue    — вход: вызвать следующего пациента из очереди
     //   visit    — единый экран приёма: анамнез + фото + осмотр кожи + диагноз + AI inline
     //   patients — поиск/история пациентов (включая бывший 'history' tab)
-    //   ai       — AI-помощник (draft support, не диагноз)
     items: [
       { id: 'queue',    labelKey: 'nav.queue',     icon: Users },
       { id: 'visit',    labelKey: 'nav.visit',       icon: Stethoscope },
       { id: 'patients', labelKey: 'nav.patients',    icon: Users },
-      { id: 'ai',       labelKey: 'nav.ai_assistant', icon: Brain, ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },
   dentistry: {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'queue',
-    // Phase 4 fix: reduced from 13 tabs in 4 sections to 5 flat tabs.
-    // Goal: dentist workflow is "queue → visit → patient/photos" — everything
+    // Phase 4 + protected archive: queue → visit → patients → photos.
+    // Goal: dentist workflow is "queue → visit → patients" — everything
     // else (examinations/diagnoses/dental-chart/treatment-plans/prosthetics/
     // templates/reports) was either dead UI (treatment-plans/prosthetics had
     // 501 backend stubs) or duplicated the visit screen (dental-chart
     // duplicated the chart embedded in the visit; examinations/diagnoses
     // were merged into EMR v2 visit screen).
     //
-    // The 5 remaining tabs:
+    // The 4 remaining tabs:
     //   queue    — вход: вызвать следующего пациента из очереди
     //   visit    — единый экран приёма: анамнез + схема зубов + Дополнительно
-    //   patients — поиск/история пациентов
-    //   photos   — фотоархив (рентген + intraoral)
-    //   ai-assistant — AI-помощник (draft support, не диагноз)
-    //
-    // Muscle memory: 5 flat items, well under Miller's 7±2.
+    //   patients — единственный серверный поиск/выбор пациента
+    //   photos   — защищённый архив пациента с подтверждённым визитом
     items: [
       { id: 'queue',         labelKey: 'nav.queue',      icon: ListOrdered },
       { id: 'visit',         labelKey: 'nav.visit',        icon: Stethoscope },
       { id: 'patients',      labelKey: 'nav.patients',     icon: Users },
-      { id: 'photos',        labelKey: 'nav.photo_archive',    icon: Camera },
-      { id: 'ai-assistant',  labelKey: 'nav.ai_assistant',  icon: Brain, ...AI_SIDEBAR_DISCLAIMER_META },
+      { id: 'photos',        labelKey: 'nav.photo_archive', icon: Camera },
     ],
   },
 };
