@@ -65,7 +65,11 @@ SCRATCH_DB = "rq16c_check"
 # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved
 # to 0072 (nurse workplace assignments 0071 + service executions 0072).
 # Corrective follow-up: chain head moved to 0073 (routing snapshot).
-EXPECTED_HEAD = "0073_execution_routing_snapshot"
+# RQ-18 follow-up (#3362, 2026-09-25): the chain head moved to 0074
+# (join attempt payload binding) — the pin advances with the chain
+# (same established pattern; the advance was missed in that cycle and
+# is carried by the RQ-26.b verification slice).
+EXPECTED_HEAD = "0074_join_payload_binding"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
