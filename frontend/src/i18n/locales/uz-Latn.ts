@@ -845,7 +845,9 @@ const uzLatn = {
     cardio_visit_doctor_prefix: "shifokor #{id}",
     cardio_visit_emr_title: 'Elektron tibbiy karta',
     cardio_visit_cancel: 'Bekor qilish',
+    cardio_visit_back_to_queue: 'Navbatga qaytish',
     cardio_visit_complete: 'Qabulni yakunlash',
+    cardio_visit_readonly: 'Yakunlangan qabul — faqat ko‘rish uchun',
 
     // ─── HistoryTab (cardio.cardio_hist_*) ───
     cardio_hist_empty_title: 'Tarix',

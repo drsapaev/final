@@ -856,7 +856,9 @@ const uzCyrl = {
     cardio_visit_doctor_prefix: 'врач #{id}',
     cardio_visit_emr_title: 'Электронная медицинская карта',
     cardio_visit_cancel: 'Отменить',
+    cardio_visit_back_to_queue: 'Навбатга қайтиш',
     cardio_visit_complete: 'Завершить прием',
+    cardio_visit_readonly: 'Якунланган қабул — фақат кўриш учун',
 
     // ─── HistoryTab (cardio.cardio_hist_*) ───
     cardio_hist_empty_title: 'История',
