@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import logger from '../../utils/logger';
+import { normalizeVisitProtocolRecord } from './VisitProtocol';
 import notify from '../../services/notify';
 import TeethChart from '../dental/TeethChart';
 import ToothModal from '../dental/ToothModal';
@@ -426,11 +427,6 @@ type VisitProtocolRecord = Record<string, unknown>;
 type VisitProtocolUpdater = (current: VisitProtocolRecord) => VisitProtocolRecord;
 type VisitProtocolUpdate = (update: VisitProtocolUpdater) => void;
 
-const protocolRecord = (value: unknown): VisitProtocolRecord =>
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as VisitProtocolRecord
-    : {};
-
 const VisitProtocolSections = ({
   value,
   onUpdate,
@@ -443,7 +439,7 @@ const VisitProtocolSections = ({
   const { t: rawT } = useTranslation();
   const t = rawT;
   const entries = (field: string) => Array.isArray(value[field])
-    ? (value[field] as unknown[]).map(protocolRecord)
+    ? (value[field] as unknown[]).map(normalizeVisitProtocolRecord)
     : [];
   const updateField = (field: string, nextValue: unknown) => {
     onUpdate((current) => ({ ...current, [field]: nextValue }));
@@ -456,7 +452,7 @@ const VisitProtocolSections = ({
       return {
         ...current,
         [field]: currentItems.map((item, itemIndex) => itemIndex === index
-          ? { ...protocolRecord(item), ...patch }
+          ? { ...normalizeVisitProtocolRecord(item), ...patch }
           : item),
       };
     });
@@ -481,7 +477,7 @@ const VisitProtocolSections = ({
   const anesthesia = entries('anesthesia');
   const radiographs = entries('radiographs');
   const prescriptions = entries('prescriptions');
-  const nextVisit = protocolRecord(value.nextVisit);
+  const nextVisit = normalizeVisitProtocolRecord(value.nextVisit);
 
   return (
     <section className="dental-flex-col dental-gap-12" aria-labelledby="dental-visit-protocol-title">
@@ -685,9 +681,9 @@ const VisitProtocolSections = ({
       <details>
         <summary>{t('dental.dental_vp_next_visit_title')}</summary>
         <div className="dental-flex-col dental-gap-12">
-          <Input type="date" aria-label={t('dental.dental_vp_next_visit_aria_date')} value={String(nextVisit.date ?? '')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...protocolRecord(current.nextVisit), date: event.target.value } }))} disabled={disabled} />
-          <Input type="time" aria-label={t('dental.dental_vp_next_visit_aria_time')} value={String(nextVisit.time ?? '')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...protocolRecord(current.nextVisit), time: event.target.value } }))} disabled={disabled} />
-          <Input aria-label={t('dental.dental_vp_next_visit_aria_purpose')} value={String(nextVisit.purpose ?? '')} placeholder={t('dental.dental_vp_next_visit_ph_purpose')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...protocolRecord(current.nextVisit), purpose: event.target.value } }))} disabled={disabled} />
+          <Input type="date" aria-label={t('dental.dental_vp_next_visit_aria_date')} value={String(nextVisit.date ?? '')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...normalizeVisitProtocolRecord(current.nextVisit), date: event.target.value } }))} disabled={disabled} />
+          <Input type="time" aria-label={t('dental.dental_vp_next_visit_aria_time')} value={String(nextVisit.time ?? '')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...normalizeVisitProtocolRecord(current.nextVisit), time: event.target.value } }))} disabled={disabled} />
+          <Input aria-label={t('dental.dental_vp_next_visit_aria_purpose')} value={String(nextVisit.purpose ?? '')} placeholder={t('dental.dental_vp_next_visit_ph_purpose')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...normalizeVisitProtocolRecord(current.nextVisit), purpose: event.target.value } }))} disabled={disabled} />
         </div>
       </details>
     </section>
@@ -1031,7 +1027,7 @@ const DentalVisitScreen = ({
   }, [scheduleAutosave]);
 
   const updateVisitProtocol = useCallback((update: VisitProtocolUpdater) => {
-    const current = protocolRecord(latestDraftRef.current.specialty_data.visit_protocol);
+    const current = normalizeVisitProtocolRecord(latestDraftRef.current.specialty_data.visit_protocol);
     updateSpecialtyData('visit_protocol', update(current));
   }, [updateSpecialtyData]);
 
@@ -1263,7 +1259,7 @@ const DentalVisitScreen = ({
             />
 
             <VisitProtocolSections
-              value={protocolRecord(emrData.specialty_data?.visit_protocol)}
+              value={normalizeVisitProtocolRecord(emrData.specialty_data?.visit_protocol)}
               onUpdate={updateVisitProtocol}
               disabled={fieldsDisabled}
             />

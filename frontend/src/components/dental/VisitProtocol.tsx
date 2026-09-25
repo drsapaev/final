@@ -5,6 +5,14 @@ import { Camera, Check, Edit, FileText, Pill, Plus, Save, Scissors, Syringe, Tra
 import notify from '../../services/notify';
 import { Alert, Button } from '../ui/macos';
 
+export type VisitProtocolRecord = Record<string, unknown>;
+
+/** Normalize legacy and EMR v2 protocol values before editing the visit draft. */
+export const normalizeVisitProtocolRecord = (value: unknown): VisitProtocolRecord =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as VisitProtocolRecord
+    : {};
+
 /**
  * Протокол лечения по визитам для стоматологической ЭМК
  * Включает процедуры, материалы, анестезию, фото до/после
