@@ -173,6 +173,12 @@ export type paths = {
          *     per-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same
          *     409 on occupied slots, same lifecycle eligibility for the doctor.
          *
+         *     Merged-#3340 follow-up (P1): the FINAL routing department is re-read
+         *     with ``populate_existing().with_for_update()`` in THIS transaction and
+         *     its ``active`` re-validated before the INSERT — the persisted routing
+         *     context can no longer reference a department that a concurrently
+         *     committed admin transaction deactivated (or deleted).
+         *
          *     P2 (round 2): the `Idempotency-Key` header is REQUIRED. The global
          *     idempotency middleware only protects requests that carry a key —
          *     without a mandated key a lost response + automatic browser retry of a
@@ -16832,6 +16838,59 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dental/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Список стоматологических снимков пациента */
+        get: operations["list_dental_media_api_v1_dental_media_get"];
+        put?: never;
+        /** Загрузить стоматологическое фото или рентген */
+        post: operations["upload_dental_media_api_v1_dental_media_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dental/media/{media_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Защищённый просмотр стоматологического снимка */
+        get: operations["view_dental_media_api_v1_dental_media__media_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dental/media/{media_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Мягко удалить стоматологический снимок */
+        delete: operations["delete_dental_media_api_v1_dental_media__media_id__delete"];
+        options?: never;
+        head?: never;
+        /** Изменить метаданные стоматологического снимка */
+        patch: operations["update_dental_media_api_v1_dental_media__media_id__patch"];
+        trace?: never;
+    };
     "/api/v1/dental/examinations": {
         parameters: {
             query?: never;
@@ -24694,6 +24753,28 @@ export type components = {
             /** File */
             file: string;
         };
+        /** Body_upload_dental_media_api_v1_dental_media_post */
+        Body_upload_dental_media_api_v1_dental_media_post: {
+            /** File */
+            file: string;
+            /** Patient Id */
+            patient_id: number;
+            /** Visit Id */
+            visit_id: number;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "photo" | "xray";
+            /** Tooth */
+            tooth?: string | null;
+            /** Capture Date */
+            capture_date?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+        };
         /** Body_upload_file_api_v1_files_upload_post */
         Body_upload_file_api_v1_files_upload_post: {
             /** File */
@@ -25995,6 +26076,69 @@ export type components = {
              * @default
              */
             recommendations: string;
+        };
+        /** DentalMediaList */
+        DentalMediaList: {
+            /** Items */
+            items: components["schemas"]["DentalMediaOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
+        /**
+         * DentalMediaOut
+         * @description Storage-safe representation of a dental media record.
+         */
+        DentalMediaOut: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string | null;
+            /** Description */
+            description: string | null;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "photo" | "xray";
+            /** Tooth */
+            tooth: string | null;
+            /** Capture Date */
+            capture_date: string | null;
+            /** Mime Type */
+            mime_type: string;
+            /** File Size */
+            file_size: number;
+            /** Patient Id */
+            patient_id: number;
+            /** Visit Id */
+            visit_id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** DentalMediaUpdate */
+        DentalMediaUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Category */
+            category?: ("photo" | "xray") | null;
+            /** Tooth */
+            tooth?: string | null;
+            /** Capture Date */
+            capture_date?: string | null;
         };
         /** DentalPriceOverrideRequest */
         DentalPriceOverrideRequest: {
@@ -70731,6 +70875,176 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_dental_media_api_v1_dental_media_get: {
+        parameters: {
+            query: {
+                patient_id: number;
+                visit_id: number;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DentalMediaList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_dental_media_api_v1_dental_media_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_dental_media_api_v1_dental_media_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DentalMediaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    view_dental_media_api_v1_dental_media__media_id__content_get: {
+        parameters: {
+            query: {
+                visit_id: number;
+            };
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": unknown;
+                    "image/png": unknown;
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_dental_media_api_v1_dental_media__media_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_dental_media_api_v1_dental_media__media_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DentalMediaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DentalMediaOut"];
                 };
             };
             /** @description Validation Error */

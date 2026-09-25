@@ -6,13 +6,13 @@ import PhotoArchive from '../PhotoArchive';
 import VisitProtocol from '../VisitProtocol';
 
 describe('legacy dental media forms', () => {
-  it('does not offer local-only upload, delete, or save actions in the photo archive', () => {
+  it('requires a confirmed visit before loading or changing an archive', () => {
     renderWithProviders(
-      <PhotoArchive patientId={7} patientName="SYNTHETIC-Patient" onClose={vi.fn()} />,
+      <PhotoArchive patientId={7} patientName="SYNTHETIC-Patient" presentation="dialog" onClose={vi.fn()} />,
     );
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText(/protected storage|защищённого хранения/i)).toBeInTheDocument();
+    expect(screen.getByText(/confirmed visit|подтверждённым визитом/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /upload|загрузить|save|сохранить|delete|удалить/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/upload|загрузить/i)).not.toBeInTheDocument();
   });

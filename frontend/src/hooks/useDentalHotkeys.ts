@@ -59,6 +59,11 @@ export const useDentalHotkeys = ({
       }
 
       if (e.key === 'Escape') {
+        // A modal owns Escape while it is open (for example the protected
+        // dental-media preview). Do not clear the patient underneath it.
+        if (e.defaultPrevented || document.querySelector('[role="dialog"][aria-modal="true"]')) {
+          return;
+        }
         if (clearSelection) {
           clearSelection();
         }

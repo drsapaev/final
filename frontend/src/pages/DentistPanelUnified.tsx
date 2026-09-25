@@ -15,7 +15,6 @@ import '../styles/animations.css';
 import notify from '../services/notify';
 // STRAT#34: useTranslation adapter for confirm/notify i18n.
 import { useTranslation } from '../i18n/useTranslation';
-import type { Appointment } from '../types/domain/clinic';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDentalHotkeys } from '../hooks/useDentalHotkeys';
@@ -29,7 +28,6 @@ import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 // bootstrap) extracted verbatim to ./dentist/dentistContracts.
 import {
   invalidateDentistPanelCaches,
-  type SelectedPatient,
   type DoctorPanelState,
 } from './dentist/dentistContracts';
 // PR-UI-15-3: worklist data lifecycle (queues/today fetch + DTO mapping +
@@ -51,11 +49,11 @@ import { useDentistActions } from './dentist/useDentistActions';
 // cashier 14-5 / doctor 15-2 precedent).
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import DentistVisitsView from './dentist/views/DentistVisitsView';
-import DentistAIAssistantView from './dentist/views/DentistAIAssistantView';
 import DentistDialogsLayer from './dentist/views/DentistDialogsLayer';
+import PhotoArchive from '../components/dental/PhotoArchive';
 
-const DENTIST_VALID_TABS = ['queue', 'visit', 'patients', 'ai-assistant'];
-const DENTIST_TAB_ALIASES = { photos: 'patients', visits: 'visit', appointments: 'patients' };
+const DENTIST_VALID_TABS = ['queue', 'visit', 'patients', 'photos'];
+const DENTIST_TAB_ALIASES = { visits: 'visit', appointments: 'patients', 'ai-assistant': 'visit' };
 
 /**
  * Объединенная стоматологическая панель с полным функционалом
@@ -109,14 +107,6 @@ const DentistPanelUnified = () => {
     [],
   );
 
-  useEffect(() => {
-    if (new URLSearchParams(location.search).get('tab') === 'photos') {
-      notify.info(tI18n('dental.dental_panel_photo_archive_unavailable'));
-    }
-  }, [location.search, tI18n]);
-
-  // PR-UI-15-6: handleCardKeyDown moved verbatim to ./dentist/dentistCardA11y
-  // (shared by the extracted card-grid views).
   const [loading, setLoading] = useState(true);
   // P-009: selectedPatient / setSelectedPatient now come from useDoctorPanelState
   // PR-UI-15-4: savedVisitProtocols + protocol loaders/persist/reopen moved
@@ -248,9 +238,9 @@ const DentistPanelUnified = () => {
   // (the handlers stay available on the hook API).
   const {
     handlePatientSelect,
+    handleStartQueueVisit,
     handleCompleteVisit,
     handleProtocolTemplateSelect,
-    handleDentalChart,
   } = useDentistActions({
     tI18n,
     confirm,
@@ -408,9 +398,8 @@ const DentistPanelUnified = () => {
     />;
   const renderPatients = () =>
     <DentalPatientsTab
-      patients={patients as unknown as Array<Record<string, unknown>>}
       onSelectPatient={handlePatientSelect as unknown as (patient: Record<string, unknown>) => void}
-      onDentalChart={handleDentalChart as unknown as (patient: Record<string, unknown>) => void}
+      onGoToQueue={() => handleTabChange('queue')}
     />;
   // PR-UI-15-6: renderAppointments / renderDiagnoses / renderTemplates /
   // renderReports / renderDentalChart removed — unreachable after the
@@ -429,22 +418,25 @@ const DentistPanelUnified = () => {
   const renderVisits = () =>
     <DentistVisitsView
       selectedPatient={selectedPatient}
-      patients={patients}
       loading={loading}
       onCompleteVisit={handleCompleteVisit}
-      onPatientSelect={handlePatientSelect}
+      onGoToPatients={() => handleTabChange('patients')}
       onBackToQueue={() => {
         setSelectedPatient(null);
         handleTabChange('queue');
       }}
       tI18n={tI18n} />;
 
-  // Рендер планов лечения
-
-
-  // PR-UI-15-6: renderAIAssistant → views/DentistAIAssistantView
-  // (verbatim JSX).
-  const renderAIAssistant = () => <DentistAIAssistantView tI18n={tI18n} />;
+  const renderPhotos = () => (
+    <PhotoArchive
+      key={`${selectedPatient?.patient_id || selectedPatient?.patient?.id || 'none'}:${selectedPatient?.visit_id || 'none'}`}
+      patientId={selectedPatient?.patient_id || selectedPatient?.patient?.id}
+      visitId={selectedPatient?.visit_id}
+      patientName={selectedPatient?.patient_name || selectedPatient?.patient_fio || selectedPatient?.name || ''}
+      onGoToPatients={() => handleTabChange('patients')}
+      onGoToQueue={() => handleTabChange('queue')}
+    />
+  );
 
   // Рендер контента
   const renderContent = () => {
@@ -454,22 +446,18 @@ const DentistPanelUnified = () => {
           <QueueIntegration
             specialistId={String(user?.doctor_id || user?.specialist_id || '')}
             specialty="dentistry"
-            onPatientSelect={handlePatientSelect}
-            onStartVisit={(appointment: Appointment) => {
-              setSelectedPatient(appointment as unknown as SelectedPatient);
-              handleTabChange('visit');
-            }} />);
+            onStartVisit={handleStartQueueVisit} />);
 
 
       case 'patients':
         return renderPatients();
+      case 'photos':
+        return renderPhotos();
       case 'visit':
       case 'visits':
         // Phase 4: 'visit' is the new sidebar tab; 'visits' kept as
         // alias for back-compat with deep links and old saved URLs.
         return renderVisits();
-      case 'ai-assistant':
-        return renderAIAssistant();
       default:
         return renderDashboard();
     }

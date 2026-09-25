@@ -52,7 +52,11 @@ describe('EMRContainerV2 visit completion contract', () => {
     expect(source).toContain('savedEMRStatus !== \'draft\'');
     expect(source).toContain('&& !isDirty');
     expect(source).toContain('&& version > 0');
-    expect(source).toContain('signSavedEMR({ confirm: confirmSigning, rowVersion: version, sign: signEMR })');
+    // R34 regression (#3433 P2): the read-only sign must pass the optimistic-lock
+    // token (rowVersion) — NOT the clinical revision (version).
+    expect(source).toContain('&& rowVersion > 0');
+    expect(source).toContain('signSavedEMR({ confirm: confirmSigning, rowVersion, sign: signEMR })');
+    expect(source).not.toContain('signSavedEMR({ confirm: confirmSigning, rowVersion: version, sign: signEMR })');
 
     const readOnlyBranch = source.match(/\{isReadOnly \? \([\s\S]*?\) : !isSigned \?/);
     expect(readOnlyBranch).not.toBeNull();

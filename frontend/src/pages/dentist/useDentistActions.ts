@@ -34,8 +34,7 @@ import {
  *  - protocol-template drafting: buildVisitProtocolDraftFromTemplate +
  *    handleProtocolTemplateSelect
  *
- * NOT extracted (remain in the panel): handleCardKeyDown (render-adjacent),
- * the URL deep-link patient effect (location-bound), session warning /
+ * NOT extracted (remain in the panel): the URL deep-link patient effect (location-bound), session warning /
  * hotkeys wiring, stats and render functions (PR-UI-15-6 surface).
  */
 
@@ -214,6 +213,42 @@ export function useDentistActions({
 
     notify.info(tI18n('dental.no_active_visit'));
     handleTabChange('patients');
+  };
+
+  const handleStartQueueVisit = async (calledPatient: Record<string, unknown> | null | undefined): Promise<boolean> => {
+    if (!calledPatient || calledPatient.id === null || calledPatient.id === undefined || calledPatient.id === '') {
+      notify.error(tI18n('dental.no_queue_id_for_visit'));
+      return false;
+    }
+
+    const queueEntryId = calledPatient.id;
+    try {
+      const response = await queueService.startVisit(queueEntryId as string | number) as Record<string, unknown>;
+      const patientId = response.patient_id as string | number | null | undefined;
+      const visitId = response.visit_id as string | number | null | undefined;
+      if (response.success !== true || patientId === null || patientId === undefined || visitId === null || visitId === undefined) {
+        notify.error(tI18n('dental.dental_panel_start_visit_failed'));
+        return false;
+      }
+
+      const patientName = (calledPatient.name as string | undefined) || tI18n('dental.dental_panel_patient_default');
+      handlePatientSelect({
+        id: patientId,
+        patient_id: patientId,
+        visit_id: visitId,
+        doctor_queue_entry_id: queueEntryId,
+        queue_entry_id: queueEntryId,
+        patient_name: patientName,
+        patient_fio: patientName,
+        number: (calledPatient.number as string | number | undefined) ?? null,
+        source: 'queue',
+        status: (response.status as string | undefined) || 'in_progress',
+      });
+      return true;
+    } catch {
+      notify.error(tI18n('dental.dental_panel_start_visit_failed'));
+      return false;
+    }
   };
 
   // C-3 (UX audit, port of cardio P-020): critical ICD-10 codes that require
@@ -533,6 +568,7 @@ export function useDentistActions({
     handleAppointmentRowClick,
     handleAppointmentActionClick,
     handlePatientSelect,
+    handleStartQueueVisit,
     CRITICAL_ICD10_CODES,
     getCriticalDiagnosisWarning,
     handleCompleteVisit,

@@ -271,7 +271,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
               padding: isCollapsed ? '10px' : '7px 10px',
               borderRadius: 'var(--mac-radius-md, 6px)',
               // Sprint 8: macOS Finder-style active state — accent bg, no border, subtle
-              background: isActive ? 'var(--mac-accent-bg)' : 'transparent',
+              background: isActive ? 'var(--mac-nav-item-active)' : 'transparent',
               // CC-1: active ink was var(--mac-accent) — blue-on-blue (1.0:1) against
               // the solid --mac-nav-item-active !important background from the
               // embedded style block below; invisible in light and (after the
@@ -332,7 +332,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-primary)'
+                  color: isActive ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-primary)'
                 }}>
                     {displayLabel}
                   </span>
@@ -340,11 +340,11 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
 
                 {!isCollapsed && displayBadge &&
                 <span style={{
-                  backgroundColor: isActive ? 'var(--mac-accent-bg)' : 'var(--mac-bg-tertiary)',
+                  backgroundColor: isActive ? 'transparent' : 'var(--mac-bg-tertiary)',
                   // AXE-EXP-2: inactive badge ink — secondary was 3.95:1 on
                   // the tertiary surface in dark; on-tertiary ink passes both
                   // themes (5.71:1 light / 6.74:1 dark).
-                  color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-on-tertiary)',
+                  color: isActive ? 'var(--mac-nav-item-active-text)' : 'var(--mac-text-on-tertiary)',
                   fontSize: 'var(--mac-font-size-xs, 11px)',
                   fontWeight: 'var(--mac-font-weight-semibold, 600)',
                   padding: '2px 7px',
@@ -443,7 +443,7 @@ const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
         }
 
         .mac-sidebar-item--active:hover {
-          background: var(--mac-accent-bg) !important;
+          background: var(--mac-nav-item-active) !important;
         }
 
         /* PR-49: fixed orphan CSS — was missing selector, browser silently discarded */
