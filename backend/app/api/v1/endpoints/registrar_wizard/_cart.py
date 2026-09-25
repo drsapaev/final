@@ -556,6 +556,23 @@ def _edit_delta_quote_context(
         # Команда конвертирует ValueError в 400 на эндпоинте; квота
         # отвечает тем же 400 с тем же сообщением — контракт один.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    payloads = (
+        edit_service._find_service_payloads(
+            edit_service._coerce_services(entry.services), service
+        )
+        if entry is not None
+        else []
+    )
+    existing_qty = sum(int(edit_service._payload_quantity(p)) for p in payloads)
+    if requested_qty > existing_qty:
+        edit_service._assert_doctor_eligibility_for_addition(
+            service=service,
+            specialist_id=specialist_id,
+            entry=entry,
+            target_date=target_date,
+        )
+
     if entry is None:
         # Codex R11 #3095 (P2): the command routes a no-entry edit to
         # _create_new_queue_entry → _resolve_daily_queue, which refuses
@@ -587,12 +604,8 @@ def _edit_delta_quote_context(
                 ),
             )
         return requested_qty, None
-    payloads = edit_service._find_service_payloads(
-        edit_service._coerce_services(entry.services), service
-    )
     if not payloads:
         return requested_qty, None
-    existing_qty = sum(int(edit_service._payload_quantity(p)) for p in payloads)
     delta = requested_qty - existing_qty
     if delta < 0:
         # Codex R12 PR 3118 (P2): гвард НЕ-редактируемого состояния зеркалится

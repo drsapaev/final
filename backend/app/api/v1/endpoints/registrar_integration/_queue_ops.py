@@ -30,7 +30,7 @@ def _prime_registrar_queue_read_cache(
 
     from app.models.appointment import Appointment
     from app.models.clinic import Doctor
-    from app.models.online_queue import DailyQueue, OnlineQueueEntry
+    from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
     from app.models.patient import Patient
     from app.models.payment import Payment
     from app.models.service import Service
@@ -102,6 +102,10 @@ def _prime_registrar_queue_read_cache(
                 service_id = item.get("id") or item.get("service_id")
                 if isinstance(service_id, int):
                     service_ids.add(service_id)
+                else:
+                    service_name = item.get("name") or item.get("service_name")
+                    if isinstance(service_name, str):
+                        service_names.add(service_name)
             elif isinstance(item, int):
                 service_ids.add(item)
             elif isinstance(item, str) and isinstance(record, Appointment):
@@ -119,11 +123,26 @@ def _prime_registrar_queue_read_cache(
     )
     services_by_id = {service.id: service for service in id_services}
     services_by_name: dict[str, Any] = {}
+    services_by_name_candidates: dict[str, list] = {}
     for service in name_services:
         services_by_name.setdefault(service.name, service)
+        services_by_name_candidates.setdefault(service.name, []).append(service)
     services = list(services_by_id.values())
     services.extend(
         service for service in name_services if service.id not in services_by_id
+    )
+    resource_tags = {
+        service.queue_tag for service in services if service.queue_tag
+    }
+    active_resources = (
+        db.query(QueueResource)
+        .filter(
+            QueueResource.active.is_(True),
+            QueueResource.queue_tag.in_(resource_tags),
+        )
+        .all()
+        if resource_tags
+        else []
     )
 
     patients = (
@@ -224,7 +243,11 @@ def _prime_registrar_queue_read_cache(
         "services_by_id": services_by_id,
         "service_ids_checked": service_ids,
         "services_by_name": services_by_name,
+        "services_by_name_candidates": services_by_name_candidates,
         "service_names_checked": service_names,
+        "active_resource_ids_by_tag": {
+            resource.queue_tag: resource.id for resource in active_resources
+        },
         "visit_services": visit_services_by_id,
         "daily_queues": daily_queues_by_id,
         "daily_queue_ids_checked": queue_ids,
@@ -277,6 +300,16 @@ def _cached_service_by_name(db: Session, name: str):
     return db.query(Service).filter(Service.name == name).first()
 
 
+def _cached_owner_services_by_name(db: Session, name: str) -> list:
+    """Keep all exact-name matches; Service.name is not unique."""
+    from app.models.service import Service
+
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    if cache is not None and name in cache["service_names_checked"]:
+        return cache["services_by_name_candidates"].get(name, [])
+    return db.query(Service).filter(Service.name == name).all()
+
+
 def _cached_services_for_ids(db: Session, service_ids: list[int]) -> list:
     from app.models.service import Service
 
@@ -287,6 +320,116 @@ def _cached_services_for_ids(db: Session, service_ids: list[int]) -> list:
     if not service_ids:
         return []
     return db.query(Service).filter(Service.id.in_(service_ids)).all()
+
+
+def _cached_daily_queue(db: Session, queue_id: int | None):
+    from app.models.online_queue import DailyQueue
+
+    if queue_id is None:
+        return None
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    if cache is not None and queue_id in cache["daily_queue_ids_checked"]:
+        return cache["daily_queues"].get(queue_id)
+    return db.query(DailyQueue).filter(DailyQueue.id == queue_id).first()
+
+
+def _active_resource_id_for_exact_tag(db: Session, tag: str | None) -> int | None:
+    from app.models.online_queue import QueueResource
+
+    if not tag:
+        return None
+    cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY)
+    if cache is not None:
+        return cache["active_resource_ids_by_tag"].get(tag)
+    resource = (
+        db.query(QueueResource)
+        .filter(QueueResource.queue_tag == tag, QueueResource.active.is_(True))
+        .first()
+    )
+    return resource.id if resource else None
+
+
+def _resolve_registrar_row_owner(
+    *,
+    db: Session,
+    entry_type: str,
+    entry_data: Any,
+    service_details: list,
+) -> tuple[str | None, int | None, int | None]:
+    """Return the row's actual owner axis and real DailyQueue id, if linked.
+
+    A specialty bucket's legacy ``doctor_id`` and ordinal ``queue_id`` are
+    display metadata, not per-row ownership. Appointment queue-time matching
+    by patient/day/doctor is likewise insufficient to prove a queue link.
+    """
+    queue_entry = None
+    if entry_type == "online_queue":
+        if getattr(entry_data, "queue_id", None) is not None:
+            queue_entry = entry_data
+        elif getattr(entry_data, "visit_date", None) is not None:
+            queue_entry = _same_patient_queue_entry_for_visit(db, entry_data)
+        # An orphaned OQE is explicitly unknown; do not infer a doctor from
+        # the linked visit or specialty bucket.
+        if queue_entry is None:
+            return None, None, None
+    elif entry_type == "visit":
+        queue_entry = _same_patient_queue_entry_for_visit(db, entry_data)
+
+    if queue_entry is not None:
+        daily_queue = _cached_daily_queue(db, queue_entry.queue_id)
+        if daily_queue is None:
+            return None, None, None
+        if daily_queue.queue_resource_id is not None:
+            return "resource", daily_queue.queue_resource_id, daily_queue.id
+        if daily_queue.specialist_id is not None:
+            return "doctor", daily_queue.specialist_id, daily_queue.id
+        return None, None, daily_queue.id
+
+    if entry_type == "visit":
+        service_items = service_details
+    elif entry_type == "appointment":
+        service_items = getattr(entry_data, "services", None) or []
+    else:
+        return None, None, None
+
+    # Resource ownership for a row without a queue requires an exact active
+    # registry tag shared by every resolved service in that row. Mixed or
+    # unknown services alongside a resource tag are ambiguous.
+    tags: set[str | None] = set()
+    unresolved_service = False
+    for item in service_items:
+        candidates = []
+        if isinstance(item, dict):
+            service_id = item.get("id") or item.get("service_id")
+            if isinstance(service_id, int):
+                service = _cached_service_by_id(db, service_id)
+                candidates = [service] if service else []
+            else:
+                service_name = item.get("name") or item.get("service_name")
+                if isinstance(service_name, str):
+                    candidates = _cached_owner_services_by_name(db, service_name)
+        elif isinstance(item, int):
+            service = _cached_service_by_id(db, item)
+            candidates = [service] if service else []
+        elif isinstance(item, str):
+            candidates = _cached_owner_services_by_name(db, item)
+        if not candidates or len(candidates) > 1:
+            unresolved_service = True
+        for service in candidates:
+            tags.add(service.queue_tag)
+
+    resource_ids = {
+        resource_id
+        for tag in tags
+        if (resource_id := _active_resource_id_for_exact_tag(db, tag)) is not None
+    }
+    if resource_ids:
+        if len(resource_ids) == 1 and len(tags) == 1 and not unresolved_service:
+            return "resource", next(iter(resource_ids)), None
+        return None, None, None
+
+    doctor_id = getattr(entry_data, "doctor_id", None)
+    return ("doctor", doctor_id, None) if doctor_id is not None else (None, None, None)
 
 
 def _cached_default_service_by_specialty(db: Session, specialty: str):
@@ -1062,6 +1205,9 @@ def _serialize_queue_entry(
     latest_lab_report: dict | None,
     entry_department_key: str | None,
     entry_department: str | None,
+    queue_owner_kind: str | None,
+    queue_owner_id: int | None,
+    daily_queue_id: int | None,
     record_date: Any = None,
 ) -> dict:
     """R-22 Phase 4: Serialize a single queue entry into the API response dict."""
@@ -1121,6 +1267,9 @@ def _serialize_queue_entry(
         "type": entry_type,
         "record_type": entry_type,
         "queue_entry_id": entry_wrapper.get("queue_entry_id"),
+        "queue_owner_kind": queue_owner_kind,
+        "queue_owner_id": queue_owner_id,
+        "daily_queue_id": daily_queue_id,
         # W2-PR2: канонический день записи (день очереди/визита, для которого
         # построен лист) — редактирование должно целился в этот день, а не в
         # «сегодня» на момент запроса (см. AppointmentWizardV2 targetDate).
@@ -1812,10 +1961,9 @@ def _process_visit_entry(
     all_visit_services = _cached_visit_services(db, visit.id)
 
     ecg_only_flag = entry_wrapper.get("ecg_only", False)
-    filter_services_flag = entry_wrapper.get("filter_services", False)
 
     visit_services = []
-    if filter_services_flag or ecg_only_flag:
+    if ecg_only_flag:
         # Показываем только ЭКГ услуги (для очереди echokg)
         for vs in all_visit_services:
             if hasattr(vs, 'service_id') and vs.service_id:

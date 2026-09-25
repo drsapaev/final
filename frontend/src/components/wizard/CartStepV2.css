@@ -37,6 +37,87 @@
   font-size: var(--mac-font-size-sm);
 }
 
+.cart-step-v2__doctor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--mac-spacing-3);
+  margin-bottom: var(--mac-spacing-3);
+}
+
+.cart-step-v2__doctor-card {
+  min-width: 0;
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  background: var(--mac-bg-secondary);
+  padding: var(--mac-spacing-3);
+}
+
+.cart-step-v2__doctor-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-1);
+  margin-bottom: var(--mac-spacing-2);
+}
+
+.cart-step-v2__doctor-name {
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-sm);
+}
+
+.cart-step-v2__doctor-meta,
+.cart-step-v2__cart-doctor-name {
+  color: var(--mac-text-secondary);
+  font-size: var(--mac-font-size-xs);
+}
+
+.cart-step-v2__doctor-services {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-1);
+}
+
+.cart-step-v2__doctor-service {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--mac-spacing-2);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  background: var(--mac-bg-primary);
+  color: var(--mac-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cart-step-v2__doctor-service:hover,
+.cart-step-v2__doctor-service:focus-visible {
+  border-color: var(--mac-accent);
+}
+
+.cart-step-v2__doctor-service:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.cart-step-v2__doctor-service:focus-visible {
+  outline: 2px solid var(--mac-accent);
+  outline-offset: 2px;
+}
+
+.cart-step-v2__doctor-service.selected {
+  background: color-mix(in srgb, var(--mac-accent), transparent 92%);
+}
+
+.cart-step-v2__doctor-service-action {
+  flex-shrink: 0;
+  font-size: var(--mac-font-size-xs);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-accent);
+}
+
 /* Services grid — 3 columns */
 .cart-step-v2__services-grid {
   display: grid;

@@ -6,9 +6,11 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session, attributes
 
 from app.crud.patient import normalize_patient_name
+from app.crud.queue_resource_routing import resolve_tag_resource, tag_routes_to_resource
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
@@ -18,6 +20,10 @@ from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit, VisitService
 from app.services.queue_service import queue_service
+from app.services.registrar_doctor_eligibility import (
+    assert_doctor_eligible_for_service,
+    service_requires_doctor_selection,
+)
 from app.services.service_mapping import get_service_code, normalize_service_code
 
 ACTIVE_APPEND_STATUSES = ("waiting", "called", "in_service", "diagnostics")
@@ -133,6 +139,24 @@ class RegistrarEditDeltaService:
                     int(item.queue_entry_id) if item.queue_entry_id is not None else None
                 ),
             )
+
+            existing_qty = (
+                sum(
+                    int(self._payload_quantity(payload))
+                    for payload in self._find_service_payloads(
+                        self._coerce_services(entry.services), service
+                    )
+                )
+                if entry
+                else 0
+            )
+            if requested_qty > existing_qty:
+                self._assert_doctor_eligibility_for_addition(
+                    service=service,
+                    specialist_id=item.specialist_id,
+                    entry=entry,
+                    target_date=target_date,
+                )
 
             if entry:
                 delta = self._append_to_existing_entry(
@@ -688,6 +712,58 @@ class RegistrarEditDeltaService:
             ]
             return same_specialist[0] if same_specialist else None
         return entries[0] if entries else None
+
+    def _assert_doctor_eligibility_for_addition(
+        self,
+        *,
+        service: Service,
+        specialist_id: int | None,
+        entry: OnlineQueueEntry | None,
+        target_date: date,
+    ) -> None:
+        """Keep added clinician work on an eligible doctor's queue."""
+        if not service_requires_doctor_selection(service):
+            return
+
+        queue = entry.queue if entry else None
+        if entry is not None and (
+            queue is None
+            or queue.specialist_id is None
+            or queue.queue_resource_id is not None
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Услугу «{service.name}» нельзя добавить в очередь без врача",
+            )
+
+        queue_tag = service.queue_tag or service.department_key
+        if queue_tag and (
+            resolve_tag_resource(self.db, queue_tag) is not None
+            or tag_routes_to_resource(self.db, queue_tag, target_date) is not None
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Услугу «{service.name}» нельзя добавить в ресурсную очередь",
+            )
+
+        doctor_id = (
+            queue.specialist_id
+            if queue is not None
+            else specialist_id or service.doctor_id
+        )
+        assert_doctor_eligible_for_service(
+            self.db, service, doctor_id, target_date=target_date
+        )
+        if entry is not None and entry.visit_id:
+            visit = self.db.query(Visit).filter(Visit.id == entry.visit_id).first()
+            if visit is not None and visit.doctor_id != doctor_id:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Врач визита не совпадает с врачом очереди — "
+                        "добавление услуги требует отдельной корректировки записи"
+                    ),
+                )
 
     def _append_to_existing_entry(
         self,

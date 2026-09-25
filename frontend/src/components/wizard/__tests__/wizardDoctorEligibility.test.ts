@@ -112,10 +112,14 @@ describe('RQ-08.a: адаптер переносит accepted_specialties ЯВН
       id: 7,
       name: 'dental service',
       requires_doctor: true,
+      doctor_selection_required: true,
+      doctor_booking_available: true,
       department_key: 'dental',
       accepted_specialties: ['dentistry', 'dental'],
     });
     expect(data.accepted_specialties).toEqual(['dentistry', 'dental']);
+    expect(data.doctor_selection_required).toBe(true);
+    expect(data.doctor_booking_available).toBe(true);
   });
 
   it('undefined (старый бэкенд) остаётся undefined — НЕ коллапсирует в null (codex P1 раунд 2)', () => {
@@ -123,6 +127,8 @@ describe('RQ-08.a: адаптер переносит accepted_specialties ЯВН
       id: 9,
       name: 'legacy entry',
       requires_doctor: false,
+      doctor_selection_required: false,
+      doctor_booking_available: true,
     });
     expect(data.accepted_specialties).toBeUndefined();
   });
@@ -132,6 +138,8 @@ describe('RQ-08.a: адаптер переносит accepted_specialties ЯВН
       id: 10,
       name: 'no department field',
       requires_doctor: true,
+      doctor_selection_required: true,
+      doctor_booking_available: true,
       accepted_specialties: null,
     });
     expect(data.accepted_specialties).toBeNull();
@@ -142,6 +150,8 @@ describe('RQ-08.a: адаптер переносит accepted_specialties ЯВН
       id: 8,
       name: 'x',
       requires_doctor: false,
+      doctor_selection_required: false,
+      doctor_booking_available: true,
       accepted_specialties: 'garbage' as unknown as string[],
     });
     expect(data.accepted_specialties).toBeNull();

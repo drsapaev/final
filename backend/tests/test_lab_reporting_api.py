@@ -1486,13 +1486,22 @@ def test_registrar_lab_queue_page_bounds_enrichment_after_global_dedup(monkeypat
             non_ecg_count=page_non_ecg_services_count,
         )
     )
-    assert current_cardiology_branch_is_serializable is False
+    assert current_cardiology_branch_is_serializable is True
+    # Legacy ECG-name detection can create an ECG wrapper even when the
+    # exact queue_tag serializer has no ECG service to put in that slice.
+    ecg_branch_is_serializable = today_queues._serializer_will_emit_visit(
+        filter_services=True,
+        ecg_only=True,
+        ecg_count=page_ecg_services_count,
+        non_ecg_count=page_non_ecg_services_count,
+    )
+    assert ecg_branch_is_serializable is False
     skipped_visit = {
         "type": "visit",
         "data": SimpleNamespace(id=99),
         "created_at": datetime(2026, 9, 20, 8, 0),
         "queue_time": datetime(2026, 9, 20, 8, 0),
-        "_page_serializable": current_cardiology_branch_is_serializable,
+        "_page_serializable": ecg_branch_is_serializable,
     }
 
     queues_by_specialty = {

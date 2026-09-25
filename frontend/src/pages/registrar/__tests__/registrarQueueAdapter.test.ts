@@ -21,6 +21,18 @@ const baseQueue = { queue_tag: 'cardio', specialty: 'cardio', specialist_name: '
 const baseData = { date: '2026-08-29', timezone: 'Asia/Tashkent' };
 
 describe('adaptQueueEntry (PR-UI-13-1)', () => {
+  it('passes per-entry queue ownership through without using specialty bucket ownership', () => {
+    const row = adaptQueueEntry(
+      { data: { id: 33, queue_owner_kind: 'doctor', queue_owner_id: 7, daily_queue_id: 91 } },
+      { ...baseQueue, specialist_id: 8, doctor_id: 8 },
+      baseData,
+      '2026-08-29',
+      FALLBACK,
+    );
+    expect(row).toMatchObject({ queue_owner_kind: 'doctor', queue_owner_id: 7, daily_queue_id: 91 });
+    const legacy = adaptQueueEntry({ id: 34 }, { ...baseQueue, specialist_id: 8 }, baseData, '2026-08-29', FALLBACK);
+    expect(legacy).toMatchObject({ queue_owner_kind: null, queue_owner_id: null, daily_queue_id: null });
+  });
   it('skips entries without an id (null result)', () => {
     expect(adaptQueueEntry({ patient_fio: 'X' }, baseQueue, baseData, '2026-08-29', FALLBACK)).toBeNull();
     expect(adaptQueueEntry({ data: { patient_fio: 'Y' } }, baseQueue, baseData, '2026-08-29', FALLBACK)).toBeNull();

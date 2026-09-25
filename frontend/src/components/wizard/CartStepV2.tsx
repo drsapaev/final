@@ -10,12 +10,12 @@
  * Props передаются из родительского AppointmentWizardV2.
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import { Button, Tooltip,
   Checkbox } from '../ui/macos';
 import { normalizeCategoryCode, parseServiceCode } from '../../utils/serviceCodeUtils';
-import { MIXED_REPEAT_WARNING, categories, filterDoctorsForService } from './wizardUtils';
+import { MIXED_REPEAT_WARNING, filterDoctorsForService, getWizardDoctorDisplayName } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './CartStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -53,9 +53,10 @@ export interface CartService {
   service_code?: string;
   code?: string;
   is_consultation?: boolean;
-  // RQ-05.b: поля из DTO каталога (GET /registrar/services), по которым
-  // рисуется селектор врача: флаг обязательности и профиль отделения.
+  // Метаданные каталога для раскладки услуги по карточкам врачей.
   requires_doctor?: boolean;
+  doctor_selection_required?: boolean;
+  doctor_booking_available?: boolean;
   department_key?: string;
   // RQ-08.a: серверные допустимые специальности врача (null — не применимо);
   // приоритетный путь фильтра врача, UI не зависит от alias-таблицы.
@@ -96,7 +97,7 @@ export interface CartStepV2Props {
   /** Cart state (items + visit metadata). */
   cart: CartState;
   /** Add a service to the cart. */
-  onAddToCart: (service: CartService) => void;
+  onAddToCart: (service: CartService, doctor?: CartDoctor | null) => void;
   /** Remove an item from the cart by id. */
   onRemoveFromCart: (itemId: string | number | undefined) => void;
   /** All available services (filtered + grouped internally). */
@@ -109,8 +110,10 @@ export interface CartStepV2Props {
   activeCategory: string;
   /** Service search query string. */
   searchQuery: string;
-  /** Wizard edit mode (loads every service). */
+  /** Wizard edit mode; existing cart assignment remains read-only. */
   editMode?: boolean;
+  /** QR full-update retains this owner. null means the owner could not be resolved. */
+  lockedDoctorId?: string | number | null;
   /** SSOT: function to resolve a service display name (accepts cart item or service). */
   getServiceName: (itemOrService: { service_id?: string | number; name?: string; [key: string]: unknown }) => string;
   /** Update a single field on a cart item. Caller signature is (itemId, field, value). */
@@ -142,7 +145,7 @@ const CartStepV2 = ({
   // New props from parent
   activeCategory,
   searchQuery,
-  editMode = false,
+  lockedDoctorId,
   getServiceName, // ✅ SSOT: Функция для получения названий услуг
   onUpdateItem,
   repeatEligibilityByItemId,
@@ -154,10 +157,15 @@ const CartStepV2 = ({
   cartQuoteMessage
 }: CartStepV2Props) => {
   const { t: rawT } = useTranslation(); const t = rawT;
+  const doctorRowLabel = (name: string) =>
+    t('misc.csv_vrach_row_doctorname').replace('{row.doctorName}', name);
   // Local state removed - lifted to AppointmentWizardV2
 
   // Categories are now defined globally at the top of the file
 
+
+  const isDoctorPerformed = (service: CartService) =>
+    Boolean(service.is_consultation || service.requires_doctor || service.doctor_selection_required);
 
   // Фильтрация и группировка услуг
   const getDisplayedServices = () => {
@@ -167,11 +175,11 @@ const CartStepV2 = ({
 
     // 1. Фильтрация по поиску (Глобальный поиск)
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+      const query = searchQuery.trim().toLowerCase();
       return filtered.filter((service) =>
       service.name.toLowerCase().includes(query) ||
-      service.service_code && String(service.service_code).toLowerCase().includes(query) ||
-      !service.service_code && service.code && String(service.code).toLowerCase().includes(query)
+      Boolean(service.service_code && String(service.service_code).toLowerCase().includes(query)) ||
+      Boolean(!service.service_code && service.code && String(service.code).toLowerCase().includes(query))
       );
     }
 
@@ -181,7 +189,7 @@ const CartStepV2 = ({
       const normalizedCategory = service.category_code
         ? normalizeCategoryCode(service.category_code)
         : parseServiceCode(service.service_code).category;
-      const isConsultation = Boolean(service.is_consultation);
+      const doctorPerformed = isDoctorPerformed(service);
 
       // RQ-07 / S-05: классификация — ТОЛЬКО по каноническим метаданным DTO:
       // category_code (SSOT-нормализация serviceCodeUtils) и is_consultation.
@@ -199,15 +207,15 @@ const CartStepV2 = ({
           // Специалисты: каноническая категория (K/S/D → specialists) или
           // явный is_consultation из DTO. Legacy ЭКГ/ЭхоКГ (категория K)
           // остаются здесь без текстовых эвристик.
-          return normalizedCategory === 'specialists' || isConsultation;
+          return normalizedCategory === 'specialists' || doctorPerformed;
         case 'laboratory':
-          return normalizedCategory === 'laboratory';
+          return normalizedCategory === 'laboratory' && !doctorPerformed;
         case 'procedures':
-          return normalizedCategory === 'procedures' && !isConsultation;
+          return normalizedCategory === 'procedures' && !doctorPerformed;
         case 'other':
           // Неклассифицированные услуги (категория не распознана) остаются
           // видимыми явно на «Прочем» — не исчезают.
-          return normalizedCategory === 'other' && !isConsultation;
+          return normalizedCategory === 'other' && !doctorPerformed;
         default:
           return true;
       }
@@ -216,18 +224,9 @@ const CartStepV2 = ({
 
   const displayedServices = getDisplayedServices();
 
-  // PR-23 P0 #2: clicking a service that's already in cart increments quantity
-  // instead of toggling it off. Remove is via the X button in the cart mini-card.
-  const handleServiceToggle = (service: CartService) => {
-    const existingItem = cart?.items?.find((item) => item.service_id === service.id);
-
-    if (existingItem) {
-      // Already in cart → increment quantity
-      onUpdateItem?.(existingItem.id, 'quantity', (existingItem.quantity || 1) + 1);
-    } else {
-      onAddToCart(service);
-    }
-  };
+  // The parent atomically increments or inserts the exact service/doctor pair.
+  const handleServiceToggle = (service: CartService, doctor?: CartDoctor) =>
+    onAddToCart(service, doctor ?? null);
 
   // Fix D: локальная сумма БЕЗ применения скидок — скидки считает backend
   // (_apply_service_discount): repeat configurable percent / benefit / all_free.
@@ -264,7 +263,7 @@ const CartStepV2 = ({
   const normalizedDoctorsData = useMemo(() => {
     if (Array.isArray(doctorsData)) {
       return doctorsData.filter((doctor): doctor is CartDoctor =>
-        Boolean(doctor && typeof doctor === 'object' && !Array.isArray(doctor) && doctor.id != null)
+        Boolean(doctor && typeof doctor === 'object' && !Array.isArray(doctor) && doctor.id != null && doctor.active !== false && doctor.is_active !== false)
       );
     }
 
@@ -275,9 +274,43 @@ const CartStepV2 = ({
     return Object.values(doctorsData)
       .flatMap((value) => (Array.isArray(value) ? value : [value]))
       .filter((doctor): doctor is CartDoctor =>
-        Boolean(doctor && typeof doctor === 'object' && !Array.isArray(doctor) && doctor.id != null)
+        Boolean(doctor && typeof doctor === 'object' && !Array.isArray(doctor) && doctor.id != null && doctor.active !== false && doctor.is_active !== false)
       );
   }, [doctorsData]);
+
+  const selectedItemForService = (service: CartService, doctorId: string | number | null): CartItem | undefined =>
+    cart?.items?.find((item) => {
+      if (String(item.doctor_id ?? '') !== String(doctorId ?? '')) return false;
+      if (service.id != null && String(item.service_id) === String(service.id)) return true;
+      if (item.service_id != null || !service.service_code) return false;
+      const itemCode = String(item.service_name || item._temp_name || '').toUpperCase().trim();
+      const serviceCode = String(service.service_code).toUpperCase().trim();
+      return itemCode === serviceCode ||
+        itemCode.replace(/^([A-Z])0+(\d+)$/, '$1$2') === serviceCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+    });
+
+  const doctorServices = displayedServices.filter(isDoctorPerformed);
+  const regularServices = displayedServices.filter((service) => !isDoctorPerformed(service));
+  const doctorQuery = searchQuery.trim().toLowerCase();
+  const showDoctorCards = doctorQuery || !['laboratory', 'procedures', 'other'].includes(activeCategory);
+  const doctorGroups = (showDoctorCards ? normalizedDoctorsData : [])
+    .filter((doctor) => lockedDoctorId === undefined ||
+      (lockedDoctorId !== null && String(doctor.id) === String(lockedDoctorId)))
+    .map((doctor) => {
+      const doctorName = getWizardDoctorDisplayName(doctor);
+      const matchesDoctor = Boolean(doctorQuery && (
+        doctorName.toLowerCase().includes(doctorQuery) ||
+        String(doctor.specialty || '').toLowerCase().includes(doctorQuery)
+      ));
+      const candidateServices = matchesDoctor ? servicesData.filter(isDoctorPerformed) : doctorServices;
+      return {
+        doctor,
+        doctorName,
+        matchesDoctor,
+        services: candidateServices.filter((service) => filterDoctorsForService([doctor], service).length > 0),
+      };
+    })
+    .filter((group) => !doctorQuery || group.matchesDoctor || group.services.length > 0);
 
   const consultationRows = useMemo(() =>
   (cart?.items || []).
@@ -290,32 +323,12 @@ const CartStepV2 = ({
     return {
       itemId: item.id,
       serviceName: getServiceName ? getServiceName(item) : service.name,
-      doctorName: doctor?.name || doctor?.full_name || null,
+      doctorName: doctor ? getWizardDoctorDisplayName(doctor) : item.doctor_name || null,
       eligibility: repeatEligibilityByItemId?.[item.id ?? ''] || null
     };
   }).
   filter((r): r is NonNullable<typeof r> => r !== null),
   [cart?.items, servicesData, normalizedDoctorsData, getServiceName, repeatEligibilityByItemId]);
-
-  const getDoctorDisplayName = useCallback((doctor: CartDoctor) => {
-    if (!doctor) return '';
-    return (
-      (doctor.user as Record<string, unknown>)?.full_name ||
-      (doctor.user as Record<string, unknown>)?.username ||
-      doctor.full_name ||
-      doctor.name ||
-      t('misc.aw_doctor_hash', { id: doctor.id })
-    );
-  }, [t]);
-
-  const getDoctorOptionLabel = useCallback((doctor: CartDoctor) => {
-    const parts = [String(getDoctorDisplayName(doctor))];
-    if (doctor.specialty) parts.push(String(doctor.specialty));
-    if (doctor.cabinet != null && String(doctor.cabinet).trim()) {
-      parts.push(String(t('misc.aw_doctor_cabinet', { cabinet: doctor.cabinet })));
-    }
-    return parts.filter(Boolean).join(' · ');
-  }, [getDoctorDisplayName, t]);
 
   return (
     // UX Audit R-3.3: main container inline style → .cart-step-v2 class
@@ -328,25 +341,63 @@ const CartStepV2 = ({
       <div className="cart-step-v2__services-area">
         {searchQuery &&
         <div className="cart-step-v2__search-info">
-            Результаты поиска: {displayedServices.length}
+            Результаты поиска: {regularServices.length + doctorGroups.reduce((count, group) => count + group.services.length, 0)}
           </div>
         }
 
+        {doctorGroups.length > 0 &&
+        <div className="cart-step-v2__doctor-grid">
+          {doctorGroups.map(({ doctor, doctorName, services }) =>
+            <section key={String(doctor.id)} className="cart-step-v2__doctor-card" aria-label={doctorName}>
+              <div className="cart-step-v2__doctor-header">
+                <strong className="cart-step-v2__doctor-name">{doctorName}</strong>
+                <span className="cart-step-v2__doctor-meta">
+                  {[doctor.specialty, doctor.cabinet != null && t('misc.aw_doctor_cabinet', { cabinet: doctor.cabinet })]
+                    .filter(Boolean).join(' · ')}
+                </span>
+              </div>
+              <div className="cart-step-v2__doctor-services">
+                {services.map((service) => {
+                  const selectedItem = selectedItemForService(service, doctor.id ?? null);
+                  const bookingUnavailable = service.doctor_booking_available === false;
+                  const unavailableHint = 'Очередь для этой консультации не настроена';
+                  return <button
+                    key={`${String(doctor.id)}:${String(service.id)}`}
+                    type="button"
+                    className={`cart-step-v2__doctor-service ${selectedItem ? 'selected' : ''}`}
+                    aria-label={bookingUnavailable
+                      ? `${service.name} — ${doctorName}. ${unavailableHint}`
+                      : `${t('misc.snm_btn_add_service')}: ${service.name} — ${doctorName}`}
+                    disabled={bookingUnavailable}
+                    onClick={() => handleServiceToggle(service, doctor)}>
+                    <span className="cart-step-v2__service-info">
+                      <span className="cart-step-v2__service-name-row">
+                        {service.service_code && <span className="cart-step-v2__service-code">{String(service.service_code).toUpperCase()}</span>}
+                        <span className="cart-step-v2__service-name">{service.name}</span>
+                      </span>
+                      <span className="service-price-text">
+                        {service.price != null
+                          ? `${service.price.toLocaleString('ru-RU')} ${t('misc.aw_currency_sum')}`
+                          : t('misc.aw_quote_price_not_set')}
+                      </span>
+                      {bookingUnavailable && <span className="cart-step-v2__discount-hint">{unavailableHint}</span>}
+                    </span>
+                    <span className="cart-step-v2__doctor-service-action">
+                      {bookingUnavailable ? t('misc.qj_registration_unavailable') : selectedItem ? `+${selectedItem.quantity || 1}` : t('misc.snm_btn_add_service')}
+                    </span>
+                  </button>;
+                })}
+                {services.length === 0 &&
+                  <span className="cart-step-v2__discount-hint">{t('admin2.sc_empty_title')}</span>}
+              </div>
+            </section>
+          )}
+        </div>
+        }
+
         <div className="cart-step-v2__services-grid">
-          {displayedServices.map((service) => {
-            // ✅ ИСПРАВЛЕНО: Проверяем также по service_code для edit режима (когда service_id еще null)
-            const isInCart = Array.isArray(cart?.items) ? cart.items.some((item) => {
-              if (item.service_id === service.id) return true;
-              if (!item.service_id && service.service_code) {
-                const itemCode = String(item.service_name || item._temp_name || '').toUpperCase().trim();
-                const serviceCode = String(service.service_code).toUpperCase().trim();
-                if (itemCode === serviceCode) return true;
-                const itemCodeNoZero = itemCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                const serviceCodeNoZero = serviceCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                if (itemCodeNoZero === serviceCodeNoZero) return true;
-              }
-              return false;
-            }) : false;
+          {regularServices.map((service) => {
+            const isInCart = Boolean(selectedItemForService(service, null));
             return (
               <label
                 key={service.id}
@@ -375,9 +426,13 @@ const CartStepV2 = ({
 
           })}
 
-          {displayedServices.length === 0 &&
+          {regularServices.length === 0 && doctorGroups.length === 0 &&
           <div className="cart-step-v2__empty-services">
-              Услуги не найдены
+              {doctorServices.length > 0
+                ? lockedDoctorId === null
+                  ? 'Врач исходной QR-записи не определён. Услуги врача добавить нельзя.'
+                  : 'Нет доступного врача для этих услуг'
+                : 'Услуги не найдены'}
             </div>
           }
         </div>
@@ -430,7 +485,7 @@ const CartStepV2 = ({
                       {row.serviceName}
                     </div>
                     <div className="cart-step-v2__consultation-doctor">
-                      {row.doctorName ? t('misc.csv_vrach_row_doctorname', { doctorName: row.doctorName }) : t('misc.csv_vrach_ne_vybran')}
+                      {row.doctorName ? doctorRowLabel(row.doctorName) : t('misc.csv_vrach_ne_vybran')}
                     </div>
                   </div>
                   {/* QW-10 fix: wrapped repeat-eligibility badge in Tooltip with explanation. */}
@@ -479,7 +534,9 @@ const CartStepV2 = ({
           const doctorGroups = new Map<string | number, { id: string | number; name: string; items: CartItem[] }>();
           items.forEach((item) => {
             const docId = item.doctor_id || 'no_doctor';
-            const docName = item.doctor_name || (item.doctor_id ? t('misc.csv_vrach_item_doctor_id', { doctor_id: item.doctor_id }) : t('misc.csv_bez_vracha'));
+            const doctor = normalizedDoctorsData.find((candidate) => String(candidate.id) === String(item.doctor_id));
+            const docName = doctor ? getWizardDoctorDisplayName(doctor) :
+              item.doctor_name || (item.doctor_id ? t('misc.csv_vrach_item_doctor_id', { doctor_id: item.doctor_id }) : t('misc.csv_bez_vracha'));
             if (!doctorGroups.has(docId)) {
               doctorGroups.set(docId, { id: docId, name: docName, items: [] as CartItem[] });
             }
@@ -515,15 +572,9 @@ const CartStepV2 = ({
             // ✅ SSOT: Используем единую функцию для получения названия услуги
             const displayName = String(getServiceName ? getServiceName(item) : item.service_name || t('misc.csv_neizvestnaya_usluga'));
             const service = servicesData?.find((s) => s.id === item.service_id);
-            const requiresDoctor = Boolean(service?.requires_doctor || service?.is_consultation);
-
-            // PR-23 P0 #1 / W2-PR2 / RQ-08.a: фильтр врачей по серверной
-            // eligibility — запись каталога несёт accepted_specialties (тот же
-            // код, что серверный гейт RQ-05.a); fallback на alias-таблицу —
-            // только при отсутствии серверных данных. Пустой список — валидный
-            // ответ: ADR-001, владелец очереди = выбранный врач.
-            const filteredDoctors = filterDoctorsForService(normalizedDoctorsData, service);
-            const doctorOptions = filteredDoctors;
+            const requiresDoctor = Boolean(service?.doctor_selection_required);
+            const doctor = normalizedDoctorsData.find((candidate) => String(candidate.id) === String(item.doctor_id));
+            const doctorName = doctor ? getWizardDoctorDisplayName(doctor) : item.doctor_name;
 
             return (
               <div key={item.id} style={{
@@ -581,40 +632,12 @@ const CartStepV2 = ({
                       <X size={14} />
                     </button>
                   </div>
-                  {requiresDoctor &&
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-1)' }}>
-                      <label style={{
-                    fontSize: 'var(--mac-font-size-xs)',
-                    color: 'var(--mac-text-secondary)'
-                  }}>
-                        Врач для консультации
-                      </label>
-                      <select
-                    value={item.doctor_id || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdateItem?.(item.id, 'doctor_id', e.target.value ? Number(e.target.value) : null)}
-                    style={{
-                      width: '100%',
-                      fontSize: 'var(--mac-font-size-xs)',
-                      padding: '4px 6px',
-                      borderRadius: 'var(--mac-radius-sm)',
-                      border: '1px solid var(--mac-border)',
-                      background: 'var(--mac-bg-primary)',
-                      color: 'var(--mac-text-primary)'
-                    }}>
-
-                        <option value="">{t('misc.csv_vyberite_vracha')}</option>
-                        {doctorOptions.map((doctor, index) =>
-                    <option key={`${doctor.id ?? 'doctor'}-${doctor.specialty ?? ''}-${index}`} value={doctor.id}>
-                            {getDoctorOptionLabel(doctor)}
-                          </option>)}
-                      </select>
-                      {filteredDoctors.length === 0 && normalizedDoctorsData.length > 0 && (
-                        <span className="cart-step-v2__discount-hint">
-                          Нет врача этого профиля — услуга недоступна для записи
-                        </span>
-                      )}
-                    </div>
-                }
+                  {item.doctor_id != null &&
+                    <div className="cart-step-v2__cart-doctor-name">
+                      {doctorRowLabel(doctorName || t('misc.aw_doctor_hash', { id: item.doctor_id }))}
+                    </div>}
+                  {requiresDoctor && item.doctor_id == null &&
+                    <div className="cart-step-v2__discount-hint">{t('misc.aw_doctors_required')}</div>}
                 </div>);
 
           })}
