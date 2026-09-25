@@ -23,6 +23,7 @@ import { queueService } from '../services/queue';
 import { printPanelTicket } from '../services/panelPrint';
 import apiClient from '../api/client';
 import CardiologyQueueTab, { type CardiologyQueueEntry } from '../components/cardiology/CardiologyQueueTab';
+import PatientSearch, { type PatientSearchResult } from '../components/cardiology/PatientSearch';
 import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -213,6 +214,9 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   const [ecgResults, setEcgResults] = useState<Record<string, unknown>[]>([]);
   const [bloodTests, setBloodTests] = useState<Record<string, unknown>[]>([]);
   const [patientFiles, setPatientFiles] = useState<Record<string, unknown>[]>([]);
+  // Cardioplan slice 4: the doctor-owned visit history ("записи") of the
+  // currently selected patient, rendered alongside the medical history.
+  const [visitHistory, setVisitHistory] = useState<Record<string, unknown>[]>([]);
   const [historyFilter, setHistoryFilter] = useState('all');
   const [authRefreshTick, setAuthRefreshTick] = useState(0);
   const filesAccessDeniedRef = useRef(false);
@@ -383,10 +387,29 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     setShowForm({ open: true, type: 'blood' });
   };
 
+  // Canonical Doctor.id of the authenticated doctor (cached per mount).
+  // Cardioplan slice 4: also used to scope the visit-history query — the
+  // backend allows doctor roles to list only their own visits.
+  const resolveCurrentDoctorId = useCallback(async (): Promise<number> => {
+    if (currentDoctorIdRef.current !== null) return currentDoctorIdRef.current;
+
+    const { data: profile } = await apiClient.get<{ doctor?: { id?: unknown } }>('/doctor/my-info');
+    const doctorId = Number(profile?.doctor?.id);
+    if (!Number.isInteger(doctorId) || doctorId <= 0) {
+      throw new Error('Current doctor profile has no canonical Doctor.id');
+    }
+
+    currentDoctorIdRef.current = doctorId;
+    return doctorId;
+  }, []);
+
   // ✅ Функция загрузки данных пациента (объявлена до использования)
   const loadPatientData = useCallback(async () => {
     const { patientId, visitId } = getSelectedPatientContext();
-    if (!patientId) return;
+    if (!patientId) {
+      setVisitHistory([]);
+      return;
+    }
 
     try {
       const token = tokenManager.getAccessToken();
@@ -452,10 +475,25 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       }
 
       setPatientFiles(Array.from(mergedFiles.values()));
+
+      // Cardioplan slice 4: doctor-owned visit history ("записи") of the same
+      // patient. The backend requires doctor roles to pass their canonical
+      // Doctor.id and rejects foreign doctor_id values, so the panel only
+      // ever renders visits the authenticated doctor owns.
+      try {
+        const historyDoctorId = await resolveCurrentDoctorId();
+        const { data: visitsData } = await apiClient.get('/visits/visits', {
+          params: { patient_id: patientId, doctor_id: historyDoctorId, limit: 50 },
+        });
+        setVisitHistory(Array.isArray(visitsData) ? visitsData : []);
+      } catch (visitErr) {
+        logger.warn('[Cardiology] Failed to load doctor-owned visit history', visitErr);
+        setVisitHistory([]);
+      }
     } catch (error: unknown) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_data_update_failed')));
     }
-  }, [getSelectedPatientContext]);
+  }, [getSelectedPatientContext, resolveCurrentDoctorId]);
 
   // ✅ Очистка EMR и visitData при смене пациента
   useEffect(() => {
@@ -483,6 +521,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       setEcgResults([]);
       setBloodTests([]);
       setPatientFiles([]);
+      setVisitHistory([]);
       setHistoryFilter('all');
     }
   }, [selectedPatient, loadPatientData, authRefreshTick]);
@@ -658,19 +697,6 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   // Функция для получения всех услуг пациента из всех записей
   const getAllPatientServicesCb = useCallback((patientId: string | number | null | undefined, allAppointments: Record<string, unknown>[]) => {
     return getAllPatientServices(patientId, allAppointments);
-  }, []);
-
-  const resolveCurrentDoctorId = useCallback(async (): Promise<number> => {
-    if (currentDoctorIdRef.current !== null) return currentDoctorIdRef.current;
-
-    const { data: profile } = await apiClient.get<{ doctor?: { id?: unknown } }>('/doctor/my-info');
-    const doctorId = Number(profile?.doctor?.id);
-    if (!Number.isInteger(doctorId) || doctorId <= 0) {
-      throw new Error('Current doctor profile has no canonical Doctor.id');
-    }
-
-    currentDoctorIdRef.current = doctorId;
-    return doctorId;
   }, []);
 
   // Загрузка записей текущего кардиолога по каноническому Doctor.id.
@@ -1133,26 +1159,6 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       loadEMR(visitId);
     }
   }, [selectedPatient, authRefreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Обработка AI предложений
-  const handleAISuggestion = (type: string, suggestion: unknown) => {
-    if (type === 'icd10') {
-      setVisitData({ ...visitData, icd10: String(suggestion ?? '') });
-      notify.success(tI18n('cardio.icd_added_from_ai'));
-      // P-020 (UX audit): immediately warn if the AI-suggested ICD-10 code
-      // is a critical diagnosis, so the doctor can double-check before
-      // completing the visit.
-      const critical = getCriticalDiagnosisWarning(suggestion);
-      if (critical) {
-        notify.warning(
-          tI18n('cardio.cardio_panel_critical_diagnosis_warning', { label: critical.label, fullCode: critical.fullCode })
-        );
-      }
-    } else if (type === 'diagnosis') {
-      setVisitData({ ...visitData, diagnosis: String(suggestion ?? '') });
-      notify.success(tI18n('cardio.diagnosis_added_from_ai'));
-    }
-  };
 
   // Обработка сохранения визита
   const handleSaveVisit = async (savedEMRData: Record<string, unknown>) => {
@@ -1628,6 +1634,19 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       badgeVariant: 'success',
       meta: (result.source as string | null | undefined) || tI18n('cardio.cardio_panel_ecg_meta', { id: result.id || '—' }),
     })),
+    ...visitHistory.map((visit) => {
+      const when = (visit.finished_at || visit.started_at || visit.planned_date || visit.created_at) as string | null | undefined;
+      const doctorName = (visit.doctor_name as string | null | undefined) || tI18n('cardio.cardio_panel_doctor_fallback');
+      return {
+        id: `visit-${visit.id}`,
+        kind: 'visits',
+        title: tI18n('cardio.cardio_panel_visit_history_title', { date: when || '—' }),
+        subtitle: doctorName,
+        timestamp: (when || null) as string | number | Date | null,
+        badgeVariant: 'primary',
+        meta: null,
+      };
+    }),
     ...patientFiles.map((file) => {
       const fileLabel = (file.title || file.original_filename || file.filename || file.name || tI18n('cardio.cardio_panel_file_label', { id: file.id })) as string;
       const tags = Array.isArray(file.tags) && file.tags.length > 0 ? (file.tags as unknown[]).join(', ') : '';
@@ -1652,6 +1671,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
 
   const historyFilterOptions = [
     { value: 'all', label: tI18n('cardio.cardio_panel_filter_all'), count: historyEntries.length },
+    { value: 'visits', label: tI18n('cardio.cardio_panel_filter_visits'), count: visitHistory.length },
     { value: 'ecg', label: tI18n('cardio.cardio_panel_filter_ecg'), count: ecgResults.length },
     { value: 'labs', label: tI18n('cardio.cardio_panel_filter_labs'), count: bloodTests.length },
     { value: 'attachments', label: tI18n('cardio.cardio_panel_filter_attachments'), count: patientFiles.length },
@@ -1687,6 +1707,25 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       variant: 'success'
     }
   ];
+
+  // Cardioplan slice 4: picking a patient from the search results selects
+  // them for the whole panel (visit history + medical history). No visit or
+  // queue context is attached — visits are opened from the queue screen, so
+  // this selection only feeds history views and read-only context.
+  const handlePatientSearchPick = (patient: PatientSearchResult) => {
+    setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
+    setSelectedPatient({
+      id: patient.id,
+      patient_id: patient.id,
+      visit_id: null,
+      patient_name: patient.full_name,
+      phone: patient.phone || '',
+      number: patient.id,
+      source: 'patient_search',
+      status: null,
+      specialty: 'cardiology',
+    });
+  };
 
   const handleDoctorQueueStartVisit = (entry: CardiologyQueueEntry, result: { patient_id?: number | null; visit_id?: number | null }) => {
     preloadVisitTab();
@@ -1760,6 +1799,10 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
               old deep links. */}
           {(activeTab === 'patients' || activeTab === 'appointments') &&
             <Suspense fallback={tabLoadingFallback}>
+              <PatientSearch
+                onPick={handlePatientSearchPick}
+                selectedPatientId={(selectedPatient?.patient_id ?? selectedPatient?.id ?? null) as string | number | null}
+              />
               <AppointmentsTab
                 appointments={appointments}
                 appointmentsLoading={appointmentsLoading}
@@ -1907,9 +1950,11 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
             />
           }
 
-          {/* AI Помощник — R-15: extracted to AiTab component */}
+          {/* AI Помощник — R-15: extracted to AiTab component.
+              Cardioplan slice 4: read-only — no apply button, no success
+              notify; suggestions are applied inside the EMR editor. */}
           {activeTab === 'ai' &&
-            <AiTab onSuggestionSelect={handleAISuggestion} />
+            <AiTab />
           }
 
           {/* Управление услугами — R-15: extracted to ServicesTab component */}
