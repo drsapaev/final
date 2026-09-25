@@ -172,16 +172,16 @@ export function DermaPatientsTab({
         )}
 
         {visibleResults.length > 0 && (
-          <ul
+          <div
             className="derma-flex-col-24"
+            role="list"
             aria-label={t('derma.derma_panel_patients_search_results')}
-            style={{ listStyle: 'none', margin: 0, padding: 0 }}
           >
             {visibleResults.map((patient) => {
               const mappedPatient = toDermatologyPatient(patient);
               const id = patientId(mappedPatient);
               return (
-                <li key={String(id)} className="derma-patient-card">
+                <div key={String(id)} className="derma-patient-card" role="listitem">
                   <div className="derma-flex-between-top">
                     <div className="derma-flex-1">
                       <h4 className="derma-h4-16-600">{patientName(mappedPatient)}</h4>
@@ -208,10 +208,10 @@ export function DermaPatientsTab({
                       {t('derma.derma_panel_patients_select')}
                     </Button>
                   </div>
-                </li>
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
       </Card>
 
@@ -227,7 +227,7 @@ export function DermaPatientsTab({
                   <span>{t('derma.derma_panel_patient_id', { id: selectedId })}</span>
                 </div>
               </div>
-              <div className="derma-flex-gap-16" style={{ flexWrap: 'wrap' }}>
+              <div className="derma-flex-gap-16-wrap">
                 <Button variant="outline" onClick={() => onOpenExam(selectedPatient)}>
                   <HeartPulse size={16} aria-hidden="true" />
                   {t('derma.derma_panel_button_exam')}
