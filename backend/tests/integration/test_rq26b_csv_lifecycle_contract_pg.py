@@ -38,10 +38,24 @@ E-055) have landed:
 
 No migrations: the registry table (0068) and the Alembic chain are
 consumed, never modified. Disposable PostgreSQL: the module provisions
-its own scratch database (rq26b_check), runs ``alembic upgrade head``
-and drops it at the end; skips (NOT_RUN, plan P0) when no disposable
-PostgreSQL server is reachable. SQLite is never a substitute here.
-SYNTHETIC data only (``rq26b-``/``RQ26B-`` markers, no PHI/PII).
+its own UNIQUE scratch database (``rq26b_check_<hex>`` — a fixed name
+with a pre-drop let two parallel pytest/agent runs on one server drop
+each other's database), runs ``alembic upgrade head`` and drops it at
+the end; skips (NOT_RUN, plan P0) when no disposable PostgreSQL server
+is reachable. ``DATABASE_URL`` is accepted for automatic provisioning
+only for localhost/unix-socket servers; a remote admin DSN must be
+passed explicitly via the test-owned ``RQ26B_PG_ADMIN_URL``. SQLite is
+never a substitute here.
+
+Determinism: the anonymous start-session leg goes through the queue
+time gate (``ONLINE_QUEUE_START_TIME`` 07:00 Asia/Tashkent), so the
+module pins the gate open with the same autouse ``_no_time_gate``
+fixture as test_rq16d_public_direction_runtime.py — otherwise a nightly
+run before 07:00 local time fails with no code change.
+
+SYNTHETIC data only (``rq26b-``/``RQ26B-`` markers); per AGENTS.md PII
+rules no plaintext ``email``/``phone``/``patients.*`` values are
+committed — synthetic users carry ``email=None`` (no PHI/PII).
 
 Modeled on tests/integration/test_rq16d_public_direction_runtime.py and
 test_rq24b_cross_panel_s21_pg.py (merged real-PG harness precedents).
@@ -56,16 +70,23 @@ from __future__ import annotations
 
 import os
 import sys
+import uuid
+from datetime import time
 from pathlib import Path
 
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-SCRATCH_DB = "rq26b_check"
+
+# Unique per run (review P2 — scratch-DB isolation): cleanup drops ONLY
+# the database this run created, so parallel runs cannot destroy each
+# other's scratch state (same class fix as the schedule-lock harness).
+SCRATCH_DB = f"rq26b_check_{uuid.uuid4().hex[:12]}"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -104,18 +125,30 @@ CSV_SOURCE_PROFILE_KEYS = {
 
 
 def _candidate_admin_urls() -> list[str]:
-    """Plain-psycopg admin DSNs.
+    """Plain-psycopg admin DSNs — LOCAL servers only for auto-detection.
 
     ``DATABASE_URL`` in CI is a SQLAlchemy URL
     (``postgresql+psycopg://``); psycopg.connect rejects the driver
     suffix, so the scheme is normalized for the admin connection
     (RQ-24.b lesson: without the normalization the module would silently
     SKIP in CI).
+
+    The scratch database must never be provisioned — or dropped — on a
+    remote server reachable through a plain ``DATABASE_URL`` (review P2):
+    auto-detected candidates are accepted only for localhost / 127.0.0.1
+    / ::1 hosts or unix-socket DSNs. A remote admin DSN must be passed
+    explicitly via the test-owned ``RQ26B_PG_ADMIN_URL``.
     """
     urls: list[str] = []
 
     def _normalized(raw: str) -> str:
         return raw.replace("postgresql+psycopg://", "postgresql://", 1)
+
+    def _is_local(url: str) -> bool:
+        u = make_url(url)
+        return (u.host or "") in {"localhost", "127.0.0.1", "::1"} or bool(
+            u.query.get("host")
+        )
 
     explicit = os.getenv("RQ26B_PG_ADMIN_URL", "").strip()
     if explicit:
@@ -124,7 +157,7 @@ def _candidate_admin_urls() -> list[str]:
     if local_pw:
         urls.append(f"postgresql://postgres:{local_pw}@localhost:5432/postgres")
     env_url = os.getenv("DATABASE_URL", "").strip()
-    if env_url:
+    if env_url and _is_local(_normalized(env_url)):
         urls.append(_normalized(env_url))
     return urls
 
@@ -182,8 +215,9 @@ def pg_engine():
         )
 
     psycopg_dsn, sa_url = _scratch_urls(admin_url)
+    # No pre-drop: the name is unique per run, so a leftover database can
+    # never be silently reused — a name collision fails loudly instead.
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
         c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
     env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
@@ -209,7 +243,10 @@ def pg_engine():
 
     engine.dispose()
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        try:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+        except Exception:  # noqa: BLE001 — pre-PG13 fallback
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
 
 
 @pytest.fixture
@@ -239,6 +276,26 @@ def pg_client(pg_session):
     app.dependency_overrides.clear()
 
 
+@pytest.fixture(autouse=True)
+def _no_time_gate(monkeypatch):
+    """Pin the queue time gate open (same fixture as test_rq16d).
+
+    The permanent-address start-session leg goes through
+    ``start_join_session()`` → ``_check_online_time_restrictions()``,
+    which refuses before 07:00 Asia/Tashkent. Without this fixture a
+    nightly CI run inside that window fails with no code change (review
+    P1); with the gate pinned to 00:00 the module is deterministic at
+    any wall-clock time.
+    """
+    from app.services.queue_svc import QueueBusinessService
+    from app.services.queue_svc._base import QueueBusinessServiceMixinBase
+
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
+    monkeypatch.setattr(
+        QueueBusinessServiceMixinBase, "ONLINE_QUEUE_START_TIME", time(0, 0)
+    )
+
+
 def _get_or_create_user(session, username: str, role: str):
     """Idempotent synthetic user (the scratch DB persists across tests)."""
     from app.core.security import get_password_hash
@@ -249,7 +306,9 @@ def _get_or_create_user(session, username: str, role: str):
         return user
     user = User(
         username=username,
-        email=f"{username}@example.com",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all.
+        email=None,
         full_name=f"RQ-26.b {username}",
         hashed_password=get_password_hash("rq26b-synthetic-pw"),
         role=role,
@@ -641,8 +700,11 @@ def test_csv_create_refuses_keys_outside_backend_pattern(
     enforces ^[a-z][a-z0-9_]*$ on the key — a hand-edited CSV with a
     foreign key style (hyphens, digits lead) gets a deterministic 422 BEFORE
     any state change, surfacing through the import failure counter. Every
-    legitimately created profile satisfies the pattern, so real CSV exports
-    always re-import (the round-trip test above uses a valid key)."""
+    SUPPORTED creation surface now enforces the same pattern: this profile
+    POST and the admin department create (RQ-26.b follow-up unified
+    DepartmentCreate with QueueProfileCreate — the department-integration
+    path turns department.key into a profile key), so real CSV exports
+    always re-import (the round-trip tests use valid keys)."""
     headers = _auth_headers(pg_admin_user)
 
     refused = pg_client.post(
@@ -657,3 +719,103 @@ def test_csv_create_refuses_keys_outside_backend_pattern(
     assert all(
         p["key"] != "rq26b-invalid-key" for p in listing.json()["profiles"]
     ), "a refused key must leave no partial state behind"
+
+
+# ------------------------------------------------------------------
+# 7. Full round-trip: admin department create → CSV export → fresh import
+# ------------------------------------------------------------------
+
+
+def test_admin_department_create_key_enters_csv_round_trip(
+    pg_client, pg_admin_user, pg_session
+):
+    """RQ-26.b review follow-up (P2): the department-integration path
+    (``_ensure_department_integrations``) turns ``department.key`` into a
+    ``QueueProfile.key`` — the OTHER supported creation surface the CSV
+    export reads. The round-trip closes only if that key also satisfies
+    the strict import schema:
+
+    - a department create with a foreign key style is refused 422 BEFORE
+      any state change (DepartmentCreate now enforces the same pattern as
+      QueueProfileCreate), so a supported-flow export can never carry a
+      key the fresh import would reject;
+    - a department create with a conforming key auto-provisions the
+      profile (PR-16), the admin list exposes it (the CSV export source),
+      and the CSV-shaped payload re-imports cleanly into a fresh state
+      (the auto-created row is removed first to simulate a fresh install).
+    """
+    headers = _auth_headers(pg_admin_user)
+
+    refused = pg_client.post(
+        "/api/v1/admin/departments",
+        json={"key": "rq26b-invalid-key", "name_ru": "RQ-26.b отказ (синтетик)"},
+        headers=headers,
+    )
+    assert refused.status_code == 422, refused.text
+    listing = pg_client.get(
+        PROFILES_PATH, params={"active_only": "false"}, headers=headers
+    )
+    assert listing.status_code == 200
+    assert all(
+        p["key"] != "rq26b-invalid-key" for p in listing.json()["profiles"]
+    ), "a refused department key must leave no queue profile behind"
+
+    created = pg_client.post(
+        "/api/v1/admin/departments",
+        json={
+            "key": "rq26b_rt",
+            "name_ru": "RQ-26.b round-trip (синтетик)",
+            # Explicit short service_code: the auto-derived f"{key}_consult"
+            # exceeds the legacy services VARCHAR(10) for longer keys — a
+            # pre-existing quirk out of RQ-26.b scope; the round-trip target
+            # here is the profile key, not the service code.
+            "integration": {"service_code": "RQ26BRT"},
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["integration"]["queue_profile_created"] is True, (
+        "the auto-provisioned registrar tab (PR-16) is the export source"
+    )
+
+    export = pg_client.get(
+        PROFILES_PATH, params={"active_only": "false"}, headers=headers
+    )
+    assert export.status_code == 200
+    source = {p["key"]: p for p in export.json()["profiles"]}["rq26b_rt"]
+    assert set(source.keys()) == CSV_SOURCE_PROFILE_KEYS
+
+    # CSV payload shape: typed values, `order` → display_order, omitted
+    # empty cells — exactly what queueProfilesCsv.ts builds for import.
+    payload = {
+        "key": source["key"],
+        "title": source["title"],
+        "title_ru": source["title_ru"],
+        "queue_tags": source["queue_tags"],
+        "department_key": source["department_key"],
+        "icon": source["icon"],
+        "color": source["color"],
+        "display_order": source["order"],
+        "is_active": source["is_active"],
+        "show_on_qr_page": source["show_on_qr_page"],
+    }
+
+    # Fresh-install simulation: remove the auto-created row, then import.
+    from app.models.queue_profile import QueueProfile
+
+    auto_created = (
+        pg_session.query(QueueProfile).filter(QueueProfile.key == "rq26b_rt").one()
+    )
+    pg_session.delete(auto_created)
+    pg_session.commit()
+
+    reimported = pg_client.post(PROFILES_PATH, json=payload, headers=headers)
+    assert reimported.status_code == 200, reimported.text
+    assert reimported.json()["success"] is True
+    body = reimported.json()["profile"]
+    assert body["key"] == "rq26b_rt"
+    assert body["order"] == source["order"]
+    assert body["queue_tags"] == source["queue_tags"]
+    assert body["department_key"] == source["department_key"]
+    assert body["is_active"] == source["is_active"]
+    assert body["show_on_qr_page"] == source["show_on_qr_page"]

@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import os
 import sys
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -44,10 +45,16 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-SCRATCH_DB = "rq24b_check"
+
+# Unique per run (review P2 — scratch-DB isolation, RQ-26.b follow-up
+# class fix): a fixed name with an unconditional pre-drop let two
+# parallel pytest/agent runs on the same PostgreSQL server drop each
+# other's database. Cleanup drops ONLY the database this run created.
+SCRATCH_DB = f"rq24b_check_{uuid.uuid4().hex[:12]}"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -87,16 +94,29 @@ PHONE_D = "998501000003"  # SYNTHETIC walk-in (cashier leg)
 
 
 def _candidate_admin_urls() -> list[str]:
-    """Plain-psycopg admin DSNs.
+    """Plain-psycopg admin DSNs — LOCAL servers only for auto-detection.
 
     ``DATABASE_URL`` in CI is a SQLAlchemy URL
     (``postgresql+psycopg://``); psycopg.connect rejects the driver
     suffix, so the scheme is normalized for the admin connection.
+
+    The scratch database must never be provisioned — or dropped — on a
+    remote server reachable through a plain ``DATABASE_URL`` (review P2,
+    RQ-26.b follow-up class fix): auto-detected candidates are accepted
+    only for localhost / 127.0.0.1 / ::1 hosts or unix-socket DSNs. A
+    remote admin DSN must be passed explicitly via the test-owned
+    ``RQ24B_PG_ADMIN_URL``.
     """
     urls: list[str] = []
 
     def _normalized(raw: str) -> str:
         return raw.replace("postgresql+psycopg://", "postgresql://", 1)
+
+    def _is_local(url: str) -> bool:
+        u = make_url(url)
+        return (u.host or "") in {"localhost", "127.0.0.1", "::1"} or bool(
+            u.query.get("host")
+        )
 
     explicit = os.getenv("RQ24B_PG_ADMIN_URL", "").strip()
     if explicit:
@@ -105,7 +125,7 @@ def _candidate_admin_urls() -> list[str]:
     if local_pw:
         urls.append(f"postgresql://postgres:{local_pw}@localhost:5432/postgres")
     env_url = os.getenv("DATABASE_URL", "").strip()
-    if env_url:
+    if env_url and _is_local(_normalized(env_url)):
         urls.append(_normalized(env_url))
     return urls
 
@@ -163,8 +183,9 @@ def pg_engine():
         )
 
     psycopg_dsn, sa_url = _scratch_urls(admin_url)
+    # No pre-drop: the name is unique per run, so a leftover database can
+    # never be silently reused — a name collision fails loudly instead.
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
         c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
     env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
@@ -326,7 +347,10 @@ def _get_or_create_user(session, username: str, role: str):
         return user
     user = User(
         username=username,
-        email=f"{username}@example.com",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all
+        # (RQ-26.b follow-up class fix).
+        email=None,
         full_name=f"RQ-24.b {username}",
         hashed_password=get_password_hash("rq24b-synthetic-pw"),
         role=role,

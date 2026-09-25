@@ -115898,6 +115898,9 @@
         "properties": {
           "key": {
             "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*$",
             "title": "Key"
           },
           "name_ru": {
