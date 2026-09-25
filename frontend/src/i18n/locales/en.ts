@@ -845,7 +845,9 @@ const en = {
     cardio_visit_doctor_prefix: 'врач #{id}',
     cardio_visit_emr_title: 'Электронная медицинская карта',
     cardio_visit_cancel: 'Отменить',
+    cardio_visit_back_to_queue: 'Back to queue',
     cardio_visit_complete: 'Завершить прием',
+    cardio_visit_readonly: 'Completed visit — view only',
 
     // ─── HistoryTab (cardio.cardio_hist_*) ───
     cardio_hist_empty_title: 'История',

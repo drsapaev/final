@@ -36,6 +36,7 @@ import tokenManager from '../utils/tokenManager';
 import { countAppointmentsByStatuses, SPECIALTY_KEYS, getAllPatientServices, makeEnsureCanonicalVisitId } from '../utils/doctorPanelShared';
 import { selectEntriesForSpecialist } from '../utils/cardiologyQueue';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
+import { emrTextValue } from '../components/emr-v2/emrCompletion';
 import { Download, Settings } from 'lucide-react';
 
 const AppointmentsTab = lazy(() => import('../components/cardiology/AppointmentsTab'));
@@ -1154,8 +1155,16 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   };
 
   // Обработка сохранения визита
-  const handleSaveVisit = async () => {
+  const handleSaveVisit = async (savedEMRData: Record<string, unknown>) => {
     if (!selectedPatient) return;
+
+    const complaint = emrTextValue(savedEMRData.complaints);
+    const diagnosis = emrTextValue(savedEMRData.diagnosis);
+    const legacyDiagnosis = savedEMRData.diagnosis && typeof savedEMRData.diagnosis === 'object'
+      ? savedEMRData.diagnosis as Record<string, unknown>
+      : null;
+    const icd10 = emrTextValue(savedEMRData.icd10_code) || emrTextValue(legacyDiagnosis?.icd10_code);
+    const notes = emrTextValue(savedEMRData.notes);
 
     // QW-10 (UX audit): confirm before completing the visit. completeVisit is
     // an irreversible action that closes the encounter and auto-calls the next
@@ -1169,10 +1178,10 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
     // dissection, R57 shock), we show the strongest warning (intent='danger')
     // and require explicit confirmation. This prevents accidental entry of
     // a life-threatening diagnosis that could trigger aggressive therapy.
-    const hasDiagnosis = Boolean(visitData?.diagnosis?.trim());
-    const hasComplaint = Boolean(visitData?.complaint?.trim());
+    const hasDiagnosis = Boolean(diagnosis.trim());
+    const hasComplaint = Boolean(complaint.trim());
     const missingCritical = !hasDiagnosis || !hasComplaint;
-    const criticalWarning = getCriticalDiagnosisWarning(visitData?.icd10);
+    const criticalWarning = getCriticalDiagnosisWarning(icd10);
 
     let confirmOptions: Record<string, unknown>;
     if (criticalWarning) {
@@ -1225,39 +1234,13 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         return;
       }
 
-      // X-2 (UX audit): fetch latest EMR data for the payload instead of
-      // using local visitData which is never populated by EMRContainerV2.
-      let emrPayload = { complaint: '', diagnosis: '', icd10: '', notes: '' };
-      try {
-        const emrResponse = await fetch(`${API_V1_BASE}/v2/emr/${selectedPatient?.visit_id}`, {
-          headers: { 'Authorization': `Bearer ${tokenManager.getAccessToken()}` }
-        });
-        if (emrResponse.ok) {
-          const emrData = await emrResponse.json();
-          emrPayload = {
-            complaint: emrData?.complaints || '',
-            diagnosis: emrData?.diagnosis || '',
-            icd10: emrData?.icd10_code || emrData?.icd10 || '',
-            notes: emrData?.notes || '',
-          };
-        }
-      } catch (emrErr) {
-        logger.warn('[Cardiology] Failed to fetch EMR for visit payload, using local visitData', emrErr);
-        emrPayload = {
-          complaint: visitData.complaint,
-          diagnosis: visitData.diagnosis,
-          icd10: visitData.icd10,
-          notes: visitData.notes,
-        };
-      }
-
       const visitPayload = {
         patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
-        complaint: emrPayload.complaint,
-        diagnosis: emrPayload.diagnosis,
-        icd10: emrPayload.icd10,
+        complaint,
+        diagnosis,
+        icd10,
         services: selectedServices,
-        notes: emrPayload.notes
+        notes,
       };
       await queueService.completeVisit(queueEntryId, visitPayload);
       notify.success(tI18n('cardio.visit_completed'));
@@ -1471,14 +1454,18 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
 
 
   // Обработка завершения приема через EMR
-  const handleCompleteVisitFromEMR = async () => {
+  const handleCompleteVisitFromEMR = async (savedEMRData: Record<string, unknown>) => {
     if (!selectedPatient) return;
 
     try {
-      await handleSaveVisit();
+      await handleSaveVisit(savedEMRData);
     } catch (error: unknown) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_complete_visit_emr_failed')));
     }
+  };
+
+  const handleEMRCompletionBlocked = () => {
+    notify.error(tI18n('cardio.cardio_panel_complete_visit_emr_failed'));
   };
 
   // Обработка анализов крови
@@ -1801,6 +1788,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
                   number?: string | number;
                   phone?: string;
                   visit_id?: number | string;
+                  status?: string | null;
                 } | null}
                 emr={emr}
                 loading={loading}
@@ -1809,6 +1797,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
                   setActiveTab('queue');
                 }}
                 onComplete={handleCompleteVisitFromEMR}
+                onCompletionBlocked={handleEMRCompletionBlocked}
                 onGoToAppointments={() => goToTab('patients')}
                 getColor={getColor}
                 getFontSize={getFontSize}
