@@ -38,7 +38,7 @@ describe('Cardiology Patients & AI contract', () => {
 
   it('selects the picked patient for the panel without visit or queue context', () => {
     expect(panelSource).toContain('source: \'patient_search\'');
-    const pickHandler = panelSource.match(/const handlePatientSearchPick = [\s\S]*?\n {2};/);
+    const pickHandler = panelSource.match(/const handlePatientSearchPick = [\s\S]*?\n {2}};/);
     expect(pickHandler).not.toBeNull();
     expect(pickHandler?.[0]).toContain('visit_id: null');
     expect(pickHandler?.[0]).not.toContain('doctor_queue_entry_id');
