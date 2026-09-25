@@ -561,7 +561,12 @@ class VisitConfirmationService:
                     if visit.confirmation_expires_at
                     else None
                 ),
-                "notes": visit.notes,
+                # PR 3407 delta review P2: the confirmation card is a
+                # PUBLIC, bearer-token-addressed projection, so it is built
+                # patient-safe at the capability level — ``notes`` (clinical
+                # text: diagnosis markers, cancel reasons, force-reopen audit
+                # lines) must never be readable through any token-addressed
+                # route (both the legacy GET and the POST share this card).
             }
         except VisitConfirmationDomainError:
             raise

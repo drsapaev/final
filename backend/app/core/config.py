@@ -435,6 +435,18 @@ class Settings(BaseSettings):
             return origins
         return value
 
+    @field_validator("FRONTEND_URL", mode="after")
+    @classmethod
+    def _normalize_frontend_url(cls, value):
+        # Public deep links are built as f"{settings.FRONTEND_URL}/path" —
+        # PWA invitation, password reset, Telegram web-app buttons, QR codes.
+        # A trailing slash (accepted from env/config sources) would produce
+        # "//path" URLs that miss the intended React Router route; strip it
+        # once at the typed-contract boundary so every consumer is safe.
+        if isinstance(value, str):
+            return value.strip().rstrip("/")
+        return value
+
     @model_validator(mode="after")
     def _no_testing_in_production(self) -> Settings:
         if self.TESTING and self.is_production:

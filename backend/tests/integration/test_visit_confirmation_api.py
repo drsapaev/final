@@ -6,6 +6,10 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.models.online_queue import OnlineQueueEntry
+from app.services.visit_confirmation_service import (
+    VisitConfirmationDomainError,
+    VisitConfirmationService,
+)
 
 
 @pytest.mark.integration
@@ -44,6 +48,122 @@ class TestVisitConfirmationAPI:
         assert response.status_code == 400
         data = response.json()
         assert "истек" in data["detail"]
+
+    def test_post_visit_info_matches_legacy_get(self, client, test_visit):
+        """The token moves to the request body; the card keeps its fields.
+
+        PR 3407 delta review P2: BOTH the POST and the legacy GET are
+        patient-safe now — the card is built without the internal
+        ``notes`` field at the service level, so the two routes publish
+        the identical shape.
+        """
+        token = test_visit.confirmation_token
+        test_visit.notes = "diagnosis: private clinical note"
+        post_response = client.post("/api/v1/visits/info", json={"token": token})
+        get_response = client.get(f"/api/v1/visits/info/{token}")
+
+        assert post_response.status_code == get_response.status_code == 200
+        assert post_response.json() == get_response.json()
+        assert "notes" not in get_response.json()
+        assert token not in post_response.request.url.path
+
+    def test_post_visit_info_omits_internal_notes(self, client, test_visit):
+        """PR 3390 review P2: the public POST card must not leak Visit.notes.
+
+        ``Visit.notes`` carries clinical/admin text (the same marker the
+        Telegram security tests keep off patient-facing messaging:
+        "diagnosis: private clinical note", cancel reasons, force-reopen
+        audit lines). The bearer-token confirmation card does not need it,
+        so the POST response is a minimal patient-safe DTO without the
+        field — even though the UI never renders it, any link holder could
+        read it in the Network response.
+        """
+        test_visit.notes = "diagnosis: private clinical note"
+        response = client.post(
+            "/api/v1/visits/info", json={"token": test_visit.confirmation_token}
+        )
+
+        assert response.status_code == 200
+        assert "notes" not in response.json()
+        assert "private clinical note" not in response.text
+
+        # PR 3407 delta review P2: the patient-safe boundary must hold at
+        # the capability level, not per-route — the same bearer token must
+        # not read ``notes`` through the legacy GET either.
+        legacy = client.get(
+            f"/api/v1/visits/info/{test_visit.confirmation_token}"
+        )
+        assert legacy.status_code == 200
+        assert "notes" not in legacy.json()
+        assert "private clinical note" not in legacy.text
+
+    def test_legacy_get_visit_info_omits_internal_notes(self, client, test_visit):
+        """PR 3407 delta review P2: legacy GET is patient-safe too.
+
+        The old per-route fix filtered ``notes`` only on the POST via the
+        ``VisitInfoResponse`` model, while the legacy GET still published
+        the raw service card. Any holder of the confirmation token could
+        read the clinical/admin text through the legacy URL, so the field
+        is now dropped from the service card itself (both routes share
+        it) and the GET response is additionally filtered through the
+        same patient-safe model.
+        """
+        test_visit.notes = "diagnosis: private clinical note"
+        response = client.get(
+            f"/api/v1/visits/info/{test_visit.confirmation_token}"
+        )
+
+        assert response.status_code == 200
+        assert "notes" not in response.json()
+        assert "private clinical note" not in response.text
+
+    def test_post_visit_info_unknown_token_matches_legacy_get(self, client):
+        token = "synthetic-unknown-token"
+        post_response = client.post("/api/v1/visits/info", json={"token": token})
+        get_response = client.get(f"/api/v1/visits/info/{token}")
+
+        assert post_response.status_code == get_response.status_code == 404
+        assert post_response.json() == get_response.json()
+
+    def test_post_visit_info_expired_token_matches_legacy_get(self, client, test_visit):
+        """Error bodies stay identical between POST and legacy GET."""
+        test_visit.confirmation_expires_at = datetime.utcnow() - timedelta(hours=1)
+        token = test_visit.confirmation_token
+        post_response = client.post("/api/v1/visits/info", json={"token": token})
+        get_response = client.get(f"/api/v1/visits/info/{token}")
+
+        assert post_response.status_code == get_response.status_code == 400
+        assert post_response.json() == get_response.json()
+
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            VisitConfirmationDomainError(
+                status_code=500, detail="SYNTHETIC-SENSITIVE-DETAIL"
+            ),
+            RuntimeError("SYNTHETIC-SENSITIVE-DETAIL"),
+        ],
+    )
+    def test_post_visit_info_hides_internal_errors(self, client, monkeypatch, failure):
+        def fail_read(_service, _token):
+            raise failure
+
+        monkeypatch.setattr(VisitConfirmationService, "get_visit_info", fail_read)
+        response = client.post(
+            "/api/v1/visits/info", json={"token": "synthetic-error-token"}
+        )
+
+        assert response.status_code == 500
+        assert response.json() == {"detail": "Не удалось получить информацию о визите"}
+        assert "SYNTHETIC-SENSITIVE-DETAIL" not in response.text
+
+    def test_post_visit_info_is_in_openapi(self, client):
+        schema = client.get("/openapi.json").json()
+        operation = schema["paths"]["/api/v1/visits/info"]["post"]
+        request_ref = operation["requestBody"]["content"]["application/json"]["schema"]
+        assert request_ref["$ref"] == "#/components/schemas/VisitInfoRequest"
+        response_ref = operation["responses"]["200"]["content"]["application/json"]["schema"]
+        assert response_ref["$ref"] == "#/components/schemas/VisitInfoResponse"
 
     def test_confirm_visit_telegram_success(self, client, test_visit, test_daily_queue):
         """Тест успешного подтверждения визита через Telegram"""
@@ -112,6 +232,54 @@ class TestVisitConfirmationAPI:
         assert response.status_code == 400
         data = response.json()
         assert "не совпадает" in data["detail"]
+
+    @pytest.mark.parametrize("status_code", [500, 503])
+    def test_confirm_visit_pwa_hides_internal_error(
+        self, client, monkeypatch, status_code
+    ):
+        marker = "SYNTHETIC-SENSITIVE-DETAIL"
+
+        def fail_confirmation(_service, **_kwargs):
+            raise VisitConfirmationDomainError(
+                status_code=status_code, detail=f"Internal error: {marker}"
+            )
+
+        monkeypatch.setattr(
+            VisitConfirmationService, "confirm_by_pwa", fail_confirmation
+        )
+        response = client.post(
+            "/api/v1/patient/visits/confirm",
+            json={"token": "synthetic-confirm-token"},
+        )
+
+        assert response.status_code == status_code
+        assert response.json() == {"detail": "Не удалось подтвердить визит"}
+        assert marker not in response.text
+
+    @pytest.mark.parametrize("status_code", [400, 404, 429])
+    def test_confirm_visit_pwa_preserves_domain_error(
+        self, client, monkeypatch, status_code
+    ):
+        detail = "Синтетическая ошибка подтверждения"
+        headers = {"Retry-After": "7"} if status_code == 429 else None
+
+        def fail_confirmation(_service, **_kwargs):
+            raise VisitConfirmationDomainError(
+                status_code=status_code, detail=detail, headers=headers
+            )
+
+        monkeypatch.setattr(
+            VisitConfirmationService, "confirm_by_pwa", fail_confirmation
+        )
+        response = client.post(
+            "/api/v1/patient/visits/confirm",
+            json={"token": "synthetic-confirm-token"},
+        )
+
+        assert response.status_code == status_code
+        assert response.json() == {"detail": detail}
+        if headers:
+            assert response.headers["Retry-After"] == "7"
 
     def test_confirm_visit_registrar_success(self, client, test_visit, registrar_auth_headers, test_daily_queue):
         """Тест подтверждения визита регистратором"""

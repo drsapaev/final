@@ -138,50 +138,44 @@ export const SIDEBAR_PRESETS = {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'queue',
-    // Phase 4+ fix: reduced from 9 tabs to 4 flat tabs.
+    // Phase 4+ fix: reduced from 9 tabs to 3 flat tabs.
     // Goal: dermatologist workflow is "queue → visit" — everything else
     // (photos/skin/cosmetic/ai/services/history) was either a separate tab
     // for a tool that belongs inside the visit (photos, skin, cosmetic),
     // or admin/lookup that doesn't belong in the clinical workflow.
     //
-    // The 4 remaining tabs:
+    // The 3 remaining tabs:
     //   queue    — вход: вызвать следующего пациента из очереди
     //   visit    — единый экран приёма: анамнез + фото + осмотр кожи + диагноз + AI inline
     //   patients — поиск/история пациентов (включая бывший 'history' tab)
-    //   ai       — AI-помощник (draft support, не диагноз)
     items: [
       { id: 'queue',    labelKey: 'nav.queue',     icon: Users },
       { id: 'visit',    labelKey: 'nav.visit',       icon: Stethoscope },
       { id: 'patients', labelKey: 'nav.patients',    icon: Users },
-      { id: 'ai',       labelKey: 'nav.ai_assistant', icon: Brain, ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },
   dentistry: {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'queue',
-    // Phase 4 fix: reduced from 13 tabs in 4 sections to 5 flat tabs.
-    // Goal: dentist workflow is "queue → visit → patient/photos" — everything
+    // Phase 4 + protected archive: queue → visit → patients → photos.
+    // Goal: dentist workflow is "queue → visit → patients" — everything
     // else (examinations/diagnoses/dental-chart/treatment-plans/prosthetics/
     // templates/reports) was either dead UI (treatment-plans/prosthetics had
     // 501 backend stubs) or duplicated the visit screen (dental-chart
     // duplicated the chart embedded in the visit; examinations/diagnoses
     // were merged into EMR v2 visit screen).
     //
-    // The 5 remaining tabs:
+    // The 4 remaining tabs:
     //   queue    — вход: вызвать следующего пациента из очереди
     //   visit    — единый экран приёма: анамнез + схема зубов + Дополнительно
-    //   patients — поиск/история пациентов
-    //   photos   — фотоархив (рентген + intraoral)
-    //   ai-assistant — AI-помощник (draft support, не диагноз)
-    //
-    // Muscle memory: 5 flat items, well under Miller's 7±2.
+    //   patients — единственный серверный поиск/выбор пациента
+    //   photos   — защищённый архив пациента с подтверждённым визитом
     items: [
       { id: 'queue',         labelKey: 'nav.queue',      icon: ListOrdered },
       { id: 'visit',         labelKey: 'nav.visit',        icon: Stethoscope },
       { id: 'patients',      labelKey: 'nav.patients',     icon: Users },
-      { id: 'photos',        labelKey: 'nav.photo_archive',    icon: Camera },
-      { id: 'ai-assistant',  labelKey: 'nav.ai_assistant',  icon: Brain, ...AI_SIDEBAR_DISCLAIMER_META },
+      { id: 'photos',        labelKey: 'nav.photo_archive', icon: Camera },
     ],
   },
 };
@@ -367,6 +361,29 @@ export const ROUTE_REGISTRY = [
     component: 'QueueJoin',
     legacyRedirectFrom: [],
     layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Join Queue' }),
+  },
+  {
+    // PR 3390 review round (P1): the PWA/SMS visit-confirmation invitation
+    // (backend notifications_pkg/_formatting.py) deep-links patients to
+    // /confirm-visit?token=… — this public screen consumes the existing
+    // visit-confirmation API (GET /visits/info/{token}, POST
+    // /patient/visits/confirm). Without it the App wildcard redirected the
+    // invitation link to /not-found while the reminder was stamped as sent.
+    id: 'confirm-visit',
+    path: '/confirm-visit',
+    group: 'public',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'fullscreen',
+    auth: 'public',
+    roles: [],
+    entry: 'direct',
+    nav: false,
+    title: 'Confirm Visit',
+    owner: 'clinical.patient',
+    component: 'ConfirmVisitPage',
+    legacyRedirectFrom: [],
+    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Confirm Visit' }),
   },
   {
     id: 'telegram-mini-app-patient',
@@ -1232,6 +1249,32 @@ export const ROUTE_REGISTRY = [
     layout: layout({ sidebarPreset: 'lab', pageTitle: 'Lab Panel' }),
   },
   {
+    id: 'nurse-serving',
+    path: '/nurse',
+    group: 'clinical',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'app-shell',
+    // NURSE-V2 N2-5: the Nurse-only tablet workspace. Deliberately WITHOUT
+    // Admin (the repo staff-route convention is intentionally not applied
+    // here): the serving plane performs data-level authorization that
+    // requires an ACTIVE NurseWorkplaceAssignment for everyone (N2-3,
+    // superuser included), so an Admin hitting /nurse would render an empty
+    // no-workplace shell at best. No Nurse-to-Doctor alias (ROLE_ALIASES
+    // stays empty), no sidebar preset (no clinical sidebar — a tablet-first
+    // frameless surface, the patient-home precedent), no extra route grants:
+    // this is the ONLY new route of the slice and it grants exactly one role.
+    auth: 'role-scoped',
+    roles: ['Nurse'],
+    homeForRoles: ['nurse'],
+    entry: 'direct',
+    nav: false,
+    title: 'Nurse Serving',
+    owner: 'clinical.nurse',
+    component: 'NurseTabletPage',
+    layout: layout({ hideSidebar: true, pageTitle: 'Nurse Serving' }),
+  },
+  {
     id: 'patient-home',
     path: '/patient',
     group: 'clinical',
@@ -1379,12 +1422,10 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'authenticated',
     roles: [],
-    // NURSE-V2 N2-2 (review P2, PR #3333): the Nurse login landing until
-    // the N2-5 tablet workspace ships. auth:'authenticated' means the page
-    // grants NOTHING role-scoped — privilege-zero is preserved (no clinical
-    // search/patients/EMR); the Nurse simply sees their own profile instead
-    // of an automatic /forbidden bounce after a successful login.
-    homeForRoles: ['nurse'],
+    // NURSE-V2 N2-2 (PR #3333) parked the Nurse login landing here while
+    // the tablet workspace did not exist. N2-5 ships /nurse as the
+    // canonical home, so this route no longer carries homeForRoles —
+    // it stays a plain authenticated self-profile screen.
     entry: 'contextual',
     nav: false,
     title: 'User Profile',

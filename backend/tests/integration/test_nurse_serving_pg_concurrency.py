@@ -39,6 +39,7 @@ from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.crud.clinic import clinic_today
 from app.db.base_class import Base
+from app.crud.clinic import clinic_today
 from app.models.nurse_workplace import NurseWorkplaceAssignment
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
@@ -147,6 +148,11 @@ def _mk_world(engine, *, waiting: int = 2, station_services: int = 1):
                 ),
             ]
         )
+        # Round-11: the service resolves «today» via the clinic calendar
+        # (Asia/Tashkent) — a UTC runner between 19:00 and midnight
+        # already has TOMORROW's clinic date, and the old host
+        # date.today() here produced «Очередь рабочего места не
+        # активна на дату ...» midnight-flakes in the PG suite.
         queue = DailyQueue(
             day=clinic_today(db),
             specialist_id=None,

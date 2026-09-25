@@ -36,6 +36,11 @@ services:
       CORS_ALLOW_ALL: 0
       CORS_ORIGINS: ${CORS_ORIGINS}
       CORS_DISABLE: 0
+      # PR 3390 review round (P1): canonical public frontend origin for
+      # user-facing deep links (password reset, PWA invitations). Without
+      # this the Settings default (http://192.168.1.9:5173) leaks into links
+      # sent to patients on staging.
+      FRONTEND_URL: ${STAGING_PUBLIC_BASE_URL}
       TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
       HOST: 0.0.0.0
       PORT: 18000
@@ -74,7 +79,8 @@ services:
     working_dir: /app
     command: ["/bin/bash", "/entrypoint.sh"]
     ports:
-      - "${STAGING_BACKEND_PORT:-18000}:18000"
+      # Windows production uses host port 18000; keep staging separate by default.
+      - "${STAGING_BACKEND_PORT:-18001}:18000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -145,6 +151,12 @@ services:
       ENV: staging
       SECRET_KEY: ${SECRET_KEY}
       TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
+      # PR 3390 review round (P1): the reminder worker builds the PWA/SMS
+      # visit-confirmation deep link from settings.FRONTEND_URL. Without
+      # this var the worker fell back to the Settings default
+      # (http://192.168.1.9:5173) instead of the actual staging frontend
+      # origin — patients would receive an unreachable link.
+      FRONTEND_URL: ${STAGING_PUBLIC_BASE_URL}
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_ENV: staging
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.05}

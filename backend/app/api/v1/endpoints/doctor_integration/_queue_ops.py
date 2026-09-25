@@ -2,6 +2,7 @@
 
 Split from doctor_integration.py (1900 LOC god file → modular).
 """
+
 from __future__ import annotations
 
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
@@ -28,9 +29,54 @@ from app.crud.visit_appointment_pairing import (
     AmbiguousAppointmentPairingError,
     move_paired_appointment_to_day,
 )
+from app.schemas.doctor_queue import (
+    DoctorQueueStartVisitResponse,
+    DoctorQueueTodayResponse,
+)
+
+_DERMATOLOGY_SPECIALTY_KEYS = frozenset({"derma", "dermatology", "dermatologist"})
+_DERMATOLOGY_EMR_REQUIRED_DETAIL = (
+    "Для завершения дерматологического приёма сохраните ЭМК со статусом не «черновик»"
+)
 
 
-@router.get("/doctor/{specialty}/queue/today", response_model=dict[str, Any])
+def _is_dermatology_specialty(specialty: str | None) -> bool:
+    return _normalize_queue_specialty(specialty or "") in _DERMATOLOGY_SPECIALTY_KEYS
+
+
+def _saved_dermatology_emr_pairs(
+    db: Session, candidates: set[tuple[int, int]]
+) -> set[tuple[int, int]]:
+    """Return active, non-draft EMRs keyed by their visit and patient IDs."""
+    candidate_pairs = {
+        (visit_id, patient_id)
+        for visit_id, patient_id in candidates
+        if visit_id is not None and patient_id is not None
+    }
+    if not candidate_pairs:
+        return set()
+
+    from app.models.emr_v2 import EMRRecord
+
+    visit_ids = {visit_id for visit_id, _ in candidate_pairs}
+    rows = (
+        db.query(EMRRecord.visit_id, EMRRecord.patient_id)
+        .filter(
+            EMRRecord.visit_id.in_(visit_ids),
+            EMRRecord.is_active.is_(True),
+            EMRRecord.status != "draft",
+        )
+        .all()
+    )
+    ready_pairs = {(row.visit_id, row.patient_id) for row in rows}
+    return ready_pairs.intersection(candidate_pairs)
+
+
+@router.get(
+    "/doctor/{specialty}/queue/today",
+    response_model=DoctorQueueTodayResponse,
+    response_model_exclude_unset=True,
+)
 def get_doctor_queue_today(
     specialty: str,
     db: Session = Depends(get_db),
@@ -163,12 +209,32 @@ def get_doctor_queue_today(
             .all()
         )
 
+        is_dermatology_queue = _is_dermatology_specialty(normalized_specialty)
+        dermatology_emr_pairs: set[tuple[int, int]] = set()
+        if is_dermatology_queue:
+            dermatology_emr_pairs = _saved_dermatology_emr_pairs(
+                db,
+                {
+                    (entry.visit_id, entry.patient_id)
+                    for entry in entries
+                    if entry.visit_id is not None and entry.patient_id is not None
+                },
+            )
+
         # Формируем данные для врача
         queue_entries = []
         next_call_entry_id = None
         for entry in entries:
             available_actions = _doctor_queue_available_actions(entry)
             action_flags = _doctor_queue_action_flags(entry)
+            if (
+                is_dermatology_queue
+                and (entry.visit_id, entry.patient_id) not in dermatology_emr_pairs
+            ):
+                available_actions = [
+                    action for action in available_actions if action != "complete"
+                ]
+                action_flags["can_complete"] = False
             if next_call_entry_id is None and action_flags["can_call"]:
                 next_call_entry_id = entry.id
 
@@ -190,6 +256,8 @@ def get_doctor_queue_today(
             queue_entries.append(
                 {
                     "id": entry.id,
+                    "patient_id": entry.patient_id,
+                    "visit_id": entry.visit_id,
                     "number": entry.number,
                     "patient_name": entry.patient_name
                     or (
@@ -200,11 +268,21 @@ def get_doctor_queue_today(
                     "phone": entry.phone,
                     "source": entry.source,
                     "status": entry.status,
-                    "created_at": entry.created_at.isoformat() if entry.created_at else None,
-                    "queue_time": entry.queue_time.isoformat() if entry.queue_time else None,
-                    "updated_at": entry.updated_at.isoformat() if entry.updated_at else None,
-                    "last_changed_at": entry.updated_at.isoformat() if entry.updated_at else None,
-                    "display_time_kind": "queue_time" if entry.queue_time else "created_at",
+                    "created_at": (
+                        entry.created_at.isoformat() if entry.created_at else None
+                    ),
+                    "queue_time": (
+                        entry.queue_time.isoformat() if entry.queue_time else None
+                    ),
+                    "updated_at": (
+                        entry.updated_at.isoformat() if entry.updated_at else None
+                    ),
+                    "last_changed_at": (
+                        entry.updated_at.isoformat() if entry.updated_at else None
+                    ),
+                    "display_time_kind": (
+                        "queue_time" if entry.queue_time else "created_at"
+                    ),
                     "timezone": "Asia/Tashkent",
                     "called_at": (
                         entry.called_at.isoformat() if entry.called_at else None
@@ -234,7 +312,9 @@ def get_doctor_queue_today(
                 if daily_queues[0].opened_at
                 else None
             ),
-            "doctor": _serialize_queue_doctor(doctor, current_user, normalized_specialty),
+            "doctor": _serialize_queue_doctor(
+                doctor, current_user, normalized_specialty
+            ),
             "date": today.isoformat(),
             "entries": queue_entries,
             "stats": stats,
@@ -516,10 +596,14 @@ def call_patient(
         # Now: Admin can always call; any doctor can call from queues
         # where the queue's doctor has the same specialty as the caller.
         if current_user.role != "Admin":
-            caller_doctor = db.query(Doctor).filter(
-                Doctor.user_id == current_user.id,
-                Doctor.active == True,
-            ).first()
+            caller_doctor = (
+                db.query(Doctor)
+                .filter(
+                    Doctor.user_id == current_user.id,
+                    Doctor.active == True,
+                )
+                .first()
+            )
 
             if not caller_doctor:
                 raise HTTPException(
@@ -531,7 +615,11 @@ def call_patient(
             if doctor.user_id != current_user.id:
                 caller_specialty = (caller_doctor.specialty or "").lower().strip()
                 queue_specialty = (doctor.specialty or "").lower().strip()
-                if not caller_specialty or not queue_specialty or caller_specialty != queue_specialty:
+                if (
+                    not caller_specialty
+                    or not queue_specialty
+                    or caller_specialty != queue_specialty
+                ):
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
                         detail="Нет прав для работы с этой очередью — вы не владелец и специальность не совпадает",
@@ -601,7 +689,11 @@ def call_patient(
                 "number": queue_entry.number,
                 "status": queue_entry.status,
                 "called_at": queue_entry.called_at.isoformat(),
-                "updated_at": queue_entry.updated_at.isoformat() if queue_entry.updated_at else None,
+                "updated_at": (
+                    queue_entry.updated_at.isoformat()
+                    if queue_entry.updated_at
+                    else None
+                ),
             },
         }
 
@@ -614,7 +706,10 @@ def call_patient(
         )
 
 
-@router.post("/doctor/queue/{entry_id}/start-visit", response_model=dict[str, Any])
+@router.post(
+    "/doctor/queue/{entry_id}/start-visit",
+    response_model=DoctorQueueStartVisitResponse,
+)
 def start_patient_visit(
     entry_id: int,
     db: Session = Depends(get_db),
@@ -669,18 +764,35 @@ def start_patient_visit(
                 )
 
         # PR-26: same-specialty doctors can also work with this queue
-        if current_user.role != "Admin" and doctor.user_id and doctor.user_id != current_user.id:
-            caller_doctor = db.query(Doctor).filter(
-                Doctor.user_id == current_user.id, Doctor.active == True,
-            ).first()
+        if (
+            current_user.role != "Admin"
+            and doctor.user_id
+            and doctor.user_id != current_user.id
+        ):
+            caller_doctor = (
+                db.query(Doctor)
+                .filter(
+                    Doctor.user_id == current_user.id,
+                    Doctor.active == True,
+                )
+                .first()
+            )
             if not caller_doctor:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Только врач может работать с этой очередью")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Только врач может работать с этой очередью",
+                )
             caller_specialty = (caller_doctor.specialty or "").lower().strip()
             queue_specialty = (doctor.specialty or "").lower().strip()
-            if not caller_specialty or not queue_specialty or caller_specialty != queue_specialty:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Нет прав для работы с этой очередью")
+            if (
+                not caller_specialty
+                or not queue_specialty
+                or caller_specialty != queue_specialty
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Нет прав для работы с этой очередью",
+                )
 
         # Обновляем статус
         if "start_visit" not in _doctor_queue_available_actions(queue_entry):
@@ -726,6 +838,7 @@ def start_patient_visit(
         # visit_time/notes lost. The explicit db.commit() below stays
         # the SINGLE transaction boundary of the start unit.
         from app.services.visit_lifecycle_service import VisitLifecycleService
+
         if visit.status == "open":
             visit = VisitLifecycleService(db).start_visit(
                 visit_id=visit.id,
@@ -750,6 +863,8 @@ def start_patient_visit(
             "success": True,
             "message": "Прием пациента начат",
             "entry_id": entry_id,
+            "patient_id": queue_entry.patient_id,
+            "visit_id": visit.id,
             "status": "in_progress",
         }
 
@@ -840,6 +955,18 @@ def complete_patient_visit(
                 record_doctor_id=visit.doctor_id,
                 current_user=current_user,
             )
+            if _is_dermatology_specialty(
+                visit.doctor.specialty if visit.doctor else None
+            ) and (
+                visit.patient_id is None
+                or (visit.id, visit.patient_id)
+                not in _saved_dermatology_emr_pairs(db, {(visit.id, visit.patient_id)})
+            ):
+                db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=_DERMATOLOGY_EMR_REQUIRED_DETAIL,
+                )
             # Issue #06 Phase 3: delegate to VisitLifecycleService for
             # state machine validation + row lock. The transition
             # in_progress → completed (or completed → completed idempotent)
@@ -892,6 +1019,40 @@ def complete_patient_visit(
                 record_doctor_id=appointment.doctor_id,
                 current_user=current_user,
             )
+            if _is_dermatology_specialty(
+                appointment.doctor.specialty if appointment.doctor else None
+            ):
+                from app.services.canonical_visit_service import (
+                    CanonicalVisitResolutionError,
+                    CanonicalVisitService,
+                )
+
+                try:
+                    appointment_visit_id = CanonicalVisitService(
+                        db
+                    ).resolve_canonical_visit(appointment.id, create_if_missing=False)
+                except CanonicalVisitResolutionError as exc:
+                    db.rollback()
+                    if exc.status_code == 404:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail=_DERMATOLOGY_EMR_REQUIRED_DETAIL,
+                        ) from exc
+                    raise HTTPException(
+                        status_code=exc.status_code, detail=exc.detail
+                    ) from exc
+
+                if (
+                    appointment_visit_id,
+                    appointment.patient_id,
+                ) not in _saved_dermatology_emr_pairs(
+                    db, {(appointment_visit_id, appointment.patient_id)}
+                ):
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=_DERMATOLOGY_EMR_REQUIRED_DETAIL,
+                    )
             # Обновляем статус appointment
             appointment.status = "completed"
 
@@ -934,14 +1095,6 @@ def complete_patient_visit(
                 )
 
             changed_at = datetime.now(UTC)
-            queue_entry.status = "served"
-            queue_entry.updated_at = changed_at
-            # QF-1 (operator attribution): persist WHO completed the entry —
-            # the live human operator, deliberately separate from the routing
-            # owner (specialist_id / resource doctor). Nullable FK: deleting
-            # the user keeps the history row with NULL attribution.
-            queue_entry.served_by_user_id = current_user.id
-            queue_entry.served_at = changed_at
 
             # Codex round-1 P1 (corrective follow-up): resolve + pair the
             # visit BEFORE the served-commit. The pairing may FAIL CLOSED
@@ -980,6 +1133,22 @@ def complete_patient_visit(
                 db, queue_entry, doctor, department_hint
             )
 
+            if _is_dermatology_specialty(doctor.specialty if doctor else None):
+                emr_ready = resolved_visit.patient_id == queue_entry.patient_id and (
+                    resolved_visit.id,
+                    queue_entry.patient_id,
+                ) in _saved_dermatology_emr_pairs(
+                    db, {(resolved_visit.id, queue_entry.patient_id)}
+                )
+                if not emr_ready:
+                    # Resolution may have staged a visit link or date move;
+                    # discard it together with the rejected completion.
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=_DERMATOLOGY_EMR_REQUIRED_DETAIL,
+                    )
+
             # Codex round-2 P2 + round-3 P2: the lifecycle completion ALSO
             # runs BEFORE the served-commit — resolution + lifecycle + the
             # served flip are one atomic unit. A lifecycle failure
@@ -1003,6 +1172,14 @@ def complete_patient_visit(
                 commit=False,
             )
             resolved_visit.updated_at = changed_at
+
+            # Stage the queue transition only after dermatology's EMR check
+            # and visit lifecycle validation have both succeeded.
+            queue_entry.status = "served"
+            queue_entry.updated_at = changed_at
+            # QF-1: persist WHO completed the entry, separately from its owner.
+            queue_entry.served_by_user_id = current_user.id
+            queue_entry.served_at = changed_at
 
             db.commit()
             db.refresh(queue_entry)
@@ -1038,11 +1215,11 @@ def complete_patient_visit(
                     # Paid payment may update explicit payment markers only;
                     # registration discount_mode must be preserved.
                     if (
-                        hasattr(visit, 'payment_processed_at')
+                        hasattr(visit, "payment_processed_at")
                         and not visit.payment_processed_at
                     ):
-                        visit.payment_processed_at = (
-                            payment.paid_at or datetime.now(UTC)
+                        visit.payment_processed_at = payment.paid_at or datetime.now(
+                            UTC
                         )
                 # ✅ Также обновляем соответствующий Appointment, если он существует
                 from app.models.appointment import Appointment
@@ -1066,10 +1243,7 @@ def complete_patient_visit(
                 if appointment:
                     appointment.status = "completed"
                     # Appointment has no discount_mode; use its explicit payment marker.
-                    if (
-                        payment_is_paid
-                        and not appointment.payment_processed_at
-                    ):
+                    if payment_is_paid and not appointment.payment_processed_at:
                         appointment.payment_processed_at = (
                             payment.paid_at or datetime.now(UTC)
                         )
@@ -1114,5 +1288,3 @@ def complete_patient_visit(
 
 
 # ===================== УСЛУГИ ДЛЯ ВРАЧА =====================
-
-

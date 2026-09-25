@@ -30,6 +30,38 @@ def test_openapi_schema_not_fallback_and_has_paths(client: TestClient) -> None:
     assert len(schema["paths"]) >= 100
 
 
+def test_openapi_ai_v2_medical_responses_require_doctor_confirmation(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    response = schema["components"]["schemas"]["AIResponse"]
+    assert {
+        "requires_doctor_confirmation",
+        "decision_boundary",
+        "ai_notice",
+    }.issubset(response["required"])
+    assert response["properties"]["requires_doctor_confirmation"]["const"] is True
+    assert response["properties"]["decision_boundary"]["const"] == "suggestion_only"
+    assert response["properties"]["ai_notice"]["minLength"] == 1
+
+    for path in (
+        "analyze-complaints",
+        "suggest-icd10",
+        "differential-diagnosis",
+        "interpret-lab",
+        "analyze-skin",
+        "analyze-ecg",
+        "symptom-check",
+        "analyze-document",
+        "drug-interaction",
+    ):
+        operation = schema["paths"][f"/api/v1/ai/v2/{path}"]["post"]
+        model_ref = operation["responses"]["200"]["content"]["application/json"][
+            "schema"
+        ]["$ref"]
+        assert model_ref == "#/components/schemas/AIResponse"
+
+
 @pytest.mark.parametrize(
     ("path", "method"),
     [
@@ -62,10 +94,14 @@ def test_openapi_contains_critical_routes(
 ) -> None:
     schema = _get_openapi_schema(client)
     assert path in schema["paths"], f"Missing route in OpenAPI: {path}"
-    assert method in schema["paths"][path], f"Missing method in OpenAPI: {method.upper()} {path}"
+    assert (
+        method in schema["paths"][path]
+    ), f"Missing method in OpenAPI: {method.upper()} {path}"
 
 
-def test_openapi_queue_join_contract_has_request_and_responses(client: TestClient) -> None:
+def test_openapi_queue_join_contract_has_request_and_responses(
+    client: TestClient,
+) -> None:
     schema = _get_openapi_schema(client)
     operation = schema["paths"]["/api/v1/queue/join/complete"]["post"]
 
@@ -73,6 +109,31 @@ def test_openapi_queue_join_contract_has_request_and_responses(client: TestClien
     assert operation["requestBody"].get("required") is True
     assert "responses" in operation
     assert any(code in operation["responses"] for code in ("200", "201", "400", "422"))
+
+
+def test_openapi_doctor_queue_workflow_exposes_canonical_ids(
+    client: TestClient,
+) -> None:
+    schema = _get_openapi_schema(client)
+    components = schema["components"]["schemas"]
+
+    queue_response = schema["paths"]["/api/v1/doctor/{specialty}/queue/today"]["get"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    assert queue_response["$ref"].endswith("/DoctorQueueTodayResponse")
+    queue_contract = components["DoctorQueueTodayResponse"]
+    entry_ref = queue_contract["properties"]["entries"]["items"]["$ref"]
+    entry_contract = components[entry_ref.rsplit("/", 1)[-1]]
+    assert {"patient_id", "visit_id"}.issubset(entry_contract["properties"])
+    assert {"patient_id", "visit_id"}.issubset(entry_contract["required"])
+
+    start_response = schema["paths"]["/api/v1/doctor/queue/{entry_id}/start-visit"][
+        "post"
+    ]["responses"]["200"]["content"]["application/json"]["schema"]
+    assert start_response["$ref"].endswith("/DoctorQueueStartVisitResponse")
+    start_contract = components["DoctorQueueStartVisitResponse"]
+    assert {"patient_id", "visit_id"}.issubset(start_contract["properties"])
+    assert {"patient_id", "visit_id"}.issubset(start_contract["required"])
 
 
 def test_openapi_payment_invoice_requires_positive_patient_reference(
@@ -99,9 +160,9 @@ def test_openapi_pending_invoice_exposes_backend_owned_settlement_state(
 ) -> None:
     schema = _get_openapi_schema(client)
     operation = schema["paths"]["/api/v1/payments/invoices/pending"]["get"]
-    response_schema = operation["responses"]["200"]["content"][
-        "application/json"
-    ]["schema"]
+    response_schema = operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
     response_name = response_schema["items"]["$ref"].rsplit("/", 1)[-1]
     response_contract = schema["components"]["schemas"][response_name]
 
@@ -118,15 +179,9 @@ def test_openapi_pending_invoice_exposes_backend_owned_settlement_state(
         for item in response_contract["properties"]["provider"]["anyOf"]
     }
     assert provider_types == {"string", "null"}
-    action_ref = response_contract["properties"]["available_actions"]["items"][
-        "$ref"
-    ]
-    action_contract = schema["components"]["schemas"][
-        action_ref.rsplit("/", 1)[-1]
-    ]
-    assert action_contract["properties"]["action"]["const"] == (
-        "start_online_payment"
-    )
+    action_ref = response_contract["properties"]["available_actions"]["items"]["$ref"]
+    action_contract = schema["components"]["schemas"][action_ref.rsplit("/", 1)[-1]]
+    assert action_contract["properties"]["action"]["const"] == ("start_online_payment")
     assert action_contract["required"] == ["action", "provider"]
 
 
@@ -134,9 +189,7 @@ def test_openapi_patient_appointment_history_is_an_explicit_list(
     client: TestClient,
 ) -> None:
     schema = _get_openapi_schema(client)
-    operation = schema["paths"]["/api/v1/patients/{patient_id}/appointments"][
-        "get"
-    ]
+    operation = schema["paths"]["/api/v1/patients/{patient_id}/appointments"]["get"]
     response_schema = operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]
@@ -159,7 +212,9 @@ def test_openapi_patient_appointment_history_is_an_explicit_list(
 def test_openapi_qr_token_info_exposes_join_read_contract(client: TestClient) -> None:
     schema = _get_openapi_schema(client)
     operation = schema["paths"]["/api/v1/queue/qr-tokens/{token}/info"]["get"]
-    response_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    response_schema = operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
     schema_name = response_schema["$ref"].rsplit("/", 1)[-1]
     properties = schema["components"]["schemas"][schema_name]["properties"]
 
@@ -202,9 +257,10 @@ def test_openapi_telegram_onboarding_contract_has_stable_operation_ids(
         ("/api/v1/telegram/onboarding/requests/{request_id}/create-patient", "post"): (
             "telegram_registrar_create_patient_from_onboarding_request"
         ),
-        ("/api/v1/telegram/onboarding/requests/{request_id}/request-more-info", "post"): (
-            "telegram_registrar_request_more_info_onboarding_request"
-        ),
+        (
+            "/api/v1/telegram/onboarding/requests/{request_id}/request-more-info",
+            "post",
+        ): ("telegram_registrar_request_more_info_onboarding_request"),
         ("/api/v1/telegram/onboarding/requests/{request_id}/reject", "post"): (
             "telegram_registrar_reject_patient_onboarding_request"
         ),
@@ -229,9 +285,9 @@ def test_openapi_has_no_duplicate_operation_id_warnings() -> None:
         for item in captured
         if "Duplicate Operation ID" in str(item.message)
     ]
-    assert not duplicate_messages, "Duplicate OpenAPI operation IDs found:\n" + "\n".join(
-        duplicate_messages
-    )
+    assert (
+        not duplicate_messages
+    ), "Duplicate OpenAPI operation IDs found:\n" + "\n".join(duplicate_messages)
 
 
 def _decorator_route(decorator: ast.expr) -> tuple[str, str] | None:
@@ -250,7 +306,9 @@ def _decorator_route(decorator: ast.expr) -> tuple[str, str] | None:
     for keyword in decorator.keywords:
         if keyword.arg != "path":
             continue
-        if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
+        if isinstance(keyword.value, ast.Constant) and isinstance(
+            keyword.value.value, str
+        ):
             return decorator.func.attr.upper(), keyword.value.value
 
     return None
@@ -283,7 +341,9 @@ def _is_shadowed_static_route(previous_route: str, current_route: str) -> bool:
     return saw_previous_param
 
 
-def test_fastapi_static_routes_are_declared_before_same_shape_parameter_routes() -> None:
+def test_fastapi_static_routes_are_declared_before_same_shape_parameter_routes() -> (
+    None
+):
     """A later static route can be swallowed by an earlier same-shape path parameter."""
 
     shadow_messages: list[str] = []
@@ -316,9 +376,9 @@ def test_fastapi_static_routes_are_declared_before_same_shape_parameter_routes()
                     f"is shadowed by {previous_route_path} at {previous_line}"
                 )
 
-    assert not shadow_messages, "Static routes declared after parameter routes:\n" + "\n".join(
-        shadow_messages
-    )
+    assert (
+        not shadow_messages
+    ), "Static routes declared after parameter routes:\n" + "\n".join(shadow_messages)
 
 
 def test_published_fastapi_routes_do_not_shadow_static_paths_across_routers() -> None:
@@ -335,9 +395,12 @@ def test_published_fastapi_routes_do_not_shadow_static_paths_across_routers() ->
 
     shadow_messages: list[str] = []
     for index, method, route_path, route_name in published_routes:
-        for previous_index, previous_method, previous_route_path, previous_route_name in (
-            published_routes
-        ):
+        for (
+            previous_index,
+            previous_method,
+            previous_route_path,
+            previous_route_name,
+        ) in published_routes:
             if previous_index >= index:
                 break
             if method != previous_method:
@@ -349,9 +412,9 @@ def test_published_fastapi_routes_do_not_shadow_static_paths_across_routers() ->
                 f"{previous_route_path} ({previous_route_name}) at {previous_index}"
             )
 
-    assert not shadow_messages, "Published static routes shadowed by app order:\n" + "\n".join(
-        shadow_messages
-    )
+    assert (
+        not shadow_messages
+    ), "Published static routes shadowed by app order:\n" + "\n".join(shadow_messages)
 
 
 def test_openapi_user_create_publishes_catalog_503_and_price_bounds(
@@ -479,9 +542,9 @@ def test_openapi_nurse_serving_publishes_domain_and_auth_errors(
     ]
     assert {"200", "401", "403", "404"} <= set(entries["responses"])
 
-    call_next = schema["paths"][f"{base}/queue-resources/{{queue_resource_id}}/call-next"][
-        "post"
-    ]
+    call_next = schema["paths"][
+        f"{base}/queue-resources/{{queue_resource_id}}/call-next"
+    ]["post"]
     assert {"200", "401", "403", "404"} <= set(call_next["responses"])
 
     start = schema["paths"][
@@ -499,7 +562,9 @@ def test_openapi_nurse_serving_publishes_domain_and_auth_errors(
     complete = schema["paths"][f"{base}/executions/{{execution_id}}/complete"]["post"]
     assert {"200", "400", "401", "403", "404", "409"} <= set(complete["responses"])
 
-    incomplete = schema["paths"][f"{base}/executions/{{execution_id}}/incomplete"]["post"]
+    incomplete = schema["paths"][f"{base}/executions/{{execution_id}}/incomplete"][
+        "post"
+    ]
     assert {"200", "400", "401", "403", "404", "409"} <= set(incomplete["responses"])
 
     no_show = schema["paths"][

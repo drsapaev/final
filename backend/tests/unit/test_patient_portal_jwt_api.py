@@ -1599,8 +1599,10 @@ class TestPortalBookingRound12:
     JWT portal surface. The FINAL department row is re-validated under FOR
     UPDATE next to the INSERT (an admin deactivate/delete racing the
     booking cannot persist a routing context pointing at a non-active
-    department), and the routing resolution follows the established
-    doctor_not_eligible contract."""
+    department). Rebased onto #3402: the portal keeps the owner-reviewed
+    up-front submitted-key resolution (a request-shaped routing 400
+    outranks the doctor_not_eligible 409); the Mini App surface keeps its
+    eligibility-first ordering — an intentional, flagged divergence."""
 
     future_date = str(date.today() + timedelta(days=3))
 
@@ -1659,7 +1661,7 @@ class TestPortalBookingRound12:
             "stale routing context"
         )
 
-    def test_create_eligibility_precedes_routing_400(
+    def test_create_submitted_key_resolve_precedes_eligibility(
         self,
         client: TestClient,
         linked_patient_headers,
@@ -1667,9 +1669,14 @@ class TestPortalBookingRound12:
         test_patient,
         test_doctor,
     ):
-        # P2 ordering: a request that is both ineligible-doctor AND
-        # bad-department answers the established doctor_not_eligible
-        # contract — the routing 400 never preempts it.
+        # Merge-parity note (PR #3386 rebased onto #3402): the portal keeps
+        # the owner-reviewed #3402 order — the submitted department key is
+        # resolved UP FRONT ("P1 (round 2): resolve BEFORE any mutation"),
+        # so a request that is both ineligible-doctor AND bad-department
+        # answers the request-shaped 400 department_unknown. The Mini App
+        # surface keeps its eligibility-first ordering (intentional
+        # divergence between the two surfaces, flagged for review).
+        # Either way nothing persists.
         test_doctor.active = False
         db_session.commit()
 
@@ -1682,8 +1689,8 @@ class TestPortalBookingRound12:
                 "department": "nonexistent-department",
             },
         )
-        assert response.status_code == 409, response.json()
-        assert response.json()["detail"]["reason"] == "doctor_not_eligible"
+        assert response.status_code == 400, response.json()
+        assert response.json()["detail"]["reason"] == "department_unknown"
         assert db_session.query(Appointment).count() == 0
 
     def test_lock_department_for_booking_semantics(

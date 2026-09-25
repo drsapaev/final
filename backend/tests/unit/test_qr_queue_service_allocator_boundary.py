@@ -115,7 +115,7 @@ def test_complete_join_session_uses_queue_domain_boundary(monkeypatch):
     assert result["success"] is True
     assert result["queue_number"] == 5
     assert result["queue_length"] == 2
-    assert session.status == "joined"
+    assert session.status == "joined_v2"  # Round-6 (P1-1): versioned joined marker
     assert session.queue_entry_id == 88
     assert session.queue_number == 5
     db.commit.assert_called_once()
@@ -127,6 +127,10 @@ def test_complete_join_session_uses_queue_domain_boundary(monkeypatch):
         telegram_id=77,
         patient_id=123,
         source="online",
+        # Round-5 (PR #3362 review, P1-2): the allocation runs WITHOUT its
+        # own commit — the claim, the талон and the joined outcome share
+        # ONE transaction boundary owned by the complete flow.
+        commit=False,
     )
 
 
@@ -185,7 +189,7 @@ def test_complete_join_session_multiple_uses_queue_domain_boundary(monkeypatch):
     assert len(result["entries"]) == 2
     assert result["entries"][0]["queue_number"] == 4
     assert result["entries"][1]["queue_number"] == 9
-    assert session.status == "joined"
+    assert session.status == "joined_v2"  # Round-6 (P1-1): versioned joined marker
     assert session.queue_entry_id == 101
     assert session.queue_number == 4
     db.commit.assert_called_once()
@@ -198,7 +202,13 @@ def test_complete_join_session_multiple_uses_queue_domain_boundary(monkeypatch):
 
 
 @pytest.mark.unit
-def test_complete_join_session_claim_rejects_replay_before_allocator(monkeypatch):
+def test_complete_join_session_claim_replays_joined_before_allocator(monkeypatch):
+    """Round-4 (PR #3362, P1-2) + Round-5 (P1-3): the retry after a lost
+    complete response re-uses the ORIGINAL attempt identity AND the
+    ORIGINAL payload. A joined session REPLAYS its saved result only to
+    the payload that created it — the replay is served BEFORE the
+    allocator, and a different payload can never reach the business
+    operation under someone else's attempt identity."""
     session = SimpleNamespace(
         qr_token="qr-token",
         status="pending",
@@ -237,20 +247,83 @@ def test_complete_join_session_claim_rejects_replay_before_allocator(monkeypatch
         lambda patient_name, phone: SimpleNamespace(id=123),
     )
 
+    original_body = {
+        "session_token": "session-token",
+        "patient_name": "Boundary Patient",
+        "phone": "+998900000137",
+        "telegram_id": 77,
+    }
+    service.complete_join_session(**original_body)
+
+    # Round-5: the retry with the SAME session token AND the SAME payload
+    # REPLAYS the saved result — a decisive answer, the allocator ran once.
+    replay = service.complete_join_session(**original_body)
+
+    assert replay["success"] is True
+    assert replay["replayed"] is True
+    assert replay["queue_number"] == 5
+    assert session.status == "joined_v2"  # Round-6 (P1-1): versioned joined marker
+    assert domain_service.allocate_ticket.call_count == 1
+
+
+@pytest.mark.unit
+def test_complete_join_session_replay_refuses_foreign_payload(monkeypatch):
+    """Round-5 (PR #3362 review, P1-3): ONE session token = ONE immutable
+    payload. The old semantics let «Replay Patient / ...138» re-use a
+    session joined by «Boundary Patient / ...137» — the exact wrong-patient
+    hole. The replay with a different identity is now refused decisively
+    (join_session_payload_mismatch) and never reaches the allocator."""
+    session = SimpleNamespace(
+        qr_token="qr-token",
+        status="pending",
+        expires_at=datetime.utcnow() + timedelta(hours=1),
+        patient_name=None,
+        phone=None,
+        telegram_id=None,
+        queue_entry_id=None,
+        queue_number=None,
+        joined_at=None,
+    )
+    qr_token = SimpleNamespace(
+        token="qr-token",
+        specialist_id=11,
+        department="cardiology",
+    )
+    db = _ClaimDbStub(session, qr_token)
+    domain_service = Mock()
+    domain_service.allocate_ticket.return_value = {
+        "entry": SimpleNamespace(id=88, number=5),
+        "duplicate": True,
+        "queue_length_before": 2,
+        "estimated_wait_minutes": 15,
+        "specialist_name": "Dr. Boundary",
+    }
+
+    service = QRQueueService(db, queue_domain_service=domain_service)
+    monkeypatch.setattr(
+        service,
+        "_find_or_create_patient",
+        lambda patient_name, phone: SimpleNamespace(id=123),
+    )
+
     service.complete_join_session(
         session_token="session-token",
         patient_name="Boundary Patient",
         phone="+998900000137",
         telegram_id=77,
     )
+    assert domain_service.allocate_ticket.call_count == 1
 
-    with pytest.raises(ValueError, match="Сессия"):
+    from app.services.qr_queue._base import JoinSessionStateRefusal
+
+    with pytest.raises(JoinSessionStateRefusal) as refusal:
         service.complete_join_session(
             session_token="session-token",
+            # the review's dangerous replay: ANOTHER person's identity
             patient_name="Replay Patient",
             phone="+998900000138",
             telegram_id=78,
         )
-
-    assert session.status == "joined"
+    assert refusal.value.reason == "join_session_payload_mismatch"
+    # the business operation still ran exactly ONCE for this session
     assert domain_service.allocate_ticket.call_count == 1

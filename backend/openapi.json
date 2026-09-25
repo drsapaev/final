@@ -329,7 +329,7 @@
           "patients"
         ],
         "summary": "Create Patient Portal Booking",
-        "description": "Create one trusted patient-portal appointment (own scope only).\n\nMirrors the Mini App creation contract: same draft validation, same\nper-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same\n409 on occupied slots, same lifecycle eligibility for the doctor.\n\nP2 (round 2): the `Idempotency-Key` header is REQUIRED. The global\nidempotency middleware only protects requests that carry a key —\nwithout a mandated key a lost response + automatic browser retry of a\ndate-only/department-only request (no doctor slot lock applies) would\ncreate duplicate appointments. Same key + same payload replays the\ncommitted 201; same key + changed payload is a 409.\n\nP2 (round 3): creation goes through the portal-INTERNAL\n`PatientPortalAppointmentCreate` — the persisted `department_id` is the\nserver-resolved FK from `_resolve_portal_department`, never a\nclient-owned field (the shared `AppointmentCreate` no longer accepts\none, closing the legacy-endpoint bypass).",
+        "description": "Create one trusted patient-portal appointment (own scope only).\n\nMirrors the Mini App creation contract: same draft validation, same\nper-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same\n409 on occupied slots, same lifecycle eligibility for the doctor.\n\nMerged-#3340 follow-up (P1): the FINAL routing department is re-read\nwith ``populate_existing().with_for_update()`` in THIS transaction and\nits ``active`` re-validated before the INSERT — the persisted routing\ncontext can no longer reference a department that a concurrently\ncommitted admin transaction deactivated (or deleted).\n\nP2 (round 2): the `Idempotency-Key` header is REQUIRED. The global\nidempotency middleware only protects requests that carry a key —\nwithout a mandated key a lost response + automatic browser retry of a\ndate-only/department-only request (no doctor slot lock applies) would\ncreate duplicate appointments. Same key + same payload replays the\ncommitted 201; same key + changed payload is a 409.\n\nP2 (round 3): creation goes through the portal-INTERNAL\n`PatientPortalAppointmentCreate` — the persisted `department_id` is the\nserver-resolved FK from `_resolve_portal_department`, never a\nclient-owned field (the shared `AppointmentCreate` no longer accepts\none, closing the legacy-endpoint bypass).",
         "operationId": "create_patient_portal_booking_api_v1_patients_booking_post",
         "security": [
           {
@@ -4449,7 +4449,7 @@
           "visit-confirmation"
         ],
         "summary": "Get Visit Info By Token",
-        "description": "Получение информации о визите по токену (без подтверждения).",
+        "description": "Получение информации о визите по токену (без подтверждения).\n\nPR 3407 delta review P2: the legacy GET returns the same patient-safe\ncard as the POST — the raw ``dict[str, Any]`` response_model is gone,\nso the shared service projection cannot leak internal fields here\neven if it regresses.",
         "operationId": "get_visit_info_by_token_api_v1_visits_info__token__get",
         "parameters": [
           {
@@ -4468,9 +4468,49 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Visit Info By Token Api V1 Visits Info  Token  Get"
+                  "$ref": "#/components/schemas/VisitInfoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/visits/info": {
+      "post": {
+        "tags": [
+          "visit-confirmation"
+        ],
+        "summary": "Post Visit Info By Token",
+        "description": "Read a public visit card without putting its bearer token in the URL.",
+        "operationId": "post_visit_info_by_token_api_v1_visits_info_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitInfoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitInfoResponse"
                 }
               }
             }
@@ -8500,6 +8540,68 @@
                     }
                   ],
                   "title": "Response Complete Join Session Api V1 Queue Join Complete Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinSessionRefusalErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinSessionRefusalErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queue/join/probe": {
+      "post": {
+        "tags": [
+          "qr-queue"
+        ],
+        "summary": "Probe Join Session",
+        "description": "Round-11 (PR #3362 review, P1-2): read-only oracle состояния попытки\nприсоединения (публичный эндпоинт).\n\nOwnerless-ambiguity recovery НЕ ДОЛЖЕН вызывать ``/join/complete`` как\n«проверку»: для ещё не claims-нутой (``pending``) сессии complete — это\nсамо исполнение бизнес-операции с введённым payload'ом (второй заход\nдля пациента, чья настоящая попытка уже может быть закоммичена).\nЭтот оракул возвращает класс состояния attempt'а относительно введённых\nданных, не мутируя ни одной строки; для совпавшей закоммиченной попытки\nповторно отдаёт СОХРАНЁННЫЙ ответ первой попытки (без записи).",
+        "operationId": "probe_join_session_api_v1_queue_join_probe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinSessionProbeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinSessionProbeResponse"
                 }
               }
             }
@@ -19522,9 +19624,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Doctor Queue Today Api V1 Doctor  Specialty  Queue Today Get"
+                  "$ref": "#/components/schemas/DoctorQueueTodayResponse"
                 }
               }
             }
@@ -19622,9 +19722,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Start Patient Visit Api V1 Doctor Queue  Entry Id  Start Visit Post"
+                  "$ref": "#/components/schemas/DoctorQueueStartVisitResponse"
                 }
               }
             }
@@ -48509,6 +48607,297 @@
         }
       }
     },
+    "/api/v1/dental/media": {
+      "post": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Загрузить стоматологическое фото или рентген",
+        "operationId": "upload_dental_media_api_v1_dental_media_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_dental_media_api_v1_dental_media_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DentalMediaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Список стоматологических снимков пациента",
+        "operationId": "list_dental_media_api_v1_dental_media_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "visit_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DentalMediaList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dental/media/{media_id}/content": {
+      "get": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Защищённый просмотр стоматологического снимка",
+        "operationId": "view_dental_media_api_v1_dental_media__media_id__content_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          },
+          {
+            "name": "visit_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "image/jpeg": {},
+              "image/png": {},
+              "application/pdf": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dental/media/{media_id}": {
+      "patch": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Изменить метаданные стоматологического снимка",
+        "operationId": "update_dental_media_api_v1_dental_media__media_id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DentalMediaUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DentalMediaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Мягко удалить стоматологический снимок",
+        "operationId": "delete_dental_media_api_v1_dental_media__media_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Delete Dental Media Api V1 Dental Media  Media Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/dental/examinations": {
       "get": {
         "tags": [
@@ -67848,6 +68237,24 @@
             "title": "Warnings",
             "description": "Предупреждения"
           },
+          "requires_doctor_confirmation": {
+            "type": "boolean",
+            "const": true,
+            "title": "Requires Doctor Confirmation",
+            "description": "Врач должен подтвердить предложение AI перед внесением в ЭМК"
+          },
+          "decision_boundary": {
+            "type": "string",
+            "const": "suggestion_only",
+            "title": "Decision Boundary",
+            "description": "Ответ AI является только предложением"
+          },
+          "ai_notice": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ai Notice",
+            "description": "Предупреждение о роли AI"
+          },
           "disclaimer": {
             "type": "string",
             "title": "Disclaimer",
@@ -67892,7 +68299,10 @@
           "status",
           "provider",
           "model",
-          "latency_ms"
+          "latency_ms",
+          "requires_doctor_confirmation",
+          "decision_boundary",
+          "ai_notice"
         ],
         "title": "AIResponse",
         "description": "Единый контракт ответа для ВСЕХ AI endpoints.\n\nFrontend всегда получает этот формат, независимо от провайдера или task type."
@@ -72354,6 +72764,89 @@
         ],
         "title": "Body_upload_clinic_logo_api_v1_admin_clinic_logo_post"
       },
+      "Body_upload_dental_media_api_v1_dental_media_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "patient_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Visit Id"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "photo",
+              "xray"
+            ],
+            "title": "Category"
+          },
+          "tooth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooth"
+          },
+          "capture_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Date"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "patient_id",
+          "visit_id",
+          "category"
+        ],
+        "title": "Body_upload_dental_media_api_v1_dental_media_post"
+      },
       "Body_upload_file_api_v1_files_upload_post": {
         "properties": {
           "file": {
@@ -75772,6 +76265,212 @@
         "title": "DentalExaminationRequest",
         "description": "Request body for POST /dental/examinations.\n\nBased on frontend DentistPanelUnified.jsx examinationForm:\npatient_id, examination_date, oral_hygiene, caries_status,\nperiodontal_status, occlusion, missing_teeth, dental_plaque,\ngingival_bleeding, diagnosis, recommendations."
       },
+      "DentalMediaList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DentalMediaOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size"
+        ],
+        "title": "DentalMediaList"
+      },
+      "DentalMediaOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "photo",
+              "xray"
+            ],
+            "title": "Category"
+          },
+          "tooth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooth"
+          },
+          "capture_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Date"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "category",
+          "tooth",
+          "capture_date",
+          "mime_type",
+          "file_size",
+          "patient_id",
+          "visit_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DentalMediaOut",
+        "description": "Storage-safe representation of a dental media record."
+      },
+      "DentalMediaUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "photo",
+                  "xray"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "tooth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooth"
+          },
+          "capture_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DentalMediaUpdate"
+      },
       "DentalPriceOverrideRequest": {
         "properties": {
           "visit_id": {
@@ -78633,6 +79332,238 @@
         "title": "DoctorProfileCreate",
         "description": "Doctor profile block for canonical new-doctor onboarding (POST /users).\n\nOnly accepted for role=\"Doctor\" (canonical onboarding); legacy\ndoctor-role spellings keep their compatibility auto-map and must not\nsend this block. ``specialty`` must be a canonical onboarding id —\nthe incomplete sentinel (\"general\"), legacy dental spellings and any\nfree-text value are rejected."
       },
+      "DoctorQueueDoctor": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "specialty": {
+            "type": "string",
+            "title": "Specialty"
+          },
+          "cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "specialty"
+        ],
+        "title": "DoctorQueueDoctor"
+      },
+      "DoctorQueueEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Id"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "queue_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Time"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "last_changed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Changed At"
+          },
+          "display_time_kind": {
+            "type": "string",
+            "title": "Display Time Kind"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "called_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Called At"
+          },
+          "patient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DoctorQueuePatient"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "available_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Actions"
+          },
+          "can_call": {
+            "type": "boolean",
+            "title": "Can Call"
+          },
+          "can_start_visit": {
+            "type": "boolean",
+            "title": "Can Start Visit"
+          },
+          "can_no_show": {
+            "type": "boolean",
+            "title": "Can No Show"
+          },
+          "can_send_to_diagnostics": {
+            "type": "boolean",
+            "title": "Can Send To Diagnostics"
+          },
+          "can_complete": {
+            "type": "boolean",
+            "title": "Can Complete"
+          },
+          "can_notify_diagnostics_return": {
+            "type": "boolean",
+            "title": "Can Notify Diagnostics Return"
+          },
+          "can_mark_incomplete": {
+            "type": "boolean",
+            "title": "Can Mark Incomplete"
+          },
+          "can_restore_next": {
+            "type": "boolean",
+            "title": "Can Restore Next"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "patient_id",
+          "visit_id",
+          "patient_name",
+          "source",
+          "status",
+          "display_time_kind",
+          "timezone",
+          "available_actions",
+          "can_call",
+          "can_start_visit",
+          "can_no_show",
+          "can_send_to_diagnostics",
+          "can_complete",
+          "can_notify_diagnostics_return",
+          "can_mark_incomplete",
+          "can_restore_next"
+        ],
+        "title": "DoctorQueueEntry"
+      },
       "DoctorQueueLimit": {
         "properties": {
           "doctor_id": {
@@ -78662,6 +79593,263 @@
         ],
         "title": "DoctorQueueLimit",
         "description": "Индивидуальный лимит для врача"
+      },
+      "DoctorQueuePatient": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "middle_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middle Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "DoctorQueuePatient"
+      },
+      "DoctorQueueStartVisitResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "entry_id": {
+            "type": "integer",
+            "title": "Entry Id"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "entry_id",
+          "patient_id",
+          "visit_id",
+          "status"
+        ],
+        "title": "DoctorQueueStartVisitResponse"
+      },
+      "DoctorQueueStats": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting"
+          },
+          "called": {
+            "type": "integer",
+            "title": "Called"
+          },
+          "served": {
+            "type": "integer",
+            "title": "Served"
+          },
+          "online_entries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Entries"
+          },
+          "desk_entries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desk Entries"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "total",
+          "waiting",
+          "called",
+          "served"
+        ],
+        "title": "DoctorQueueStats"
+      },
+      "DoctorQueueTodayResponse": {
+        "properties": {
+          "queue_exists": {
+            "type": "boolean",
+            "title": "Queue Exists"
+          },
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
+          "queue_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Ids"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "doctor": {
+            "$ref": "#/components/schemas/DoctorQueueDoctor"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorQueueEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/DoctorQueueStats"
+          },
+          "can_call_next": {
+            "type": "boolean",
+            "title": "Can Call Next"
+          },
+          "next_call_entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Call Entry Id"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "queue_exists",
+          "doctor",
+          "date",
+          "entries",
+          "stats",
+          "can_call_next",
+          "next_call_entry_id"
+        ],
+        "title": "DoctorQueueTodayResponse"
       },
       "DoctorSearchRequest": {
         "properties": {
@@ -85634,6 +86822,11 @@
           "message": {
             "type": "string",
             "title": "Message"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "Replayed",
+            "default": false
           }
         },
         "type": "object",
@@ -85744,6 +86937,11 @@
           "department": {
             "type": "string",
             "title": "Department"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "Replayed",
+            "default": false
           }
         },
         "type": "object",
@@ -85757,6 +86955,183 @@
         ],
         "title": "JoinSessionCompleteResponse",
         "description": "Ответ с результатом присоединения"
+      },
+      "JoinSessionProbeRequest": {
+        "properties": {
+          "session_token": {
+            "type": "string",
+            "title": "Session Token",
+            "description": "Токен сессии"
+          },
+          "patient_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Patient Name",
+            "description": "ФИО пациента"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 5,
+            "title": "Phone",
+            "description": "Номер телефона"
+          },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id",
+            "description": "Telegram ID"
+          },
+          "specialist_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Ids",
+            "description": "Список ID специалистов (для общего QR)"
+          },
+          "specialist_entity_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Entity Types",
+            "description": "Типы сущностей specialist_ids, выровненные по индексам ('doctor' | 'profile')"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_token",
+          "patient_name",
+          "phone"
+        ],
+        "title": "JoinSessionProbeRequest",
+        "description": "Round-11 (PR #3362 review, P1-2): запрос read-only oracle'а.\n\nПоля идентичны ``JoinSessionCompleteRequest`` — оракул сравнивает\nканонизированный отпечаток ТЕМ ЖЕ алгоритмом, которым complete\nсвязывает попытку с payload'ом. Никаких бизнес-эффектов запрос не\nимеет: ни claim, ни создание пациента, ни выдача талона."
+      },
+      "JoinSessionProbeResponse": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "description": "joined_match | joined_mismatch | joined_owner_unknown | pending_unbound | processing | expired | not_found"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result",
+            "description": "Сохранённый ответ первой попытки (только для joined_match); иначе null"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "title": "JoinSessionProbeResponse",
+        "description": "Round-11 (PR #3362 review, P1-2): классификация попытки БЕЗ мутаций.\n\n``outcome``:\n  joined_match         — typed payload владеет уже совершённой попыткой;\n                         ``result`` несёт СОХРАНЁННЫЙ ответ первой попытки\n                         (read-only re-serve, эквивалент replay-ветки);\n  joined_mismatch      — попытка совершена с другим payload'ом (чужая);\n  joined_owner_unknown — устаревшая строка без отпечатка — владение\n                         недоказуемо, ведёт себя как UNKNOWN;\n  pending_unbound      — сессия жива, но под ней НЕ выполнено ни одного\n                         бизнес-действия — конверт можно безопасно удалить;\n  processing           — claim в полёте — UNKNOWN, повторить позже;\n  expired / not_found  — попытка мертва, ничего не создано."
+      },
+      "JoinSessionRefusalDetail": {
+        "properties": {
+          "specialist_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Id",
+            "description": "ID выбора (Doctor.id или QueueProfile.id); None для одиночного пути"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Человекочитаемое сообщение домена"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "JoinSessionRefusalDetail",
+        "description": "Один per-specialist отказ аллокатора (round-6, P2-1)."
+      },
+      "JoinSessionRefusalErrorResponse": {
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/JoinSessionRefusalResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "JoinSessionRefusalErrorResponse",
+        "description": "Полное HTTP-тело отказа complete-попытки (round-9, review P2-1).\n\nRuntime raises ``HTTPException(detail={reason, message[, details]})``,\nso FastAPI serves the refusal wrapped in the standard ``detail``\nenvelope: ``{\"detail\": {\"reason\": ..., \"message\": ...}}``. The\nfrontend reads ``response.data.detail.reason`` — the declared OpenAPI\ncontract must describe EXACTLY that wire format, so 400/409 reference\nTHIS wrapper (not the bare inner payload)."
+      },
+      "JoinSessionRefusalResponse": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Машиночитаемая причина отказа"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Человекочитаемое сообщение"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/JoinSessionRefusalDetail"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details",
+            "description": "Per-specialist ошибки (только для join_session_not_executed)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "message"
+        ],
+        "title": "JoinSessionRefusalResponse",
+        "description": "Структурированный отказ complete-попытки (round-6, P2-1/P2-2).\n\n400 — session-state / pre-execution refusals (incl. the\nrollback-proven ``join_session_not_executed``); 409 — immutable\npayload mismatch. ``reason`` vocabulary:\njoin_session_not_found | join_session_expired | join_session_processing |\njoin_session_used | join_session_payload_mismatch | join_session_not_executed."
       },
       "JoinSessionStartRequest": {
         "properties": {
@@ -85787,6 +87162,30 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Queue Info"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Date",
+            "description": "Целевая дата очереди токена (YYYY-MM-DD)"
+          },
+          "attempt_expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Expires At",
+            "description": "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace"
           }
         },
         "type": "object",
@@ -91976,6 +93375,28 @@
             "type": "boolean",
             "title": "Is My Claim",
             "default": false
+          },
+          "claim_owner_assignment_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Owner Assignment Active"
+          },
+          "actionable_by_current_user": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actionable By Current User"
           },
           "services": {
             "items": {
@@ -99197,6 +100618,30 @@
             "type": "boolean",
             "title": "Permanent Address",
             "description": "Always True on this surface (the address is permanent)"
+          },
+          "target_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Date",
+            "description": "Целевая дата очереди токена (YYYY-MM-DD)"
+          },
+          "attempt_expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Expires At",
+            "description": "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки"
           },
           "direction": {
             "$ref": "#/components/schemas/PublicDirectionAddressInfo"
@@ -112252,6 +113697,164 @@
         },
         "type": "object",
         "title": "VisitCreate"
+      },
+      "VisitInfoRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "VisitInfoRequest"
+      },
+      "VisitInfoResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "doctor_name": {
+            "type": "string",
+            "title": "Doctor Name"
+          },
+          "visit_date": {
+            "type": "string",
+            "title": "Visit Date"
+          },
+          "visit_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Time"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "discount_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discount Mode"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/VisitInfoServiceItem"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "total_amount": {
+            "type": "number",
+            "title": "Total Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "confirmation_expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "visit_id",
+          "status",
+          "patient_name",
+          "doctor_name",
+          "visit_date",
+          "visit_time",
+          "department",
+          "discount_mode",
+          "services",
+          "total_amount",
+          "currency",
+          "confirmation_expires_at"
+        ],
+        "title": "VisitInfoResponse",
+        "description": "Patient-safe public visit card (GET/POST /visits/info).\n\nPR 3390 review P2 + PR 3407 delta review P2: deliberately does NOT\ninclude ``notes``. The card is bearer-token-addressed and public, so\nthe internal clinical/admin field (``diagnosis: …``, cancel reasons,\nforce-reopen audit lines) is dropped from the service projection\nitself, and BOTH routes (the new POST and the legacy GET) are\nadditionally filtered through this model — defense in depth against\na future regression re-adding the field to the shared card."
+      },
+      "VisitInfoServiceItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          },
+          "total": {
+            "type": "number",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "code",
+          "quantity",
+          "price",
+          "total"
+        ],
+        "title": "VisitInfoServiceItem"
       },
       "VisitOut": {
         "properties": {

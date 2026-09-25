@@ -1,7 +1,7 @@
 """Core mixin for UserManagementService. Split from user_management_service.py."""
 from __future__ import annotations
 
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload
 
 from app.services.medical_specialty_catalog import (
     MedicalSpecialtyCatalogError,
@@ -886,7 +886,7 @@ class CoreMixin(UserManagementServiceMixinBase):
             # Пагинация
             offset = (search_params.page - 1) * search_params.per_page
             users = (
-                query.options(selectinload(User.profile))
+                query.options(joinedload(User.profile))
                 .offset(offset)
                 .limit(search_params.per_page)
                 .all()

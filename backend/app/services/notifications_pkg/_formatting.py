@@ -172,7 +172,20 @@ class FormattingMixin(NotificationSenderMixinBase):
             if not patient.phone:
                 return {"success": False, "error": "У пациента нет номера телефона"}
 
-            pwa_url = f"{settings.PWA_BASE_URL}/confirm-visit?token={data['confirmation_token']}"
+            # Canonical public base URL for user-facing deep links — the
+            # same source as the password-reset link, Telegram web-app
+            # buttons and QR codes. The PWA is served by the same frontend
+            # origin; there is no separate PWA_BASE_URL setting (staging
+            # Check 5b finding: reading it crashed every PWA reminder).
+            # rstrip("/"): Settings already normalizes FRONTEND_URL, but the
+            # deep-link builders follow the defensive repo convention
+            # (see telegram_service) so a stray trailing slash can never
+            # yield a "//confirm-visit" path that misses the route.
+            # The fragment never enters the HTTP request target or Referer.
+            pwa_url = (
+                f"{settings.FRONTEND_URL.rstrip('/')}"
+                f"/confirm-visit#token={data['confirmation_token']}"
+            )
             sms_text = self._format_sms_message(data, pwa_url)
 
             success = await self.send_sms(patient.phone, sms_text)
@@ -199,5 +212,3 @@ class FormattingMixin(NotificationSenderMixinBase):
             "channel": "phone",
             "message": "Создана задача для регистратуры",
         }
-
-

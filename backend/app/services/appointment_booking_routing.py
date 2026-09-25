@@ -50,6 +50,9 @@ from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
 from app.models.department import Department
+from app.services.appointment_slot_guard import (
+    lock_department_for_booking as _slot_guard_department_lock,
+)
 
 
 def resolve_booking_department(
@@ -165,52 +168,24 @@ def lock_department_for_booking(
 ) -> Department | None:
     """Re-validate the FINAL routing department under ``FOR UPDATE``.
 
-    Round-12 (owner P1, PR #3386 review): ``resolve_booking_department``
-    and the canonical path check ``active`` on a plain (unlocked) read —
-    an admin deactivate/delete can commit between that check and the
-    appointment INSERT, so the created row would carry a routing context
-    pointing at an inactive (or gone) department. The create endpoints
-    call THIS immediately before persisting ``department_id``:
+    Round-12 (owner P1, PR #3386 review): the create endpoints call THIS
+    immediately before persisting ``department_id`` — an admin
+    deactivate/delete that races the appointment INSERT either commits
+    first (controlled 400 ``department_unknown``/``department_inactive``)
+    or serializes BEHIND the booking.
 
-    * the row is re-read by id ``FOR UPDATE`` inside the booking
-      transaction — a concurrent admin UPDATE/DELETE on the department
-      blocks until the booking commits, and the lock acquisition itself
-      re-reads the latest committed row version (READ COMMITTED);
-    * ``populate_existing()`` (round-13 owner P1) forces the ORM to
-      overwrite the attributes it already cached for this PK — the
-      Session usually loaded the same department during the earlier
-      routing reads, and without the refresh the ``active`` check below
-      could answer a stale PRE-deactivation value even though the
-      SELECT ... FOR UPDATE delivered the new row version;
-    * a row that is no longer active answers the SAME 400
-      ``department_inactive`` the routing contract already publishes;
-    * a row deleted outright answers 400 ``department_unknown`` (the FK
-      the INSERT would need no longer resolves — a controlled refusal,
-      never an IntegrityError/500).
-
-    ``None`` passes through (a departmentless booking has no row to lock
-    and no routing context to lose).
+    PR #3386 merge note: the implementation is the SINGLE canonical
+    ``appointment_slot_guard.lock_department_for_booking`` (owner-reviewed
+    in #3402) — this wrapper exists so both protected booking surfaces
+    (JWT portal + Telegram Mini App) keep importing the guard from THIS
+    module, the SSOT entry. The slot-guard implementation is strictly
+    stronger than the pre-merge local one: it additionally maps an
+    expired-and-deleted instance (``ObjectDeletedError`` on the PK read)
+    to the controlled 400 ``department_unknown`` instead of a 500, while
+    keeping the same ``populate_existing().with_for_update()`` re-read,
+    the same 400 reasons, and the same ``None`` pass-through.
     """
-    if department_row is None:
-        return None
-    locked_row = (
-        db.query(Department)
-        .filter(Department.id == department_row.id)
-        .populate_existing()
-        .with_for_update()
-        .first()
-    )
-    if locked_row is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"reason": "department_unknown"},
-        )
-    if not getattr(locked_row, "active", True):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"reason": "department_inactive"},
-        )
-    return locked_row
+    return _slot_guard_department_lock(db, department_row)
 
 
 def attach_department_id(

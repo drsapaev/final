@@ -21,10 +21,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, ArrowRight, Clock } from 'lucide-react';
-import { getCanonicalRoutes, isRouteAccessibleToProfile } from '../../routing/routeSelectors';
+import { getCanonicalRouteByPath, getCanonicalRoutes, isRouteAccessibleToProfile } from '../../routing/routeSelectors';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
 import { safeJsonParse } from '../../utils/safeJsonParse';
 
 interface CommandItem {
@@ -196,16 +196,20 @@ export function CommandPalette({ profile, navigate }: { profile: CommandProfile;
       };
     });
 
-    // Filter quick actions by role
-    const roleNorm = (profile?.role || '').toLowerCase();
+    // Filter quick actions by the CANONICAL ROUTE gate (N2-5 owner
+    // review): the palette's route items already pass
+    // isRouteAccessibleToProfile — the quick actions must not bypass
+    // it. "Поиск пациента" targets /clinical/search, whose allowlist has
+    // no Nurse: offering it on the Nurse tablet sent the user straight
+    // to /forbidden. The target's canonical route decides; query
+    // strings are stripped (matchPath is path-only); non-navigation
+    // actions (back) stay.
     const actionItems = getQuickActions(t).filter(action => {
-      if (action.id === 'action-new-appointment') {
-        return roleNorm === 'admin' || roleNorm === 'registrar';
+      if (action.action !== 'navigate' || !action.target) {
+        return true; // 'back' is not a route jump
       }
-      if (action.id === 'action-search-patient') {
-        return true; // all clinical roles can search
-      }
-      return true;
+      const targetRoute = getCanonicalRouteByPath(action.target.split('?')[0]);
+      return isRouteAccessibleToProfile(targetRoute, profile);
     });
 
     return [...actionItems, ...routeItems];

@@ -71,6 +71,9 @@ export type DoctorListResponseDto = Schemas['DoctorListResponse'];
 export type VisitDto = Schemas['VisitOut'];
 export type VisitCreateDto = Schemas['VisitCreate'];
 export type VisitWithServicesDto = Schemas['VisitWithServices'];
+// Public PWA visit-confirmation endpoints (visit_confirmation.py)
+export type VisitConfirmationResponseDto = Schemas['ConfirmationResponse'];
+export type PWAConfirmRequestDto = Schemas['PWAConfirmRequest'];
 
 export type EMRDto = Schemas['EMR'];
 export type EMRCreateDto = Schemas['EMRCreate'];
@@ -200,3 +203,22 @@ export type ValidationError = Schemas['ValidationError'];
 // Re-export the full components/paths/operations types for advanced consumers
 // (e.g. when a hook needs to type an axios response with the full operation shape).
 export type { components, paths, operations } from './generated/api';
+
+// ============================================================================
+// NURSE-V2 serving plane (N2-3 API contract + the N2-3 follow-up
+// drain-recovery discovery) — consumed by the N2-5 tablet (NurseTabletPage).
+// ============================================================================
+
+export type NurseServingWorkplaceDto = Schemas['NurseServingWorkplaceResponse'];
+export type NurseServingWorkplaceListDto = Schemas['NurseServingWorkplaceListResponse'];
+export type NurseServingStationDto = Schemas['NurseServingStationResponse'];
+export type NurseServingEntryDto = Schemas['NurseServingEntryResponse'];
+export type NurseServingStationServiceDto = Schemas['NurseServingStationServiceState'];
+export type NurseServingExecutionDto = Schemas['NurseServingExecutionResponse'];
+export type NurseServingCallNextDto = Schemas['NurseServingCallNextResponse'];
+export type NurseServingStartDto = Schemas['NurseServingStartResponse'];
+export type NurseServingEntryActionDto = Schemas['NurseServingEntryActionResponse'];
+export type NurseServingExecutionCreateRequestDto = Schemas['NurseServingExecutionCreateRequest'];
+export type NurseServingReasonRequestDto = Schemas['NurseServingExecutionIncompleteRequest'];
+export type NurseServingDrainingExecutionItemDto = Schemas['NurseServingDrainingExecutionItem'];
+export type NurseServingDrainingExecutionListDto = Schemas['NurseServingDrainingExecutionListResponse'];

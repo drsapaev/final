@@ -489,6 +489,15 @@ def test_public_start_happy_path_continues_existing_join_flow(
     assert body["direction"]["public_code"] == code.lower()
     info = body["queue_info"]
     assert info.get("is_clinic_wide") is True
+    # RQ-18 follow-up (owner round-1 P1-1): the patient-facing display
+    # fields are DIRECTION-true — the clinic-wide sentinel values
+    # («Клиника» / «Все специалисты» / queue_length 0) emitted by the
+    # shared token-info builder for the minted is_clinic_wide token are
+    # overridden with the direction identity; live stats stay with the
+    # join-time result instead of a synthesized fake zero.
+    assert info.get("department_name") == "RQ-16.d rq16d-cardio (синтетик)"
+    assert info.get("specialist_name") is None
+    assert info.get("queue_length") is None
     selectable = info.get("selectable_specialists") or []
     assert {item["id"] for item in selectable} == {
         direction_world["cardio_doctor"].id

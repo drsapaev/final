@@ -54,6 +54,7 @@ const LabPanel = lazy(() => import('./pages/LabPanel'));
 const UserSelect = lazy(() => import('./pages/UserSelect'));
 const Search = lazy(() => import('./pages/Search'));
 const QueueJoin = lazy(() => import('./pages/QueueJoin'));
+const ConfirmVisitPage = lazy(() => import('./pages/ConfirmVisitPage'));
 const PatientPanel = lazy(() => import('./pages/PatientPanel'));
 const DisplayBoardUnified = lazy(() => import('./pages/DisplayBoardUnified'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
@@ -67,6 +68,7 @@ const PatientLoginPage = lazy(() => import('./pages/auth/PatientLoginPage'));
 const PatientActivatePage = lazy(() => import('./pages/auth/PatientActivatePage'));
 const PatientPickupView = lazy(() => import('./pages/PatientPickupView'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
+const NurseTabletPage = lazy(() => import('./pages/nurse/NurseTabletPage'));
 // SW-01 fix: removed ButtonShowcase (dead code, components/buttons/ deleted)
 const TelegramManager = lazy(() => import('./components/TelegramManager'));
 const TelegramMiniAppPatientShell = lazy(() => import('./pages/TelegramMiniAppPatientShell'));
@@ -107,6 +109,7 @@ const ROUTE_COMPONENTS = {
   PatientActivatePage,
   Health,
   QueueJoin,
+  ConfirmVisitPage,
   PaymentSuccess,
   PaymentCancel,
   DisplayBoardUnified,
@@ -132,6 +135,7 @@ const ROUTE_COMPONENTS = {
   Appointments,
   Search,
   UserProfile,
+  NurseTabletPage,
   PatientPickupView,
   MacOSDemoPage,
   IntegrationDemo,
