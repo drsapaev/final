@@ -12,7 +12,6 @@ import {
   mapDentistVisitProtocolFromEmr,
   mergeDentistVisitProtocolCards,
 } from '../../utils/dentistVisitProtocolBridge';
-import { getErrorMessage } from '../../utils/type-guards';
 import notify from '../../services/notify';
 import { dentistCache, loadStoredDentistDocuments, type SelectedPatient } from './dentistContracts';
 
@@ -57,8 +56,8 @@ export function useDentistVisitProtocols({
         DENTIST_DOCUMENTS_STORAGE_KEY,
         JSON.stringify({ visitProtocols: savedVisitProtocols })
       );
-    } catch (error: unknown) {
-      logger.warn('[Dentist] Не удалось сохранить локальные протоколы визита:', error);
+    } catch {
+      logger.warn('[Dentist] Не удалось сохранить локальные протоколы визита');
     }
   }, [savedVisitProtocols]);
 
@@ -81,10 +80,7 @@ export function useDentistVisitProtocols({
       return inFlightProtocols;
     }
 
-    logger.info('[Dentist] Загружаю протоколы визитов из EMR v2', {
-      patientId,
-      patientName: patientRecord.patient_name as string || patientRecord.patient_fio as string || patientRecord.name as string || 'Пациент',
-    });
+    logger.info('[Dentist] Загружаю протоколы визитов из EMR v2');
 
     const loadPromise = (async () => {
       try {
@@ -116,12 +112,8 @@ export function useDentistVisitProtocols({
               }
 
               return protocolRecord;
-            } catch (error: unknown) {
-              logger.warn('[Dentist] Не удалось загрузить EMR визита для протокола', {
-                patientId,
-                visitId: summary.visit_id,
-                error: getErrorMessage(error) || error,
-              });
+            } catch {
+              logger.warn('[Dentist] Не удалось загрузить EMR визита для протокола');
               return null;
             }
           })
@@ -162,18 +154,11 @@ export function useDentistVisitProtocols({
         return null;
       }
 
-      logger.info('[Dentist] Протокол визита загружен из EMR v2', {
-        visitId,
-        emrId: response.data?.id,
-        status: response.data?.status,
-      });
+      logger.info('[Dentist] Протокол визита загружен из EMR v2');
 
       return protocolRecord;
-    } catch (error: unknown) {
-      logger.warn('[Dentist] Не удалось загрузить протокол визита из EMR v2', {
-        visitId,
-        error: getErrorMessage(error) || error,
-      });
+    } catch {
+      logger.warn('[Dentist] Не удалось загрузить протокол визита из EMR v2');
       return null;
     }
   }, []);
@@ -184,9 +169,6 @@ export function useDentistVisitProtocols({
       return;
     }
 
-    const nestedPatient = patientRecord.patient as { id?: string | number; [k: string]: unknown } | undefined;
-    const patientId = nestedPatient?.id || patientRecord.patient_id || patientRecord.id || null;
-    const patientName = (patientRecord.patient_name as string) || (patientRecord.patient_fio as string) || (patientRecord.name as string) || tI18n('dental.dental_panel_patient_default');
     const localRecord = buildDentistVisitProtocolCard(patient, visitData, {
       source: 'local_cache',
     });
@@ -196,27 +178,20 @@ export function useDentistVisitProtocols({
         isDraft: true,
         rowVersion: 0,
       });
-      logger.info('[Dentist] Сохраняю протокол визита в EMR v2', {
-        visitId: patientRecord.visit_id,
-        patientId,
-      });
+      logger.info('[Dentist] Сохраняю протокол визита в EMR v2');
 
       const response = await apiClient.post(`/v2/emr/${patientRecord.visit_id}`, payload);
       const backendRecord = mapDentistVisitProtocolFromEmr(response.data, patient as Record<string, unknown> | null) || localRecord;
 
       setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, backendRecord));
       return backendRecord;
-    } catch (error: unknown) {
-      logger.warn('[Dentist] Не удалось сохранить протокол визита в EMR v2, сохраняю локальный кеш', {
-        visitId: patientRecord.visit_id,
-        patientName,
-        error: getErrorMessage(error) || error,
-      });
+    } catch {
+      logger.warn('[Dentist] Не удалось сохранить протокол визита в EMR v2, сохраняю локальный кеш');
 
       setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, localRecord));
       return localRecord;
     }
-  }, [tI18n]);
+  }, []);
 
   const reopenVisitProtocol = useCallback(async (protocolRecord: Record<string, unknown> | null) => {
     const backendProtocol = await loadDentistVisitProtocolByVisitId(protocolRecord?.visit_id as string | number | null | undefined, protocolRecord);
@@ -258,11 +233,8 @@ export function useDentistVisitProtocols({
         }
 
         setSavedVisitProtocols((prev) => mergeDentistVisitProtocolCards(prev, backendProtocols));
-      } catch (error: unknown) {
-        logger.warn('[Dentist] Не удалось синхронизировать историю протоколов из EMR v2', {
-          patientId: selectedPatientIdForProtocols,
-          error: getErrorMessage(error) || error,
-        });
+      } catch {
+        logger.warn('[Dentist] Не удалось синхронизировать историю протоколов из EMR v2');
       }
     };
 
