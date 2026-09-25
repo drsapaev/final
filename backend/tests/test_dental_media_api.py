@@ -38,7 +38,9 @@ def _make_actor(
     suffix = secrets.token_hex(6)
     user = User(
         username=f"dental_media_{suffix}",
-        email=f"dental_media_{suffix}@example.test",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all.
+        email=None,
         full_name="Synthetic Dental Clinician",
         hashed_password=get_password_hash("not-a-real-user-password"),
         role=role,
@@ -420,7 +422,9 @@ def _make_bare_user(
     suffix = secrets.token_hex(6)
     user = User(
         username=f"dental_bare_{suffix}",
-        email=f"dental_bare_{suffix}@example.test",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all.
+        email=None,
         full_name="Synthetic Bare Clinician",
         hashed_password=get_password_hash("not-a-real-user-password"),
         role=role,
@@ -440,7 +444,9 @@ def _make_colliding_victim_doctor(
     suffix = secrets.token_hex(6)
     victim_user = User(
         username=f"dental_victim_{suffix}",
-        email=f"dental_victim_{suffix}@example.test",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all.
+        email=None,
         full_name="Synthetic Victim Dentist",
         hashed_password=get_password_hash("not-a-real-user-password"),
         role="dentist",
@@ -686,7 +692,9 @@ def test_superadmin_role_passes_admin_gate_on_dental_visit(
     suffix = secrets.token_hex(6)
     superadmin = User(
         username=f"dental_superadmin_{suffix}",
-        email=f"dental_superadmin_{suffix}@example.test",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all.
+        email=None,
         full_name="Synthetic Super Admin",
         hashed_password=get_password_hash("not-a-real-user-password"),
         role="SuperAdmin",
@@ -910,6 +918,77 @@ def test_generic_surfaces_classify_tags_by_exact_token_not_substring(
     assert fetched.status_code == 200, fetched.text
 
 
+def test_file_statistics_respect_protected_domain_boundary(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """Owner verdict on f0667b9b5 (P2): /files/statistics must mirror the same
+    protected-domain boundary as list/search. Protected dental rows must not
+    be counted in total_files/total_size/files_by_type/files_by_permission
+    nor surface in recent_uploads (FileOut carries file_path/file_hash and
+    patient/visit ids). recent_uploads must also be serialized through
+    FileOut.from_orm() — raw ORM rows fail FileStats response validation
+    (FileOut.tags expects list[str] while the column stores a JSON string),
+    so a tagged generic file in the window would 500 the whole endpoint."""
+    owner, owner_doctor = _make_actor(db_session, role="Doctor")
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+
+    upload = _upload(
+        client,
+        headers=_headers(owner),
+        patient_id=test_patient.id,
+        visit_id=owner_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+    media_id = upload.json()["id"]
+
+    # A generic file WITH tags: exercises the from_orm() serialization path
+    # (pre-fix this row alone would 500 the statistics response validation).
+    tagged = client.post(
+        "/api/v1/files/upload",
+        files={
+            "file": (
+                "tagged-note.txt",
+                BytesIO(b"tagged ordinary document"),
+                "text/plain",
+            )
+        },
+        data={"file_type": "document", "tags": "dental-media:v1-backup, keep"},
+        headers=_headers(owner),
+    )
+    assert tagged.status_code in (200, 201), tagged.text
+    tagged_id = tagged.json()["id"]
+
+    stats = client.get("/api/v1/files/statistics", headers=_headers(owner))
+    assert stats.status_code == 200, stats.text
+    body = stats.json()
+
+    # Aggregates mirror the scoped generic surface: the protected dental row
+    # (image/xray + private) is invisible to statistics.
+    assert body["total_files"] == 1, body["total_files"]
+    assert dict(body["files_by_type"]) == {"document": 1}, body["files_by_type"]
+    assert dict(body["files_by_permission"]) == {"private": 1}, (
+        body["files_by_permission"]
+    )
+    assert body["total_size"] > 0
+
+    recent_ids = [f["id"] for f in body["recent_uploads"]]
+    assert recent_ids == [tagged_id], recent_ids
+    assert media_id not in recent_ids, (
+        "protected dental media leaked through statistics recent_uploads"
+    )
+    # Serialized rows must be FileOut-shaped (tags parsed from JSON), not raw
+    # ORM fields — a JSON string here would mean the from_orm path was skipped.
+    assert all(
+        isinstance(f.get("tags"), list) or f.get("tags") is None
+        for f in body["recent_uploads"]
+    ), [f.get("tags") for f in body["recent_uploads"]]
+
+
 def test_superadmin_can_delete_dental_media_without_ownership(
     client: TestClient,
     db_session: Session,
@@ -937,7 +1016,9 @@ def test_superadmin_can_delete_dental_media_without_ownership(
     suffix = secrets.token_hex(6)
     superadmin = User(
         username=f"dental_superadmin_del_{suffix}",
-        email=f"dental_superadmin_del_{suffix}@example.test",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all.
+        email=None,
         full_name="Synthetic Super Admin Deleter",
         hashed_password=get_password_hash("not-a-real-user-password"),
         role="SuperAdmin",

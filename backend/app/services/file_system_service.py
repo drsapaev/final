@@ -24,6 +24,7 @@ from app.crud.file_system import (
     file_access_log,
     file_quota,
     file_share,
+    file_tags_exclusion_predicate,
     file_version,
 )
 from app.models.appointment import Appointment
@@ -42,6 +43,7 @@ from app.schemas.file_system import (
     FileCreate,
     FileExportRequest,
     FileImportRequest,
+    FileOut,
     FilePermissionEnum,
     FileSearchRequest,
     FileTypeEnum,
@@ -959,38 +961,53 @@ class FileSystemService:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     def get_file_statistics(self, db: Session, user_id: int) -> dict[str, Any]:
-        """Получить статистику файлов"""
-        # Общая статистика
-        total_files = db.query(File).filter(File.owner_id == user_id).count()
-        total_size = (
-            db.query(func.sum(File.file_size)).filter(File.owner_id == user_id).scalar()
-            or 0
+        """Получить статистику файлов (generic-surface scope).
+
+        Protected-domain boundary: list/search/item-поверхности generic /files
+        API исключают protected-domain строки (например dental-media) на уровне
+        запроса, поэтому агрегаты статистики обязаны зеркалировать ту же
+        границу через тот же shared exact-token предикат — иначе counts/size,
+        фасеты и recent_uploads утекают агрегатные и строковые метаданные
+        защищённых клинических файлов (FileOut несёт file_path/file_hash/
+        patient_id/visit_id).
+
+        recent_uploads сериализуется через FileOut.from_orm(): сырые ORM-строки
+        валидатор FileStats не принимает (FileOut.tags ждёт list[str], а в
+        Text-колонке лежит JSON-строка; кроме того у ORM-объекта есть
+        служебный атрибут metadata) — любой файл в recent_uploads ронял бы
+        /files/statistics в response-validation 500.
+        """
+        base = (
+            db.query(File)
+            .filter(File.owner_id == user_id)
+            .filter(
+                file_tags_exclusion_predicate(File, sorted(PROTECTED_FILE_DOMAIN_TAGS))
+            )
         )
+
+        # Общая статистика
+        total_files = base.count()
+        total_size = base.with_entities(func.sum(File.file_size)).scalar() or 0
 
         # Статистика по типам
         files_by_type = (
-            db.query(File.file_type, func.count(File.id))
-            .filter(File.owner_id == user_id)
+            base.with_entities(File.file_type, func.count(File.id))
             .group_by(File.file_type)
             .all()
         )
 
         # Статистика по правам доступа
         files_by_permission = (
-            db.query(File.permission, func.count(File.id))
-            .filter(File.owner_id == user_id)
+            base.with_entities(File.permission, func.count(File.id))
             .group_by(File.permission)
             .all()
         )
 
-        # Недавние загрузки
-        recent_uploads = (
-            db.query(File)
-            .filter(File.owner_id == user_id)
-            .order_by(desc(File.created_at))
-            .limit(10)
-            .all()
-        )
+        # Недавние загрузки — уже сериализованные FileOut (не ORM-строки)
+        recent_uploads = [
+            FileOut.from_orm(row)
+            for row in base.order_by(desc(File.created_at)).limit(10).all()
+        ]
 
         # Использование квоты
         quota = file_quota.get_user_quota(db, user_id=user_id)
