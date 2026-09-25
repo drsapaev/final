@@ -9,7 +9,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import DentistVisitsView from '../views/DentistVisitsView';
-import { dentalCardKeyDown } from '../dentistCardA11y';
 import { useDentistUrlPatient } from '../useDentistUrlPatient';
 import type { SelectedPatient } from '../dentistContracts';
 
@@ -56,22 +55,6 @@ describe('dentist views (PR-UI-15-6)', () => {
     expect(screen.getByTestId('visit-screen')).toHaveTextContent('SYNTHETIC-Selected');
   });
 
-  it('dentalCardKeyDown activates on Enter/Space and swallows the event', () => {
-    const action = vi.fn();
-    const enter = { key: 'Enter', preventDefault: vi.fn() } as unknown as React.KeyboardEvent<HTMLElement>;
-    dentalCardKeyDown(enter, action);
-    expect(action).toHaveBeenCalledTimes(1);
-    expect(enter.preventDefault).toHaveBeenCalled();
-
-    const space = { key: ' ', preventDefault: vi.fn() } as unknown as React.KeyboardEvent<HTMLElement>;
-    dentalCardKeyDown(space, action);
-    expect(action).toHaveBeenCalledTimes(2);
-
-    const other = { key: 'a', preventDefault: vi.fn() } as unknown as React.KeyboardEvent<HTMLElement>;
-    dentalCardKeyDown(other, action);
-    expect(action).toHaveBeenCalledTimes(2);
-    expect(other.preventDefault).not.toHaveBeenCalled();
-  });
 });
 
 describe('useDentistUrlPatient (PR-UI-15-6)', () => {

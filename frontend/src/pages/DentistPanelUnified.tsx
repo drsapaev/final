@@ -109,8 +109,6 @@ const DentistPanelUnified = () => {
     [],
   );
 
-  // PR-UI-15-6: handleCardKeyDown moved verbatim to ./dentist/dentistCardA11y
-  // (shared by the extracted card-grid views).
   const [loading, setLoading] = useState(true);
   // P-009: selectedPatient / setSelectedPatient now come from useDoctorPanelState
   // PR-UI-15-4: savedVisitProtocols + protocol loaders/persist/reopen moved
