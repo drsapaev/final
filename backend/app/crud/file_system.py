@@ -46,8 +46,12 @@ class CRUDFile:
         """Создать файл"""
         # Преобразуем tags в JSON строку если это список
         file_data = obj_in.model_dump()
-        if 'tags' in file_data and isinstance(file_data['tags'], list):
-            file_data['tags'] = json.dumps(file_data['tags'])
+        if "tags" in file_data and isinstance(file_data["tags"], list):
+            file_data["tags"] = json.dumps(file_data["tags"])
+        if isinstance(file_data.get("file_metadata"), dict | list):
+            file_data["file_metadata"] = json.dumps(
+                file_data["file_metadata"], ensure_ascii=False
+            )
 
         db_obj = File(**file_data, owner_id=owner_id, status=FileStatus.UPLOADING)
         db.add(db_obj)

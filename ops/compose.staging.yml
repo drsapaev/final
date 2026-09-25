@@ -79,7 +79,8 @@ services:
     working_dir: /app
     command: ["/bin/bash", "/entrypoint.sh"]
     ports:
-      - "${STAGING_BACKEND_PORT:-18000}:18000"
+      # Windows production uses host port 18000; keep staging separate by default.
+      - "${STAGING_BACKEND_PORT:-18001}:18000"
     depends_on:
       postgres:
         condition: service_healthy

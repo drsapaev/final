@@ -23,12 +23,15 @@ from fastapi import (
     status,
 )
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.audit import extract_model_changes
 from app.core.i18n import t  # noqa: F401
+from app.models.clinic import Doctor
 from app.models.user import User
+from app.models.visit import Visit
 from app.schemas.file_system import (
     FileExportRequest,
     FileExportResponse,
@@ -49,6 +52,53 @@ from app.utils.file_validator import validate_upload_file
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+_DERMATOLOGY_SPECIALTIES = ("derma", "dermatology", "dermatologist")
+
+
+def _is_dermatology_user(user: User) -> bool:
+    return str(getattr(user, "role", "")).strip().casefold() == "derma"
+
+
+def _dermatology_visit_is_owned(
+    db: Session,
+    current_user: User,
+    *,
+    patient_id: int | None,
+    visit_id: int | None,
+) -> bool:
+    if patient_id is None or visit_id is None:
+        return False
+
+    return (
+        db.query(Visit.id)
+        .join(Doctor, Doctor.id == Visit.doctor_id)
+        .filter(
+            Visit.id == visit_id,
+            Visit.patient_id == patient_id,
+            Doctor.user_id == current_user.id,
+            Doctor.active.is_(True),
+            func.lower(Doctor.specialty).in_(_DERMATOLOGY_SPECIALTIES),
+        )
+        .first()
+        is not None
+    )
+
+
+def _require_dermatology_file_visit_access(
+    db: Session, current_user: User, file_obj: Any
+) -> None:
+    if not _dermatology_visit_is_owned(
+        db,
+        current_user,
+        patient_id=file_obj.patient_id,
+        visit_id=file_obj.visit_id,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found or access denied",
+        )
+
 
 IMPORT_ARCHIVE_READ_CHUNK_BYTES = 1024 * 1024
 
@@ -107,9 +157,7 @@ async def upload_file(
     tags: str | None = Form(None),
     expires_at: datetime | None = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "derma")),
 ):
     """Загрузить файл"""
     try:
@@ -122,29 +170,64 @@ async def upload_file(
                 detail=f"File validation failed: {error_msg}",
             )
 
+        if _is_dermatology_user(current_user):
+            if patient_id is None or visit_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Patient and visit are required for dermatology files",
+                )
+            if permission.strip().casefold() != "private":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Dermatology files must remain private",
+                )
+            if not _dermatology_visit_is_owned(
+                db,
+                current_user,
+                patient_id=patient_id,
+                visit_id=visit_id,
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Visit not found or access denied",
+                )
+
         # Парсим теги
         tags_list = []
         if tags:
-            tags_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+            tags_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
 
         # FILES-AUDIT-28 P1: validate patient_id ownership
         # M5.2: centralized authorization
         from app.services.authorization.staff import staff_authorization_service
-        if patient_id is not None and not staff_authorization_service.has_permission(current_user, "patient:write"):
+
+        if patient_id is not None and not staff_authorization_service.has_permission(
+            current_user, "patient:write"
+        ):
             from app.models.patient import Patient
+
             patient = db.query(Patient).filter(Patient.id == patient_id).first()
             if not patient:
                 raise HTTPException(status_code=404, detail=t("patient.not_found"))
             if current_user.role in ("Doctor", "cardio", "derma", "dentist"):
                 from app.models.clinic import Doctor
                 from app.models.visit import Visit
-                doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+
+                doctor = (
+                    db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+                )
                 if doctor:
-                    has_visit = db.query(Visit).filter(
-                        Visit.patient_id == patient_id, Visit.doctor_id == doctor.id
-                    ).first()
+                    has_visit = (
+                        db.query(Visit)
+                        .filter(
+                            Visit.patient_id == patient_id, Visit.doctor_id == doctor.id
+                        )
+                        .first()
+                    )
                     if not has_visit:
-                        raise HTTPException(status_code=403, detail="Нет доступа к данному пациенту")
+                        raise HTTPException(
+                            status_code=403, detail="Нет доступа к данному пациенту"
+                        )
 
         # Создаем данные для загрузки
         file_data = FileUploadRequest(
@@ -153,7 +236,6 @@ async def upload_file(
             title=title,
             description=description,
             permission=permission,
-
             patient_id=patient_id,
             appointment_id=appointment_id,
             visit_id=visit_id,
@@ -185,9 +267,7 @@ async def upload_file(
 @router.get("/statistics", response_model=FileStats)
 async def get_file_statistics(
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor")),
 ):
     """Получить статистику файлов"""
     try:
@@ -204,12 +284,21 @@ async def get_file_statistics(
 async def get_file(
     file_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Patient")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Patient", "derma")),
 ):
     """Получить информацию о файле"""
     try:
+        if _is_dermatology_user(current_user):
+            from app.crud.file_system import file as file_crud
+
+            candidate = file_crud.get(db, id=file_id)
+            if not candidate:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Файл не найден или нет доступа",
+                )
+            _require_dermatology_file_visit_access(db, current_user, candidate)
+
         service = get_file_system_service()
         file_obj = service.get_file(db, file_id, current_user.id)
 
@@ -231,12 +320,21 @@ async def get_file(
 async def download_file(
     file_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Patient")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Patient", "derma")),
 ):
     """Скачать файл"""
     try:
+        if _is_dermatology_user(current_user):
+            from app.crud.file_system import file as file_crud
+
+            candidate = file_crud.get(db, id=file_id)
+            if not candidate:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Файл не найден или нет доступа",
+                )
+            _require_dermatology_file_visit_access(db, current_user, candidate)
+
         service = get_file_system_service()
         file_content, filename, mime_type = service.download_file(
             db, file_id, current_user.id
@@ -258,12 +356,21 @@ async def download_file(
 async def preview_file(
     file_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Patient")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Patient", "derma")),
 ):
     """Предварительный просмотр файла"""
     try:
+        if _is_dermatology_user(current_user):
+            from app.crud.file_system import file as file_crud
+
+            candidate = file_crud.get(db, id=file_id)
+            if not candidate:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Файл не найден или нет доступа",
+                )
+            _require_dermatology_file_visit_access(db, current_user, candidate)
+
         service = get_file_system_service()
         file_obj = service.get_file(db, file_id, current_user.id)
 
@@ -274,7 +381,7 @@ async def preview_file(
             )
 
         # Проверяем, поддерживается ли предварительный просмотр
-        if not file_obj.mime_type.startswith(('image/', 'text/', 'application/pdf')):
+        if not file_obj.mime_type.startswith(("image/", "text/", "application/pdf")):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Предварительный просмотр не поддерживается для этого типа файла",
@@ -304,9 +411,7 @@ async def preview_file(
 async def search_files(
     search_request: FileSearchRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Patient")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Patient")),
 ):
     """Поиск файлов"""
     try:
@@ -340,9 +445,7 @@ async def get_files(
     page: int = Query(1, ge=1, description="Номер страницы"),
     size: int = Query(20, ge=1, le=100, description="Размер страницы"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor", "Patient")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Patient", "derma")),
 ):
     """Получить список файлов"""
     try:
@@ -350,8 +453,25 @@ async def get_files(
 
         # Определяем владельца файлов — M5.2: centralized authorization
         from app.services.authorization.staff import staff_authorization_service
+
         owner_id = current_user.id
-        if staff_authorization_service.can_manage_files(current_user):
+        if _is_dermatology_user(current_user):
+            if patient_id is None or visit_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Patient and visit are required for dermatology file lists",
+                )
+            if not _dermatology_visit_is_owned(
+                db,
+                current_user,
+                patient_id=patient_id,
+                visit_id=visit_id,
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Visit not found or access denied",
+                )
+        elif staff_authorization_service.can_manage_files(current_user):
             owner_id = None  # Admin sees all files
 
         files = file.get_multi(
@@ -388,6 +508,8 @@ async def get_files(
             pages=pages,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise_file_system_internal_error("get_files", e)
 
@@ -402,9 +524,7 @@ async def update_file(
     tags: str | None = Form(None),
     expires_at: datetime | None = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor")),
 ):
     """Обновить файл"""
     try:
@@ -429,7 +549,7 @@ async def update_file(
         tags_list = None
         if tags is not None:
             tags_list = (
-                [tag.strip() for tag in tags.split(',') if tag.strip()] if tags else []
+                [tag.strip() for tag in tags.split(",") if tag.strip()] if tags else []
             )
 
         # Создаем данные для обновления
@@ -470,9 +590,7 @@ async def replace_file_content(
     file: UploadFile = File(...),
     change_description: str | None = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor")),
 ):
     """
     ✅ CERTIFICATION: Заменить содержимое файла с версионированием.
@@ -510,9 +628,7 @@ async def delete_file(
     request: Request,
     file_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "derma")),
 ):
     """Удалить файл"""
     try:
@@ -524,6 +640,9 @@ async def delete_file(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Файл не найден"
             )
+
+        if _is_dermatology_user(current_user):
+            _require_dermatology_file_visit_access(db, current_user, db_file)
 
         # Сохраняем данные для аудита перед удалением
         old_data, _ = extract_model_changes(db_file, None)
@@ -560,9 +679,7 @@ async def create_file_share(
     file_id: int,
     share_data: FileShareCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor")),
 ):
     """Создать совместное использование файла"""
     try:
@@ -583,9 +700,7 @@ async def create_file_share(
 async def get_file_shares(
     file_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor")),
 ):
     """Получить совместные использования файла"""
     try:
@@ -614,9 +729,7 @@ async def export_files(
     export_request: FileExportRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor")),
 ):
     """Экспортировать файлы в архив"""
     try:
@@ -657,9 +770,7 @@ async def import_files(
     target_folder_id: int | None = Form(None),
     overwrite_existing: bool = Form(False),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("Admin", "Doctor")
-    ),
+    current_user: User = Depends(require_roles("Admin", "Doctor")),
 ):
     """Импортировать файлы из архива"""
     try:
@@ -672,9 +783,9 @@ async def import_files(
         # Определяем формат архива
         file_format = "zip"  # По умолчанию ZIP
         if file.filename:
-            if file.filename.endswith('.tar.gz'):
+            if file.filename.endswith(".tar.gz"):
                 file_format = "tar.gz"
-            elif file.filename.endswith('.tar'):
+            elif file.filename.endswith(".tar"):
                 file_format = "tar"
 
         if file_format != "zip":

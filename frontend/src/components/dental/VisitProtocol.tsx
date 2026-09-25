@@ -3,6 +3,15 @@ import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import { Camera, Check, Edit, FileText, Pill, Plus, Save, Scissors, Syringe, Trash2, Upload, X } from 'lucide-react';
 import notify from '../../services/notify';
+import { Alert, Button } from '../ui/macos';
+
+export type VisitProtocolRecord = Record<string, unknown>;
+
+/** Normalize legacy and EMR v2 protocol values before editing the visit draft. */
+export const normalizeVisitProtocolRecord = (value: unknown): VisitProtocolRecord =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as VisitProtocolRecord
+    : {};
 
 /**
  * Протокол лечения по визитам для стоматологической ЭМК
@@ -100,13 +109,12 @@ type PhotoCategory = 'before' | 'during' | 'after';
 
 const VisitProtocol = ({
   patientName,
-  patientId,
-  visitId,
   initialData = null,
   onSave,
   onClose,
-  onComplete
-}: { patientName?: string; patientId?: string | number; visitId?: string | number; initialData?: Record<string, unknown> | null; onSave?: (data: unknown) => void; onClose?: () => void; onComplete?: () => void }) => {
+  onComplete,
+  temporarilyUnavailable = true,
+}: { patientName?: string; patientId?: string | number; visitId?: string | number; initialData?: Record<string, unknown> | null; onSave?: (data: unknown) => void; onClose?: () => void; onComplete?: () => void; temporarilyUnavailable?: boolean }) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const [formData, setFormData] = useState<VisitProtocolFormData>({
@@ -169,6 +177,31 @@ const VisitProtocol = ({
       setIsEditing(false);
     }
   }, [initialData]);
+
+  if (temporarilyUnavailable) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dental-visit-protocol-unavailable-title">
+        <section className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl">
+          <h2 id="dental-visit-protocol-unavailable-title" className="mb-4 text-xl font-semibold">
+            {t('dental.dental_vp_title', { name: patientName })}
+          </h2>
+          <Alert
+            type="warning"
+            title={t('dental.dental_vp_unavailable_title')}
+            description={t('dental.dental_vp_unavailable')} />
+          <div className="mt-5 flex justify-end">
+            <Button variant="outline" onClick={onClose}>
+              {t('dental.dental_vp_aria_close')}
+            </Button>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   // Обработчики
   const handleInputChange = (field: string, value: unknown) => {

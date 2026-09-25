@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from datetime import date
 from decimal import Decimal
 
@@ -7,12 +8,86 @@ import pytest
 
 from app.models.clinic import Doctor
 from app.models.appointment import Appointment
+from app.models.emr_v2 import EMRRecord
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment
 from app.models.visit import Visit
 from app.core.security import get_password_hash
 from app.models.user import User
+
+
+def _create_dermatology_queue_world(
+    db_session, test_patient, *, suffix, emr_status, visit_id=None
+):
+    password = secrets.token_urlsafe(24)
+    user = User(
+        username=f"derma_completion_{suffix}",
+        email=f"derma_completion_{suffix}@example.test",
+        full_name="Test Dermatology Doctor",
+        hashed_password=get_password_hash(password),
+        role="derma",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    doctor = Doctor(
+        user_id=user.id,
+        specialty="dermatology",
+        active=True,
+        cabinet="404",
+    )
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+
+    queue = DailyQueue(
+        day=date.today(),
+        specialist_id=doctor.id,
+        queue_tag="dermatology",
+        active=True,
+    )
+    db_session.add(queue)
+    db_session.commit()
+    db_session.refresh(queue)
+
+    visit = Visit(
+        id=visit_id,
+        patient_id=test_patient.id,
+        doctor_id=doctor.id,
+        visit_date=date.today(),
+        status="in_progress",
+    )
+    db_session.add(visit)
+    db_session.flush()
+    entry = OnlineQueueEntry(
+        queue_id=queue.id,
+        number=1,
+        patient_id=test_patient.id,
+        patient_name=test_patient.short_name(),
+        phone=test_patient.phone,
+        source="registrar",
+        status="in_progress",
+        visit_id=visit.id,
+    )
+    db_session.add(entry)
+    if emr_status is not None:
+        db_session.add(
+            EMRRecord(
+                patient_id=test_patient.id,
+                visit_id=visit.id,
+                created_by=user.id,
+                status=emr_status,
+                data={},
+            )
+        )
+    db_session.commit()
+    db_session.refresh(visit)
+    db_session.refresh(entry)
+    return user, entry, visit, password
 
 
 @pytest.mark.integration
@@ -67,6 +142,8 @@ class TestDoctorGeneralQueue:
         assert payload["stats"]["waiting"] == 1
         assert len(payload["entries"]) == 1
         assert payload["entries"][0]["id"] == entry.id
+        assert payload["entries"][0]["patient_id"] == test_patient.id
+        assert payload["entries"][0]["visit_id"] is None
         assert payload["entries"][0]["patient_name"] == test_patient.short_name()
         assert payload["can_call_next"] is True
         assert payload["next_call_entry_id"] == entry.id
@@ -148,6 +225,184 @@ class TestDoctorGeneralQueue:
         assert set(in_progress_payload["available_actions"]) == {"complete"}
         assert in_progress_payload["can_start_visit"] is False
         assert in_progress_payload["can_complete"] is True
+
+    @pytest.mark.parametrize("emr_status", [None, "draft"])
+    def test_dermatology_queue_hides_complete_without_saved_non_draft_emr(
+        self,
+        client,
+        db_session,
+        test_patient,
+        emr_status,
+    ):
+        user, entry, _visit, password = _create_dermatology_queue_world(
+            db_session,
+            test_patient,
+            suffix="missing" if emr_status is None else "draft",
+            emr_status=emr_status,
+        )
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": user.username, "password": password},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.get("/api/v1/doctor/dermatology/queue/today", headers=headers)
+
+        assert response.status_code == 200
+        payload = next(
+            row for row in response.json()["entries"] if row["id"] == entry.id
+        )
+        assert payload["can_complete"] is False
+        assert "complete" not in payload["available_actions"]
+
+    def test_dermatology_queue_allows_completion_for_unsigned_non_draft_emr(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        user, entry, _visit, password = _create_dermatology_queue_world(
+            db_session,
+            test_patient,
+            suffix="in_progress",
+            emr_status="in_progress",
+        )
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": user.username, "password": password},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.get("/api/v1/doctor/dermatology/queue/today", headers=headers)
+
+        assert response.status_code == 200
+        payload = next(
+            row for row in response.json()["entries"] if row["id"] == entry.id
+        )
+        assert payload["can_complete"] is True
+        assert "complete" in payload["available_actions"]
+
+    @pytest.mark.parametrize("emr_status", [None, "draft"])
+    def test_dermatology_completion_rejects_missing_or_draft_emr_atomically(
+        self,
+        client,
+        db_session,
+        test_patient,
+        emr_status,
+    ):
+        user, entry, visit, password = _create_dermatology_queue_world(
+            db_session,
+            test_patient,
+            suffix="complete_missing" if emr_status is None else "complete_draft",
+            emr_status=emr_status,
+        )
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": user.username, "password": password},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{entry.id}/complete", headers=headers
+        )
+
+        assert response.status_code == 409
+        db_session.refresh(entry)
+        db_session.refresh(visit)
+        assert entry.status == "in_progress"
+        assert entry.served_by_user_id is None
+        assert entry.served_at is None
+        assert visit.status == "in_progress"
+
+    def test_dermatology_completion_accepts_unsigned_non_draft_emr(
+        self,
+        client,
+        db_session,
+        test_patient,
+    ):
+        user, entry, visit, password = _create_dermatology_queue_world(
+            db_session,
+            test_patient,
+            suffix="complete_unsigned",
+            emr_status="in_progress",
+        )
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": user.username, "password": password},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{entry.id}/complete", headers=headers
+        )
+
+        assert response.status_code == 200, response.text
+        db_session.refresh(entry)
+        db_session.refresh(visit)
+        assert entry.status == "served"
+        assert visit.status == "completed"
+        emr = db_session.query(EMRRecord).filter(EMRRecord.visit_id == visit.id).one()
+        assert emr.status == "in_progress"
+        assert emr.signed_at is None
+        assert emr.signed_by is None
+
+    @pytest.mark.parametrize("legacy_kind", ["visit", "appointment"])
+    def test_dermatology_legacy_completion_also_requires_saved_emr(
+        self,
+        client,
+        db_session,
+        test_patient,
+        legacy_kind,
+    ):
+        legacy_visit_id = 990001 if legacy_kind == "visit" else None
+        user, entry, visit, password = _create_dermatology_queue_world(
+            db_session,
+            test_patient,
+            suffix=f"legacy_{legacy_kind}",
+            emr_status=None,
+            visit_id=legacy_visit_id,
+        )
+        legacy_record_id = visit.id
+        appointment = None
+        if legacy_kind == "appointment":
+            appointment = Appointment(
+                id=990002,
+                patient_id=test_patient.id,
+                doctor_id=visit.doctor_id,
+                appointment_date=date.today(),
+                appointment_time="10:00",
+                status="in_visit",
+                visit_type="paid",
+                payment_type="cash",
+                services=["consultation"],
+            )
+            db_session.add(appointment)
+            db_session.commit()
+            legacy_record_id = appointment.id
+
+        login_response = client.post(
+            "/api/v1/authentication/login",
+            json={"username": user.username, "password": password},
+        )
+        assert login_response.status_code == 200
+        headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/doctor/queue/{legacy_record_id}/complete", headers=headers
+        )
+
+        assert response.status_code == 409
+        db_session.refresh(entry)
+        db_session.refresh(visit)
+        assert entry.status == "in_progress"
+        assert visit.status == "in_progress"
+        if appointment is not None:
+            db_session.refresh(appointment)
+            assert appointment.status == "in_visit"
 
     def test_queue_commands_reject_statuses_without_backend_action(
         self,
@@ -293,6 +548,7 @@ class TestDoctorGeneralQueue:
         )
 
         assert response.status_code == 200, response.text
+        start_payload = response.json()
         db_session.refresh(entry)
         db_session.refresh(unrelated_visit)
         created_visit = (
@@ -306,6 +562,10 @@ class TestDoctorGeneralQueue:
         )
 
         assert entry.status == "in_progress"
+        assert start_payload["entry_id"] == entry.id
+        assert start_payload["patient_id"] == test_patient.id
+        assert start_payload["visit_id"] == created_visit.id
+        assert entry.visit_id == created_visit.id
         assert created_visit.id != unrelated_visit.id
         assert created_visit.notes is not None
         assert unrelated_visit.status == "open"
@@ -791,7 +1051,10 @@ class TestDoctorGeneralQueue:
 
         login_response = client.post(
             "/api/v1/authentication/login",
-            json={"username": cardiologist_user.username, "password": "cardiologist123"},
+            json={
+                "username": cardiologist_user.username,
+                "password": "cardiologist123",
+            },
         )
         assert login_response.status_code == 200
         headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}

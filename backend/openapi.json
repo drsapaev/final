@@ -19624,9 +19624,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Doctor Queue Today Api V1 Doctor  Specialty  Queue Today Get"
+                  "$ref": "#/components/schemas/DoctorQueueTodayResponse"
                 }
               }
             }
@@ -19724,9 +19722,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Start Patient Visit Api V1 Doctor Queue  Entry Id  Start Visit Post"
+                  "$ref": "#/components/schemas/DoctorQueueStartVisitResponse"
                 }
               }
             }
@@ -48567,6 +48563,297 @@
         }
       }
     },
+    "/api/v1/dental/media": {
+      "post": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Загрузить стоматологическое фото или рентген",
+        "operationId": "upload_dental_media_api_v1_dental_media_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_dental_media_api_v1_dental_media_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DentalMediaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Список стоматологических снимков пациента",
+        "operationId": "list_dental_media_api_v1_dental_media_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "visit_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DentalMediaList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dental/media/{media_id}/content": {
+      "get": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Защищённый просмотр стоматологического снимка",
+        "operationId": "view_dental_media_api_v1_dental_media__media_id__content_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          },
+          {
+            "name": "visit_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "image/jpeg": {},
+              "image/png": {},
+              "application/pdf": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dental/media/{media_id}": {
+      "patch": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Изменить метаданные стоматологического снимка",
+        "operationId": "update_dental_media_api_v1_dental_media__media_id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DentalMediaUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DentalMediaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Мягко удалить стоматологический снимок",
+        "operationId": "delete_dental_media_api_v1_dental_media__media_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Delete Dental Media Api V1 Dental Media  Media Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/dental/examinations": {
       "get": {
         "tags": [
@@ -72433,6 +72720,89 @@
         ],
         "title": "Body_upload_clinic_logo_api_v1_admin_clinic_logo_post"
       },
+      "Body_upload_dental_media_api_v1_dental_media_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "patient_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Visit Id"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "photo",
+              "xray"
+            ],
+            "title": "Category"
+          },
+          "tooth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooth"
+          },
+          "capture_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Date"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "patient_id",
+          "visit_id",
+          "category"
+        ],
+        "title": "Body_upload_dental_media_api_v1_dental_media_post"
+      },
       "Body_upload_file_api_v1_files_upload_post": {
         "properties": {
           "file": {
@@ -75851,6 +76221,212 @@
         "title": "DentalExaminationRequest",
         "description": "Request body for POST /dental/examinations.\n\nBased on frontend DentistPanelUnified.jsx examinationForm:\npatient_id, examination_date, oral_hygiene, caries_status,\nperiodontal_status, occlusion, missing_teeth, dental_plaque,\ngingival_bleeding, diagnosis, recommendations."
       },
+      "DentalMediaList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DentalMediaOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size"
+        ],
+        "title": "DentalMediaList"
+      },
+      "DentalMediaOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "photo",
+              "xray"
+            ],
+            "title": "Category"
+          },
+          "tooth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooth"
+          },
+          "capture_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Date"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "category",
+          "tooth",
+          "capture_date",
+          "mime_type",
+          "file_size",
+          "patient_id",
+          "visit_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DentalMediaOut",
+        "description": "Storage-safe representation of a dental media record."
+      },
+      "DentalMediaUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "photo",
+                  "xray"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "tooth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooth"
+          },
+          "capture_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DentalMediaUpdate"
+      },
       "DentalPriceOverrideRequest": {
         "properties": {
           "visit_id": {
@@ -78712,6 +79288,238 @@
         "title": "DoctorProfileCreate",
         "description": "Doctor profile block for canonical new-doctor onboarding (POST /users).\n\nOnly accepted for role=\"Doctor\" (canonical onboarding); legacy\ndoctor-role spellings keep their compatibility auto-map and must not\nsend this block. ``specialty`` must be a canonical onboarding id —\nthe incomplete sentinel (\"general\"), legacy dental spellings and any\nfree-text value are rejected."
       },
+      "DoctorQueueDoctor": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "specialty": {
+            "type": "string",
+            "title": "Specialty"
+          },
+          "cabinet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "specialty"
+        ],
+        "title": "DoctorQueueDoctor"
+      },
+      "DoctorQueueEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Id"
+          },
+          "patient_name": {
+            "type": "string",
+            "title": "Patient Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "queue_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Time"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "last_changed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Changed At"
+          },
+          "display_time_kind": {
+            "type": "string",
+            "title": "Display Time Kind"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "called_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Called At"
+          },
+          "patient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DoctorQueuePatient"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "available_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Actions"
+          },
+          "can_call": {
+            "type": "boolean",
+            "title": "Can Call"
+          },
+          "can_start_visit": {
+            "type": "boolean",
+            "title": "Can Start Visit"
+          },
+          "can_no_show": {
+            "type": "boolean",
+            "title": "Can No Show"
+          },
+          "can_send_to_diagnostics": {
+            "type": "boolean",
+            "title": "Can Send To Diagnostics"
+          },
+          "can_complete": {
+            "type": "boolean",
+            "title": "Can Complete"
+          },
+          "can_notify_diagnostics_return": {
+            "type": "boolean",
+            "title": "Can Notify Diagnostics Return"
+          },
+          "can_mark_incomplete": {
+            "type": "boolean",
+            "title": "Can Mark Incomplete"
+          },
+          "can_restore_next": {
+            "type": "boolean",
+            "title": "Can Restore Next"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "patient_id",
+          "visit_id",
+          "patient_name",
+          "source",
+          "status",
+          "display_time_kind",
+          "timezone",
+          "available_actions",
+          "can_call",
+          "can_start_visit",
+          "can_no_show",
+          "can_send_to_diagnostics",
+          "can_complete",
+          "can_notify_diagnostics_return",
+          "can_mark_incomplete",
+          "can_restore_next"
+        ],
+        "title": "DoctorQueueEntry"
+      },
       "DoctorQueueLimit": {
         "properties": {
           "doctor_id": {
@@ -78741,6 +79549,263 @@
         ],
         "title": "DoctorQueueLimit",
         "description": "Индивидуальный лимит для врача"
+      },
+      "DoctorQueuePatient": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "middle_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middle Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "birth_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Date"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "DoctorQueuePatient"
+      },
+      "DoctorQueueStartVisitResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "entry_id": {
+            "type": "integer",
+            "title": "Entry Id"
+          },
+          "patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "entry_id",
+          "patient_id",
+          "visit_id",
+          "status"
+        ],
+        "title": "DoctorQueueStartVisitResponse"
+      },
+      "DoctorQueueStats": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting"
+          },
+          "called": {
+            "type": "integer",
+            "title": "Called"
+          },
+          "served": {
+            "type": "integer",
+            "title": "Served"
+          },
+          "online_entries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online Entries"
+          },
+          "desk_entries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desk Entries"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "total",
+          "waiting",
+          "called",
+          "served"
+        ],
+        "title": "DoctorQueueStats"
+      },
+      "DoctorQueueTodayResponse": {
+        "properties": {
+          "queue_exists": {
+            "type": "boolean",
+            "title": "Queue Exists"
+          },
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
+          "queue_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Ids"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "doctor": {
+            "$ref": "#/components/schemas/DoctorQueueDoctor"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorQueueEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/DoctorQueueStats"
+          },
+          "can_call_next": {
+            "type": "boolean",
+            "title": "Can Call Next"
+          },
+          "next_call_entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Call Entry Id"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "queue_exists",
+          "doctor",
+          "date",
+          "entries",
+          "stats",
+          "can_call_next",
+          "next_call_entry_id"
+        ],
+        "title": "DoctorQueueTodayResponse"
       },
       "DoctorSearchRequest": {
         "properties": {
