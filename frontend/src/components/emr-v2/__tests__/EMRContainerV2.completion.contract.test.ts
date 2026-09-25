@@ -8,8 +8,10 @@ const source = fs.readFileSync(path.join(__dirname, '../EMRContainerV2.tsx'), 'u
 
 describe('EMRContainerV2 visit completion contract', () => {
   it('saves unsaved or newly initialized EMR data before a forced server re-read', () => {
-    expect(source).toContain('shouldSave: isDirty || !emr.id');
-    expect(source).toContain('save: () => saveEMR({ isDraft: true })');
+    expect(source).toContain('String(emr.status ?? \'\').trim().toLowerCase() === \'draft\'');
+    expect(source).toContain('shouldSave:');
+    expect(source).toContain('|| !emr.id');
+    expect(source).toContain('save: () => saveEMR({ isDraft: false })');
     expect(source).toContain('reload: () => loadEMR(true)');
     expect(source).toContain('if (!completionScope.active || completionScope.visitId !== visitId) return;');
     expect(source).toContain('await onComplete(savedData)');
@@ -29,6 +31,12 @@ describe('EMRContainerV2 visit completion contract', () => {
       expect(handler?.[0]).toContain(condition);
     }
     expect(source).toContain('onCompletionBlocked?.()');
+  });
+
+  it('requires the freshly read server EMR to be non-draft before completion', () => {
+    const helper = fs.readFileSync(path.join(__dirname, '../emrCompletion.ts'), 'utf8');
+    expect(helper).toContain('hasCompletionReadyStatus(latestEMR)');
+    expect(helper).toContain('value.status.trim().toLowerCase() !== \'draft\'');
   });
 
   it('locks every EMR section, keyboard edit action, and mutation dialog for completed visits', () => {

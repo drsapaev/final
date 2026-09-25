@@ -186,7 +186,7 @@ export async function persistAndSignEMR(actions: {
 }
 
 interface EMRHookResult {
-    emr: { id?: string | number } | null;
+    emr: { id?: string | number; status?: string } | null;
     data: EMRDataShape | null;
     status: string;
     isDirty: boolean;
@@ -630,8 +630,11 @@ export function EMRContainerV2({
         setIsPreparingCompletion(true);
         try {
             const savedData = await readSavedEMRForCompletion({
-                shouldSave: isDirty || !emr.id,
-                save: () => saveEMR({ isDraft: true }),
+                shouldSave:
+                    isDirty
+                    || !emr.id
+                    || String(emr.status ?? '').trim().toLowerCase() === 'draft',
+                save: () => saveEMR({ isDraft: false }),
                 reload: () => loadEMR(true),
             });
             if (!completionScope.active || completionScope.visitId !== visitId) return;

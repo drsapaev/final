@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { emrTextValue, readSavedEMRForCompletion } from '../emrCompletion';
 
-const emrRecord = (data: Record<string, unknown> = {}) => ({ id: 17, data });
+const emrRecord = (
+  data: Record<string, unknown> = {},
+  status = 'in_progress',
+) => ({ id: 17, status, data });
 
 describe('readSavedEMRForCompletion', () => {
   it('saves a dirty draft, then returns the freshly re-read EMR data', async () => {
@@ -32,6 +35,17 @@ describe('readSavedEMRForCompletion', () => {
 
     expect(save).not.toHaveBeenCalled();
     expect(result).toEqual({ diagnosis: 'saved diagnosis' });
+  });
+
+  it.each([
+    [{ ...emrRecord({ diagnosis: 'draft diagnosis' }), status: 'draft' }],
+    [{ ...emrRecord({ diagnosis: 'unknown status' }), status: undefined }],
+  ])('blocks completion unless the server re-read is non-draft EMR', async (latestEMR) => {
+    await expect(readSavedEMRForCompletion({
+      shouldSave: false,
+      save: vi.fn(),
+      reload: async () => latestEMR,
+    })).rejects.toMatchObject({ reason: 'not_ready' });
   });
 
   it.each([

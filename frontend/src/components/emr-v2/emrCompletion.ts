@@ -1,4 +1,4 @@
-export type EMRCompletionBlockReason = 'save_failed' | 'conflict' | 'access_denied' | 'read_failed';
+export type EMRCompletionBlockReason = 'save_failed' | 'conflict' | 'access_denied' | 'read_failed' | 'not_ready';
 
 export class EMRCompletionBlockedError extends Error {
   readonly reason: EMRCompletionBlockReason;
@@ -13,6 +13,7 @@ export class EMRCompletionBlockedError extends Error {
 type EMRRecord = Record<string, unknown> & {
   id: string | number;
   data: Record<string, unknown>;
+  status?: unknown;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -23,6 +24,13 @@ function isPersistedEMR(value: unknown): value is EMRRecord {
   if (!isRecord(value) || !isRecord(value.data)) return false;
   return (typeof value.id === 'number' && Number.isFinite(value.id) && value.id > 0)
     || (typeof value.id === 'string' && value.id.trim().length > 0);
+}
+
+function hasCompletionReadyStatus(value: unknown): value is EMRRecord {
+  return isPersistedEMR(value)
+    && typeof value.status === 'string'
+    && value.status.trim().length > 0
+    && value.status.trim().toLowerCase() !== 'draft';
 }
 
 /** Return only a persisted server snapshot suitable for visit-completion checks. */
@@ -66,6 +74,9 @@ export async function readSavedEMRForCompletion({
   }
   if (!isPersistedEMR(latestEMR)) {
     throw new EMRCompletionBlockedError('read_failed');
+  }
+  if (!hasCompletionReadyStatus(latestEMR)) {
+    throw new EMRCompletionBlockedError('not_ready');
   }
 
   return latestEMR.data;
