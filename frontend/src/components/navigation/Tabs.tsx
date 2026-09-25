@@ -46,7 +46,7 @@ const iconMap = {
   Users
 };
 
-const defaultTabColor = 'var(--mac-accent)';
+const defaultTabColor = 'var(--mac-accent, currentColor)';
 const emptyDoctors: Doctor[] = [];
 
 const toGradient = (color: string) =>
@@ -555,8 +555,8 @@ const Tabs = ({
                 aria-label={tab.label}
                 aria-describedby={hasStatusFor(tab.key) ? statusIdFor(tab.key) : undefined}
                 style={{
-                  color: isActive ? 'var(--mac-text-primary)' : colors.text,
-                  backgroundColor: isActive ? 'color-mix(in srgb, var(--mac-nav-item-active), transparent 70%)' : 'transparent',
+                  color: isActive ? 'var(--mac-text-primary, currentColor)' : colors.text,
+                  backgroundColor: isActive ? 'color-mix(in srgb, var(--mac-nav-item-active, currentColor), transparent 70%)' : 'transparent',
                   '--tab-color': tab.color,
                   '--tab-gradient': tab.gradient
                 } as CSSProperties}>

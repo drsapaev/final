@@ -40,61 +40,61 @@
 .cart-step-v2__doctor-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
-  gap: var(--mac-spacing-3);
-  margin-bottom: var(--mac-spacing-3);
+  gap: var(--mac-spacing-3, 12px);
+  margin-bottom: var(--mac-spacing-3, 12px);
 }
 
 .cart-step-v2__doctor-card {
   min-width: 0;
-  border: 1px solid var(--mac-border);
-  border-radius: var(--mac-radius-md);
-  background: var(--mac-bg-secondary);
-  padding: var(--mac-spacing-3);
+  border: 1px solid var(--mac-border, currentColor);
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-bg-secondary, transparent);
+  padding: var(--mac-spacing-3, 12px);
 }
 
 .cart-step-v2__doctor-header {
   display: flex;
   flex-direction: column;
-  gap: var(--mac-spacing-1);
-  margin-bottom: var(--mac-spacing-2);
+  gap: var(--mac-spacing-1, 4px);
+  margin-bottom: var(--mac-spacing-2, 8px);
 }
 
 .cart-step-v2__doctor-name {
-  color: var(--mac-text-primary);
-  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-primary, currentColor);
+  font-size: var(--mac-font-size-sm, 12px);
 }
 
 .cart-step-v2__doctor-meta,
 .cart-step-v2__cart-doctor-name {
-  color: var(--mac-text-secondary);
-  font-size: var(--mac-font-size-xs);
+  color: var(--mac-text-secondary, currentColor);
+  font-size: var(--mac-font-size-xs, 11px);
 }
 
 .cart-step-v2__doctor-services {
   display: flex;
   flex-direction: column;
-  gap: var(--mac-spacing-1);
+  gap: var(--mac-spacing-1, 4px);
 }
 
 .cart-step-v2__doctor-service {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: var(--mac-spacing-2);
+  gap: var(--mac-spacing-2, 8px);
   width: 100%;
   min-height: 44px;
-  padding: var(--mac-spacing-2);
-  border: 1px solid var(--mac-border);
-  border-radius: var(--mac-radius-sm);
-  background: var(--mac-bg-primary);
-  color: var(--mac-text-primary);
+  padding: var(--mac-spacing-2, 8px);
+  border: 1px solid var(--mac-border, currentColor);
+  border-radius: var(--mac-radius-sm, 6px);
+  background: var(--mac-bg-primary, transparent);
+  color: var(--mac-text-primary, currentColor);
   text-align: left;
   cursor: pointer;
 }
 
 .cart-step-v2__doctor-service:hover,
 .cart-step-v2__doctor-service:focus-visible {
-  border-color: var(--mac-accent);
+  border-color: var(--mac-accent, currentColor);
 }
 
 .cart-step-v2__doctor-service:disabled {
@@ -103,19 +103,19 @@
 }
 
 .cart-step-v2__doctor-service:focus-visible {
-  outline: 2px solid var(--mac-accent);
+  outline: 2px solid var(--mac-accent, currentColor);
   outline-offset: 2px;
 }
 
 .cart-step-v2__doctor-service.selected {
-  background: color-mix(in srgb, var(--mac-accent), transparent 92%);
+  background: color-mix(in srgb, var(--mac-accent, currentColor), transparent 92%);
 }
 
 .cart-step-v2__doctor-service-action {
   flex-shrink: 0;
-  font-size: var(--mac-font-size-xs);
-  font-weight: var(--mac-font-weight-semibold);
-  color: var(--mac-accent);
+  font-size: var(--mac-font-size-xs, 11px);
+  font-weight: var(--mac-font-weight-semibold, 600);
+  color: var(--mac-accent, currentColor);
 }
 
 /* Services grid — 3 columns */
