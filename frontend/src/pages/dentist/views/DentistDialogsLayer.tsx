@@ -124,8 +124,7 @@ export default function DentistDialogsLayer({
       {showPatientCard && selectedPatient &&
       <PatientCard
         patient={selectedPatient as unknown as PatientFormData}
-        onSave={(updatedPatient: unknown) => {
-          logger.info('Сохранение пациента:', updatedPatient);
+        onSave={() => {
           setShowPatientCard(false);
         }}
         onClose={() => setShowPatientCard(false)} />
@@ -137,8 +136,7 @@ export default function DentistDialogsLayer({
         patientId={selectedPatientId}
         patientName={selectedPatientDisplayName}
         initialData={selectedPatient.diagnosisData}
-        onSave={(diagnosisData: unknown) => {
-          logger.info('Сохранение диагнозов:', diagnosisData);
+        onSave={() => {
           setShowDiagnosisForm(false);
         }}
         onClose={() => setShowDiagnosisForm(false)} />
@@ -174,8 +172,7 @@ export default function DentistDialogsLayer({
         doctorId={doctorId}
         clinicId={clinicId}
         initialData={null}
-        onSave={(reportData) => {
-          logger.info('Сохранение отчета:', reportData);
+        onSave={() => {
           setShowReports(false);
         }}
           onClose={() => setShowReports(false)} />
@@ -210,7 +207,6 @@ export default function DentistDialogsLayer({
             patientId={selectedPatientId}
             initialData={(dentalChartData ?? {}) as Record<string, { status?: string; updatedAt?: string; [key: string]: unknown }>}
             onToothClick={(toothNumber, toothData) => {
-              logger.info('Клик по зубу:', toothNumber, toothData);
               setSelectedTooth({ number: toothNumber, data: toothData });
               setToothModalOpen(true);
             }}
@@ -271,7 +267,6 @@ export default function DentistDialogsLayer({
         toothNumber={(selectedTooth as { number?: string | number } | null | undefined)?.number}
         toothData={(selectedTooth as { data?: Record<string, unknown> } | null | undefined)?.data}
         onSave={(data: unknown) => {
-          logger.info('Сохранение данных зуба:', data);
           // Обновляем данные зубной карты
           setDentalChartData((prev) => ({
             ...prev,
@@ -295,10 +290,6 @@ export default function DentistDialogsLayer({
         onClose={() => {
           setShowPriceManager(false);
           setSelectedServiceForPrice(null);
-        }}
-        onPriceSet={(priceData) => {
-          logger.info('Price set:', priceData);
-          // Можно добавить логику обновления состояния
         }} />
 
       }
