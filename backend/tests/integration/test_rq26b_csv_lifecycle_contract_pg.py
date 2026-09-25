@@ -43,9 +43,11 @@ with a pre-drop let two parallel pytest/agent runs on one server drop
 each other's database), runs ``alembic upgrade head`` and drops it at
 the end; skips (NOT_RUN, plan P0) when no disposable PostgreSQL server
 is reachable. ``DATABASE_URL`` is accepted for automatic provisioning
-only for localhost/unix-socket servers; a remote admin DSN must be
-passed explicitly via the test-owned ``RQ26B_PG_ADMIN_URL``. SQLite is
-never a substitute here.
+only for local servers — an explicit loopback host, a hostless
+unix-socket DSN, or a ``?host=`` that is a socket-directory path or a
+loopback name; a remote admin DSN (including a plain ``DATABASE_URL``
+with a remote ``?host=``) must be passed explicitly via the test-owned
+``RQ26B_PG_ADMIN_URL``. SQLite is never a substitute here.
 
 Determinism: the anonymous start-session leg goes through the queue
 time gate (``ONLINE_QUEUE_START_TIME`` 07:00 Asia/Tashkent), so the
@@ -135,9 +137,13 @@ def _candidate_admin_urls() -> list[str]:
 
     The scratch database must never be provisioned — or dropped — on a
     remote server reachable through a plain ``DATABASE_URL`` (review P2):
-    auto-detected candidates are accepted only for localhost / 127.0.0.1
-    / ::1 hosts or unix-socket DSNs. A remote admin DSN must be passed
-    explicitly via the test-owned ``RQ26B_PG_ADMIN_URL``.
+    auto-detected candidates are accepted only for LOCAL servers, judged
+    by the address libpq actually dials, not by the URL spelling. A
+    ``?host=`` query parameter overrides the authority host, so a remote
+    value there (``postgresql://u:p@/postgres?host=db.internal``,
+    review P1) is rejected even though the authority is empty. A remote
+    admin DSN must be passed explicitly via the test-owned
+    ``RQ26B_PG_ADMIN_URL``.
     """
     urls: list[str] = []
 
@@ -145,10 +151,29 @@ def _candidate_admin_urls() -> list[str]:
         return raw.replace("postgresql+psycopg://", "postgresql://", 1)
 
     def _is_local(url: str) -> bool:
-        u = make_url(url)
-        return (u.host or "") in {"localhost", "127.0.0.1", "::1"} or bool(
-            u.query.get("host")
-        )
+        """True only for addresses libpq dials locally (review P1)."""
+        try:
+            u = make_url(url)
+        except Exception:  # noqa: BLE001 — a malformed env DSN (e.g. a
+            # non-SQLAlchemy ``file:`` URL) must degrade to "not a local
+            # PG candidate", never crash the auto-detection.
+            return False
+        if not u.drivername.startswith("postgresql"):
+            return False  # a sqlite fallback URL is never a PG candidate
+        # ``?host=`` overrides the authority host in libpq URIs — check
+        # it first: a socket-directory path is local, a loopback name is
+        # local, any other value (``db.internal``) is REMOTE.
+        qhost = u.query.get("host") or ""
+        if qhost:
+            if qhost.startswith("/"):
+                return True
+            return qhost in {"localhost", "127.0.0.1", "::1"}
+        if u.host is not None:
+            return u.host in {"localhost", "127.0.0.1", "::1"}
+        # Hostless DSN (``postgresql:///db``): libpq dials the default
+        # unix-socket directory — local by definition (review P2: this
+        # must not silently skip a reachable local server).
+        return True
 
     explicit = os.getenv("RQ26B_PG_ADMIN_URL", "").strip()
     if explicit:
@@ -163,36 +188,62 @@ def _candidate_admin_urls() -> list[str]:
 
 
 def _dsn_parts(admin_url: str) -> dict:
+    """Split a DSN into libpq address parts WITHOUT re-typing the host.
+
+    The address mode is preserved verbatim (review P2): a hostless DSN
+    must stay hostless — substituting ``"localhost"`` would silently
+    switch the scratch connection from the unix socket to TCP.
+    """
     from urllib.parse import parse_qs, urlparse
 
     p = urlparse(admin_url)
     q = parse_qs(p.query)
+    qhost = (q.get("host") or [None])[0]
     return {
-        "sockdir": (q.get("host") or [None])[0],
+        # ``?host=/abs/path`` → unix-socket directory; ``?host=<name>``
+        # → explicit TCP host from the query; no host anywhere →
+        # default unix socket (host=None, no qhost).
+        "sockdir": qhost if qhost and qhost.startswith("/") else None,
+        "qhost": qhost if qhost and not qhost.startswith("/") else None,
         "user": p.username or "postgres",
         "password": p.password or "",
-        "host": p.hostname or "localhost",
-        "port": p.port or 5432,
+        "host": p.hostname,
+        "port": p.port,
     }
 
 
 def _scratch_urls(admin_url: str) -> tuple[str, str]:
     parts = _dsn_parts(admin_url)
+    userinfo = f"{parts['user']}:{parts['password']}"
     if parts["sockdir"]:
-        base_p = f"postgresql://{parts['user']}:{parts['password']}@/"
-        base_s = f"postgresql+psycopg://{parts['user']}:{parts['password']}@/"
+        base_p = f"postgresql://{userinfo}@/"
+        base_s = f"postgresql+psycopg://{userinfo}@/"
         return (
             f"{base_p}{SCRATCH_DB}?host={parts['sockdir']}",
             f"{base_s}{SCRATCH_DB}?host={parts['sockdir']}",
         )
-    base = (
-        f"postgresql://{parts['user']}:{parts['password']}"
-        f"@{parts['host']}:{parts['port']}"
-    )
+    if parts["qhost"]:
+        # The admin DSN dialed an explicit TCP host through the query —
+        # the scratch DSN repeats that form instead of inventing one.
+        base_p = f"postgresql://{userinfo}@/{SCRATCH_DB}?host={parts['qhost']}"
+        base_s = f"postgresql+psycopg://{userinfo}@/{SCRATCH_DB}?host={parts['qhost']}"
+        return base_p, base_s
+    if not parts["host"]:
+        # Hostless stays hostless: the scratch connection resolves the
+        # server through the (default) unix-socket directory exactly
+        # like the admin DSN did (review P2).
+        port = f":{parts['port']}" if parts["port"] else ""
+        base_p = f"postgresql://{userinfo}@{port}/"
+        base_s = f"postgresql+psycopg://{userinfo}@{port}/"
+        return (
+            f"{base_p}{SCRATCH_DB}",
+            f"{base_s}{SCRATCH_DB}",
+        )
+    port = parts["port"] if parts["port"] else 5432
+    base = f"postgresql://{userinfo}@{parts['host']}:{port}"
     return (
         f"{base}/{SCRATCH_DB}",
-        f"postgresql+psycopg://{parts['user']}:{parts['password']}"
-        f"@{parts['host']}:{parts['port']}/{SCRATCH_DB}",
+        f"postgresql+psycopg://{userinfo}@{parts['host']}:{port}/{SCRATCH_DB}",
     )
 
 
@@ -220,33 +271,46 @@ def pg_engine():
     with psycopg.connect(admin_url, autocommit=True) as c:
         c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
-    env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
-    import subprocess
+    # try/finally (review P2): alembic, engine creation, or an assertion
+    # may fail BEFORE the yield — pytest does not run the post-yield
+    # teardown then, and with run-unique names the leaked scratch
+    # database would never be cleaned by any later run. Everything after
+    # the successful CREATE DATABASE must therefore drop it
+    # unconditionally.
+    engine = None
+    try:
+        env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
+        import subprocess
 
-    r = subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
-        capture_output=True,
-        text=True,
-        cwd=str(BACKEND_DIR),
-        env=env,
-    )
-    assert r.returncode == 0, r.stderr[-1500:]
+        r = subprocess.run(
+            [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
+            capture_output=True,
+            text=True,
+            cwd=str(BACKEND_DIR),
+            env=env,
+        )
+        assert r.returncode == 0, r.stderr[-1500:]
 
-    engine = create_engine(sa_url, future=True)
-    with engine.connect() as conn:
-        version = conn.execute(text("select version_num from alembic_version")).scalar()
-        dialect = conn.execute(text("select version()")).scalar()
-    assert version, "alembic_version must be present after upgrade"
-    assert "PostgreSQL" in (dialect or ""), "RQ-26.b proof requires real PostgreSQL"
+        engine = create_engine(sa_url, future=True)
+        with engine.connect() as conn:
+            version = conn.execute(
+                text("select version_num from alembic_version")
+            ).scalar()
+            dialect = conn.execute(text("select version()")).scalar()
+        assert version, "alembic_version must be present after upgrade"
+        assert "PostgreSQL" in (dialect or ""), (
+            "RQ-26.b proof requires real PostgreSQL"
+        )
 
-    yield engine
-
-    engine.dispose()
-    with psycopg.connect(admin_url, autocommit=True) as c:
-        try:
-            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
-        except Exception:  # noqa: BLE001 — pre-PG13 fallback
-            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        yield engine
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with psycopg.connect(admin_url, autocommit=True) as c:
+            try:
+                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+            except Exception:  # noqa: BLE001 — pre-PG13 fallback
+                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
 
 
 @pytest.fixture
