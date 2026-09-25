@@ -225,7 +225,7 @@ function createMiniAppAppointmentPreviewForm() {
   };
 }
 
-// Round-14 (owner P1, PR #3386 merge review): reference rows for the
+// Round-14 (owner P1, PR-3386 merge review): reference rows for the
 // department selector on THIS shell — the actual Telegram /book surface
 // (PATIENT_BOOKING_ENTRY_ROUTE → /telegram/mini-app/patient?section=appointments).
 interface MiniAppDepartmentOption {
@@ -344,7 +344,7 @@ function getMiniAppApiErrorReason(error: any, fallback: string) {
   return typeof reason === 'string' ? reason : fallback;
 }
 
-// Round-14 (owner P2, PR #3386 merge review): booking errors arrive as
+// Round-14 (owner P2, PR-3386 merge review): booking errors arrive as
 // machine reason codes (department_unknown, doctor_not_eligible, ...).
 // THIS shell is the actual /book surface, so it must explain them with
 // patient-safe wording — not splice the raw code into
@@ -756,7 +756,7 @@ function TelegramMiniAppPatientShell() {
     };
   }, [location.search, selectedSection]);
 
-  // Round-14 (owner P1, PR #3386 merge review): the booking form on THIS
+  // Round-14 (owner P1, PR-3386 merge review): the booking form on THIS
   // shell submits canonical Department.key values, so it loads the same
   // authenticated ACTIVE-departments reference PatientBookingPanel uses
   // (POST /telegram/mini-app/booking/departments). The auth payload comes

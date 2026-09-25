@@ -1,5 +1,5 @@
 /**
- * Round-14 regression (owner round-5 review of PR #3386 merge commit bc362d5).
+ * Round-14 regression (owner round-5 review of PR-3386 merge commit bc362d5).
  *
  * P1: the actual Telegram /book entrypoint is PATIENT_BOOKING_ENTRY_ROUTE =
  * /telegram/mini-app/patient?section=appointments, which opens THIS shell —
