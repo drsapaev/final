@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { persistAndSignEMR } from '../EMRContainerV2';
+import { persistAndSignEMR, signSavedEMR } from '../EMRContainerV2';
 
 describe('EMRContainerV2 save and sign flow', () => {
   it('does not save or sign when confirmation is cancelled', async () => {
@@ -84,5 +84,32 @@ describe('EMRContainerV2 save and sign flow', () => {
 
     expect(result).toBe('sign_failed');
     expect(sign).toHaveBeenCalledWith({ rowVersion: 7 });
+  });
+
+  it('signs an existing saved EMR by its loaded row version without saving it again', async () => {
+    const sign = vi.fn(async () => ({ row_version: 8, status: 'signed' }));
+
+    const result = await signSavedEMR({
+      confirm: async () => true,
+      rowVersion: 7,
+      sign,
+    });
+
+    expect(result).toBe('sign_attempted');
+    expect(sign).toHaveBeenCalledOnce();
+    expect(sign).toHaveBeenCalledWith({ rowVersion: 7 });
+  });
+
+  it('does not sign a completed visit EMR when its saved version is unavailable', async () => {
+    const sign = vi.fn();
+
+    const result = await signSavedEMR({
+      confirm: async () => true,
+      rowVersion: null,
+      sign,
+    });
+
+    expect(result).toBe('sign_failed');
+    expect(sign).not.toHaveBeenCalled();
   });
 });

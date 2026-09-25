@@ -185,6 +185,30 @@ export async function persistAndSignEMR(actions: {
     }
 }
 
+export async function signSavedEMR(actions: {
+    confirm: () => Promise<boolean>;
+    rowVersion: number | null;
+    sign: (options: { rowVersion: number }) => Promise<unknown>;
+}): Promise<'cancelled' | 'sign_failed' | 'sign_attempted'> {
+    let confirmed: boolean;
+    try {
+        confirmed = await actions.confirm();
+    } catch {
+        confirmed = false;
+    }
+    if (!confirmed) return 'cancelled';
+    if (!Number.isInteger(actions.rowVersion) || !actions.rowVersion || actions.rowVersion < 1) {
+        return 'sign_failed';
+    }
+
+    try {
+        const signed = await actions.sign({ rowVersion: actions.rowVersion });
+        return isRejectedEMRWrite(signed) ? 'sign_failed' : 'sign_attempted';
+    } catch {
+        return 'sign_failed';
+    }
+}
+
 interface EMRHookResult {
     emr: { id?: string | number; status?: string } | null;
     data: EMRDataShape | null;
@@ -258,6 +282,19 @@ export function EMRContainerV2({
     const [isPreparingCompletion, setIsPreparingCompletion] = useState(false);
     const completionScopeRef = useRef({ visitId, active: true });
     const editingDisabled = isReadOnly || isSigned || isPreparingCompletion || completionBusy;
+    const savedEMRStatus = String(emr?.status ?? '').trim().toLowerCase();
+    const canSignReadOnly = isReadOnly
+        && Boolean(emr?.id)
+        && savedEMRStatus !== ''
+        && savedEMRStatus !== 'draft'
+        && !isDirty
+        && !isLoading
+        && !isSaving
+        && !isSigned
+        && !accessDenied
+        && !conflict
+        && version !== null
+        && version > 0;
 
     useEffect(() => {
         const scope = { visitId, active: true };
@@ -590,25 +627,38 @@ export function EMRContainerV2({
 
     // Actions
     const handleSign = useCallback(async () => {
-        if (isReadOnly || isPreparingCompletion || completionBusy) return;
-        const result = await persistAndSignEMR({
-            confirm: () => confirm({
+        if ((isReadOnly && !canSignReadOnly) || isPreparingCompletion || completionBusy) return;
+        const confirmSigning = () => confirm({
                 title: t('misc.emr_sign_title'),
                 message: t('misc.emr_sign_message'),
                 description: t('misc.emr_sign_desc'),
                 confirmLabel: t('misc.emr_sign_confirm'),
                 cancelLabel: t('misc.cancel'),
                 intent: 'primary',
-            }),
-            save: saveEMR,
-            sign: signEMR,
-        });
+            });
+        const result = isReadOnly
+            ? await signSavedEMR({ confirm: confirmSigning, rowVersion: version, sign: signEMR })
+            : await persistAndSignEMR({
+                confirm: confirmSigning,
+                save: saveEMR,
+                sign: signEMR,
+            });
         if (result === 'save_failed') {
             logger.error('[EMR] Save-and-sign stopped because the save did not return a valid non-draft version');
         } else if (result === 'sign_failed') {
-            logger.error('[EMR] Save-and-sign stopped because signing failed');
+            logger.error('[EMR] Signing stopped because the signing request failed');
         }
-    }, [saveEMR, signEMR, confirm, t, isReadOnly, isPreparingCompletion, completionBusy]);
+    }, [
+        saveEMR,
+        signEMR,
+        confirm,
+        t,
+        isReadOnly,
+        isPreparingCompletion,
+        completionBusy,
+        canSignReadOnly,
+        version,
+    ]);
 
     const handleCompleteVisit = useCallback(async () => {
         if (
@@ -671,8 +721,8 @@ export function EMRContainerV2({
         canUndo: canUndo && !editingDisabled,
         canRedo: canRedo && !editingDisabled,
         canSave: isDirty && !isSaving && !editingDisabled,
-        canSign: !isDirty && !isSaving && !isSigned && !isReadOnly && !completionBusy,
-        enabled: !isReadOnly && !isPreparingCompletion && !completionBusy,
+        canSign: !isDirty && !isSaving && !isSigned && (!isReadOnly || canSignReadOnly) && !completionBusy,
+        enabled: (!isReadOnly || canSignReadOnly) && !isPreparingCompletion && !completionBusy,
     });
 
     if (!visitId) {
@@ -1034,9 +1084,22 @@ export function EMRContainerV2({
                         </div>
                     )}
                     {isReadOnly ? (
-                        <div className="emr-v2-signed-badge" role="status">
-                            <CheckCircle2 size={14} aria-hidden="true" /> {t('cardio.cardio_visit_readonly')}
-                        </div>
+                        <>
+                            <div className="emr-v2-signed-badge" role="status">
+                                <CheckCircle2 size={14} aria-hidden="true" /> {t('cardio.cardio_visit_readonly')}
+                            </div>
+                            {canSignReadOnly && (
+                                <button
+                                    className="emr-v2-btn emr-v2-btn--success"
+                                    onClick={handleSign}
+                                    disabled={isPreparingCompletion || completionBusy || isSaving}
+                                    title={t('misc.emr_sign_title')}
+                                    aria-label={t('misc.emr_sign_confirm')}
+                                >
+                                    <CheckCircle2 size={14} aria-hidden="true" /> {t('misc.emr_sign_confirm')}
+                                </button>
+                            )}
+                        </>
                     ) : !isSigned ? (
                         <>
                             <button

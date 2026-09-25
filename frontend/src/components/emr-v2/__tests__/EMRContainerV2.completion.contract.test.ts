@@ -41,9 +41,23 @@ describe('EMRContainerV2 visit completion contract', () => {
 
   it('locks every EMR section, keyboard edit action, and mutation dialog for completed visits', () => {
     expect(source.match(/disabled=\{editingDisabled\}/g)?.length).toBeGreaterThanOrEqual(10);
-    expect(source).toContain('enabled: !isReadOnly && !isPreparingCompletion && !completionBusy');
+    expect(source).toContain('enabled: (!isReadOnly || canSignReadOnly) && !isPreparingCompletion && !completionBusy');
     expect(source).toContain('{isReadOnly ? (');
     expect(source).toContain('{!isReadOnly && Boolean(conflict)');
     expect(source).toContain('{!isReadOnly && onComplete && (');
+  });
+
+  it('allows only confirmed signing for a saved unsigned EMR on a completed visit', () => {
+    expect(source).toContain('const canSignReadOnly = isReadOnly');
+    expect(source).toContain('savedEMRStatus !== \'draft\'');
+    expect(source).toContain('&& !isDirty');
+    expect(source).toContain('&& version > 0');
+    expect(source).toContain('signSavedEMR({ confirm: confirmSigning, rowVersion: version, sign: signEMR })');
+
+    const readOnlyBranch = source.match(/\{isReadOnly \? \([\s\S]*?\) : !isSigned \?/);
+    expect(readOnlyBranch).not.toBeNull();
+    expect(readOnlyBranch?.[0]).toContain('{canSignReadOnly && (');
+    expect(readOnlyBranch?.[0]).not.toContain('saveEMR');
+    expect(readOnlyBranch?.[0]).not.toContain('emr_save_sign');
   });
 });
