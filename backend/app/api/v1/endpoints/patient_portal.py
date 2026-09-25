@@ -89,7 +89,10 @@ from app.models.department import Department
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
 from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
-from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
+from app.services.appointment_slot_guard import (
+    lock_department_for_booking,
+    lock_doctor_for_slot_reservation,
+)
 from app.services.patient_access_audit import log_patient_access
 from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppSessionScope,
@@ -846,6 +849,12 @@ def create_patient_portal_booking(
     per-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same
     409 on occupied slots, same lifecycle eligibility for the doctor.
 
+    Merged-#3340 follow-up (P1): the FINAL routing department is re-read
+    with ``populate_existing().with_for_update()`` in THIS transaction and
+    its ``active`` re-validated before the INSERT — the persisted routing
+    context can no longer reference a department that a concurrently
+    committed admin transaction deactivated (or deleted).
+
     P2 (round 2): the `Idempotency-Key` header is REQUIRED. The global
     idempotency middleware only protects requests that carry a key —
     without a mandated key a lost response + automatic browser retry of a
@@ -919,17 +928,32 @@ def create_patient_portal_booking(
                     doctor_row, department_row
                 )
 
-            if preview.draft.appointment_time:
-                if appointment_crud.is_time_slot_occupied(
-                    db,
-                    doctor_id=preview.draft.doctor_id,
-                    appointment_date=preview.draft.appointment_date,
-                    appointment_time=preview.draft.appointment_time,
-                ):
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail={"reason": "appointment_time_slot_occupied"},
-                    )
+        # Merged-#3340 follow-up (owner P1): the final routing department is
+        # re-read under the booking row lock and `active` re-validated
+        # ATOMICALLY with the INSERT below. The plain resolves above guard
+        # only the SNAPSHOT they observed — an admin deactivation (or a
+        # delete) committing between that snapshot and this transaction
+        # previously produced an appointment routed at an INACTIVE
+        # department. The lock is taken for BOTH shapes (submitted-key and
+        # doctor-canonical), AFTER the routing context is final and BEFORE
+        # the occupancy check — a department refusal (400) still outranks
+        # a slot conflict (409), and the lock is held until
+        # `appointment_crud.create` commits, so a concurrent
+        # deactivate/delete serializes BEHIND this booking.
+        if department_row is not None:
+            department_row = lock_department_for_booking(db, department_row)
+
+        if preview.draft.doctor_id is not None and preview.draft.appointment_time:
+            if appointment_crud.is_time_slot_occupied(
+                db,
+                doctor_id=preview.draft.doctor_id,
+                appointment_date=preview.draft.appointment_date,
+                appointment_time=preview.draft.appointment_time,
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"reason": "appointment_time_slot_occupied"},
+                )
     except HTTPException as exc:
         # Round-3 (owner P2): denial leaves a trail row (SSOT parity) —
         # unknown/inactive department 400, doctor eligibility 404, occupied
