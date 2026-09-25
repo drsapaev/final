@@ -898,7 +898,7 @@ const AppointmentWizardV2 = ({
 
   // ===================== ЗАГРУЗКА ДАННЫХ =====================
 
-  // PR #3438 review round-2 P2: каталог услуг запрашивается ДЛЯ ДНЯ ЗАПИСИ.
+  // PR 3438 review round-2 P2: каталог услуг запрашивается ДЛЯ ДНЯ ЗАПИСИ.
   // Владелец очереди услуги (doctor_selection_required /
   // doctor_booking_available) вычисляется backend'ом date-aware: в edit-
   // режиме это день редактируемой записи (resolveEditRecordDate — тот же
