@@ -14493,6 +14493,33 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram/mini-app/booking/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List Mini App Booking Departments
+         * @description Round-12 (owner P1, PR #3386 review): ACTIVE departments for the
+         *     Mini App booking form's department selector.
+         *
+         *     The form submits the canonical `Department.key` picked from THIS list —
+         *     a localized free-text label ("Кардиология") is not a `Department.key`
+         *     and would be refused with 400 `department_unknown` by the routing
+         *     contract. Same authenticated identity surface as the booking endpoints
+         *     themselves (initData primary, entry token allowed); no PHI is returned.
+         */
+        post: operations["telegram_mini_app_list_booking_departments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/telegram/mini-app/appointments/preview": {
         parameters: {
             query?: never;
@@ -38326,6 +38353,27 @@ export type components = {
             notes?: string | null;
             /** Services */
             services?: string[] | null;
+        };
+        /**
+         * TelegramMiniAppBookingDepartmentsRequest
+         * @description Round-12 (owner P1, PR #3386 review): auth shape for the booking
+         *     departments reference endpoint.
+         *
+         *     The Mini App booking form no longer free-types a department name (a
+         *     localized label like "Кардиология" is NOT the canonical `Department.key`
+         *     the routing contract resolves); it picks from THIS endpoint's list, so
+         *     the submitted value is always a canonical key. Same identity contract
+         *     as the booking endpoints themselves (initData primary, entry token
+         *     allowed) — the reference data rides the SAME authenticated surface it
+         *     feeds, and the error reasons match the booking scope contract.
+         */
+        TelegramMiniAppBookingDepartmentsRequest: {
+            /** Initdata */
+            initData?: string | null;
+            /** Entrytoken */
+            entryToken?: string | null;
+            /** Section */
+            section?: string | null;
         };
         /** TelegramMiniAppPatientCabinetSummaryRequest */
         TelegramMiniAppPatientCabinetSummaryRequest: {
@@ -66985,6 +67033,41 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    telegram_mini_app_list_booking_departments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramMiniAppBookingDepartmentsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

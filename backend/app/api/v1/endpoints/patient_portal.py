@@ -88,11 +88,14 @@ from app.models.clinic import Doctor
 from app.models.department import Department
 from app.models.user import User
 from app.schemas import appointment as appointment_schemas
-from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
-from app.services.appointment_slot_guard import (
+from app.services.appointment_booking_routing import (
+    attach_department_id,
     lock_department_for_booking,
-    lock_doctor_for_slot_reservation,
+    resolve_booking_department,
+    resolve_doctor_routing_department,
 )
+from app.services.appointment_eligibility import ensure_doctor_eligible_for_appointment
+from app.services.appointment_slot_guard import lock_doctor_for_slot_reservation
 from app.services.patient_access_audit import log_patient_access
 from app.services.telegram_mini_app_init_data import (
     TelegramMiniAppSessionScope,
@@ -500,106 +503,42 @@ def _raise_scope_error(
 
 
 def _resolve_portal_department(
-    db: Session, department: str | None
+    db: Session, department: str | None, *, for_update: bool = False
 ) -> Department | None:
     """Resolve a booking `department` to an ACTIVE department row (P1).
 
-    The request carries the canonical `Department.key`; the persisted
-    routing context is `departments.id`. Unknown keys and deactivated
-    departments are rejected with 400 BEFORE any appointment is created —
-    a silently-dropped department produced `department_id = NULL` rows
-    (routing context loss: preview echoed a department the row never got).
+    Round-11 (PR #3340 parity): the implementation moved to the shared
+    booking-routing service so the Mini App booking endpoints resolve the
+    SAME canonical routing context through the SAME helper — one SSOT for
+    every protected patient booking surface.
 
-    Round-4 (owner P2): the value is STRIPPED before the lookup. The SSOT
-    builder normalizes the draft (`str(value).strip()`) while this resolver
-    previously queried the RAW request string — a JSON body of
-    `" cardio "` passed the SSOT normalization, then missed the exact
-    `Department.key == " cardio "` match and answered 400
-    `department_unknown` for a department the preview had already accepted.
-    Normalizing here keeps the resolver safe for ANY caller, not just the
-    draft-fed path.
+    Round-12 (owner P1, PR #3386 review): ``for_update=True`` — create
+    paths whose resolved row IS the final routing context read the row
+    ``FOR UPDATE`` so the active check is atomic with the appointment
+    INSERT (see ``lock_department_for_booking``).
     """
-    if department is None or not department.strip():
-        return None
-    normalized_key = department.strip()
-    department_row = db.query(Department).filter(Department.key == normalized_key).first()
-    if department_row is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"reason": "department_unknown"},
-        )
-    if not getattr(department_row, "active", True):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"reason": "department_inactive"},
-        )
-    return department_row
+    return resolve_booking_department(db, department, for_update=for_update)
 
 
 def _with_resolved_department(
     payload: dict[str, Any], department_row: Department | None
 ) -> dict[str, Any]:
     """Attach the resolved `department_id` to an echo payload (typed field)."""
-    if department_row is not None:
-        payload["appointment"]["department_id"] = int(department_row.id)
-    return payload
+    return attach_department_id(payload, department_row)
 
 
 def _resolve_doctor_routing_department(
     doctor_row: Doctor,
     submitted_department_row: Department | None,
 ) -> Department:
-    """Round-9 (owner P1, PR #3340): a doctor-booking's routing department is
-    the doctor's CANONICAL department — never the independently submitted
-    string.
+    """Round-9/10 (owner P1, PR #3340) canonical doctor-department routing.
 
-    The previous flow persisted the submitted `department` (or NULL when
-    omitted) next to the requested doctor: a cardiology doctor booked into
-    a dentistry department stored contradictory routing data (the row
-    surfaced in one doctor's schedule and in the WRONG department's), and
-    a doctor-only booking stored `department_id = NULL` — a routing
-    context no schedule could join on. Both booking surfaces (preview and
-    create) resolve through THIS helper, so preview and create always
-    agree on the routing context.
-
-    Refusals are controlled 400s BEFORE any mutation:
-
-    * ``doctor_department_missing`` — the doctor has no canonical
-      department (an explicit refusal, not a NULL routing context);
-    * ``department_inactive`` — the doctor's CANONICAL department exists
-      but is DEACTIVATED (round-10 owner P1): the routing helper returned
-      the relationship unconditionally, so an active doctor bound to an
-      inactive department still booked — the preview even echoed the
-      inactive department_id the create then persisted. Every OTHER
-      department path (`_resolve_portal_department`) refuses inactive
-      keys with this SAME reason; the canonical path now refuses with
-      the identical 400 (it is already part of the published booking
-      error contract `_PORTAL_BOOKING_REQUEST_ERROR_REASONS`), so
-      preview and create answer BEFORE any mutation and the persisted
-      routing context can never point at a deactivated department;
-    * ``doctor_department_mismatch`` — the submitted department is not
-      the doctor's own. Compared by the resolved department's id, which
-      is key-equivalent: the submitted row was looked up BY key.
+    Round-11 (PR #3340 parity): the implementation moved to the shared
+    booking-routing service (see `_resolve_portal_department`) — the Mini
+    App booking endpoints now enforce the identical contract through the
+    SAME helper.
     """
-    if doctor_row.department_id is None or doctor_row.department is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"reason": "doctor_department_missing"},
-        )
-    department = doctor_row.department
-    if not getattr(department, "active", True):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"reason": "department_inactive"},
-        )
-    if submitted_department_row is not None and int(submitted_department_row.id) != int(
-        doctor_row.department_id
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"reason": "doctor_department_mismatch"},
-        )
-    return department
+    return resolve_doctor_routing_department(doctor_row, submitted_department_row)
 
 
 # Shared OpenAPI error responses (P2: documented error surface).
@@ -893,6 +832,10 @@ def create_patient_portal_booking(
         # P1 (round 2): resolve BEFORE any mutation — unknown/inactive keys are a
         # 400, never a silently-NULL routing context on the created row.
         # Round-4 (owner P2): SSOT-NORMALIZED draft value (see preview).
+        # Round-12 parity note (PR #3386 merge): the resolution stays UP FRONT
+        # (the owner-reviewed #3402 order) — the Mini App surface keeps its
+        # eligibility-first ordering, the divergence is intentional and
+        # flagged for review.
         department_row = _resolve_portal_department(db, preview.draft.department)
 
         draft_payload = preview.draft.to_appointment_create_payload()
@@ -922,8 +865,8 @@ def create_patient_portal_booking(
                 # unchanged, and BEFORE the slot check (a routing refusal
                 # never creates anything). The submitted department either
                 # matches the doctor's own or the request is a controlled
-                # 400; a departmentless doctor is an explicit refusal, not
-                # a NULL department_id.
+                # 400; a departmentless doctor is an explicit refusal, not a
+                # NULL department_id.
                 department_row = _resolve_doctor_routing_department(
                     doctor_row, department_row
                 )

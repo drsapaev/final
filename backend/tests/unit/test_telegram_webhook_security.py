@@ -14,6 +14,7 @@ import pytest
 from app.api.v1.endpoints import admin_telegram, telegram_webhook
 from app.models.appointment import Appointment
 from app.models.audit import AuditLog
+from app.models.department import Department
 from app.schemas.notifications import SendMessageRequest
 from app.services import telegram_bot
 from app.services.telegram_templates import TelegramTemplatesService
@@ -95,6 +96,32 @@ def _add_mini_app_telegram_config(db_session) -> None:
 
 def _future_mini_app_appointment_date() -> date:
     return date.today() + timedelta(days=1)
+
+
+def _seed_department(db_session, *, key: str = "cardio", active: bool = True):
+    """Round-11 parity tests need a canonical Department row (unique `key`)."""
+    row = db_session.query(Department).filter(Department.key == key).first()
+    if not row:
+        row = Department(
+            key=key,
+            name_ru="Кардиология" if key == "cardio" else key,
+            name_uz="Kardiologiya" if key == "cardio" else key,
+            active=active,
+        )
+        db_session.add(row)
+        db_session.commit()
+        db_session.refresh(row)
+    elif row.active != active:
+        row.active = active
+        db_session.commit()
+        db_session.refresh(row)
+    return row
+
+
+def _bind_doctor_department(db_session, doctor, department) -> None:
+    doctor.department_id = department.id
+    db_session.commit()
+    db_session.refresh(doctor)
 
 
 def _link_patient_to_chat(
@@ -329,6 +356,10 @@ class TestTelegramWebhookSecurity:
         _add_mini_app_telegram_config(db_session)
         chat_id = 880201
         _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        # Round-11: the submitted department resolves to an ACTIVE row
+        # (doctor id 12 has NO Doctor row — the pre-round-11 shape is kept;
+        # create's eligibility gate answers 404 for it).
+        cardio = _seed_department(db_session)
         initial_appointments = db_session.query(Appointment).count()
         appointment_date = _future_mini_app_appointment_date()
 
@@ -340,7 +371,7 @@ class TestTelegramWebhookSecurity:
                 "doctorId": 12,
                 "appointmentDate": appointment_date.isoformat(),
                 "appointmentTime": "09:30",
-                "department": "Cardiology",
+                "department": cardio.key,
                 "notes": "Mini App request",
                 "services": ["Consultation"],
             },
@@ -362,6 +393,8 @@ class TestTelegramWebhookSecurity:
         assert appointment["payment_provider"] is None
         assert appointment["payment_transaction_id"] is None
         assert appointment["payment_webhook_id"] is None
+        # Round-11 parity: the preview echoes the RESOLVED routing context.
+        assert appointment["department_id"] == cardio.id
         assert db_session.query(Appointment).count() == initial_appointments
 
     def test_mini_app_booking_preview_endpoint_rejects_forged_init_data(
@@ -864,6 +897,10 @@ class TestTelegramWebhookSecurity:
         _add_mini_app_telegram_config(db_session)
         chat_id = 880206
         _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        # Round-11: the doctor's canonical department is bound and the
+        # submitted key MATCHES it — the routing context persists.
+        cardio = _seed_department(db_session)
+        _bind_doctor_department(db_session, test_doctor, cardio)
         initial_appointments = db_session.query(Appointment).count()
         appointment_date = _future_mini_app_appointment_date()
 
@@ -875,7 +912,7 @@ class TestTelegramWebhookSecurity:
                 "doctorId": test_doctor.id,
                 "appointmentDate": appointment_date.isoformat(),
                 "appointmentTime": "09:30",
-                "department": "Cardiology",
+                "department": cardio.key,
                 "notes": "Mini App create request",
                 "services": ["Consultation"],
             },
@@ -888,9 +925,13 @@ class TestTelegramWebhookSecurity:
         assert payload["preview"]["preview_only"] is True
         assert payload["preview"]["mutation_allowed"] is False
         assert payload["preview"]["appointment"]["payment_provider"] is None
+        # Round-11 parity: the persisted row and the echoed preview carry
+        # the SAME canonical routing context.
+        assert payload["preview"]["appointment"]["department_id"] == cardio.id
         assert created is not None
         assert created.patient_id == test_patient.id
         assert created.doctor_id == test_doctor.id
+        assert created.department_id == cardio.id
         assert created.appointment_date == appointment_date
         assert created.appointment_time == "09:30"
         assert created.status == "scheduled"
@@ -912,6 +953,10 @@ class TestTelegramWebhookSecurity:
         _add_mini_app_telegram_config(db_session)
         chat_id = 880207
         _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        # Round-11: a routing-valid doctor (canonical department bound) so
+        # the request reaches the slot check instead of a routing 400.
+        cardio = _seed_department(db_session)
+        _bind_doctor_department(db_session, test_doctor, cardio)
         appointment_date = _future_mini_app_appointment_date()
         db_session.add(
             Appointment(
@@ -950,6 +995,391 @@ class TestTelegramWebhookSecurity:
         )
 
         assert response.status_code in {401, 403}
+
+
+class TestMiniAppBookingRoutingParity:
+    """Round-11 (PR #3340 parity): the Mini App booking endpoints enforce the
+    SAME canonical doctor-department routing contract the JWT portal got in
+    rounds 9-10 — the persisted routing department is the doctor's CANONICAL
+    department, contradictions are controlled 400s BEFORE any mutation, and
+    preview/create always agree on the routing context."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def test_doctor_only_booking_persists_canonical_department(
+        self, client, db_session, test_patient, test_doctor
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880221
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session)
+        _bind_doctor_department(db_session, test_doctor, cardio)
+
+        preview = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "doctorId": test_doctor.id,
+                "appointmentDate": self.future_date,
+            },
+        )
+        assert preview.status_code == 200, preview.json()
+        assert preview.json()["appointment"]["department_id"] == cardio.id
+
+        created = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "doctorId": test_doctor.id,
+                "appointmentDate": self.future_date,
+            },
+        )
+        assert created.status_code == 201, created.json()
+        row = db_session.get(Appointment, created.json()["appointment_id"])
+        assert row.department_id == cardio.id, (
+            "a doctor-booking never persists a NULL routing context"
+        )
+
+    def test_foreign_submitted_department_rejected_400(
+        self, client, db_session, test_patient, test_doctor
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880222
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session)
+        _bind_doctor_department(db_session, test_doctor, cardio)
+        dentistry = _seed_department(db_session, key="dentistry")
+        assert dentistry.id != cardio.id
+
+        body = {
+            "patientId": test_patient.id,
+            "doctorId": test_doctor.id,
+            "appointmentDate": self.future_date,
+            "department": dentistry.key,
+        }
+        preview = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview",
+            json={"initData": _signed_mini_app_init_data(chat_id), **body},
+        )
+        assert preview.status_code == 400, preview.json()
+        assert preview.json()["detail"]["reason"] == "doctor_department_mismatch"
+
+        created = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={"initData": _signed_mini_app_init_data(chat_id), **body},
+        )
+        assert created.status_code == 400, created.json()
+        assert created.json()["detail"]["reason"] == "doctor_department_mismatch"
+        assert db_session.query(Appointment).count() == 0, (
+            "a routing contradiction never materializes an appointment"
+        )
+
+    def test_departmentless_doctor_explicitly_refused(
+        self, client, db_session, test_patient, test_doctor
+    ):
+        # The harness doctor has NO canonical department: an explicit 400,
+        # never a silent NULL routing context (create + preview).
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880223
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+
+        body = {
+            "patientId": test_patient.id,
+            "doctorId": test_doctor.id,
+            "appointmentDate": self.future_date,
+        }
+        created = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={"initData": _signed_mini_app_init_data(chat_id), **body},
+        )
+        assert created.status_code == 400, created.json()
+        assert created.json()["detail"]["reason"] == "doctor_department_missing"
+
+        preview = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview",
+            json={"initData": _signed_mini_app_init_data(chat_id), **body},
+        )
+        assert preview.status_code == 400, preview.json()
+        assert preview.json()["detail"]["reason"] == "doctor_department_missing"
+        assert db_session.query(Appointment).count() == 0
+
+    def test_unknown_submitted_department_rejected_400(
+        self, client, db_session, test_patient
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880224
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        # NO department rows exist for this key.
+        body = {
+            "patientId": test_patient.id,
+            "appointmentDate": self.future_date,
+            "department": "nonexistent-department",
+        }
+        preview = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview",
+            json={"initData": _signed_mini_app_init_data(chat_id), **body},
+        )
+        assert preview.status_code == 400, preview.json()
+        assert preview.json()["detail"]["reason"] == "department_unknown"
+
+        created = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={"initData": _signed_mini_app_init_data(chat_id), **body},
+        )
+        assert created.status_code == 400, created.json()
+        assert created.json()["detail"]["reason"] == "department_unknown"
+        assert db_session.query(Appointment).count() == 0
+
+    def test_inactive_canonical_department_refused_400(
+        self, client, db_session, test_patient, test_doctor
+    ):
+        # Round-10 owner P1 parity: an active doctor bound to a DEACTIVATED
+        # department is refused with the SAME `department_inactive` reason
+        # every other department path uses — on BOTH surfaces.
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880225
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        stale = _seed_department(db_session, key="stale-dept", active=False)
+        _bind_doctor_department(db_session, test_doctor, stale)
+
+        body = {
+            "patientId": test_patient.id,
+            "doctorId": test_doctor.id,
+            "appointmentDate": self.future_date,
+        }
+        preview = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview",
+            json={"initData": _signed_mini_app_init_data(chat_id), **body},
+        )
+        assert preview.status_code == 400, preview.json()
+        assert preview.json()["detail"]["reason"] == "department_inactive"
+
+        created = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={"initData": _signed_mini_app_init_data(chat_id), **body},
+        )
+        assert created.status_code == 400, created.json()
+        assert created.json()["detail"]["reason"] == "department_inactive"
+        assert db_session.query(Appointment).count() == 0
+
+
+class TestMiniAppBookingRound12:
+    """Round-12 (PR #3386 review): canonical keys END-TO-END and atomic
+    routing. The booking form's department comes from an authenticated
+    reference endpoint (the selector submits the canonical `Department.key`,
+    never a free-text localized label); the create endpoints re-validate the
+    FINAL department row under FOR UPDATE next to the INSERT; the routing
+    resolution follows the established doctor_not_eligible contract."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def test_departments_endpoint_requires_identity(self, client, db_session):
+        _add_mini_app_telegram_config(db_session)
+        response = client.post("/api/v1/telegram/mini-app/booking/departments", json={})
+        assert response.status_code == 403
+        assert "reason" in response.json()["detail"]
+
+    def test_departments_endpoint_lists_active_canonical_rows(
+        self, client, db_session, test_patient
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880241
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session, key="cardio")
+        _seed_department(db_session, key="retired-dept", active=False)
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/booking/departments",
+            json={"initData": _signed_mini_app_init_data(chat_id)},
+        )
+        assert response.status_code == 200, response.json()
+        rows = response.json()["departments"]
+        by_key = {row["key"]: row["name"] for row in rows}
+        # ACTIVE rows only, canonical key + clinic display name — the exact
+        # value the selector submits back to the booking endpoints.
+        assert by_key.get("cardio") == cardio.name_ru
+        assert "retired-dept" not in by_key
+
+    def test_create_revalidates_department_under_lock(
+        self, client, db_session, test_patient, test_doctor, monkeypatch
+    ):
+        # P1: an admin deactivation commits AFTER the plain routing read but
+        # BEFORE the INSERT — the FOR UPDATE re-validation refuses with the
+        # SAME department_inactive contract instead of persisting a routing
+        # context that points at a deactivated department.
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880242
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session)
+        _bind_doctor_department(db_session, test_doctor, cardio)
+
+        from app.api.v1.endpoints.telegram_webhook import _routes as mini_app_routes
+
+        real_routing = mini_app_routes.resolve_doctor_routing_department
+
+        def racing_admin_deactivation(doctor_row, submitted_row):
+            resolved = real_routing(doctor_row, submitted_row)
+            cardio.active = False
+            db_session.commit()
+            return resolved
+
+        monkeypatch.setattr(
+            mini_app_routes,
+            "resolve_doctor_routing_department",
+            racing_admin_deactivation,
+        )
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "doctorId": test_doctor.id,
+                "appointmentDate": self.future_date,
+            },
+        )
+        assert response.status_code == 400, response.json()
+        assert response.json()["detail"]["reason"] == "department_inactive"
+        assert db_session.query(Appointment).count() == 0, (
+            "a raced deactivation never materializes an appointment with a "
+            "stale routing context"
+        )
+
+    def test_create_locks_canonical_department_before_insert(
+        self, client, db_session, test_patient, test_doctor, monkeypatch
+    ):
+        # Wiring: the doctor-booking create path calls the FOR UPDATE
+        # re-validation with the CANONICAL row right before persisting.
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880243
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session)
+        _bind_doctor_department(db_session, test_doctor, cardio)
+
+        from app.api.v1.endpoints.telegram_webhook import _routes as mini_app_routes
+
+        real_lock = mini_app_routes.lock_department_for_booking
+        locked_ids: list[int] = []
+
+        def spying_lock(db, department_row):
+            if department_row is not None:
+                locked_ids.append(int(department_row.id))
+            return real_lock(db, department_row)
+
+        monkeypatch.setattr(mini_app_routes, "lock_department_for_booking", spying_lock)
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "doctorId": test_doctor.id,
+                "appointmentDate": self.future_date,
+            },
+        )
+        assert response.status_code == 201, response.json()
+        row = db_session.get(Appointment, response.json()["appointment_id"])
+        assert locked_ids == [cardio.id], (
+            "the FINAL (canonical) department row is re-validated under lock"
+        )
+        assert row.department_id == cardio.id
+
+    def test_routing_follows_doctor_not_eligible(
+        self, client, db_session, test_patient, test_doctor
+    ):
+        # P2 ordering: a request that is both ineligible-doctor AND
+        # bad-department answers the established doctor_not_eligible
+        # contract — the routing 400 never preempts it.
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880244
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        test_doctor.active = False
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "doctorId": test_doctor.id,
+                "appointmentDate": self.future_date,
+                "department": "nonexistent-department",
+            },
+        )
+        assert response.status_code == 409, response.json()
+        assert response.json()["detail"]["reason"] == "doctor_not_eligible"
+        assert db_session.query(Appointment).count() == 0
+
+
+class TestMiniAppClinicCalendarDateValidation:
+    """Round-11 (owner P2 parity, PR #3340): the Mini App booking past-day
+    check follows the CLINIC's calendar (`clinic_today`, Asia/Tashkent
+    queue-settings SSOT), not the UTC host's `date.today()` — the portal
+    surface got this in round-9; BOTH Mini App booking endpoints share the
+    helper that now validates against the same clinic-local day."""
+
+    def _shift_clinic_today(self, monkeypatch):
+        from app.api.v1.endpoints.telegram_webhook import _clinic_bot
+
+        monkeypatch.setattr(
+            _clinic_bot,
+            "clinic_today",
+            lambda db: date.today() + timedelta(days=1),
+        )
+
+    def test_previous_clinic_day_refused_on_both_surfaces(
+        self, client, db_session, test_patient, monkeypatch
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880231
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        self._shift_clinic_today(monkeypatch)
+        # host-today is already YESTERDAY for the clinic (the UTC-host
+        # window the finding describes).
+        body = {
+            "patientId": test_patient.id,
+            "appointmentDate": str(date.today()),
+        }
+
+        created = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={"initData": _signed_mini_app_init_data(chat_id), **body},
+        )
+        assert created.status_code == 400, created.json()
+        assert created.json()["detail"]["reason"] == "appointment_date_in_past"
+
+        preview = client.post(
+            "/api/v1/telegram/mini-app/appointments/preview",
+            json={"initData": _signed_mini_app_init_data(chat_id), **body},
+        )
+        assert preview.status_code == 400, preview.json()
+        assert preview.json()["detail"]["reason"] == "appointment_date_in_past"
+
+        assert db_session.query(Appointment).count() == 0, (
+            "an already-past (by the clinic calendar) day never books"
+        )
+
+    def test_clinic_today_is_still_accepted(
+        self, client, db_session, test_patient, monkeypatch
+    ):
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880232
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session)
+        self._shift_clinic_today(monkeypatch)
+        # host-tomorrow == clinic-TODAY: valid on the clinic calendar.
+        created = client.post(
+            "/api/v1/telegram/mini-app/appointments",
+            json={
+                "initData": _signed_mini_app_init_data(chat_id),
+                "patientId": test_patient.id,
+                "appointmentDate": str(date.today() + timedelta(days=1)),
+                "department": cardio.key,
+            },
+        )
+        assert created.status_code == 201, created.json()
 
     @pytest.mark.asyncio
     async def test_send_message_response_hides_chat_id(self, monkeypatch):

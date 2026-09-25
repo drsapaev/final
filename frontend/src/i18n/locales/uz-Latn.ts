@@ -972,6 +972,20 @@ const uzLatn = {
     cardio_panel_filter_ecg: "EKG",
     cardio_panel_filter_labs: "Tahlillar",
     cardio_panel_filter_attachments: "Ilovalar",
+    // Cardioplan slice 4: patient search + visit history
+    patient_search_title: 'Bemorlarni qidirish',
+    patient_search_placeholder: 'F.I.Sh. yoki telefon — kamida 2 belgi',
+    patient_search_results_for: 'Qidiruv natijalari: “{query}”',
+    patient_search_hint_title: 'Bemorlarni qidirish',
+    patient_search_hint_desc: 'Kamida 2 belgi kiriting — F.I.Sh. yoki telefon',
+    patient_search_error_title: 'Bemorlarni yuklash mumkin bo‘lmadi',
+    patient_search_error_desc: 'Ulanishni tekshirib, qayta urinib ko‘ring',
+    patient_search_retry: 'Qayta urinish',
+    patient_search_empty_title: 'Bemorlar topilmadi',
+    patient_search_empty_desc: 'So‘rov bo‘yicha hech narsa topilmadi — boshqasini sinab ko‘ring',
+    cardio_panel_filter_visits: 'Qabullar',
+    cardio_panel_visit_history_title: '{date} dagi qabul',
+    cardio_hist_badge_visits: 'Qabul',
     // Summary labels
     cardio_panel_summary_total: "Jami",
     cardio_panel_summary_waiting: "Kutilmoqda",
@@ -10654,7 +10668,12 @@ const uzLatn = {
     pat_book_label_date: 'Sana',
     pat_book_label_time: 'Afzal qilingan vaqt',
     pat_book_label_department: 'Boʻlim',
-    pat_book_placeholder_department: 'Masalan: Kardiologiya',
+    // Round-12 (PR #3386): the department is a SELECTOR fed by the
+    // booking/departments reference endpoint — the form submits the
+    // canonical Department.key, never a free-text localized label.
+    pat_book_placeholder_department: 'Boʻlimni tanlang',
+    pat_book_option_no_department: 'Boʻlimsiz',
+    pat_book_departments_unavailable: 'Boʻlimlar roʻyxati hozir mavjud emas — arizani boʻlimsiz yuborish mumkin.',
     pat_book_label_services: 'Xizmatlar',
     pat_book_placeholder_services: 'Konsultatsiya, tahlillar',
     pat_book_label_notes: 'Izoh',

@@ -100,6 +100,14 @@ const BOOKING_ERROR_MESSAGES = {
   appointment_time_slot_occupied: 'Это время у врача уже занято. Выберите другое время или оставьте поле пустым.',
   patient_scope_mismatch: 'Эта заявка на запись не принадлежит привязанному пациенту.',
   patient_scope_required: 'Привяжите Telegram к профилю пациента перед записью.',
+  // Round-12 (PR #3386 review): patient-safe wording for the canonical
+  // department routing contract (backend refuses unknown/inactive keys and
+  // inconsistent doctor-department pairs with these reasons).
+  department_unknown: 'Выберите отделение из списка и попробуйте ещё раз.',
+  department_inactive: 'Это отделение сейчас недоступно. Выберите другое отделение.',
+  doctor_department_missing: 'Этот врач сейчас недоступен для записи. Выберите другого врача или оставьте отделение пустым.',
+  doctor_department_mismatch: 'Выбранный врач принимает в другом отделении. Проверьте отделение и попробуйте снова.',
+  doctor_not_eligible: 'Этот врач сейчас недоступен для записи. Выберите другого врача.',
 };
 
 const CABINET_ERROR_MESSAGES = {

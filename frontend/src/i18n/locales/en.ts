@@ -972,6 +972,20 @@ const en = {
     cardio_panel_filter_ecg: 'ЭКГ',
     cardio_panel_filter_labs: 'Анализы',
     cardio_panel_filter_attachments: 'Вложения',
+    // Cardioplan slice 4: patient search + visit history
+    patient_search_title: 'Patient search',
+    patient_search_placeholder: 'Name or phone — at least 2 characters',
+    patient_search_results_for: 'Search results: “{query}”',
+    patient_search_hint_title: 'Patient search',
+    patient_search_hint_desc: 'Enter at least 2 characters — name or phone',
+    patient_search_error_title: 'Could not load patients',
+    patient_search_error_desc: 'Check the connection and try again',
+    patient_search_retry: 'Retry',
+    patient_search_empty_title: 'No patients found',
+    patient_search_empty_desc: 'Nothing matched the query — try a different one',
+    cardio_panel_filter_visits: 'Visits',
+    cardio_panel_visit_history_title: 'Visit on {date}',
+    cardio_hist_badge_visits: 'Visit',
     // Summary labels
     cardio_panel_summary_total: 'Всего',
     cardio_panel_summary_waiting: 'Ожидают',
@@ -10657,7 +10671,12 @@ const en = {
     pat_book_label_date: 'Дата',
     pat_book_label_time: 'Предпочтительное время',
     pat_book_label_department: 'Отделение',
-    pat_book_placeholder_department: 'Например: Кардиология',
+    // Round-12 (PR #3386): the department is a SELECTOR fed by the
+    // booking/departments reference endpoint — the form submits the
+    // canonical Department.key, never a free-text localized label.
+    pat_book_placeholder_department: 'Выберите отделение',
+    pat_book_option_no_department: 'Без отделения',
+    pat_book_departments_unavailable: 'Список отделений сейчас недоступен — можно отправить заявку без отделения.',
     pat_book_label_services: 'Услуги',
     pat_book_placeholder_services: 'Консультация, анализы',
     pat_book_label_notes: 'Комментарий',
