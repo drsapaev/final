@@ -426,6 +426,10 @@ const DermatologistPanelUnified = () => {
   const [emr, setEmr] = useState<Record<string, unknown> | null>(null);
   const [prescription, setPrescription] = useState<Record<string, unknown> | null>(null);
   const [canCreatePrescription, setCanCreatePrescription] = useState(false);
+  const [appointmentCompletionStatus, setAppointmentCompletionStatus] = useState<{
+    appointmentId: string;
+    canComplete: boolean;
+  } | null>(null);
   const [doctorPrice, setDoctorPrice] = useState('');
 
   // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
@@ -458,6 +462,7 @@ const DermatologistPanelUnified = () => {
       // currentAppointment changes.
       setEmr(null);
       setPrescription(null);
+      setAppointmentCompletionStatus(null);
     },
   });
 
@@ -1172,11 +1177,16 @@ const DermatologistPanelUnified = () => {
       setEmr(null);
       setPrescription(null);
       setCanCreatePrescription(false);
+      setAppointmentCompletionStatus(null);
       return;
     }
 
     let isMounted = true;
+    const appointmentIdKey = String(appointmentId);
+    setEmr(null);
+    setPrescription(null);
     setCanCreatePrescription(false);
+    setAppointmentCompletionStatus({ appointmentId: appointmentIdKey, canComplete: false });
 
     const loadCanonicalStatus = async () => {
       try {
@@ -1194,6 +1204,10 @@ const DermatologistPanelUnified = () => {
         setEmr((statusData.emr as Record<string, unknown>) || null);
         setPrescription((statusData.prescription as Record<string, unknown>) || null);
         setCanCreatePrescription(statusData.can_create_prescription === true);
+        setAppointmentCompletionStatus({
+          appointmentId: appointmentIdKey,
+          canComplete: statusData.can_complete === true,
+        });
 
         const normalizedStatusVisitId = normalizeNumericId(statusData.visit_id as string | number | null | undefined);
         const normalizedCurrentVisitId = normalizeNumericId(currentAppointment?.visit_id);
@@ -1299,6 +1313,14 @@ const DermatologistPanelUnified = () => {
         notify.success(t('derma.diagnosis_added_from_ai'));
     }
   };
+
+  const canCompleteCurrentVisit = Boolean(
+    currentAppointment?.can_complete === true &&
+    (!currentAppointment.appointment_id ||
+      (appointmentCompletionStatus?.appointmentId ===
+        String(currentAppointment.appointment_id) &&
+        appointmentCompletionStatus.canComplete))
+  );
 
   // Унифицированная обработка сохранения визита
   const handleSaveVisit = async () => {
@@ -1685,7 +1707,7 @@ const DermatologistPanelUnified = () => {
                 </div>
 
                 {/* Система рецептов */}
-                {emr && !emr.is_draft &&
+                {canCompleteCurrentVisit && emr && !emr.is_draft &&
               <div className="derma-mt-24">
                     <h4 className="derma-flex-center">
                       <FileText size={20} className="derma-icon-mr-green" aria-hidden="true" />

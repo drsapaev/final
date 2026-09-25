@@ -194,13 +194,17 @@ describe('Doctor panels SSOT contract', () => {
     ).toBe(true);
   });
 
-  it('keeps dermatology prescription availability backend-owned', () => {
+  it('keeps dermatology prescription and completion availability backend-owned', () => {
     const dermatology = read('pages/DermatologistPanelUnified.tsx');
     const prescriptionSystem = read('components/PrescriptionSystem.tsx');
 
     expect(dermatology).toContain('/appointments/${appointmentId}/status');
     expect(dermatology).toContain('setCanCreatePrescription(statusData.can_create_prescription === true)');
     expect(dermatology).toContain('canCreatePrescription={canCreatePrescription}');
+    expect(dermatology).toContain('canComplete: statusData.can_complete === true');
+    expect(dermatology).toContain('currentAppointment?.can_complete === true');
+    expect(dermatology).toContain('appointmentCompletionStatus.canComplete');
+    expect(dermatology).toContain('canCompleteCurrentVisit && emr && !emr.is_draft');
 
     expect(prescriptionSystem).toContain('canCreatePrescription');
     expect(prescriptionSystem).toContain('const prescriptionEligible = canCreatePrescription === true');

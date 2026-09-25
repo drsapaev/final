@@ -34,6 +34,43 @@ from app.schemas.doctor_queue import (
     DoctorQueueTodayResponse,
 )
 
+_DERMATOLOGY_SPECIALTY_KEYS = frozenset({"derma", "dermatology", "dermatologist"})
+_DERMATOLOGY_EMR_REQUIRED_DETAIL = (
+    "Для завершения дерматологического приёма сохраните ЭМК со статусом не «черновик»"
+)
+
+
+def _is_dermatology_specialty(specialty: str | None) -> bool:
+    return _normalize_queue_specialty(specialty or "") in _DERMATOLOGY_SPECIALTY_KEYS
+
+
+def _saved_dermatology_emr_pairs(
+    db: Session, candidates: set[tuple[int, int]]
+) -> set[tuple[int, int]]:
+    """Return active, non-draft EMRs keyed by their visit and patient IDs."""
+    candidate_pairs = {
+        (visit_id, patient_id)
+        for visit_id, patient_id in candidates
+        if visit_id is not None and patient_id is not None
+    }
+    if not candidate_pairs:
+        return set()
+
+    from app.models.emr_v2 import EMRRecord
+
+    visit_ids = {visit_id for visit_id, _ in candidate_pairs}
+    rows = (
+        db.query(EMRRecord.visit_id, EMRRecord.patient_id)
+        .filter(
+            EMRRecord.visit_id.in_(visit_ids),
+            EMRRecord.is_active.is_(True),
+            EMRRecord.status != "draft",
+        )
+        .all()
+    )
+    ready_pairs = {(row.visit_id, row.patient_id) for row in rows}
+    return ready_pairs.intersection(candidate_pairs)
+
 
 @router.get(
     "/doctor/{specialty}/queue/today",
@@ -172,12 +209,32 @@ def get_doctor_queue_today(
             .all()
         )
 
+        is_dermatology_queue = _is_dermatology_specialty(normalized_specialty)
+        dermatology_emr_pairs: set[tuple[int, int]] = set()
+        if is_dermatology_queue:
+            dermatology_emr_pairs = _saved_dermatology_emr_pairs(
+                db,
+                {
+                    (entry.visit_id, entry.patient_id)
+                    for entry in entries
+                    if entry.visit_id is not None and entry.patient_id is not None
+                },
+            )
+
         # Формируем данные для врача
         queue_entries = []
         next_call_entry_id = None
         for entry in entries:
             available_actions = _doctor_queue_available_actions(entry)
             action_flags = _doctor_queue_action_flags(entry)
+            if (
+                is_dermatology_queue
+                and (entry.visit_id, entry.patient_id) not in dermatology_emr_pairs
+            ):
+                available_actions = [
+                    action for action in available_actions if action != "complete"
+                ]
+                action_flags["can_complete"] = False
             if next_call_entry_id is None and action_flags["can_call"]:
                 next_call_entry_id = entry.id
 
@@ -898,6 +955,18 @@ def complete_patient_visit(
                 record_doctor_id=visit.doctor_id,
                 current_user=current_user,
             )
+            if _is_dermatology_specialty(
+                visit.doctor.specialty if visit.doctor else None
+            ) and (
+                visit.patient_id is None
+                or (visit.id, visit.patient_id)
+                not in _saved_dermatology_emr_pairs(db, {(visit.id, visit.patient_id)})
+            ):
+                db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=_DERMATOLOGY_EMR_REQUIRED_DETAIL,
+                )
             # Issue #06 Phase 3: delegate to VisitLifecycleService for
             # state machine validation + row lock. The transition
             # in_progress → completed (or completed → completed idempotent)
@@ -950,6 +1019,40 @@ def complete_patient_visit(
                 record_doctor_id=appointment.doctor_id,
                 current_user=current_user,
             )
+            if _is_dermatology_specialty(
+                appointment.doctor.specialty if appointment.doctor else None
+            ):
+                from app.services.canonical_visit_service import (
+                    CanonicalVisitResolutionError,
+                    CanonicalVisitService,
+                )
+
+                try:
+                    appointment_visit_id = CanonicalVisitService(
+                        db
+                    ).resolve_canonical_visit(appointment.id, create_if_missing=False)
+                except CanonicalVisitResolutionError as exc:
+                    db.rollback()
+                    if exc.status_code == 404:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail=_DERMATOLOGY_EMR_REQUIRED_DETAIL,
+                        ) from exc
+                    raise HTTPException(
+                        status_code=exc.status_code, detail=exc.detail
+                    ) from exc
+
+                if (
+                    appointment_visit_id,
+                    appointment.patient_id,
+                ) not in _saved_dermatology_emr_pairs(
+                    db, {(appointment_visit_id, appointment.patient_id)}
+                ):
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=_DERMATOLOGY_EMR_REQUIRED_DETAIL,
+                    )
             # Обновляем статус appointment
             appointment.status = "completed"
 
@@ -992,14 +1095,6 @@ def complete_patient_visit(
                 )
 
             changed_at = datetime.now(UTC)
-            queue_entry.status = "served"
-            queue_entry.updated_at = changed_at
-            # QF-1 (operator attribution): persist WHO completed the entry —
-            # the live human operator, deliberately separate from the routing
-            # owner (specialist_id / resource doctor). Nullable FK: deleting
-            # the user keeps the history row with NULL attribution.
-            queue_entry.served_by_user_id = current_user.id
-            queue_entry.served_at = changed_at
 
             # Codex round-1 P1 (corrective follow-up): resolve + pair the
             # visit BEFORE the served-commit. The pairing may FAIL CLOSED
@@ -1038,6 +1133,22 @@ def complete_patient_visit(
                 db, queue_entry, doctor, department_hint
             )
 
+            if _is_dermatology_specialty(doctor.specialty if doctor else None):
+                emr_ready = resolved_visit.patient_id == queue_entry.patient_id and (
+                    resolved_visit.id,
+                    queue_entry.patient_id,
+                ) in _saved_dermatology_emr_pairs(
+                    db, {(resolved_visit.id, queue_entry.patient_id)}
+                )
+                if not emr_ready:
+                    # Resolution may have staged a visit link or date move;
+                    # discard it together with the rejected completion.
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=_DERMATOLOGY_EMR_REQUIRED_DETAIL,
+                    )
+
             # Codex round-2 P2 + round-3 P2: the lifecycle completion ALSO
             # runs BEFORE the served-commit — resolution + lifecycle + the
             # served flip are one atomic unit. A lifecycle failure
@@ -1061,6 +1172,14 @@ def complete_patient_visit(
                 commit=False,
             )
             resolved_visit.updated_at = changed_at
+
+            # Stage the queue transition only after dermatology's EMR check
+            # and visit lifecycle validation have both succeeded.
+            queue_entry.status = "served"
+            queue_entry.updated_at = changed_at
+            # QF-1: persist WHO completed the entry, separately from its owner.
+            queue_entry.served_by_user_id = current_user.id
+            queue_entry.served_at = changed_at
 
             db.commit()
             db.refresh(queue_entry)
