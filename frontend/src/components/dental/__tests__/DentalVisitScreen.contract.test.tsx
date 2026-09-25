@@ -161,7 +161,7 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
     expect(source).toContain('<DentalVisitScreen');
     // The panel wires the completion flow into the view.
     expect(readPanel()).toContain('onCompleteVisit={handleCompleteVisit}');
-    expect(readPanel()).toContain('onPatientSelect={handlePatientSelect}');
+    expect(readPanel()).toContain('onStartVisit={handleStartQueueVisit}');
 
     // Must NOT use the old EMRContainerV2 for selectedPatient visits
     // (EMRContainerV2 may still be imported for other uses, but not in renderVisits).

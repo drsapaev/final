@@ -15,7 +15,6 @@ import '../styles/animations.css';
 import notify from '../services/notify';
 // STRAT#34: useTranslation adapter for confirm/notify i18n.
 import { useTranslation } from '../i18n/useTranslation';
-import type { Appointment } from '../types/domain/clinic';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDentalHotkeys } from '../hooks/useDentalHotkeys';
@@ -29,7 +28,6 @@ import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 // bootstrap) extracted verbatim to ./dentist/dentistContracts.
 import {
   invalidateDentistPanelCaches,
-  type SelectedPatient,
   type DoctorPanelState,
 } from './dentist/dentistContracts';
 // PR-UI-15-3: worklist data lifecycle (queues/today fetch + DTO mapping +
@@ -240,6 +238,7 @@ const DentistPanelUnified = () => {
   // (the handlers stay available on the hook API).
   const {
     handlePatientSelect,
+    handleStartQueueVisit,
     handleCompleteVisit,
     handleProtocolTemplateSelect,
   } = useDentistActions({
@@ -447,11 +446,7 @@ const DentistPanelUnified = () => {
           <QueueIntegration
             specialistId={String(user?.doctor_id || user?.specialist_id || '')}
             specialty="dentistry"
-            onPatientSelect={handlePatientSelect}
-            onStartVisit={(appointment: Appointment) => {
-              setSelectedPatient(appointment as unknown as SelectedPatient);
-              handleTabChange('visit');
-            }} />);
+            onStartVisit={handleStartQueueVisit} />);
 
 
       case 'patients':

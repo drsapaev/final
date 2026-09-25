@@ -2312,6 +2312,10 @@ const uzCyrl = {
     dental_ra_tab_procedures: 'Процедуры',
 
     // ─── DentistPanelUnified.jsx (dental_panel_*) ───────────────────────────
+    dental_panel_called_waiting: 'Чақирилган беморлар',
+    dental_panel_start_visit: 'Қабулни бошлаш',
+    dental_panel_start_visit_for: 'Қабулни бошлаш: {name}, талон №{number}',
+    dental_panel_start_visit_failed: 'Қабулни бошлаб бўлмади. Қайта уриниб кўринг ёки навбат ҳолатини текширинг.',
     dental_panel_patient_default: 'Пациент',
     dental_panel_discount_repeat: 'Повторный',
     dental_panel_discount_benefit: 'Льготный',

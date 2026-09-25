@@ -97,6 +97,68 @@ async function installDentistApiMocks(page: Page) {
   });
 }
 
+async function installDentistQueueFlowMocks(page: Page) {
+  const requests: string[] = [];
+
+  await page.route('**/api/v1/queue/available-specialists', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ specialists: [{ id: 7, specialty: 'dentistry', doctor_name: 'Synthetic Dentist' }] }),
+    });
+  });
+
+  await page.route('**/api/v1/registrar/queues/today**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ queues: [{ id: 7, specialist_id: 7, specialty: 'dentistry', entries: [], is_open: true }] }),
+    });
+  });
+
+  await page.route('**/api/v1/queue/7/call-next**', async (route) => {
+    requests.push('call-next');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        patient: { id: 91, patient_id: 701, name: 'Synthetic Patient', number: 8 },
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/doctor/queue/91/start-visit', async (route) => {
+    requests.push('start-visit');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, patient_id: 701, visit_id: 901, status: 'in_progress' }),
+    });
+  });
+
+  await page.route('**/api/v1/v2/emr/901', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    requests.push('save-emr');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ row_version: 2 }),
+    });
+  });
+
+  await page.route('**/api/v1/doctor/queue/91/complete', async (route) => {
+    requests.push('complete-queue');
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) });
+  });
+
+  await page.route('**/api/v1/doctor/dentistry/queue/today', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ entries: [] }) });
+  });
+
+  return requests;
+}
+
 async function openPhotoArchive(page: Page) {
   await page.goto('/doctor/dentistry?patientId=701&visitId=901&tab=visit', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('button', { name: /Фотоархив/ })).toBeVisible({ timeout: 20_000 });
@@ -106,6 +168,30 @@ async function openPhotoArchive(page: Page) {
 }
 
 test.describe('Dentist panel — synthetic product flow', () => {
+  test('queue call starts the returned visit, saves EMR, then completes the queue entry', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('language', 'ru'));
+    await installDentistApiMocks(page);
+    const requests = await installDentistQueueFlowMocks(page);
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    await page.goto('/doctor/dentistry?tab=queue', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Вызвать', exact: true }).click();
+    const startVisit = page.getByRole('button', { name: /Начать приём.*Synthetic Patient/i });
+    await expect(startVisit).toBeVisible();
+    await startVisit.click();
+
+    const complaint = page.getByRole('textbox', { name: 'Жалобы и анамнез пациента' });
+    await expect(complaint).toBeVisible();
+    await complaint.fill('Synthetic complaint for lifecycle check');
+    await page.getByRole('button', { name: 'Завершить приём и вызвать следующего пациента' }).click();
+
+    const confirmDialog = page.getByRole('dialog');
+    await expect(confirmDialog.getByRole('heading', { name: 'Завершить приём?' })).toBeVisible();
+    await confirmDialog.getByRole('button', { name: 'Завершить приём', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Вызвать', exact: true })).toBeVisible();
+    expect(requests).toEqual(['call-next', 'start-visit', 'save-emr', 'complete-queue']);
+  });
+
   test('legacy tabs resolve to supported screens and server search is usable', async ({ page }) => {
     await installDentistApiMocks(page);
     await page.setViewportSize({ width: 1280, height: 800 });

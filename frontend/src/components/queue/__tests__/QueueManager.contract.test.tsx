@@ -75,6 +75,27 @@ describe('Queue manager command contract', () => {
     expect(managerSource).toContain('onGenerateQR={isRegistrarMode ? generateQR : undefined}');
   });
 
+  it('starts a called dentist visit from a manager action without adding queue-row commands', () => {
+    const integrationSource = read('components/QueueIntegration.tsx');
+    const managerSource = read('components/queue/ModernQueueManager.tsx');
+    const tableSource = read('components/queue/QueueTable.tsx');
+    const dentistSource = read('pages/DentistPanelUnified.tsx');
+    const actionsSource = read('pages/dentist/useDentistActions.ts');
+
+    expect(integrationSource).toContain('onStartVisit={onStartVisit}');
+    expect(integrationSource).not.toContain('nullPatient');
+    expect(managerSource).toContain('setCalledPatients');
+    expect(managerSource).toContain('onStartVisit(patient)');
+    expect(managerSource).toContain('dental.dental_panel_start_visit_for');
+    expect(dentistSource).toContain('onStartVisit={handleStartQueueVisit}');
+    expect(actionsSource).toContain('queueService.startVisit(queueEntryId)');
+    expect(actionsSource).toContain('doctor_queue_entry_id');
+    expect(actionsSource).toContain('queue_entry_id');
+    // Queue order remains controlled by call-next; no new per-row call or start action.
+    expect(tableSource).not.toContain('Button');
+    expect(tableSource).not.toContain('onStartVisit');
+  });
+
   // RQ-11 (F-10): скачанный QR воспринимался как плакат, но токен имеет
   // ограниченный срок. Диалог обязан различать valid/expired/unspecified,
   // а скачиваемый PNG — нести подпись срока и пометку временного кода.

@@ -2301,6 +2301,10 @@ const en = {
     dental_ra_tab_procedures: 'Процедуры',
 
     // ─── DentistPanelUnified.jsx (dental_panel_*) ───────────────────────────
+    dental_panel_called_waiting: 'Called patients',
+    dental_panel_start_visit: 'Start visit',
+    dental_panel_start_visit_for: 'Start visit: {name}, ticket #{number}',
+    dental_panel_start_visit_failed: 'Could not start the visit. Try again or check the queue status.',
     dental_panel_patient_default: 'Пациент',
     dental_panel_discount_repeat: 'Повторный',
     dental_panel_discount_benefit: 'Льготный',

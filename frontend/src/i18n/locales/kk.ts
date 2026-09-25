@@ -2301,6 +2301,10 @@ const kk = {
     dental_ra_tab_procedures: 'Процедуры',
 
     // ─── DentistPanelUnified.jsx (dental_panel_*) ───────────────────────────
+    dental_panel_called_waiting: 'Шақырылған пациенттер',
+    dental_panel_start_visit: 'Қабылдауды бастау',
+    dental_panel_start_visit_for: 'Қабылдауды бастау: {name}, талон №{number}',
+    dental_panel_start_visit_failed: 'Қабылдауды бастау мүмкін болмады. Қайталап көріңіз немесе кезек күйін тексеріңіз.',
     dental_panel_patient_default: 'Пациент',
     dental_panel_discount_repeat: 'Повторный',
     dental_panel_discount_benefit: 'Льготный',
