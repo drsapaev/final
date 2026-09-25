@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import desc, func, or_
+from sqlalchemy import ColumnElement, and_, desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.file_system import (
@@ -35,6 +35,35 @@ from app.schemas.file_system import (
 )
 
 # ===================== ФАЙЛЫ =====================
+
+
+def file_tags_exclusion_predicate(
+    model: type[File], exclude_tags: Sequence[str]
+) -> ColumnElement[bool]:
+    """SQL-предикат «в tags нет ни одного из exclude_tags» (exact-token match).
+
+    ``File.tags`` хранит JSON-документ в Text-колонке, поэтому наивный
+    ``column.contains(tag)`` вырождается в substring-поиск: обычный
+    пользовательский тег ``"dental-media:v1-backup"`` ошибочно получал бы
+    классификацию protected-строки на list/search, хотя item-level
+    ``FileSystemService.protected_domain_tag()`` после парсинга JSON требует
+    точного вхождения тега. Сопоставление закавыченного JSON-токена
+    (``json.dumps(tag)`` — ровно тот вид, в каком CRUD сериализует теги)
+    прижимает предикат к точному членству тега и делает запросную
+    классификацию согласованной с item-классификацией: у одного файла — одна
+    классификация на всех поверхностях. Тот же паттерн ``%"<tag>"%`` уже
+    использует специализированная dental-поверхность при выборке своих строк.
+
+    NULL-теги не защищены — предикат пропускает строки без тегов. На диалектах
+    с регистронезависимым LIKE (SQLite) рассинхрон возможен только в
+    fail-closed сторону: скрыть чуть больше, но никогда не показать
+    защищённую строку на generic-поверхности.
+    """
+    tags_column = model.tags
+    not_protected = [
+        ~tags_column.contains(json.dumps(tag), autoescape=True) for tag in exclude_tags
+    ]
+    return or_(tags_column.is_(None), and_(*not_protected))
 
 
 class CRUDFile:
@@ -111,8 +140,11 @@ class CRUDFile:
         # Protected-domain boundary: tagged clinical rows (e.g. dental-media)
         # are excluded at the query level — BEFORE pagination — so the page,
         # and any consumer-side totals, stay consistent with the boundary.
-        for tag in exclude_tags or ():
-            query = query.filter(or_(File.tags.is_(None), ~File.tags.contains(tag)))
+        # Exact-token predicate: см. file_tags_exclusion_predicate().
+        if exclude_tags:
+            query = query.filter(
+                file_tags_exclusion_predicate(self.model, exclude_tags)
+            )
 
         return query.order_by(desc(File.created_at)).offset(skip).limit(limit).all()
 
@@ -161,8 +193,9 @@ class CRUDFile:
         # Protected-domain boundary: tagged clinical rows (e.g. dental-media)
         # are excluded at the query level — BEFORE count/pagination/facets —
         # so total/pages stay consistent with the generic-surface boundary.
-        for tag in exclude_tags or ():
-            query = query.filter(or_(File.tags.is_(None), ~File.tags.contains(tag)))
+        # Exact-token predicate: см. file_tags_exclusion_predicate().
+        if exclude_tags:
+            query = query.filter(file_tags_exclusion_predicate(File, exclude_tags))
 
         # Фильтр по дате
         if search_request.date_from:
@@ -192,16 +225,20 @@ class CRUDFile:
             .all()
         )
 
-        # Фасеты для фильтрации. Rows must be converted to plain serializable
-        # values: raw sqlalchemy.engine.row.Row objects break pydantic response
-        # serialization of FileSearchResponse whenever any non-deleted file
-        # exists (pre-existing latent 400 on /files/search with data present).
+        # Фасеты для фильтрации — агрегаты ОТ ТОГО ЖЕ base query, что total
+        # и страница (owner scope, поисковые фильтры, protected-domain
+        # exclusion). Отдельные запросы по всей таблице files утекали бы
+        # агрегатные метаданные чужих и защищённых строк читателям, чьи
+        # files[] корректно скоуплены. Rows must be converted to plain
+        # serializable values: raw sqlalchemy.engine.row.Row objects break
+        # pydantic response serialization of FileSearchResponse whenever any
+        # non-deleted file exists (pre-existing latent 400 on /files/search
+        # with data present).
         facets = {
             "file_types": [
                 {"file_type": row[0], "count": row[1]}
                 for row in (
-                    db.query(File.file_type, func.count(File.id))
-                    .filter(File.status != FileStatus.DELETED)
+                    query.with_entities(File.file_type, func.count(File.id))
                     .group_by(File.file_type)
                     .all()
                 )
@@ -209,8 +246,7 @@ class CRUDFile:
             "permissions": [
                 {"permission": row[0], "count": row[1]}
                 for row in (
-                    db.query(File.permission, func.count(File.id))
-                    .filter(File.status != FileStatus.DELETED)
+                    query.with_entities(File.permission, func.count(File.id))
                     .group_by(File.permission)
                     .all()
                 )

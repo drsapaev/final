@@ -782,6 +782,134 @@ def test_generic_list_and_search_exclude_protected_dental_media(
     )
 
 
+def test_search_facets_scoped_to_base_query_not_whole_table(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """Owner verdict on e7fe45cac (P2): /files/search facets (file_types,
+    permissions) must aggregate over the SAME base query as total/page —
+    non-admin owner scope, requested search filters and the protected-domain
+    exclusion — not over the whole files table. Separate unscoped aggregate
+    queries leak global metadata (counts of foreign and protected rows) to
+    readers whose files[] payload is correctly scoped."""
+    owner, owner_doctor = _make_actor(db_session, role="Doctor")
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+
+    # Protected dental media owned by the reader: image/xray + private.
+    upload = _upload(
+        client,
+        headers=_headers(owner),
+        patient_id=test_patient.id,
+        visit_id=owner_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+
+    control = client.post(
+        "/api/v1/files/upload",
+        files={
+            "file": (
+                "scoped-note.txt",
+                BytesIO(b"scoped control document"),
+                "text/plain",
+            )
+        },
+        data={"file_type": "document", "title": "scoped control"},
+        headers=_headers(owner),
+    )
+    assert control.status_code in (200, 201), control.text
+    control_id = control.json()["id"]
+
+    # Foreign ordinary image of a file_type the owner does not have: its
+    # type/permission aggregates must not surface in the owner's facets.
+    foreign, _foreign_doctor = _make_actor(db_session, role="Doctor")
+    foreign_file = client.post(
+        "/api/v1/files/upload",
+        files={
+            "file": (
+                "foreign-scan.png",
+                BytesIO(b"\x89PNG\r\n\x1a\n synthetic foreign scan"),
+                "image/png",
+            )
+        },
+        data={"file_type": "image", "title": "foreign image"},
+        headers=_headers(foreign),
+    )
+    assert foreign_file.status_code in (200, 201), foreign_file.text
+
+    search = client.post("/api/v1/files/search", json={}, headers=_headers(owner))
+    assert search.status_code == 200, search.text
+    body = search.json()
+    assert body["total"] == 1, "owner scope: only the control document"
+    assert {f["id"] for f in body["files"]} == {control_id}
+
+    # Facets must mirror the scoped result set: no "image" from the foreign
+    # file, no image/xray from the protected dental row, single "private".
+    file_types = {
+        row["file_type"]: row["count"] for row in body["facets"]["file_types"]
+    }
+    assert file_types == {"document": 1}, file_types
+    permissions = {
+        row["permission"]: row["count"] for row in body["facets"]["permissions"]
+    }
+    assert permissions == {"private": 1}, permissions
+
+
+def test_generic_surfaces_classify_tags_by_exact_token_not_substring(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """Owner verdict on e7fe45cac (P2): the protected-tag exclusion on the
+    generic list/search must be an exact-tag check, not a substring (LIKE)
+    check. A generic file whose ordinary user tag merely CONTAINS a protected
+    tag as a substring (e.g. "dental-media:v1-backup") must stay visible on
+    GET /files/ and POST /files/search and readable via GET /files/{file_id} —
+    the query-level classification must agree with the item-level
+    protected_domain_tag() classification (one classification per file)."""
+    owner, _owner_doctor = _make_actor(db_session, role="Doctor")
+
+    lookalike = client.post(
+        "/api/v1/files/upload",
+        files={
+            "file": (
+                "backup-notes.txt",
+                BytesIO(b"ordinary backup document"),
+                "text/plain",
+            )
+        },
+        data={
+            "file_type": "document",
+            "title": "backup notes",
+            "tags": "dental-media:v1-backup, year-2026",
+        },
+        headers=_headers(owner),
+    )
+    assert lookalike.status_code in (200, 201), lookalike.text
+    lookalike_id = lookalike.json()["id"]
+
+    listing = client.get("/api/v1/files/", headers=_headers(owner))
+    assert listing.status_code == 200, listing.text
+    listed_ids = {f["id"] for f in listing.json()["files"]}
+    assert lookalike_id in listed_ids, (
+        "substring exclusion misclassified a lookalike user tag as protected"
+    )
+
+    search = client.post("/api/v1/files/search", json={}, headers=_headers(owner))
+    assert search.status_code == 200, search.text
+    searched_ids = {f["id"] for f in search.json()["files"]}
+    assert lookalike_id in searched_ids, (
+        "substring exclusion misclassified a lookalike user tag as protected"
+    )
+
+    fetched = client.get(f"/api/v1/files/{lookalike_id}", headers=_headers(owner))
+    assert fetched.status_code == 200, fetched.text
+
+
 def test_superadmin_can_delete_dental_media_without_ownership(
     client: TestClient,
     db_session: Session,

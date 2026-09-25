@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.crud.file_system import file_tags_exclusion_predicate
 from app.models.file_system import FileStatus
 
 
@@ -61,10 +61,12 @@ class FileSystemApiRepository:
             query = query.filter(file_model.folder_id == folder_id)
         # Protected-domain boundary: the count must mirror the list query —
         # tagged clinical rows are excluded BEFORE count so total/pages stay
-        # consistent with the generic-surface boundary.
-        for tag in exclude_tags or ():
+        # consistent with the generic-surface boundary. Exact-token predicate
+        # (shared with crud list/search — одна классификация файла на всех
+        # поверхностях): см. file_tags_exclusion_predicate().
+        if exclude_tags:
             query = query.filter(
-                or_(file_model.tags.is_(None), ~file_model.tags.contains(tag))
+                file_tags_exclusion_predicate(file_model, exclude_tags)
             )
 
         return query.count()
