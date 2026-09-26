@@ -87,7 +87,7 @@ function PreviewTab({ draftVersion }: PreviewTabProps) {
           <FileText size={16} aria-hidden="true" />
           {pdfPending ? 'Формирую…' : 'PDF-предпросмотр (сервер)'}
         </Button>
-        <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary, #6b7280)' }}>
+        <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
           показывает сохранённую версию — сначала «Сохранить черновик»
         </span>
       </div>
