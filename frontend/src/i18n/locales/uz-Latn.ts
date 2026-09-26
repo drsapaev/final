@@ -10088,6 +10088,9 @@ const uzLatn = {
     tgs_booking_reason_scope_mismatch: 'Bu yozilish so\'rovi bog\'langan bemorga tegishli emas.',
     tgs_booking_reason_scope_required: 'Yozilishdan oldin Telegramni bemor profiliga bog\'lang.',
     tgs_booking_reason_bot_token_required: 'Telegram Mini App hali sozlanmagan.',
+    // Round-15 (owner P2): telegram_link_inactive / telegram_link_blocked
+    tgs_booking_reason_telegram_link_inactive: 'Telegram bog\'lanishingiz o\'chirilgan. Kirishni tiklash uchun klinikaga murojaat qiling.',
+    tgs_booking_reason_telegram_link_blocked: 'Telegram orqali kirish hozircha bloklangan. Klinikaga murojaat qiling.',
     tgs_date_missing: 'Sana ko\'rsatilmagan',
     tgs_cabinet: 'Kabinet',
     tgs_cabinet_missing: 'Kabinet ko\'rsatilmagan',

@@ -1202,6 +1202,27 @@ class TestMiniAppBookingRound12:
         assert by_key.get("cardio") == cardio.name_ru
         assert "retired-dept" not in by_key
 
+    def test_departments_endpoint_includes_uzbek_names(
+        self, client, db_session, test_patient
+    ):
+        # Round-15 owner P2: the uz-Latn Mini App renders the whole booking
+        # form in Uzbek, but this payload carried only `name_ru` — the
+        # department list stayed Russian. The clinic's own `name_uz` must
+        # ride along so the selector localizes per display language.
+        _add_mini_app_telegram_config(db_session)
+        chat_id = 880243
+        _link_patient_to_chat(db_session, chat_id=chat_id, patient_id=test_patient.id)
+        cardio = _seed_department(db_session, key="cardio")
+
+        response = client.post(
+            "/api/v1/telegram/mini-app/booking/departments",
+            json={"initData": _signed_mini_app_init_data(chat_id)},
+        )
+        assert response.status_code == 200, response.json()
+        rows = {row["key"]: row for row in response.json()["departments"]}
+        assert rows["cardio"]["name"] == cardio.name_ru
+        assert rows["cardio"]["name_uz"] == "Kardiologiya"
+
     def test_create_revalidates_department_under_lock(
         self, client, db_session, test_patient, test_doctor, monkeypatch
     ):

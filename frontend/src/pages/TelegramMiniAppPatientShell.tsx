@@ -228,9 +228,24 @@ function createMiniAppAppointmentPreviewForm() {
 // Round-14 (owner P1, PR-3386 merge review): reference rows for the
 // department selector on THIS shell — the actual Telegram /book surface
 // (PATIENT_BOOKING_ENTRY_ROUTE → /telegram/mini-app/patient?section=appointments).
+// Round-15 (owner P2): the payload carries the clinic's own `name_uz`
+// alongside the Russian-first `name`, so the uz-Latn selector renders in
+// the same language as the rest of the form (falls back to `name` when
+// the clinic row has no Uzbek name).
 interface MiniAppDepartmentOption {
   key: string;
   name: string;
+  name_uz?: string | null;
+}
+
+// Round-15 (owner P2): selector display name follows the shell display
+// language (ru | uz-Latn); `name` stays the Russian-first default and is
+// what the registrar-facing desiredService text keeps using.
+function miniAppDepartmentDisplayName(department: MiniAppDepartmentOption, languageCode: string) {
+  if (normalizeMiniAppLanguage(languageCode) !== MINI_APP_LANGUAGE_UZ) {
+    return department.name;
+  }
+  return department.name_uz || department.name;
 }
 
 // Round-14: form.department now holds the canonical Department.key picked
@@ -365,6 +380,11 @@ const MINI_APP_BOOKING_REASON_I18N_KEYS: Record<string, string> = {
   patient_scope_mismatch: 'bookingReasonScopeMismatch',
   patient_scope_required: 'bookingReasonScopeRequired',
   telegram_link_required: 'bookingReasonScopeRequired',
+  // Round-15 (owner P2): the Telegram link can be deactivated/blocked
+  // AFTER the manifest loaded — preview/create then answer 403 with these
+  // reasons; they must not reach the patient as raw machine codes.
+  telegram_link_inactive: 'bookingReasonTelegramLinkInactive',
+  telegram_link_blocked: 'bookingReasonTelegramLinkBlocked',
   bot_token_required: 'bookingReasonBotTokenRequired',
   auth_date_expired: 'sessionExpired',
   hash_mismatch: 'sessionExpired',
@@ -790,6 +810,12 @@ function TelegramMiniAppPatientShell() {
         if (!isMounted) return;
         setBookingDepartmentOptions([]);
         setBookingDepartmentsUnavailable(true);
+        // Round-15 (owner P2): the refetch failure empties the selector
+        // (placeholder shows) — a previously selected key would keep
+        // riding along in the preview/create payload while the UI claims
+        // "можно без отделения". Clear it so form state and the visible
+        // selector never diverge.
+        setAppointmentPreviewForm((prev) => (prev.department ? { ...prev, department: '' } : prev));
       });
     return () => {
       isMounted = false;
@@ -1859,7 +1885,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                           { value: '', label: t('departmentNone') },
                           ...bookingDepartmentOptions.map((department) => ({
                             value: department.key,
-                            label: department.name,
+                            label: miniAppDepartmentDisplayName(department, languageCode),
                           })),
                         ]}
                         onValueChange={(value) => handleAppointmentPreviewFieldChange('department')({ target: { value: String(value) } })}

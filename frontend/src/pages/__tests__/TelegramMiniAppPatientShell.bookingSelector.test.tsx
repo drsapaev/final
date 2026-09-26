@@ -17,8 +17,17 @@
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import i18n from '../../i18n';
+
+// The uz-Latn bundle loads lazily and the i18n singleton is shared between
+// test files inside one worker — drop it afterwards so the
+// "unused locale resources stay unloaded" invariant pinned by
+// src/i18n/__tests__/adapter.test.ts keeps holding.
+afterAll(() => {
+  i18n.removeResourceBundle('uz-Latn', 'translation');
+});
 
 const { apiPost } = vi.hoisted(() => ({ apiPost: vi.fn() }));
 
@@ -49,6 +58,17 @@ const departmentRows = [
   { key: 'cardio', name: 'Кардиология' },
   { key: 'derma', name: 'Дерматология' },
 ];
+
+// Round-15 (owner P2): the payload must carry the clinic's own Uzbek name
+// so the uz-Latn selector is not stuck on Russian labels.
+const departmentRowsUz = [
+  { key: 'cardio', name: 'Кардиология', name_uz: 'Kardiologiya' },
+];
+
+const uzManifest = {
+  ...linkedManifest,
+  language: { code: 'uz' },
+};
 
 function routeApiPostByUrl(url: string, body: Record<string, any>) {
   if (url === MANIFEST_URL) {
@@ -111,10 +131,10 @@ function renderBookSurface(search: string) {
   );
 }
 
-async function selectDepartmentByName(label: string) {
+async function selectDepartmentByName(label: string, triggerLabel = 'Отделение') {
   // The custom Select renders a trigger button associated to the visible
   // label ('Отделение'), then a portal listbox with role="option" rows.
-  const trigger = await screen.findByLabelText('Отделение');
+  const trigger = await screen.findByLabelText(triggerLabel);
   fireEvent.click(trigger);
   const option = await screen.findByRole('option', { name: label });
   fireEvent.click(option);
@@ -186,6 +206,79 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
       expect(apiPost).toHaveBeenCalledWith(
         PREVIEW_URL,
         expect.objectContaining({ department: 'cardio' }),
+        expect.anything(),
+      );
+    });
+  });
+
+  it('shows the Uzbek department name on the uz-Latn UI — label comes from the payload name_uz (round-15 P2)', async () => {
+    // The uz-Latn bundle loads on demand (documented fallback uz-Latn → ru);
+    // an Uzbek booking form assumes the bundle is present — the observed
+    // divergence is that the SELECTOR stayed Russian even then.
+    await i18n.loadLanguages('uz-Latn');
+    (window as unknown as { Telegram?: unknown }).Telegram = {
+      WebApp: { initData: 'test-init-data-payload' },
+    };
+    apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === MANIFEST_URL) return Promise.resolve({ data: uzManifest });
+      if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRowsUz } });
+      if (url === PREVIEW_URL) return routeApiPostByUrl(PREVIEW_URL, body);
+      return Promise.resolve({ data: {} });
+    });
+
+    renderBookSurface('?section=appointments');
+
+    // The uz-Latn form must list the clinic's own Uzbek name — not the
+    // Russian label — while still submitting the canonical key.
+    await selectDepartmentByName("Kardiologiya", "Bo'lim");
+    expect(screen.getByLabelText("Bo'lim")).toHaveTextContent('Kardiologiya');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Qoralamani tekshirish' }));
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith(
+        PREVIEW_URL,
+        expect.objectContaining({ department: 'cardio' }),
+        expect.anything(),
+      );
+    });
+  });
+
+  it('clears a stale selected department when the reference refetch fails after a section switch (round-15 P2)', async () => {
+    (window as unknown as { Telegram?: unknown }).Telegram = {
+      WebApp: { initData: 'test-init-data-payload' },
+    };
+    let departmentsCalls = 0;
+    apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
+      if (url === DEPARTMENTS_URL) {
+        departmentsCalls += 1;
+        if (departmentsCalls >= 2) {
+          return Promise.reject({ response: { status: 503, data: { detail: { reason: 'bot_token_required' } } } });
+        }
+        return Promise.resolve({ data: { departments: departmentRows } });
+      }
+      if (url === PREVIEW_URL) return routeApiPostByUrl(PREVIEW_URL, body);
+      return Promise.resolve({ data: {} });
+    });
+
+    renderBookSurface('?section=appointments');
+    await selectDepartmentByName('Кардиология');
+
+    // Leave the booking section (the departments effect is gated to
+    // appointments, so no refetch happens there) and come back — the shell
+    // refetches the reference list and the second attempt fails (503). The
+    // selector renders empty/placeholder now, so the payload must NOT
+    // silently carry the previously selected key.
+    fireEvent.click(screen.getByLabelText('Открытый раздел: Визиты'));
+    fireEvent.click(screen.getByLabelText('Открытый раздел: Запись'));
+    await waitFor(() => expect(departmentsCalls).toBe(2));
+
+    await screen.findByText('Список отделений сейчас недоступен — можно отправить заявку без отделения.');
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith(
+        PREVIEW_URL,
+        expect.objectContaining({ department: undefined }),
         expect.anything(),
       );
     });
@@ -268,6 +361,46 @@ describe('TelegramMiniAppPatientShell patient-safe booking errors (P2, round-14)
       expect(screen.getByText('Этот врач сейчас недоступен для записи. Выберите другого врача.')).toBeInTheDocument();
     });
     expect(screen.queryByText(/doctor_not_eligible/)).not.toBeInTheDocument();
+  });
+
+  it('maps preview telegram_link_inactive to the patient-safe wording instead of the machine reason (round-15 P2)', async () => {
+    apiPost.mockImplementation((url: string, _body: Record<string, any>) => {
+      if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
+      if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
+      if (url === PREVIEW_URL) return rejectWithReason(403, 'telegram_link_inactive');
+      return Promise.resolve({ data: {} });
+    });
+
+    renderBookSurface('?section=appointments');
+    await screen.findByLabelText('Отделение');
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Ваша привязка к Telegram отключена. Свяжитесь с клиникой, чтобы восстановить доступ.')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/telegram_link_inactive/)).not.toBeInTheDocument();
+  });
+
+  it('maps create telegram_link_blocked to the patient-safe wording instead of the machine reason (round-15 P2)', async () => {
+    apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
+      if (url === DEPARTMENTS_URL) return Promise.resolve({ data: { departments: departmentRows } });
+      if (url === PREVIEW_URL) return routeApiPostByUrl(PREVIEW_URL, body);
+      if (url === CREATE_URL) return rejectWithReason(403, 'telegram_link_blocked');
+      return Promise.resolve({ data: {} });
+    });
+
+    renderBookSurface('?section=appointments');
+    await screen.findByLabelText('Отделение');
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
+
+    const createButton = await screen.findByRole('button', { name: 'Отправить заявку' });
+    fireEvent.click(createButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Доступ через Telegram сейчас заблокирован. Свяжитесь с клиникой.')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/telegram_link_blocked/)).not.toBeInTheDocument();
   });
 
   it('keeps the reason visible for genuinely unknown backend codes (diagnostics preserved)', async () => {

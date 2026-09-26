@@ -10220,6 +10220,9 @@ const ru = {
     tgs_booking_reason_scope_mismatch: 'Эта заявка на запись не принадлежит привязанному пациенту.',
     tgs_booking_reason_scope_required: 'Привяжите Telegram к профилю пациента перед записью.',
     tgs_booking_reason_bot_token_required: 'Telegram Mini App ещё не настроен.',
+    // Round-15 (owner P2): telegram_link_inactive / telegram_link_blocked
+    tgs_booking_reason_telegram_link_inactive: 'Ваша привязка к Telegram отключена. Свяжитесь с клиникой, чтобы восстановить доступ.',
+    tgs_booking_reason_telegram_link_blocked: 'Доступ через Telegram сейчас заблокирован. Свяжитесь с клиникой.',
     tgs_date_missing: 'Дата не указана',
     tgs_cabinet: 'Кабинет',
     tgs_cabinet_missing: 'Кабинет не указан',

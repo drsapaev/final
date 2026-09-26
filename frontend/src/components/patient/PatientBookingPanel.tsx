@@ -34,6 +34,9 @@ interface BookingCreatedResponse {
 interface BookingDepartmentOption {
   key: string;
   name: string;
+  // Round-15 (owner P2): clinic's own Uzbek name — uz-Latn UI renders the
+  // selector in the same language as the rest of the form.
+  name_uz?: string | null;
 }
 
 /**
@@ -55,7 +58,10 @@ interface BookingDepartmentOption {
  * («Кардиология») после PR получал бы 400 department_unknown.
  */
 function PatientBookingPanel() {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT, language } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  // Round-15 (owner P2): follow the same display-language contract as the
+  // shell selector — uz locales show the clinic's own name_uz when present.
+  const isUzDisplayLanguage = String(language || '').trim().toLowerCase().startsWith('uz');
   const [bookingForm, setBookingForm] = useState(() => ({
     appointmentDate: getDefaultAppointmentDate(),
     appointmentTime: '',
@@ -203,7 +209,7 @@ function PatientBookingPanel() {
               { value: '', label: t('patient.pat_book_option_no_department') },
               ...departmentOptions.map((department) => ({
                 value: department.key,
-                label: department.name,
+                label: isUzDisplayLanguage ? (department.name_uz || department.name) : department.name,
               })),
             ]}
             onValueChange={(value) => handleChange('department', String(value))}
