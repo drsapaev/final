@@ -50,6 +50,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 import psycopg
@@ -58,7 +59,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-SCRATCH_DB = "rq16c_check"
+SCRATCH_DB_PREFIX = "rq16c_check"
+SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 # The head pin advances with the chain (established pattern: #3306
 # advanced the 0067-era pins; the RQ-15.d repair chains 0069 above the
 # 0068 registry revision — owner directive trace 1a0aef280204950d).
@@ -72,6 +74,8 @@ SCRATCH_DB = "rq16c_check"
 EXPECTED_HEAD = "0074_join_payload_binding"
 
 sys.path.insert(0, str(BACKEND_DIR))
+
+from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
 
 pytestmark = pytest.mark.integration
 
@@ -87,7 +91,12 @@ def _candidate_admin_urls() -> list[str]:
         urls.append(f"postgresql://postgres:{local_pw}@localhost:5432/postgres")
     env_url = os.getenv("DATABASE_URL", "").strip()
     if env_url:
-        urls.append(env_url)
+        # PR #3468 audit P1: DATABASE_URL is usable for scratch
+        # provisioning only when EVERY endpoint it can reach (netloc host,
+        # ?host= / ?hostaddr= failover lists) is local — a remote DSN must
+        # never receive CREATE/DROP DATABASE.
+        if is_local_admin_dsn(env_url):
+            urls.append(env_url)
     return urls
 
 
@@ -155,16 +164,29 @@ def pg_env():
 
     psycopg_dsn, sa_url = _scratch_urls(admin_url)
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        # No pre-drop: the run-unique name cannot pre-exist (a collision would
+        # take 2**48 parallel runs), and dropping a fixed name unconditionally
+        # is exactly the cross-run hazard this fixture used to carry.
         c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
-    r = _run_alembic(sa_url, "upgrade", "head")
-    assert r.returncode == 0, r.stderr[-1500:]
+    # PR #3468 audit P2: a scratch database now EXISTS on the admin server;
+    # teardown must run on every exit path — a pre-yield alembic failure
+    # included — because the run-unique name can no longer be swept by the
+    # next run (the old fixed-name pre-drop used to).
+    try:
+        r = _run_alembic(sa_url, "upgrade", "head")
+        assert r.returncode == 0, r.stderr[-1500:]
 
-    yield sa_url, psycopg_dsn
-
-    with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        yield sa_url, psycopg_dsn
+    finally:
+        with psycopg.connect(admin_url, autocommit=True) as c:
+            # Cleanup touches ONLY the run-unique database this process created;
+            # WITH (FORCE) clears lingering connections (PG 13+), falling back
+            # to the plain form on older servers.
+            try:
+                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+            except psycopg.errors.SyntaxError:
+                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
 
 
 @pytest.fixture(scope="module")
