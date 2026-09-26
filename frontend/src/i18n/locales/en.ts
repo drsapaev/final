@@ -2815,7 +2815,7 @@ const en = {
     dept_err_name_required: 'Название обязательно и должно быть длиннее 2 символов',
     dept_err_key_required: 'Ключ обязателен',
     dept_err_key_duplicate: 'Отделение с таким ключом уже существует',
-    dept_err_key_pattern: 'Ключ: только строчные латинские буквы, цифры и «_», начинается с буквы, до 50 символов',
+    dept_err_key_pattern: 'Key: only lowercase Latin letters, digits and "_", must start with a letter, up to 50 characters',
     dept_err_fix_form: 'Исправьте ошибки в форме',
     dept_created_synced: 'Отделение создано и синхронизировано',
     dept_create_failed: 'Не удалось создать отделение',
