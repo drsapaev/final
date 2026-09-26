@@ -88,9 +88,11 @@ def _scratch_url(admin_url: str) -> tuple[str, str]:
     and unix-socket (?host=/dir) admin DSNs alike.
     """
     u = make_url(admin_url)
+    psycopg_dsn = u.set(drivername="postgresql", database=SCRATCH_DB)
+    sa_url = u.set(drivername="postgresql+psycopg", database=SCRATCH_DB)
     return (
-        str(u.set(drivername="postgresql", database=SCRATCH_DB)),
-        str(u.set(drivername="postgresql+psycopg", database=SCRATCH_DB)),
+        psycopg_dsn.render_as_string(hide_password=False),
+        sa_url.render_as_string(hide_password=False),
     )
 
 
