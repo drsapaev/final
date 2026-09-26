@@ -1,0 +1,162 @@
+/* DermaVisitGallery — галерея фото текущего визита (пункт 8 плана аудита).
+ * Только токены дизайн-системы (--mac-*), без хардкода цветов. */
+
+.derma-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-4);
+}
+
+.derma-gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--mac-spacing-3);
+}
+
+.derma-gallery-title {
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+  margin: 0;
+}
+
+.derma-gallery-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-3);
+  flex-wrap: wrap;
+}
+
+.derma-gallery-categories {
+  display: inline-flex;
+  gap: var(--mac-spacing-2);
+}
+
+.derma-gallery-chip {
+  border: 1px solid var(--mac-border);
+  background: var(--mac-background-secondary);
+  color: var(--mac-text-primary);
+  border-radius: var(--mac-radius-full);
+  padding: var(--mac-spacing-1) var(--mac-spacing-3);
+  font-size: var(--mac-font-size-sm);
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.derma-gallery-chip:hover:not(:disabled) {
+  background: var(--mac-card-hover-bg);
+}
+
+.derma-gallery-chip-active,
+.derma-gallery-chip[aria-pressed='true'] {
+  background: var(--mac-accent);
+  border-color: var(--mac-accent);
+  color: var(--mac-text-on-accent);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+.derma-gallery-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.derma-gallery-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  border: 1px solid var(--mac-border);
+  background: var(--mac-background-secondary);
+  color: var(--mac-text-primary);
+  border-radius: var(--mac-radius-md);
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  font-size: var(--mac-font-size-sm);
+  cursor: pointer;
+}
+
+.derma-gallery-upload-btn:hover:not(:disabled) {
+  background: var(--mac-card-hover-bg);
+}
+
+.derma-gallery-upload-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.derma-gallery-file-input {
+  display: none;
+}
+
+.derma-gallery-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mac-spacing-2);
+  padding: var(--mac-spacing-6) var(--mac-spacing-4);
+  color: var(--mac-text-secondary);
+  border: 1px dashed var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  text-align: center;
+}
+
+.derma-gallery-state p {
+  margin: 0;
+  font-size: var(--mac-font-size-sm);
+}
+
+.derma-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--mac-spacing-3);
+}
+
+.derma-gallery-item {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--mac-radius-md);
+  overflow: hidden;
+  border: 1px solid var(--mac-border);
+  background: var(--mac-background-secondary);
+}
+
+.derma-gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.derma-gallery-item-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mac-text-tertiary);
+}
+
+.derma-gallery-delete {
+  position: absolute;
+  top: var(--mac-spacing-2);
+  right: var(--mac-spacing-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--mac-radius-full);
+  background: var(--mac-danger);
+  color: var(--mac-text-on-accent);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.derma-gallery-item:hover .derma-gallery-delete,
+.derma-gallery-delete:focus-visible {
+  opacity: 1;
+}

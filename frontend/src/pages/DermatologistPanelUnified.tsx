@@ -20,7 +20,7 @@ import QueueIntegration from '../components/QueueIntegration';
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import DermaExamsTab from '../components/dermatology/DermaExamsTab';
 import DermaPatientsTab from '../components/dermatology/DermaPatientsTab';
-import DermaPhotosTab from '../components/dermatology/DermaPhotosTab';
+import DermaVisitGallery from '../components/dermatology/DermaVisitGallery';
 import { useDermatologyPatientHistory } from './useDermatologyPatientHistory';
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
@@ -370,8 +370,7 @@ const DermatologistPanelUnified = () => {
   });
 
   const [showCosmeticForm, setShowCosmeticForm] = useState(false);
-  // D-001 fix: photoData now receives state from PhotoUploader via onDataUpdate callback
-  const [photoData, setPhotoData] = useState<{ before: unknown[]; after: unknown[] }>({ before: [], after: [] });
+
 
   // Дополнительные состояния из старого файла
   const [currentAppointment, setCurrentAppointment] = useState<DermatologyPatient | null>(null);
@@ -1493,6 +1492,15 @@ const DermatologistPanelUnified = () => {
                   </div>
                 )}
 
+                {/* Фото визита — /files единственный источник (пункт 8 аудита) */}
+                {currentAppointment.patient_id && currentAppointment.visit_id && (
+                  <div className="derma-mt-24">
+                    <DermaVisitGallery
+                      patientId={currentAppointment.patient_id}
+                      visitId={currentAppointment.visit_id} />
+                  </div>
+                )}
+
                 {/* Система рецептов */}
                 {emr && !emr.is_draft &&
               <div className="derma-mt-24">
@@ -1551,20 +1559,6 @@ const DermatologistPanelUnified = () => {
             </Card>
           }
 
-          {/* Фото — R-15: extracted to DermaPhotosTab */}
-          {activeTab === 'photos' &&
-            <DermaPhotosTab
-              hasPatient={!!(currentAppointment || selectedPatient)}
-              currentAppointment={currentAppointment as unknown as never}
-              selectedPatient={selectedPatient as unknown as never}
-              photoData={photoData as unknown as never}
-              onPhotoUpdate={(updatedPhotos) => {
-                if (updatedPhotos) setPhotoData(updatedPhotos as { before: unknown[]; after: unknown[] });
-                loadPatientData();
-              }}
-              onGoToAppointments={() => handleTabChange('patients')}
-            />
-          }
           {activeTab === 'ai' &&
           <AIAssistant
             specialty="dermatology"
