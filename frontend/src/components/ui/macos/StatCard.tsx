@@ -209,27 +209,27 @@ const MacOSStatCard = ({
   const renderLoading = () => (
     <div style={cardStyle} aria-busy="true">
       <div style={headerStyle}>
-        <div style={{ 
+        <div aria-hidden="true" style={{
           width: '60%', 
           height: '16px', 
           background: 'var(--mac-bg-tertiary)', 
           borderRadius: 'var(--mac-radius-sm)' 
         }} />
-        <div style={{ 
+        <div aria-hidden="true" style={{
           width: '24px', 
           height: '24px', 
           background: 'var(--mac-bg-tertiary)', 
           borderRadius: '50%' 
         }} />
       </div>
-      <div style={{ 
+      <div aria-hidden="true" style={{
         width: '80%', 
         height: '32px', 
         background: 'var(--mac-bg-tertiary)', 
         borderRadius: 'var(--mac-radius-sm)',
         marginBottom: '8px'
       }} />
-      <div style={{ 
+      <div aria-hidden="true" style={{
         width: '40%', 
         height: '12px', 
         background: 'var(--mac-bg-tertiary)', 
