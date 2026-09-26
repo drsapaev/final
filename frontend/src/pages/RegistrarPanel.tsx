@@ -27,6 +27,7 @@ import { useRegistrarDialogs } from './registrar/useRegistrarDialogs';
 import { useRegistrarWizard } from './registrar/useRegistrarWizard';
 import WorklistView from './registrar/views/WorklistView';
 import { useRegistrarNavigation } from './registrar/useRegistrarNavigation';
+import { useRegistrarDoctorWorklistFacts } from './registrar/useRegistrarDoctorWorklistFacts';
 import { useRegistrarCalendar } from './registrar/useRegistrarCalendar';
 import { useRegistrarRowActions } from './registrar/useRegistrarRowActions';
 import RegistrarBreadcrumb from './registrar/views/RegistrarBreadcrumb';
@@ -147,6 +148,8 @@ const RegistrarPanel = () => {
     navigate,
     activeTab,
     setActiveTab,
+    activeDoctorId,
+    setActiveDoctorId,
     clearStatusFilter,
     currentView,
     searchQuery,
@@ -158,8 +161,6 @@ const RegistrarPanel = () => {
     setWizardInitialData,
   });
 
-  // Worklist header labels (moved after nav wiring — PR-UI-13-5).
-  const currentWorklistLabel = resolveRegistrarTabLabel(activeTab, queueProfiles, (key) => tI18n('registrarPanel.' + key));
   const statusFilterLabel = statusFilter ? tI18n('registrarPanel.' + (REGISTRAR_STATUS_LABEL_KEYS[statusFilter as keyof typeof REGISTRAR_STATUS_LABEL_KEYS] || statusFilter)) : null;
 
   // Legacy aliases over the consolidated reschedule slice { open, data }.
@@ -252,17 +253,18 @@ const RegistrarPanel = () => {
     () => computeDepartmentStats(appointments, todayStr, queueProfiles),
     [appointments, todayStr, queueProfiles],
   );
+  const { selectedDoctorLabel, doctorStats, doctorCountLabel } = useRegistrarDoctorWorklistFacts({
+    appointments, doctors, activeDoctorId, showCalendar, historyDate,
+    urlDate: searchParams.get('date'), todayStr, tI18n,
+  });
+  const currentWorklistLabel = selectedDoctorLabel || resolveRegistrarTabLabel(activeTab, queueProfiles, (key) => tI18n('registrarPanel.' + key));
   // View-model rows (PR-UI-13-2: pure functions in registrarWorklistRows.ts;
   // memo deps preserve the original recompute triggers).
   const filteredAppointments = useMemo(() => computeRegistrarWorklistRows({
-    appointments,
-    activeTab,
-    statusFilter,
-    searchQuery,
-    queueProfiles,
-    services,
+    appointments, activeTab, activeDoctorId, statusFilter, searchQuery,
+    queueProfiles, services,
     fallbackPatientLabel: tI18n('registrarPanel.rp_unknown_patient'),
-  }), [appointments, activeTab, statusFilter, searchQuery, queueProfiles, services]);
+   }), [appointments, activeTab, activeDoctorId, statusFilter, searchQuery, queueProfiles, services]);
 
   // Row action routing (PR-UI-13-5 → useRegistrarRowActions).
   const {
@@ -309,11 +311,9 @@ const RegistrarPanel = () => {
       {/* R-03 fix: breadcrumb навигация для wayfinding — extracted to
           RegistrarBreadcrumb (PR-UI-13-5). */}
       <RegistrarBreadcrumb
-        activeTab={activeTab}
-        queueProfiles={queueProfiles}
-        searchQuery={searchQuery}
-        wizardEditMode={wizardEditMode}
-        showWizard={showWizard}
+        activeTab={activeTab} activeDoctorLabel={selectedDoctorLabel}
+        queueProfiles={queueProfiles} searchQuery={searchQuery}
+        wizardEditMode={wizardEditMode} showWizard={showWizard}
         onNavigateToWelcome={() => {
           // Phase 2: navigate to canonical path (replaces legacy ?view=welcome)
           const p = new URLSearchParams(searchParams);
@@ -336,14 +336,12 @@ const RegistrarPanel = () => {
       {/* Современные вкладки */}
       {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
       <div className="registrar-tabs-wrapper">
-          <Tabs
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onProfilesLoaded={handleProfilesLoaded} // ⭐ SSOT: Store profiles for filtering
-          departmentStats={departmentStats}
-          theme={theme}
-          language={legacyLanguage}
-          dynamicDepartments={dynamicDepartments} />
+          <Tabs activeTab={activeTab} activeDoctorId={activeDoctorId}
+            onTabChange={setActiveTab} onDoctorChange={setActiveDoctorId}
+            doctors={doctors} onProfilesLoaded={handleProfilesLoaded}
+            departmentStats={departmentStats} doctorStats={doctorStats}
+            doctorCountLabel={doctorCountLabel} theme={theme}
+            language={legacyLanguage} dynamicDepartments={dynamicDepartments} />
 
         </div>
       }
@@ -415,7 +413,7 @@ const RegistrarPanel = () => {
         {/* Основная панель с записями — extracted to WorklistView (PR-UI-13-4) */}
         {(!currentView || currentView !== 'welcome' && currentView !== 'queue') &&
           <WorklistView
-            activeTab={activeTab} currentWorklistLabel={currentWorklistLabel}
+            activeTab={activeTab} activeDoctorId={activeDoctorId} currentWorklistLabel={currentWorklistLabel}
             statusFilterLabel={statusFilterLabel}
             showCalendar={showCalendar} historyDate={historyDate}
             language={language}
@@ -434,7 +432,7 @@ const RegistrarPanel = () => {
             // RQ-20.b: явный сброс активного статус-фильтра (владелец URL — useRegistrarNavigation).
             onClearStatusFilter={clearStatusFilter}
             stale={worklistStale} onRetry={() => { void loadAppointments({ silent: false, source: 'worklist_retry' }); }}
-            {...resolveRegistrarWorklistPresentationFacts({ appointments, activeTab, queueProfiles, rows: filteredAppointments as Record<string, unknown>[], hasMore: paginationInfo.hasMore })}
+             {...resolveRegistrarWorklistPresentationFacts({ appointments, activeTab, activeDoctorId, queueProfiles, rows: filteredAppointments as Record<string, unknown>[], hasMore: paginationInfo.hasMore })}
             tI18n={tI18n}
           />
         }

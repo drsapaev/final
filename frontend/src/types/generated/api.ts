@@ -52419,6 +52419,8 @@ export interface operations {
                 specialty?: string | null;
                 /** @description Только активные услуги */
                 active_only?: boolean;
+                /** @description День, для которого вычисляется владелец очереди каждой услуги (resource-routing truth); по умолчанию — сегодня. Дата важна для деактивационно-устойчивой поверхности: уже открытая ресурсная очередь дня остаётся владельцем тега */
+                target_date?: string | null;
             };
             header?: never;
             path?: never;

@@ -2,6 +2,7 @@
 
 Split from registrar_wizard.py (3533 LOC → modular).
 """
+
 from __future__ import annotations
 
 """
@@ -21,9 +22,6 @@ from sqlalchemy import String, literal  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.api.deps import get_db, require_roles  # noqa: F401
-from app.api.v1.endpoints.doctor_integration._helpers import (
-    DOCTOR_QUEUE_SPECIALTY_VARIANTS,
-)
 from app.crud import clinic as crud_clinic  # noqa: F401
 from app.crud import online_queue as crud_queue  # noqa: F401
 from app.crud.appointment import appointment as crud_appointment  # noqa: F401
@@ -44,6 +42,13 @@ from app.services.payment_provider_manager_factory import (
     get_payment_manager,  # noqa: F401
 )
 from app.services.queue_service import queue_service  # noqa: F401
+from app.services.registrar_doctor_eligibility import (  # noqa: F401
+    accepted_specialty_variants_for_department_key as _accepted_specialty_variants_for_department_key,
+)
+from app.services.registrar_doctor_eligibility import (
+    assert_doctor_eligible_for_service,
+    service_requires_doctor_selection,
+)
 from app.services.registrar_edit_delta_service import (  # noqa: F401
     RegistrarEditDeltaItem,
     RegistrarEditDeltaService,
@@ -87,6 +92,7 @@ def _ensure_visit_doctor_access(db: Session, visit: Visit, current_user: User) -
         return
 
     raise HTTPException(status_code=403, detail="Access denied")
+
 
 # ===================== СХЕМЫ ДЛЯ КОРЗИНЫ =====================
 
@@ -135,9 +141,7 @@ class CartResponse(BaseModel):
         int, list[dict]
     ]  # visit_id -> [{"queue_tag": str, "number": int, "queue_id": int}]
     print_tickets: list[dict[str, Any]]
-    created_visits: list[dict[str, Any]] | None = (
-        None  # Информация о созданных визитах
-    )
+    created_visits: list[dict[str, Any]] | None = None  # Информация о созданных визитах
 
 
 class EditDeltaPatientData(BaseModel):
@@ -185,6 +189,7 @@ class EditDeltaRequest(BaseModel):
     # сумма не может «тихо» разойтись с фактическим начислением.
     quote_token: str | None = None
 
+
 class EditDeltaResponse(BaseModel):
     success: bool
     message: str
@@ -202,7 +207,9 @@ class EditDeltaResponse(BaseModel):
 
 class MarkPaidRequest(BaseModel):
     # REG-AUDIT-28 P0-2: validate amount is positive and reasonable
-    amount: Decimal | None = Field(None, gt=0, le=Decimal("1000000000"), decimal_places=2)
+    amount: Decimal | None = Field(
+        None, gt=0, le=Decimal("1000000000"), decimal_places=2
+    )
     method: str | None = Field(default="cash")
     payment_snapshot: str | None = Field(default=None, max_length=64)
 
@@ -219,7 +226,9 @@ class RegistrarRecordActionRequest(BaseModel):
     records: list[RegistrarRecordRef] | None = None
     reason: str | None = None
     # REG-AUDIT-28 P0-2: validate amount is positive and reasonable
-    amount: Decimal | None = Field(None, gt=0, le=Decimal("1000000000"), decimal_places=2)
+    amount: Decimal | None = Field(
+        None, gt=0, le=Decimal("1000000000"), decimal_places=2
+    )
     method: str | None = Field(default="cash")
     payment_snapshot: str | None = Field(default=None, max_length=64)
 
@@ -370,32 +379,9 @@ class CartQuoteResponse(BaseModel):
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 
-def _accepted_specialty_variants_for_department_key(
-    department_key: str | None,
-) -> set[str] | None:
-    """Набор допустимых специальностей врача для department_key услуги.
-
-    RQ-05.a: серверная сторона фильтра ``filterDoctorsForService`` (wizard
-    UI, W2-PR2). SSOT — DOCTOR_QUEUE_SPECIALTY_VARIANTS (doctor_integration):
-    фронтовая SPECIALTY_ALIASES сознательно выровнена с этой таблицей, поэтому
-    сервер зеркалирует ЕЁ семантику, а не изобретает отдельный маппинг:
-    - ключ ищется РЕВЕРСИВНО: "dental" не является ключом таблицы, но входит
-      в варианты канона "dentistry" (подстрочный матч здесь запрещён так же,
-      как на фронте — он отбрасывал валидные пары dental/dentistry);
-    - пара вне таблицы → точное совпадение (канон = сам ключ);
-    - None/пустой ключ → None (проверка специальности неприменима).
-    """
-    key = (department_key or "").strip().lower()
-    if not key:
-        return None
-    for variants in DOCTOR_QUEUE_SPECIALTY_VARIANTS.values():
-        lowered = {v.strip().lower() for v in variants}
-        if key in lowered:
-            return lowered
-    return {key}
-
-
-def _assert_cart_doctor_eligibility(db: Session, visits: list[Any]) -> None:
+def _assert_cart_doctor_eligibility(
+    db: Session, visits: list[Any], *, doctor_map: dict[int, Doctor] | None = None
+) -> None:
     """RQ-05.a: серверная валидация допустимости врача при записи в корзину.
 
     E-023 трассировка: requires_doctor на пути сохранения корзины не
@@ -406,14 +392,16 @@ def _assert_cart_doctor_eligibility(db: Session, visits: list[Any]) -> None:
     advisory-замков и первой записи корзины: отклонённая корзина не
     оставляет частичного состояния и не участвует в lock-ordering.
 
-    Семантика зеркалирует фронтовый filterDoctorsForService (W2-PR2):
-    - услуга с requires_doctor=true требует doctor_id на визите;
+    Семантика зеркалирует каталог регистратуры:
+    - услуга с requires_doctor=true или is_consultation=true требует врача;
     - врач обязан существовать и быть активным;
     - при наличии у услуги department_key специальность врача сверяется
       с SSOT-таблицей вариантов; услуги без department_key специальность
-      не проверяют (существующие тесты/данные key не заполняют), а врач
-      с пустой специальностью проходит «как раньше» — фронт таких врачей
-      тоже показывает.
+      не проверяют (существующие тесты/данные key не заполняют).
+
+    ``doctor_map`` — внешний снапшот докторов (используется locked-
+    ревалидацией P1-2 ниже); отсутствие id в мапе трактуется как 404 —
+    между первой проверкой и ревалидацией строка могла быть удалена.
     """
     service_ids = sorted(
         {item.service_id for visit in visits for item in visit.services}
@@ -424,60 +412,134 @@ def _assert_cart_doctor_eligibility(db: Session, visits: list[Any]) -> None:
     service_map = {service.id: service for service in services}
 
     doctor_ids = sorted({visit.doctor_id for visit in visits if visit.doctor_id})
-    doctor_map: dict[int, Doctor] = {}
-    if doctor_ids:
+    resolved_map: dict[int, Doctor] = doctor_map or {}
+    if doctor_ids and doctor_map is None:
         doctors = db.query(Doctor).filter(Doctor.id.in_(doctor_ids)).all()
-        doctor_map = {doctor.id: doctor for doctor in doctors}
+        resolved_map = {doctor.id: doctor for doctor in doctors}
 
     for visit in visits:
         required = [
             service
             for item in visit.services
             if (service := service_map.get(item.service_id)) is not None
-            and service.requires_doctor
+            and service_requires_doctor_selection(service)
         ]
         if not required:
             continue
-        if not visit.doctor_id:
-            names = ", ".join(sorted({s.name for s in required}))
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Услуга ({names}) требует выбора врача: "
-                    "сохранение визита без врача недоступно"
-                ),
-            )
-        doctor = doctor_map.get(visit.doctor_id)
-        if doctor is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Врач с ID {visit.doctor_id} не найден",
-            )
-        if not doctor.active:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Выбранный врач (ID {doctor.id}) неактивен: "
-                    "выберите действующего врача"
-                ),
-            )
-        doctor_specialty = (doctor.specialty or "").strip().lower()
-        if not doctor_specialty:
-            continue
         for service in required:
-            accepted = _accepted_specialty_variants_for_department_key(
-                service.department_key
+            assert_doctor_eligible_for_service(
+                db,
+                service,
+                visit.doctor_id,
+                doctor_map=resolved_map,
+                target_date=visit.visit_date,
             )
-            if accepted is None or doctor_specialty in accepted:
+
+
+def _revalidate_cart_doctor_eligibility_locked(
+    db: Session, visits: list[Any], *, max_attempts: int = 3
+) -> None:
+    """PR #3438 review P1-2 (+ round-2 P1): атомарная eligibility врача.
+
+    Первый вызов ``_assert_cart_doctor_eligibility`` читает Doctor/User
+    обычным SELECT — между проверкой и единственным коммитом корзины
+    успевает закоммититься деактивация/понижение врача (admin), и корзина
+    создаёт Visit/QueueEntry уже неактивному или переведённому врачу.
+
+    Фикс — перечитывание под row-lock'ами ПОСЛЕ (day, tag) prelock-ов и ДО
+    первого INSERT, в ГЛОБАЛЬНОМ порядке ``User → Doctor``:
+
+    1. pre-read связки ``Doctor.id → Doctor.user_id`` (без локов — набор
+       владельцев для User-лока можно вычислить только по текущей карте);
+    2. ``User FOR SHARE`` (sorted user_id);
+    3. ``Doctor FOR SHARE`` (sorted doctor_id);
+    4. re-check связки под Doctor-локом.
+
+    Round-2 P1 (AB-BA): порядок обязан совпадать с каноническим
+    ``UserManagementService.update_user`` — ``lock_user_candidate_state``
+    берёт ``users FOR UPDATE``, затем деактивация/понижение зеркалируется
+    ``_sync_doctor_active`` в ``UPDATE doctors``. Прежний порядок
+    ``Doctor → User`` давал живой deadlock: корзина держит Doctor FOR
+    SHARE и ждёт User FOR SHARE, admin держит User FOR UPDATE и ждёт
+    UPDATE doctors → SQLSTATE 40P01. Порядок ``users → user_profiles →
+    phone advisory`` из patient_phone_scope остаётся префиксом: наш User
+    FOR SHARE следует тому же users-первым правилу.
+
+    Re-check связки: re-link владельца (``doctors.user_id`` сменился
+    между pre-read и Doctor-локом, напр. detach_owner при удалении
+    аккаунта) оставил бы НОВОГО владельца незаблокированным — даём
+    ограниченное число повторов на свежей карте; при исчерпании — 409
+    (регистратор просто повторяет сохранение).
+
+    - concurrent eligibility-changing UPDATE (Doctor.active/specialty,
+      User.is_active/role) блокируется до коммита корзины;
+    - уже закоммиченное изменение ВИДИМО ревалидации → корзина
+      отклонена, ни одного Visit/Invoice/QueueEntry;
+    - FOR SHARE совместим с FK KEY-SHARE визитов; advisory (day, tag)
+      prelock'и остаются ПЕРВЫМИ — инверсии против GraphQL joinQueue нет.
+
+    SQLite (тесты): with_for_update — no-op, семантика sequential.
+    """
+    doctor_ids = sorted({visit.doctor_id for visit in visits if visit.doctor_id})
+    if not doctor_ids:
+        return
+
+    for attempt in range(1, max_attempts + 1):
+        # Phase 1 — unlocked pre-read of the owner linkage (tuple columns:
+        # no identity-map pollution, always a fresh READ COMMITTED
+        # snapshot on retry).
+        linkage: dict[int, int | None] = dict(
+            db.query(Doctor.id, Doctor.user_id).filter(Doctor.id.in_(doctor_ids)).all()
+        )
+        owner_ids = sorted({uid for uid in linkage.values() if uid is not None})
+
+        # Phase 2 — owner User rows FOR SHARE FIRST (sorted user_id): the
+        # users -> doctors order of the canonical update_user(); locking
+        # doctors first deadlocks against a concurrent deactivate/demote.
+        owners: dict[int, User] = {}
+        if owner_ids:
+            locked_users = (
+                db.query(User)
+                .filter(User.id.in_(owner_ids))
+                .order_by(User.id)
+                .with_for_update(read=True)
+                .populate_existing()
+                .all()
+            )
+            owners = {user.id: user for user in locked_users}
+
+        # Phase 3 — Doctor rows FOR SHARE (sorted doctor_id).
+        doctors = (
+            db.query(Doctor)
+            .filter(Doctor.id.in_(doctor_ids))
+            .order_by(Doctor.id)
+            .with_for_update(read=True)
+            .populate_existing()
+            .all()
+        )
+
+        # Phase 4 — linkage re-check under the Doctor lock: a relink
+        # committed between phases 1 and 3 leaves the NEW owner unlocked.
+        if any(doctor.user_id != linkage.get(doctor.id) for doctor in doctors):
+            if attempt < max_attempts:
                 continue
             raise HTTPException(
-                status_code=400,
+                status_code=409,
                 detail=(
-                    f"Врач (ID {doctor.id}, специальность "
-                    f"«{doctor.specialty}») не подходит для услуги "
-                    f"«{service.name}» (отделение «{service.department_key}»)"
+                    "Связка врача с учётной записью изменилась во время "
+                    "сохранения: обновите страницу и повторите запись"
                 ),
             )
+
+        # Pin the relationship to the locked instances so the
+        # revalidation below reads exactly the locked snapshot, not a
+        # lazy re-load.
+        for doctor in doctors:
+            if doctor.user_id in owners:
+                doctor.user = owners[doctor.user_id]
+        locked_map = {doctor.id: doctor for doctor in doctors}
+        _assert_cart_doctor_eligibility(db, visits, doctor_map=locked_map)
+        return
 
 
 def _check_repeat_visit_eligibility(
@@ -531,7 +593,9 @@ def _resolve_effective_discount_mode(cart_data: Any) -> str:
     return cart_data.discount_mode or "none"
 
 
-def _load_registration_discount_settings(db: Session, lock_rows: bool = False) -> dict[str, Any]:
+def _load_registration_discount_settings(
+    db: Session, lock_rows: bool = False
+) -> dict[str, Any]:
     """Load repeat/benefit settings with safe defaults.
 
     Codex R4 #3095 (P1): lock_rows=True (save-time revalidation) takes row
@@ -573,7 +637,12 @@ def _load_registration_discount_settings(db: Session, lock_rows: bool = False) -
             # молча включала настройку (например, all_free_auto_approve),
             # и квота/invoice расходились в approval-статусе. Детерминированный
             # список truthy-значений.
-            settings[row.key] = str(row.value).strip().lower() in {"1", "true", "yes", "on"}
+            settings[row.key] = str(row.value).strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
 
     return settings
 
@@ -591,9 +660,9 @@ def _apply_service_discount(
     if discount_mode == "repeat" and is_consultation:
         repeat_discount = Decimal(str(settings.get("repeat_visit_discount", 0) or 0))
         repeat_discount = max(Decimal("0"), min(repeat_discount, Decimal("100")))
-        return (base_price * (Decimal("100") - repeat_discount) / Decimal("100")).quantize(
-            Decimal("0.01")
-        )
+        return (
+            base_price * (Decimal("100") - repeat_discount) / Decimal("100")
+        ).quantize(Decimal("0.01"))
 
     if discount_mode == "benefit" and is_consultation:
         if settings.get("benefit_consultation_free", True):
@@ -746,4 +815,3 @@ class InvoicePaymentResponse(BaseModel):
     payment_url: str | None = None
     provider_payment_id: str | None = None
     error_message: str | None = None
-

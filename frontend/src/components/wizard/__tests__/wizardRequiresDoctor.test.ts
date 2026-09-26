@@ -32,7 +32,7 @@ const readCartStepSource = () => fs.readFileSync(cartStepPath, 'utf8');
 const svc = (id: number | string, requiresDoctor: boolean) => ({
   id,
   name: `Service ${id}`,
-  requires_doctor: requiresDoctor,
+  doctor_selection_required: requiresDoctor,
 });
 
 const cartItem = (serviceId: number | string, doctorId?: number | string | null) => ({
@@ -98,9 +98,11 @@ describe('RQ-05.b: wizard validateStep(2) wiring (source contract)', () => {
     expect(block).not.toContain('service?.requires_doctor && !(item');
   });
 
-  it('addToCart pre-nulls doctor for flagged services (explicit missing state)', () => {
+  it('adds the chosen doctor together with the service in one cart update', () => {
     const source = readWizardSource();
-    expect(source).toContain('doctor_id: serviceFromData.requires_doctor ? null : undefined');
+    expect(source).toContain('items: addServiceToWizardCart(');
+    expect(source).toContain('serviceFromData,');
+    expect(source).toContain('doctor,');
   });
 });
 
@@ -108,23 +110,22 @@ describe('RQ-05.b: wizard validateStep(2) wiring (source contract)', () => {
 // 3. Source contract: CartStepV2 селектор врача по флагу
 // =====================================================================
 
-describe('RQ-05.b: CartStepV2 doctor selector per DTO flag (source contract)', () => {
-  it('CartService declares requires_doctor and department_key from the DTO', () => {
+describe('RQ-05.b: CartStepV2 doctor cards per DTO flag (source contract)', () => {
+  it('CartService declares doctor selection and eligibility metadata from the DTO', () => {
     const source = readCartStepSource();
     const block = source.slice(
       source.indexOf('export interface CartService'),
       source.indexOf('export interface CartDoctor')
     );
     expect(block).toContain('requires_doctor?: boolean;');
+    expect(block).toContain('doctor_selection_required?: boolean;');
     expect(block).toContain('department_key?: string;');
   });
 
-  it('renders the doctor select for doctor-requiring items and binds doctor_id', () => {
+  it('renders doctor cards and does not allow reassigning a cart row with a dropdown', () => {
     const source = readCartStepSource();
-    expect(source).toContain(
-      'const requiresDoctor = Boolean(service?.requires_doctor || service?.is_consultation);'
-    );
-    expect(source).toContain("value={item.doctor_id || ''}");
-    expect(source).toContain("onUpdateItem?.(item.id, 'doctor_id',");
+    expect(source).toContain('doctorGroups.map(({ doctor, doctorName, services }) =>');
+    expect(source).toContain('onClick={() => handleServiceToggle(service, doctor)}');
+    expect(source).not.toContain("onUpdateItem?.(item.id, 'doctor_id',");
   });
 });

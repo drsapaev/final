@@ -3647,8 +3647,10 @@ def test_full_update_independent_entry_uses_resource_floor(
         id=1,
         name="Лабораторная панель",
         queue_tag="lab",
+        department_key="laboratory",
         price=1000,
         is_consultation=False,
+        requires_doctor=False,
         service_code="LAB1",
     )
     created = _full_update_create_single_independent_entry(
@@ -3664,8 +3666,10 @@ def test_full_update_independent_entry_uses_resource_floor(
         id=2,
         name="Консультация",
         queue_tag="cardio",
+        department_key="cardiology",
         price=500,
         is_consultation=True,
+        requires_doctor=True,
         service_code="CARD1",
     )
     created_doctor = _full_update_create_single_independent_entry(
