@@ -162,6 +162,8 @@ export function useLabReportState({
   const canFinalize = hasLabReportAction(activeInstance, 'finalize');
   const canRevise = hasLabReportAction(activeInstance, 'revise');
   const canPrint = hasLabReportAction(activeInstance, 'print');
+  // PR8: серверный PDF-preview до утверждения (backend SSOT 'preview').
+  const canPreview = hasLabReportAction(activeInstance, 'preview');
 
   // ─── Derived: WF-10 missing required fields (inline-валидация) ───────────
   const missingRequiredFields = useMemo(() => {
@@ -283,6 +285,7 @@ export function useLabReportState({
     canFinalize,
     canRevise,
     canPrint,
+    canPreview,
     missingRequiredFields,
     hasMissingRequired,
     canFinalizeWithValidation,

@@ -11,6 +11,49 @@ from app.services.lab_report_pdf._base import LabReportPDFServiceMixinBase
 class ReportlabMixin(LabReportPDFServiceMixinBase):
     """Reportlab methods."""
 
+    def _draw_reportlab_watermark(self, canvas, text: str, page_size) -> None:
+        """PR8: диагональный watermark «Черновик» на одной странице.
+
+        Вызывается из onFirstPage/onLaterPages-калбэков SimpleDocTemplate —
+        по одному разу на каждую страницу, поэтому многостраничные бланки
+        помечаются целиком (паритет с WeasyPrint `position: fixed`).
+        """
+        canvas.saveState()
+        try:
+            canvas.setFontSize(64)
+            canvas.setFillColorRGB(0.42, 0.45, 0.50)
+            try:
+                # ReportLab >= 3.x: прозрачность через setFillAlpha.
+                canvas.setFillAlpha(0.16)
+            except AttributeError:  # pragma: no cover — старые сборки
+                pass
+            canvas.translate(page_size[0] / 2, page_size[1] / 2)
+            canvas.rotate(45)
+            canvas.drawCentredString(0, 0, text)
+        finally:
+            canvas.restoreState()
+
+    def _reportlab_watermark_callback(self, page_size, watermark_text: str):
+        """Калбэк страницы для doc.build(onFirstPage=..., onLaterPages=...)."""
+
+        def _on_page(canvas, doc) -> None:  # type: ignore[no-untyped-def]
+            self._draw_reportlab_watermark(canvas, watermark_text, page_size)
+
+        return _on_page
+
+    def _build_reportlab_doc(
+        self, doc, story, *, watermark_text: str | None = None
+    ) -> None:
+        """Единая точка сборки ReportLab-документа: без watermark — обычный
+        build, с watermark — калбэки на каждую страницу."""
+        if watermark_text:
+            on_page = self._reportlab_watermark_callback(
+                doc.pagesize, str(watermark_text)
+            )
+            doc.build(story, onFirstPage=on_page, onLaterPages=on_page)
+        else:
+            doc.build(story)
+
     def _render_reportlab(self, context: dict[str, Any]) -> bytes:
         if not REPORTLAB_AVAILABLE:
             raise RuntimeError(
@@ -323,7 +366,9 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
         )
         story.append(signature_table)
 
-        doc.build(story)
+        self._build_reportlab_doc(
+            doc, story, watermark_text=context.get("watermark_text")
+        )
         return buffer.getvalue()
 
 
@@ -529,7 +574,9 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
             )
         )
 
-        doc.build(story)
+        self._build_reportlab_doc(
+            doc, story, watermark_text=context.get("watermark_text")
+        )
         return buffer.getvalue()
 
 
@@ -769,7 +816,9 @@ class ReportlabMixin(LabReportPDFServiceMixinBase):
             )
         )
 
-        doc.build(story)
+        self._build_reportlab_doc(
+            doc, story, watermark_text=context.get("watermark_text")
+        )
         return buffer.getvalue()
 
 

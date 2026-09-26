@@ -17460,6 +17460,67 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lab/report-instances/{instance_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Lab Report Instance Pdf
+         * @description PR8 (codex-lab-workflow-hardening-plan): серверный A4-preview того же
+         *     движка, что финальный PDF, ДО утверждения.
+         *
+         *     Контракт:
+         *     - доступ только Admin/Lab (врач получает результат через /pdf после
+         *       finalize; preview неутверждённых бланков — лабораторная поверхность);
+         *     - рендерятся ТЕКУЩИЕ СОХРАНЕННЫЕ значения (Save Draft до preview —
+         *       unsaved-черновик клиента на сервер не отправляется);
+         *     - watermark «Черновик» для неутверждённых статусов; утверждённые
+         *       рендерятся без watermark (эквивалент финального вида);
+         *     - Content-Disposition: inline + Cache-Control: private, no-store
+         *       (клиническое содержание);
+         *     - побочных эффектов нет: без mark-printed, уведомлений и финализации.
+         */
+        get: operations["preview_lab_report_instance_pdf_api_v1_lab_report_instances__instance_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/template-versions/{version_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Lab Template Version Pdf
+         * @description PR8: template preview — серверный A4-рендер СОХРАНЁННОЙ версии
+         *     шаблона до публикации.
+         *
+         *     Контракт:
+         *     - доступ только Admin/Lab (редакторская поверхность шаблонов);
+         *     - только синтетические placeholder-значения: patient-блок пуст, value
+         *       колонка — очевидный маркер, никаких данных реальных пациентов;
+         *     - неопубликованные версии (DRAFT) помечаются watermark «Черновик»;
+         *       PUBLISHED рендерится без watermark (это и есть печатный бланк);
+         *     - inline + no-store; рендерер тот же, что у финального PDF.
+         */
+        get: operations["preview_lab_template_version_pdf_api_v1_lab_template_versions__version_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/appointments/{appointment_id}/start-visit": {
         parameters: {
             query?: never;
@@ -30512,6 +30573,11 @@ export type components = {
              * @default false
              */
             can_print: boolean;
+            /**
+             * Can Preview
+             * @default false
+             */
+            can_preview: boolean;
         };
         /** LabReportInstanceSummaryOut */
         LabReportInstanceSummaryOut: {
@@ -30585,6 +30651,11 @@ export type components = {
              * @default false
              */
             can_print: boolean;
+            /**
+             * Can Preview
+             * @default false
+             */
+            can_preview: boolean;
         };
         /** LabReportInstanceUpdate */
         LabReportInstanceUpdate: {
@@ -72332,6 +72403,72 @@ export interface operations {
             header?: never;
             path: {
                 instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_lab_report_instance_pdf_api_v1_lab_report_instances__instance_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_lab_template_version_pdf_api_v1_lab_template_versions__version_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: number;
             };
             cookie?: never;
         };

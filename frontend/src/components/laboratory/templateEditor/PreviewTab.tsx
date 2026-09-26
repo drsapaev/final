@@ -1,7 +1,8 @@
 
-import { Alert, Card } from '../../ui/macos';
-import React from 'react';
-import { useTranslation } from '@/i18n/useTranslation';
+import { Alert, Button, Card } from '../../ui/macos';
+import React, { useState } from 'react';
+import { labReportingApi } from '../../../api/labReporting';
+import { FileText } from 'lucide-react';
 
 interface PreviewTabField {
   label?: string;
@@ -19,6 +20,7 @@ interface PreviewTabSection {
 }
 
 interface PreviewTabDraftVersion {
+  id?: string | number;
   branding_overrides?: Record<string, string>;
   signer_defaults?: Record<string, string>;
   sections: PreviewTabSection[];
@@ -34,17 +36,64 @@ interface PreviewTabProps {
  * L-H-6 fix: PreviewTab выделен в отдельный файл (~70 строк).
  * Phase 4+ tab 4: read-only sample render of the template.
  * Shows branding + sections + fields as they'll appear in the PDF.
+ *
+ * PR8 (codex-lab-workflow-hardening-plan): добавлен серверный PDF-preview —
+ * точный A4-рендер ТОГО ЖЕ движка, что пойдёт на печать. Рендерится
+ * СОХРАНЁННАЯ версия шаблона (синтетические placeholder-значения, без
+ * данных пациентов; неопубликованная версия помечена watermark
+ * «Черновик»). Unsaved-изменения редактора в PDF не попадают — сначала
+ * Save (PUT /lab/template-versions/{id}).
  */
 function PreviewTab({ draftVersion }: PreviewTabProps) {
-  const { t: rawT } = useTranslation(); const t = rawT;
   const branding = draftVersion.branding_overrides || {};
   const signers = draftVersion.signer_defaults || {};
+  const [pdfPending, setPdfPending] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  async function handleServerPdfPreview() {
+    const versionId = draftVersion?.id;
+    if (!versionId || pdfPending) return;
+    setPdfPending(true);
+    setPdfError(null);
+    try {
+      const blob = await labReportingApi.previewTemplateVersionPdf(versionId);
+      if (!blob || !(blob instanceof Blob)) {
+        setPdfError('PDF сформирован некорректно. Обратитесь к администратору.');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setPdfError('Не удалось сформировать PDF-предпросмотр. Сохраните черновик и попробуйте снова.');
+    } finally {
+      setPdfPending(false);
+    }
+  }
 
   return (
     <div className="ltw-grid-16">
       <Alert severity="info">
         Предпросмотр показывает структуру бланка. Финальный PDF рендерится на backend.
       </Alert>
+
+      <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
+        <Button
+          variant="outline"
+          onClick={handleServerPdfPreview}
+          disabled={pdfPending || !draftVersion?.id}
+          title="Серверный A4-рендер сохранённой версии — тот же движок, что печать; неопубликованная версия помечена «Черновик»"
+        >
+          <FileText size={16} aria-hidden="true" />
+          {pdfPending ? 'Формирую…' : 'PDF-предпросмотр (сервер)'}
+        </Button>
+        <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary, #6b7280)' }}>
+          показывает сохранённую версию — сначала «Сохранить черновик»
+        </span>
+      </div>
+      {pdfError && (
+        <Alert severity="error">{pdfError}</Alert>
+      )}
 
       <Card variant="filled" padding="default">
         <div className="ltw-preview-header">

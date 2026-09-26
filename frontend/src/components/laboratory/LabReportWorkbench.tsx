@@ -233,6 +233,7 @@ export default function LabReportWorkbench({
     canFinalize,
     canRevise,
     canPrint,
+    canPreview,
     missingRequiredFields,
     hasMissingRequired,
     canFinalizeWithValidation,
@@ -834,6 +835,50 @@ export default function LabReportWorkbench({
     }
   }
 
+  // PR8 (codex-lab-workflow-hardening-plan): серверный A4-preview сохранённых
+  // значений ДО утверждения — тот же движок, что пойдёт на печать.
+  // Контракт: blob открывается в новой вкладке; mark-printed НЕ вызывается,
+  // статус/уведомления/финализация не затрагиваются (см. backend endpoint
+  // /lab/report-instances/{id}/preview). Unsaved-значения не отправляются:
+  // preview рендерит последний сохранённый draft (Save Draft до preview).
+  async function handlePreviewPdf() {
+    if (!activeInstance || instanceTransitionPending) return;
+    const expectedInstanceId = activeInstance.id as string | number;
+    setBusyAction('preview');
+    setPrintFeedback({ severity: 'info', text: t('workbench.preview_building') });
+    try {
+      const blob = await labReportingApi.previewInstancePdf(expectedInstanceId);
+      if (!blob || !(blob instanceof Blob)) {
+        setPrintFeedback({ severity: 'error', text: t('workbench.print_pdf_invalid') });
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const popup = window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      // WF-05 parity: НЕ помечаем PRINTED и не дёргаем onRefresh* —
+      // preview не имеет серверных побочных эффектов.
+      setPrintFeedback(
+        popup
+          ? { severity: 'success', text: t('workbench.preview_opened') }
+          : { severity: 'error', text: t('workbench.print_pdf_blocked') }
+      );
+      if (printFeedbackTimerRef.current) {
+        clearTimeout(printFeedbackTimerRef.current);
+        printFeedbackTimerRef.current = null;
+      }
+      printFeedbackTimerRef.current = setTimeout(() => {
+        setPrintFeedback(null);
+        printFeedbackTimerRef.current = null;
+      }, 5000);
+    } catch (previewError) {
+      logger.error('[LabReportWorkbench] PDF preview failed', previewError);
+      setPrintFeedback({ severity: 'error', text: t('workbench.preview_failed') });
+      notify?.('error', getErrorMessage(previewError) || t('errors.print_failed'));
+    } finally {
+      setBusyAction('');
+    }
+  }
+
   async function handlePrint() {
     if (!activeInstance || instanceTransitionPending) return;
     const printAttempt = ++printAttemptRef.current;
@@ -1275,6 +1320,7 @@ export default function LabReportWorkbench({
                     canFinalize={canFinalizeWithValidation}
                     canRevise={canRevise}
                     canPrint={canPrint}
+                    canPreview={canPreview}
                     // P1 fix: Notify patient — only for finalized/printed reports.
                     canNotify={String(activeInstance?.status ?? '') === 'FINALIZED' || String(activeInstance?.status ?? '') === 'PRINTED'}
                     onSaveDraft={handleSaveDraft}
@@ -1282,6 +1328,7 @@ export default function LabReportWorkbench({
                     onRevise={handleRevise}
                     onPrint={handlePrint}
                     onNotify={handleNotifyPatient}
+                    onPreview={handlePreviewPdf}
                   />
                   {/* WF-10 fix: inline-индикатор missing required fields.
                       Показываем сколько обязательных полей ещё не заполнено,
