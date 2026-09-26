@@ -12,22 +12,24 @@ advisory-замков: отклонённая корзина не оставля
 Семантика «свой/чужой» зеркалирует фронтовый filterDoctorsForService
 (W2-PR2): SSOT-таблица DOCTOR_QUEUE_SPECIALTY_VARIANTS, реверсивный поиск
 канона (department_key "dental" → канон "dentistry"), неизвестные пары —
-точное совпадение, пустая специальность врача проходит «как раньше».
+точное совпадение, незавершённый профиль врача отклоняется.
 """
 
 from __future__ import annotations
 
 from datetime import date
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-from tests.conftest import mint_access_token
 
 from app.models.clinic import Doctor
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.service import Service
+from app.models.user import User
 from app.models.visit import Visit
+from tests.conftest import mint_access_token
 
 pytestmark = [pytest.mark.integration]
 
@@ -84,6 +86,7 @@ def _make_service(
         active=True,
         requires_doctor=requires_doctor,
         department_key=department_key,
+        queue_tag=(department_key or code.lower()) if requires_doctor else None,
         is_consultation=requires_doctor,
     )
     db_session.add(service)
@@ -93,8 +96,17 @@ def _make_service(
 
 
 def _make_doctor(db_session: Session, *, specialty: str, active: bool = True) -> Doctor:
+    user = User(
+        username=f"rq05_doctor_{uuid4().hex[:12]}",
+        full_name="Тестовый Врач",
+        hashed_password="unused-test-hash",
+        role="Doctor",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.flush()
     doctor = Doctor(
-        user_id=None,
+        user_id=user.id,
         specialty=specialty,
         active=active,
         cabinet="101",
@@ -346,10 +358,10 @@ def test_service_without_doctor_requirement_still_allows_no_doctor(
     assert visits == before[0] + 1
 
 
-def test_empty_doctor_specialty_passes_known_department_key(
+def test_empty_doctor_specialty_is_ineligible_for_booking(
     client: TestClient, db_session: Session, admin_user, test_patient
 ):
-    """Пустая специальность врача проходит (зеркало фронта «как раньше»)."""
+    """An incomplete doctor profile must not bypass the booking gate."""
     service = _make_service(
         db_session,
         code="RQ05A-EMPTYSPEC",
@@ -367,4 +379,5 @@ def test_empty_doctor_specialty_passes_known_department_key(
         ),
     )
 
-    assert response.status_code == 200, response.text
+    assert response.status_code == 409, response.text
+    assert "Профиль врача" in response.json()["detail"]

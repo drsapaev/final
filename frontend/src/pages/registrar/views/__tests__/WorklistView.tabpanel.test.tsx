@@ -39,7 +39,8 @@ vi.mock('../../../../components/ui/macos', () => ({
 }));
 
 import WorklistView from '../WorklistView';
-import Tabs, { tabButtonIdFor } from '../../../../components/navigation/Tabs';
+import Tabs, { doctorTabButtonIdFor, tabButtonIdFor } from '../../../../components/navigation/Tabs';
+import { toDoctorId } from '../../../../types/domain/branded';
 
 afterEach(() => cleanup());
 
@@ -116,6 +117,18 @@ describe('RQ-19 — worklist tabpanel wiring', () => {
 
     const panel = screen.getByRole('tabpanel');
     expect(panel.getAttribute('aria-labelledby')).toBeNull();
+  });
+
+  it('selected doctor controls the same worklist tabpanel and uses records as its counter unit', async () => {
+    render(<>
+      <Tabs activeDoctorId={7} doctors={[{ id: toDoctorId(7), user: { full_name: 'Иванов Иван' } }]} />
+      <WorklistView {...baseProps} activeTab={null} activeDoctorId={7} currentWorklistLabel="Иванов Иван" />
+    </>);
+    const doctorTab = await screen.findByRole('tab', { name: 'Иванов Иван' });
+    const panel = screen.getByRole('tabpanel');
+    expect(doctorTab.id).toBe(doctorTabButtonIdFor(7));
+    expect(panel).toHaveAttribute('aria-labelledby', doctorTab.id);
+    expect(doctorTab).toHaveAttribute('aria-selected', 'true');
   });
 });
 

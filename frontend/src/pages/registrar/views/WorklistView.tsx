@@ -27,12 +27,13 @@ import {
 } from '../registrarWorklistRows';
 // RQ-19: the tabpanel labelledby must reference the REAL id of the tab
 // button selected in navigation/Tabs — both sides share tabButtonIdFor.
-import { tabButtonIdFor } from '../../../components/navigation/Tabs';
+import { doctorTabButtonIdFor, tabButtonIdFor } from '../../../components/navigation/Tabs';
 import { ArrowUpDown, AlertTriangle, FileText, Plus, Search, X } from 'lucide-react';
 
 interface WorklistViewProps {
   // presentation inputs
   activeTab: string | null;
+  activeDoctorId?: number | null;
   currentWorklistLabel: string;
   statusFilterLabel: string | null;
   showCalendar: boolean;
@@ -80,6 +81,7 @@ interface WorklistViewProps {
 
 const WorklistView = ({
   activeTab,
+  activeDoctorId = null,
   currentWorklistLabel,
   statusFilterLabel,
   showCalendar,
@@ -111,7 +113,7 @@ const WorklistView = ({
   // pagination flag stays honest — only the scope denominator is unknown,
   // so no «N из M» claim is made (narrowed=false, scope=count).
   const effectiveCounter: RegistrarWorklistCounterDescriptor = counter ?? {
-    unit: activeTab ? 'records' : 'patients',
+    unit: activeTab || activeDoctorId != null ? 'records' : 'patients',
     count: filteredAppointments.length,
     scopeCount: filteredAppointments.length,
     narrowed: false,
@@ -126,7 +128,7 @@ const WorklistView = ({
     // whitespace-bearing profile keys). Before RQ-19 this was
     // `${activeTab}-tab`, which no button carried — a dangling IDREF that
     // left the tabpanel unlabelled for screen readers.
-    aria-labelledby={activeTab ? tabButtonIdFor(activeTab) : undefined}
+    aria-labelledby={activeDoctorId != null ? doctorTabButtonIdFor(activeDoctorId) : activeTab ? tabButtonIdFor(activeTab) : undefined}
     className="registrar-table-container"
     data-breakpoint={isMobile ? 'mobile' : 'desktop'}>
     <div
@@ -253,7 +255,8 @@ const WorklistView = ({
             {tI18n('registrarPanel.rp_empty_queue_title')}
           </h3>
           <p className="registrar-empty-desc-text registrar-empty-desc-fixed">
-            {activeTab ?
+            {activeDoctorId != null ?
+        tI18n('registrarPanel.rp_empty_queue_dept', { dept: currentWorklistLabel }) : activeTab ?
         tI18n('registrarPanel.rp_empty_queue_dept', { dept: activeTab === 'cardio' ? tI18n('registrarPanel.rp_dept_cardio') : activeTab === 'derma' ? tI18n('registrarPanel.rp_dept_derma') : activeTab === 'dental' ? tI18n('registrarPanel.rp_dept_dental') : activeTab === 'lab' ? tI18n('registrarPanel.rp_dept_lab') : activeTab }) :
         tI18n('registrarPanel.rp_empty_queue_general')}
           </p>

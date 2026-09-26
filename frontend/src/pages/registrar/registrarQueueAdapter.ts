@@ -65,6 +65,11 @@ export const adaptQueueEntry = (
     visit_id: fullEntry.visit_id || entry.visit_id || null,
     appointment_id: fullEntry.appointment_id || entry.appointment_id || null,
     queue_entry_id: fullEntry.queue_entry_id || entry.queue_entry_id || null,
+    // Per-entry queue ownership from the read model. The surrounding
+    // specialty bucket can contain several doctors and is not an owner.
+    queue_owner_kind: fullEntry.queue_owner_kind ?? entry.queue_owner_kind ?? null,
+    queue_owner_id: fullEntry.queue_owner_id ?? entry.queue_owner_id ?? null,
+    daily_queue_id: fullEntry.daily_queue_id ?? entry.daily_queue_id ?? null,
     patient_id: fullEntry.patient_id || entry.patient_id,
     patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name ?? entry.patient_fio ?? entry.patient_name ?? fallbackPatientLabel,
     patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year ?? entry.patient_birth_year ?? entry.birth_year ?? null,
