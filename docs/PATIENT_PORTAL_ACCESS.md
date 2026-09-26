@@ -453,6 +453,14 @@ Round-12 (PR #3386 review: canonical keys end-to-end, atomic routing):
   contract, not a 400. Routing refusals on the Mini App create flow keep
   their `outcome="denied"` audit rows (the create endpoint writes them
   itself now that routing moved out of the shared helper).
+  Fresh-pass unification (post-PR-3457, owner directive): this ordering
+  had been briefly reverted on the portal by the PR-3402 rebase (the
+  up-front resolution returned, flagged as an "intentional divergence");
+  it is re-applied now, and the portal denial audit row for the
+  combined-bad request records `doctor_not_eligible` — the reason the
+  API actually answered. The department-only branch resolves the
+  submitted key itself (no eligibility gate applies on that path, so the
+  request-shaped 400s keep answering first there).
 - Patient-safe frontend errors (P2): the Mini App booking panel maps the
   new reasons to actionable Russian copy (`department_unknown`,
   `department_inactive`, `doctor_department_missing`,
