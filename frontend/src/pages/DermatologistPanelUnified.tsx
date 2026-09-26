@@ -5,21 +5,19 @@ import { useLocation } from 'react-router-dom';
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
 import { DERMATOLOGY_PANEL_TABS, getDermatologyTabAliases } from './dermatologyTabAliases';
 // S-M-2 (история, ОТМЕНЕНО Track 3-2): macos-Icon обёртка → lucide refs (§3.3)
-import { Button, Card, Badge, Input, AppEmpty } from '../components/ui/macos';
+import { Button, Card, Badge, AppEmpty } from '../components/ui/macos';
 
 import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './dermatology.css';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import AIAssistant from '../components/ai/AIAssistant';
-import ServiceChecklist from '../components/ServiceChecklist';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import SessionWarningModal from '../components/common/SessionWarningModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
-import ProcedureTemplates from '../components/dermatology/ProcedureTemplates';
 import DermaExamsTab from '../components/dermatology/DermaExamsTab';
 import DermaPatientsTab from '../components/dermatology/DermaPatientsTab';
 import DermaPhotosTab from '../components/dermatology/DermaPhotosTab';
@@ -59,7 +57,7 @@ import {
   toPrescriptionCreatePayload,
   type DermatologyVisitContext,
 } from './dermatologyVisitActions';
-import { Calendar, CheckCircle2, CircleDollarSign, FileText, RotateCw, Scissors, Stethoscope } from 'lucide-react';
+import { Calendar, CheckCircle2, FileText, RotateCw, Stethoscope } from 'lucide-react';
 
 const API_V1_BASE = getApiBaseUrl();
 const DERMATOLOGY_REQUEST_COOLDOWN_MS = 5000;
@@ -159,14 +157,6 @@ interface DermatologyAppointment {
   visit_id?: number | string | null;
   all_patient_services?: unknown[];
   all_patient_service_codes?: unknown[];
-  [key: string]: unknown;
-}
-
-interface SelectedServiceItem {
-  id: number;
-  name?: string;
-  price?: number;
-  duration?: number;
   [key: string]: unknown;
 }
 
@@ -350,7 +340,6 @@ const DermatologistPanelUnified = () => {
     selectedPatient: DermatologyPatient | null;
     setSelectedPatient: (patient: DermatologyPatient | null) => void;
   };
-  const [selectedServices, setSelectedServices] = useState<SelectedServiceItem[]>([]);
   const [visitData, setVisitData] = useState({
     complaint: '',
     diagnosis: '',
@@ -368,20 +357,7 @@ const DermatologistPanelUnified = () => {
   const appointmentsLoadPromiseRef = useRef<Promise<DermatologyAppointment[]> | null>(null);
   const urlResolutionRef = useRef({ search: '', refreshAttempted: false, notified: false });
 
-  // Специализированные данные дерматолога
-  const [skinExamination, setSkinExamination] = useState({
-    patient_id: '',
-    visit_id: '',
-    examination_date: '',
-    skin_type: '',
-    skin_condition: '',
-    lesions: '',
-    distribution: '',
-    symptoms: '',
-    diagnosis: '',
-    treatment_plan: ''
-  });
-
+  // Optional procedure documentation belongs to the currently open visit.
   const [cosmeticProcedure, setCosmeticProcedure] = useState({
     patient_id: '',
     visit_id: '',
@@ -393,7 +369,6 @@ const DermatologistPanelUnified = () => {
     follow_up: ''
   });
 
-  const [showSkinForm, setShowSkinForm] = useState(false);
   const [showCosmeticForm, setShowCosmeticForm] = useState(false);
   // D-001 fix: photoData now receives state from PhotoUploader via onDataUpdate callback
   const [photoData, setPhotoData] = useState<{ before: unknown[]; after: unknown[] }>({ before: [], after: [] });
@@ -409,7 +384,6 @@ const DermatologistPanelUnified = () => {
     canComplete: boolean;
   } | null>(null);
   const statusRequestIdRef = useRef(0);
-  const [doctorPrice, setDoctorPrice] = useState('');
 
   // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
   // is invalidated when the doctor switches between visits or patients.
@@ -442,31 +416,19 @@ const DermatologistPanelUnified = () => {
       setEmr(null);
       setPrescription(null);
       setAppointmentCompletionStatus(null);
+      setShowCosmeticForm(false);
+      setCosmeticProcedure({
+        patient_id: '',
+        visit_id: '',
+        procedure_date: '',
+        procedure_type: '',
+        area_treated: '',
+        products_used: '',
+        results: '',
+        follow_up: '',
+      });
     },
   });
-
-  // PR-47: removed unused showPriceOverride / selectedServiceForPriceOverride state
-  // (PriceOverrideManager import also removed — component was not rendered)
-
-  // Локальный справочник цен для дерма/косметологии
-  const dermaPriceMap = useMemo((): Record<string, number> => ({
-    derma_consultation: 50000,
-    derma_biopsy: 150000,
-    cosm_cleaning: 80000,
-    cosm_botox: 300000,
-    cosm_laser: 250000
-  }), []);
-
-  const servicesSubtotal = useMemo(() => {
-    return selectedServices.reduce((sum: number, item: SelectedServiceItem) => sum + (((item as { id?: string | number })?.id as unknown as string) ? (dermaPriceMap[(item as { id?: string | number }).id as unknown as string] || 0) : 0), 0);
-  }, [selectedServices, dermaPriceMap]);
-
-  const doctorPriceNum = useMemo(() => {
-    const n = Number(String(doctorPrice).replace(/[^0-9.-]/g, ''));
-    return Number.isFinite(n) ? Math.max(0, n) : 0;
-  }, [doctorPrice]);
-
-  const totalCost = useMemo(() => servicesSubtotal + doctorPriceNum, [servicesSubtotal, doctorPriceNum]);
 
   // Загрузка услуг для правильного отображения в tooltips
   const loadServices = useCallback(async (force = false) => {
@@ -822,12 +784,6 @@ const DermatologistPanelUnified = () => {
     null
   ), [currentAppointment?.patient_id, selectedPatient]);
 
-  const getSelectedVisitId = useCallback(() => (
-    currentAppointment?.visit_id ||
-    selectedPatient?.visit_id ||
-    null
-  ), [currentAppointment?.visit_id, selectedPatient]);
-
   const patientHistory = useDermatologyPatientHistory(getSelectedPatientId());
   const {
     appointments: patientAppointmentsHistory,
@@ -839,27 +795,17 @@ const DermatologistPanelUnified = () => {
     reload: loadPatientData,
   } = patientHistory;
 
-  const openSkinExaminationForm = useCallback(() => {
-    const patientId = getSelectedPatientId();
-    const visitId = getSelectedVisitId();
-    setSkinExamination((prev) => ({
-      ...prev,
-      patient_id: String(patientId || ''),
-      visit_id: String(visitId || '')
-    }));
-    setShowSkinForm(true);
-  }, [getSelectedPatientId, getSelectedVisitId]);
-
   const openCosmeticProcedureForm = useCallback(() => {
-    const patientId = getSelectedPatientId();
-    const visitId = getSelectedVisitId();
+    const patientId = currentAppointment?.patient_id;
+    const visitId = currentAppointment?.visit_id;
+    if (!patientId || !visitId) return;
     setCosmeticProcedure((prev) => ({
       ...prev,
-      patient_id: String(patientId || ''),
-      visit_id: String(visitId || '')
+      patient_id: String(patientId),
+      visit_id: String(visitId),
     }));
     setShowCosmeticForm(true);
-  }, [getSelectedPatientId, getSelectedVisitId]);
+  }, [currentAppointment?.patient_id, currentAppointment?.visit_id]);
 
   // D-5 (UX audit): auto-promote selectedPatient to currentAppointment
   // so the first visit branch (with EMRContainerV2) renders correctly.
@@ -1344,7 +1290,6 @@ const DermatologistPanelUnified = () => {
       // Очищаем форму и состояние
       setSelectedPatient(null);
       setCurrentAppointment(null);
-      setSelectedServices([]);
       setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
       setEmr(null);
       setPrescription(null);
@@ -1369,51 +1314,20 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  // Обработка осмотра кожи
-  const handleSkinExaminationSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        ...skinExamination,
-        patient_id: skinExamination.patient_id || getSelectedPatientId(),
-        visit_id: skinExamination.visit_id || getSelectedVisitId() || null
-      };
-      const response = (await api.post('/derma/examinations', payload)) as AxiosResponse<Record<string, unknown>>;
-
-      if (response.status < 400) {
-        setShowSkinForm(false);
-        setSkinExamination({
-          patient_id: '',
-          visit_id: '',
-          examination_date: '',
-          skin_type: '',
-          skin_condition: '',
-          lesions: '',
-          distribution: '',
-          symptoms: '',
-          diagnosis: '',
-          treatment_plan: ''
-        });
-        loadPatientData();
-        notify.success(t('derma.skin_exam_saved'));
-      } else {
-        logger.error('[Dermatology] Skin examination save rejected', { statusCode: response.status });
-        notify.error(t('derma.skin_exam_save_failed'));
-      }
-    } catch (error: unknown) {
-      logger.error('[Dermatology] Skin examination save failed', safeErrorMetadata(error));
-      notify.error(t('derma.skin_exam_save_failed'));
-    }
-  };
-
   // Обработка косметической процедуры
   const handleCosmeticProcedureSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const patientId = currentAppointment?.patient_id;
+    const visitId = currentAppointment?.visit_id;
+    if (!patientId || !visitId) {
+      notify.error(t('derma.procedure_save_failed'));
+      return;
+    }
     try {
       const payload = {
         ...cosmeticProcedure,
-        patient_id: cosmeticProcedure.patient_id || getSelectedPatientId(),
-        visit_id: cosmeticProcedure.visit_id || getSelectedVisitId() || null
+        patient_id: patientId,
+        visit_id: visitId,
       };
       const response = (await api.post('/derma/procedures', payload)) as AxiosResponse<Record<string, unknown>>;
 
@@ -1518,26 +1432,6 @@ const DermatologistPanelUnified = () => {
                 setSelectedPatient(patient as DermatologyPatient | null);
                 setCurrentAppointment(null);
               }}
-              onOpenExam={(patient) => {
-                setSelectedPatient(patient as DermatologyPatient);
-                setCurrentAppointment(null);
-                setSkinExamination((previous) => ({
-                  ...previous,
-                  patient_id: String(patient.patient_id ?? patient.id ?? ''),
-                  visit_id: String(patient.visit_id || ''),
-                }));
-                setShowSkinForm(true);
-              }}
-              onOpenProcedure={(patient) => {
-                setSelectedPatient(patient as DermatologyPatient);
-                setCurrentAppointment(null);
-                setCosmeticProcedure((previous) => ({
-                  ...previous,
-                  patient_id: String(patient.patient_id ?? patient.id ?? ''),
-                  visit_id: String(patient.visit_id || ''),
-                }));
-                setShowCosmeticForm(true);
-              }}
               appointments={patientAppointmentsHistory}
               skinExaminations={skinExaminations}
               cosmeticProcedures={cosmeticProcedures}
@@ -1585,6 +1479,19 @@ const DermatologistPanelUnified = () => {
                   onPersisted={() => refreshCanonicalStatus(currentVisitContext, true)} />
 
                 </div>
+
+                {currentAppointment.patient_id && currentAppointment.visit_id && (
+                  <div className="derma-mt-24">
+                    <DermaExamsTab
+                      cosmeticProcedure={cosmeticProcedure}
+                      setCosmeticProcedure={setCosmeticProcedure}
+                      showCosmeticForm={showCosmeticForm}
+                      onCosmeticSubmit={handleCosmeticProcedureSubmit}
+                      onOpenCosmeticForm={openCosmeticProcedureForm}
+                      onCancelCosmeticForm={() => setShowCosmeticForm(false)}
+                    />
+                  </div>
+                )}
 
                 {/* Система рецептов */}
                 {emr && !emr.is_draft &&
@@ -1658,139 +1565,11 @@ const DermatologistPanelUnified = () => {
               onGoToAppointments={() => handleTabChange('patients')}
             />
           }
-          {(activeTab === 'skin' || activeTab === 'cosmetic') &&
-            <DermaExamsTab
-              activeTab={activeTab}
-              skinExamination={skinExamination}
-              setSkinExamination={setSkinExamination}
-              showSkinForm={showSkinForm}
-              skinExaminations={skinExaminations as unknown as never[]}
-              onSkinSubmit={handleSkinExaminationSubmit}
-              onOpenSkinForm={openSkinExaminationForm}
-              onCancelSkinForm={() => setShowSkinForm(false)}
-              cosmeticProcedure={cosmeticProcedure}
-              setCosmeticProcedure={setCosmeticProcedure}
-              showCosmeticForm={showCosmeticForm}
-              cosmeticProcedures={cosmeticProcedures as unknown as never[]}
-              onCosmeticSubmit={handleCosmeticProcedureSubmit}
-              onOpenCosmeticForm={openCosmeticProcedureForm}
-              onCancelCosmeticForm={() => setShowCosmeticForm(false)}
-              getColor={getColor}
-              getFontSize={getFontSize}
-              getSpacing={getSpacing}
-            />
-          }
           {activeTab === 'ai' &&
           <AIAssistant
             specialty="dermatology"
             onSuggestionSelect={handleAISuggestion} />
 
-          }
-
-          {/* Управление услугами */}
-          {activeTab === 'services' &&
-          <div className="derma-flex-col-24">
-              <Card className="derma-p-8">
-                <h3 className="derma-flex-center">
-                  <Scissors size={20} className="derma-icon-mr-orange" aria-hidden="true" />
-                  {t('derma.derma_panel_services_title')}
-                </h3>
-
-                <div className="derma-flex-col-16">
-                  <div>
-                    <label className="derma-label-13-mb8">
-                      {t('derma.derma_panel_services_select')}
-                    </label>
-
-                    {/* Шаблоны процедур */}
-                    <ProcedureTemplates
-                    visitId={(selectedPatient?.visit_id ?? undefined) as string | number | undefined}
-                    onSelectProcedure={(procedure) => {
-                      // Добавляем процедуру в список услуг
-                      setSelectedServices((prev) => [...prev, {
-                        id: Date.now(),
-                        name: (procedure as { name?: string }).name,
-                        price: (procedure as { price?: number }).price,
-                        duration: (procedure as { duration?: number }).duration
-                      }]);
-                    }} />
-
-
-                    <div className="derma-p-4 derma-mt-16">
-                      <ServiceChecklist
-                      value={selectedServices as unknown as string[]}
-                      onChange={(v: unknown) => setSelectedServices(v as unknown as SelectedServiceItem[])}
-                      department="derma" />
-
-                    </div>
-                  </div>
-
-                  <div className="derma-grid-auto-300">
-                    <div>
-                      <label className="derma-label-13-mb8">
-                        {t('derma.derma_panel_doctor_price_label')}
-                      </label>
-                      <div className="derma-flex-gap-8">
-                        <div className="derma-pos-rel-flex-1">
-                          <CircleDollarSign size={16} className="derma-dollar-icon-abs" aria-hidden="true" />
-                          <Input
-                          type="text"
-                          value={doctorPrice}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDoctorPrice(e.target.value)}
-                          placeholder={t('derma.derma_panel_ph_doctor_price')}
-                          inputMode="numeric"
-                          className="derma-input-pl-40" />
-
-                        </div>
-                        <Button
-                        onClick={() => {
-                          // PR-47: PriceOverrideManager was dead code (imported but never rendered).
-                          // Button now shows a toast instead of calling removed state setters.
-                          notify.info(t('derma.price_change_unavailable'));
-                        }}
-                        variant="primary"
-                        aria-label={t('derma.derma_panel_change_price_aria')}
-                        title={t('derma.derma_panel_change_price_aria')}>
-
-                          <CircleDollarSign size={16} aria-hidden="true" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="derma-label-13-mb8">
-                        {t('derma.derma_panel_total_label')}
-                      </label>
-                      <div className="derma-flex-center">
-                        <span className="derma-text-18-600-primary">
-                          {totalCost.toLocaleString()} UZS
-                        </span>
-                        <span className="derma-ml-8-text-13-secondary">
-                          {t('derma.derma_panel_total_breakdown', {
-                            services: servicesSubtotal.toLocaleString(),
-                            doctor: doctorPriceNum ? t('derma.derma_panel_doctor_inline', { amount: doctorPriceNum.toLocaleString() }) : ''
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="derma-price-info-box">
-                    <h4 className="derma-price-h4">
-                      {t('derma.derma_panel_price_directory')}
-                    </h4>
-                    <div className="derma-grid-auto-200-13">
-                      <div>{t('derma.derma_panel_price_consultation')}</div>
-                      <div>{t('derma.derma_panel_price_biopsy')}</div>
-                      <div>{t('derma.derma_panel_price_cleaning')}</div>
-                      <div>{t('derma.derma_panel_price_botox')}</div>
-                      <div>{t('derma.derma_panel_price_laser')}</div>
-                      <div>{t('derma.derma_panel_price_doctor_extra')}</div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
           }
 
         </div>{/* End of tab content wrapper */}
