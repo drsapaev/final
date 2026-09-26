@@ -8,12 +8,12 @@
  *
  * Supported shortcuts (only when not focused in input/textarea):
  * - Ctrl+1: switch to queue tab
- * - Ctrl+2: switch to appointments tab
- * - Ctrl+3: switch to visit tab
- * - Ctrl+4: switch to ecg tab
- * - Ctrl+5: switch to blood tab
- * - F5: refresh data (reload appointments)
- * - Escape: close any open modal
+ * - Ctrl+2: switch to visit tab
+ * - Ctrl+3: switch to patients tab
+ * - Ctrl+4: switch to ai tab
+ * - Ctrl+5: switch to blood tab (legacy view, kept for muscle memory)
+ * - F5: refresh data (reloads appointments/queue data)
+ * - Escape: close open form / schedule-next modal
  *
  * @param {Object} handlers
  * @param {Function} handlers.setActiveTab - switches tab
