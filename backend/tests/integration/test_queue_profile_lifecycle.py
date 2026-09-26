@@ -41,6 +41,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -52,7 +53,8 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-SCRATCH_DB = "rq12a_check"
+SCRATCH_DB_PREFIX = "rq12a_check"
+SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -139,7 +141,9 @@ def pg_engine():
 
     psycopg_dsn, sa_url = _scratch_url(admin_url)
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        # No pre-drop: the run-unique name cannot pre-exist (a collision would
+        # take 2**48 parallel runs), and dropping a fixed name unconditionally
+        # is exactly the cross-run hazard this fixture used to carry.
         c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
     env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
@@ -163,7 +167,13 @@ def pg_engine():
 
     engine.dispose()
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        # Cleanup touches ONLY the run-unique database this process created;
+        # WITH (FORCE) clears lingering connections (PG 13+), falling back
+        # to the plain form on older servers.
+        try:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+        except psycopg.errors.SyntaxError:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
 
 
 @pytest.fixture

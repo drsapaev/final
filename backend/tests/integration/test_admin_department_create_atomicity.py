@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import sys
+import uuid
 from pathlib import Path
 
 import psycopg
@@ -29,7 +30,8 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-SCRATCH_DB = "rq04_atomic"
+SCRATCH_DB_PREFIX = "rq04_atomic"
+SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -58,18 +60,27 @@ def _candidate_admin_urls() -> list[str]:
             urls.append(
                 f"postgresql://{u.username}:{u.password}@{u.host}:{u.port}/postgres"
             )
+        elif not u.host and (u.query.get("host") or "").startswith(
+            ("/", "./")
+        ):
+            # Unix-socket DSN (userspace pgserver holder): the socket dir
+            # travels in the query string; still localhost-only by
+            # construction, so safe for scratch provisioning.
+            urls.append(env_url)
 
     return urls
 
 
 def _scratch_url(admin_url: str) -> tuple[str, str]:
-    """(psycopg conninfo, sqlalchemy URL) for the scratch database."""
+    """(psycopg conninfo, sqlalchemy URL) for the scratch database.
+
+    Shape-agnostic: works for TCP (postgres:pw@localhost:5432/postgres)
+    and unix-socket (?host=/dir) admin DSNs alike.
+    """
     u = make_url(admin_url)
-    base = f"postgresql://{u.username}:{u.password}@{u.host}:{u.port}"
     return (
-        f"{base}/{SCRATCH_DB}",
-        f"postgresql+psycopg://{u.username}:{u.password}"
-        f"@{u.host}:{u.port}/{SCRATCH_DB}",
+        str(u.set(drivername="postgresql", database=SCRATCH_DB)),
+        str(u.set(drivername="postgresql+psycopg", database=SCRATCH_DB)),
     )
 
 
@@ -94,7 +105,9 @@ def pg_engine():
 
     psycopg_dsn, sa_url = _scratch_url(admin_url)
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        # No pre-drop: the run-unique name cannot pre-exist (a collision would
+        # take 2**48 parallel runs), and dropping a fixed name unconditionally
+        # is exactly the cross-run hazard this fixture used to carry.
         c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
     env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
@@ -118,7 +131,13 @@ def pg_engine():
 
     engine.dispose()
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        # Cleanup touches ONLY the run-unique database this process created;
+        # WITH (FORCE) clears lingering connections (PG 13+), falling back
+        # to the plain form on older servers.
+        try:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+        except psycopg.errors.SyntaxError:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
 
 
 @pytest.fixture
@@ -300,8 +319,9 @@ def test_injected_failure_in_settings_rolls_back_everything(
     AGAIN after the intermediate commit; injecting a raising stub there
     left the department persisted without settings. Post-fix the stub is
     never called and creation succeeds with exactly one guarded row."""
-    from app.api.v1.endpoints.admin_departments import _crud
     from types import SimpleNamespace
+
+    from app.api.v1.endpoints.admin_departments import _crud
 
     class _Boom:
         def __init__(self, *args, **kwargs):
@@ -322,8 +342,9 @@ def test_failure_at_late_staging_rolls_back_everything(db_session, monkeypatch):
     """QueueProfile creation is the LAST onboarding step: a failure there
     (after settings/services staged, before the single commit) must leave
     NOTHING persisted."""
-    from app.api.v1.endpoints.admin_departments import _helpers
     from types import SimpleNamespace
+
+    from app.api.v1.endpoints.admin_departments import _helpers
 
     def _boom_tags(*args, **kwargs):
         raise RuntimeError("RQ-04 late-staging failure")
@@ -344,8 +365,9 @@ def test_failure_at_late_staging_rolls_back_everything(db_session, monkeypatch):
 def test_retry_after_failure_succeeds(db_session, monkeypatch):
     """A failed attempt must leave zero rows; the immediate retry then
     succeeds cleanly (no «key already taken» from partial state)."""
-    from app.api.v1.endpoints.admin_departments import _helpers
     from types import SimpleNamespace
+
+    from app.api.v1.endpoints.admin_departments import _helpers
 
     def _boom_tags(*args, **kwargs):
         raise RuntimeError("RQ-04 late-staging failure")

@@ -50,6 +50,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 import psycopg
@@ -58,7 +59,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-SCRATCH_DB = "rq16c_check"
+SCRATCH_DB_PREFIX = "rq16c_check"
+SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 # The head pin advances with the chain (established pattern: #3306
 # advanced the 0067-era pins; the RQ-15.d repair chains 0069 above the
 # 0068 registry revision — owner directive trace 1a0aef280204950d).
@@ -155,7 +157,9 @@ def pg_env():
 
     psycopg_dsn, sa_url = _scratch_urls(admin_url)
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        # No pre-drop: the run-unique name cannot pre-exist (a collision would
+        # take 2**48 parallel runs), and dropping a fixed name unconditionally
+        # is exactly the cross-run hazard this fixture used to carry.
         c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
     r = _run_alembic(sa_url, "upgrade", "head")
@@ -164,7 +168,13 @@ def pg_env():
     yield sa_url, psycopg_dsn
 
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        # Cleanup touches ONLY the run-unique database this process created;
+        # WITH (FORCE) clears lingering connections (PG 13+), falling back
+        # to the plain form on older servers.
+        try:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+        except psycopg.errors.SyntaxError:
+            c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
 
 
 @pytest.fixture(scope="module")
