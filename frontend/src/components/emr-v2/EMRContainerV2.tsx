@@ -50,7 +50,6 @@ import {
 import {
     CardiologySection,
     DermatologySection,
-    type DermatologyPhoto,
     DentistrySection,
 } from './sections/specialty';
 
@@ -1086,7 +1085,6 @@ export function EMRContainerV2({
 
                     {data?.specialty === 'dermatology' && (
                         <DermatologySection
-                            photos={(data?.specialty_data?.photos as DermatologyPhoto[]) || []}
                             skinType={(data?.specialty_data?.skin_type as string) || ''}
                             skinCondition={(data?.specialty_data?.skin_condition as string) || ''}
                             localization={(data?.specialty_data?.localization as Record<string, unknown>) || {}}
