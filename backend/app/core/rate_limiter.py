@@ -194,6 +194,15 @@ RATE_LIMITS = {
     "file_upload": _env_rate_limit("file_upload", "20/minute"),
     "export": _env_rate_limit("export", "5/minute"),
     "migration": _env_rate_limit("migration", "1/minute"),
+    # PR-6 round 6 (codex P1): push credential registration writes a
+    # 64 KiB TOAST value per request — cap the write churn (WAL/TOAST,
+    # dead tuples) that even a retention-pruned registry incurs.
+    "push_register": _env_rate_limit("push_register", "10/minute"),
+    # RQ-16.d (E-055 §9 item 6): the permanent-address anonymous
+    # resolve/start inherits the rate-limit discipline of the queue
+    # entry path — each start mints a short-lived session row, so the
+    # public surface gets its own, tighter env-tunable knob.
+    "public_direction_start": _env_rate_limit("public_direction_start", "10/minute"),
     "default": _env_rate_limit("default", "60/minute"),
 }
 

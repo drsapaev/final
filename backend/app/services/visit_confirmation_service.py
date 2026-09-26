@@ -14,18 +14,26 @@ from typing import Any
 from app.core.config import settings
 from app.crud import clinic as crud_clinic
 from app.crud import telegram_config as crud_telegram
-from app.crud.queue_resource_routing import resolve_tag_resource
+from app.crud.queue_owner_policy import (
+    eligible_real_doctor,
+    owner_configuration_error,
+)
+from app.crud.queue_resource_routing import resolve_tag_resource, tag_routes_to_resource
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.visit import Visit
+from app.models.service import Service
+from app.models.visit import Visit, VisitService
 from app.repositories.visit_confirmation_repository import VisitConfirmationRepository
 from app.services.confirmation_security import ConfirmationSecurityService
 from app.services.context_facades.queue_facade import (
     QueueContextFacade,
     QueueDomainServiceContractAdapter,
 )
+from app.services.queue_claim_service import (
+    QueueClaimConflictError,
+    lock_and_resolve_active_tag_claim,
+)
 from app.services.queue_service import queue_service
 from app.services.telegram_token_store import resolve_patient_bot_token
-from app.utils.validators import normalize_phone_uz
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +41,6 @@ logger = logging.getLogger(__name__)
 # get_queue_settings (нейтральный слой, доступный всем контекстам).
 from app.crud.clinic import clinic_today as _clinic_today  # noqa: E402
 
-CANONICAL_ACTIVE_CONFIRMATION_STATUSES = (
-    "waiting",
-    "called",
-    "in_service",
-    "diagnostics",
-)
 CONFIRMATION_PROCESSING_STATUS = "confirmation_processing"
 
 TELEGRAM_TICKET_QR_PREFIX = "tq"
@@ -559,7 +561,12 @@ class VisitConfirmationService:
                     if visit.confirmation_expires_at
                     else None
                 ),
-                "notes": visit.notes,
+                # PR 3407 delta review P2: the confirmation card is a
+                # PUBLIC, bearer-token-addressed projection, so it is built
+                # patient-safe at the capability level — ``notes`` (clinical
+                # text: diagnosis markers, cancel reasons, force-reopen audit
+                # lines) must never be readable through any token-addressed
+                # route (both the legacy GET and the POST share this card).
             }
         except VisitConfirmationDomainError:
             raise
@@ -663,86 +670,49 @@ class VisitConfirmationService:
         )
 
     @staticmethod
-    def _normalize_confirmation_phone(phone: str | None) -> str | None:
-        if not phone:
-            return None
-        normalized_phone = normalize_phone_uz(phone)
-        return normalized_phone or None
-
-    @staticmethod
-    def _normalize_confirmation_telegram_id(
-        telegram_id: str | int | None,
-    ) -> int | None:
-        if telegram_id in (None, ""):
-            return None
-        try:
-            return int(str(telegram_id).strip())
-        except (TypeError, ValueError):
-            return None
-
-    def _resolve_existing_active_entry(
-        self,
+    def _assert_existing_claim_owner(
         *,
         daily_queue: DailyQueue,
-        visit,
-        patient,
-        confirmation_phone: str | None,
-        confirmation_telegram_id: str | int | None,
-    ) -> OnlineQueueEntry | None:
-        active_entries = self.repository.get_active_queue_entries(
-            queue_id=daily_queue.id,
-            active_statuses=CANONICAL_ACTIVE_CONFIRMATION_STATUSES,
-        )
-        if not active_entries:
-            return None
-
-        candidate_entries: dict[int, OnlineQueueEntry] = {}
-
-        if visit.patient_id:
-            for entry in active_entries:
-                if entry.patient_id == visit.patient_id:
-                    candidate_entries[entry.id] = entry
-
-        normalized_phone = self._normalize_confirmation_phone(
-            confirmation_phone or (patient.phone if patient else None)
-        )
-        if normalized_phone:
-            for entry in active_entries:
-                entry_phone = self._normalize_confirmation_phone(entry.phone)
-                if entry_phone and entry_phone == normalized_phone:
-                    candidate_entries[entry.id] = entry
-
-        normalized_telegram_id = self._normalize_confirmation_telegram_id(
-            confirmation_telegram_id
-        )
-        if normalized_telegram_id is not None:
-            for entry in active_entries:
-                if entry.telegram_id == normalized_telegram_id:
-                    candidate_entries[entry.id] = entry
-
-        if not candidate_entries:
-            return None
-
-        if len(candidate_entries) > 1:
+        specialist_id: int | None,
+        queue_resource_id: int | None,
+        expected_daily_queue_id: int | None,
+        queue_tag: str,
+    ) -> None:
+        if expected_daily_queue_id is not None:
+            if daily_queue.id == expected_daily_queue_id:
+                return
             raise VisitConfirmationDomainError(
                 status_code=409,
                 detail=(
-                    "Cannot unambiguously resolve an existing queue entry "
-                    "for visit confirmation"
+                    "Existing queue claim belongs to a different owner "
+                    f"for queue_tag={queue_tag}"
                 ),
             )
 
-        existing_entry = next(iter(candidate_entries.values()))
+        doctor_owner_matches = (
+            specialist_id is not None
+            and daily_queue.specialist_id == specialist_id
+            and daily_queue.queue_resource_id is None
+        )
+        resource_owner_matches = (
+            queue_resource_id is not None
+            and daily_queue.queue_resource_id == queue_resource_id
+            and daily_queue.specialist_id is None
+        )
+        if doctor_owner_matches or resource_owner_matches:
+            return
+        raise VisitConfirmationDomainError(
+            status_code=409,
+            detail=(
+                "Existing queue claim belongs to a different owner "
+                f"for queue_tag={queue_tag}"
+            ),
+        )
 
-        if existing_entry.patient_id not in (None, visit.patient_id):
-            raise VisitConfirmationDomainError(
-                status_code=409,
-                detail=(
-                    "Cannot unambiguously resolve an existing queue entry "
-                    "for visit confirmation"
-                ),
-            )
-
+    @staticmethod
+    def _reuse_existing_active_entry(
+        *, existing_entry: OnlineQueueEntry, visit
+    ) -> None:
         if existing_entry.visit_id not in (None, visit.id):
             raise VisitConfirmationDomainError(
                 status_code=409,
@@ -751,13 +721,6 @@ class VisitConfirmationService:
                     "for visit confirmation"
                 ),
             )
-
-        return existing_entry
-
-    @staticmethod
-    def _reuse_existing_active_entry(
-        *, existing_entry: OnlineQueueEntry, visit
-    ) -> None:
         if existing_entry.patient_id is None:
             existing_entry.patient_id = visit.patient_id
         if existing_entry.visit_id is None:
@@ -796,14 +759,51 @@ class VisitConfirmationService:
         today = _clinic_today(self.repository.db)
         queue_numbers: list[dict[str, Any]] = []
         print_tickets: list[dict[str, Any]] = []
+        unowned_queue_tags: list[str] = []
         patient = self.repository.get_patient(visit.patient_id)
         telegram_ticket_qr_payload: str | None = None
         telegram_ticket_qr_resolved = False
 
         for queue_tag in sorted(unique_queue_tags):
+            # Lock and resolve the patient claim before reading any routing
+            # owner. Every writer uses this exact (day, tag) transaction lock,
+            # and sorted acquisition keeps multi-tag confirmations ordered.
+            try:
+                existing_claim = lock_and_resolve_active_tag_claim(
+                    self.repository.db,
+                    day=today,
+                    queue_tag=queue_tag,
+                    patient_id=visit.patient_id,
+                    phone=(
+                        confirmation_phone
+                        or (patient.phone if patient is not None else None)
+                    ),
+                    telegram_id=confirmation_telegram_id,
+                    # RQ-25.a.1 (S-22): the legacy-phone bridge is
+                    # name-narrowed so family members sharing one phone
+                    # each keep their own claim.
+                    patient_name=(
+                        patient.short_name() if patient is not None else None
+                    ),
+                )
+            except QueueClaimConflictError as exc:
+                raise VisitConfirmationDomainError(
+                    status_code=409,
+                    detail=(
+                        "Cannot unambiguously resolve an existing queue entry "
+                        "for visit confirmation"
+                    ),
+                ) from exc
+
             daily_queue: DailyQueue | None = None
             specialist_doctor_id: int | None = None
-            if visit.doctor_id:
+            registry_surface = tag_routes_to_resource(
+                self.repository.db, queue_tag, today
+            )
+            registry_resource = resolve_tag_resource(self.repository.db, queue_tag)
+            registry_tag = registry_surface is not None or registry_resource is not None
+
+            if visit.doctor_id and not registry_tag:
                 visit_doctor = self.repository.get_doctor(visit.doctor_id)
                 if visit_doctor:
                     specialist_doctor_id = visit_doctor.id
@@ -812,71 +812,94 @@ class VisitConfirmationService:
             # (сиды 0059 — lab/ecg) маршрутизируется на РЕСУРСНОЙ оси:
             # синтетик не резолвится (specialist остаётся None),
             # get_or_create_daily_queue ниже найдёт/создаст ресурсную
-            # очередь. Теги без строки реестра — старый путь.
-            registry_tag = (
-                not specialist_doctor_id
-                and resolve_tag_resource(self.repository.db, queue_tag) is not None
-            )
-
-            if queue_tag == "ecg" and not specialist_doctor_id and not registry_tag:
-                ecg_resource = self.repository.get_active_user_by_username(
-                    "ecg_resource"
-                )
-                if ecg_resource:
-                    ecg_doctor = self.repository.get_doctor_by_user_id(ecg_resource.id)
-                    if ecg_doctor:
-                        specialist_doctor_id = ecg_doctor.id
-                    else:
-                        logger.warning(
-                            "ECG resource user id=%s has no doctor row",
-                            ecg_resource.id,
+            # очередь.
+            # QD-2E (RQ-15.b): ветки резолва ecg_resource/lab_resource
+            # УДАЛЕНЫ (D-08) — теги покрываются реестром, а их
+            # деактивация — операторское решение, не синтетик.
+            if not specialist_doctor_id and not registry_tag:
+                # QD-2E (Codex round-1 P2): явный владелец из услуг визита —
+                # единственный distinct врач среди услуг визита с этим
+                # тегом (K01 → кардиолог после operator map), проверенный
+                # на пригодность (активный реальный владелец).
+                visit_service_doctor_ids = {
+                    int(row[0])
+                    for row in (
+                        self.repository.db.query(Service.doctor_id)
+                        .join(
+                            VisitService, VisitService.service_id == Service.id
                         )
-            elif queue_tag == "lab" and not specialist_doctor_id and not registry_tag:
-                lab_resource = self.repository.get_active_user_by_username(
-                    "lab_resource"
-                )
-                if lab_resource:
-                    lab_doctor = self.repository.get_doctor_by_user_id(lab_resource.id)
-                    if lab_doctor:
-                        specialist_doctor_id = lab_doctor.id
-                        logger.info(
-                            "For queue_tag=%s using lab resource doctor id=%s",
+                        .filter(
+                            VisitService.visit_id == visit.id,
+                            Service.queue_tag == queue_tag,
+                            Service.doctor_id.isnot(None),
+                        )
+                        .distinct()
+                        .all()
+                    )
+                    if row[0] is not None
+                }
+                if len(visit_service_doctor_ids) == 1:
+                    candidate_id = next(iter(visit_service_doctor_ids))
+                    if eligible_real_doctor(self.repository.db, candidate_id):
+                        specialist_doctor_id = candidate_id
+                    else:
+                        logger.error(
+                            "QD-2E fail-closed: visit_id=%s queue_tag=%s "
+                            "single service doctor_id=%s is not an "
+                            "eligible real owner (inactive/unlinked/"
+                            "synthetic) — treating the tag as unowned (D-08)",
+                            visit.id,
                             queue_tag,
-                            specialist_doctor_id,
+                            candidate_id,
                         )
-                    else:
-                        logger.warning(
-                            "Lab resource user id=%s has no doctor row",
-                            lab_resource.id,
-                        )
+                elif len(visit_service_doctor_ids) > 1:
+                    # QD-2E (Codex round-4 P2): и эта ветка — доменная
+                    # ошибка подтверждения (422 + причина), не голый
+                    # ValueError у PWA/Telegram-обёрток.
+                    config_error = owner_configuration_error(
+                        queue_tag=queue_tag,
+                        detail=(
+                            f"visit_id={visit.id} carries multiple explicit "
+                            "service doctors for one tag — the operator "
+                            "must pick one per booking"
+                        ),
+                    )
+                    raise VisitConfirmationDomainError(
+                        status_code=422,
+                        detail=str(config_error),
+                    ) from config_error
 
             if not specialist_doctor_id and not registry_tag:
-                daily_queue = self._get_active_daily_queue_by_tag(today, queue_tag)
-                if not daily_queue:
-                    logger.info(
-                        "No doctor profile or active daily queue for "
-                        "confirmation visit_id=%s doctor_id=%s queue_tag=%s",
-                        visit.id,
-                        visit.doctor_id,
-                        queue_tag,
-                    )
-                    continue
+                # An existing queue for this tag does not prove who should
+                # perform an unowned service. D-08 requires an explicit owner.
+                logger.error(
+                    "QD-2E fail-closed: queue_tag=%s has no owner surface "
+                    "for confirmation visit_id=%s doctor_id=%s",
+                    queue_tag,
+                    visit.id,
+                    visit.doctor_id,
+                )
+                unowned_queue_tags.append(queue_tag)
+                continue
 
-            if daily_queue is None:
-                daily_queue = self.repository.get_or_create_daily_queue(
-                    day=today,
+            if existing_claim is not None:
+                daily_queue = existing_claim.daily_queue
+                existing_entry = existing_claim.entry
+                self._assert_existing_claim_owner(
+                    daily_queue=daily_queue,
                     specialist_id=specialist_doctor_id,
+                    queue_resource_id=(
+                        int(registry_resource.id)
+                        if registry_surface is None and registry_resource is not None
+                        else None
+                    ),
+                    expected_daily_queue_id=(
+                        int(registry_surface.id)
+                        if registry_surface is not None
+                        else None
+                    ),
                     queue_tag=queue_tag,
                 )
-
-            existing_entry = self._resolve_existing_active_entry(
-                daily_queue=daily_queue,
-                visit=visit,
-                patient=patient,
-                confirmation_phone=confirmation_phone,
-                confirmation_telegram_id=confirmation_telegram_id,
-            )
-            if existing_entry:
                 self._reuse_existing_active_entry(
                     existing_entry=existing_entry,
                     visit=visit,
@@ -884,6 +907,11 @@ class VisitConfirmationService:
                 queue_number = existing_entry.number
                 queue_id = existing_entry.queue_id
             else:
+                daily_queue = self.repository.get_or_create_daily_queue(
+                    day=today,
+                    specialist_id=specialist_doctor_id,
+                    queue_tag=queue_tag,
+                )
                 queue_number = queue_service.get_next_queue_number(
                     self.repository.db,
                     daily_queue=daily_queue,
@@ -897,6 +925,7 @@ class VisitConfirmationService:
                     visit_id=visit.id,
                     number=queue_number,
                     source="confirmation",
+                    commit=False,
                 )
                 queue_number = created_entry.number
                 queue_id = created_entry.queue_id
@@ -918,8 +947,15 @@ class VisitConfirmationService:
                 "lab": "Лаборатория",
                 "general": "Общая очередь",
             }
+            # QD-2E (Codex round-2 P2): талон строится от РЕШЁННОГО
+            # владельца записи — у doctorless-визита K01/K11 владельцем
+            # становится врач услуги (specialist_doctor_id), а не пустой
+            # visit.doctor_id (иначе талон печатал «Без врача»).
+            resolved_owner_id = specialist_doctor_id or visit.doctor_id
             doctor = (
-                self.repository.get_doctor(visit.doctor_id) if visit.doctor_id else None
+                self.repository.get_doctor(resolved_owner_id)
+                if resolved_owner_id
+                else None
             )
             patient = self.repository.get_patient(visit.patient_id)
 
@@ -956,6 +992,24 @@ class VisitConfirmationService:
                     **ticket_payload_extra,
                 }
             )
+
+        if unowned_queue_tags:
+            # Атомарно: ни один номер не закреплён — вызывающая транзакция
+            # откатывается целиком. QD-2E (Codex round-3 P2): ошибка
+            # владельца — ДОМЕННАЯ ошибка подтверждения (422 с причиной и
+            # путями решения), а не голый ValueError — PWA/Telegram-
+            # обёртки и регистраторский путь не превращают её в 500.
+            config_error = owner_configuration_error(
+                queue_tag=", ".join(sorted(set(unowned_queue_tags))),
+                detail=(
+                    f"visit_id={visit.id} confirmation cannot resolve an "
+                    "owner surface for the listed tag(s)"
+                ),
+            )
+            raise VisitConfirmationDomainError(
+                status_code=422,
+                detail=str(config_error),
+            ) from config_error
 
         return queue_numbers, print_tickets
 

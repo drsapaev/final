@@ -7,11 +7,16 @@ from typing import Any
 from app.api.v1.endpoints.registrar_wizard._helpers import *  # noqa
 from app.api.v1.endpoints.registrar_wizard._helpers import (
     _apply_service_discount,
+    _assert_cart_doctor_eligibility,
     _check_repeat_visit_eligibility,
     _load_registration_discount_settings,
     _resolve_effective_discount_mode,
 )  # noqa: F401
+from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.online_queue import DailyQueue
+from app.services.registrar_wizard_queue_assignment_service import (
+    DuplicateCartResourceQueueVisitsError,
+)
 
 
 @router.post("/registrar/cart", response_model=CartResponse)
@@ -78,6 +83,38 @@ def create_cart_appointments(
         # re-read (an unlocked reload would see settings rows inserted by the
         # admin endpoint after revalidation, which FOR UPDATE cannot lock).
         registration_settings = validated_settings or _load_registration_discount_settings(db)
+
+        # RQ-05.a (server-side doctor eligibility): requires_doctor=true
+        # услуги не должны сохраняться без врача, с неактивным врачом или
+        # врачом чужой специальности (E-023: на пути корзины проверки НЕ
+        # было). Гейт стоит ДО prelock advisory-замков и первой записи:
+        # отклонённая корзина не оставляет частичного состояния. Семантика
+        # специальности зеркалирует фронтовый filterDoctorsForService
+        # (SSOT: DOCTOR_QUEUE_SPECIALTY_VARIANTS).
+        _assert_cart_doctor_eligibility(db, cart_data.visits)
+
+        # QD-2E review P1 (cart/GQL lock ordering): every (day, tag) claim
+        # scope of the cart is taken BEFORE the first cart write. The
+        # visit INSERTs below fire the doctors FK check — a FOR KEY SHARE
+        # row lock on the doctor held until the single db.commit() below —
+        # so acquiring the tag/day advisory locks only inside queue
+        # assignment inverted the order against GraphQL joinQueue (tag
+        # lock first, then Doctor FOR UPDATE) and deadlocked PostgreSQL
+        # under concurrency. Pre-acquired scopes are re-entrant inside the
+        # assignment pass (idempotent transaction-scoped xact locks).
+        # ``today`` is computed once and reused for the assignment call so
+        # the pre-locked scope set cannot drift across a midnight rollover.
+        today = date.today()
+        RegistrarWizardQueueAssignmentService.assert_unique_same_day_resource_queue_visits(
+            db,
+            cart_data.visits,
+            target_day=today,
+        )
+        RegistrarWizardQueueAssignmentService.prelock_cart_tag_claim_scopes(
+            db,
+            cart_data.visits,
+            target_day=today,
+        )
 
         created_visits = []
         created_visit_amounts: dict[int, Decimal] = {}
@@ -228,7 +265,9 @@ def create_cart_appointments(
 
         # Assign queue entries for confirmed same-day visits via extracted seam.
         queue_numbers = {}
-        today = date.today()
+        # ``today`` was computed BEFORE the pre-lock above — the same
+        # instance is reused so the assignment pass targets exactly the
+        # scopes that were pre-acquired.
 
         queue_numbers = RegistrarWizardQueueAssignmentService(db).assign_same_day_queue_numbers(
             created_visits,
@@ -371,6 +410,23 @@ def create_cart_appointments(
         # путь ошибки обязан откатить частичные данные корзины.
         db.rollback()
         raise
+    except DuplicateCartResourceQueueVisitsError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except QueueOwnerConfigurationError as exc:
+        # QD-2E (RQ-15.b): fail-closed владелец очереди — это
+        # КОНФИГУРАЦИОННАЯ ошибка каталога (D-08), а не сбой сервера:
+        # откатываем корзину и возвращаем оператору 422 с причиной и
+        # тремя путями решения (assign_doctor / retag_resource /
+        # disable_service по operator map RQ-15.b).
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     except Exception as e:
         logger.exception(
             "REGISTRATION: cart creation failed",
@@ -1537,4 +1593,3 @@ class BenefitSettingsResponse(BaseModel):
     benefit_consultation_free: bool
     all_free_auto_approve: bool
     updated_at: datetime
-

@@ -301,6 +301,120 @@ landing made explicit:
   alembic head and the deterministic conversion is a clean no-op on
   the second pass.
 
+### Stage E landing note (2026-09-17, RQ-15.d — migration 0069)
+
+Stage E retired the 0055 synthetic User+Doctor pairs
+(`ecg_resource` / `lab_resource` / `general_resource`) by the paired
+deletion the stage table prescribes — the terminal state has doctorless
+queues owned by `queue_resources` rows, a reference registry with no
+User, no role, no login. The pre-state was verified on production by
+the 2026-09-12 inventory (`evidence/stage_e_inventory_20260912_rerun.json`:
+`general_queues.total = 0`, zero active services on the synthetic
+doctors, and exactly ONE inbound FK row across 103 introspected
+surfaces — a failed-login probe). Four clarifications the landing made
+explicit:
+
+- **All-or-nothing, inventory-before-mutation.** The three pairs are
+  resolved as a SET: all present and shape-valid (linked doctor, the
+  0055 specialty, the post-0057 'Resource' role, not a superuser) →
+  the guarded deletion; all absent → a printed clean no-op (the
+  re-deploy path); a PARTIAL set or any shape drift → a loud abort
+  with nothing changed. The all-or-nothing invariant is also what
+  keeps the downgrade a TRUE inverse.
+- **Semantic guards before FK machinery.** ANY `services.doctor_id`
+  or `daily_queues.specialist_id` row referencing a synthetic doctor —
+  active OR historical — aborts with the per-row inventory: the
+  catalog and the queue history are never silently doctor-stripped
+  (0063 consumed every canonical bridge, so any survivor is drift).
+- **The FK catch-all.** On PostgreSQL every FK surface referencing
+  `users.id`/`doctors.id` is enumerated from `information_schema` and
+  counted BEFORE the deletion: NO ACTION/RESTRICT or CASCADE surfaces
+  with rows abort (the latter because the retirement never silently
+  cascade-deletes history), any SET NULL surface other than
+  `login_attempts` aborts (a future surface is an operator decision),
+  composite FKs abort as unsupported, and the pair's own
+  `doctors.user_id` self-reference is excluded. `login_attempts` is
+  the only allow-listed SET NULL surface — the designed security
+  semantic ("preserve failed attempts even if user deleted"): the
+  probe rows survive the deletion ANONYMIZED. Non-PostgreSQL
+  dialects skip the introspection with a printed note (the 0066
+  dialect-gate precedent); the semantic guards still run.
+- **A TRUE-inverse downgrade.** `downgrade` re-provisions the three
+  pairs in the exact 0055+0057 shape (username,
+  `!disabled:queue-resource` unusable hash, 'Resource' role, the 0055
+  specialty mapping, active, caps 1/15) with `ON CONFLICT DO
+  NOTHING` — no id invention, no sequence games; the anonymized
+  `login_attempts` rows stay anonymized (a downgrade restores PAIRS,
+  not per-row audit links).
+- **Pair-row locking before the resolution reads (post-merge
+  hardening, E-062).** The three User rows and their linked Doctor
+  rows are locked `FOR UPDATE` — users first, then doctors, each
+  ordered by id — BEFORE the resolution SELECT and every guard runs
+  (PostgreSQL; the SQLite scratch harness skips with a printed note,
+  the P1-2 dialect-gate precedent). `FOR UPDATE` conflicts with every
+  concurrent row writer (a re-purpose of `users.role`, an orphaning
+  `doctors.user_id` update) and with the `FOR KEY SHARE` lock an
+  FK-referencing INSERT takes on the parent row, so the inventory,
+  the guards, and the deletion see ONE stable world: the "verified
+  0055 shape" contract holds at DELETE time, not just at CHECK time.
+  The rowcount verification and the postcondition re-check stay in
+  place as the backstop (defense in depth). Applied in the only
+  window where the merged 0069 body may change — BEFORE the
+  production application (the operator stage).
+- **The locked SET, the provable terminal state, the exact-shape
+  downgrade (the E-062 review round).** Three hardenings close the
+  gaps a lock-on-rows cannot: (1) the lock selects return the locked
+  id sets and the resolution must prove EXACT set equality — a pair
+  that appeared AFTER the locks (a concurrent restore of a missing
+  half committing between the locks and the read) was never locked,
+  and the retirement aborts rather than delete an unlocked row;
+  (2) "all three usernames absent" is the already-retired verdict
+  only while no ACTIVE Doctor row carries the bridge vocabulary
+  without a User link — the `active` flag is the provenance-honest
+  discriminator: the sanctioned user-deletion path DEACTIVATES the
+  profile before deleting the owner, so an inactive userless
+  bridge-specialty row is preserved clinical history ('general'
+  doubles as the live `INCOMPLETE_DOCTOR_SPECIALTY` onboarding
+  sentinel), while a raw hand-deleted User (the `doctors.user_id`
+  FK is ON DELETE SET NULL, nothing deactivates the row) leaves the
+  half ACTIVE — and an ACTIVE userless row is drift either way
+  (decision #13: the linkage contract) — and the same proof runs
+  when the pairs are present, so the bridge vocabulary always
+  leaves WITH the pairs; (3) the downgrade verifies an existing
+  username field-by-field (hash, role, is_active, is_superuser,
+  must_change_password, exactly one linked Doctor, specialty,
+  active, caps 1/15) before treating it as the idempotent no-op,
+  and a final postcondition re-verifies all three pairs — a
+  username captured by a foreign row aborts instead of a silent
+  skip.
+- **Table locks around the whole verdict window (the E-062 review
+  round 2).** Row locks fix only the rows they SEE, so two
+  read-to-commit windows stayed open to a concurrent INSERT that
+  would silently invalidate the verdict Alembic is about to stamp:
+  the already-retired no-op pass (no pair rows exist to lock at
+  all — a rival could restore a pair or insert an ACTIVE userless
+  bridge Doctor after the final guard read), and the downgrade's
+  postcondition window (a rival could delete a just-restored pair
+  after the final read). Both migrations now OPEN the transaction
+  with `LOCK TABLE users, doctors IN SHARE ROW EXCLUSIVE MODE`
+  (PostgreSQL; the SQLite scratch harness skips with a printed
+  note): SHARE ROW EXCLUSIVE conflicts with every
+  INSERT/UPDATE/DELETE (ROW EXCLUSIVE) on the two tables, while
+  plain readers (ACCESS SHARE) and row-lockers (ROW SHARE) are
+  unaffected — from the first statement to the commit, no
+  concurrent writer can land inside the window, and the stamped
+  verdict is true of a world no concurrent writer can change. The
+  P2-1 set-equality guard stays as defense-in-depth beneath the
+  table lock.
+
+The runtime half needed no code change: since the QD-2E cutover
+(0066, RQ-15.b) the owner resolution is fail-closed
+(`queue_owner_policy`) and the internal-account guards are ROLE-based,
+not username-based (the gate-5 vocabulary ruling) — deleting the rows
+leaves no dangling vocabulary in runtime code. The 0056/0057
+'Resource' role machinery stays: it guards any FUTURE internal account
+the operator may provision.
+
 ### Guidance for readers of this ADR
 
 Anything that routes, authorizes, or reports on queues must treat ownership
@@ -321,7 +435,10 @@ writes a resource-owned row; stage D enforces the XOR at the DB level.
   constraints and does NOT restore consumed bridge links (the upgrade
   log inventory is the audit trail).
 - Existing doctor-owned rows: byte-compatible, untouched at every stage.
-- Synthetic identities: removed only in stage E, after zero references.
+- Synthetic identities: removed only in stage E, after zero references
+  (`0069_sentinel_pair_retirement` — the paired deletion with the guard
+  taxonomy above; a pre-E backup is the restore path, the migration log
+  inventory is the audit trail).
 
 ---
 

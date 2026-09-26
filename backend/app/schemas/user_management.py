@@ -7,13 +7,11 @@ import os
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Literal, Union
+from typing import Annotated, Any, Literal
 
 from email_validator import EmailNotValidError
 from email_validator import validate_email as validate_email_address
-from typing_extensions import Annotated
-
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic.config import ConfigDict
 
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
@@ -552,11 +550,17 @@ class UserAuditLogResponse(UserAuditLogBase):
 # the spelling by construction; the freeze is the mechanism, exactly as
 # for Manager.
 _USER_MANAGEMENT_ROLE_PATTERN = (
-    "^(Admin|Registrar|Doctor|Cashier|Lab|Patient|"
+    "^(Admin|Registrar|Nurse|Doctor|Cashier|Lab|Patient|"
     "SuperAdmin|"
     + "|".join(sorted(DOCTOR_ROLE_SPELLINGS))
     + ")$"
 )
+# NURSE-V2 (owner design-GO 2026-09-19): 'Nurse' added to the write
+# vocabulary " + EM + " the canonical product role is re-opened (N2-2):
+# a Nurse User can be created/updated through user management WITHOUT a
+# doctor_profile (the NonDoctorRoleLiteral variant below), exactly like
+# Registrar. Privileges are NOT granted here " + EM + " Nurse stays
+# privilege-zero until N2-3 serving permissions.
 
 # Roles accepted by POST /users WITHOUT a doctor_profile. Exact complement
 # of the canonical "Doctor" variant below — DOCTOR_ROLE_SPELLINGS carries
@@ -576,6 +580,11 @@ _USER_MANAGEMENT_ROLE_PATTERN = (
 _NON_DOCTOR_ROLE_VALUES: tuple[str, ...] = (
     "Admin",
     "Registrar",
+    # NURSE-V2 (owner design-GO 2026-09-19): 'Nurse' accepted by
+    # POST /users WITHOUT a doctor_profile " + EM + " the role is a
+    # non-doctor clinical-serving role (workplace assignments are
+    # administered separately, N2-2 admin contract).
+    "Nurse",
     "Cashier",
     "Lab",
     "Patient",
@@ -744,9 +753,20 @@ class NonDoctorUserCreateRequest(_UserCreateCommon):
 # discriminator, so OpenAPI/generated TS distinguish the Doctor variant
 # (doctor_profile REQUIRED) from every non-Doctor create.
 UserCreateRequest = Annotated[
-    Union[DoctorUserCreateRequest, NonDoctorUserCreateRequest],
+    DoctorUserCreateRequest | NonDoctorUserCreateRequest,
     Field(discriminator="role"),
 ]
+
+
+class UserPhoneScopeConflictDetail(BaseModel):
+    """Body of the HTTP 409 phone-scope conflict on the user-management
+    surfaces (Phase 0, PR #3320 round 2): ``{"detail": ...}``.
+
+    Raised when a mutation would create a SECOND active verified
+    Patient-user on a phone that already backs another active patient
+    portal account (the login resolver is fail-closed at >1 candidates)."""
+
+    detail: str
 
 
 class UserUpdateRequest(BaseModel):

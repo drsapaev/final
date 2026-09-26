@@ -38,6 +38,11 @@ if (typeof window !== 'undefined') {
     setItem: vi.fn((key: string, value: string) => { _localStorageStore[key] = String(value); }),
     removeItem: vi.fn((key: string) => { delete _localStorageStore[key]; }),
     clear: vi.fn(() => { for (const k of Object.keys(_localStorageStore)) delete _localStorageStore[k]; }),
+    // Round-9 (PR #3362 review P1-2): Storage-faithful enumeration — the
+    // per-attempt attempt-state discovery scans keys by prefix, so the
+    // mock must implement length + key(i) like a real Storage.
+    get length() { return Object.keys(_localStorageStore).length; },
+    key(index: number) { return Object.keys(_localStorageStore)[index] ?? null; },
   };
   Object.defineProperty(window, 'localStorage', {
     value: localStorageMock,
@@ -60,6 +65,9 @@ if (typeof window !== 'undefined') {
     setItem: vi.fn((key, value) => { _sessionStore[key] = String(value); }),
     removeItem: vi.fn((key) => { delete _sessionStore[key]; }),
     clear: vi.fn(() => { for (const k of Object.keys(_sessionStore)) delete _sessionStore[k]; }),
+    // Round-8: Storage-faithful enumeration (same reason as localStorage).
+    get length() { return Object.keys(_sessionStore).length; },
+    key(index: number) { return Object.keys(_sessionStore)[index] ?? null; },
   };
   Object.defineProperty(window, 'sessionStorage', {
     value: sessionStorageMock,

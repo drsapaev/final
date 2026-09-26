@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, desc, func
+from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -14,6 +14,7 @@ from app.models.patient import Patient
 from app.models.payment_webhook import PaymentWebhook
 from app.models.user import User
 from app.models.visit import Visit
+from app.services.analytics import department_ids_for_filter
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -28,6 +29,34 @@ def raise_admin_stats_error(action: str, public_detail: str, exc: Exception) -> 
     raise HTTPException(status_code=500, detail=public_detail)
 
 
+def _as_date(value: date | datetime | str) -> date:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(value)
+
+
+def _daily_counts_by_date(
+    db: Session,
+    model: Any,
+    timestamp_column: Any,
+    start: datetime,
+    end_exclusive: datetime,
+    *filters: Any,
+) -> dict[date, int]:
+    day_expression = func.date(timestamp_column)
+    query = db.query(day_expression, func.count(model.id)).filter(
+        timestamp_column >= start,
+        timestamp_column < end_exclusive,
+        *filters,
+    )
+    return {
+        _as_date(day): int(count)
+        for day, count in query.group_by(day_expression).all()
+    }
+
+
 @router.get("/stats", summary="Общая статистика для админ-панели", response_model=dict[str, Any])
 def get_admin_stats(
     db: Session = Depends(get_db),
@@ -38,62 +67,15 @@ def get_admin_stats(
         # Даты/границы
         today: date = datetime.now(UTC).date()
 
-        # Пользователи
-        total_users = db.query(User).count()
-
-        # Врачи (включая специализированные роли)
-        total_doctors = (
-            db.query(User)
-            .filter(User.role.in_(["Doctor", "cardio", "derma", "dentist"]))
-            .count()
+        # Одна группировка по роли заменяет общий счётчик, подсчёт врачей
+        # и восемь отдельных запросов для roleStats.
+        user_counts_by_role = dict(
+            db.query(User.role, func.count(User.id)).group_by(User.role).all()
         )
-
-        # Пациенты
-        total_patients = db.query(Patient).count()
-
-        # Доход (успешные платежи; amount хранится в тийинах)
-        total_revenue_cents = (
-            db.query(func.coalesce(func.sum(PaymentWebhook.amount), 0))
-            .filter(PaymentWebhook.status == "processed")
-            .scalar()
-            or 0
-        )
-        total_revenue = float(total_revenue_cents) / 100.0
-
-        # Записи и визиты за сегодня
-        appointments_today = (
-            db.query(Appointment).filter(Appointment.appointment_date == today).count()
-        )
-
-        # Используем сравнение datetime для SQLite совместимости
-        today_start = datetime.combine(today, time.min)
-        today_end = datetime.combine(today, time.max)
-
-        visits_today = (
-            db.query(Visit)
-            .filter(
-                and_(Visit.created_at >= today_start, Visit.created_at <= today_end)
-            )
-            .count()
-        )
-
-        # Ожидающие подтверждения записей
-        pending_approvals = (
-            db.query(Appointment).filter(Appointment.status == "pending").count()
-        )
-
-        # Новые пациенты за сегодня
-        new_patients_today = (
-            db.query(Patient)
-            .filter(
-                and_(Patient.created_at >= today_start, Patient.created_at <= today_end)
-            )
-            .count()
-        )
-
-        # Разбивка по ролям
-        role_stats: dict[str, int] = {}
-        roles = [
+        total_users = sum(user_counts_by_role.values())
+        doctor_roles = ("Doctor", "cardio", "derma", "dentist")
+        total_doctors = sum(user_counts_by_role.get(role, 0) for role in doctor_roles)
+        roles = (
             "Admin",
             "Registrar",
             "Doctor",
@@ -102,9 +84,77 @@ def get_admin_stats(
             "cardio",
             "derma",
             "dentist",
-        ]
-        for r in roles:
-            role_stats[r.lower()] = db.query(User).filter(User.role == r).count()
+        )
+        role_stats = {
+            role.lower(): int(user_counts_by_role.get(role, 0)) for role in roles
+        }
+
+        # Используем сравнение datetime для SQLite совместимости
+        today_start = datetime.combine(today, time.min)
+        today_end = datetime.combine(today, time.max)
+
+        # Независимые агрегаты собираем одним SQL-запросом: при удалённой БД
+        # каждый отдельный запрос добавляет задержку сети к открытию панели.
+        revenue_cents = (
+            select(func.coalesce(func.sum(PaymentWebhook.amount), 0))
+            .where(PaymentWebhook.status == "processed")
+            .scalar_subquery()
+        )
+        patient_counts = select(
+            func.count(Patient.id).label("total_patients"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                Patient.created_at >= today_start,
+                                Patient.created_at <= today_end,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("new_patients_today"),
+        ).subquery()
+
+        appointments_today_count = (
+            select(func.count(Appointment.id))
+            .where(Appointment.appointment_date == today)
+            .scalar_subquery()
+        )
+        pending_approvals_count = (
+            select(func.count(Appointment.id))
+            .where(Appointment.status == "pending")
+            .scalar_subquery()
+        )
+        visits_today_count = (
+            select(func.count(Visit.id))
+            .where(and_(Visit.created_at >= today_start, Visit.created_at <= today_end))
+            .scalar_subquery()
+        )
+        (
+            total_revenue_cents,
+            total_patients,
+            new_patients_today,
+            appointments_today,
+            pending_approvals,
+            visits_today,
+        ) = db.query(
+            revenue_cents,
+            patient_counts.c.total_patients,
+            patient_counts.c.new_patients_today,
+            appointments_today_count,
+            pending_approvals_count,
+            visits_today_count,
+        ).one()
+        total_revenue = float(total_revenue_cents or 0) / 100.0
+        total_patients = int(total_patients)
+        new_patients_today = int(new_patients_today)
+        appointments_today = int(appointments_today)
+        pending_approvals = int(pending_approvals)
+        visits_today = int(visits_today)
 
         return {
             "totalUsers": total_users,
@@ -155,8 +205,11 @@ def get_quick_stats(
             .count()
         )
 
-        today_revenue_rows = (
-            db.query(PaymentWebhook)
+        today_revenue_cents, today_transactions = (
+            db.query(
+                func.coalesce(func.sum(PaymentWebhook.amount), 0),
+                func.count(PaymentWebhook.id),
+            )
             .filter(
                 and_(
                     PaymentWebhook.status == "processed",
@@ -164,16 +217,16 @@ def get_quick_stats(
                     PaymentWebhook.created_at <= today_end,
                 )
             )
-            .all()
+            .one()
         )
-        today_revenue = sum(float(p.amount) / 100.0 for p in today_revenue_rows)
+        today_revenue = float(today_revenue_cents) / 100.0
 
         return {
             "today": {
                 "visits": today_visits,
                 "newPatients": today_patients,
                 "revenue": today_revenue,
-                "transactions": len(today_revenue_rows),
+                "transactions": int(today_transactions),
             },
             "generatedAt": datetime.now(UTC).isoformat(),
         }
@@ -205,9 +258,22 @@ def get_recent_activities(
             .all()
         )
 
+        # PERF: имена пациентов загружаем ОДНИМ batch-запросом. N+1 по
+        # удалённому (us-east-1) пулеру стоил ~200мс на запись и разгонял
+        # эндпоинт до 15.6с p95 (Sentry SLA breach 2026-09-14).
+        appointment_patient_ids = sorted(
+            {apt.patient_id for apt in recent_appointments if apt.patient_id is not None}
+        )
+        patients_by_id: dict[int, Patient] = {}
+        if appointment_patient_ids:
+            for patient in (
+                db.query(Patient).filter(Patient.id.in_(appointment_patient_ids)).all()
+            ):
+                patients_by_id[patient.id] = patient
+
         for apt in recent_appointments:
-            # Получаем имя пациента
-            patient = db.query(Patient).filter(Patient.id == apt.patient_id).first()
+            # Получаем имя пациента (из батча, без N+1)
+            patient = patients_by_id.get(apt.patient_id) if apt.patient_id is not None else None
             patient_name = (
                 patient.short_name() if patient else f"Пациент #{apt.patient_id}"
             )
@@ -395,55 +461,31 @@ def get_activity_chart(
         end_date = datetime.now(UTC).date()
         start_date = end_date - timedelta(days=days - 1)
 
+        start = datetime.combine(start_date, time.min)
+        end_exclusive = datetime.combine(end_date + timedelta(days=1), time.min)
+        appointments_by_date = _daily_counts_by_date(
+            db, Appointment, Appointment.created_at, start, end_exclusive
+        )
+        payments_by_date = _daily_counts_by_date(
+            db,
+            PaymentWebhook,
+            PaymentWebhook.created_at,
+            start,
+            end_exclusive,
+            PaymentWebhook.status == "processed",
+        )
+        users_by_date = _daily_counts_by_date(
+            db, User, User.created_at, start, end_exclusive
+        )
+
         chart_data = []
         labels = []
 
         current_date = start_date
         while current_date <= end_date:
-            # Используем сравнение datetime для SQLite совместимости
-            # Создаем начало и конец дня как naive datetime (без timezone)
-            day_start = datetime.combine(current_date, time.min)
-            day_end = datetime.combine(current_date, time.max)
-
-            # Подсчет записей за день
-            appointments_count = (
-                db.query(Appointment)
-                .filter(
-                    and_(
-                        Appointment.created_at.isnot(None),
-                        Appointment.created_at >= day_start,
-                        Appointment.created_at <= day_end,
-                    )
-                )
-                .count()
-            )
-
-            # Подсчет платежей за день
-            payments_count = (
-                db.query(PaymentWebhook)
-                .filter(
-                    and_(
-                        PaymentWebhook.status == "processed",
-                        PaymentWebhook.created_at.isnot(None),
-                        PaymentWebhook.created_at >= day_start,
-                        PaymentWebhook.created_at <= day_end,
-                    )
-                )
-                .count()
-            )
-
-            # Подсчет новых пользователей за день
-            users_count = (
-                db.query(User)
-                .filter(
-                    and_(
-                        User.created_at.isnot(None),
-                        User.created_at >= day_start,
-                        User.created_at <= day_end,
-                    )
-                )
-                .count()
-            )
+            appointments_count = appointments_by_date.get(current_date, 0)
+            payments_count = payments_by_date.get(current_date, 0)
+            users_count = users_by_date.get(current_date, 0)
 
             labels.append(current_date.strftime("%d.%m"))
             chart_data.append(
@@ -539,9 +581,17 @@ def get_analytics_overview(
 
         # Применяем фильтры
         if department and department != "all":
-            appointments_query = appointments_query.filter(
-                Appointment.department == department
-            )
+            # Round-10 (owner P2, PR #3340): the canonical KEY resolves to FK
+            # ids (department_ids_for_filter) — the old
+            # `Appointment.department == department` compared the ORM
+            # RELATIONSHIP to the string (ArgumentError → 500 on the first
+            # keyed overview). An unknown key answers an EMPTY overview
+            # (exact-key semantics).
+            department_ids = department_ids_for_filter(db, department)
+            if department_ids is not None:
+                appointments_query = appointments_query.filter(
+                    Appointment.department_id.in_(department_ids)
+                )
 
         if doctor_id and doctor_id != 0:
             appointments_query = appointments_query.filter(
@@ -599,15 +649,22 @@ def get_analytics_overview(
                 doctor_appointments = [
                     apt for apt in appointments_all if apt.doctor_id == doctor_id
                 ]
-                department = (
-                    doctor_appointments[0].department
-                    if doctor_appointments and doctor_appointments[0].department
+                # Round-10 (owner P2, PR #3340): the JSON contract is the
+                # STRING canonical department — `doctor_appointments[0].department`
+                # is the ORM RELATIONSHIP, and a Department OBJECT went into
+                # the JSON payload (TypeError → 500 for every doctor whose
+                # first appointment carried a non-NULL department_id). The
+                # `department_key` accessor publishes the same `cardio`-style
+                # string every other read surface shows.
+                doctor_department = (
+                    doctor_appointments[0].department_key
+                    if doctor_appointments and doctor_appointments[0].department_key
                     else "Неизвестно"
                 )
                 top_doctors.append(
                     {
                         "name": doctor_name,
-                        "department": department,
+                        "department": doctor_department,
                         "patients": stats["appointments"],
                         "revenue": f"{stats['revenue']:.0f} UZS",
                     }
@@ -689,9 +746,13 @@ def get_analytics_charts(
                 )
             )
             if department and department != "all":
-                appointments_query = appointments_query.filter(
-                    Appointment.department == department
-                )
+                # Round-10 (owner P2, PR #3340): FK-id filter, see
+                # department_ids_for_filter (relationship-vs-string → 500).
+                department_ids = department_ids_for_filter(db, department)
+                if department_ids is not None:
+                    appointments_query = appointments_query.filter(
+                        Appointment.department_id.in_(department_ids)
+                    )
             appointments_count = appointments_query.count()
 
             # Доходы за день

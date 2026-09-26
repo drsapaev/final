@@ -5,14 +5,18 @@ ARG VITE_API_URL=http://localhost:18080
 ARG VITE_API_BASE_URL=http://localhost:18080
 ARG VITE_WS_URL=ws://localhost:18080
 ARG VITE_WS_HOST=localhost:18080
+ARG VITE_SENTRY_DSN=
+ARG VITE_SENTRY_ENV=staging
 
 ENV CI=true \
-    NODE_ENV=development \
+    NODE_ENV=production \
     VITE_API_BASE=${VITE_API_BASE} \
     VITE_API_URL=${VITE_API_URL} \
     VITE_API_BASE_URL=${VITE_API_BASE_URL} \
     VITE_WS_URL=${VITE_WS_URL} \
-    VITE_WS_HOST=${VITE_WS_HOST}
+    VITE_WS_HOST=${VITE_WS_HOST} \
+    VITE_SENTRY_DSN=${VITE_SENTRY_DSN} \
+    VITE_SENTRY_ENV=${VITE_SENTRY_ENV}
 
 WORKDIR /app
 
@@ -23,7 +27,8 @@ RUN npm ci --legacy-peer-deps --include=dev
 COPY src /app/src
 COPY public /app/public
 COPY index.html /app/index.html
-COPY vite.config.js /app/vite.config.js
+COPY vite.config.ts /app/vite.config.ts
+COPY sw.template.js /app/sw.template.js
 
 RUN npm run build
 

@@ -43,6 +43,14 @@ import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 import { getErrorMessage } from '../../utils/type-guards';
+import { extractApiPayload } from '../../utils/error-utils';
+// RQ-13 UI (S-11/D-06): one SSOT for lifecycle consequence texts + 409 parse.
+import {
+  describeDepartmentDeactivationConsequences,
+  describeDepartmentReactivationConsequences,
+  formatDepartmentDeleteBlockMessage,
+  parseDepartmentDeleteBlock,
+} from './departmentLifecycle';
 const API_BASE = getApiOrigin();
 
 const DEFAULT_STATS = {
@@ -71,6 +79,15 @@ const DEFAULT_FORM = {
   display_order: 999,
   active: true
 };
+
+// Round-2 review P2 (PR 3455): mirror the server-side create contract
+// (DepartmentCreate.key — lowercase latin identifier, max 50) in the form,
+// so a value the UI presents as valid always survives the API boundary.
+// Applied on create/CSV-import only: the update schema has no key field
+// (server-side immutable), and legacy keys created before the contract
+// must stay editable.
+const DEPARTMENT_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
+const DEPARTMENT_KEY_MAX_LENGTH = 50;
 
 // ✅ НОВОЕ: Форма для настройки маппинга услуг
 const DEFAULT_SERVICE_MAPPING = {
@@ -238,13 +255,24 @@ const DepartmentManagement = () => {
   }, [loadDepartments]);
 
   const validateDepartment = useCallback(
-    (data: Record<string, unknown>, currentId: string | number | null = null) => {
+    (data: Record<string, unknown>, currentId: string | number | null = null, enforceKeyPattern: boolean = true) => {
       const errors: Record<string, string> = {};
       if (!data.name_ru || String(data.name_ru ?? '').trim().length < 2) {
         errors.name_ru = t('admin2.dept_err_name_required');
       }
-      if (!data.key || String(data.key ?? '').trim().length < 2) {
+      if (!data.key || !String(data.key ?? '').trim()) {
+        // Round-5 review P2: the server contract (DepartmentCreate.key)
+        // is min_length=1 — a single lowercase letter is a VALID key, so
+        // the required check must only reject an empty/whitespace value;
+        // the pattern branch below enforces the rest of the contract.
         errors.key = t('admin2.dept_err_key_required');
+      } else if (
+        enforceKeyPattern &&
+        (!DEPARTMENT_KEY_PATTERN.test(String(data.key)) || String(data.key).length > DEPARTMENT_KEY_MAX_LENGTH)
+      ) {
+        // Round-2 review P2: inline format guidance matching the 422 the
+        // server would otherwise return after the submit.
+        errors.key = t('admin2.dept_err_key_pattern');
       } else {
         const duplicate = departments.find((dept: Record<string, unknown>) => dept.key === data.key && dept.id !== currentId);
         if (duplicate) {
@@ -317,7 +345,10 @@ const DepartmentManagement = () => {
 
   const handleUpdateDepartment = async () => {
     if (!editingDepartment) return;
-    const errors = validateDepartment(formData, String(editingDepartment?.id ?? ''));
+    // Round-2 review P2: pattern is NOT enforced on update — the server
+    // update schema has no key field (immutable) and legacy keys created
+    // before the unified contract must remain savable.
+    const errors = validateDepartment(formData, String(editingDepartment?.id ?? ''), false);
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       toast.error(t('admin2.dept_err_fix_form'));
@@ -341,8 +372,47 @@ const DepartmentManagement = () => {
     }
   };
 
+  // RQ-13 UI (S-11/D-06): the status switch tells the operator what will
+  // happen BEFORE the transition — deactivation lists the three
+  // distinguishable D-06 consequences (close new entries / hide tab + QR /
+  // waiting patients keep being served), reactivation explains the 1:1
+  // restore semantics. Cancel leaves everything untouched.
+  const buildLifecycleConfirm = async (deptName: string, newActive: boolean, count: number | null) => {
+    const bullets = newActive
+      ? describeDepartmentReactivationConsequences(t)
+      : describeDepartmentDeactivationConsequences(t);
+    const title = newActive
+      ? t('admin2.dept_reactivate_confirm_title')
+      : t('admin2.dept_deactivate_confirm_title');
+    const message = count === null
+      ? (newActive
+        ? t('admin2.dept_reactivate_confirm_msg', { name: deptName })
+        : t('admin2.dept_deactivate_confirm_msg', { name: deptName }))
+      : (newActive
+        ? t('admin2.dept_reactivate_confirm_msg_bulk', { count })
+        : t('admin2.dept_deactivate_confirm_msg_bulk', { count }));
+    return confirm({
+      title,
+      message,
+      description: (
+        <ul style={{ paddingLeft: 18, margin: '4px 0 0' }}>
+          {bullets.map((b) => (<li key={b}>{b}</li>))}
+        </ul>
+      ),
+      confirmLabel: newActive ? t('admin2.dept_reactivate_confirm_ok') : t('admin2.dept_deactivate_confirm_ok'),
+      cancelLabel: t('admin2.cancel'),
+      intent: newActive ? 'primary' : 'warning',
+    });
+  };
+
   // ✅ НОВОЕ: Быстрое переключение статуса отделения
   const handleToggleActive = async (dept: Record<string, unknown>, newActive: boolean) => {
+    const ok = await buildLifecycleConfirm(
+      String(dept.name_ru ?? dept.name ?? dept.key ?? ''),
+      newActive,
+      null,
+    );
+    if (!ok) return;
     try {
       await api.put(`/admin/departments/${String(dept.id ?? "")}`, { active: newActive });
       toast.success(newActive ? t('admin2.dept_activated') : t('admin2.dept_deactivated'));
@@ -384,7 +454,15 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка удаления отделения:', err);
-      toast.error(getErrorMessage(err) || t('admin2.dept_delete_failed'));
+      // RQ-13 UI (S-11): a 409 department_has_queue_history carries the
+      // live impact (waiting patients / owning profiles) — surface it and
+      // recommend the D-02-aligned alternative instead of a generic error.
+      const blockInfo = parseDepartmentDeleteBlock(extractApiPayload(err)?.detail);
+      if (blockInfo) {
+        toast.error(formatDepartmentDeleteBlockMessage(t, blockInfo, false));
+      } else {
+        toast.error(getErrorMessage(err) || t('admin2.dept_delete_failed'));
+      }
     }
   };
 
@@ -638,7 +716,14 @@ const DepartmentManagement = () => {
       }
     } catch (error: unknown) {
       logger.error('Ошибка массового удаления:', error);
-      toast.error(t('admin2.dept_bulk_delete_failed'));
+      // RQ-13 UI (S-11): bulk delete fails CLOSED server-side — the 409
+      // names every blocked department with its live impact.
+      const blockInfo = parseDepartmentDeleteBlock(extractApiPayload(error)?.detail);
+      if (blockInfo) {
+        toast.error(formatDepartmentDeleteBlockMessage(t, blockInfo, true));
+      } else {
+        toast.error(t('admin2.dept_bulk_delete_failed'));
+      }
     }
   };
 
@@ -647,6 +732,11 @@ const DepartmentManagement = () => {
       toast.warning(t('admin2.dept_select_departments'));
       return;
     }
+
+    // RQ-13 UI (S-11/D-06): the bulk buttons follow the same consequence
+    // confirmation as the row switch — one contract, not two behaviors.
+    const ok = await buildLifecycleConfirm('', activate, selectedDepartments.length);
+    if (!ok) return;
 
     try {
       const response = await api.patch('/admin/departments/bulk-activate', {
@@ -1131,6 +1221,7 @@ const DepartmentManagement = () => {
                                             <td className="admin-td-center">
                                                 <Switch
                           checked={dept.active !== false}
+                          aria-label={t('admin2.dept_status_switch_title')}
                           onChange={(checked: boolean) => handleToggleActive(dept, checked)} />
 
                                             </td>
@@ -1248,6 +1339,13 @@ const DepartmentManagement = () => {
                                 {validationErrors.name_uz}
                             </div>
             }
+                    </div>
+                    {/* RQ-13 UI (S-11): renaming must not leave diverging tab
+                        titles — the backend syncs the 1:1 profile title; say so. */}
+                    <div className="admin-grid-span-all">
+                        <div className="admin-hint-text-12-secondary-mt-4">
+                            {t('admin2.dept_rename_sync_hint')}
+                        </div>
                     </div>
                     <div>
                         <Input

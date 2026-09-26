@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AppProviders } from './providers/AppProviders';
@@ -17,6 +17,9 @@ import {
   Sidebar,
 } from './components/ui/macos';
 import HeaderNew from './components/layout/HeaderNew';
+// PR 3351 (review round 2, P1): route-level dirty guard для /lab — общий
+// реестр источников + диалог + sentinel против browser Back.
+import { LabDirtyGuardProvider, useGuardedLabNavigate } from './components/laboratory/LabDirtyGuardContext';
 // SW-05 fix: global command palette (Cmd+K)
 import { CommandPalette, type CommandProfile } from './components/common/CommandPalette';
 import GlobalNotificationCenter from './components/notifications/GlobalNotificationCenter';
@@ -51,6 +54,7 @@ const LabPanel = lazy(() => import('./pages/LabPanel'));
 const UserSelect = lazy(() => import('./pages/UserSelect'));
 const Search = lazy(() => import('./pages/Search'));
 const QueueJoin = lazy(() => import('./pages/QueueJoin'));
+const ConfirmVisitPage = lazy(() => import('./pages/ConfirmVisitPage'));
 const PatientPanel = lazy(() => import('./pages/PatientPanel'));
 const DisplayBoardUnified = lazy(() => import('./pages/DisplayBoardUnified'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
@@ -60,8 +64,11 @@ const PaymentCancel = lazy(() => import('./pages/PaymentCancel'));
 const PaymentTest = lazy(() => import('./pages/PaymentTest'));
 const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage'));
 const ChangePasswordRequired = lazy(() => import('./pages/auth/ChangePasswordRequired'));
+const PatientLoginPage = lazy(() => import('./pages/auth/PatientLoginPage'));
+const PatientActivatePage = lazy(() => import('./pages/auth/PatientActivatePage'));
 const PatientPickupView = lazy(() => import('./pages/PatientPickupView'));
 const UserProfile = lazy(() => import('./pages/UserProfile'));
+const NurseTabletPage = lazy(() => import('./pages/nurse/NurseTabletPage'));
 // SW-01 fix: removed ButtonShowcase (dead code, components/buttons/ deleted)
 const TelegramManager = lazy(() => import('./components/TelegramManager'));
 const TelegramMiniAppPatientShell = lazy(() => import('./pages/TelegramMiniAppPatientShell'));
@@ -76,6 +83,7 @@ const AdminDoctors = lazy(() => import('./components/admin/AdminDoctors'));
 const AdminPatients = lazy(() => import('./components/admin/AdminPatients'));
 const AdminAppointments = lazy(() => import('./components/admin/AdminAppointments'));
 const AdminServices = lazy(() => import('./components/admin/AdminServices'));
+const AdminSetupDirections = lazy(() => import('./components/admin/AdminSetupDirections'));
 const UnifiedFinance = lazy(() => import('./components/admin/UnifiedFinance'));
 const UnifiedSettings = lazy(() => import('./components/admin/UnifiedSettings'));
 const SystemManagement = lazy(() => import('./components/admin/SystemManagement'));
@@ -97,8 +105,11 @@ const ROUTE_COMPONENTS = {
   ResetPasswordPage,
   LoginFormStyled,
   ChangePasswordRequired,
+  PatientLoginPage,
+  PatientActivatePage,
   Health,
   QueueJoin,
+  ConfirmVisitPage,
   PaymentSuccess,
   PaymentCancel,
   DisplayBoardUnified,
@@ -124,6 +135,7 @@ const ROUTE_COMPONENTS = {
   Appointments,
   Search,
   UserProfile,
+  NurseTabletPage,
   PatientPickupView,
   MacOSDemoPage,
   IntegrationDemo,
@@ -142,6 +154,7 @@ const ROUTE_COMPONENTS = {
   AdminPatients,
   AdminAppointments,
   AdminServices,
+  AdminSetupDirections,
   UnifiedFinance,
   UnifiedSettings,
   SystemManagement,
@@ -167,13 +180,15 @@ function LoadingScreen() {
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const navigate = useNavigate();
+  // PR 3351: guarded navigate — sidebar и Command Palette уходят с /lab
+  // через dirty-guard при несохранённых черновиках.
+  const navigate = useGuardedLabNavigate();
   const { theme } = useTheme();
   const { isMobile } = useBreakpoint();
   const [authState, setAuthState] = useState(() => auth.getState());
   const chrome = getRouteChromeState(location.pathname, location.search, authState.profile as unknown as RouteProfile) as unknown as Record<string, unknown> & {
     sidebarItems?: unknown[]; sidebarSections?: unknown[]; activeSidebarItem?: string;
-    hideHeader?: boolean; hideSidebar?: boolean; route?: { id?: string };
+    hideHeader?: boolean; hideSidebar?: boolean; route?: { id?: string; component?: string };
     sidebarPreset?: { navigation?: string; queryParam?: string };
   };
   const compactSidebar = isMobile && !chrome.hideSidebar;
@@ -197,7 +212,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
     if (chrome.sidebarPreset?.navigation === 'query') {
       const params = new URLSearchParams(location.search);
       params.set(String(chrome.sidebarPreset.queryParam), String(item.id));
-      navigate({ pathname: location.pathname, search: `?${params.toString()}` });
+      // PR 3351 (review round 5, P1): replace — ТОЛЬКО для маршрута,
+      // рендерящего LabPanel. Doctor-панели (doctor/cardiology/dermatology/
+      // dentistry) делят этот query-код, но их контракт — PUSH (P-029,
+      // useDoctorPanelState): browser Back ходит между вкладками панели, а
+      // replace размонтировал бы панель целиком вместе с несохранёнными
+      // visitData/bloodTestForm/emr. Для LabPanel replace сохраняет
+      // sentinel-контракт «под вооружённым sentinel ровно одна настоящая
+      // /lab-запись» (подтверждённый уход = navigate(-2), после Save —
+      // один Back): внутренние /lab-переходы не создают history-записей.
+      const replaceQueryEntry = chrome.route?.component === 'LabPanel';
+      navigate({ pathname: location.pathname, search: `?${params.toString()}` }, { replace: replaceQueryEntry });
       // Collapse after navigation on mobile
       if (compactSidebar) setMobileSidebarExpanded(false);
       return;
@@ -449,7 +474,13 @@ export default function App() {
   return (
     <ThemeProvider>
       <AppProviders>
-        <AppContent />
+        {/* PR 3351 (review round 2, P1): dirty-guard реестр лаборатории на
+            уровне App — route-level leave guard (Header/Profile/Command
+            Palette/logout/browser Back) работает с теми же источниками и тем
+            же диалогом, что и переходы внутри LabPanel. */}
+        <LabDirtyGuardProvider>
+          <AppContent />
+        </LabDirtyGuardProvider>
         <ToastContainer
           position="bottom-right"
           autoClose={4000}

@@ -4,6 +4,8 @@ Split from lab_reporting_service.py.
 """
 from __future__ import annotations
 
+from datetime import timedelta
+
 from app.services.lab_reporting._base import *  # noqa: F401, F403
 from app.services.lab_reporting._base import LabReportingServiceMixinBase
 
@@ -133,15 +135,18 @@ class InstancesMixin(LabReportingServiceMixinBase):
         self, instance_id: int, payload: dict[str, Any], expected_updated_at: str | None = None
     ) -> LabReportInstance:
         logger.info("[LAB] update_instance instance_id=%s", instance_id)
-        instance = self.get_instance(instance_id)
+        instance = self._get_locked_instance(instance_id)
         self._assert_instance_editable(instance)
-        # WF-06 fix: optimistic locking — проверяем что никто не изменил
-        # бланк с момента последнего чтения frontend'ом.
         self._assert_not_concurrently_modified(instance, expected_updated_at)
+        changed = False
         if "signer_snapshot" in payload and payload["signer_snapshot"] is not None:
             instance.signer_snapshot = payload["signer_snapshot"]
+            changed = True
         if "branding_snapshot" in payload and payload["branding_snapshot"] is not None:
             instance.branding_snapshot = payload["branding_snapshot"]
+            changed = True
+        if changed:
+            self._advance_instance_version(instance)
         self.repository.commit()
         return self.get_instance(instance.id)
 
@@ -155,10 +160,8 @@ class InstancesMixin(LabReportingServiceMixinBase):
             instance_id,
             len(values_payload),
         )
-        instance = self.get_instance(instance_id)
+        instance = self._get_locked_instance(instance_id)
         self._assert_instance_editable(instance)
-        # WF-06 fix: optimistic locking — проверяем что никто не изменил
-        # бланк с момента последнего чтения frontend'ом.
         self._assert_not_concurrently_modified(instance, expected_updated_at)
         field_map = self._field_map(instance.template_version)
         existing_by_key = {value.field_key: value for value in instance.values}
@@ -202,15 +205,17 @@ class InstancesMixin(LabReportingServiceMixinBase):
 
         if instance.status == "DRAFT" and updated_values:
             instance.status = "IN_PROGRESS"
+        self._advance_instance_version(instance)
         self.repository.commit()
         return self.get_instance(instance.id), updated_values
 
 
     def mark_ready(self, instance_id: int) -> LabReportInstance:
         logger.info("[LAB] mark_ready instance_id=%s", instance_id)
-        instance = self.get_instance(instance_id)
+        instance = self._get_locked_instance(instance_id)
         self._assert_instance_editable(instance)
         instance.status = "READY"
+        self._advance_instance_version(instance)
         self.repository.commit()
         return self.get_instance(instance.id)
 
@@ -260,11 +265,12 @@ class InstancesMixin(LabReportingServiceMixinBase):
 
     def mark_printed(self, instance_id: int) -> LabReportInstance:
         logger.info("[LAB] mark_printed instance_id=%s", instance_id)
-        instance = self.get_instance(instance_id)
+        instance = self._get_locked_instance(instance_id)
         if instance.status not in {"FINALIZED", "PRINTED"}:
             raise LabReportingDomainError(409, "Only finalized reports can be printed")
         instance.status = "PRINTED"
         instance.printed_at = datetime.now(UTC)
+        self._advance_instance_version(instance)
         self.repository.commit()
         return self.get_instance(instance.id)
 
@@ -272,7 +278,9 @@ class InstancesMixin(LabReportingServiceMixinBase):
     def instance_available_actions(self, instance: LabReportInstance) -> list[str]:
         actions: list[str] = []
         if instance.status not in FINAL_INSTANCE_STATUSES:
-            actions.extend(["edit", "save_draft", "mark_ready", "finalize"])
+            # PR8: preview — серверный A4-рендер сохранённых значений без
+            # утверждения (endpoint /report-instances/{id}/preview, Admin/Lab).
+            actions.extend(["edit", "save_draft", "mark_ready", "finalize", "preview"])
         if instance.status in FINAL_INSTANCE_STATUSES:
             actions.extend(["revise", "print"])
         return actions
@@ -287,6 +295,9 @@ class InstancesMixin(LabReportingServiceMixinBase):
             "can_finalize": "finalize" in actions,
             "can_revise": "revise" in actions,
             "can_print": "print" in actions,
+            # PR8: preview доступен только неутверждённым бланкам; после
+            # finalize используется print (+ /pdf без watermark).
+            "can_preview": "preview" in actions,
         }
 
 
@@ -295,41 +306,55 @@ class InstancesMixin(LabReportingServiceMixinBase):
             raise LabReportingDomainError(409, "Finalized reports are immutable; use revise")
 
 
+    def _get_locked_instance(self, instance_id: int) -> LabReportInstance:
+        instance = self.repository.get_instance_for_update(instance_id)
+        if not instance:
+            raise LabReportingDomainError(404, "Lab report instance not found")
+        return instance
+
+
+    @staticmethod
+    def _normalized_version(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+
+    def _advance_instance_version(self, instance: LabReportInstance) -> None:
+        """Advance the opaque server token even on same-clock-tick writes."""
+        current = self._normalized_version(instance.updated_at)
+        instance.updated_at = max(
+            datetime.now(UTC),
+            current + timedelta(microseconds=1),
+        )
+
+
     def _assert_not_concurrently_modified(
         self, instance: LabReportInstance, expected_updated_at: str | None
     ) -> None:
-        """WF-06 fix: optimistic locking via updated_at.
-
-        Если frontend передал expected_updated_at (ISO string), проверяем
-        что instance.updated_at не изменился с момента последнего чтения.
-        Если изменился — другой пользователь сохранил изменения, 409 Conflict.
-
-        Это предотвращает silent data loss когда два лаборанта редактируют
-        один бланк одновременно (last-write-wins без этой проверки).
-        """
-        if not expected_updated_at:
-            return  # optimistic locking опционален, backward compatible
+        """Compare an optional opaque server version exactly under row lock."""
+        if expected_updated_at is None:
+            return
         try:
-            from datetime import datetime
-            # Парсим ISO string (frontend передаёт ISO 8601)
+            if len(expected_updated_at) < 19:
+                raise ValueError("Expected a full timestamp")
             expected_dt = datetime.fromisoformat(
                 expected_updated_at.replace("Z", "+00:00")
             )
-            actual_dt = instance.updated_at
-            if actual_dt and actual_dt.tzinfo is None:
-                actual_dt = actual_dt.replace(tzinfo=UTC)
-            if expected_dt and actual_dt and abs((actual_dt - expected_dt).total_seconds()) > 1:
-                raise LabReportingDomainError(
-                    409,
-                    "Бланк был изменён другим пользователем. "
-                    "Обновите страницу, чтобы получить актуальные данные.",
-                )
         except (ValueError, TypeError):
-            # Если не удалось распарсить дату — не блокируем (graceful degradation)
-            logger.warning(
-                "[LAB] _assert_not_concurrently_modified: failed to parse "
-                "expected_updated_at=%s, skipping lock check",
-                expected_updated_at,
+            raise LabReportingDomainError(
+                400,
+                "Некорректная версия бланка. "
+                "Обновите страницу, чтобы получить актуальные данные.",
+            ) from None
+
+        expected_dt = self._normalized_version(expected_dt)
+        actual_dt = self._normalized_version(instance.updated_at)
+        if actual_dt != expected_dt:
+            raise LabReportingDomainError(
+                409,
+                "Бланк был изменён другим пользователем. "
+                "Обновите страницу, чтобы получить актуальные данные.",
             )
 
 

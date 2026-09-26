@@ -8,11 +8,12 @@
  * - one backend entry = one row (no dedup/aggregation — backend owns facts)
  * - entries without an ID are skipped
  * - display fields: fullEntry.* ?? entry.* ?? defaults
- * - gender triple normalized via normalizePatientGender
+ * - nullable backend patient_gender wins; older gender aliases remain compatible
  */
 import { describe, expect, it } from 'vitest';
 
 import { adaptQueueEntry } from '../registrarQueueAdapter';
+import { hasBackendPatientGenderContract } from '../registrarHelpers';
 
 const FALLBACK = 'Неизвестный пациент';
 
@@ -126,6 +127,63 @@ describe('adaptQueueEntry (PR-UI-13-1)', () => {
 
     const d = adaptQueueEntry({ id: 4 }, baseQueue, baseData, '2026-08-29', FALLBACK) as Record<string, unknown>;
     expect(d.patient_gender).toBeNull();
+  });
+
+  it('treats explicit nullable backend gender as complete, with nested canonical value first', () => {
+    const row = adaptQueueEntry(
+      { patient_gender: 'outer', gender: 'legacy', data: { id: 5, patient_gender: null, sex: 'legacy nested' } },
+      baseQueue,
+      baseData,
+      '2026-08-29',
+      FALLBACK,
+    ) as Record<string, unknown>;
+    expect(row.patient_gender).toBeNull();
+    expect(row.gender).toBeNull();
+    expect(row.sex).toBeNull();
+    expect(row.__patient_gender_contract_present).toBe(true);
+    expect(hasBackendPatientGenderContract(row)).toBe(true);
+
+    const valued = adaptQueueEntry(
+      { patient_gender: 'outer', data: { id: 6, patient_gender: 'nested' } },
+      baseQueue,
+      baseData,
+      '2026-08-29',
+      FALLBACK,
+    ) as Record<string, unknown>;
+    expect(valued.patient_gender).toBe('nested');
+    expect(hasBackendPatientGenderContract(valued)).toBe(true);
+  });
+
+  it('uses an outer canonical nullable field before nested legacy aliases', () => {
+    const row = adaptQueueEntry(
+      { patient_gender: null, data: { id: 7, sex: 'legacy nested' } },
+      baseQueue,
+      baseData,
+      '2026-08-29',
+      FALLBACK,
+    ) as Record<string, unknown>;
+    expect(row.patient_gender).toBeNull();
+    expect(row.__patient_gender_contract_present).toBe(true);
+    expect(hasBackendPatientGenderContract(row)).toBe(true);
+  });
+
+  it('keeps legacy alias fallback without inventing a nullable backend contract', () => {
+    const aliased = adaptQueueEntry(
+      { gender: 'outer legacy', data: { id: 8, sex: 'nested legacy' } },
+      baseQueue,
+      baseData,
+      '2026-08-29',
+      FALLBACK,
+    ) as Record<string, unknown>;
+    expect(aliased.patient_gender).toBe('nested legacy');
+    expect(aliased.__patient_gender_contract_present).toBe(false);
+    expect(hasBackendPatientGenderContract(aliased)).toBe(true);
+
+    const absent = adaptQueueEntry({ id: 9 }, baseQueue, baseData, '2026-08-29', FALLBACK) as Record<string, unknown>;
+    expect(absent.patient_gender).toBeNull();
+    expect(absent.__patient_gender_contract_present).toBe(false);
+    expect(hasBackendPatientGenderContract(absent)).toBe(false);
+    expect(hasBackendPatientGenderContract({ patient_gender: null })).toBe(true);
   });
 
   it('canonical_status precedence: canonical_status > queue_status > status', () => {

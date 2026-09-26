@@ -103,6 +103,14 @@ function parseRuleText(text: string | null | undefined): ReferenceRule | null {
   }
 }
 
+// PR4: границы нормы — 0 валиден; пустой ввод означает «не задано».
+// parseFloat(x) || null превращал введённый 0 в null (0..10 -> null..10).
+function parseBoundValue(raw: string): number | null {
+  if (raw.trim() === '') return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function serializeRule(rule: ReferenceRule | null | undefined): string {
   if (!rule) return '';
   return JSON.stringify(rule, null, 2);
@@ -286,7 +294,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }: R
                   aria-label={t('misc.rre_lower_bound_aria')}
                   type="number"
                   value={caseItem.low ?? ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCase(caseIndex, 'low', parseFloat(e.target.value) || null)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCase(caseIndex, 'low', parseBoundValue(e.target.value))}
                 />
               </label>
               <label className="ltw-label-grid">
@@ -296,7 +304,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }: R
                   aria-label={t('misc.rre_upper_bound_aria')}
                   type="number"
                   value={caseItem.high ?? ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCase(caseIndex, 'high', parseFloat(e.target.value) || null)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCase(caseIndex, 'high', parseBoundValue(e.target.value))}
                 />
               </label>
             </div>
@@ -324,7 +332,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }: R
               aria-label={t('misc.rre_lower_bound_default_aria')}
               type="number"
               value={defaultRule.low ?? ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDefault('low', parseFloat(e.target.value) || null)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDefault('low', parseBoundValue(e.target.value))}
             />
           </label>
           <label className="ltw-label-grid">
@@ -334,7 +342,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }: R
               aria-label={t('misc.rre_upper_bound_default_aria')}
               type="number"
               value={defaultRule.high ?? ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDefault('high', parseFloat(e.target.value) || null)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDefault('high', parseBoundValue(e.target.value))}
             />
           </label>
         </div>

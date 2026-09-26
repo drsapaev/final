@@ -139,6 +139,9 @@ from .notification import (
     NotificationHistory,
     NotificationTemplate,
 )
+# NURSE-V2 N2-2 (owner design-GO 2026-09-19): nurse workplace
+# assignments + per-service execution facts.
+from .nurse_workplace import NurseWorkplaceAssignment
 from .online import OnlineDay
 from .online_queue import (  # noqa: F401  # manual-review: registry re-export
     DailyQueue,
@@ -151,7 +154,11 @@ from .payment import Payment
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from .payment_webhook import PaymentProvider, PaymentTransaction, PaymentWebhook
 from .print_config import PrinterConfig, PrintJob, PrintTemplate
+from .push_device import PushDevice  # noqa: F401  # PR-6: registry re-export
 from .queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
+from .queue_direction_public_address import (  # noqa: F401  # RQ-16.c: public-address registry re-export
+    QueueDirectionPublicAddress,
+)
 from .refund_deposit import (
     DepositTransaction,
     DepositTransactionType,
@@ -172,6 +179,10 @@ from .salary_history import SalaryHistory, SalaryPayment
 from .schedule import ScheduleTemplate
 from .service import Service, ServiceCatalog
 from .service_audit import ServiceAuditLog
+from .service_execution import (  # noqa: F401  # NURSE-V2 N2-2 registry re-export
+    SERVICE_EXECUTION_STATUSES,
+    ServiceExecution,
+)
 from .setting import Setting
 from .telegram_config import (
     PatientOnboardingRequest,
@@ -304,6 +315,10 @@ __all__ = [
     "SystemInfo",
     "DailyQueue",
     "OnlineQueueEntry",
+    # NURSE-V2 N2-2
+    "NurseWorkplaceAssignment",
+    "ServiceExecution",
+    "SERVICE_EXECUTION_STATUSES",
     "QueueToken",
     "QueueProfile",
     "INITIAL_QUEUE_PROFILES",

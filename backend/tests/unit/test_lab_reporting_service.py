@@ -270,6 +270,102 @@ class TestLabReportingService:
             f"Backfill должен создать 2 LabResult, got {after}"
         )
 
+    def test_revise_and_additional_blank_refresh_managed_projection(
+        self, db_session, test_patient, test_visit
+    ):
+        """A+ runtime (решение владельца, см.
+        .ai-factory/plans/lab-results-lineage-decision.md): управляемая
+        проекция ключуется (source_root_instance_id, test_code).
+
+          - ревизия обновляет проекцию СВОЕЙ цепочки (hgb 100 → 140);
+          - дополнительный бланк того же визита — другая цепочка: его
+            total_ige появляется, показатели A не тронуты;
+          - исторические/чужие строки заказа не затрагиваются.
+        """
+        test_patient.sex = "M"
+        test_patient.birth_date = date(1990, 1, 1)
+        db_session.commit()
+
+        service = LabReportingService(db_session)
+        templates = service.list_templates()
+        cbc_template = next(t for t in templates if t.code == "cbc_oak")
+
+        instance_a = service.create_instance(
+            {
+                "patient_id": test_patient.id,
+                "visit_id": test_visit.id,
+                "template_id": cbc_template.id,
+            }
+        )
+        service.bulk_upsert_values(
+            instance_a.id,
+            [
+                {"field_key": "hgb", "value_text": "100"},
+                {"field_key": "wbc", "value_text": "5.2"},
+            ],
+        )
+        db_session.execute(
+            delete(LabResult).where(LabResult.order_id == instance_a.order_id)
+        )
+        db_session.commit()
+
+        finalized_a = service.finalize(instance_a.id)
+        assert finalized_a.status == "FINALIZED"
+
+        def _managed_rows() -> dict:
+            return {
+                row.test_code: row
+                for row in db_session.query(LabResult)
+                .filter(LabResult.order_id == instance_a.order_id)
+                .all()
+            }
+
+        rows = _managed_rows()
+        assert rows["hgb"].value == "100"
+        assert rows["hgb"].source_root_instance_id == instance_a.id
+        assert rows["hgb"].source_instance_id == instance_a.id
+
+        # Ревизия обновляет проекцию своей цепочки
+        revision = service.revise(finalized_a.id)
+        service.bulk_upsert_values(
+            revision.id,
+            [{"field_key": "hgb", "value_text": "140"}],
+        )
+        service.finalize(revision.id)
+
+        rows = _managed_rows()
+        assert len(rows) == 2, "no duplicate rows from the revision"
+        assert rows["hgb"].value == "140"
+        assert rows["hgb"].source_instance_id == revision.id
+        assert rows["hgb"].source_root_instance_id == instance_a.id
+        assert rows["wbc"].value == "5.2", (
+            "unrelated indicator of the chain is preserved"
+        )
+
+        # Дополнительный бланк B (другой шаблон/test_code) того же visit:
+        # другая цепочка — его показатель появляется, показатели A целы.
+        ige_template = next(t for t in templates if t.code == "ige_total")
+        instance_b = service.create_instance(
+            {
+                "patient_id": test_patient.id,
+                "visit_id": test_visit.id,
+                "template_id": ige_template.id,
+            }
+        )
+        assert instance_b.order_id == instance_a.order_id
+        service.bulk_upsert_values(
+            instance_b.id,
+            [{"field_key": "total_ige", "value_text": "150"}],
+        )
+        service.finalize(instance_b.id)
+
+        rows = _managed_rows()
+        assert rows["hgb"].value == "140"
+        assert rows["wbc"].value == "5.2"
+        assert rows["total_ige"].value == "150"
+        assert rows["total_ige"].source_root_instance_id == instance_b.id
+        assert rows["total_ige"].source_root_instance_id != rows["hgb"].source_root_instance_id
+
     def test_create_instance_prefills_signer_snapshot_from_actor_name(
         self, db_session, test_patient
     ):
@@ -926,6 +1022,11 @@ class TestLabReportingService:
     def test_catalog_reference_mode_resolves_seeded_ranges(
         self, db_session, test_patient
     ):
+        # Each test rolls back its SQLite transaction while the process-level
+        # catalog seed cache survives; re-arm it before using catalog rows.
+        from app.services.lab_reporting._base import reset_lab_seed_cache
+
+        reset_lab_seed_cache()
         test_patient.sex = "M"
         test_patient.birth_date = date(1990, 1, 1)
         db_session.commit()
@@ -1118,3 +1219,105 @@ class TestLabReportingService:
         assert send_mock.await_args.kwargs["recipient"].id == lab_user.id
         assert send_mock.await_args.kwargs["metadata"]["patient_id"] == test_patient.id
         assert send_mock.await_args.kwargs["metadata"]["visit_id"] == test_visit.id
+
+    def test_update_template_version_rejects_structurally_invalid_rules(
+        self, db_session
+    ):
+        """PR4: backend не доверяет клиенту в структуре правил —
+        reference/visibility/highlight rule обязаны быть null или dict
+        (rule engine читает rule.get("cases") и падает AttributeError
+        на строке/списке при рендере отчёта)."""
+        service = LabReportingService(db_session)
+        template = service.create_template(
+            {
+                "code": "rule_validation_demo",
+                "name": "Rule Validation Demo",
+                "family": "chemistry",
+                "description": "PR4 structural rule validation",
+                "initial_version": {
+                    "layout_preset": "lab_table_classic_v1",
+                    "page_settings": {"paper_size": "A4", "orientation": "portrait"},
+                    "branding_overrides": {},
+                    "signer_defaults": {},
+                    "footer_notes": "",
+                    "sections": [
+                        {
+                            "key": "demo",
+                            "title": "Demo",
+                            "sort_order": 10,
+                            "fields": [
+                                {
+                                    "field_key": "glucose",
+                                    "label": "Glucose",
+                                    "value_type": "numeric",
+                                    "unit": "mmol/L",
+                                    "reference_mode": "static_text",
+                                    "reference_text": "3.3-5.5",
+                                    "reference_rule": None,
+                                    "visibility_rule": None,
+                                    "highlight_rule": None,
+                                }
+                            ],
+                        }
+                    ],
+                },
+            }
+        )
+        # create_template создаёт initial_version в статусе DRAFT — правим его.
+        draft = next(version for version in template.versions if version.status == "DRAFT")
+
+        def _payload(rule_value):
+            return {
+                "layout_preset": "lab_table_classic_v1",
+                "page_settings": {"paper_size": "A4", "orientation": "portrait"},
+                "branding_overrides": {},
+                "signer_defaults": {},
+                "footer_notes": "",
+                "sections": [
+                    {
+                        "key": "demo",
+                        "title": "Demo",
+                        "sort_order": 10,
+                        "fields": [
+                            {
+                                "field_key": "glucose",
+                                "label": "Glucose",
+                                "value_type": "numeric",
+                                "unit": "mmol/L",
+                                "reference_mode": "static_text",
+                                "reference_text": "3.3-5.5",
+                                "reference_rule": rule_value,
+                                "visibility_rule": None,
+                                "highlight_rule": None,
+                            }
+                        ],
+                    }
+                ],
+            }
+
+        with pytest.raises(LabReportingDomainError) as string_exc:
+            service.update_template_version(draft.id, _payload("{oops"))
+        assert string_exc.value.status_code == 400
+
+        with pytest.raises(LabReportingDomainError) as cases_exc:
+            service.update_template_version(draft.id, _payload({"cases": "not-a-list"}))
+        assert cases_exc.value.status_code == 400
+
+        # Корректные формы проходят: dict с cases-списком и null.
+        service.update_template_version(
+            draft.id,
+            _payload(
+                {
+                    "cases": [
+                        {
+                            "when": {"source": "patient.sex", "op": "eq", "value": "M"},
+                            "text": "4-6",
+                            "low": 4,
+                            "high": 6,
+                        }
+                    ],
+                    "default": {"text": "4-6", "low": 4, "high": 6},
+                }
+            ),
+        )
+        service.update_template_version(draft.id, _payload(None))

@@ -129,7 +129,9 @@ export async function fetchRegistrarDoctors(): Promise<RegistrarDoctorsResponse>
   // Backend returns { doctors: [...] }. Map each row to domain Doctor.
   const list: unknown = Array.isArray(data) ? data : (data as { doctors?: unknown })?.doctors ?? [];
   const doctors = mapDoctorDtos(list);
-  return { doctors, ...(data as Record<string, unknown> ?? {}) };
+  // Keep backend metadata, but the normalized Doctor[] is authoritative.
+  // Spreading the transport envelope last would overwrite it with raw DTOs.
+  return { ...(data as Record<string, unknown> ?? {}), doctors };
 }
 
 /**
@@ -161,12 +163,46 @@ export async function fetchRegistrarQueueSettings(): Promise<QueueSettings> {
 // =====================================================================
 
 /**
+ * Per-service entry of GET /registrar/services (значения services_by_group).
+ * RQ-05.b: типизировано по актуальному DTO бэкенда
+ * (api/v1/endpoints/registrar_integration/_services_doctors.py), включая
+ * requires_doctor (RQ-05, F-04) — по этому флагу мастер записи делает
+ * выбор врача обязательным ровно там, где его требует сервер (S-03).
+ */
+export interface RegistrarCatalogService {
+  id: string | number;
+  name: string;
+  code?: string | null;
+  price?: number;
+  currency?: string;
+  duration_minutes?: number;
+  category_id?: string | number | null;
+  doctor_id?: string | number | null;
+  department_key?: string | null;
+  category_code?: string | null;
+  service_code?: string | null;
+  queue_tag?: string | null;
+  is_consultation?: boolean;
+  /** RQ-05 (F-04): сервер требует выбор врача для этой услуги. */
+  requires_doctor: boolean;
+  /**
+   * RQ-08.a: серверные допустимые специальности врача для department_key —
+   * вычислены той же функцией, что и серверный гейт корзины (RQ-05.a).
+   * null — проверка неприменима (у услуги нет department_key).
+   */
+  accepted_specialties?: string[] | null;
+  group?: string | null;
+  [key: string]: unknown;
+}
+
+/**
  * Services catalog grouped by specialty/group.
  * Returned by GET /registrar/services.
- * Free-form dict — backend-owned, not yet normalized to a domain type.
+ * RQ-05.b: значения групп типизированы по актуальному DTO
+ * (RegistrarCatalogService); сам envelope остаётся backend-owned.
  */
 export interface RegistrarServicesResponse {
-  services_by_group?: Record<string, unknown>;
+  services_by_group?: Record<string, RegistrarCatalogService[]>;
   categories?: unknown[];
   [key: string]: unknown;
 }

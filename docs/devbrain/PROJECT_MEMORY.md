@@ -29,14 +29,17 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 - Existing migrations can be tempting to edit, but already-applied revisions must remain immutable.
 - Frontend presentation code must not invent backend-owned values such as payment status, queue ordering, role policy, or appointment time.
 - Broad audit findings should be converted into small PR slices before implementation.
+- A closed `/ws/queue` connection once retried receive errors in a tight loop, flooding logs and consuming CPU while unrelated panels waited. Preserve exit, heartbeat cancellation, room cleanup, and the focused disconnect regression test.
+- First-screen latency means time until content appears, not FastAPI startup. Separate browser bundle/API waterfalls, backend queries, and WebSocket load before changing infrastructure; keep inactive panel tabs off the initial path.
 
 ## Strict Operating Rules
 
 - Use direct execution only for narrow known-root-cause tasks with no risky domain or ownership ambiguity.
 - Use dossier or handoff for graph-heavy, mixed-contract, or ownership-sensitive work.
-- Use gate or gate-known-root-cause for DB, RBAC, payment, queue, Telegram security/storage, EMR/lab, CI/CD, deploy, and frontend/backend contract work.
-- If the gate misroutes, retry once with `--known-root-cause`; if it still misses the confirmed file, use narrow override and report it.
-- Do not silently expand scope. Stop when the required file set exceeds the declared first-touch boundary.
+- GPT-6 may use `advisory_gate` for UI/API work that does not change DB schema/migrations, authentication/RBAC/security, production configuration/deployment, queue ownership/fairness, or clinical lifecycle/signature rules. In that mode, the gate is optional context; source, tests, user scope, and explicit boundaries decide the patch.
+- Keep mandatory gate use for DB schema/migrations, authentication/RBAC/security, production configuration/deployment, and queue ownership/fairness or clinical lifecycle/signature changes. Other agent models follow the existing gate process.
+- For mandatory gate work, if the gate misroutes, retry once with `--known-root-cause`; if it still misses the confirmed file, use a narrow override only with an approved basis and report it. Advisory-mode misroutes do not block a well-grounded task.
+- Do not silently expand scope. Stop when the required file set exceeds the manually declared patch boundary; for GPT-6 advisory work, the gate's first-touch list is not that boundary.
 - Every PR needs evidence: local validation, `git diff --check`, PR scope/impact notes, and green GitHub checks when opened.
 
 ## Local Dev Runtime Contour
@@ -48,6 +51,7 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 - Set `DATABASE_URL` explicitly to a PostgreSQL URL for `clinic_dev`; do not rely on fallback database behavior.
 - Dev reset/seed commands must keep safety confirmations such as `--confirm-dev-reset`, `--confirm-dev-seed`, and `--confirm-db-name clinic_dev`.
 - Local 2FA bypass flags are manual smoke-test aids only and must not be used in production-like environments.
+- Isolated Linux staging runs in WSL2 Ubuntu 24.04 Docker on this Windows host, with its own Compose project, database, ports, and synthetic data; production remains the Windows main tree on backend `:18000`. See `docs/runbooks/AGENT_SESSION_WORKTREES.md`.
 
 ## Migration / Alembic Ownership Rules
 

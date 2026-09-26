@@ -200,6 +200,7 @@ def test_clinic_wide_join_finds_canonical_dentistry_doctor(
         patient_name="D-1 Patient",
         phone="+998900000111",
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     # The join resolved the profile to the canonical doctor instead of
     # raising "Нет активных врачей для профиля ...".
@@ -992,10 +993,25 @@ def test_department_integration_profile_tags_cover_family(db_session) -> None:
     assert "dental" in (profile.queue_tags or [])
 
     # and the QR clinic-wide matcher now sees canonical dentistry doctors
+    # (RQ-09: the public selection applies the canonical owner-eligibility
+    # contract — the doctor carries an active owner account with a
+    # doctor-family role, decision #13)
+    from app.core.security import get_password_hash
     from app.models.clinic import Doctor as DoctorModel
+    from app.models.user import User as UserModel
     from app.services.qr_queue import QRQueueService
 
-    doctor = DoctorModel(specialty="dentistry", active=True)
+    owner = UserModel(
+        username="rq09_dental_owner",
+        email="rq09-dental-owner@synthetic.test",
+        full_name="RQ-09 Dental Owner",
+        hashed_password=get_password_hash("rq09-synthetic-pw"),
+        role="Doctor",
+        is_active=True,
+    )
+    db_session.add(owner)
+    db_session.flush()
+    doctor = DoctorModel(specialty="dentistry", user_id=owner.id, active=True)
     db_session.add(doctor)
     db_session.commit()
 

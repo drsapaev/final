@@ -282,3 +282,120 @@ class TestMigrationService:
 
             assert result["success"] is False
             assert mock_logger.error.called
+
+    def test_backup_restore_roundtrip_preserves_start_number(
+        self, db_session, cardio_user, tmp_path, monkeypatch
+    ):
+        """R19 P2 (snapshot survives the backup): the backup format must
+        carry the day's frozen start_number (RQ-13.b D-06 snapshot) and
+        the restore must put it back. A restored otherwise-empty queue
+        used to silently fall back to the column default (1): ordinary
+        numbering then read the restored row as a snapshot-1 day instead
+        of the saved 41."""
+        from app.crud.clinic import clinic_today
+        from app.services.queue_service import queue_service
+
+        queue = DailyQueue(
+            day=clinic_today(db_session),
+            specialist_id=cardio_user.id,
+            queue_resource_id=None,
+            queue_tag="r19_roundtrip",
+            active=True,
+            start_number=41,
+        )
+        db_session.add(queue)
+        db_session.commit()
+        db_session.refresh(queue)
+        queue_id = queue.id
+
+        monkeypatch.chdir(tmp_path)
+        service = MigrationService(db_session)
+
+        backup_result = service.backup_queue_data(queue.day)
+        assert backup_result["success"] is True, backup_result
+
+        with open(backup_result["backup_file"], encoding="utf-8") as f:
+            payload = json.load(f)
+        exported = next(q for q in payload["queues"] if q["id"] == queue_id)
+        assert exported.get("start_number") == 41, (
+            "backup must serialize the day's frozen start_number"
+        )
+
+        # restore into a DB where the original row is absent
+        db_session.delete(queue)
+        db_session.commit()
+
+        try:
+            restore_result = service.restore_queue_data(
+                str(tmp_path / backup_result["backup_file"])
+            )
+            assert restore_result["success"] is True, restore_result
+
+            restored = (
+                db_session.query(DailyQueue).filter(DailyQueue.id == queue_id).first()
+            )
+            assert restored is not None
+            assert restored.start_number == 41, (
+                "restore must put the recorded snapshot back without "
+                "recalculation (got the column default?)"
+            )
+            # the next ordinary ticket continues the SAVED baseline
+            assert (
+                queue_service.get_next_queue_number(
+                    db_session, daily_queue=restored, queue_tag=restored.queue_tag
+                )
+                == 41
+            )
+        finally:
+            leftover = (
+                db_session.query(DailyQueue).filter(DailyQueue.id == queue_id).first()
+            )
+            if leftover is not None:
+                db_session.query(OnlineQueueEntry).filter(
+                    OnlineQueueEntry.queue_id == queue_id
+                ).delete(synchronize_session=False)
+                db_session.delete(leftover)
+                db_session.commit()
+
+    def test_restore_legacy_backup_without_start_number_uses_default(
+        self, db_session, tmp_path
+    ):
+        """R19 P2 compat pin: pre-snapshot backups (no start_number key
+        in the JSON) stay restorable — the row comes back at the column
+        default (1). The explicitly defined compatible behavior, same
+        contract as queue_resource_id (QD-2A)."""
+        backup_data = {
+            "backup_date": date.today().isoformat(),
+            "created_at": datetime.utcnow().isoformat(),
+            "queues": [
+                {
+                    "id": 998,
+                    "day": date.today().isoformat(),
+                    "specialist_id": 1,
+                    "queue_tag": "r19_legacy",
+                    "active": True,
+                    "opened_at": None,
+                    "entries": [],
+                }
+            ],
+        }
+        backup_file = tmp_path / "legacy_backup.json"
+        backup_file.write_text(json.dumps(backup_data), encoding="utf-8")
+
+        service = MigrationService(db_session)
+        try:
+            result = service.restore_queue_data(str(backup_file))
+            assert result["success"] is True, result
+
+            restored = (
+                db_session.query(DailyQueue).filter(DailyQueue.id == 998).first()
+            )
+            assert restored is not None
+            assert restored.start_number == 1
+        finally:
+            leftover = (
+                db_session.query(DailyQueue).filter(DailyQueue.id == 998).first()
+            )
+            if leftover is not None:
+                db_session.delete(leftover)
+                db_session.commit()

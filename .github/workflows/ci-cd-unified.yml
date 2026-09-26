@@ -763,7 +763,11 @@ jobs:
   frontend-e2e:
     name: Frontend e2e
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # PR #3368 review P1: был 15 — job уже занимал ~10m (npm ci + install
+    # chromium + 128 тестов); добавленный блокирующий lab-dirty-guard suite
+    # (61 тест, workers=1 на CI) требует запаса, чтобы timeout не убивал
+    # валидный прогон на медленных раннерах.
+    timeout-minutes: 25
     needs: [ci-scope]
     if: |
       needs.ci-scope.outputs.frontend_e2e_required == 'true' &&
@@ -803,6 +807,8 @@ jobs:
         npx playwright test e2e/registrar-time.spec.ts --project=chromium
 
     - name: 📸 UX Audit e2e + Visual regression (Chromium)
+      env:
+        UPDATE_SNAPSHOTS_FLAG: ${{ github.event.inputs.update_snapshots == 'true' && '--update-snapshots' || '' }}
       run: |
         cd frontend
         # --retries=0 is MANDATORY for UX/Visual E2E. These tests must pass
@@ -822,7 +828,10 @@ jobs:
         # with its own seeded pre-existing-findings baseline
         # (e2e/a11y-baseline-auth.json — same shrink-only ratchet contract;
         # remediation increments must shrink it toward zero).
-        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts e2e/a11y-axe-authenticated.spec.ts --project=chromium --retries=0 2>&1 | tee ux-audit-output.txt
+        # PR7: dispatch with update_snapshots=true regenerates the LINUX
+        # visual baselines in-place (the dedicated update step below runs
+        # only after this step and cannot fix an already-failed spec run).
+        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts e2e/frontend-10-route-smoke.spec.ts e2e/frontend-10-visual-a11y.spec.ts e2e/a11y-axe-audit.spec.ts e2e/a11y-axe-authenticated.spec.ts --project=chromium --retries=0 $UPDATE_SNAPSHOTS_FLAG 2>&1 | tee ux-audit-output.txt
       # E2E root-cause fix: removed continue-on-error. All non-fixme tests
       # must pass. Tests marked test.fixme have documented root causes and
       # are tracked for follow-up. See PR description for details.
@@ -837,22 +846,27 @@ jobs:
         # reality: if the count drops below the expected number, something
         # was skipped).
         #
-        # Expected: 127 passed, 0 skipped, 0 failed
+        # Expected: 131 passed, 0 skipped, 0 failed
         # (12 cashier + 9 registrar + 40 visual [7 state baselines + EAT +
-        #  pr16-landing + 22 pr18 twelve-screen baselines] + 8 route-smoke
+        #  pr16-landing + 22 pr18 twelve-screen baselines] + 12 route-smoke
         # + 12 visual-a11y + 12 a11y-axe-audit + 34 a11y-axe-authenticated).
         # Metric integrity (§17, original → revised → methodology → reason):
-        # 93 → 127. Methodology unchanged (same CI step, count-invariant on
-        # passed tests). Reason: AXE-EXP-1 adds a11y-axe-authenticated.spec.ts
+        # 93 → 127 → 131. Methodology unchanged (same CI step, count-invariant
+        # on passed tests). Reason: AXE-EXP-1 adds a11y-axe-authenticated.spec.ts
         # (17 authorized QA-harness routes × 2 themes = 34 audits, seeded
-        # shrink-only baseline e2e/a11y-baseline-auth.json). Historical
-        # values: 93 = pre-AXE-EXP canonical count (12+9+40+8+12+12).
+        # shrink-only baseline e2e/a11y-baseline-auth.json). 127 → 131: PR #3390
+        # adds the /confirm-visit public route smoke (11 route-smoke) plus the
+        # split-origin CSRF credentials regression (12 route-smoke; the gate
+        # floor previously lagged the file at 8). Historical values: 93 =
+        # pre-AXE-EXP canonical count (12+9+40+8+12+12); 127 = AXE-EXP-1
+        # (12+9+40+8+12+12+34, floor never re-bumped for the route-smoke
+        # growth to 11).
         # Reconciliation note: registrar-time.spec.ts (1 test) runs in its own
         # step above and is intentionally NOT counted here. Empirically
-        # verified locally with `playwright --list` per file on the PR-UI-18-5
-        # head. If a test is intentionally added/removed, update EXPECTED_COUNT
-        # below.
-        EXPECTED_COUNT=127
+        # verified locally with `playwright --list` per file on the PR-3390
+        # review-fix head. If a test is intentionally added/removed, update
+        # EXPECTED_COUNT below.
+        EXPECTED_COUNT=131
         if [ ! -f ux-audit-output.txt ]; then
           echo "ERROR: ux-audit-output.txt not found. The UX Audit step may not have run."
           exit 1
@@ -885,6 +899,58 @@ jobs:
         fi
         echo "✓ UX/Visual E2E count invariant intact: $PASSED passed, $SKIPPED skipped, $FAILED failed (expected ≥ $EXPECTED_COUNT)."
 
+    - name: 🧪 Lab dirty-guard e2e (Chromium)
+      run: |
+        cd frontend
+        # PR #3368 review P1: regression-пины lab dirty-navigation обязаны быть
+        # CI-инвариантом required-job. До этого шага spec был только
+        # type-checked (tsc --noEmit выше) и никогда не исполнялся: регрессия
+        # в bindAppointmentForActiveInstance, appointmentMatchesInstance или
+        # request-epoch недавних бланков сливалась бы зелёной.
+        # Отдельный блокирующий шаг по прецеденту registrar-time (не в
+        # UX-батч: у того свой 127-count invariant, который не должен меняться).
+        # --retries=0: regression-пины обязаны проходить с первой попытки —
+        # та же политика, что у UX/Visual батча; suite провалидирован 61/61
+        # с retries=0 (см. PR #3368).
+        set -o pipefail
+        npx playwright test e2e/lab-dirty-guard.spec.ts --project=chromium --retries=0 2>&1 | tee lab-dirty-guard-output.txt
+
+    - name: 🔒 Lab dirty-guard E2E test count invariant
+      run: |
+        cd frontend
+        # Тот же контракт, что у UX/Visual count invariant выше: suite реально
+        # исполнил все 61 теста — никаких тихих пропусков (философия инцидента
+        # PR #2715). Обновляйте EXPECTED_COUNT при осознанном добавлении/
+        # удалении тестов.
+        EXPECTED_COUNT=61
+        if [ ! -f lab-dirty-guard-output.txt ]; then
+          echo "ERROR: lab-dirty-guard-output.txt not found. The Lab dirty-guard step may not have run."
+          exit 1
+        fi
+        FAILED_SUMMARY=$(grep -E "^\s+[0-9]+ failed" lab-dirty-guard-output.txt | tail -1 || echo "0 failed")
+        PASSED_SUMMARY=$(grep -E "^\s+[0-9]+ passed" lab-dirty-guard-output.txt | tail -1 || echo "0 passed")
+        SKIPPED_SUMMARY=$(grep -E "^\s+[0-9]+ skipped" lab-dirty-guard-output.txt | tail -1 || echo "0 skipped")
+        echo "Playwright summary: $FAILED_SUMMARY $PASSED_SUMMARY $SKIPPED_SUMMARY"
+        PASSED=$(echo "$PASSED_SUMMARY" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "0")
+        SKIPPED=$(echo "$SKIPPED_SUMMARY" | grep -oE "[0-9]+ skipped" | grep -oE "[0-9]+" || echo "0")
+        FAILED=$(echo "$FAILED_SUMMARY" | grep -oE "[0-9]+ failed" | grep -oE "[0-9]+" || echo "0")
+        echo "Parsed: passed=$PASSED skipped=$SKIPPED failed=$FAILED"
+        if [ "$FAILED" != "0" ]; then
+          echo "ERROR: $FAILED test(s) failed. Lab dirty-guard E2E must have 0 failures."
+          exit 1
+        fi
+        if [ "$SKIPPED" != "0" ]; then
+          echo "ERROR: $SKIPPED test(s) skipped. Lab dirty-guard E2E must have 0 skipped (no test.fixme/test.skip allowed)."
+          echo "If a test was intentionally skipped, remove the skip and fix the test, or update EXPECTED_COUNT."
+          exit 1
+        fi
+        if [ "$PASSED" -lt "$EXPECTED_COUNT" ]; then
+          echo "ERROR: Only $PASSED tests passed, expected at least $EXPECTED_COUNT."
+          echo "This means some tests were silently excluded. Check for test.fixme/test.skip."
+          exit 1
+        fi
+        echo "✓ Lab dirty-guard E2E count invariant intact: $PASSED passed, $SKIPPED skipped, $FAILED failed (expected ≥ $EXPECTED_COUNT)."
+
     - name: 📸 Update visual regression baseline snapshots (manual only)
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_snapshots == 'true'
       run: |
@@ -893,11 +959,17 @@ jobs:
       continue-on-error: true
 
     - name: 📤 Upload visual regression artifacts
+      # PR7 follow-up: when the dispatch asked for baseline regeneration,
+      # --update-snapshots rewrites files in e2e/visual-regression.spec.ts-snapshots/
+      # (the __screenshots__/ dir only holds failure diffs) — upload them too,
+      # so the operator can commit the regenerated linux baselines.
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: visual-regression-screenshots
-        path: frontend/e2e/__screenshots__/
+        path: |
+          frontend/e2e/__screenshots__/
+          frontend/e2e/visual-regression.spec.ts-snapshots/
         retention-days: 14
         if-no-files-found: ignore
 
@@ -926,7 +998,11 @@ jobs:
   backend-tests:
     name: 🐍 Backend тесты
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Round-5 (PR #3362): the suite fits in ~9 min on a warm runner, but
+    # shared-hosted variance (uniform 2x slowdown observed on a contended
+    # run) cancels the job at 20 and fails the required gate. Other heavy
+    # jobs in this workflow already run at 30/35.
+    timeout-minutes: 30
     needs: [ci-scope]
     if: |
       always() &&
@@ -1049,10 +1125,15 @@ jobs:
     # locks (SQLite ignores FOR UPDATE). gate_d is excluded from the main
     # suite above; this step runs the dedicated proof against the job's
     # postgres service.
-    - name: 🧪 Reminder PG concurrency (gate_d)
+    # Round-12 (PR #3362 review, P1): the same applies to the QR-join
+    # recovery probe — its FOR UPDATE NOWAIT lock-conflict mapping
+    # (55P03 -> processing) and the in-flight-claim MVCC race are proven
+    # here with two independent connections against the alembic-provisioned
+    # schema from the step above.
+    - name: 🧪 Reminder + QR-join probe PG concurrency (gate_d)
       run: |
         cd backend
-        pytest tests/integration/test_reminder_pipeline_pg.py -m gate_d --noconftest
+        pytest tests/integration/test_reminder_pipeline_pg.py tests/integration/test_qr_join_probe_concurrency_pg.py -m gate_d --noconftest
 
     - name: 🧪 Critical E2E Smoke
       run: |

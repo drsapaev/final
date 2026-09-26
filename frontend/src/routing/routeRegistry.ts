@@ -1,9 +1,10 @@
 import {
   AlertTriangle, BarChart3, Bell, Brain, Building2, Calendar, Camera,
-  CircleDollarSign, CreditCard, FileText, Heart, KeyRound, List, ListOrdered,
+  CircleDollarSign, Compass, CreditCard, FileText, Heart, KeyRound, List, ListOrdered,
   Lock, Monitor, Percent, Phone, Puzzle, Search, Send, Settings, Smile,
   SquareStack, Stethoscope, TestTube2, UserPlus, Users, Wand2,
 } from 'lucide-react';
+import { matchPath } from 'react-router-dom';
 
 export const ROUTE_GROUPS = ['public', 'onboarding', 'clinical', 'admin', 'internal-demo'];
 export const ROUTE_SURFACES = ['screen', 'modal-route', 'callback', 'utility'];
@@ -30,6 +31,14 @@ export const ROLE_HOME_PRIORITY = [
   'cashier',
   'doctor',
   'patient',
+  // NURSE-V2 N2-2 (review P2, PR #3333): 'nurse' re-opened as a login-
+  // capable role — it MUST have a home route that actually admits it.
+  // Without an entry getRoleHomeRoute() fell through to the shared
+  // '/clinical/search' fallback, which is role-scoped WITHOUT Nurse —
+  // a successful login landed on /forbidden. Last position: a Nurse
+  // profile carries exactly one role, so priority collisions cannot
+  // arise; the entry exists purely to resolve the home lookup.
+  'nurse',
 ];
 
 // PR-UI-19 (C-6, Codex round 1): the AI safety disclaimer is user-visible in
@@ -129,50 +138,44 @@ export const SIDEBAR_PRESETS = {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'queue',
-    // Phase 4+ fix: reduced from 9 tabs to 4 flat tabs.
+    // Phase 4+ fix: reduced from 9 tabs to 3 flat tabs.
     // Goal: dermatologist workflow is "queue → visit" — everything else
     // (photos/skin/cosmetic/ai/services/history) was either a separate tab
     // for a tool that belongs inside the visit (photos, skin, cosmetic),
     // or admin/lookup that doesn't belong in the clinical workflow.
     //
-    // The 4 remaining tabs:
+    // The 3 remaining tabs:
     //   queue    — вход: вызвать следующего пациента из очереди
     //   visit    — единый экран приёма: анамнез + фото + осмотр кожи + диагноз + AI inline
     //   patients — поиск/история пациентов (включая бывший 'history' tab)
-    //   ai       — AI-помощник (draft support, не диагноз)
     items: [
       { id: 'queue',    labelKey: 'nav.queue',     icon: Users },
       { id: 'visit',    labelKey: 'nav.visit',       icon: Stethoscope },
       { id: 'patients', labelKey: 'nav.patients',    icon: Users },
-      { id: 'ai',       labelKey: 'nav.ai_assistant', icon: Brain, ...AI_SIDEBAR_DISCLAIMER_META },
     ],
   },
   dentistry: {
     navigation: 'query',
     queryParam: 'tab',
     defaultItem: 'queue',
-    // Phase 4 fix: reduced from 13 tabs in 4 sections to 5 flat tabs.
-    // Goal: dentist workflow is "queue → visit → patient/photos" — everything
+    // Phase 4 + protected archive: queue → visit → patients → photos.
+    // Goal: dentist workflow is "queue → visit → patients" — everything
     // else (examinations/diagnoses/dental-chart/treatment-plans/prosthetics/
     // templates/reports) was either dead UI (treatment-plans/prosthetics had
     // 501 backend stubs) or duplicated the visit screen (dental-chart
     // duplicated the chart embedded in the visit; examinations/diagnoses
     // were merged into EMR v2 visit screen).
     //
-    // The 5 remaining tabs:
+    // The 4 remaining tabs:
     //   queue    — вход: вызвать следующего пациента из очереди
     //   visit    — единый экран приёма: анамнез + схема зубов + Дополнительно
-    //   patients — поиск/история пациентов
-    //   photos   — фотоархив (рентген + intraoral)
-    //   ai-assistant — AI-помощник (draft support, не диагноз)
-    //
-    // Muscle memory: 5 flat items, well under Miller's 7±2.
+    //   patients — единственный серверный поиск/выбор пациента
+    //   photos   — защищённый архив пациента с подтверждённым визитом
     items: [
       { id: 'queue',         labelKey: 'nav.queue',      icon: ListOrdered },
       { id: 'visit',         labelKey: 'nav.visit',        icon: Stethoscope },
       { id: 'patients',      labelKey: 'nav.patients',     icon: Users },
-      { id: 'photos',        labelKey: 'nav.photo_archive',    icon: Camera },
-      { id: 'ai-assistant',  labelKey: 'nav.ai_assistant',  icon: Brain, ...AI_SIDEBAR_DISCLAIMER_META },
+      { id: 'photos',        labelKey: 'nav.photo_archive', icon: Camera },
     ],
   },
 };
@@ -238,6 +241,38 @@ export const ROUTE_REGISTRY = [
     owner: 'iam.auth',
     component: 'LoginFormStyled',
     layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Login' }),
+  },
+  {
+    id: 'patient-login',
+    path: '/patient/login',
+    group: 'public',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'landing',
+    auth: 'public',
+    roles: [],
+    entry: 'direct',
+    nav: false,
+    title: 'Patient Login',
+    owner: 'iam.patient-access',
+    component: 'PatientLoginPage',
+    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Patient Login' }),
+  },
+  {
+    id: 'patient-activate',
+    path: '/patient/activate',
+    group: 'public',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'landing',
+    auth: 'public',
+    roles: [],
+    entry: 'direct',
+    nav: false,
+    title: 'Patient Activation',
+    owner: 'iam.patient-access',
+    component: 'PatientActivatePage',
+    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Patient Activation' }),
   },
   {
     id: 'change-password-required',
@@ -306,6 +341,49 @@ export const ROUTE_REGISTRY = [
     component: 'QueueJoin',
     legacyRedirectFrom: [],
     layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Join Queue' }),
+  },
+  {
+    // RQ-18 (S-15): permanent public address of a direction — the SAME
+    // QueueJoin experience in direction mode (ONE start-session per mount,
+    // existing complete flow). The address is permanent, NOT a token.
+    id: 'queue-join-direction',
+    path: '/q/:publicCode',
+    group: 'public',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'fullscreen',
+    auth: 'public',
+    roles: [],
+    entry: 'direct',
+    nav: false,
+    title: 'Join Queue',
+    owner: 'queue.public',
+    component: 'QueueJoin',
+    legacyRedirectFrom: [],
+    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Join Queue' }),
+  },
+  {
+    // PR 3390 review round (P1): the PWA/SMS visit-confirmation invitation
+    // (backend notifications_pkg/_formatting.py) deep-links patients to
+    // /confirm-visit?token=… — this public screen consumes the existing
+    // visit-confirmation API (GET /visits/info/{token}, POST
+    // /patient/visits/confirm). Without it the App wildcard redirected the
+    // invitation link to /not-found while the reminder was stamped as sent.
+    id: 'confirm-visit',
+    path: '/confirm-visit',
+    group: 'public',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'fullscreen',
+    auth: 'public',
+    roles: [],
+    entry: 'direct',
+    nav: false,
+    title: 'Confirm Visit',
+    owner: 'clinical.patient',
+    component: 'ConfirmVisitPage',
+    legacyRedirectFrom: [],
+    layout: layout({ hideHeader: true, hideSidebar: true, pageTitle: 'Confirm Visit' }),
   },
   {
     id: 'telegram-mini-app-patient',
@@ -773,6 +851,27 @@ export const ROUTE_REGISTRY = [
     layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-queue-settings', pageTitle: 'Admin Queue Settings' }),
   },
   {
+    // RQ-17 (E-065): собранный путь настройки направления — экран-вход
+    // checklist + мастер S-14 (brief RQ17_SETUP_PATH_BRIEF.md §4).
+    // Единственная новая запись сайдбара среза: минимальный QueueResource
+    // CRUD живёт своей поверхностью внутри экрана-входа, не отдельным route.
+    id: 'admin-setup-directions',
+    path: '/admin/setup-directions',
+    group: 'admin',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'app-shell',
+    auth: 'role-scoped',
+    roles: ['Admin'],
+    entry: 'menu',
+    nav: nav({ labelKey: 'nav.setup_directions', icon: Compass, sectionKey: 'nav.section_clinic_queue', order: 35, sidebar: true }),
+    title: 'Admin Setup Directions',
+    owner: 'admin.queue',
+    component: 'AdminSetupDirections',
+    legacyRedirectFrom: [],
+    layout: layout({ sidebarPreset: 'admin', activeSidebarItem: 'admin-setup-directions', pageTitle: 'Admin Setup Directions' }),
+  },
+  {
     id: 'admin-ai-settings',
     path: '/admin/ai-settings',
     group: 'admin',
@@ -1150,6 +1249,32 @@ export const ROUTE_REGISTRY = [
     layout: layout({ sidebarPreset: 'lab', pageTitle: 'Lab Panel' }),
   },
   {
+    id: 'nurse-serving',
+    path: '/nurse',
+    group: 'clinical',
+    surface: 'screen',
+    lifecycle: stable,
+    shell: 'app-shell',
+    // NURSE-V2 N2-5: the Nurse-only tablet workspace. Deliberately WITHOUT
+    // Admin (the repo staff-route convention is intentionally not applied
+    // here): the serving plane performs data-level authorization that
+    // requires an ACTIVE NurseWorkplaceAssignment for everyone (N2-3,
+    // superuser included), so an Admin hitting /nurse would render an empty
+    // no-workplace shell at best. No Nurse-to-Doctor alias (ROLE_ALIASES
+    // stays empty), no sidebar preset (no clinical sidebar — a tablet-first
+    // frameless surface, the patient-home precedent), no extra route grants:
+    // this is the ONLY new route of the slice and it grants exactly one role.
+    auth: 'role-scoped',
+    roles: ['Nurse'],
+    homeForRoles: ['nurse'],
+    entry: 'direct',
+    nav: false,
+    title: 'Nurse Serving',
+    owner: 'clinical.nurse',
+    component: 'NurseTabletPage',
+    layout: layout({ hideSidebar: true, pageTitle: 'Nurse Serving' }),
+  },
+  {
     id: 'patient-home',
     path: '/patient',
     group: 'clinical',
@@ -1297,6 +1422,10 @@ export const ROUTE_REGISTRY = [
     shell: 'app-shell',
     auth: 'authenticated',
     roles: [],
+    // NURSE-V2 N2-2 (PR #3333) parked the Nurse login landing here while
+    // the tablet workspace did not exist. N2-5 ships /nurse as the
+    // canonical home, so this route no longer carries homeForRoles —
+    // it stays a plain authenticated self-profile screen.
     entry: 'contextual',
     nav: false,
     title: 'User Profile',
@@ -1446,4 +1575,33 @@ export const ROUTE_REGISTRY = [
 
 export function getCanonicalRoutes() {
   return ROUTE_REGISTRY;
+}
+
+/**
+ * PR 3351 (review round 3, P1): resolve a pathname to its registry route.
+ *
+ * Route IDENTITY — not path prefixes — decides whether a navigation keeps
+ * the current screen mounted. '/lab/results' is not a registered route:
+ * the App wildcard redirects it to /not-found and unmounts LabPanel, so
+ * the lab leave guard must treat it as a transition AWAY from /lab. The
+ * reverse also holds: legacy redirect aliases ('/lab-panel') remount the
+ * panel after the redirect hop, so they are leaves as well — only the
+ * exact registry path that renders the screen preserves its state.
+ *
+ * PR 3351 (review round 4, P1): resolve with the SAME matcher React Router
+ * uses for <Route path={route.path}> — matchPath({ end: true }) — instead of
+ * exact string equality. App renders routes straight from this registry and
+ * never canonicalizes the URL (the Vercel rewrite serves index.html as-is),
+ * so '/lab/' keeps rendering LabPanel via the router's trailing-slash
+ * normalization; exact equality made findRouteByPath('/lab/') return
+ * undefined and the lab leave guard silently skipped arming the sentinel —
+ * browser Back then unmounted the panel with a dirty draft and no dialog.
+ * matchPath mirrors the router faithfully: '/lab/' and (case-insensitive,
+ * like <Route>) '/Lab' resolve to the registered route, while '/lab/results'
+ * and the legacy alias '/lab-panel' still do not. Registry order is safe:
+ * static routes precede their parametric siblings ('/queue/join' before
+ * '/queue/join/:token'), matching the router's static-over-dynamic rank.
+ */
+export function findRouteByPath(pathname: string): (typeof ROUTE_REGISTRY)[number] | undefined {
+  return ROUTE_REGISTRY.find((route) => matchPath({ path: route.path, end: true }, pathname));
 }

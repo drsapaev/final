@@ -48,10 +48,14 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
       'useEffect(() => {',
     );
 
-    expect(servicesLoadBlock).toContain('api.get(\'/registrar/services\')');
-    expect(doctorsLoadBlock).toContain('api.get(\'/registrar/doctors\')');
+    expect(servicesLoadBlock).toContain('await fetchRegistrarServices()');
+    expect(doctorsLoadBlock).toContain('await fetchRegistrarDoctors()');
+    expect(doctorsLoadBlock).toContain('setDoctorsData(doctors.map(');
+    // RQ-05.b (codex P2 PR 3309): каталог идёт через типизированный wrapper
+    // api/registrar (RegistrarCatalogService), а не через raw api.get.
     expect(servicesLoadBlock).not.toContain('fetch(`${API_BASE}/registrar/services`');
     expect(doctorsLoadBlock).not.toContain('fetch(`${API_BASE}/registrar/doctors`');
+    expect(doctorsLoadBlock).not.toContain('api.get(\'/registrar/doctors\')');
     expect(servicesLoadBlock).not.toContain('\'Authorization\': `Bearer ${tokenManager.getAccessToken()}`');
     expect(doctorsLoadBlock).not.toContain('\'Authorization\': `Bearer ${tokenManager.getAccessToken()}`');
   });

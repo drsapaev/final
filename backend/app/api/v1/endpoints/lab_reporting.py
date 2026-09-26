@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.clinic import Doctor
+from app.models.lab import FINAL_INSTANCE_STATUSES
 from app.models.visit import Visit
 from app.schemas.lab_reporting import (
     LabCatalogAnalyteOut,
@@ -78,17 +79,20 @@ def _doctor_allowed_visit_ids(
 
 
 def _ensure_doctor_can_read_lab_instance(db: Session, instance, current_user) -> None:
-    """LAB-AUDIT-28 P0-1: ранее non-Doctor roles (Lab) bypassed ownership check
-    (early return). Теперь все non-Admin роли без Doctor profile получают 403.
-    Lab role could read ANY patient's lab results by sequential instance_id
-    enumeration — patient_snapshot (full_name, phone, address, DOB, sex),
-    all lab values, critical findings.
+    """Read/PDF guard for lab report instances.
+
+    Роль Lab обслуживает всю лабораторную очередь: она создаёт бланки
+    (POST /lab/report-instances разрешён Admin/Lab) и читает их (list
+    endpoint отдаёт Lab неразмеченный список), поэтому Doctor ownership
+    к Lab не применяется. LAB-AUDIT-28 P0-1 остаётся в силе для остальных
+    ролей: Doctor и любые другие роли, добравшиеся до endpoint, проходят
+    doctor ownership check — без него sequential instance_id enumeration
+    открывает patient_snapshot, values и critical findings чужих пациентов.
     """
     if getattr(current_user, "is_superuser", False):
         return
-    if getattr(current_user, "role", None) == "Admin":
+    if getattr(current_user, "role", None) in ("Admin", "Lab"):
         return
-    # All other roles (including Lab) must go through Doctor ownership check
     if not instance.visit_id:
         raise HTTPException(status_code=403, detail="Access denied")
     _doctor_allowed_visit_ids(db, current_user, requested_visit_ids=[instance.visit_id])
@@ -261,8 +265,8 @@ def list_lab_orders(
 # Façade решает все 3 проблемы: собственный контракт, собственная RBAC,
 # нормализация в lab-специфичный формат на backend.
 #
-# Внутренне делегирует к существующей функции get_today_queues из
-# registrar_integration, чтобы не дублировать ~1700 строк логики.
+# Внутренне делегирует к bounded-варианту registrar today-queues,
+# чтобы не дублировать каноническую логику сборки очереди.
 # Возвращает плоский массив записей (а не nested queues[]) — это
 # упрощает frontend и убирает промежуточную нормализацию.
 @router.get("/queue/today", response_model=dict[str, Any])
@@ -283,13 +287,15 @@ target_date: str | None = Query(default=None, description="Дата (YYYY-MM-DD)
     """
     # Импортируем внутри функции, чтобы избежать circular import
     # (registrar_integration импортирует много зависимостей).
-    from app.api.v1.endpoints.registrar_integration import get_today_queues
+    from app.api.v1.endpoints.registrar_integration import get_today_queues_page
 
     # Делегируем к существующей функции с явным department=lab.
     # current_user передаём как есть — RBAC уже проверена этим endpoint'ом.
-    raw_payload = get_today_queues(
+    raw_payload = get_today_queues_page(
         target_date=target_date,
         department="lab",
+        limit=limit,
+        offset=offset,
         db=db,
         current_user=user,
     )
@@ -348,7 +354,7 @@ target_date: str | None = Query(default=None, description="Дата (YYYY-MM-DD)
 
     return {
         "entries": flat_entries,
-        "total": len(flat_entries),
+        "total": raw_payload["total_entries"],
         "date": raw_payload.get("date"),
         "timezone": raw_payload.get("timezone", "Asia/Tashkent"),
     }
@@ -730,6 +736,118 @@ def download_lab_report_pdf(
             content=pdf_bytes,
             media_type="application/pdf",
             headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        )
+    except LabReportingDomainError as exc:
+        _handle_domain_error(exc)
+
+
+@router.get("/report-instances/{instance_id}/preview", response_model=dict[str, Any])
+def preview_lab_report_instance_pdf(
+    instance_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_roles("Admin", "Lab")),
+):
+    """PR8 (codex-lab-workflow-hardening-plan): серверный A4-preview того же
+    движка, что финальный PDF, ДО утверждения.
+
+    Контракт:
+    - доступ только Admin/Lab (врач получает результат через /pdf после
+      finalize; preview неутверждённых бланков — лабораторная поверхность);
+    - рендерятся ТЕКУЩИЕ СОХРАНЕННЫЕ значения (Save Draft до preview —
+      unsaved-черновик клиента на сервер не отправляется);
+    - watermark «Черновик» для неутверждённых статусов; утверждённые
+      рендерятся без watermark (эквивалент финального вида);
+    - Content-Disposition: inline + Cache-Control: private, no-store
+      (клиническое содержание);
+    - побочных эффектов нет: без mark-printed, уведомлений и финализации.
+    """
+    service = LabReportingService(db)
+    try:
+        instance = service.get_instance(instance_id)
+        watermark_text = (
+            "Черновик" if instance.status not in FINAL_INSTANCE_STATUSES else None
+        )
+        materialized_sections = service.materialize_instance(instance)
+        critical_findings = service.summarize_critical_findings(materialized_sections)
+        pdf_bytes = lab_report_pdf_service.render_report(
+            {
+                "template_name": instance.template.name,
+                "layout_preset": instance.template_version.layout_preset,
+                "page_settings": instance.template_version.page_settings or {},
+                "branding": instance.branding_snapshot or {},
+                "patient": instance.patient_snapshot or {},
+                "signers": instance.signer_snapshot or {},
+                "sections": materialized_sections,
+                "critical_findings": critical_findings,
+                "footer_notes": instance.template_version.footer_notes,
+                "report_date": (
+                    instance.finalized_at or instance.created_at or datetime.now(UTC)
+                ).strftime("%d.%m.%Y"),
+                "watermark_text": watermark_text,
+            }
+        )
+        filename = f"lab-report-{instance.id}-preview.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Cache-Control": "private, no-store",
+            },
+        )
+    except LabReportingDomainError as exc:
+        _handle_domain_error(exc)
+
+
+@router.get("/template-versions/{version_id}/preview", response_model=dict[str, Any])
+def preview_lab_template_version_pdf(
+    version_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_roles("Admin", "Lab")),
+):
+    """PR8: template preview — серверный A4-рендер СОХРАНЁННОЙ версии
+    шаблона до публикации.
+
+    Контракт:
+    - доступ только Admin/Lab (редакторская поверхность шаблонов);
+    - только синтетические placeholder-значения: patient-блок пуст, value
+      колонка — очевидный маркер, никаких данных реальных пациентов;
+    - неопубликованные версии (DRAFT) помечаются watermark «Черновик»;
+      PUBLISHED рендерится без watermark (это и есть печатный бланк);
+    - inline + no-store; рендерер тот же, что у финального PDF.
+    """
+    service = LabReportingService(db)
+    try:
+        version = service.repository.get_template_version(version_id)
+        if not version:
+            raise LabReportingDomainError(404, "Template version not found")
+        watermark_text = "Черновик" if version.status != "PUBLISHED" else None
+        sections = service.materialize_template_preview(version)
+        pdf_bytes = lab_report_pdf_service.render_report(
+            {
+                "template_name": version.template.name,
+                "layout_preset": version.layout_preset,
+                "page_settings": version.page_settings or {},
+                "branding": service._build_branding_snapshot(version),
+                # Никаких данных реальных пациентов: пустой patient-блок —
+                # шаблон сам отрисует подписи-прочерки полей.
+                "patient": {},
+                "signers": service._build_signer_snapshot(version),
+                "sections": sections,
+                "critical_findings": [],
+                "footer_notes": version.footer_notes,
+                "report_date": datetime.now(UTC).strftime("%d.%m.%Y"),
+                "watermark_text": watermark_text,
+            }
+        )
+        filename = f"lab-template-version-{version.id}-preview.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Cache-Control": "private, no-store",
+            },
         )
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)

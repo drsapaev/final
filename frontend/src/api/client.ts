@@ -97,6 +97,21 @@ async function performTokenRefresh(): Promise<string | null> {
     });
 
     if (response.data && response.data.access_token) {
+      // Session-replacement guard (Phase 0 PR-B review P1): if the stored
+      // refresh token changed while this refresh was in flight — e.g.
+      // replaceAccessOnlySession() cleared it during a patient login or
+      // activation — the rotated tokens below belong to the REPLACED
+      // principal. Persisting them would resurrect the old staff session
+      // on top of the freshly installed patient one. Drop them and let the
+      // pending request continue under the current (replacement) session;
+      // the 401-recovery path already refuses to clear a replaced session
+      // (failedToken !== currentToken guard), so null is safe there too.
+      if (tokenManager.getRefreshToken() !== refreshToken) {
+        logger.warn('🔄 Refresh token changed mid-flight — dropping rotated tokens of the replaced session');
+        pendingRequestsQueue.forEach(resolve => resolve(null));
+        pendingRequestsQueue = [];
+        return null;
+      }
       const newToken = response.data.access_token;
       tokenManager.setAccessToken(newToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
@@ -184,7 +199,17 @@ const AUTH_BOOTSTRAP_SUFFIXES = [
   '/password-reset',
   '/password-reset/confirm',
   '/auth/logout',
-  '/authentication/logout'
+  '/authentication/logout',
+  // Patient portal (Phase 0 PR-A1/A2): pre-session endpoints whose uniform
+  // anti-enum 400/401/429 must surface as form errors — they must never
+  // trigger the reactive refresh/retry path (a patient session has no
+  // refresh_token, and a 401 here means "wrong code / not activated",
+  // not "token expired").
+  '/patient-access/request-otp',
+  '/patient-access/verify-otp',
+  '/patient-access/login',
+  '/patient-access/activate/request-otp',
+  '/patient-access/activate/confirm'
 ];
 
 function isAuthBootstrapEndpoint(url: string | undefined): boolean {
@@ -302,7 +327,7 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
       if (!isAuthEndpoint) {
         return Promise.reject(new Error(
           `[FIX:CSRF] Strict mode: refusing ${method.toUpperCase()} ${url} without CSRF token. `
-          + `Set VITE_CSRF_STRICT=0 to revert to fail-open behaviour.`
+          + 'Set VITE_CSRF_STRICT=0 to revert to fail-open behaviour.'
         ));
       }
     }
@@ -313,6 +338,39 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 
 // ✅ SECURITY: Handle 401 responses - log but don't auto-clear tokens
 // (prevents race condition where 401 during login transition clears new token)
+
+// Phase 0 follow-up (owner P2, access-only session lifecycle): the 401
+// recovery path must be able to TERMINATE a dead access-only session
+// (Patient portal login/activation install sessions with no refresh
+// token) through the same machinery as an explicit logout - clearing
+// auth_token/auth_profile + tokenManager + PHI caches and notifying
+// subscribers so RouteAccessBoundary redirects immediately instead of
+// showing a zombie session. The auth store registers the hook below
+// (stores/auth.ts imports this module, so the listener keeps the import
+// direction acyclic); when no store is loaded (standalone client tests)
+// the fallback still drops the client-level credentials.
+export type SessionInvalidationListener = () => void;
+let sessionInvalidationListener: SessionInvalidationListener | null = null;
+
+export function setSessionInvalidationListener(listener: SessionInvalidationListener | null): void {
+  sessionInvalidationListener = listener;
+}
+
+function invalidateDeadSession(): void {
+  const listener = sessionInvalidationListener;
+  if (listener) {
+    try {
+      listener();
+    } catch (e) {
+      logger.warn('[api] session invalidation listener failed:', e);
+    }
+  }
+  // Belt-and-suspenders: even without the store hook, drop client-level
+  // credentials so guards and the request interceptor see an anonymous
+  // state (idempotent with the listener path).
+  tokenManager.clearAll();
+  delete api.defaults.headers.common['Authorization'];
+}
 
 // #05 Tier 1: Detect CSRF rejection from the backend.
 // The backend sets `X-CSRF-Status: rejected` header and returns
@@ -357,7 +415,6 @@ api.interceptors.response.use(
       const hadAuthHeader = !!config.headers?.Authorization;
       const failedToken = String(config.headers?.Authorization || '')
         .replace(/^Bearer\s+/i, '');
-      const currentToken = tokenManager.getAccessToken();
       const refreshToken = tokenManager.getRefreshToken();
 
       if (hadAuthHeader && refreshToken && !config._retriedAfterRefresh) {
@@ -371,10 +428,47 @@ api.interceptors.response.use(
           return api.request(config);
         }
         // Session is dead only if no newer session took its place meanwhile.
-        if (!currentToken || failedToken === currentToken) {
-          logger.warn('🔒 Token refresh failed — clearing session');
-          tokenManager.clearAll();
-          delete api.defaults.headers.common['Authorization'];
+        // Phase 0 PR-B review round 2 (P1): the decision MUST be made on the
+        // LIVE access token re-read AFTER the await — not on a snapshot taken
+        // before it. Interleaving: 401 on a staff request → refresh starts →
+        // patient login replaces the session mid-flight (replaceAccessOnlySession)
+        // → the stale staff refresh is dropped by the performTokenRefresh
+        // guard → resolve null here. With the old pre-await snapshot
+        // (failedToken === snapshot) clearAll() wiped the freshly installed
+        // Patient session right after a successful login. liveToken now
+        // differs from failedToken (or the new session is access-only and
+        // still present), so the replacement survives; a genuinely dead
+        // session still fails the check and gets cleared.
+        const liveToken = tokenManager.getAccessToken();
+        if (!liveToken || failedToken === liveToken) {
+          // N2-5 review round 3 (P1): a STAFF session whose refresh died is
+          // terminated through the SAME machinery as the access-only path
+          // below — invalidateDeadSession() (the auth-store listener:
+          // auth_token/auth_profile + PHI caches + subscriber notify, so
+          // RouteAccessBoundary redirects at once) plus the idempotent
+          // client-level credential drop. The old manual clearAll() left
+          // auth_profile and the React auth subscribers untouched: the
+          // staff UI (e.g. the Nurse tablet) kept rendering a zombie
+          // logged-in session with no guaranteed redirect.
+          logger.warn('🔒 Token refresh failed — clearing dead session');
+          invalidateDeadSession();
+        }
+      } else if (hadAuthHeader && !refreshToken) {
+        // Access-only session (Patient portal): no refresh token exists, so
+        // the reactive refresh branch above never runs. Phase 0 follow-up
+        // (owner P2): without this branch a dead 30-minute JWT used to leave
+        // the session installed — every request kept 401ing while the UI
+        // still showed the patient as logged in. Clear the session, keeping
+        // the SAME race guard as the refresh path: the decision is made on
+        // the LIVE access token re-read at rejection time. If a newer login
+        // replaced the principal mid-flight, liveToken differs from
+        // failedToken and the replacement survives untouched.
+        const liveToken = tokenManager.getAccessToken();
+        if (liveToken && failedToken === liveToken) {
+          logger.warn('🔒 401 on access-only session (no refresh token) — clearing dead session', {
+            url: config.url
+          });
+          invalidateDeadSession();
         }
       }
     }
@@ -624,6 +718,11 @@ export {
   login,
   ensureCSRFToken,
   isCSRFRejection,
+  // PR 3351 (review round 9, P2): канонический single-flight refresh для
+  // UI-контролов продления сессии (кнопка «Продлить сессию» в LabPanel).
+  // Тот же мьютекс, что и у 401-recovery: клик по кнопке не порождает
+  // параллельный /authentication/refresh поверх уже идущего.
+  forceRefreshToken,
 };
 
 export default apiClient;

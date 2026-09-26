@@ -38,10 +38,19 @@ from app.synthetic_seed import (
 
 class TestCheckDbSafety:
     def test_refuses_protected_prod_names(self):
+        # The refusal names the DATABASE only: the exception travels to
+        # operator consoles/logs, so the URL (credentials included) must
+        # never appear in it.
         for protected in PROTECTED_DB_NAMES:
             url = f"postgresql://user:pass@host:5432/{protected}"
-            with pytest.raises(SyntheticSeedSafetyError, match="protected name"):
+            with pytest.raises(
+                SyntheticSeedSafetyError, match="protected database"
+            ) as exc_info:
                 _check_db_safety(url)
+            message = str(exc_info.value)
+            assert "user:pass" not in message
+            assert "postgresql://" not in message
+            assert protected in message
 
     def test_refuses_db_without_dev_marker(self):
         # DB name 'clinic' is in PROTECTED, but also any name without dev/staging/test marker

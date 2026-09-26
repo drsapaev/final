@@ -24,6 +24,7 @@ from app.crud.file_system import (
     file_access_log,
     file_quota,
     file_share,
+    file_tags_exclusion_predicate,
     file_version,
 )
 from app.models.appointment import Appointment
@@ -42,6 +43,7 @@ from app.schemas.file_system import (
     FileCreate,
     FileExportRequest,
     FileImportRequest,
+    FileOut,
     FilePermissionEnum,
     FileSearchRequest,
     FileTypeEnum,
@@ -51,6 +53,15 @@ from app.schemas.file_system import (
 logger = logging.getLogger(__name__)
 
 FILE_READ_CHUNK_BYTES = 1024 * 1024
+
+# Protected-domain file boundary (PR #3439 corrective follow-up).
+# Files tagged with one of these tags carry clinical references (patient/visit)
+# and MUST be served only by the owning specialty surface (e.g. the dental
+# media endpoints), which enforces visit-relationship + specialty checks that
+# the generic /files surface cannot perform. Owner- or share-based access in
+# the generic surface is NOT a valid authorization for such files.
+DENTAL_MEDIA_TAG = "dental-media:v1"
+PROTECTED_FILE_DOMAIN_TAGS: frozenset[str] = frozenset({DENTAL_MEDIA_TAG})
 
 
 class FileSystemService:
@@ -68,17 +79,17 @@ class FileSystemService:
         )
         self.max_import_files = int(os.getenv("MAX_IMPORT_FILES", 1000))
         self.allowed_extensions = {
-            FileType.DOCUMENT: ['.pdf', '.doc', '.docx', '.txt', '.rtf', '.odt'],
-            FileType.IMAGE: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'],
-            FileType.VIDEO: ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm'],
-            FileType.AUDIO: ['.mp3', '.wav', '.flac', '.aac', '.ogg'],
-            FileType.ARCHIVE: ['.zip', '.rar', '.7z', '.tar', '.gz'],
-            FileType.MEDICAL_RECORD: ['.pdf', '.doc', '.docx', '.xml'],
-            FileType.LAB_RESULT: ['.pdf', '.xlsx', '.csv', '.xml'],
-            FileType.XRAY: ['.dcm', '.dicom', '.jpg', '.jpeg', '.png'],
-            FileType.PRESCRIPTION: ['.pdf', '.xml', '.json'],
-            FileType.REPORT: ['.pdf', '.doc', '.docx', '.xlsx'],
-            FileType.BACKUP: ['.zip', '.sql', '.bak'],
+            FileType.DOCUMENT: [".pdf", ".doc", ".docx", ".txt", ".rtf", ".odt"],
+            FileType.IMAGE: [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"],
+            FileType.VIDEO: [".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm"],
+            FileType.AUDIO: [".mp3", ".wav", ".flac", ".aac", ".ogg"],
+            FileType.ARCHIVE: [".zip", ".rar", ".7z", ".tar", ".gz"],
+            FileType.MEDICAL_RECORD: [".pdf", ".doc", ".docx", ".xml"],
+            FileType.LAB_RESULT: [".pdf", ".xlsx", ".csv", ".xml"],
+            FileType.XRAY: [".dcm", ".dicom", ".jpg", ".jpeg", ".png"],
+            FileType.PRESCRIPTION: [".pdf", ".xml", ".json"],
+            FileType.REPORT: [".pdf", ".doc", ".docx", ".xlsx"],
+            FileType.BACKUP: [".zip", ".sql", ".bak"],
             FileType.OTHER: [],
         }
 
@@ -127,15 +138,15 @@ class FileSystemService:
                 return file_type
 
         # Дополнительная проверка по MIME типу
-        if mime_type.startswith('image/'):
+        if mime_type.startswith("image/"):
             return FileType.IMAGE
-        elif mime_type.startswith('video/'):
+        elif mime_type.startswith("video/"):
             return FileType.VIDEO
-        elif mime_type.startswith('audio/'):
+        elif mime_type.startswith("audio/"):
             return FileType.AUDIO
-        elif mime_type == 'application/pdf':
+        elif mime_type == "application/pdf":
             return FileType.DOCUMENT
-        elif mime_type in ['application/zip', 'application/x-rar-compressed']:
+        elif mime_type in ["application/zip", "application/x-rar-compressed"]:
             return FileType.ARCHIVE
 
         return FileType.OTHER
@@ -240,7 +251,12 @@ class FileSystemService:
         name, ext = os.path.splitext(filename)
         # Sanitize: remove path separators, dots-only names, null bytes
         safe_name = os.path.basename(name)  # strips directory components
-        safe_name = safe_name.replace("..", "").replace("/", "").replace("\\", "").replace("\x00", "")
+        safe_name = (
+            safe_name.replace("..", "")
+            .replace("/", "")
+            .replace("\\", "")
+            .replace("\x00", "")
+        )
         if not safe_name or safe_name.startswith("."):
             safe_name = "file"
         safe_ext = os.path.splitext(ext)[1]  # just the extension
@@ -308,10 +324,7 @@ class FileSystemService:
                     detail="EMR appointment not found",
                 )
             context_patient_ids["emr_id"] = int(appointment.patient_id)
-            if (
-                appointment_id is not None
-                and int(emr.appointment_id) != appointment_id
-            ):
+            if appointment_id is not None and int(emr.appointment_id) != appointment_id:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="EMR does not belong to selected appointment",
@@ -365,7 +378,7 @@ class FileSystemService:
             mime_type = (
                 upload_file.content_type
                 or mimetypes.guess_type(upload_file.filename)[0]
-                or 'application/octet-stream'
+                or "application/octet-stream"
             )
             _file_type = self._get_file_type(upload_file.filename, mime_type)
 
@@ -395,7 +408,7 @@ class FileSystemService:
                 os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
                 # Сохраняем файл
-                with open(file_path, 'wb') as f:
+                with open(file_path, "wb") as f:
                     f.write(file_content)
                 logger.info(f"Создан новый файл: {file_path}")
 
@@ -480,6 +493,10 @@ class FileSystemService:
         if not self._check_file_access(db, db_file, user_id):
             return None
 
+        # Protected-domain boundary: even a legitimate generic-surface owner or
+        # share holder must use the owning specialty surface for tagged files.
+        self.ensure_generic_surface_allowed(db_file)
+
         # Логируем доступ
         if user_id:
             file_access_log.create(db, file_id=file_id, user_id=user_id, action="view")
@@ -489,6 +506,46 @@ class FileSystemService:
     def _is_deleted_file(self, file_obj: File) -> bool:
         """Soft-deleted files must be hidden from normal file access paths."""
         return file_obj.status == FileStatusEnum.DELETED
+
+    @staticmethod
+    def _parse_file_tags(file_obj: File) -> list[str]:
+        tags = file_obj.tags
+        if isinstance(tags, str):
+            try:
+                tags = json.loads(tags)
+            except (json.JSONDecodeError, TypeError):
+                return []
+        if not isinstance(tags, list):
+            return []
+        return [str(tag) for tag in tags if isinstance(tag, str)]
+
+    @classmethod
+    def protected_domain_tag(cls, file_obj: File) -> str | None:
+        """Return the protected-domain tag carried by the file, if any."""
+        for tag in cls._parse_file_tags(file_obj):
+            if tag in PROTECTED_FILE_DOMAIN_TAGS:
+                return tag
+        return None
+
+    def ensure_generic_surface_allowed(self, file_obj: File) -> None:
+        """Fail-closed boundary for protected-domain files on the generic surface.
+
+        The generic /files API authorizes by ownership or file shares only; it has
+        no knowledge of the clinical relationship (visit ownership, doctor
+        specialty, patient binding) that the owning specialty surface enforces.
+        A tagged file therefore must not be readable, mutable, shareable, or
+        exportable here — including by its own generic-surface owner — and must
+        be served through the specialty endpoints instead.
+        """
+        tag = self.protected_domain_tag(file_obj)
+        if tag:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "Файл защищён специализированным клиническим архивом "
+                    f"(тег {tag}) и доступен только через его API"
+                ),
+            )
 
     def _check_file_access(
         self, db: Session, file_obj: File, user_id: int | None
@@ -539,7 +596,7 @@ class FileSystemService:
             )
 
         # Читаем файл
-        with open(db_file.file_path, 'rb') as f:
+        with open(db_file.file_path, "rb") as f:
             file_content = f.read()
 
         # Логируем скачивание
@@ -558,14 +615,30 @@ class FileSystemService:
         if not self._is_admin(db, user_id):
             search_request.owner_id = user_id
 
-        return file.search(db, search_request=search_request)
+        # Protected-domain boundary: tagged clinical files (e.g. dental-media)
+        # never surface through generic search — they are reachable only via
+        # the owning specialty surface. The exclusion happens at the query
+        # level (BEFORE count/pagination/facets), so totals and facets stay
+        # consistent with the boundary instead of drifting from the page.
+        return file.search(
+            db,
+            search_request=search_request,
+            exclude_tags=sorted(PROTECTED_FILE_DOMAIN_TAGS),
+        )
 
     def _is_admin(self, db: Session, user_id: int) -> bool:
-        """Проверить, является ли пользователь администратором"""
+        """Проверить, является ли пользователь администратором (IAM SSOT).
+
+        Role decisions must come from the role SSOT (``is_admin_role``), not a
+        literal spelling — otherwise SuperAdmin passes the specialty RBAC
+        gates (dental editor policy) yet falls through the service-level
+        owner-or-Admin checks into misleading 403/404 responses.
+        """
+        from app.core.roles import is_admin_role
         from app.models.user import User
 
         user = db.query(User).filter(User.id == user_id).first()
-        return user and user.role == "Admin"
+        return bool(user and is_admin_role(user.role))
 
     def replace_file_content(
         self,
@@ -598,6 +671,10 @@ class FileSystemService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Нет прав для замены содержимого файла",
             )
+
+        # Protected-domain boundary: content replacement must go through the
+        # owning specialty surface (e.g. dental media re-upload policy).
+        self.ensure_generic_surface_allowed(db_file)
 
         new_content, new_size = self._read_upload_file_limited(
             new_file, self.max_file_size
@@ -635,7 +712,7 @@ class FileSystemService:
         os.makedirs(os.path.dirname(new_file_path), exist_ok=True)
 
         # Сохраняем новый файл
-        with open(new_file_path, 'wb') as f:
+        with open(new_file_path, "wb") as f:
             f.write(new_content)
 
         # Обновляем запись файла
@@ -665,11 +742,28 @@ class FileSystemService:
 
         return db_file
 
-    def delete_file(self, db: Session, file_id: int, user_id: int) -> bool:
-        """Удалить файл"""
+    def delete_file(
+        self,
+        db: Session,
+        file_id: int,
+        user_id: int,
+        *,
+        allow_protected_domain: bool = False,
+    ) -> bool:
+        """Удалить файл.
+
+        Protected-domain files (e.g. dental media) are rejected here unless the
+        caller is the owning specialty surface passing
+        ``allow_protected_domain=True`` — the specialty surface enforces its own
+        editor policy before delegating the mechanical soft-delete + quota
+        update to this method.
+        """
         db_file = file.get(db, id=file_id)
         if not db_file or self._is_deleted_file(db_file):
             return False
+
+        if not allow_protected_domain:
+            self.ensure_generic_surface_allowed(db_file)
 
         # Проверяем права доступа
         if db_file.owner_id != user_id and not self._is_admin(db, user_id):
@@ -678,9 +772,12 @@ class FileSystemService:
         # Мягкое удаление
         result = file.delete(db, id=file_id)
         if result:
-            # Обновляем квоту пользователя
+            # Учитываем квоту владельца файла, в том числе при удалении администратором.
             file_quota.update_usage(
-                db, user_id=user_id, size_delta=-db_file.file_size, files_delta=-1
+                db,
+                user_id=db_file.owner_id,
+                size_delta=-db_file.file_size,
+                files_delta=-1,
             )
 
             # Логируем удаление
@@ -701,6 +798,10 @@ class FileSystemService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Нет прав для создания совместного использования",
             )
+
+        # Protected-domain boundary: clinical files must not be shared through
+        # the generic surface — sharing bypasses the specialty visit checks.
+        self.ensure_generic_surface_allowed(db_file)
 
         from app.schemas.file_system import FileShareCreate
 
@@ -734,7 +835,7 @@ class FileSystemService:
         )
 
         try:
-            with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zipf:
                 for db_file in files_to_export:
                     if os.path.exists(db_file.file_path):
                         # Добавляем файл в архив
@@ -789,7 +890,7 @@ class FileSystemService:
                     detail="Import archive is too large",
                 )
 
-            with zipfile.ZipFile(io.BytesIO(import_request.import_data), 'r') as zipf:
+            with zipfile.ZipFile(io.BytesIO(import_request.import_data), "r") as zipf:
                 self._safe_extract_zip(zipf, extracted_path)
 
             processed_files = 0
@@ -798,20 +899,20 @@ class FileSystemService:
             # Обрабатываем извлеченные файлы
             for root, _dirs, files in os.walk(extracted_path):
                 for filename in files:
-                    if filename.endswith('.metadata.json'):
+                    if filename.endswith(".metadata.json"):
                         continue  # Пропускаем файлы метаданных
 
                     file_path = os.path.join(root, filename)
 
                     try:
                         # Читаем файл
-                        with open(file_path, 'rb') as f:
+                        with open(file_path, "rb") as f:
                             file_content = f.read()
 
                         # Определяем тип файла
                         mime_type = (
                             mimetypes.guess_type(filename)[0]
-                            or 'application/octet-stream'
+                            or "application/octet-stream"
                         )
                         file_type = self._get_file_type(filename, mime_type)
 
@@ -860,38 +961,53 @@ class FileSystemService:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     def get_file_statistics(self, db: Session, user_id: int) -> dict[str, Any]:
-        """Получить статистику файлов"""
-        # Общая статистика
-        total_files = db.query(File).filter(File.owner_id == user_id).count()
-        total_size = (
-            db.query(func.sum(File.file_size)).filter(File.owner_id == user_id).scalar()
-            or 0
+        """Получить статистику файлов (generic-surface scope).
+
+        Protected-domain boundary: list/search/item-поверхности generic /files
+        API исключают protected-domain строки (например dental-media) на уровне
+        запроса, поэтому агрегаты статистики обязаны зеркалировать ту же
+        границу через тот же shared exact-token предикат — иначе counts/size,
+        фасеты и recent_uploads утекают агрегатные и строковые метаданные
+        защищённых клинических файлов (FileOut несёт file_path/file_hash/
+        patient_id/visit_id).
+
+        recent_uploads сериализуется через FileOut.from_orm(): сырые ORM-строки
+        валидатор FileStats не принимает (FileOut.tags ждёт list[str], а в
+        Text-колонке лежит JSON-строка; кроме того у ORM-объекта есть
+        служебный атрибут metadata) — любой файл в recent_uploads ронял бы
+        /files/statistics в response-validation 500.
+        """
+        base = (
+            db.query(File)
+            .filter(File.owner_id == user_id)
+            .filter(
+                file_tags_exclusion_predicate(File, sorted(PROTECTED_FILE_DOMAIN_TAGS))
+            )
         )
+
+        # Общая статистика
+        total_files = base.count()
+        total_size = base.with_entities(func.sum(File.file_size)).scalar() or 0
 
         # Статистика по типам
         files_by_type = (
-            db.query(File.file_type, func.count(File.id))
-            .filter(File.owner_id == user_id)
+            base.with_entities(File.file_type, func.count(File.id))
             .group_by(File.file_type)
             .all()
         )
 
         # Статистика по правам доступа
         files_by_permission = (
-            db.query(File.permission, func.count(File.id))
-            .filter(File.owner_id == user_id)
+            base.with_entities(File.permission, func.count(File.id))
             .group_by(File.permission)
             .all()
         )
 
-        # Недавние загрузки
-        recent_uploads = (
-            db.query(File)
-            .filter(File.owner_id == user_id)
-            .order_by(desc(File.created_at))
-            .limit(10)
-            .all()
-        )
+        # Недавние загрузки — уже сериализованные FileOut (не ORM-строки)
+        recent_uploads = [
+            FileOut.from_orm(row)
+            for row in base.order_by(desc(File.created_at)).limit(10).all()
+        ]
 
         # Использование квоты
         quota = file_quota.get_user_quota(db, user_id=user_id)

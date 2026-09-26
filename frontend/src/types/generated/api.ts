@@ -111,6 +111,116 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/patients/cabinet/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Patient Cabinet Summary
+         * @description Home-screen summary for the JWT patient portal (own scope only).
+         */
+        get: operations["get_patient_cabinet_summary_api_v1_patients_cabinet_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/booking/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Patient Portal Booking
+         * @description Non-mutating booking preview for the JWT patient portal.
+         *
+         *     Round-7 (owner P2): the keyed surface is PUBLISHED — the middleware
+         *     processes every preview that carries an Idempotency-Key (the operation
+         *     -scoping contract depends on it), so 409/503 are real runtime outcomes
+         *     of this endpoint, not undocumented surprises.
+         */
+        post: operations["preview_patient_portal_booking_api_v1_patients_booking_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/booking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Patient Portal Booking
+         * @description Create one trusted patient-portal appointment (own scope only).
+         *
+         *     Mirrors the Mini App creation contract: same draft validation, same
+         *     per-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same
+         *     409 on occupied slots, same lifecycle eligibility for the doctor.
+         *
+         *     Merged-#3340 follow-up (P1): the FINAL routing department is re-read
+         *     with ``populate_existing().with_for_update()`` in THIS transaction and
+         *     its ``active`` re-validated before the INSERT — the persisted routing
+         *     context can no longer reference a department that a concurrently
+         *     committed admin transaction deactivated (or deleted).
+         *
+         *     P2 (round 2): the `Idempotency-Key` header is REQUIRED. The global
+         *     idempotency middleware only protects requests that carry a key —
+         *     without a mandated key a lost response + automatic browser retry of a
+         *     date-only/department-only request (no doctor slot lock applies) would
+         *     create duplicate appointments. Same key + same payload replays the
+         *     committed 201; same key + changed payload is a 409.
+         *
+         *     P2 (round 3): creation goes through the portal-INTERNAL
+         *     `PatientPortalAppointmentCreate` — the persisted `department_id` is the
+         *     server-resolved FK from `_resolve_portal_department`, never a
+         *     client-owned field (the shared `AppointmentCreate` no longer accepts
+         *     one, closing the legacy-endpoint bypass).
+         */
+        post: operations["create_patient_portal_booking_api_v1_patients_booking_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Patient Portal Forms
+         * @description Read-only protected forms metadata + saved answers for the JWT portal.
+         *
+         *     Submissions remain Telegram-only in this PR (see module docstring).
+         */
+        get: operations["get_patient_portal_forms_api_v1_patients_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/patients/appointments": {
         parameters: {
             query?: never;
@@ -816,6 +926,12 @@ export type paths = {
          *
          *     Позволяет изменить одинаковые поля у группы услуг.
          *     Например: изменить цену, активность, категорию и т.д.
+         *
+         *     RQ-17 round-2 (P1-1): batch — равноправный writer serialization-scope
+         *     §3.1 (не прямой setattr-обход): row-locks sorted по id,
+         *     owner-config-локи всех affected-тегов (sorted) и пост-валидация
+         *     инварианта каждого тега до single commit. Атомарно: нарушение
+         *     инварианта -> 409, при котором ни одна услуга batch не изменена.
          */
         post: operations["batch_update_services_api_v1_services_admin_batch_update_post"];
         delete?: never;
@@ -1377,10 +1493,42 @@ export type paths = {
         /**
          * Get Visit Info By Token
          * @description Получение информации о визите по токену (без подтверждения).
+         *
+         *     PR 3407 delta review P2: the legacy GET returns the same patient-safe
+         *     card as the POST — the raw ``dict[str, Any]`` response_model is gone,
+         *     so the shared service projection cannot leak internal fields here
+         *     even if it regresses.
+         *
+         *     PR 3417 review residual P2: the card is bearer-capability PHI, so the
+         *     response is marked ``Cache-Control: private, no-store`` (same policy
+         *     as dental clinical content), and the 5xx error path is sanitized
+         *     exactly like the POST's — the service wraps raw exception text
+         *     (SQLAlchemy/DB internals) into its 500 detail, which must never
+         *     reach a public bearer-token caller.
          */
         get: operations["get_visit_info_by_token_api_v1_visits_info__token__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/visits/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Visit Info By Token
+         * @description Read a public visit card without putting its bearer token in the URL.
+         */
+        post: operations["post_visit_info_by_token_api_v1_visits_info_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2228,6 +2376,368 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/nurse-workplace-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Nurse Workplace Assignments
+         * @description Paged list of workplace assignments (active first, newest first).
+         */
+        get: operations["list_nurse_workplace_assignments_api_v1_admin_nurse_workplace_assignments_get"];
+        put?: never;
+        /**
+         * Create Nurse Workplace Assignment
+         * @description Assign a Nurse User to a QueueResource workplace (D2 FINAL).
+         *
+         *     404 — referenced user/resource not found; 400 — the user is not an
+         *     active Nurse or the resource is inactive; 409 — an active
+         *     assignment for the same (user, resource) pair already exists;
+         *     401/403 — the control-plane auth contract (see
+         *     _AUTH_ERROR_RESPONSES).
+         *
+         *     The mutation is committed with an actor-attributed UserAuditLog row
+         *     in the same transaction (codex round-2 P2): the acting Admin and the
+         *     (user_id, queue_resource_id) grant are reconstructable from the
+         *     ledger alone.
+         */
+        post: operations["create_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/nurse-workplace-assignments/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Nurse Workplace Assignment
+         * @description Read a single workplace assignment by id (404 when missing).
+         */
+        get: operations["get_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/nurse-workplace-assignments/{assignment_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate Nurse Workplace Assignment
+         * @description Deactivate an assignment (the row stays as history; D2 FINAL).
+         *
+         *     404 — assignment not found; 409 — already inactive. A new active row
+         *     for the same (user, resource) pair may be created afterwards;
+         *     401/403 — the control-plane auth contract (see
+         *     _AUTH_ERROR_RESPONSES).
+         *
+         *     The transition is committed with an actor-attributed UserAuditLog
+         *     row in the same transaction (codex round-2 P2).
+         */
+        post: operations["deactivate_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/workplaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Workplaces
+         * @description The caller's ACTIVE workplaces (self-scope; no admin surface).
+         *
+         *     One row per active NurseWorkplaceAssignment, enriched with the
+         *     resource mirror fields and the D2-resolved effective cabinet
+         *     (assignment override ?? resource default) — the station list the
+         *     tablet (N2-5) will offer as the shift context.
+         */
+        get: operations["list_my_workplaces_api_v1_nurse_serving_workplaces_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Station Entries
+         * @description The station board: waiting + active entries + the caller's claim.
+         *
+         *     ``waiting`` is the canonical call order (priority DESC, arrival
+         *     ASC, id ASC); ``active`` are the called/in_progress entries with
+         *     their station-routed services and execution state (the tablet's
+         *     "what is left to perform" list); ``my_entry`` is the caller's own
+         *     held claim — the §6 reconnect/reload contract (the active serving
+         *     is re-fetchable, never lost). ``late_pending`` surfaces TERMINAL
+         *     entries whose visit still has pending station-routed services (a
+         *     procedure prescribed after the last-completer flip): the serving
+         *     plane never reopens terminal entries — the servable path is the
+         *     existing rejoin flow (a new ticket for the same visit); the board
+         *     makes the state visible so nothing prescribed is silently stranded.
+         */
+        get: operations["get_station_entries_api_v1_nurse_serving_queue_resources__queue_resource_id__entries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/draining-executions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Draining Executions
+         * @description Drain-recovery discovery (N2-5 §8 backend follow-up): read-only.
+         *
+         *     The graceful drain (N2-3) keeps the terminal complete/incomplete
+         *     mutations authorized for the STARTER after a mid-flight assignment
+         *     deactivation — but the read plane (workplaces list empty, station
+         *     board 403) gave a RELOADED tablet no way to discover the execution
+         *     id, making the drain unreachable from the UI. This self-scope read
+         *     closes exactly that loop: it returns the caller's OWN in_progress
+         *     executions that today's station board does NOT already surface (no
+         *     active assignment on the station, or the entry no longer belongs
+         *     to the station's today queue), with the station/entry/service
+         *     context needed to finish them through the existing terminal
+         *     endpoints. No mutations, no new authorization surface, no
+         *     client-side workaround.
+         */
+        get: operations["list_draining_executions_api_v1_nurse_serving_draining_executions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/call-next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Call Next Patient
+         * @description Atomically claim the next waiting patient (§6, idempotent per Nurse).
+         *
+         *     The claim serializes on the station's queue row; a Nurse already
+         *     holding a called/in_progress entry at this station gets the SAME
+         *     entry back (``idempotent: true`` — the repeat/reconnect contract);
+         *     two nurses claiming concurrently always get DIFFERENT patients. The
+         *     transition is committed with an actor-attributed UserAuditLog row;
+         *     ``called_by_user_id`` is the claiming Nurse.
+         */
+        post: operations["call_next_patient_api_v1_nurse_serving_queue_resources__queue_resource_id__call_next_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/entries/{entry_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Serving
+         * @description Start serving the called patient (called -> in_progress).
+         *
+         *     Station-assignment-authorized (any assigned nurse may start a
+         *     called entry of her station — the admin-called display-board flow
+         *     works too); idempotent while in_progress (the D1 handover surface).
+         *     The visit is resolved (visit_id-first, else station-branch with the
+         *     open|in_progress widening) and linked to the entry; an ``open``
+         *     visit transitions to ``in_progress`` (the doctor-surface BUG-3
+         *     lesson). NOTHING closes the visit here.
+         */
+        post: operations["start_serving_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/executions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Service Execution
+         * @description Start an execution attempt of a concrete VisitService (D1 FINAL).
+         *
+         *     ``queue_entry_id`` is REQUIRED (the D1 contract for the nurse API —
+         *     the queue entry is the serving context, stored on the attempt); the
+         *     service must route to the station (D3: queue_tag match +
+         *     requires_doctor=false). Same-nurse repeat POST is a no-op (200 with
+         *     the existing in_progress attempt); a DIFFERENT nurse gets 409 (the
+         *     one-active claim). A retry after incomplete creates a NEW attempt
+         *     (attempt_no = previous + 1); history is never overwritten.
+         */
+        post: operations["start_service_execution_api_v1_nurse_serving_queue_resources__queue_resource_id__executions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/executions/{execution_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete Service Execution
+         * @description Complete an in_progress attempt (performed_by = the ACTUAL nurse).
+         *
+         *     D1 handover: one nurse may start, another finishes. The
+         *     last-completer contract: the completion that observes ALL
+         *     station-routed services of the visit done flips the queue entry to
+         *     ``served`` with ``served_by_user_id`` = the flipping nurse (§6
+         *     attribution); exactly one concurrent completion wins the flip.
+         *     Mid-flight assignment deactivation does not strand the attempt: the
+         *     STARTER may always complete what she started (graceful drain).
+         *     Same-nurse repeat = 200 no-op; a different actor on a terminal
+         *     attempt = 409.
+         */
+        post: operations["complete_service_execution_api_v1_nurse_serving_executions__execution_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/executions/{execution_id}/incomplete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Incomplete Service Execution
+         * @description Abort an in_progress attempt with a mandatory reason (no flip).
+         *
+         *     The service stays PENDING (the retry is a NEW attempt — D1
+         *     history); the queue entry must NOT flip to served. The entry-level
+         *     terminal (patient done, not everything performed) is the separate
+         *     entry-incomplete operation.
+         */
+        post: operations["incomplete_service_execution_api_v1_nurse_serving_executions__execution_id__incomplete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/entries/{entry_id}/no-show": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Entry No Show
+         * @description Mark the patient as no-show (queue-level only).
+         *
+         *     The sibling-pending services decision (N2-3 brief): VisitServices
+         *     and ServiceExecutions are deliberately NOT touched — the patient
+         *     may be restored (the existing Admin restore path) and serving
+         *     continues. The mutation is committed with an actor-attributed
+         *     UserAuditLog row.
+         */
+        post: operations["mark_entry_no_show_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__no_show_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nurse/serving/queue-resources/{queue_resource_id}/entries/{entry_id}/incomplete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Entry Incomplete
+         * @description Terminate the entry-level serving with a mandatory reason.
+         *
+         *     409 while any in_progress execution is linked — each attempt must
+         *     be resolved explicitly (billing/medical audit). The visit is NOT
+         *     closed (the §5 forbidden list); entry-level terminal states are
+         *     queue facts.
+         */
+        post: operations["mark_entry_incomplete_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__incomplete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/admin/queue-analytics/{specialist_id}": {
         parameters: {
             query?: never;
@@ -2243,6 +2753,79 @@ export type paths = {
         get: operations["get_queue_analytics_api_v1_queue_admin_queue_analytics__specialist_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/directions/{profile_key}/entry-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Поддерживаемые способы QR-входа направления (RQ-16.b/RQ-16.d)
+         * @description Read-only contract surface: explicitly enumerate the QR-entry
+         *     methods the server supports for the direction addressed by its
+         *     QR-visible profile key. ``permanent_address`` is dynamic per
+         *     direction since RQ-16.d (E-055 §8).
+         */
+        get: operations["get_direction_entry_methods_api_v1_queue_directions__profile_key__entry_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/admin/directions/{profile_key}/public-address/provision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Provision постоянного публичного адреса направления (RQ-16.d)
+         * @description Admin provision/enable of the permanent public address (E-055 §3):
+         *     the server generates the opaque code ONCE and persists it forever.
+         *     Idempotent — a re-provision returns the SAME address (created=False);
+         *     archive/reactivate cycles never regenerate (E-055 §7). Manual address
+         *     editing and rotation are out of scope (E-055 §6).
+         */
+        post: operations["provision_public_address_api_v1_queue_admin_directions__profile_key__public_address_provision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/public/{public_code}/start-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Начало короткоживущей сессии по постоянному адресу направления (RQ-16.d, анонимный путь)
+         * @description ONE canonical anonymous resolve/start operation (E-055 §9):
+         *
+         *     public_code -> registry -> QueueProfile -> visibility/eligibility ->
+         *     anonymous rate limit -> short-lived session -> the existing
+         *     QueueJoin session flow. No second join mechanism: every rule stays
+         *     in the canonical resolver, and the minted direction-scoped token is
+         *     bound to THIS direction for the session's whole short life.
+         */
+        post: operations["start_public_direction_session_api_v1_queue_public__public_code__start_session_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2477,6 +3060,35 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/join/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Probe Join Session
+         * @description Round-11 (PR #3362 review, P1-2): read-only oracle состояния попытки
+         *     присоединения (публичный эндпоинт).
+         *
+         *     Ownerless-ambiguity recovery НЕ ДОЛЖЕН вызывать ``/join/complete`` как
+         *     «проверку»: для ещё не claims-нутой (``pending``) сессии complete — это
+         *     само исполнение бизнес-операции с введённым payload'ом (второй заход
+         *     для пациента, чья настоящая попытка уже может быть закоммичена).
+         *     Этот оракул возвращает класс состояния attempt'а относительно введённых
+         *     данных, не мутируя ни одной строки; для совпавшей закоммиченной попытки
+         *     повторно отдаёт СОХРАНЁННЫЙ ответ первой попытки (без записи).
+         */
+        post: operations["probe_join_session_api_v1_queue_join_probe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/online-entry/{entry_id}/update": {
         parameters: {
             query?: never;
@@ -2590,6 +3202,42 @@ export type paths = {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/admin/queue-resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Список QueueResource (реестр ресурсных владельцев тегов) */
+        get: operations["list_queue_resources_api_v1_queue_admin_queue_resources_get"];
+        put?: never;
+        /** Создать QueueResource (draft по умолчанию; active=true — через gate §3.1) */
+        post: operations["create_queue_resource_api_v1_queue_admin_queue_resources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/admin/queue-resources/{resource_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** QueueResource по id */
+        get: operations["get_queue_resource_api_v1_queue_admin_queue_resources__resource_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** PATCH QueueResource (ordinary-поля; code/queue_tag immutable; active — lifecycle §3.2) */
+        patch: operations["update_queue_resource_api_v1_queue_admin_queue_resources__resource_id__patch"];
         trace?: never;
     };
     "/api/v1/queue/available-specialists": {
@@ -5276,6 +5924,32 @@ export type paths = {
          *     Используется на странице /queue/join для выбора специальности.
          */
         get: operations["get_queue_profiles_public_api_v1_queues_profiles_public_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queues/profiles/{profile_key}/impact-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Queue Profile Impact Preview
+         * @description RQ-12.b (D-02): server-side impact preview of what a lifecycle
+         *     action on this profile would touch.
+         *
+         *     Read-only: this endpoint never mutates anything and its report is
+         *     informational only — the delete endpoint re-verifies the same links
+         *     at execution time, so a stale preview cannot authorize destruction
+         *     (ACCEPTANCE S-10: "повторить со stale preview").
+         */
+        get: operations["get_queue_profile_impact_preview_api_v1_queues_profiles__profile_key__impact_preview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8820,6 +9494,32 @@ export type paths = {
          * @description Обновить настройки системы очередей
          */
         put: operations["update_queue_settings_api_v1_admin_queue_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/queue/settings/effective": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Effective Queue Settings
+         * @description RQ-23.a (D-06 APPROVED, S-20): отчёт эффективных настроек очереди.
+         *
+         *     Read-only вычисление над существующими строками: каждый управляемый
+         *     параметр получает источник (клиника → отделение → владелец → снимок
+         *     дня), флаг «живое/не применяется» и время применения. Фронтенд
+         *     отображает результат и источник уровня (D-06); поведение очередей
+         *     отчёт не меняет.
+         */
+        get: operations["get_effective_queue_settings_api_v1_admin_queue_settings_effective_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -13800,6 +14500,33 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram/mini-app/booking/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List Mini App Booking Departments
+         * @description Round-12 (owner P1, PR #3386 review): ACTIVE departments for the
+         *     Mini App booking form's department selector.
+         *
+         *     The form submits the canonical `Department.key` picked from THIS list —
+         *     a localized free-text label ("Кардиология") is not a `Department.key`
+         *     and would be refused with 400 `department_unknown` by the routing
+         *     contract. Same authenticated identity surface as the booking endpoints
+         *     themselves (initData primary, entry token allowed); no PHI is returned.
+         */
+        post: operations["telegram_mini_app_list_booking_departments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/telegram/mini-app/appointments/preview": {
         parameters: {
             query?: never;
@@ -14460,6 +15187,106 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/push/devices/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register Push Device
+         * @description Register (or idempotently refresh) a push device credential.
+         */
+        post: operations["register_push_device_api_v1_push_devices_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Push Device
+         * @description Heartbeat from an already-registered device (bumps last_seen_at).
+         */
+        post: operations["refresh_push_device_api_v1_push_devices_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices/unregister": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unregister Push Device
+         * @description Retire the matching device(s) of the current user (single logout).
+         */
+        post: operations["unregister_push_device_api_v1_push_devices_unregister_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Push Devices
+         * @description List the current user's registered push devices (no credentials).
+         */
+        get: operations["list_push_devices_api_v1_push_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push/devices/{device_row_id}/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Toggle Push Device
+         * @description Toggle the device-level switch; other devices stay untouched.
+         */
+        post: operations["toggle_push_device_api_v1_push_devices__device_row_id__toggle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/phone-verification/send-code": {
         parameters: {
             query?: never;
@@ -14694,6 +15521,140 @@ export type paths = {
         get: operations["get_password_reset_statistics_api_v1_password_reset_statistics_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/request-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Patient Otp
+         * @description Отправить OTP для входа пациента. Ответ номер-нейтрален (anti-enum).
+         */
+        post: operations["request_patient_otp_api_v1_patient_access_request_otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/verify-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Patient Otp
+         * @description Проверить OTP -> одноразовый verification_grant (единый ответ при любой неудаче).
+         */
+        post: operations["verify_patient_otp_api_v1_patient_access_verify_otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Patient Login
+         * @description phone + verification_grant -> JWT канонического User(role=Patient).
+         *
+         *     Fail-closed: 0 или >1 активных verified Patient-пользователей на номер ->
+         *     единый generic 401 (endpoint не становится каталогом пациентов).
+         */
+        post: operations["patient_login_api_v1_patient_access_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/activate/request-otp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Activation Otp
+         * @description Отправить OTP для активации доступа.
+         *
+         *     OTP уходит ТОЛЬКО на номер карты, привязанный к токену при выпуске.
+         *     Ответ маскирует номер и не содержит PHI.
+         */
+        post: operations["request_activation_otp_api_v1_patient_access_activate_request_otp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patient-access/activate/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Activation
+         * @description Токен + OTP -> каноническая сессия User(role=Patient).
+         *
+         *     Атомарно: User + UserProfile(phone, verified) + Patient.user_id в одной
+         *     транзакции (SELECT FOR UPDATE + один commit). Все отказы — единый
+         *     generic текст (anti-enum).
+         */
+        post: operations["confirm_activation_api_v1_patient_access_activate_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/activation-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Activation Token
+         * @description Выдать одноразовый токен активации портала для карты пациента.
+         *
+         *     Токен привязывается к (Patient.id, нормализованный phone) на момент
+         *     выдачи; действует 72 часа; перевыпуск отзывает предыдущий токен.
+         *     Открытый текст токена возвращается ОДИН раз и не попадает в аудит.
+         */
+        post: operations["issue_activation_token_api_v1_patients__patient_id__activation_token_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -15911,6 +16872,59 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dental/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Список стоматологических снимков пациента */
+        get: operations["list_dental_media_api_v1_dental_media_get"];
+        put?: never;
+        /** Загрузить стоматологическое фото или рентген */
+        post: operations["upload_dental_media_api_v1_dental_media_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dental/media/{media_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Защищённый просмотр стоматологического снимка */
+        get: operations["view_dental_media_api_v1_dental_media__media_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dental/media/{media_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Мягко удалить стоматологический снимок */
+        delete: operations["delete_dental_media_api_v1_dental_media__media_id__delete"];
+        options?: never;
+        head?: never;
+        /** Изменить метаданные стоматологического снимка */
+        patch: operations["update_dental_media_api_v1_dental_media__media_id__patch"];
+        trace?: never;
+    };
     "/api/v1/dental/examinations": {
         parameters: {
             query?: never;
@@ -16438,6 +17452,67 @@ export type paths = {
         };
         /** Download Lab Report Pdf */
         get: operations["download_lab_report_pdf_api_v1_lab_report_instances__instance_id__pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/report-instances/{instance_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Lab Report Instance Pdf
+         * @description PR8 (codex-lab-workflow-hardening-plan): серверный A4-preview того же
+         *     движка, что финальный PDF, ДО утверждения.
+         *
+         *     Контракт:
+         *     - доступ только Admin/Lab (врач получает результат через /pdf после
+         *       finalize; preview неутверждённых бланков — лабораторная поверхность);
+         *     - рендерятся ТЕКУЩИЕ СОХРАНЕННЫЕ значения (Save Draft до preview —
+         *       unsaved-черновик клиента на сервер не отправляется);
+         *     - watermark «Черновик» для неутверждённых статусов; утверждённые
+         *       рендерятся без watermark (эквивалент финального вида);
+         *     - Content-Disposition: inline + Cache-Control: private, no-store
+         *       (клиническое содержание);
+         *     - побочных эффектов нет: без mark-printed, уведомлений и финализации.
+         */
+        get: operations["preview_lab_report_instance_pdf_api_v1_lab_report_instances__instance_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/template-versions/{version_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Lab Template Version Pdf
+         * @description PR8: template preview — серверный A4-рендер СОХРАНЁННОЙ версии
+         *     шаблона до публикации.
+         *
+         *     Контракт:
+         *     - доступ только Admin/Lab (редакторская поверхность шаблонов);
+         *     - только синтетические placeholder-значения: patient-блок пуст, value
+         *       колонка — очевидный маркер, никаких данных реальных пациентов;
+         *     - неопубликованные версии (DRAFT) помечаются watermark «Черновик»;
+         *       PUBLISHED рендерится без watermark (это и есть печатный бланк);
+         *     - inline + no-store; рендерер тот же, что у финального PDF.
+         */
+        get: operations["preview_lab_template_version_pdf_api_v1_lab_template_versions__version_id__preview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -22130,6 +23205,23 @@ export type components = {
              */
             warnings?: string[];
             /**
+             * Requires Doctor Confirmation
+             * @description Врач должен подтвердить предложение AI перед внесением в ЭМК
+             * @constant
+             */
+            requires_doctor_confirmation: true;
+            /**
+             * Decision Boundary
+             * @description Ответ AI является только предложением
+             * @constant
+             */
+            decision_boundary: "suggestion_only";
+            /**
+             * Ai Notice
+             * @description Предупреждение о роли AI
+             */
+            ai_notice: string;
+            /**
              * Disclaimer
              * @description Медицинский дисклеймер
              * @default AI suggestions are advisory only. Final decisions must be made by licensed medical professionals.
@@ -22913,6 +24005,12 @@ export type components = {
             updated_at?: string | null;
             /** Patient Name */
             patient_name?: string | null;
+            /** Department Id */
+            department_id?: number | null;
+            /** Department Key */
+            department_key?: string | null;
+            /** Department Name */
+            department_name?: string | null;
         };
         /**
          * AppointmentCancelRequest
@@ -23749,6 +24847,28 @@ export type components = {
         Body_upload_clinic_logo_api_v1_admin_clinic_logo_post: {
             /** File */
             file: string;
+        };
+        /** Body_upload_dental_media_api_v1_dental_media_post */
+        Body_upload_dental_media_api_v1_dental_media_post: {
+            /** File */
+            file: string;
+            /** Patient Id */
+            patient_id: number;
+            /** Visit Id */
+            visit_id: number;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "photo" | "xray";
+            /** Tooth */
+            tooth?: string | null;
+            /** Capture Date */
+            capture_date?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
         };
         /** Body_upload_file_api_v1_files_upload_post */
         Body_upload_file_api_v1_files_upload_post: {
@@ -25052,6 +26172,69 @@ export type components = {
              */
             recommendations: string;
         };
+        /** DentalMediaList */
+        DentalMediaList: {
+            /** Items */
+            items: components["schemas"]["DentalMediaOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
+        /**
+         * DentalMediaOut
+         * @description Storage-safe representation of a dental media record.
+         */
+        DentalMediaOut: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string | null;
+            /** Description */
+            description: string | null;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "photo" | "xray";
+            /** Tooth */
+            tooth: string | null;
+            /** Capture Date */
+            capture_date: string | null;
+            /** Mime Type */
+            mime_type: string;
+            /** File Size */
+            file_size: number;
+            /** Patient Id */
+            patient_id: number;
+            /** Visit Id */
+            visit_id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** DentalMediaUpdate */
+        DentalMediaUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Category */
+            category?: ("photo" | "xray") | null;
+            /** Tooth */
+            tooth?: string | null;
+            /** Capture Date */
+            capture_date?: string | null;
+        };
         /** DentalPriceOverrideRequest */
         DentalPriceOverrideRequest: {
             /** Visit Id */
@@ -25620,6 +26803,47 @@ export type components = {
              */
             provider?: string | null;
         };
+        /**
+         * DirectionEntryMethod
+         * @description The contract methods space (DIRECTION_CONTRACT.md §6.2).
+         * @enum {string}
+         */
+        DirectionEntryMethod: "session_qr" | "permanent_address" | "view_only";
+        /**
+         * DirectionEntryMethodSupport
+         * @description One method with its honest support flag for this direction.
+         */
+        DirectionEntryMethodSupport: {
+            method: components["schemas"]["DirectionEntryMethod"];
+            /** Supported */
+            supported: boolean;
+        };
+        /**
+         * DirectionEntryMethodsResponse
+         * @description Explicit entry-methods enumeration for one QR-visible direction.
+         */
+        DirectionEntryMethodsResponse: {
+            /**
+             * Direction Key
+             * @description Canonical QR-visible profile key (normalized)
+             */
+            direction_key: string;
+            /**
+             * Profile Id
+             * @description QueueProfile.id — a separate id space (D-01)
+             */
+            profile_id: number;
+            /**
+             * Title
+             * @description Public display title (title_ru preferred)
+             */
+            title: string;
+            /**
+             * Entry Methods
+             * @description The WHOLE methods space, always fully present: every contract method carries an honest supported flag; clients must not infer methods absent from this enumeration
+             */
+            entry_methods: components["schemas"]["DirectionEntryMethodSupport"][];
+        };
         /** DiscountCalculationRequest */
         DiscountCalculationRequest: {
             /** Patient Id */
@@ -25966,6 +27190,73 @@ export type components = {
             /** Max Online Per Day */
             max_online_per_day?: number | null;
         };
+        /** DoctorQueueDoctor */
+        DoctorQueueDoctor: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Specialty */
+            specialty: string;
+            /** Cabinet */
+            cabinet?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DoctorQueueEntry */
+        DoctorQueueEntry: {
+            /** Id */
+            id: number;
+            /** Number */
+            number: number;
+            /** Patient Id */
+            patient_id: number | null;
+            /** Visit Id */
+            visit_id: number | null;
+            /** Patient Name */
+            patient_name: string;
+            /** Phone */
+            phone?: string | null;
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+            /** Created At */
+            created_at?: string | null;
+            /** Queue Time */
+            queue_time?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Last Changed At */
+            last_changed_at?: string | null;
+            /** Display Time Kind */
+            display_time_kind: string;
+            /** Timezone */
+            timezone: string;
+            /** Called At */
+            called_at?: string | null;
+            patient?: components["schemas"]["DoctorQueuePatient"] | null;
+            /** Available Actions */
+            available_actions: string[];
+            /** Can Call */
+            can_call: boolean;
+            /** Can Start Visit */
+            can_start_visit: boolean;
+            /** Can No Show */
+            can_no_show: boolean;
+            /** Can Send To Diagnostics */
+            can_send_to_diagnostics: boolean;
+            /** Can Complete */
+            can_complete: boolean;
+            /** Can Notify Diagnostics Return */
+            can_notify_diagnostics_return: boolean;
+            /** Can Mark Incomplete */
+            can_mark_incomplete: boolean;
+            /** Can Restore Next */
+            can_restore_next: boolean;
+        } & {
+            [key: string]: unknown;
+        };
         /**
          * DoctorQueueLimit
          * @description Индивидуальный лимит для врача
@@ -25988,6 +27279,83 @@ export type components = {
              * @default 15
              */
             max_online_entries: number;
+        };
+        /** DoctorQueuePatient */
+        DoctorQueuePatient: {
+            /** Id */
+            id: number;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Middle Name */
+            middle_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Birth Date */
+            birth_date?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DoctorQueueStartVisitResponse */
+        DoctorQueueStartVisitResponse: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
+            /** Entry Id */
+            entry_id: number;
+            /** Patient Id */
+            patient_id: number | null;
+            /** Visit Id */
+            visit_id: number;
+            /** Status */
+            status: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DoctorQueueStats */
+        DoctorQueueStats: {
+            /** Total */
+            total: number;
+            /** Waiting */
+            waiting: number;
+            /** Called */
+            called: number;
+            /** Served */
+            served: number;
+            /** Online Entries */
+            online_entries?: number | null;
+            /** Desk Entries */
+            desk_entries?: number | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DoctorQueueTodayResponse */
+        DoctorQueueTodayResponse: {
+            /** Queue Exists */
+            queue_exists: boolean;
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Queue Ids */
+            queue_ids?: number[] | null;
+            /** Opened At */
+            opened_at?: string | null;
+            doctor: components["schemas"]["DoctorQueueDoctor"];
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Entries */
+            entries: components["schemas"]["DoctorQueueEntry"][];
+            stats: components["schemas"]["DoctorQueueStats"];
+            /** Can Call Next */
+            can_call_next: boolean;
+            /** Next Call Entry Id */
+            next_call_entry_id: number | null;
+        } & {
+            [key: string]: unknown;
         };
         /**
          * DoctorSearchRequest
@@ -28592,6 +29960,11 @@ export type components = {
             }[] | null;
             /** Message */
             message: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
         };
         /**
          * JoinSessionCompleteRequest
@@ -28623,6 +29996,11 @@ export type components = {
              * @description Список ID специалистов (для общего QR)
              */
             specialist_ids?: number[] | null;
+            /**
+             * Specialist Entity Types
+             * @description Типы сущностей specialist_ids, выровненные по индексам ('doctor' | 'profile'); тип выбора передаётся явно (D-01), тип сущности не определяется по совпадению числового ID
+             */
+            specialist_entity_types?: string[] | null;
         };
         /**
          * JoinSessionCompleteResponse
@@ -28641,6 +30019,139 @@ export type components = {
             specialist_name: string;
             /** Department */
             department: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+        };
+        /**
+         * JoinSessionProbeRequest
+         * @description Round-11 (PR #3362 review, P1-2): запрос read-only oracle'а.
+         *
+         *     Поля идентичны ``JoinSessionCompleteRequest`` — оракул сравнивает
+         *     канонизированный отпечаток ТЕМ ЖЕ алгоритмом, которым complete
+         *     связывает попытку с payload'ом. Никаких бизнес-эффектов запрос не
+         *     имеет: ни claim, ни создание пациента, ни выдача талона.
+         */
+        JoinSessionProbeRequest: {
+            /**
+             * Session Token
+             * @description Токен сессии
+             */
+            session_token: string;
+            /**
+             * Patient Name
+             * @description ФИО пациента
+             */
+            patient_name: string;
+            /**
+             * Phone
+             * @description Номер телефона
+             */
+            phone: string;
+            /**
+             * Telegram Id
+             * @description Telegram ID
+             */
+            telegram_id?: number | null;
+            /**
+             * Specialist Ids
+             * @description Список ID специалистов (для общего QR)
+             */
+            specialist_ids?: number[] | null;
+            /**
+             * Specialist Entity Types
+             * @description Типы сущностей specialist_ids, выровненные по индексам ('doctor' | 'profile')
+             */
+            specialist_entity_types?: string[] | null;
+        };
+        /**
+         * JoinSessionProbeResponse
+         * @description Round-11 (PR #3362 review, P1-2): классификация попытки БЕЗ мутаций.
+         *
+         *     ``outcome``:
+         *       joined_match         — typed payload владеет уже совершённой попыткой;
+         *                              ``result`` несёт СОХРАНЁННЫЙ ответ первой попытки
+         *                              (read-only re-serve, эквивалент replay-ветки);
+         *       joined_mismatch      — попытка совершена с другим payload'ом (чужая);
+         *       joined_owner_unknown — устаревшая строка без отпечатка — владение
+         *                              недоказуемо, ведёт себя как UNKNOWN;
+         *       pending_unbound      — сессия жива, но под ней НЕ выполнено ни одного
+         *                              бизнес-действия — конверт можно безопасно удалить;
+         *       processing           — claim в полёте — UNKNOWN, повторить позже;
+         *       expired / not_found  — попытка мертва, ничего не создано.
+         */
+        JoinSessionProbeResponse: {
+            /**
+             * Outcome
+             * @description joined_match | joined_mismatch | joined_owner_unknown | pending_unbound | processing | expired | not_found
+             */
+            outcome: string;
+            /**
+             * Result
+             * @description Сохранённый ответ первой попытки (только для joined_match); иначе null
+             */
+            result?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * JoinSessionRefusalDetail
+         * @description Один per-specialist отказ аллокатора (round-6, P2-1).
+         */
+        JoinSessionRefusalDetail: {
+            /**
+             * Specialist Id
+             * @description ID выбора (Doctor.id или QueueProfile.id); None для одиночного пути
+             */
+            specialist_id?: number | null;
+            /**
+             * Error
+             * @description Человекочитаемое сообщение домена
+             */
+            error: string;
+        };
+        /**
+         * JoinSessionRefusalErrorResponse
+         * @description Полное HTTP-тело отказа complete-попытки (round-9, review P2-1).
+         *
+         *     Runtime raises ``HTTPException(detail={reason, message[, details]})``,
+         *     so FastAPI serves the refusal wrapped in the standard ``detail``
+         *     envelope: ``{"detail": {"reason": ..., "message": ...}}``. The
+         *     frontend reads ``response.data.detail.reason`` — the declared OpenAPI
+         *     contract must describe EXACTLY that wire format, so 400/409 reference
+         *     THIS wrapper (not the bare inner payload).
+         */
+        JoinSessionRefusalErrorResponse: {
+            detail: components["schemas"]["JoinSessionRefusalResponse"];
+        };
+        /**
+         * JoinSessionRefusalResponse
+         * @description Структурированный отказ complete-попытки (round-6, P2-1/P2-2).
+         *
+         *     400 — session-state / pre-execution refusals (incl. the
+         *     rollback-proven ``join_session_not_executed``); 409 — immutable
+         *     payload mismatch. ``reason`` vocabulary:
+         *     join_session_not_found | join_session_expired | join_session_processing |
+         *     join_session_used | join_session_payload_mismatch | join_session_not_executed.
+         */
+        JoinSessionRefusalResponse: {
+            /**
+             * Reason
+             * @description Машиночитаемая причина отказа
+             */
+            reason: string;
+            /**
+             * Message
+             * @description Человекочитаемое сообщение
+             */
+            message: string;
+            /**
+             * Details
+             * @description Per-specialist ошибки (только для join_session_not_executed)
+             */
+            details?: components["schemas"]["JoinSessionRefusalDetail"][] | null;
         };
         /**
          * JoinSessionStartRequest
@@ -28666,6 +30177,16 @@ export type components = {
             queue_info: {
                 [key: string]: unknown;
             };
+            /**
+             * Target Date
+             * @description Целевая дата очереди токена (YYYY-MM-DD)
+             */
+            target_date?: string | null;
+            /**
+             * Attempt Expires At
+             * @description Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: конец целевого queue-day в timezone клиники + safety grace
+             */
+            attempt_expires_at?: string | null;
         };
         /** LabCatalogAnalyteOut */
         LabCatalogAnalyteOut: {
@@ -29052,6 +30573,11 @@ export type components = {
              * @default false
              */
             can_print: boolean;
+            /**
+             * Can Preview
+             * @default false
+             */
+            can_preview: boolean;
         };
         /** LabReportInstanceSummaryOut */
         LabReportInstanceSummaryOut: {
@@ -29125,6 +30651,11 @@ export type components = {
              * @default false
              */
             can_print: boolean;
+            /**
+             * Can Preview
+             * @default false
+             */
+            can_preview: boolean;
         };
         /** LabReportInstanceUpdate */
         LabReportInstanceUpdate: {
@@ -30516,7 +32047,7 @@ export type components = {
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            role: "Admin" | "Registrar" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
+            role: "Admin" | "Registrar" | "Nurse" | "Cashier" | "Lab" | "Patient" | "SuperAdmin" | "cardio" | "cardiologist" | "cardiology" | "dentist" | "dentistry" | "derma" | "dermatologist" | "dermatology" | "doctor";
             /** Doctor Profile */
             doctor_profile?: null;
         };
@@ -30906,6 +32437,431 @@ export type components = {
                 [key: string]: number;
             };
         };
+        /**
+         * NurseServingCallNextResponse
+         * @description The atomic claim result.
+         *
+         *     ``idempotent`` is True when the Nurse already held a called /
+         *     in_progress entry at this station and the SAME entry was returned
+         *     (the §6 "повтор запроса идемпотентен" / reconnect contract).
+         */
+        NurseServingCallNextResponse: {
+            entry: components["schemas"]["NurseServingEntryResponse"];
+            /** Idempotent */
+            idempotent: boolean;
+            /** Waiting Count */
+            waiting_count: number;
+        };
+        /**
+         * NurseServingDrainingEntryRef
+         * @description The queue entry context of a draining execution.
+         */
+        NurseServingDrainingEntryRef: {
+            /** Entry Id */
+            entry_id: number;
+            /** Number */
+            number: number;
+            /** Patient Name */
+            patient_name?: string | null;
+        };
+        /**
+         * NurseServingDrainingExecutionItem
+         * @description One discoverable drain candidate: the caller's own unfinished work.
+         */
+        NurseServingDrainingExecutionItem: {
+            execution: components["schemas"]["NurseServingExecutionResponse"];
+            station: components["schemas"]["NurseServingDrainingStationRef"];
+            entry: components["schemas"]["NurseServingDrainingEntryRef"];
+            service: components["schemas"]["NurseServingDrainingServiceRef"];
+        };
+        /**
+         * NurseServingDrainingExecutionListResponse
+         * @description The drain-recovery discovery payload (self-scope, read-only).
+         */
+        NurseServingDrainingExecutionListResponse: {
+            /** Items */
+            items?: components["schemas"]["NurseServingDrainingExecutionItem"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
+        /**
+         * NurseServingDrainingServiceRef
+         * @description The VisitService a draining execution performs.
+         */
+        NurseServingDrainingServiceRef: {
+            /** Visit Service Id */
+            visit_service_id: number;
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name?: string | null;
+            /**
+             * Qty
+             * @default 1
+             */
+            qty: number;
+        };
+        /**
+         * NurseServingDrainingStationRef
+         * @description The station a draining execution belongs to (display context).
+         */
+        NurseServingDrainingStationRef: {
+            /** Queue Resource Id */
+            queue_resource_id: number;
+            /** Resource Code */
+            resource_code?: string | null;
+            /** Resource Display Name */
+            resource_display_name?: string | null;
+            /** Effective Cabinet */
+            effective_cabinet?: string | null;
+        };
+        /**
+         * NurseServingEntryActionResponse
+         * @description Entry-level no-show / incomplete result.
+         */
+        NurseServingEntryActionResponse: {
+            /** Entry Id */
+            entry_id: number;
+            /** New Status */
+            new_status: string;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * NurseServingEntryIncompleteRequest
+         * @description Terminate the entry-level serving with a mandatory reason.
+         */
+        NurseServingEntryIncompleteRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * NurseServingEntryResponse
+         * @description A queue entry as the serving station sees it.
+         */
+        NurseServingEntryResponse: {
+            /** Id */
+            id: number;
+            /** Number */
+            number: number;
+            /** Status */
+            status: string;
+            /**
+             * Priority
+             * @default 0
+             */
+            priority: number;
+            /** Source */
+            source?: string | null;
+            /** Patient Id */
+            patient_id?: number | null;
+            /** Patient Name */
+            patient_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Queue Time */
+            queue_time?: string | null;
+            /** Called At */
+            called_at?: string | null;
+            /** Called By User Id */
+            called_by_user_id?: number | null;
+            /** Served By User Id */
+            served_by_user_id?: number | null;
+            /** Served At */
+            served_at?: string | null;
+            /** Visit Id */
+            visit_id?: number | null;
+            /**
+             * Is My Claim
+             * @default false
+             */
+            is_my_claim: boolean;
+            /** Claim Owner Assignment Active */
+            claim_owner_assignment_active?: boolean | null;
+            /** Actionable By Current User */
+            actionable_by_current_user?: boolean | null;
+            /** Services */
+            services?: components["schemas"]["NurseServingStationServiceState"][];
+        };
+        /**
+         * NurseServingErrorDetail
+         * @description The typed {"detail": ...} body every domain/auth error returns.
+         */
+        NurseServingErrorDetail: {
+            /** Detail */
+            detail: string;
+        };
+        /**
+         * NurseServingExecutionCreateRequest
+         * @description Start (or idempotently re-claim) a service execution attempt.
+         */
+        NurseServingExecutionCreateRequest: {
+            /**
+             * Queue Entry Id
+             * @description The served queue entry
+             */
+            queue_entry_id: number;
+            /**
+             * Visit Service Id
+             * @description The VisitService to perform
+             */
+            visit_service_id: number;
+        };
+        /**
+         * NurseServingExecutionIncompleteRequest
+         * @description Abort an in_progress attempt with a mandatory reason.
+         */
+        NurseServingExecutionIncompleteRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * NurseServingExecutionResponse
+         * @description One ServiceExecution attempt, with the entry-flip outcome.
+         */
+        NurseServingExecutionResponse: {
+            /** Id */
+            id: number;
+            /** Visit Service Id */
+            visit_service_id: number;
+            /** Queue Entry Id */
+            queue_entry_id?: number | null;
+            /** Attempt No */
+            attempt_no: number;
+            /** Status */
+            status: string;
+            /** Started By User Id */
+            started_by_user_id: number;
+            /** Started At */
+            started_at?: string | null;
+            /** Performed By User Id */
+            performed_by_user_id?: number | null;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Incomplete Reason */
+            incomplete_reason?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /**
+             * Entry Served
+             * @default false
+             */
+            entry_served: boolean;
+            /** Entry Served By User Id */
+            entry_served_by_user_id?: number | null;
+        };
+        /**
+         * NurseServingStartResponse
+         * @description Entry-level serving start (called -> in_progress).
+         */
+        NurseServingStartResponse: {
+            /** Entry Id */
+            entry_id: number;
+            /** Status */
+            status: string;
+            /** Visit Id */
+            visit_id?: number | null;
+            /** Visit Status */
+            visit_status?: string | null;
+            /** Idempotent */
+            idempotent: boolean;
+        };
+        /**
+         * NurseServingStationResponse
+         * @description The station state: queue metadata + waiting + active entries.
+         *
+         *     ``late_pending`` (codex round-2 P1): TERMINAL entries of today's
+         *     station queue whose visit still has PENDING station-routed services
+         *     — e.g. a procedure prescribed after the last-completer flip. The
+         *     serving plane deliberately does not reopen terminal entries; the
+         *     servable path is the existing rejoin flow (a new ticket for the same
+         *     visit — the next entry's serving sees ALL pending station services).
+         *     The board surfaces the state so nothing prescribed is silently
+         *     stranded and the desk can re-ticket.
+         */
+        NurseServingStationResponse: {
+            /** Queue Resource Id */
+            queue_resource_id: number;
+            /** Resource Queue Tag */
+            resource_queue_tag?: string | null;
+            /** Resource Display Name */
+            resource_display_name?: string | null;
+            /** Effective Cabinet */
+            effective_cabinet?: string | null;
+            /** Queue Id */
+            queue_id: number;
+            /** Queue Day */
+            queue_day?: string | null;
+            /** Waiting */
+            waiting: components["schemas"]["NurseServingEntryResponse"][];
+            /** Active */
+            active: components["schemas"]["NurseServingEntryResponse"][];
+            my_entry?: components["schemas"]["NurseServingEntryResponse"] | null;
+            /** Late Pending */
+            late_pending?: components["schemas"]["NurseServingEntryResponse"][];
+            /** Counts */
+            counts?: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * NurseServingStationServiceState
+         * @description One VisitService of the held entry's visit, routed to this station.
+         *
+         *     ``pending`` is the D3/last-completer predicate: a station-routed
+         *     service is pending until some attempt completed it or its LATEST
+         *     attempt was explicitly cancelled (an incomplete latest attempt still
+         *     needs a retry or an explicit entry-level terminal decision).
+         */
+        NurseServingStationServiceState: {
+            /** Visit Service Id */
+            visit_service_id: number;
+            /** Service Id */
+            service_id?: number | null;
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name?: string | null;
+            /**
+             * Qty
+             * @default 1
+             */
+            qty: number;
+            /** Latest Attempt No */
+            latest_attempt_no?: number | null;
+            /** Latest Attempt Status */
+            latest_attempt_status?: string | null;
+            /** In Progress Execution Id */
+            in_progress_execution_id?: number | null;
+            /**
+             * Pending
+             * @default true
+             */
+            pending: boolean;
+        };
+        /** NurseServingWorkplaceListResponse */
+        NurseServingWorkplaceListResponse: {
+            /** Items */
+            items: components["schemas"]["NurseServingWorkplaceResponse"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * NurseServingWorkplaceResponse
+         * @description One ACTIVE workplace of the calling Nurse (self-scope read).
+         */
+        NurseServingWorkplaceResponse: {
+            /** Assignment Id */
+            assignment_id: number;
+            /** Queue Resource Id */
+            queue_resource_id: number;
+            /** Resource Code */
+            resource_code?: string | null;
+            /** Resource Display Name */
+            resource_display_name?: string | null;
+            /** Resource Queue Tag */
+            resource_queue_tag?: string | null;
+            /** Resource Default Cabinet */
+            resource_default_cabinet?: string | null;
+            /** Cabinet Override */
+            cabinet_override?: string | null;
+            /** Effective Cabinet */
+            effective_cabinet?: string | null;
+        };
+        /**
+         * NurseWorkplaceAssignmentCreateRequest
+         * @description Admin request to assign a Nurse User to a QueueResource workplace.
+         */
+        NurseWorkplaceAssignmentCreateRequest: {
+            /**
+             * User Id
+             * @description Target User id (role must be Nurse)
+             */
+            user_id: number;
+            /**
+             * Queue Resource Id
+             * @description QueueResource registry id
+             */
+            queue_resource_id: number;
+            /**
+             * Cabinet Override
+             * @description Station/cabinet for this assignment; NULL falls back to QueueResource.default_cabinet (D2 FINAL)
+             */
+            cabinet_override?: string | null;
+        };
+        /**
+         * NurseWorkplaceAssignmentListResponse
+         * @description Paged list of assignments with the total count for the filter.
+         */
+        NurseWorkplaceAssignmentListResponse: {
+            /** Items */
+            items: components["schemas"]["NurseWorkplaceAssignmentResponse"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * NurseWorkplaceAssignmentResponse
+         * @description Admin read model for a NurseWorkplaceAssignment row.
+         *
+         *     Enriched with the referenced user/resource mirror fields so the admin
+         *     surface does not need follow-up requests; ``effective_cabinet`` is the
+         *     resolved cabinet (override ?? QueueResource.default_cabinet).
+         */
+        NurseWorkplaceAssignmentResponse: {
+            /** Id */
+            id: number;
+            /** User Id */
+            user_id: number;
+            /** Queue Resource Id */
+            queue_resource_id: number;
+            /** Cabinet Override */
+            cabinet_override?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** User Username */
+            user_username?: string | null;
+            /** User Full Name */
+            user_full_name?: string | null;
+            /** Resource Code */
+            resource_code?: string | null;
+            /** Resource Display Name */
+            resource_display_name?: string | null;
+            /** Resource Queue Tag */
+            resource_queue_tag?: string | null;
+            /** Resource Default Cabinet */
+            resource_default_cabinet?: string | null;
+            /** Effective Cabinet */
+            effective_cabinet?: string | null;
+        };
+        /**
+         * NurseWorkplaceErrorDetail
+         * @description Body of the documented errors on the assignment control plane:
+         *     the domain errors (400/404/409) AND the auth errors (401/403, review
+         *     P2 round 2 — PR #3333).
+         *
+         *     Review P2 (PR #3333): the PR body declares 400/404/409 part of the
+         *     canonical admin contract; this model gives the generated clients the
+         *     typed ``{"detail": ...}`` shape FastAPI's HTTPException actually
+         *     returns — the same pattern as ServiceUnavailableDetail (admin-doctors
+         *     503) and UserPhoneScopeConflictDetail (user-management 409). The
+         *     401/403 publications reuse the same model because the auth failures
+         *     (get_current_user / require_active_roles) also surface as
+         *     HTTPException ``{"detail": ...}`` bodies — proven at runtime by
+         *     test_nurse_workplace_endpoints.py.
+         */
+        NurseWorkplaceErrorDetail: {
+            /** Detail */
+            detail: string;
+        };
         /** OnboardingAnalyticsDashboard */
         OnboardingAnalyticsDashboard: {
             /**
@@ -31228,6 +33184,71 @@ export type components = {
              */
             created_at: string;
         };
+        /** PatientActivationConfirmRequest */
+        PatientActivationConfirmRequest: {
+            /** Activation Token */
+            activation_token: string;
+            /** Code */
+            code: string;
+        };
+        /** PatientActivationConfirmResponse */
+        PatientActivationConfirmResponse: {
+            /** Access Token */
+            access_token: string;
+            /** Token Type */
+            token_type: string;
+            user: components["schemas"]["PatientActivationSessionUser"];
+            /** Patient Id */
+            patient_id: number;
+        };
+        /**
+         * PatientActivationOtpRequest
+         * @description Токен активации — БЕЗ поля phone: OTP отправляется только на номер,
+         *     зафиксированный в карте при выпуске токена (identity contract v3).
+         */
+        PatientActivationOtpRequest: {
+            /** Activation Token */
+            activation_token: string;
+            /** Locale */
+            locale?: string | null;
+        };
+        /** PatientActivationOtpResponse */
+        PatientActivationOtpResponse: {
+            /** Success */
+            success: boolean;
+            /** Phone Masked */
+            phone_masked: string;
+            /** Expires In Minutes */
+            expires_in_minutes: number;
+            /** Resend After Seconds */
+            resend_after_seconds: number;
+        };
+        /** PatientActivationSessionUser */
+        PatientActivationSessionUser: {
+            /** Id */
+            id: number;
+            /** Username */
+            username: string;
+            /** Email */
+            email: string | null;
+            /** Full Name */
+            full_name: string | null;
+            /** Role */
+            role: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Superuser */
+            is_superuser: boolean;
+        };
+        /** PatientActivationTokenResponse */
+        PatientActivationTokenResponse: {
+            /** Activation Token */
+            activation_token: string;
+            /** Expires In Hours */
+            expires_in_hours: number;
+            /** Phone Masked */
+            phone_masked: string;
+        };
         /** PatientBenefitCreate */
         PatientBenefitCreate: {
             /** Patient Id */
@@ -31290,6 +33311,13 @@ export type components = {
             aggregated: {
                 [key: string]: unknown;
             };
+        };
+        /** PatientLoginRequest */
+        PatientLoginRequest: {
+            /** Phone */
+            phone: string;
+            /** Verification Grant */
+            verification_grant: string;
         };
         /** PatientOnboardingAuthRequest */
         PatientOnboardingAuthRequest: {
@@ -31380,6 +33408,285 @@ export type components = {
             messageKey: string;
             /** Safenextaction */
             safeNextAction: string;
+        };
+        /** PatientOtpRequest */
+        PatientOtpRequest: {
+            /** Phone */
+            phone: string;
+            /** Locale */
+            locale?: string | null;
+        };
+        /** PatientOtpVerifyRequest */
+        PatientOtpVerifyRequest: {
+            /** Phone */
+            phone: string;
+            /** Code */
+            code: string;
+        };
+        /**
+         * PatientPortalBookingAppointment
+         * @description Draft appointment echo (Mini App payload + resolved department_id).
+         */
+        PatientPortalBookingAppointment: {
+            /** Patient Id */
+            patient_id: number;
+            /** Doctor Id */
+            doctor_id?: number | null;
+            /** Department */
+            department?: string | null;
+            /** Department Id */
+            department_id?: number | null;
+            /**
+             * Appointment Date
+             * Format: date
+             */
+            appointment_date: string;
+            /** Appointment Time */
+            appointment_time?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Status */
+            status: string;
+            /** Visit Type */
+            visit_type?: string | null;
+            /** Payment Type */
+            payment_type?: string | null;
+            /**
+             * Services
+             * @default []
+             */
+            services: string[];
+            /** Payment Amount */
+            payment_amount?: number | null;
+            /** Payment Currency */
+            payment_currency?: string | null;
+            /** Payment Provider */
+            payment_provider?: string | null;
+            /** Payment Transaction Id */
+            payment_transaction_id?: string | null;
+            /** Payment Webhook Id */
+            payment_webhook_id?: number | null;
+            /** Payment Processed At */
+            payment_processed_at?: string | null;
+        };
+        /** PatientPortalBookingCreatedResponse */
+        PatientPortalBookingCreatedResponse: {
+            /** Created */
+            created: boolean;
+            /** Appointment Id */
+            appointment_id: number;
+            preview: components["schemas"]["PatientPortalBookingPreviewResponse"];
+        };
+        /** PatientPortalBookingPreviewResponse */
+        PatientPortalBookingPreviewResponse: {
+            /** Preview Only */
+            preview_only: boolean;
+            /** Mutation Allowed */
+            mutation_allowed: boolean;
+            /** Message Key */
+            message_key: string;
+            scope: components["schemas"]["PatientPortalScope"];
+            appointment: components["schemas"]["PatientPortalBookingAppointment"];
+        };
+        /**
+         * PatientPortalBookingRequest
+         * @description Same validation contract as the Mini App booking preview request.
+         */
+        PatientPortalBookingRequest: {
+            /**
+             * Appointmentdate
+             * Format: date
+             */
+            appointmentDate: string;
+            /** Appointmenttime */
+            appointmentTime?: string | null;
+            /** Doctorid */
+            doctorId?: number | null;
+            /** Department */
+            department?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Services */
+            services?: string[] | null;
+        };
+        /** PatientPortalCabinetAppointmentsItem */
+        PatientPortalCabinetAppointmentsItem: {
+            /** Id */
+            id: number;
+            /** Date */
+            date?: string | null;
+            /** Time */
+            time?: string | null;
+            /** Status */
+            status: string;
+            /** Department */
+            department?: string | null;
+        };
+        /** PatientPortalCabinetPayments */
+        PatientPortalCabinetPayments: {
+            /** Billed */
+            billed: string;
+            /** Paid */
+            paid: string;
+            /** Pending */
+            pending: string;
+            /** Debt */
+            debt: string;
+            /** Linked Visit Count */
+            linked_visit_count: number;
+            /** Active Queue Count */
+            active_queue_count: number;
+        };
+        /** PatientPortalCabinetPolicy */
+        PatientPortalCabinetPolicy: {
+            /** Plain Telegram Chat Allowed */
+            plain_telegram_chat_allowed: boolean;
+            /** Medical Details In Chat */
+            medical_details_in_chat: boolean;
+            /** Pdf Included */
+            pdf_included: boolean;
+        };
+        /** PatientPortalCabinetQueueItem */
+        PatientPortalCabinetQueueItem: {
+            /** Number */
+            number: number;
+            /** Status */
+            status: string;
+            /** Cabinet */
+            cabinet?: string | null;
+        };
+        /** PatientPortalCabinetReportsItem */
+        PatientPortalCabinetReportsItem: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Ready At */
+            ready_at?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** PatientPortalCabinetSummaryResponse */
+        PatientPortalCabinetSummaryResponse: {
+            scope: components["schemas"]["PatientPortalScope"];
+            /** Patient */
+            patient: {
+                [key: string]: string;
+            };
+            /** Appointments */
+            appointments: components["schemas"]["PatientPortalCabinetAppointmentsItem"][];
+            /** Visits */
+            visits: components["schemas"]["PatientPortalCabinetVisitsItem"][];
+            /** Queue */
+            queue: components["schemas"]["PatientPortalCabinetQueueItem"][];
+            payments: components["schemas"]["PatientPortalCabinetPayments"];
+            /** Reports */
+            reports: components["schemas"]["PatientPortalCabinetReportsItem"][];
+            policy: components["schemas"]["PatientPortalCabinetPolicy"];
+        };
+        /** PatientPortalCabinetVisitsItem */
+        PatientPortalCabinetVisitsItem: {
+            /** Id */
+            id: number;
+            /** Date */
+            date?: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
+         * PatientPortalErrorDetail
+         * @description Structured portal error body (scope / request-shaped failures).
+         */
+        PatientPortalErrorDetail: {
+            /** Reason */
+            reason: string;
+            /** Message */
+            message?: string | null;
+        };
+        /** PatientPortalErrorResponse */
+        PatientPortalErrorResponse: {
+            /** Detail */
+            detail: components["schemas"]["PatientPortalErrorDetail"] | string;
+            /** Code */
+            code?: string | null;
+        };
+        /** PatientPortalFormField */
+        PatientPortalFormField: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Type */
+            type: string;
+            /** Required */
+            required: boolean;
+            /** Max Length */
+            max_length?: number | null;
+            /**
+             * Options
+             * @default []
+             */
+            options: string[];
+        };
+        /** PatientPortalFormItem */
+        PatientPortalFormItem: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            /** Fields */
+            fields: components["schemas"]["PatientPortalFormField"][];
+            submission?: components["schemas"]["PatientPortalFormSubmission"] | null;
+        };
+        /** PatientPortalFormSubmission */
+        PatientPortalFormSubmission: {
+            /** Id */
+            id: number;
+            /** Form Id */
+            form_id: string;
+            /** Schema Version */
+            schema_version: number;
+            /** Status */
+            status: string;
+            /** Answers */
+            answers: {
+                [key: string]: unknown;
+            };
+            /** Submitted At */
+            submitted_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** PatientPortalFormsPolicy */
+        PatientPortalFormsPolicy: {
+            /** Plain Telegram Chat Allowed */
+            plain_telegram_chat_allowed: boolean;
+            /** Medical Details In Chat */
+            medical_details_in_chat: boolean;
+            /** Storage Enabled */
+            storage_enabled: boolean;
+        };
+        /** PatientPortalFormsResponse */
+        PatientPortalFormsResponse: {
+            /** Preview Only */
+            preview_only: boolean;
+            /** Mutation Allowed */
+            mutation_allowed: boolean;
+            /** Message Key */
+            message_key: string;
+            scope: components["schemas"]["PatientPortalScope"];
+            /** Forms */
+            forms: components["schemas"]["PatientPortalFormItem"][];
+            policy: components["schemas"]["PatientPortalFormsPolicy"];
+        };
+        /** PatientPortalScope */
+        PatientPortalScope: {
+            /** Type */
+            type: string;
+            /** Patient Id */
+            patient_id: number;
         };
         /**
          * PatientProfileOut
@@ -32928,6 +35235,230 @@ export type components = {
             providers: components["schemas"]["ProviderInfo"][];
         };
         /**
+         * PublicAddressProvisionResponse
+         * @description Result of the Admin provision/enable of a permanent address.
+         */
+        PublicAddressProvisionResponse: {
+            /**
+             * Profile Id
+             * @description QueueProfile.id — a separate id space (D-01)
+             */
+            profile_id: number;
+            /**
+             * Direction Key
+             * @description Canonical profile key the address is bound to
+             */
+            direction_key: string;
+            /**
+             * Public Code
+             * @description Opaque random 12-char lowercase public code (E-055 §2) — a PUBLIC identifier, never a secret and never derived from the direction title or key
+             */
+            public_code: string;
+            /**
+             * Url Path
+             * @description The permanent frontend route: /q/<public_code>
+             */
+            url_path: string;
+            /**
+             * Created
+             * @description True when a NEW code was generated now; False when the direction already had its one active address (E-055 §3: generated ONCE, re-provision returns the SAME address)
+             */
+            created: boolean;
+            /**
+             * Provisioned At
+             * @description Address creation timestamp (ISO-8601)
+             */
+            provisioned_at?: string | null;
+        };
+        /**
+         * PublicDirectionAddressInfo
+         * @description The direction a permanent-address session is scoped to.
+         */
+        PublicDirectionAddressInfo: {
+            /**
+             * Profile Id
+             * @description QueueProfile.id — a separate id space (D-01)
+             */
+            profile_id: number;
+            /**
+             * Key
+             * @description Canonical direction key
+             */
+            key: string;
+            /**
+             * Title
+             * @description Public display title (title_ru preferred)
+             */
+            title: string;
+            /**
+             * Public Code
+             * @description The canonical lowercase public code of the address
+             */
+            public_code: string;
+        };
+        /**
+         * PublicDirectionStartResponse
+         * @description Short-lived session opened through the permanent public address.
+         *
+         *     The ``session_token`` drives the EXISTING QueueJoin flow
+         *     (``/queue/join/:token`` semantics preserved); the internal
+         *     direction-scoped QR token is deliberately NOT returned.
+         */
+        PublicDirectionStartResponse: {
+            /** Session Token */
+            session_token: string;
+            /** Expires At */
+            expires_at: string;
+            /**
+             * Permanent Address
+             * @description Always True on this surface (the address is permanent)
+             */
+            permanent_address: boolean;
+            /**
+             * Target Date
+             * @description Целевая дата очереди токена (YYYY-MM-DD)
+             */
+            target_date?: string | null;
+            /**
+             * Attempt Expires At
+             * @description Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки
+             */
+            attempt_expires_at?: string | null;
+            direction: components["schemas"]["PublicDirectionAddressInfo"];
+            /**
+             * Queue Info
+             * @description The same token-info shape the session-QR flow consumes, with selectable_specialists narrowed to this direction's eligible owners (RQ-09.b eligibility contract)
+             */
+            queue_info: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * PushDeviceErrorDetail
+         * @description Body of HTTPException errors on this surface: ``{"detail": ...}``.
+         */
+        PushDeviceErrorDetail: {
+            /** Detail */
+            detail: string;
+        };
+        /** PushDeviceListResponse */
+        PushDeviceListResponse: {
+            /** Devices */
+            devices: components["schemas"]["PushDeviceOut"][];
+            /** Total Count */
+            total_count: number;
+        };
+        /** PushDeviceOut */
+        PushDeviceOut: {
+            /** Id */
+            id: number;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "fcm" | "webpush";
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "web";
+            /** Device Id */
+            device_id: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Token Fingerprint */
+            token_fingerprint: string;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Invalidated At */
+            invalidated_at: string | null;
+            /** Created At */
+            created_at: string | null;
+        };
+        /**
+         * PushDeviceRateLimitDetail
+         * @description Body of the 429 rate-limit response on this surface.
+         */
+        PushDeviceRateLimitDetail: {
+            /** Detail */
+            detail: string;
+            /** Retry After */
+            retry_after?: number | null;
+        };
+        /** PushDeviceRefreshRequest */
+        PushDeviceRefreshRequest: {
+            /** Token */
+            token: string;
+        };
+        /** PushDeviceRefreshResponse */
+        PushDeviceRefreshResponse: {
+            /** Refreshed */
+            refreshed: boolean;
+        };
+        /** PushDeviceRegisterRequest */
+        PushDeviceRegisterRequest: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "fcm" | "webpush";
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "web";
+            /** Token */
+            token: string;
+            /** Device Id */
+            device_id?: string | null;
+            /** Previous Token */
+            previous_token?: string | null;
+        };
+        /** PushDeviceToggleRequest */
+        PushDeviceToggleRequest: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /**
+         * PushDeviceUnregisterByDeviceId
+         * @description Logout variant 2: identify the device by its install identifier.
+         */
+        PushDeviceUnregisterByDeviceId: {
+            /** Token */
+            token?: string | null;
+            /** Device Id */
+            device_id: string;
+        };
+        /**
+         * PushDeviceUnregisterByToken
+         * @description Logout variant 1: identify the device by its credential.
+         */
+        PushDeviceUnregisterByToken: {
+            /** Token */
+            token: string;
+            /** Device Id */
+            device_id?: string | null;
+        };
+        /** PushDeviceUnregisterResponse */
+        PushDeviceUnregisterResponse: {
+            /** Disabled */
+            disabled: number;
+        };
+        /**
+         * PushDeviceValidationError
+         * @description Wrapped validation-error body produced by the global handler.
+         */
+        PushDeviceValidationError: {
+            /** Error */
+            error: string;
+            /** Message */
+            message: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
          * QRTokenGenerateRequest
          * @description Запрос на генерацию QR токена
          */
@@ -33406,6 +35937,86 @@ export type components = {
             } | null;
             /** Doctor Id */
             doctor_id?: number | null;
+        };
+        /**
+         * QueueResourceCreate
+         * @description Draft-by-default (S-14: услуги/профиль → draft-ресурс → активация
+         *     через gate §3.1); `active=true` сразу — только при пройденном gate.
+         */
+        QueueResourceCreate: {
+            /** Code */
+            code: string;
+            /** Queue Tag */
+            queue_tag: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Start Number Online
+             * @default 1
+             */
+            start_number_online: number;
+            /**
+             * Max Online Per Day
+             * @default 15
+             */
+            max_online_per_day: number;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /**
+             * Active
+             * @default false
+             */
+            active: boolean;
+        };
+        /** QueueResourceOut */
+        QueueResourceOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Queue Tag */
+            queue_tag: string;
+            /** Display Name */
+            display_name: string;
+            /** Active */
+            active: boolean;
+            /** Start Number Online */
+            start_number_online: number;
+            /** Max Online Per Day */
+            max_online_per_day: number;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * QueueResourceUpdate
+         * @description §3.2: ordinary PATCH — `display_name`/`start_number_online`/
+         *     `max_online_per_day`/`default_cabinet`; `active` — lifecycle-переход
+         *     под serialization-scope §3.1(б). `code`/`queue_tag` immutable
+         *     (extra="forbid" -> 422 на попытку).
+         *
+         *     Nullable здесь только `default_cabinet` (единственная nullable-колонка
+         *     в таблице). Explicit `null` для остальных полей — 422 (round-3
+         *     owner-ревью P2): DB-колонки NOT NULL, и без этого пина explicit null
+         *     проходил Pydantic (`exclude_unset` сохранял его) и падал на
+         *     constraint violation уже в БД -> 500 вместо 422. Отличать explicit
+         *     null от unset позволяет `model_fields_set` — absent-поле в него не
+         *     попадает и остаётся «нет изменения».
+         */
+        QueueResourceUpdate: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Start Number Online */
+            start_number_online?: number | null;
+            /** Max Online Per Day */
+            max_online_per_day?: number | null;
+            /** Default Cabinet */
+            default_cabinet?: string | null;
+            /** Active */
+            active?: boolean | null;
         };
         /**
          * QueueSettingsUpdate
@@ -35821,6 +38432,27 @@ export type components = {
             /** Services */
             services?: string[] | null;
         };
+        /**
+         * TelegramMiniAppBookingDepartmentsRequest
+         * @description Round-12 (owner P1, PR #3386 review): auth shape for the booking
+         *     departments reference endpoint.
+         *
+         *     The Mini App booking form no longer free-types a department name (a
+         *     localized label like "Кардиология" is NOT the canonical `Department.key`
+         *     the routing contract resolves); it picks from THIS endpoint's list, so
+         *     the submitted value is always a canonical key. Same identity contract
+         *     as the booking endpoints themselves (initData primary, entry token
+         *     allowed) — the reference data rides the SAME authenticated surface it
+         *     feeds, and the error reasons match the booking scope contract.
+         */
+        TelegramMiniAppBookingDepartmentsRequest: {
+            /** Initdata */
+            initData?: string | null;
+            /** Entrytoken */
+            entryToken?: string | null;
+            /** Section */
+            section?: string | null;
+        };
         /** TelegramMiniAppPatientCabinetSummaryRequest */
         TelegramMiniAppPatientCabinetSummaryRequest: {
             /** Initdata */
@@ -37012,6 +39644,19 @@ export type components = {
             groups: string[];
         };
         /**
+         * UserPhoneScopeConflictDetail
+         * @description Body of the HTTP 409 phone-scope conflict on the user-management
+         *     surfaces (Phase 0, PR #3320 round 2): ``{"detail": ...}``.
+         *
+         *     Raised when a mutation would create a SECOND active verified
+         *     Patient-user on a phone that already backs another active patient
+         *     portal account (the login resolver is fail-closed at >1 candidates).
+         */
+        UserPhoneScopeConflictDetail: {
+            /** Detail */
+            detail: string;
+        };
+        /**
          * UserPreferencesRequest
          * @description Request body for PUT /users/me/preferences.
          *
@@ -37497,6 +40142,64 @@ export type components = {
              */
             source: string | null;
         };
+        /** VisitInfoRequest */
+        VisitInfoRequest: {
+            /** Token */
+            token: string;
+        };
+        /**
+         * VisitInfoResponse
+         * @description Patient-safe public visit card (GET/POST /visits/info).
+         *
+         *     PR 3390 review P2 + PR 3407 delta review P2: deliberately does NOT
+         *     include ``notes``. The card is bearer-token-addressed and public, so
+         *     the internal clinical/admin field (``diagnosis: …``, cancel reasons,
+         *     force-reopen audit lines) is dropped from the service projection
+         *     itself, and BOTH routes (the new POST and the legacy GET) are
+         *     additionally filtered through this model — defense in depth against
+         *     a future regression re-adding the field to the shared card.
+         */
+        VisitInfoResponse: {
+            /** Success */
+            success: boolean;
+            /** Visit Id */
+            visit_id: number;
+            /** Status */
+            status: string;
+            /** Patient Name */
+            patient_name: string;
+            /** Doctor Name */
+            doctor_name: string;
+            /** Visit Date */
+            visit_date: string;
+            /** Visit Time */
+            visit_time: string | null;
+            /** Department */
+            department: string | null;
+            /** Discount Mode */
+            discount_mode: string | null;
+            /** Services */
+            services: components["schemas"]["VisitInfoServiceItem"][];
+            /** Total Amount */
+            total_amount: number;
+            /** Currency */
+            currency: string;
+            /** Confirmation Expires At */
+            confirmation_expires_at: string | null;
+        };
+        /** VisitInfoServiceItem */
+        VisitInfoServiceItem: {
+            /** Name */
+            name: string;
+            /** Code */
+            code: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Price */
+            price: number;
+            /** Total */
+            total: number;
+        };
         /** VisitOut */
         VisitOut: {
             /** Id */
@@ -37580,6 +40283,12 @@ export type components = {
             doctor_specialty?: string | null;
             /** Department */
             department?: string | null;
+            /** Department Id */
+            department_id?: number | null;
+            /** Department Key */
+            department_key?: string | null;
+            /** Department Name */
+            department_name?: string | null;
             /** Visit Date */
             visit_date?: string | null;
             /** Visit Time */
@@ -39142,6 +41851,289 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_patient_cabinet_summary_api_v1_patients_cabinet_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalCabinetSummaryResponse"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description JWT user has no linked Patient profile */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_patient_portal_booking_api_v1_patients_booking_preview_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. When sent, the keyed preview is processed by the idempotency middleware under the preview's OWN operation scope (a key shared with POST /patients/booking never cross-replays the two operations). Same key + same payload replays the preview; same key + changed payload is a 409 idempotency_payload_mismatch. Oversized keys are a 400 idempotency_key_invalid. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientPortalBookingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalBookingPreviewResponse"];
+                };
+            };
+            /** @description Request-shaped validation failure (see detail.reason); on keyed endpoints also an invalid Idempotency-Key header (code=idempotency_key_invalid) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description JWT user has no linked Patient profile */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Idempotency conflict surfaced by the middleware — retry/reconcile decision reads the top-level code: idempotency_payload_mismatch / idempotency_in_flight / idempotency_uncertain_outcome / idempotency_scope_mismatch. The non-mutating preview has no endpoint-level slot conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+        };
+    };
+    create_patient_portal_booking_api_v1_patients_booking_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required. Retries of the SAME booking attempt must reuse the same key — the middleware replays the committed response instead of creating a second appointment. Bounded to 128 characters (longer keys are a 400 idempotency_key_invalid). */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientPortalBookingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalBookingCreatedResponse"];
+                };
+            };
+            /** @description Request-shaped validation failure (see detail.reason); on keyed endpoints also an invalid Idempotency-Key header (code=idempotency_key_invalid) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description JWT user has no linked Patient profile, or the requested doctor is not eligible for new appointments (doctor_not_eligible) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Doctor time slot already occupied; or an idempotency conflict surfaced by the middleware — retry/reconcile decision reads the top-level code: idempotency_payload_mismatch / idempotency_in_flight / idempotency_uncertain_outcome / idempotency_scope_mismatch */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Required distributed idempotency coordination is temporarily unavailable (code=idempotency_unavailable). Non-executing: retry the SAME Idempotency-Key after recovery */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+        };
+    };
+    get_patient_portal_forms_api_v1_patients_forms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalFormsResponse"];
+                };
+            };
+            /** @description Request-shaped validation failure (see detail.reason); on keyed endpoints also an invalid Idempotency-Key header (code=idempotency_key_invalid) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Missing/invalid JWT or revoked token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description Role/scope denied (staff role, deactivated user, invalid link) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
+                };
+            };
+            /** @description JWT user has no linked Patient profile */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientPortalErrorResponse"];
                 };
             };
         };
@@ -41398,9 +44390,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["VisitInfoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_visit_info_by_token_api_v1_visits_info_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VisitInfoRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisitInfoResponse"];
                 };
             };
             /** @description Validation Error */
@@ -42637,6 +45660,930 @@ export interface operations {
             };
         };
     };
+    list_nurse_workplace_assignments_api_v1_admin_nurse_workplace_assignments_get: {
+        parameters: {
+            query?: {
+                /** @description Filter by target Nurse user */
+                user_id?: number | null;
+                /** @description Filter by QueueResource */
+                queue_resource_id?: number | null;
+                /** @description Filter by is_active (default: all) */
+                active?: boolean | null;
+                /** @description Page size */
+                limit?: number;
+                /** @description Page offset */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentListResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NurseWorkplaceAssignmentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
+                };
+            };
+            /** @description Целевой пользователь не Nurse / деактивирован, либо QueueResource неактивен */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Пользователь или QueueResource не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Активное назначение для пары (user, queue_resource) уже существует */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Назначение не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_nurse_workplace_assignment_api_v1_admin_nurse_workplace_assignments__assignment_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceAssignmentResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Admin: не Admin, либо деактивированный (супер)админ с ещё действующим JWT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Назначение не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Назначение уже деактивировано */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseWorkplaceErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_workplaces_api_v1_nurse_serving_workplaces_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingWorkplaceListResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+        };
+    };
+    get_station_entries_api_v1_nurse_serving_queue_resources__queue_resource_id__entries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingStationResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description QueueResource не найден или очередь станции сегодня не активна */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_draining_executions_api_v1_nurse_serving_draining_executions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingDrainingExecutionListResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+        };
+    };
+    call_next_patient_api_v1_nurse_serving_queue_resources__queue_resource_id__call_next_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingCallNextResponse"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Нет ожидающих пациентов, либо очередь станции не активна */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_serving_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingStartResponse"];
+                };
+            };
+            /** @description Недопустимый статус записи (требуется called) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Запись не найдена в очереди рабочего места */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_service_execution_api_v1_nurse_serving_queue_resources__queue_resource_id__executions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NurseServingExecutionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Идемпотентный повтор той же медсестрой (in_progress attempt) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingExecutionResponse"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingExecutionResponse"];
+                };
+            };
+            /** @description Запись не in_progress / не связана с визитом, услуга не маршрутизирована на станцию или чужой визит */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Запись очереди или VisitService не найдены */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Услуга уже исполняется другой медсестрой или уже выполнена */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_service_execution_api_v1_nurse_serving_executions__execution_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                execution_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingExecutionResponse"];
+                };
+            };
+            /** @description Исполнение не в статусе in_progress */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description ServiceExecution не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Уже завершено другим пользователем */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    incomplete_service_execution_api_v1_nurse_serving_executions__execution_id__incomplete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                execution_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NurseServingExecutionIncompleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingExecutionResponse"];
+                };
+            };
+            /** @description Исполнение не в статусе in_progress */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description ServiceExecution не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Уже отмечено незавершённым другим пользователем */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_entry_no_show_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__no_show_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingEntryActionResponse"];
+                };
+            };
+            /** @description Недопустимый статус записи (допустимо waiting или called) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Запись не найдена в очереди рабочего места */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Запись связана с незавершённым исполнением услуги */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_entry_incomplete_api_v1_nurse_serving_queue_resources__queue_resource_id__entries__entry_id__incomplete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queue_resource_id: number;
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NurseServingEntryIncompleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingEntryActionResponse"];
+                };
+            };
+            /** @description Недопустимый статус записи (допустимо called или in_progress) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Требуется аутентификация (JWT отсутствует или недействителен) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Только активная роль Nurse: не Nurse, деактивированный аккаунт с действующим JWT, либо нет АКТИВНОГО назначения на это рабочее место (data-level авторизация) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Запись не найдена в очереди рабочего места */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Есть незавершённые исполнения услуг по записи */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NurseServingErrorDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_queue_analytics_api_v1_queue_admin_queue_analytics__specialist_id__get: {
         parameters: {
             query?: {
@@ -42670,6 +46617,155 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    get_direction_entry_methods_api_v1_queue_directions__profile_key__entry_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectionEntryMethodsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    provision_public_address_api_v1_queue_admin_directions__profile_key__public_address_provision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicAddressProvisionResponse"];
+                };
+            };
+            /** @description Зарезервированный ключ направления или исчерпаны попытки генерации */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Направление не найдено */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_public_direction_session_api_v1_queue_public__public_code__start_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                public_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicDirectionStartResponse"];
+                };
+            };
+            /** @description Честный отказ существующего сессионного контракта (окно записи и т.п.) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Анонимный отказ (S-15): направление недоступно — unknown/archived/hidden/deleted/retired неразличимы */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "detail": "Направление недоступно"
+                     *     }
+                     */
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limit превышен (анонимный путь) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -43034,6 +47130,57 @@ export interface operations {
                     "application/json": components["schemas"]["JoinSessionCompleteResponse"] | components["schemas"]["JoinSessionCompleteMultipleResponse"];
                 };
             };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinSessionRefusalErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinSessionRefusalErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    probe_join_session_api_v1_queue_join_probe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinSessionProbeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinSessionProbeResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -43218,6 +47365,223 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    list_queue_resources_api_v1_queue_admin_queue_resources_get: {
+        parameters: {
+            query?: {
+                active_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"][];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_queue_resource_api_v1_queue_admin_queue_resources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueResourceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Невалидный payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Дубликат code/queue_tag или отказ инварианта §3.1 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Неизвестные поля payload */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_queue_resource_api_v1_queue_admin_queue_resources__resource_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description QueueResource не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_queue_resource_api_v1_queue_admin_queue_resources__resource_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueResourceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueResourceOut"];
+                };
+            };
+            /** @description Требуется аутентификация */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Только роль Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description QueueResource не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Отказ инварианта §3.1 при активации */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Попытка изменить immutable code/queue_tag или невалидный payload */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -47910,6 +52274,39 @@ export interface operations {
             };
         };
     };
+    get_queue_profile_impact_preview_api_v1_queues_profiles__profile_key__impact_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_queue_profile_api_v1_queues_profiles__profile_key__put: {
         parameters: {
             query?: never;
@@ -49136,9 +53533,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DoctorQueueTodayResponse"];
                 };
             };
             /** @description Validation Error */
@@ -49202,9 +53597,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DoctorQueueStartVisitResponse"];
                 };
             };
             /** @description Validation Error */
@@ -53850,6 +58243,40 @@ export interface operations {
                 "application/json": components["schemas"]["QueueSettingsUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_effective_queue_settings_api_v1_admin_queue_settings_effective_get: {
+        parameters: {
+            query?: {
+                department_id?: number | null;
+                tag?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -62688,6 +67115,41 @@ export interface operations {
             };
         };
     };
+    telegram_mini_app_list_booking_departments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramMiniAppBookingDepartmentsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     telegram_mini_app_preview_appointment_booking: {
         parameters: {
             query?: never;
@@ -63692,6 +68154,198 @@ export interface operations {
             };
         };
     };
+    register_push_device_api_v1_push_devices_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushDeviceRegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceOut"];
+                };
+            };
+            /** @description Пер-юзер квота живых push-устройств исчерпана */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceErrorDetail"];
+                };
+            };
+            /** @description Ошибки валидации запроса (обёртка error/message/detail) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceValidationError"];
+                };
+            };
+            /** @description Превышен лимит частоты регистраций */
+            429: {
+                headers: {
+                    /** @description Секунды до повторной попытки */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceRateLimitDetail"];
+                };
+            };
+        };
+    };
+    refresh_push_device_api_v1_push_devices_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushDeviceRefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceRefreshResponse"];
+                };
+            };
+            /** @description Устройство не найдено или credential инвалидирован */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceErrorDetail"];
+                };
+            };
+            /** @description Ошибки валидации запроса (обёртка error/message/detail) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceValidationError"];
+                };
+            };
+        };
+    };
+    unregister_push_device_api_v1_push_devices_unregister_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushDeviceUnregisterByToken"] | components["schemas"]["PushDeviceUnregisterByDeviceId"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceUnregisterResponse"];
+                };
+            };
+            /** @description Ошибки валидации запроса (обёртка error/message/detail) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceValidationError"];
+                };
+            };
+        };
+    };
+    list_push_devices_api_v1_push_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceListResponse"];
+                };
+            };
+        };
+    };
+    toggle_push_device_api_v1_push_devices__device_row_id__toggle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_row_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushDeviceToggleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceOut"];
+                };
+            };
+            /** @description Устройство не найдено (или принадлежит другому пользователю) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceErrorDetail"];
+                };
+            };
+            /** @description Ошибки валидации запроса (обёртка error/message/detail) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushDeviceValidationError"];
+                };
+            };
+        };
+    };
     send_verification_code_api_v1_phone_verification_send_code_post: {
         parameters: {
             query?: never;
@@ -64088,6 +68742,208 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    request_patient_otp_api_v1_patient_access_request_otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientOtpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_patient_otp_api_v1_patient_access_verify_otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientOtpVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_login_api_v1_patient_access_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_activation_otp_api_v1_patient_access_activate_request_otp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientActivationOtpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientActivationOtpResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_activation_api_v1_patient_access_activate_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatientActivationConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientActivationConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_activation_token_api_v1_patients__patient_id__activation_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatientActivationTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -65409,7 +70265,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    };
+                    }[];
                 };
             };
             /** @description Validation Error */
@@ -65489,7 +70345,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    };
+                    }[];
                 };
             };
             /** @description Validation Error */
@@ -66180,6 +71036,176 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_dental_media_api_v1_dental_media_get: {
+        parameters: {
+            query: {
+                patient_id: number;
+                visit_id: number;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DentalMediaList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_dental_media_api_v1_dental_media_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_dental_media_api_v1_dental_media_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DentalMediaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    view_dental_media_api_v1_dental_media__media_id__content_get: {
+        parameters: {
+            query: {
+                visit_id: number;
+            };
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": unknown;
+                    "image/png": unknown;
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_dental_media_api_v1_dental_media__media_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_dental_media_api_v1_dental_media__media_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DentalMediaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DentalMediaOut"];
                 };
             };
             /** @description Validation Error */
@@ -67377,6 +72403,72 @@ export interface operations {
             header?: never;
             path: {
                 instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_lab_report_instance_pdf_api_v1_lab_report_instances__instance_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_lab_template_version_pdf_api_v1_lab_template_versions__version_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: number;
             };
             cookie?: never;
         };
@@ -70806,6 +75898,15 @@ export interface operations {
                     "application/json": components["schemas"]["UserResponse"];
                 };
             };
+            /** @description Номер телефона уже используется другим активным аккаунтом пациента портала (инвариант phone-scope Phase 0) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPhoneScopeConflictDetail"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70906,6 +76007,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__user_management__UserProfileResponse"];
+                };
+            };
+            /** @description Номер телефона уже используется другим активным аккаунтом пациента портала (инвариант phone-scope Phase 0) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserPhoneScopeConflictDetail"];
                 };
             };
             /** @description Validation Error */

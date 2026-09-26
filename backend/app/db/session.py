@@ -133,8 +133,15 @@ _engine_kwargs: dict[str, object] = {
 if not _is_sqlite:
     _engine_kwargs.update(
         {
-            "pool_size": _get_int_env("DB_POOL_SIZE", 20),
-            "max_overflow": _get_int_env("DB_POOL_OVERFLOW", 40),
+            # The production DATABASE_URL uses Supabase's session pooler,
+            # whose project limit is 15 clients.  The previous 20 + 40
+            # defaults could exceed that limit during a dashboard request
+            # burst, causing repeated EMAXCONNSESSION failures and multi-second
+            # waits across otherwise fast endpoints.  Keep two thirds of the
+            # remote allowance for the API and leave five connections for
+            # migrations, health checks, and operational access.
+            "pool_size": _get_int_env("DB_POOL_SIZE", 8),
+            "max_overflow": _get_int_env("DB_POOL_OVERFLOW", 2),
             "pool_timeout": _get_int_env("DB_POOL_TIMEOUT", 60),
             "pool_recycle": _get_int_env("DB_POOL_RECYCLE", 1800),
         }

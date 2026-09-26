@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.crud.base import CRUDBase
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
+from app.models.department import Department
 from app.models.enums import (
     AppointmentStatus,
     can_transition_status,
@@ -49,7 +50,7 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         """
         Получить список записей с фильтрацией
         """
-        query = db.query(self.model)
+        query = db.query(self.model).options(selectinload(self.model.department))
 
         if patient_id:
             query = query.filter(self.model.patient_id == patient_id)
@@ -58,7 +59,16 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
             query = query.filter(self.model.doctor_id == doctor_id)
 
         if department:
-            query = query.filter(self.model.department == department)
+            # Round-5 (owner P2, PR #3340): `department` is the ORM
+            # RELATIONSHIP — comparing it to the string filter raised
+            # ArgumentError and 500'd the canonical list the moment the
+            # portal booking persisted a department_id. Filter through the
+            # relationship instead: rows whose Department.key matches the
+            # canonical key the portal stores. Eager-load the relationship
+            # alongside (the read DTO's department accessors read it).
+            query = query.filter(
+                self.model.department.has(Department.key == department)
+            )
 
         if date_from:
             try:

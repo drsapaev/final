@@ -204,6 +204,62 @@ class JoinSessionStartResponse(BaseModel):
     session_token: str
     expires_at: str
     queue_info: dict[str, Any]
+    # Round-6 (PR #3362 review, P1-3): the server-computed attempt-identity
+    # horizon. ``target_date`` is the queue-day the token is bound to
+    # (tomorrow when the start happened after the cutoff);
+    # ``attempt_expires_at`` is the end of THAT day in the clinic timezone
+    # plus a safety grace — the earliest instant the client may drop the
+    # attempt envelope. Both optional/nullable for older token shapes.
+    target_date: str | None = Field(
+        None, description="Целевая дата очереди токена (YYYY-MM-DD)"
+    )
+    attempt_expires_at: str | None = Field(
+        None,
+        description=(
+            "Абсолютный horizon (ISO-8601, UTC) жизни идентичности попытки: "
+            "конец целевого queue-day в timezone клиники + safety grace"
+        ),
+    )
+
+
+class JoinSessionRefusalDetail(BaseModel):
+    """Один per-specialist отказ аллокатора (round-6, P2-1)."""
+
+    specialist_id: int | None = Field(
+        None, description="ID выбора (Doctor.id или QueueProfile.id); None для одиночного пути"
+    )
+    error: str = Field(..., description="Человекочитаемое сообщение домена")
+
+
+class JoinSessionRefusalResponse(BaseModel):
+    """Структурированный отказ complete-попытки (round-6, P2-1/P2-2).
+
+    400 — session-state / pre-execution refusals (incl. the
+    rollback-proven ``join_session_not_executed``); 409 — immutable
+    payload mismatch. ``reason`` vocabulary:
+    join_session_not_found | join_session_expired | join_session_processing |
+    join_session_used | join_session_payload_mismatch | join_session_not_executed.
+    """
+
+    reason: str = Field(..., description="Машиночитаемая причина отказа")
+    message: str = Field(..., description="Человекочитаемое сообщение")
+    details: list[JoinSessionRefusalDetail] | None = Field(
+        None, description="Per-specialist ошибки (только для join_session_not_executed)"
+    )
+
+
+class JoinSessionRefusalErrorResponse(BaseModel):
+    """Полное HTTP-тело отказа complete-попытки (round-9, review P2-1).
+
+    Runtime raises ``HTTPException(detail={reason, message[, details]})``,
+    so FastAPI serves the refusal wrapped in the standard ``detail``
+    envelope: ``{"detail": {"reason": ..., "message": ...}}``. The
+    frontend reads ``response.data.detail.reason`` — the declared OpenAPI
+    contract must describe EXACTLY that wire format, so 400/409 reference
+    THIS wrapper (not the bare inner payload).
+    """
+
+    detail: JoinSessionRefusalResponse
 
 
 class JoinSessionCompleteRequest(BaseModel):
@@ -218,6 +274,14 @@ class JoinSessionCompleteRequest(BaseModel):
     specialist_ids: list[int] | None = Field(
         None, description="Список ID специалистов (для общего QR)"
     )
+    specialist_entity_types: list[str] | None = Field(
+        None,
+        description=(
+            "Типы сущностей specialist_ids, выровненные по индексам "
+            "('doctor' | 'profile'); тип выбора передаётся явно (D-01), "
+            "тип сущности не определяется по совпадению числового ID"
+        ),
+    )
 
 
 class JoinSessionCompleteMultipleResponse(BaseModel):
@@ -228,6 +292,10 @@ class JoinSessionCompleteMultipleResponse(BaseModel):
     entries: list[dict[str, Any]]
     errors: list[dict[str, Any]] | None = None
     message: str
+    # Round-4 (PR #3362, P1-2): True — the saved result of an ALREADY
+    # joined session was re-served (the retry after a lost response reused
+    # the original attempt identity); no second business action happened.
+    replayed: bool = False
 
 
 class JoinSessionCompleteResponse(BaseModel):
@@ -239,6 +307,68 @@ class JoinSessionCompleteResponse(BaseModel):
     estimated_wait_time: int
     specialist_name: str
     department: str
+    # Round-4 (PR #3362, P1-2): idempotent replay marker (see the multi
+    # response) — same session token re-served its saved ticket result.
+    replayed: bool = False
+
+
+class JoinSessionProbeRequest(BaseModel):
+    """Round-11 (PR #3362 review, P1-2): запрос read-only oracle'а.
+
+    Поля идентичны ``JoinSessionCompleteRequest`` — оракул сравнивает
+    канонизированный отпечаток ТЕМ ЖЕ алгоритмом, которым complete
+    связывает попытку с payload'ом. Никаких бизнес-эффектов запрос не
+    имеет: ни claim, ни создание пациента, ни выдача талона.
+    """
+
+    session_token: str = Field(..., description="Токен сессии")
+    patient_name: str = Field(
+        ..., min_length=2, max_length=200, description="ФИО пациента"
+    )
+    phone: str = Field(..., min_length=5, max_length=20, description="Номер телефона")
+    telegram_id: int | None = Field(None, description="Telegram ID")
+    specialist_ids: list[int] | None = Field(
+        None, description="Список ID специалистов (для общего QR)"
+    )
+    specialist_entity_types: list[str] | None = Field(
+        None,
+        description=(
+            "Типы сущностей specialist_ids, выровненные по индексам "
+            "('doctor' | 'profile')"
+        ),
+    )
+
+
+class JoinSessionProbeResponse(BaseModel):
+    """Round-11 (PR #3362 review, P1-2): классификация попытки БЕЗ мутаций.
+
+    ``outcome``:
+      joined_match         — typed payload владеет уже совершённой попыткой;
+                             ``result`` несёт СОХРАНЁННЫЙ ответ первой попытки
+                             (read-only re-serve, эквивалент replay-ветки);
+      joined_mismatch      — попытка совершена с другим payload'ом (чужая);
+      joined_owner_unknown — устаревшая строка без отпечатка — владение
+                             недоказуемо, ведёт себя как UNKNOWN;
+      pending_unbound      — сессия жива, но под ней НЕ выполнено ни одного
+                             бизнес-действия — конверт можно безопасно удалить;
+      processing           — claim в полёте — UNKNOWN, повторить позже;
+      expired / not_found  — попытка мертва, ничего не создано.
+    """
+
+    outcome: str = Field(
+        ...,
+        description=(
+            "joined_match | joined_mismatch | joined_owner_unknown | "
+            "pending_unbound | processing | expired | not_found"
+        ),
+    )
+    result: dict[str, Any] | None = Field(
+        None,
+        description=(
+            "Сохранённый ответ первой попытки (только для joined_match); "
+            "иначе null"
+        ),
+    )
 
 
 class QueueStatusResponse(BaseModel):

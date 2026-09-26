@@ -1,13 +1,13 @@
 {
   "version": 1,
   "description": "UI_AUDIT_PLAN.md Phase 0 baseline. Ratchet: values may only improve (decrease). To move the baseline intentionally run: node scripts/ui-baseline.mjs --write-baseline and justify the change in the PR description.",
-  "generatedAt": "2026-09-11T16:02:48.694Z",
-  "gitCommit": "e2c9a5745",
+  "generatedAt": "2026-09-24T03:15:01.984Z",
+  "gitCommit": "712ba53f0",
   "metrics": {
     "tokenSourceFiles": [
       {
         "file": "src/design-system/tokens.css",
-        "definitions": 270
+        "definitions": 275
       },
       {
         "file": "src/styles/emr-tokens.css",
@@ -48,7 +48,7 @@
       "other": 165,
       "surface": 7,
       "text-legacy": 10,
-      "mac": 132,
+      "mac": 133,
       "bg-legacy": 5,
       "accent-legacy": 13,
       "landing": 3,
@@ -62,8 +62,8 @@
       "theme/tokens-legacy.ts": -1,
       "theme/tokens/ dir": 1
     },
-    "undefinedVarNameCount": 153,
-    "undefinedVarUsages": 274,
+    "undefinedVarNameCount": 152,
+    "undefinedVarUsages": 273,
     "undefinedVarNames": [
       "--accent",
       "--admin-ai",
@@ -105,7 +105,6 @@
       "--admin-h0",
       "--admin-jc",
       "--admin-left",
-      "--admin-left1",
       "--admin-lh",
       "--admin-list-border",
       "--admin-ls",
@@ -219,13 +218,13 @@
       "--warning-border",
       "--warning-text"
     ],
-    "varUsagesTotal": 12548,
-    "varUsagesNoFallback": 11309,
+    "varUsagesTotal": 12701,
+    "varUsagesNoFallback": 11366,
     "cssHexOutsideTokens": 743,
-    "tsxHex": 365,
-    "tsxHexFiles": 61,
-    "inlineStyles": 2432,
-    "inlineStyleFiles": 210,
+    "tsxHex": 384,
+    "tsxHexFiles": 64,
+    "inlineStyles": 2471,
+    "inlineStyleFiles": 213,
     "cssImportant": 309,
     "tsxImportant": 47,
     "modalFilesOutsideKit": [
@@ -233,6 +232,7 @@
       "src/components/admin/AppointmentModal.tsx",
       "src/components/admin/DoctorModal.tsx",
       "src/components/admin/FinanceModal.tsx",
+      "src/components/admin/PatientActivationTokenDialog.tsx",
       "src/components/admin/PatientModal.tsx",
       "src/components/admin/UserModal.tsx",
       "src/components/common/ConfirmDialog.tsx",
@@ -252,11 +252,11 @@
       "src/components/registrar/ForceMajeureModal.tsx",
       "src/hooks/useModal.tsx"
     ],
-    "modalFilesOutsideKitCount": 22,
-    "kitModalImporters": 13,
+    "modalFilesOutsideKitCount": 23,
+    "kitModalImporters": 15,
     "kitDialogImporters": 14,
     "reactToastifyImporters": 45,
-    "notifyServiceImporters": 56,
+    "notifyServiceImporters": 58,
     "customToastProviderImporters": 3,
     "macTabImporters": 7,
     "modernTabsImporters": 0,

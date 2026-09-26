@@ -2,7 +2,6 @@ import { useCallback, useRef } from 'react';
 
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
-import tokenManager from '../../utils/tokenManager';
 import { apiClient } from '../../api/client';
 import { queueService } from '../../services/queue';
 import { printPanelTicket } from '../../services/panelPrint';
@@ -35,8 +34,7 @@ import {
  *  - protocol-template drafting: buildVisitProtocolDraftFromTemplate +
  *    handleProtocolTemplateSelect
  *
- * NOT extracted (remain in the panel): handleCardKeyDown (render-adjacent),
- * the URL deep-link patient effect (location-bound), session warning /
+ * NOT extracted (remain in the panel): the URL deep-link patient effect (location-bound), session warning /
  * hotkeys wiring, stats and render functions (PR-UI-15-6 surface).
  */
 
@@ -97,12 +95,11 @@ export function useDentistActions({
 
   // Обработчики для таблицы записей
   const handleAppointmentRowClick = async (row: Appointment) => {
-    logger.info('Клик по записи:', row);
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
       const visitId = await ensureCanonicalVisitId(row);
       if (!visitId) {
-        logger.error('[Dentist] Не удалось определить канонический visit_id', row);
+        logger.warn('[Dentist] Could not resolve canonical visit id');
         return;
       }
 
@@ -123,7 +120,6 @@ export function useDentistActions({
   };
 
   const handleAppointmentActionClick = async (action: string, row: Appointment, event: React.MouseEvent<HTMLElement>) => {
-    logger.info('[Dentist] handleAppointmentActionClick:', action, row);
     event.stopPropagation();
 
     switch (action) {
@@ -135,34 +131,31 @@ export function useDentistActions({
         try {
           const queueEntryId = resolveDoctorQueueEntryId(row as Record<string, unknown>);
           if (queueEntryId === null) {
-            logger.warn('[Dentist] Cannot start visit without OnlineQueueEntry id', row);
+            logger.warn('[Dentist] Cannot start visit without queue entry id');
             notify.error(tI18n('dental.no_queue_id_for_visit'));
             break;
           }
-          const token = tokenManager.getAccessToken();
           const response = await apiClient.post(`/doctor/queue/${queueEntryId}/start-visit`);
 
           if (response.status < 400) {
-            logger.info('[Dentist] Пациент вызван:', row.patient_fio);
+            logger.info('[Dentist] Queue entry started');
             await loadDentistryAppointments(true);
           }
-        } catch (error: unknown) {
-          logger.error('[Dentist] Ошибка вызова пациента:', error);
+        } catch {
+          logger.error('[Dentist] Failed to start queue entry');
         }
         break;
       case 'payment':
-        logger.info('[Dentist] Открытие окна оплаты для:', row.patient_fio);
         notify.info(tI18n('dental.dental_panel_payment_todo', { name: row.patient_fio }));
         break;
       case 'print':
-        logger.info('[Dentist] Печать талона для:', row.patient_fio);
         try {
           const printResult = await printPanelTicket(row as Record<string, unknown>, {
             specialtyName: tI18n('dental.dental_panel_specialty_name')
           }) as { message?: string } | undefined;
           notify.success(printResult?.message || tI18n('dental.dental_panel_ticket_printed', { name: row.patient_fio }));
         } catch (error: unknown) {
-          logger.error('[Dentist] Ошибка печати талона:', error);
+          logger.error('[Dentist] Failed to print ticket');
           notify.error(getErrorMessage(error) || tI18n('dental.dental_panel_ticket_print_failed'));
         }
         break;
@@ -171,7 +164,7 @@ export function useDentistActions({
         try {
           const visitId = await ensureCanonicalVisitId(row);
           if (!visitId) {
-            logger.error('[Dentist] Нельзя открыть протокол без канонического visit_id', row);
+            logger.warn('[Dentist] Cannot open visit without canonical visit id');
             break;
           }
 
@@ -186,11 +179,10 @@ export function useDentistActions({
             source: 'appointments',
             status: 'in_cabinet'
           };
-          logger.info('[Dentist] Завершение приёма для:', patient.patient_name);
           setSelectedPatient(patient);
           handleTabChange('visit');
-        } catch (error: unknown) {
-          logger.error('[Dentist] Ошибка при завершении приёма:', error);
+        } catch {
+          logger.error('[Dentist] Failed to open visit for completion');
         }
         break;
       case 'edit':
@@ -221,6 +213,42 @@ export function useDentistActions({
 
     notify.info(tI18n('dental.no_active_visit'));
     handleTabChange('patients');
+  };
+
+  const handleStartQueueVisit = async (calledPatient: Record<string, unknown> | null | undefined): Promise<boolean> => {
+    if (!calledPatient || calledPatient.id === null || calledPatient.id === undefined || calledPatient.id === '') {
+      notify.error(tI18n('dental.no_queue_id_for_visit'));
+      return false;
+    }
+
+    const queueEntryId = calledPatient.id;
+    try {
+      const response = await queueService.startVisit(queueEntryId as string | number) as Record<string, unknown>;
+      const patientId = response.patient_id as string | number | null | undefined;
+      const visitId = response.visit_id as string | number | null | undefined;
+      if (response.success !== true || patientId === null || patientId === undefined || visitId === null || visitId === undefined) {
+        notify.error(tI18n('dental.dental_panel_start_visit_failed'));
+        return false;
+      }
+
+      const patientName = (calledPatient.name as string | undefined) || tI18n('dental.dental_panel_patient_default');
+      handlePatientSelect({
+        id: patientId,
+        patient_id: patientId,
+        visit_id: visitId,
+        doctor_queue_entry_id: queueEntryId,
+        queue_entry_id: queueEntryId,
+        patient_name: patientName,
+        patient_fio: patientName,
+        number: (calledPatient.number as string | number | undefined) ?? null,
+        source: 'queue',
+        status: (response.status as string | undefined) || 'in_progress',
+      });
+      return true;
+    } catch {
+      notify.error(tI18n('dental.dental_panel_start_visit_failed'));
+      return false;
+    }
   };
 
   // C-3 (UX audit, port of cardio P-020): critical ICD-10 codes that require
@@ -263,7 +291,7 @@ export function useDentistActions({
   //   - НЕ использовать row.id / selectedPatient.id напрямую
   //   - НЕ использовать /registrar/queue/${...}/start-visit
   //   - использовать resolveDoctorQueueEntryId + /doctor/queue/${queueEntryId}/complete
-  const handleCompleteVisit = async () => {
+  const handleCompleteVisit = async (latestDraft?: Record<string, unknown>) => {
     if (!selectedPatient) {
       notify.error(tI18n('dental.no_patient_for_complete'));
       return;
@@ -271,8 +299,13 @@ export function useDentistActions({
 
     const queueEntryId = resolveDoctorQueueEntryId(selectedPatient);
     if (queueEntryId === null) {
-      logger.error('[Dentistry] handleCompleteVisit: нет queueEntryId', { selectedPatient });
+      logger.warn('[Dentistry] Cannot complete visit without queue entry id');
       notify.error(tI18n('dental.no_queue_id_for_complete'));
+      return;
+    }
+
+    if (!latestDraft) {
+      notify.error(tI18n('dental2.visit_protocol_save_failed'));
       return;
     }
 
@@ -283,8 +316,7 @@ export function useDentistActions({
     // require explicit confirmation. This prevents accidental entry of a
     // diagnosis that could trigger unnecessary surgical intervention,
     // hospitalization, or IV antibiotics.
-    const visitProtocol = selectedPatient?.visitData || null;
-    const icd10ForCheck = (visitProtocol?.icd10 as string | undefined) || (visitProtocol?.icdCode as string | undefined) || '';
+    const icd10ForCheck = String(latestDraft.icd10_code || latestDraft.icd10 || latestDraft.icdCode || '');
     const criticalWarning = getCriticalDiagnosisWarning(icd10ForCheck);
 
     let confirmOptions;
@@ -315,7 +347,7 @@ export function useDentistActions({
 
     try {
       setLoading(true);
-      logger.info('[Dentistry] handleCompleteVisit: start', { queueEntryId, selectedPatient });
+      logger.info('[Dentistry] Completing queue visit');
 
       const patientId =
         selectedPatient?.patient?.id ||
@@ -325,19 +357,17 @@ export function useDentistActions({
 
       // Минимальный payload: стоматолог использует EMR v2 для протокола визита,
       // а в queue completeVisit передаём только ключевые поля для закрытия очереди.
-      const visitProtocol = selectedPatient?.visitData || null;
       const visitPayload = {
         patient_id: patientId,
-        complaint: visitProtocol?.chiefComplaint || visitProtocol?.complaint || '',
-        diagnosis: visitProtocol?.diagnosis || '',
-        icd10: visitProtocol?.icd10 || visitProtocol?.icdCode || '',
+        complaint: latestDraft.anamnesis_morbi || latestDraft.complaints || latestDraft.chiefComplaint || latestDraft.complaint || '',
+        diagnosis: latestDraft.diagnosis || '',
+        icd10: latestDraft.icd10_code || latestDraft.icd10 || latestDraft.icdCode || '',
         services: [],
-        notes: visitProtocol?.recommendations || visitProtocol?.notes || '',
+        notes: latestDraft.recommendations || latestDraft.notes || '',
       };
 
-      logger.info('[Dentistry] handleCompleteVisit: payload', visitPayload);
       await queueService.completeVisit(queueEntryId, visitPayload);
-      logger.info('[Dentistry] handleCompleteVisit: completeVisit OK');
+      logger.info('[Dentistry] Queue visit completed');
       notify.success(tI18n('dental.visit_completed'));
 
       // Сброс состояния
@@ -348,23 +378,20 @@ export function useDentistActions({
 
       // Автовызов следующего пациента по стоматологии
       try {
-        logger.info('[Dentistry] callNextWaiting(dentistry): start');
         const next = await queueService.callNextWaiting(SPECIALTY_KEYS.DENTISTRY);
-        logger.info('[Dentistry] callNextWaiting(dentistry): result', next);
         if (next?.success && next?.entry?.number) {
           notify.success(tI18n('dental.dental_panel_next_patient_called', { number: next.entry.number }));
         }
-      } catch (err) {
-        logger.warn('[Dentistry] callNextWaiting(dentistry): failed', err);
+      } catch {
+        logger.warn('[Dentistry] Failed to call next queue entry');
         // Не блокируем UI: визит уже завершён, просто информируем
       }
     } catch (error: unknown) {
-      logger.error('[Dentistry] handleCompleteVisit: error', error);
+      logger.error('[Dentistry] Failed to complete queue visit');
       notify.error(
         getErrorMessage(error) || tI18n('dental.dental_panel_complete_failed')
       );
     } finally {
-      logger.info('[Dentistry] handleCompleteVisit: finish');
       setLoading(false);
     }
   };
@@ -497,11 +524,6 @@ export function useDentistActions({
       visitData: buildVisitProtocolDraftFromTemplate(template),
     };
 
-    logger.info('[Dentist] Использую шаблон протокола', {
-      template: templateName,
-      patient: draft.patient_name,
-    });
-
     setProtocolTemplateDraft(draft);
     setShowProtocolTemplates(false);
     setShowVisitProtocol(true);
@@ -546,6 +568,7 @@ export function useDentistActions({
     handleAppointmentRowClick,
     handleAppointmentActionClick,
     handlePatientSelect,
+    handleStartQueueVisit,
     CRITICAL_ICD10_CODES,
     getCriticalDiagnosisWarning,
     handleCompleteVisit,

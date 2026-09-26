@@ -1,12 +1,12 @@
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ModernQueueManager, { type ModernQueueManagerDoctor } from './queue/ModernQueueManager';
 import React from 'react';
 // ADR-0015: use useQueueApi hook instead of importing api/queue directly.
 import { useQueueApi } from '../hooks/useQueueApi';
 import auth from '../stores/auth';
 import logger from '../utils/logger';
-import type { QueueSpecialist } from '../types/domain/queue';
+import type { QueueActionResponse, QueueSpecialist } from '../types/domain/queue';
 
 const QUEUE_SPECIALTY_ALIASES = {
   cardiology: ['cardiology', 'cardio'],
@@ -38,14 +38,12 @@ function matchesQueueSpecialty(item: { specialty?: string; department?: string }
 interface QueueIntegrationProps {
   specialistId?: string;
   specialty?: string;
-  onPatientSelect?: (patient: Record<string, unknown>) => void;
-  onStartVisit?: (patient: Record<string, unknown>) => void;
+  onStartVisit?: (patient: NonNullable<QueueActionResponse['patient']>) => boolean | void | Promise<boolean | void>;
 }
 
 const QueueIntegration = ({
   specialistId = '',
   specialty = '',
-  onPatientSelect,
   onStartVisit,
 }: QueueIntegrationProps): React.JSX.Element | null => {
   // ADR-0015: queue API accessed via hook.
@@ -75,7 +73,7 @@ const QueueIntegration = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fetchAvailableSpecialists]);
 
   useEffect(() => {
     const unsubscribe = auth.subscribe((state) => {
@@ -128,21 +126,12 @@ const QueueIntegration = ({
     })) as unknown as ModernQueueManagerDoctor[]
   ), [availableSpecialists]);
 
-  const handleQueueUpdate = useCallback(() => {
-    const nullPatient = null as unknown as Record<string, unknown>;
-    if (onPatientSelect) {
-      onPatientSelect(nullPatient);
-    }
-    if (onStartVisit) {
-      onStartVisit(nullPatient);
-    }
-  }, [onPatientSelect, onStartVisit]);
-
   return (
     <ModernQueueManager
+      mode="doctor"
       selectedDoctor={resolvedSpecialist?.id ? String(resolvedSpecialist.id) : ''}
       doctors={queueDoctors}
-      onQueueUpdate={handleQueueUpdate}
+      onStartVisit={onStartVisit}
     />
   );
 };

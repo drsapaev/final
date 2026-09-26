@@ -64,12 +64,17 @@ def _make_loaded_queue(
     waiting: int = 0,
     served: int = 0,
     called: int = 0,
+    tag: str = "stomatology",
+    active: bool = True,
 ) -> DailyQueue:
+    # RQ-14.a.1: rows are created with their FINAL (tag, active) shape —
+    # inserting a duplicate (day, doctor, tag) key and mutating it before
+    # commit is no longer legal (uq_daily_queues_active_doctor_day_tag).
     queue = DailyQueue(
         day=day,
         specialist_id=doctor.id,
-        queue_tag="stomatology",
-        active=True,
+        queue_tag=tag,
+        active=active,
     )
     db_session.add(queue)
     db_session.flush()
@@ -236,6 +241,7 @@ def test_clinic_wide_join_routes_to_least_loaded(db_session, monkeypatch) -> Non
         patient_name="D-2 Patient",
         phone="+998900000222",
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     assert result["entry"] is not None
 
@@ -453,6 +459,7 @@ def test_clinic_wide_join_routes_around_limit_reached_doctor(
         patient_name="D-2 Bookable Patient",
         phone="+998900000333",
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     assert result["entry"] is not None
 
@@ -586,9 +593,7 @@ def test_pick_least_loaded_ignores_inactive_queue_load(db_session) -> None:
     honest = _make_doctor(db_session, "dentistry")
 
     _make_loaded_queue(db_session, stale, today, waiting=4)  # real load
-    stale_inactive = _make_loaded_queue(db_session, stale, today, waiting=5)
-    stale_inactive.active = False
-    db_session.flush()
+    _make_loaded_queue(db_session, stale, today, waiting=5, active=False)
     _make_loaded_queue(db_session, honest, today, waiting=5)
 
     picked = QueueBusinessService._pick_least_loaded_doctor(
@@ -716,9 +721,7 @@ def test_pick_least_loaded_scopes_load_to_joined_tag(db_session) -> None:
 
     # multi_tag: empty target-tag queue, but a loaded LEGACY-tag queue
     _make_loaded_queue(db_session, multi_tag, today, waiting=0)
-    legacy = _make_loaded_queue(db_session, multi_tag, today, waiting=5)
-    legacy.queue_tag = "dentistry"
-    db_session.flush()
+    _make_loaded_queue(db_session, multi_tag, today, waiting=5, tag="dentistry")
     # honest: 1 waiting in the target tag
     _make_loaded_queue(db_session, honest, today, waiting=1)
 
@@ -786,6 +789,7 @@ def test_clinic_wide_join_skips_owner_ineligible_ghosts(
         patient_name="D-2 Ghost Patient",
         phone="+998900000444",
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     assert result["entry"] is not None
     routed = (
@@ -895,6 +899,7 @@ def test_clinic_wide_join_retry_returns_original_entry(db_session, monkeypatch) 
         patient_name="D-2 Retry Patient",
         phone=phone,
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     assert first_result["entry"] is not None
     assert first_result["duplicate"] is False
@@ -907,6 +912,7 @@ def test_clinic_wide_join_retry_returns_original_entry(db_session, monkeypatch) 
         patient_name="D-2 Retry Patient",
         phone=phone,
         specialist_id_override=profile.id,
+        specialist_type="profile",  # RQ-09.b (D-01): explicit entity type
     )
     assert retry_result["duplicate"] is True
     assert retry_result["entry"].id == first_result["entry"].id
@@ -935,8 +941,7 @@ def test_display_lookup_resolves_waiting_queue(db_session) -> None:
     today = date.today()
     doctor = _make_doctor(db_session, "dentistry")
     empty = _make_loaded_queue(db_session, doctor, today, waiting=0)
-    loaded = _make_loaded_queue(db_session, doctor, today, waiting=2)
-    loaded.queue_tag = "dentistry"  # different tag, same doctor/day
+    loaded = _make_loaded_queue(db_session, doctor, today, waiting=2, tag="dentistry")
     db_session.flush()
     assert empty.id < loaded.id  # the empty row would win a bare .first()
 

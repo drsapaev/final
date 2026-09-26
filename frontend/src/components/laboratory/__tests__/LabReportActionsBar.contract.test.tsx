@@ -65,6 +65,8 @@ describe('LabReportActionsBar STRAT#5 — i18n migration', () => {
       'revise', 'revising', 'revise_title',
       'print', 'printing',
       'notify_patient', 'notifying',
+      // PR8: серверный PDF-preview до утверждения.
+      'preview', 'previewing', 'preview_title',
     ];
     for (const key of keys) {
       expect(translationsSource).toContain(`${key}:`);

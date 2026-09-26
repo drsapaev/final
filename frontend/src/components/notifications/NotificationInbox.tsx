@@ -13,6 +13,7 @@ import {
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import { useGuardedLabNavigate } from '../laboratory/LabDirtyGuardContext';
 import React from "react";
 import { safeJsonParse } from '../../utils/safeJsonParse';
 
@@ -116,23 +117,6 @@ function resolveNotificationTarget(item: { deepLink?: string | null; type?: stri
   }
 }
 
-function navigateToNotificationTarget(target: string | null) {
-  if (!target || typeof window === 'undefined') {
-    return;
-  }
-
-  try {
-    const current = `${window.location.pathname || ''}${window.location.search || ''}`;
-    if (current === target) {
-      return;
-    }
-    window.history.pushState({}, '', target);
-    window.dispatchEvent(new PopStateEvent('popstate'));
-  } catch (error) {
-    logger.warn('[NotificationInbox] failed to navigate by notification target', error);
-  }
-}
-
 interface NotificationInboxProps {
   userRole: string | null | undefined;
   onClose: () => void;
@@ -164,6 +148,13 @@ export default function NotificationInbox({ userRole, onClose }: NotificationInb
     archiveNotification,
     markAllAsRead
   } = useNotificationCenter();
+  // PR 3351 (review round 3, P1): единый guarded navigator. Прежний прямой
+  // обход History API (push в history + синтетический popstate) миновал
+  // route-level leave guard — клик по уведомлению молча размонтировал
+  // LabPanel с несохранёнными черновиками (message_received → /messages)
+  // или уводил на wildcard-redirect (lab_results → /lab/results →
+  // /not-found).
+  const navigateToNotificationTarget = useGuardedLabNavigate();
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchText, setSearchText] = useState('');
@@ -230,6 +221,13 @@ export default function NotificationInbox({ userRole, onClose }: NotificationInb
       }
 
       const target = resolveNotificationTarget(item, userRole);
+      if (!target || typeof window === 'undefined') {
+        return;
+      }
+      const current = `${window.location.pathname || ''}${window.location.search || ''}`;
+      if (current === target) {
+        return;
+      }
       navigateToNotificationTarget(target);
     } catch (error) {
       logger.warn('[NotificationInbox] failed to mark notification open state', error);

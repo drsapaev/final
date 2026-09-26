@@ -5,7 +5,10 @@
  */
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
-import { generatePath, useNavigate } from 'react-router-dom';
+import { generatePath } from 'react-router-dom';
+// PR 3351: guarded navigate — глобальный поиск уводит с /lab на роуты
+// пациентов; при несохранённых lab-черновиках — dirty-guard.
+import { useGuardedLabNavigate } from '../laboratory/LabDirtyGuardContext';
 // ADR-0015: import api from api/client directly (api/index.ts barrel is also
 // flagged by the boundary scanner because it lives under api/). Both api/client
 // and the barrel re-export the same axios instance.
@@ -16,6 +19,10 @@ import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSele
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import { HEADER_PORTAL_Z } from '../../theme/zLayers';
+import {
+  canUseGlobalSearch,
+  type GlobalSearchAccessProfile,
+} from './globalSearchAccess';
 
 const patientSearchRouteByRole = {
   registrar: getRoleHomeRoute('registrar'),
@@ -100,9 +107,9 @@ function useDebounce(value: string, delay: number) {
   return debouncedValue;
 }
 
-export default function GlobalSearchBar({ className = '' }: GlobalSearchBarProps) {
+function GlobalSearchBarInner({ className = '' }: GlobalSearchBarProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
-  const navigate = useNavigate();
+  const navigate = useGuardedLabNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -595,6 +602,31 @@ export default function GlobalSearchBar({ className = '' }: GlobalSearchBarProps
       )}
         </div>);
 
+}
+
+
+// NURSE-V2 N2-2 (review P2 round 3 — PR 3333): self-gate on the backend
+// GLOBAL_SEARCH_ROLES mirror (./globalSearchAccess). GET /global-search
+// answers 403 for every role outside that allowlist; without the gate any
+// app-shell surface open to such a role (the nurse home /clinical/profile
+// reaches this bar through HeaderNew) ships a control whose every request
+// is guaranteed to fail and be swallowed into an empty "nothing found"
+// list. Gating inside the component — instead of at each mount site —
+// covers every current and future mount point. Fail closed: no profile,
+// no search bar. All hooks stay in GlobalSearchBarInner, so the
+// conditional render never violates the rules of hooks.
+function useGlobalSearchAccess(): boolean {
+  const [state, setState] = useState(auth.getState());
+  useEffect(() => auth.subscribe(setState), []);
+  return canUseGlobalSearch(
+    (state.profile ?? null) as GlobalSearchAccessProfile | null,
+  );
+}
+
+export default function GlobalSearchBar(props: GlobalSearchBarProps) {
+  const canSearch = useGlobalSearchAccess();
+  if (!canSearch) return null;
+  return <GlobalSearchBarInner {...props} />;
 }
 
 

@@ -279,10 +279,35 @@ pytest_add_cli_args_test_selection = [
     "--deselect", "tests/integration/test_queue_resource_expand.py",
     "--deselect", "tests/integration/test_queue_resource_seed_backfill.py",
     "--deselect", "tests/integration/test_queue_resource_sentinel.py",
+    # RQ-15.d sentinel-retirement suite is a migration/repo-artifact audit
+    # (alembic chain + subprocess from repo geometry), outside the mutated
+    # app/crud/* surface. In mutmut's sandbox it fails before mutations run.
+    "--deselect", "tests/integration/test_queue_resource_sentinel_retirement.py",
     "--deselect", "tests/integration/test_manager_deprecation.py::test_nightly_smoke_repointed_and_manager_free",
     # reads repo frontend/src/types/roles.ts - a repo artifact outside the
     # mutmut sandbox (zero mutation value: mutmut mutates app/ only)
     "--deselect", "tests/integration/test_nurse_retirement.py::test_frontend_roles_mirror_dropped_nurse",
+    # test_queue_resource_contract audits repo artifacts (docs/adr/ADR-001,
+    # alembic versions) — zero mutation value under the sandbox.
+    "--deselect", "tests/integration/test_queue_resource_contract.py",
+    # test_general_retirement_cutover.py (#3250) — six pure repo-artifact
+    # readers: evidence/stage_e_operator_map*.json at REPO_ROOT, the
+    # migration-0066 source, and registrar_wizard/_helpers.py +
+    # batch_patient_service.py sources at BACKEND_ROOT. Static
+    # file-vs-embedded comparisons with zero mutation value; under the
+    # sandbox REPO_ROOT resolves to backend/ and BACKEND_ROOT to
+    # backend/backend/, neither of which carries these artifacts
+    # (nightly run 70, 2026-09-16: baseline 1 failed / 2183 passed, -x
+    # stopped at the first reader — FileNotFoundError evidence JSON).
+    # The DB-driven cutover tests stay in the run: green up to the
+    # reader failure in run 70 and green in the normal backend-tests
+    # job on #3250/#3277.
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_migration_source_never_deletes_or_inserts",
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_embedded_decisions_match_the_operator_map_evidence",
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_batch_resolver_source_has_no_synthetic_mapping",
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_wizard_helpers_general_default_is_gone",
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_refinement_matches_the_refinement_evidence_file",
+    "--deselect", "tests/integration/test_general_retirement_cutover.py::test_final_confirmation_matches_the_20260916_evidence_file",
     # tests/unit/test_idempotency_distributed_claim.py — whole-file deselect:
     # the fixture patches MODULE GLOBALS of app.middleware.idempotency_middleware,
     # which is structurally incompatible with the mutmut sandbox (module-identity
@@ -299,6 +324,14 @@ pytest_add_cli_args_test_selection = [
     # Uses deprecated asyncio.get_event_loop().run_until_complete() — breaks
     # under Python 3.12 in-process pytest (mutmut); needs asyncio.run() fix.
     "--deselect", "tests/integration/test_ai_upload_limits.py::test_legacy_ai_image_upload_rejects_oversized_payload_before_provider_call",
+    # tests/unit/test_lab_reporting_service.py — whole-file deselect (#3335):
+    # its catalog-seed state leak (raw-SQL template deletion + process-global
+    # seed cache) surfaces only under the mutmut sandbox's single-process
+    # run (L01 mapped->unmapped, nightly 2026-09-18/19). Zero mutation value:
+    # only_mutate covers the four crud modules and the file imports none of
+    # them (lab_reporting service/repository only). It keeps running green
+    # in the normal backend-tests job and locally (63 passed).
+    "--deselect", "tests/unit/test_lab_reporting_service.py",
 ]
 only_mutate = [
     "app/crud/appointment.py",

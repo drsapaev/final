@@ -6,8 +6,9 @@ state-changing requests (POST / PUT / PATCH / DELETE).
 Context:
 - The ``/auth/csrf-token`` endpoint (``app/api/v1/endpoints/auth.py``)
   issues a random ``secrets.token_urlsafe(32)`` token and stores it in
-  the ``csrf_token`` cookie (``httponly=False``, ``samesite=lax``) so
-  the frontend can read it via ``document.cookie`` and replay it in
+  the ``csrf_token`` cookie (``httponly=False``, ``samesite=lax`` by
+  default — ``CSRF_COOKIE_SAMESITE=none`` opts a cross-SITE frontend/API
+  split in, forcing ``secure``) so the frontend can read it via ``document.cookie`` and replay it in
   the ``X-CSRF-Token`` header on mutating requests.
 - The frontend axios client (``frontend/src/api/client.ts``) already
   fetches ``/auth/csrf-token`` (single-flight) and attaches the
@@ -18,11 +19,23 @@ Context:
 
 Design choices:
 - **Double-submit cookie** (not signed token): simpler, no server-side
-  state, no DB lookup per request. The cookie is ``SameSite=Lax``,
-  which already blocks most cross-site POSTs in modern browsers; this
-  middleware is the second factor for the cases SameSite does not
-  cover (e.g. older browsers, navigational GETs that mutate state via
-  a hidden form, subdomain attacks).
+  state, no DB lookup per request. The cookie is ``SameSite=Lax`` by
+  default, which already blocks most cross-site POSTs in modern
+  browsers; this middleware is the second factor for the cases SameSite
+  does not cover (e.g. older browsers, navigational GETs that mutate
+  state via a hidden form, subdomain attacks). A documented cross-SITE
+  frontend/API split (different registrable domains) opts out of the
+  Lax layer explicitly via ``CSRF_COOKIE_SAMESITE=none`` on the API —
+  the double-submit check below remains the enforced control there.
+  CONTRACT CAVEAT (PR 3407 delta review P2): ``none`` only relaxes the
+  SameSite attribute; it does NOT guarantee cookie delivery. Credentialed
+  CORS still bows to the browser's third-party-cookie policy — Safari,
+  Firefox and per-user privacy settings may withhold the cookie even
+  with ``SameSite=None; Secure``, which surfaces as 403 missing_cookie.
+  Cross-site splits are therefore best-effort, not a portable
+  deployment guarantee; production should prefer a same-site topology
+  (reverse-proxy ``/api``, ``api.example.com`` next to
+  ``clinic.example.com``) instead of relying on third-party cookies.
 - **Constant-time comparison** via ``hmac.compare_digest`` to avoid
   timing oracles on token equality.
 - **GET / HEAD / OPTIONS / WebSocket upgrade requests are exempt** —

@@ -38,6 +38,7 @@ import {
 import { useQueueApi } from '../../hooks/useQueueApi';
 import { usePatientsApi } from '../../hooks/usePatientsApi';
 import { api } from '../../api/client';
+import { fetchRegistrarDoctors, fetchRegistrarServices } from '../../api/registrar';
 // UX Audit Stage 3 (Wizard issue 5.1):
 // Все 13 raw fetch() к /patients/* и /registrar/cart заменены на
 // централизованный patients API client. Это убирает дублирование
@@ -93,18 +94,6 @@ interface PatientRecord {
   middle_name?: string;
   gender?: string;
   birth_date?: string;
-  [k: string]: unknown;
-}
-
-interface ServiceData {
-  id?: string | number;
-  name: string;
-  service_code?: string;
-  queue_tag?: string;
-  category_code?: string;
-  price?: number;
-  is_consultation?: boolean;
-  requires_doctor?: boolean;
   [k: string]: unknown;
 }
 
@@ -235,10 +224,14 @@ import {
   wizardContentSignature,
   getWizardDepartmentForService,
   resolveInitialPatientId,
+  findCardPersistMismatches,
   getWizardServiceTabFilter,
   serviceCodeToWizardCategory,
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
+  findMissingDoctorItems,
+  wizardServiceFromCatalogEntry,
+  type WizardCatalogServiceData as ServiceData,
   categories
 } from './wizardUtils';
 
@@ -912,7 +905,11 @@ const AppointmentWizardV2 = ({
 
   const loadServices = useCallback(async () => {
     try {
-      const { data } = await api.get('/registrar/services');
+      // Codex P2 PR 3309 / RQ-05.b: каталог идёт через типизированный
+      // wrapper — RegistrarCatalogService доезжает до потребителя, и
+      // переименование/удаление requires_doctor в DTO ломает компиляцию,
+      // а не молча пропускает шаг 2 без врача.
+      const data = await fetchRegistrarServices();
 
         // PR-25: load queue profiles for dynamic department filtering
         let profiles: QueueProfileDto[] = queueProfiles;
@@ -926,12 +923,13 @@ const AppointmentWizardV2 = ({
           }
         }
 
-        // Извлекаем все услуги из групп
+        // Извлекаем все услуги из групп — конверсия из типизированного DTO
+        // через SSOT-адаптер wizardServiceFromCatalogEntry (codex P2 PR 3309).
         let allServices: ServiceData[] = [];
         if (data.services_by_group) {
-          Object.values(data.services_by_group as Record<string, unknown>).forEach((groupServices) => {
+          Object.values(data.services_by_group).forEach((groupServices) => {
             if (Array.isArray(groupServices)) {
-              allServices = allServices.concat(groupServices as ServiceData[]);
+              allServices = allServices.concat(groupServices.map(wizardServiceFromCatalogEntry));
             }
           });
         }
@@ -1057,8 +1055,8 @@ const AppointmentWizardV2 = ({
 
   const loadDoctors = useCallback(async () => {
     try {
-      const { data } = await api.get('/registrar/doctors');
-      setDoctorsData(data);
+      const { doctors } = await fetchRegistrarDoctors();
+      setDoctorsData(doctors.map((doctor): DoctorData => ({ ...doctor })));
     } catch (error: unknown) {
       logger.error('Ошибка загрузки врачей:', error);
     }
@@ -1593,11 +1591,12 @@ const AppointmentWizardV2 = ({
       if (wizardData.cart.items.length === 0) {
         newErrors.cart = t('misc.aw_cart_empty');
       }
-      // Проверяем, что для услуг, требующих врача, врач выбран
-      const missingDoctors = wizardData.cart.items.filter((item) => {
-        const service = servicesData.find((s) => s.id === (item as { service_id?: string | number }).service_id);
-        return service?.requires_doctor && !(item as { doctor_id?: string | number }).doctor_id;
-      });
+      // RQ-05.b: гейт «врач обязателен ровно там, где требует сервер» —
+      // SSOT-хелпер по DTO-флагу requires_doctor каталога (F-04).
+      const missingDoctors = findMissingDoctorItems(
+        wizardData.cart.items,
+        servicesData
+      );
       if (missingDoctors.length > 0) {
         newErrors.doctors = t('misc.aw_doctors_required');
       }
@@ -1902,6 +1901,7 @@ const AppointmentWizardV2 = ({
       let visits: unknown[] = groupCartItemsByVisit(
         wizardData.cart.items as Parameters<typeof groupCartItemsByVisit>[0],
         getDepartmentByService,
+        getResourceQueueTagByService,
       );
       if (!visits || visits.length === 0) {
         toast.error(t('misc.aw_cart_empty_or_invalid'));
@@ -2019,9 +2019,29 @@ const AppointmentWizardV2 = ({
             try {
               // UX Audit Stage 3: заменён raw fetch() PUT на updatePatient().
               await updatePatient(foundPatient.id as string | number, updateData);
-              logger.log('✅ Patient data updated');
+              // E-054 leftover 2 (superseded PR 3086 Fix B): 200 не доказывает
+              // сохранение — перечитываем карточку и сверяем отправленные
+              // поля. Расхождение → остановка отправки без корзины.
+              const cardReadBack = await getPatient(foundPatient.id as string | number);
+              const persistMismatches = findCardPersistMismatches(
+                updateData,
+                cardReadBack as unknown as Record<string, unknown>,
+              );
+              if (persistMismatches.length > 0) {
+                logger.error('❌ Card save not persisted:', persistMismatches);
+                toast.error(t('misc.aw_patient_profile_verify_failed'));
+                return;
+              }
+              logger.log('✅ Patient data updated (read-back verified)');
             } catch (e: unknown) {
-              logger.warn('⚠️ Failed to update patient:', e);
+              // Раньше ошибка здесь проглатывалась (logger.warn + продолжение
+              // потока) и корзина создавалась с несохранёнными правками
+              // карточки — тихая потеря данных. Теперь отправка
+              // останавливается с явной ошибкой, корзина не создаётся.
+              const saveErr = e as Error & { status?: number; message?: string };
+              logger.error('❌ Failed to update patient:', saveErr.status, saveErr.message);
+              toast.error(t('misc.aw_patient_profile_save_failed', { message: saveErr.message || '' }));
+              return;
             }
           }
         } else {
@@ -2113,9 +2133,13 @@ const AppointmentWizardV2 = ({
           // любом 400 с телефоном автоматически привязывала форму к найденной
           // по телефону карточке — валидационная ошибка приводила к записи
           // визитов чужого пациента, а семейный телефон молча менял пациента.
-          const createErr = createError as Error & { status?: number; message: string };
+          const createErr = createError as Error & { status?: number; message: string; code?: string };
+          // E-054 leftover 3: дубль распознаётся по структурному коду
+          // patient_phone_exists (backend detail {code, message}) ИЛИ по
+          // строке (легаси/прочие источники 400) — OR conservativo.
           const isPhoneDuplicate =
-            createErr.status === 400 && isPhoneDuplicateErrorMessage(createErr.message);
+            createErr.status === 400 &&
+            (createErr.code === 'patient_phone_exists' || isPhoneDuplicateErrorMessage(createErr.message));
 
           if (isPhoneDuplicate && wizardData.patient.phone) {
             let conflictPatient: PatientRecord | null = null;
@@ -2579,40 +2603,20 @@ const AppointmentWizardV2 = ({
             if (editMode) {
               logger.log('📝 Режим редактирования: создаем визиты только из новых услуг');
 
-              // Группируем только новые услуги по визитам
-              const newServiceVisits: Record<string, {
-                doctor_id: string | number | null;
-                services: Array<{ service_id?: string | number; quantity?: number }>;
-                visit_date: string;
-                visit_time: string | null;
-                department: string;
-                notes: string | null;
-              }> = {};
-              newServicesWithoutDoctor.forEach((item) => {
-                const department = getDepartmentByService((item as { service_id?: string | number }).service_id as string | number);
-                const key = `${department}_no_doctor_${new Date().toISOString().split('T')[0]}_no_time`;
-
-                if (!newServiceVisits[key]) {
-                  newServiceVisits[key] = {
-                    doctor_id: null,
-                    services: [],
-                    visit_date: new Date().toISOString().split('T')[0],
-                    visit_time: null,
-                    department: department,
-                    notes: null
-                  };
-                }
-
-                newServiceVisits[key].services.push({
-                  service_id: (item as { service_id?: string | number }).service_id,
-                  quantity: item.quantity
-                });
-              });
-
               // ✅ ИСПРАВЛЕНО: Сохраняем существующие визиты и добавляем только новые
               // По сценарию 5: новые услуги создают новые визиты, существующие не изменяются
               // Но для cart endpoint нужно отправить только новые визиты (существующие уже в БД)
-              const newVisitsOnly = Object.values(newServiceVisits);
+              const visitDate = new Date().toISOString().split('T')[0];
+              const newVisitsOnly = groupCartItemsByVisit(
+                newServicesWithoutDoctor.map((item) => ({
+                  ...item,
+                  doctor_id: null,
+                  visit_date: visitDate,
+                  visit_time: null,
+                })),
+                getDepartmentByService,
+                getResourceQueueTagByService,
+              );
               visits = newVisitsOnly;
               logger.log('📋 Созданы визиты только из новых услуг:', visits.length);
               logger.log('ℹ️ Существующие визиты не изменяются (остаются в БД)');
@@ -2782,10 +2786,23 @@ const AppointmentWizardV2 = ({
         // immediately request the current itemized pricing, so pressing
         // Complete reconfirms the NEW amount instead of resubmitting the
         // stale one indefinitely.
-        if (cartErr.status === 409) {
+        // Codex R16 PR 3095 (P2): stale-price 409 — pre-commit validation
+        // failure, so rotate BOTH idempotency refs together with the quote
+        // refresh. The refreshed quote has a NEW quote_token: the next
+        // submission serializes a different payload, and the key still bound
+        // to the old payload would be blocked locally by cartIdempotencyGuard
+        // before any request reaches the backend — the registrar could never
+        // confirm the new amount. Idempotency 409s (uncertain-outcome /
+        // in-flight / payload-mismatch) carry an `idempotency_*` code and
+        // must NOT release the binding: the uncertain case already returned
+        // above; in-flight keeps the binding so the retry replays the
+        // committed outcome with the SAME key.
+        if (cartErr.status === 409 && !backendCode?.startsWith('idempotency')) {
           setCartQuote(null);
           setCartQuoteStatus('idle');
           setQuoteRefreshNonce((n) => n + 1);
+          cartIdempotencyKeyRef.current = null;
+          cartIdempotencyPayloadRef.current = null;
         }
 
         if (isPermissionError) {
@@ -2842,6 +2859,13 @@ const AppointmentWizardV2 = ({
   // обёртка сохраняет существующие вызовы.
   const getDepartmentByService = (serviceId: string | number) => {
     return getWizardDepartmentForService(serviceId, servicesData);
+  };
+
+  const getResourceQueueTagByService = (serviceId: string | number): string | null => {
+    const service = servicesData.find((candidate) => candidate.id === serviceId);
+    if (!service || service.requires_doctor) return null;
+    const queueTag = String(service.queue_tag || '').trim();
+    return queueTag || null;
   };
 
   // ===================== ДЕЙСТВИЯ ДИАЛОГА =====================

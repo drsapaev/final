@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.crud import clinic as crud_clinic
 from app.crud.queue_resource_routing import (
+    effective_day_start_number,
     lock_registry_tag_creation,
     resolve_tag_resource,
     resolve_tag_resource_locked,
@@ -112,6 +113,11 @@ class VisitConfirmationRepository:
                     online_start_time=f"{int(settings.get('queue_start_hour', 7)):02d}:00",
                     online_end_time=f"{int(settings.get('queue_end_hour', 9)):02d}:00",
                     max_online_entries=resource.max_online_per_day,
+                    # RQ-13.b (D-06, E-039): снимок применённого стартового
+                    # номера реестра — паритет с queue_svc-конструктором.
+                    start_number=effective_day_start_number(
+                        self.db, resource=resource, queue_tag=queue_tag
+                    ),
                     # Codex round-8 P2: канонический кабинет реестра —
                     # паритет с queue_svc-конструктором (round-7)
                     cabinet_number=resource.default_cabinet,
@@ -144,26 +150,12 @@ class VisitConfirmationRepository:
 
         actual_specialist_id = doctor.id
 
-        if queue_tag:
-            existing_by_tag = (
-                self.db.query(DailyQueue)
-                .filter(
-                    DailyQueue.day == day,
-                    DailyQueue.queue_tag == queue_tag,
-                    DailyQueue.active == True,
-                )
-                .first()
-            )
-            if existing_by_tag:
-                logger.info(
-                    "[FIX] Reusing existing DailyQueue id=%s day=%s specialist=%s queue_tag=%s",
-                    existing_by_tag.id,
-                    day,
-                    actual_specialist_id,
-                    queue_tag,
-                )
-                return existing_by_tag
-
+        # QD-2E (Codex round-4 P1): поверхность для записи с решённым
+        # врачом — очередь ЭТОГО врача (PR-26 per-doctor), не tag-only
+        # очередь другого врача того же тега (doctor 10 не должен
+        # попадать в очередь doctor 11). tag-only reuse из doctor-ветки
+        # удален: врач здесь всегда решён (registry-теги вернулись
+        # раньше ресурсной осью); зеркалит фикс morning-SSOT round-3.
         query = self.db.query(DailyQueue).filter(
             DailyQueue.day == day,
             DailyQueue.specialist_id == actual_specialist_id,
@@ -193,6 +185,11 @@ class VisitConfirmationRepository:
             active=True,
             online_start_time=f"{int(queue_start_hour):02d}:00",
             online_end_time=f"{int(queue_end_hour):02d}:00",
+            # RQ-13.b (D-06, E-039): снимок эффективного стартового номера
+            # дня (владелец → клиника) — паритет с queue_svc-конструктором.
+            start_number=effective_day_start_number(
+                self.db, doctor=doctor, queue_tag=queue_tag
+            ),
         )
         self.db.add(daily_queue)
 

@@ -1,8 +1,9 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
-import { Edit, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react';
+import { Edit, KeyRound, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react';
 
 import PatientModal from './PatientModal';
+import PatientActivationTokenDialog from './PatientActivationTokenDialog';
 import usePatients from '../../hooks/usePatients';
 import useModal from '../../hooks/useModal';
 import notify from '../../services/notify';
@@ -19,7 +20,7 @@ import IconButton from './IconButton';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
-import React from "react";
+import React from 'react';
 
 type TFunc = (key: string, options?: Record<string, unknown>) => string;
 
@@ -141,6 +142,11 @@ const AdminPatients = () => {
   const handleCreatePatient = () => {
     patientModal.openModal(null);
   };
+
+  // Phase 0 PR-A2/PR-B: staff-issued card activation token (one-time confirm
+  // dialog → single-use token display). Reissue revokes the previous token
+  // server-side, hence the explicit two-stage dialog instead of an instant call.
+  const [activationDialogPatient, setActivationDialogPatient] = React.useState<Record<string, unknown> | null>(null);
 
   const handleEditPatient = (patient: Record<string, unknown>) => {
     // useModal's openModal is typed `(item = null)` so the param type is
@@ -396,6 +402,12 @@ const AdminPatients = () => {
                           <Edit size={16} />
                         </IconButton>
                         <IconButton
+                          label={t('patientPortal.pi_action_aria', { name: getPatientName(patient, t) })}
+                          onClick={() => setActivationDialogPatient(patient)}
+                        >
+                          <KeyRound size={16} />
+                        </IconButton>
+                        <IconButton
                           label={t('admin2.ap_delete_aria')}
                           tone="danger"
                           onClick={() => handleDeletePatient(patient)}
@@ -419,6 +431,11 @@ const AdminPatients = () => {
         patient={patientModal.selectedItem}
         onSave={handleSavePatient}
         loading={patientModal.loading}
+      />
+      <PatientActivationTokenDialog
+        isOpen={activationDialogPatient !== null}
+        onClose={() => setActivationDialogPatient(null)}
+        patient={activationDialogPatient}
       />
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}

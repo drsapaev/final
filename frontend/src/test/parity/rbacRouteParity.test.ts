@@ -46,6 +46,23 @@ describe('RBAC route parity', () => {
     expect(hasRouteAccess(profile, '/clinical/scheduler')).toBe(false);
   });
 
+  it('pins the Nurse-only tablet route (NURSE-V2 N2-5)', () => {
+    // N2-5 §2: /nurse is role-scoped to Nurse ONLY — no Admin (the
+    // serving plane requires an ACTIVE NurseWorkplaceAssignment for
+    // everyone, so an Admin would only ever see an empty shell), no
+    // registrar/cashier/lab surface grants.
+    const roles = routeToRoles('/nurse');
+    expect(roles).toEqual(['Nurse']);
+    expect(hasRouteAccess({ role: 'Nurse' }, '/nurse')).toBe(true);
+    expect(hasRouteAccess({ role: 'Doctor' }, '/nurse')).toBe(false);
+    expect(hasRouteAccess({ role: 'Registrar' }, '/nurse')).toBe(false);
+    expect(hasRouteAccess({ role: 'Cashier' }, '/nurse')).toBe(false);
+    expect(hasRouteAccess({ role: 'Lab' }, '/nurse')).toBe(false);
+    expect(hasRouteAccess({ role: 'Admin' }, '/nurse')).toBe(false);
+    // The Nurse stays absent from every staff sidebar preset.
+    expect(Object.keys(SIDEBAR_PRESETS)).not.toContain('nurse');
+  });
+
   it('pins the canonical trio on the appointments route (P-014 TIGHTEN)', () => {
     // P-014 TIGHTEN: /clinical/appointments route-level roles collapsed back to
     // the canonical Admin/Doctor/Registrar trio. This matches the page RoleGate

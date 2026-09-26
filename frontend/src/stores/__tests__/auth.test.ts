@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../api/client', () => ({
   me: vi.fn(),
   setToken: vi.fn(),
+  // Phase 0 follow-up: the store registers its session-termination listener
+  // in the client at module scope — stub it so registration is a no-op.
+  setSessionInvalidationListener: vi.fn(),
 }));
 
 import { me, setToken as setClientToken } from '../../api/client';
@@ -24,16 +27,20 @@ function createJwt(expSecondsFromNow: number): string {
 
 describe('auth store', () => {
   let storage: Record<string, string>;
+  let storageOps: string[] = [];
 
   function primeSessionStorage(initial: Record<string, string> = {}) {
     storage = { ...initial };
+    storageOps = [];
     vi.spyOn(sessionStorage, 'getItem').mockImplementation((key: string) =>
       Object.prototype.hasOwnProperty.call(storage, key) ? storage[key] : null
     );
     vi.spyOn(sessionStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      storageOps.push(`set:${key}`);
       storage[key] = String(value);
     });
     vi.spyOn(sessionStorage, 'removeItem').mockImplementation((key: string) => {
+      storageOps.push(`remove:${key}`);
       delete storage[key];
     });
   }
@@ -70,7 +77,9 @@ describe('auth store', () => {
     const state = await auth.validateSession(true);
 
     expect(meMock).not.toHaveBeenCalled();
-    expect(state).toEqual({ token: null, profile: null });
+    // Round 8: the snapshot carries the expired-principal kind (false here —
+    // the cleared profile was a staff/registrar one).
+    expect(state).toEqual({ token: null, profile: null, expiredPrincipalWasPatient: false });
     expect(storage.auth_token).toBeUndefined();
     expect(storage.auth_profile).toBeUndefined();
   });
@@ -110,5 +119,144 @@ describe('auth store', () => {
     });
     expect(storage.auth_token).toBeDefined();
     expect(storage.auth_profile).toBeDefined();
+  });
+
+  describe('replaceAccessOnlySession (Phase 0 PR-B review P1)', () => {
+    const patientProfile = { id: 42, username: 'patient-42', role: 'Patient' };
+
+    it('replaces a staff session with an access-only patient session (stale refresh token removed)', async () => {
+      primeSessionStorage({
+        auth_token: createJwt(3600),
+        refresh_token: 'staff-refresh-token',
+        auth_profile: JSON.stringify({ id: 1, username: 'registrar', role: 'Registrar' }),
+        user: JSON.stringify({ id: 1, username: 'registrar', role: 'Registrar' }),
+      });
+
+      const auth = await import('../auth');
+      const patientJwt = createJwt(600);
+      auth.replaceAccessOnlySession(patientJwt, patientProfile as never);
+
+      // The stale staff refresh token is gone — it can never be replayed on
+      // /authentication/refresh under the patient session.
+      expect(storage.refresh_token).toBeUndefined();
+      // Access token + profile now belong to the patient principal.
+      expect(storage.auth_token).toBe(patientJwt);
+      expect(JSON.parse(storage.auth_profile)).toEqual(patientProfile);
+      // tokenManager's `user` payload is replaced with the same principal.
+      expect(JSON.parse(storage.user)).toEqual(patientProfile);
+      expect(setClientTokenMock).toHaveBeenCalledWith(patientJwt);
+    });
+
+    it('clears the refresh token BEFORE installing the new principal (atomic replacement order)', async () => {
+      primeSessionStorage({
+        auth_token: createJwt(3600),
+        refresh_token: 'staff-refresh-token',
+        auth_profile: JSON.stringify({ id: 1, username: 'registrar' }),
+      });
+
+      const auth = await import('../auth');
+      auth.replaceAccessOnlySession(createJwt(600), patientProfile as never);
+
+      // Ordering contract: no window where the new patient access token and
+      // the old staff refresh token coexist in storage.
+      const removeRefreshIdx = storageOps.indexOf('remove:refresh_token');
+      const setTokenIdx = storageOps.indexOf('set:auth_token');
+      const setProfileIdx = storageOps.indexOf('set:auth_profile');
+      expect(removeRefreshIdx).toBeGreaterThanOrEqual(0);
+      expect(setTokenIdx).toBeGreaterThan(removeRefreshIdx);
+      expect(setProfileIdx).toBeGreaterThan(setTokenIdx);
+    });
+
+    it('is idempotent for an access-only session (no refresh token present)', async () => {
+      primeSessionStorage({
+        auth_token: createJwt(3600),
+        auth_profile: JSON.stringify({ id: 42, username: 'patient-42', role: 'Patient' }),
+      });
+
+      const auth = await import('../auth');
+      const patientJwt = createJwt(1200);
+      expect(() => auth.replaceAccessOnlySession(patientJwt, patientProfile as never)).not.toThrow();
+
+      expect(storage.refresh_token).toBeUndefined();
+      expect(storage.auth_token).toBe(patientJwt);
+      expect(JSON.parse(storage.auth_profile)).toEqual(patientProfile);
+    });
+  });
+
+  describe('expired principal kind marker (Phase 0 follow-up, Codex P1 round 3)', () => {
+    it('remembers an expired PATIENT principal and resets on the next login', async () => {
+      primeSessionStorage({
+        auth_token: 'jwt',
+        auth_profile: JSON.stringify({ id: 9, username: 'patient-9', role: 'Patient' }),
+      });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(true);
+
+      // A freshly installed session resets the marker.
+      auth.setToken('fresh-jwt');
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(false);
+    });
+
+    it('does not flag staff principals on clearToken', async () => {
+      primeSessionStorage({
+        auth_token: 'jwt',
+        auth_profile: JSON.stringify({ id: 2, username: 'registrar', role: 'Registrar' }),
+      });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(false);
+    });
+
+    it('flags nothing when the cleared session had no profile', async () => {
+      primeSessionStorage({ auth_token: 'jwt' });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(false);
+    });
+
+    it('preserves the patient hint across duplicate clears on the same 401', async () => {
+      // Codex P1 (round 4): the response interceptor clears first (hint set
+      // from the live profile), then getProfile() catches the SAME 401 and
+      // clears again — the second call sees NO profile and must not flip
+      // the hint back to false.
+      primeSessionStorage({
+        auth_token: 'jwt',
+        auth_profile: JSON.stringify({ id: 9, username: 'patient-9', role: 'Patient' }),
+      });
+
+      const auth = await import('../auth');
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(true);
+
+      primeSessionStorage({});
+      auth.clearToken();
+      expect(auth.getExpiredPrincipalWasPatient()).toBe(true);
+    });
+
+    it('carries the expired-principal kind in the notified snapshot (round 8)', async () => {
+      // Codex P2 (round 8): the kind travels INSIDE the notified AuthState
+      // so a boundary re-render reads it atomically with the token-clear,
+      // immune to stale passive-effect ordering.
+      primeSessionStorage({
+        auth_token: 'jwt',
+        auth_profile: JSON.stringify({ id: 9, username: 'patient-9', role: 'Patient' }),
+      });
+
+      const auth = await import('../auth');
+      const seen: Array<Record<string, unknown>> = [];
+      const unsubscribe = auth.subscribe((s: unknown) => {
+        seen.push(s as Record<string, unknown>);
+      });
+      auth.clearToken();
+      unsubscribe();
+
+      const last = seen[seen.length - 1];
+      expect(last.token).toBeNull();
+      expect(last.expiredPrincipalWasPatient).toBe(true);
+    });
   });
 });

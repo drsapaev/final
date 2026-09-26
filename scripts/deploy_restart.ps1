@@ -13,6 +13,12 @@
     any other deploy/restart attempt FAILS immediately without killing
     processes, restarting, or mutating git state.
 
+    The managed uvicorn listener is stopped and verified absent BEFORE any
+    migration runs. A failed stop prevents migrations; a failed migration
+    leaves the listener stopped and does not launch the new runtime.
+    Independently managed queue-writing workers must also be quiesced by
+    the operator before Deploy; this script owns only the listener below.
+
     Modes (mutually exclusive, Deploy is the default):
       -Deploy          sync main with origin/main (ff-only), apply pending
                        database migrations (alembic upgrade head), restart
@@ -158,36 +164,6 @@ try {
     $python = Join-Path $backendDir '.venv\Scripts\python.exe'
     if (-not (Test-Path $python)) { Fail "backend venv python not found at $python." }
 
-    # --- Database migrations: Deploy only --------------------------------------
-    # Applied while the OLD runtime is stopped and the NEW one has not
-    # started: production code and schema never disagree in service. A
-    # failed migration rolls back (transactional DDL) and the Fail path
-    # leaves prod down-but-consistent for manual resolution - never
-    # half-deployed. Missed on 2026-09-05: code shipped referencing
-    # queue_entries.called_by_user_id before 0054 ran, and
-    # /registrar/queues/today 500-ed for every registrar until the
-    # migration was applied by hand.
-    if (-not $SkipMigrations) {
-        Write-Host 'deploy_restart: applying database migrations (alembic upgrade head)...'
-        $alembic = Join-Path (Join-Path $backendDir '.venv\Scripts') 'alembic.exe'
-        Push-Location $backendDir
-        try {
-            # EAP=Continue around native 2>&1: alembic writes its INFO logs to
-            # stderr, and with EAP='Stop' the first one would be a terminating
-            # NativeCommandError before any migration output is visible.
-            $prevEap = $ErrorActionPreference
-            $ErrorActionPreference = 'Continue'
-            & $alembic upgrade head 2>&1 | ForEach-Object { Write-Host "alembic: $_" }
-            $alembicExit = $LASTEXITCODE
-            $ErrorActionPreference = $prevEap
-            if ($alembicExit -ne 0) {
-                Fail 'alembic upgrade head failed - resolve manually, then re-run deploy. The runtime was not restarted.'
-            }
-        } finally {
-            Pop-Location
-        }
-    }
-
     # --- Stop current uvicorn -------------------------------------------------
     # Remember the OLD listener pid: if the kill fails (e.g. an elevated
     # process vs a non-elevated shell) and the same pid still answers the
@@ -210,6 +186,36 @@ try {
     }
     else {
         Write-Host 'deploy_restart: no listener on port; starting fresh.'
+    }
+
+    # --- Database migrations: Deploy only --------------------------------------
+    # Applied while the OLD runtime is stopped and the NEW one has not
+    # started: production code and schema never disagree in service. A
+    # failed migration rolls back (transactional DDL) and the Fail path
+    # leaves prod down-but-consistent for manual resolution - never
+    # half-deployed. Missed on 2026-09-05: code shipped referencing
+    # queue_entries.called_by_user_id before 0054 ran, and
+    # /registrar/queues/today 500-ed for every registrar until the
+    # migration was applied by hand.
+    if ($Deploy -and -not $SkipMigrations) {
+        Write-Host 'deploy_restart: applying database migrations (alembic upgrade head)...'
+        $alembic = Join-Path (Join-Path $backendDir '.venv\Scripts') 'alembic.exe'
+        Push-Location $backendDir
+        try {
+            # EAP=Continue around native 2>&1: alembic writes its INFO logs to
+            # stderr, and with EAP='Stop' the first one would be a terminating
+            # NativeCommandError before any migration output is visible.
+            $prevEap = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            & $alembic upgrade head 2>&1 | ForEach-Object { Write-Host "alembic: $_" }
+            $alembicExit = $LASTEXITCODE
+            $ErrorActionPreference = $prevEap
+            if ($alembicExit -ne 0) {
+                Fail 'alembic upgrade head failed - resolve manually, then re-run deploy. The runtime was not restarted.'
+            }
+        } finally {
+            Pop-Location
+        }
     }
 
     # --- Start detached uvicorn (survives the calling session) ----------------

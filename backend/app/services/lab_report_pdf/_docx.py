@@ -201,7 +201,9 @@ class DocxMixin(LabReportPDFServiceMixinBase):
             if copy_index < copy_total - 1:
                 story.append(PageBreak())
 
-        doc.build(story)
+        self._build_reportlab_doc(
+            doc, story, watermark_text=context.get("watermark_text")
+        )
         return buffer.getvalue()
 
 
@@ -297,7 +299,13 @@ class DocxMixin(LabReportPDFServiceMixinBase):
         return None
 
 
-    def _build_css(self, *, layout_preset: str, page_settings: dict[str, Any]) -> str:
+    def _build_css(
+        self,
+        *,
+        layout_preset: str,
+        page_settings: dict[str, Any],
+        watermark_text: str | None = None,
+    ) -> str:
         paper_size = page_settings.get("paper_size", "A4")
         orientation = page_settings.get("orientation", "portrait")
         page_margin = "10mm 12mm 12mm 12mm"
@@ -310,7 +318,7 @@ class DocxMixin(LabReportPDFServiceMixinBase):
             header_font = "12px"
             body_font = "10px"
 
-        return f"""
+        css = f"""
 @page {{
   size: {paper_size} {orientation};
   margin: {page_margin};
@@ -480,6 +488,28 @@ body {{
   break-after: page;
 }}
 """
+        # PR8: watermark «Черновик» для preview неутверждённых результатов.
+        # position: fixed в WeasyPrint повторяет блок на КАЖДОЙ странице,
+        # поэтому многостраничные бланки остаются помеченными целиком.
+        if watermark_text:
+            css += """
+.pdf-watermark {{
+  position: fixed;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  font-size: 92px;
+  font-weight: 700;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+  color: rgba(107, 114, 128, 0.16);
+  white-space: nowrap;
+  z-index: 9999;
+  pointer-events: none;
+  user-select: none;
+}}
+"""
+        return css
 
 
 

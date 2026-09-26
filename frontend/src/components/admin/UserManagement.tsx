@@ -103,11 +103,6 @@ const UserManagement = () => {
   { value: 'inactive', label: t('admin2.um_status_inactive_plural') }];
 
 
-  useEffect(() => {
-    loadUsers(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // PR-22: reload when filters or search change
   useEffect(() => {
     setCurrentPage(1);
@@ -486,7 +481,7 @@ const UserManagement = () => {
         variant="ghost"
         size="small"
         className="admin-w-32-h-32-p-0">
-        
+
             <MoreVertical size={16} />
           </Button>
         </div>
@@ -505,7 +500,7 @@ const UserManagement = () => {
           variant="primary"
           onClick={() => openUserDialog()}
           startIcon={<Plus size={16} />}>
-          
+
           {t('admin2.um_btn_add')}
         </Button>
       </Box>
@@ -536,7 +531,7 @@ const UserManagement = () => {
                 value={searchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchTerm(e.target.value)}
                 className="admin-pl-32-w-100pct" />
-              
+
             </div>
           </div>
 
@@ -622,7 +617,12 @@ const UserManagement = () => {
         ref={actionsMenuRef}
         role="menu"
         aria-label={t('admin2.um_actions_menu_aria')}
-        className="admin-pos-fixed-z-2000-w-208-p-6-radius-var-mac-radius-md-bd-1px-solid-var-mac-bo-bg-bg-primary-bsh-var-mac-shadow-lg-d-grid-gap-2-top-dyn-left-dyn" style={{ '--admin-top0': actionsMenuPosition.top, '--admin-left1': actionsMenuPosition.left } as CSSProperties}>
+        className="admin-pos-fixed-z-2000-w-208-p-6-radius-var-mac-radius-md-bd-1px-solid-var-mac-bo-bg-bg-primary-bsh-var-mac-shadow-lg-d-grid-gap-2-top-dyn-left-dyn" style={{
+                // CSS custom properties are rendered verbatim: a bare
+                // number is invalid for top/left, so unitize explicitly.
+                '--admin-top0': `${actionsMenuPosition.top}px`,
+                '--admin-left1': `${actionsMenuPosition.left}px`,
+              } as CSSProperties}>
 
         <Button
           type="button"
@@ -678,7 +678,7 @@ const UserManagement = () => {
               : t('admin2.um_modal_title_delete_confirm')
         }
         size="small">
-        
+
         <div className="admin-p-0-0-24px-0">
           {deleteDialogMode === 'confirm' ? (
             <Typography>

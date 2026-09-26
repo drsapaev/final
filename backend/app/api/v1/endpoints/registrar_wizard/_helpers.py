@@ -21,6 +21,9 @@ from sqlalchemy import String, literal  # noqa: F401
 from sqlalchemy.orm import Session  # noqa: F401
 
 from app.api.deps import get_db, require_roles  # noqa: F401
+from app.api.v1.endpoints.doctor_integration._helpers import (
+    DOCTOR_QUEUE_SPECIALTY_VARIANTS,
+)
 from app.crud import clinic as crud_clinic  # noqa: F401
 from app.crud import online_queue as crud_queue  # noqa: F401
 from app.crud.appointment import appointment as crud_appointment  # noqa: F401
@@ -367,6 +370,116 @@ class CartQuoteResponse(BaseModel):
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
 
+def _accepted_specialty_variants_for_department_key(
+    department_key: str | None,
+) -> set[str] | None:
+    """Набор допустимых специальностей врача для department_key услуги.
+
+    RQ-05.a: серверная сторона фильтра ``filterDoctorsForService`` (wizard
+    UI, W2-PR2). SSOT — DOCTOR_QUEUE_SPECIALTY_VARIANTS (doctor_integration):
+    фронтовая SPECIALTY_ALIASES сознательно выровнена с этой таблицей, поэтому
+    сервер зеркалирует ЕЁ семантику, а не изобретает отдельный маппинг:
+    - ключ ищется РЕВЕРСИВНО: "dental" не является ключом таблицы, но входит
+      в варианты канона "dentistry" (подстрочный матч здесь запрещён так же,
+      как на фронте — он отбрасывал валидные пары dental/dentistry);
+    - пара вне таблицы → точное совпадение (канон = сам ключ);
+    - None/пустой ключ → None (проверка специальности неприменима).
+    """
+    key = (department_key or "").strip().lower()
+    if not key:
+        return None
+    for variants in DOCTOR_QUEUE_SPECIALTY_VARIANTS.values():
+        lowered = {v.strip().lower() for v in variants}
+        if key in lowered:
+            return lowered
+    return {key}
+
+
+def _assert_cart_doctor_eligibility(db: Session, visits: list[Any]) -> None:
+    """RQ-05.a: серверная валидация допустимости врача при записи в корзину.
+
+    E-023 трассировка: requires_doctor на пути сохранения корзины не
+    проверялся НИГДЕ — визит с requires_doctor=true услугой сохранялся без
+    врача (DTO делает doctor_id опциональным «для лабораторных»), с
+    неактивным врачом, с врачом чужой специальности; несуществующий врач
+    падал 500-й по FK IntegrityError. Гейт вызывается ДО prelock
+    advisory-замков и первой записи корзины: отклонённая корзина не
+    оставляет частичного состояния и не участвует в lock-ordering.
+
+    Семантика зеркалирует фронтовый filterDoctorsForService (W2-PR2):
+    - услуга с requires_doctor=true требует doctor_id на визите;
+    - врач обязан существовать и быть активным;
+    - при наличии у услуги department_key специальность врача сверяется
+      с SSOT-таблицей вариантов; услуги без department_key специальность
+      не проверяют (существующие тесты/данные key не заполняют), а врач
+      с пустой специальностью проходит «как раньше» — фронт таких врачей
+      тоже показывает.
+    """
+    service_ids = sorted(
+        {item.service_id for visit in visits for item in visit.services}
+    )
+    if not service_ids:
+        return
+    services = db.query(Service).filter(Service.id.in_(service_ids)).all()
+    service_map = {service.id: service for service in services}
+
+    doctor_ids = sorted({visit.doctor_id for visit in visits if visit.doctor_id})
+    doctor_map: dict[int, Doctor] = {}
+    if doctor_ids:
+        doctors = db.query(Doctor).filter(Doctor.id.in_(doctor_ids)).all()
+        doctor_map = {doctor.id: doctor for doctor in doctors}
+
+    for visit in visits:
+        required = [
+            service
+            for item in visit.services
+            if (service := service_map.get(item.service_id)) is not None
+            and service.requires_doctor
+        ]
+        if not required:
+            continue
+        if not visit.doctor_id:
+            names = ", ".join(sorted({s.name for s in required}))
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Услуга ({names}) требует выбора врача: "
+                    "сохранение визита без врача недоступно"
+                ),
+            )
+        doctor = doctor_map.get(visit.doctor_id)
+        if doctor is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Врач с ID {visit.doctor_id} не найден",
+            )
+        if not doctor.active:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Выбранный врач (ID {doctor.id}) неактивен: "
+                    "выберите действующего врача"
+                ),
+            )
+        doctor_specialty = (doctor.specialty or "").strip().lower()
+        if not doctor_specialty:
+            continue
+        for service in required:
+            accepted = _accepted_specialty_variants_for_department_key(
+                service.department_key
+            )
+            if accepted is None or doctor_specialty in accepted:
+                continue
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Врач (ID {doctor.id}, специальность "
+                    f"«{doctor.specialty}») не подходит для услуги "
+                    f"«{service.name}» (отделение «{service.department_key}»)"
+                ),
+            )
+
+
 def _check_repeat_visit_eligibility(
     db: Session,
     patient_id: int,
@@ -611,143 +724,11 @@ def _build_repeat_eligibility_preview_item(
 # _calculate_visit_price() удалена - используйте billing_service.calculate_total() (SSOT)
 
 
-def _create_queue_entries(
-    db: Session, visits: list[Visit], queue_settings: dict[str, Any]
-) -> dict[int, int]:
-    """
-    Создание записей в очереди для визитов на сегодня
-    """
-    queue_numbers = {}
-    today = date.today()
-
-    for visit in visits:
-        if visit.visit_date != today:
-            continue
-
-        # Определяем все уникальные типы очередей для услуг визита
-        visit_services = (
-            db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
-        )
-        service_ids = [vs.service_id for vs in visit_services]
-        services = db.query(Service).filter(Service.id.in_(service_ids)).all()
-
-        # Собираем все уникальные queue_tag для создания отдельных очередей
-        unique_queue_tags = set()
-        for service in services:
-            if service.queue_tag:
-                unique_queue_tags.add(service.queue_tag)
-            else:
-                unique_queue_tags.add("general")  # По умолчанию
-
-        # Создаём отдельную запись в очереди для каждого типа услуг
-        visit_queue_numbers = []
-        try:
-            for queue_tag in unique_queue_tags:
-                # Определяем врача для очереди
-                doctor_id = visit.doctor_id
-
-                # QD-2C runtime switch: тег со строкой в queue_resources
-                # (сиды 0059 — lab/ecg) — докторлесс: синтетик не
-                # резолвится (doctor_id остаётся None),
-                # crud_queue.get_or_create_daily_queue ниже найдёт/создаст
-                # ресурсную очередь. Теги без строки реестра — старый путь.
-                registry_tag = (
-                    not doctor_id
-                    and resolve_tag_resource(db, queue_tag) is not None
-                )
-
-                # Для очередей без конкретного врача используем ресурс-врачей
-                if queue_tag == "ecg" and not doctor_id and not registry_tag:
-                    # Ищем ресурс-врача ЭКГ
-                    from app.models.user import User
-
-                    ecg_resource = (
-                        db.query(User)
-                        .filter(User.username == "ecg_resource", User.is_active == True)
-                        .first()
-                    )
-                    if ecg_resource:
-                        doctor_id = ecg_resource.id
-                    else:
-                        logger.warning(
-                            "ЭКГ ресурс-врач не найден для queue_tag=%s", queue_tag
-                        )
-                        continue
-
-                elif queue_tag == "lab" and not doctor_id and not registry_tag:
-                    # Ищем ресурс-врача лаборатории
-                    from app.models.user import User
-
-                    lab_resource = (
-                        db.query(User)
-                        .filter(User.username == "lab_resource", User.is_active == True)
-                        .first()
-                    )
-                    if lab_resource:
-                        # ✅ ИСПРАВЛЕНО: Находим Doctor по user_id для правильного specialist_id
-                        lab_doctor = (
-                            db.query(Doctor)
-                            .filter(Doctor.user_id == lab_resource.id)
-                            .first()
-                        )
-                        if lab_doctor:
-                            doctor_id = (
-                                lab_doctor.id
-                            )  # Используем doctor_id, а не user_id
-                            logger.info(
-                                f"Для queue_tag={queue_tag} используется ресурс-врач: lab_resource (Doctor ID: {doctor_id})"
-                            )
-                        else:
-                            logger.warning(
-                                f"У ресурс-пользователя lab_resource (User ID: {lab_resource.id}) нет записи в таблице doctors"
-                            )
-                            continue
-                    else:
-                        logger.warning(
-                            "Лаборатория ресурс-врач не найден для queue_tag=%s",
-                            queue_tag,
-                        )
-                        continue
-
-                daily_queue = crud_queue.get_or_create_daily_queue(
-                    db, today, doctor_id, queue_tag
-                )
-
-                start_number = queue_settings.get("start_numbers", {}).get(queue_tag, 1)
-                next_number = queue_service.get_next_queue_number(
-                    db,
-                    daily_queue=daily_queue,
-                    queue_tag=queue_tag,
-                    default_start=start_number,
-                )
-
-                queue_entry = queue_service.create_queue_entry(  # noqa: F841  # manual-review: variable intentionally kept for debugging/future use
-                    db,
-                    daily_queue=daily_queue,
-                    patient_id=visit.patient_id,
-                    number=next_number,
-                    source="desk",
-                )
-
-                visit_queue_numbers.append(
-                    {
-                        "queue_tag": queue_tag,
-                        "number": next_number,
-                        "queue_id": daily_queue.id,
-                    }
-                )
-
-            # Сохраняем все номера очередей для визита
-            queue_numbers[visit.id] = visit_queue_numbers
-        except Exception as e:
-            logger.warning(
-                "Could not create queue entries for visit %d: %s",
-                visit.id,
-                e,
-                exc_info=True,
-            )
-
-    return queue_numbers
+# _create_queue_entries() удалена (QD-2E / RQ-15.b): мёртвый код без
+# вызовов, нёсший удалённый словарь моста — 'general'-дефолт для
+# услуг без тега и резолв ecg_resource/lab_resource-синтетиков.
+# Живой путь создания записей — RegistrarWizardQueueAssignmentService
+# (SSOT) и create_queue_entries_batch (явный specialist_id в запросе).
 
 
 # ===================== CLICK ИНТЕГРАЦИЯ =====================

@@ -10,7 +10,12 @@ from app.api.v1.endpoints.registrar_integration._helpers import (
     _resolve_payment_truth,
 )  # noqa: F401
 from app.api.v1.endpoints.registrar_integration._queue_ops import (  # noqa: F401
+    _REGISTRAR_QUEUE_CACHE_KEY,
     _build_queue_payload,
+    _cached_service_by_id,
+    _cached_service_by_name,
+    _cached_services_for_ids,
+    _cached_visit_services,
     _detect_ecg_services,
     _ensure_specialty_queue,
     _get_visit_created_at,
@@ -18,6 +23,7 @@ from app.api.v1.endpoints.registrar_integration._queue_ops import (  # noqa: F40
     _load_queue_data_for_date,
     _normalize_department_filter,
     _parse_queue_target_date,
+    _prime_registrar_queue_read_cache,
     _process_appointment_entry,
     _process_legacy_appointments,
     _process_online_queue_entries,
@@ -44,9 +50,6 @@ def _resolve_entry_department(
     For appointment entries: uses appointment.services → Service.department_key.
     Returns (entry_department_key, entry_department).
     """
-    from app.models.service import Service
-    from app.models.visit import VisitService
-
     # [OK] ДОБАВЛЯЕМ department_key и department для фронтенда
     entry_department_key = None
     entry_department = None
@@ -55,14 +58,10 @@ def _resolve_entry_department(
         entry_department = visit_department
 
         # Для Visit получаем department_key из услуг
-        from app.models.visit import VisitService
-
-        visit_services_for_dept = (
-            db.query(VisitService).filter(VisitService.visit_id == record_id).all()
-        )
+        visit_services_for_dept = _cached_visit_services(db, record_id)
         for vs in visit_services_for_dept:
             if vs.service_id:
-                svc = db.query(Service).filter(Service.id == vs.service_id).first()
+                svc = _cached_service_by_id(db, vs.service_id)
                 if svc and svc.department_key:
                     entry_department_key = svc.department_key
                     break
@@ -80,18 +79,42 @@ def _resolve_entry_department(
                 if isinstance(service_item, dict):
                     service_id = service_item.get('id')
                     if service_id:
-                        svc = db.query(Service).filter(Service.id == service_id).first()
+                        svc = _cached_service_by_id(db, service_id)
                 elif isinstance(service_item, int):
-                    svc = db.query(Service).filter(Service.id == service_item).first()
+                    svc = _cached_service_by_id(db, service_item)
                 elif isinstance(service_item, str):
                     # [OK] ДОБАВЛЕНО: Поиск услуги по названию (Appointment.services - это JSON строк)
-                    svc = db.query(Service).filter(Service.name == service_item).first()
+                    svc = _cached_service_by_name(db, service_item)
 
                 if svc and svc.department_key:
                     entry_department_key = svc.department_key
                     break
 
     return entry_department_key, entry_department
+
+
+def _count_serializer_visible_visit_services(services: list) -> tuple[int, int]:
+    """Mirror the exact ECG/non-ECG predicates used by the row serializer."""
+    ecg_count = sum(
+        1 for service in services if getattr(service, "queue_tag", None) == "ecg"
+    )
+    non_ecg_count = sum(
+        1 for service in services if getattr(service, "queue_tag", None) != "ecg"
+    )
+    return ecg_count, non_ecg_count
+
+
+def _serializer_will_emit_visit(
+    *,
+    filter_services: bool,
+    ecg_only: bool,
+    ecg_count: int,
+    non_ecg_count: int,
+) -> bool:
+    """Mirror the current visit serializer's service-filter branch."""
+    if filter_services or ecg_only:
+        return ecg_count > 0
+    return non_ecg_count > 0
 
 
 def _process_visits_for_queues(
@@ -108,9 +131,6 @@ def _process_visits_for_queues(
     - Visits with only ECG go to echokg.
     - Other visits go to specialty from service.department_key or visit.department.
     """
-    from app.models.service import Service
-    from app.models.visit import VisitService
-
     for visit in visits:
         # Пропускаем если уже обработан
         if visit.id in seen_visit_ids:
@@ -133,22 +153,18 @@ def _process_visits_for_queues(
 
         # [OK] Определяем specialty на основе услуг визита, а не только department
         # Проверяем услуги визита для правильного определения очереди
-        from app.models.service import Service
-        from app.models.visit import VisitService
-
-        visit_services = (
-            db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
-        )
+        visit_services = _cached_visit_services(db, visit.id)
         service_ids = [vs.service_id for vs in visit_services]
-        services = (
-            db.query(Service).filter(Service.id.in_(service_ids)).all()
-            if service_ids
-            else []
-        )
+        services = _cached_services_for_ids(db, service_ids)
 
-        # R-22: ECG detection extracted to helper
+        # R-22: ECG detection extracted to helper. Queue routing keeps the
+        # compatibility detector, while page eligibility must mirror the
+        # serializer's exact queue_tag checks to keep total/offset truthful.
         has_ecg, ecg_services_count, non_ecg_services_count = _detect_ecg_services(
             services
+        )
+        page_ecg_services_count, page_non_ecg_services_count = (
+            _count_serializer_visible_visit_services(services)
         )
 
         # Только ЭКГ: если есть ЭКГ услуги и нет не-ЭКГ услуг
@@ -190,6 +206,12 @@ def _process_visits_for_queues(
                     "queue_time": visit_queue_time,  # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
                     "filter_services": True,  # Флаг для фильтрации услуг при обработке
                     "ecg_only": True,  # Только ЭКГ услуги для этой записи
+                    "_page_serializable": _serializer_will_emit_visit(
+                        filter_services=True,
+                        ecg_only=True,
+                        ecg_count=page_ecg_services_count,
+                        non_ecg_count=page_non_ecg_services_count,
+                    ),
                 }
             )
 
@@ -212,6 +234,12 @@ def _process_visits_for_queues(
                     "queue_time": visit_queue_time,  # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
                     "filter_services": True,  # Флаг для фильтрации услуг при обработке
                     "ecg_only": False,  # Исключаем ЭКГ услуги
+                    "_page_serializable": _serializer_will_emit_visit(
+                        filter_services=True,
+                        ecg_only=False,
+                        ecg_count=page_ecg_services_count,
+                        non_ecg_count=page_non_ecg_services_count,
+                    ),
                 }
             )
             # D-2 (Codex round-1 P2): both split-visit buckets contain this
@@ -248,6 +276,12 @@ def _process_visits_for_queues(
                     "queue_time": visit_queue_time,  # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
                     "filter_services": True,  # [OK] ИСПРАВЛЕНО: Включаем фильтрацию услуг
                     "ecg_only": True,  # [OK] ИСПРАВЛЕНО: Показываем только ЭКГ услуги
+                    "_page_serializable": _serializer_will_emit_visit(
+                        filter_services=True,
+                        ecg_only=True,
+                        ecg_count=page_ecg_services_count,
+                        non_ecg_count=page_non_ecg_services_count,
+                    ),
                 }
             )
             # D-2 (Codex round-1 P2): ECG-only visits return here — register
@@ -306,6 +340,12 @@ def _process_visits_for_queues(
                 "data": visit,
                 "created_at": visit_created_at,
                 "queue_time": visit_queue_time,
+                "_page_serializable": _serializer_will_emit_visit(
+                    filter_services=False,
+                    ecg_only=False,
+                    ecg_count=page_ecg_services_count,
+                    non_ecg_count=page_non_ecg_services_count,
+                ),
             }
         )
 
@@ -384,6 +424,11 @@ def _build_queue_result(
     result = []
     queue_number = 1
     seen_entry_keys = set()
+    user_role = str(getattr(current_user, "role", "")).strip().lower()
+    can_include_patient_gender = user_role in {"admin", "registrar"}
+    cached_patients = getattr(db, "info", {}).get(_REGISTRAR_QUEUE_CACHE_KEY, {}).get(
+        "patients", {}
+    )
     latest_lab_reports_by_visit, include_lab_report_summary = (
         _collect_lab_report_summaries(
             db=db,
@@ -541,7 +586,7 @@ def _build_queue_result(
                     patient_id=patient_id,
                     appointment_date=appointment_date,
                     doctor_id=doctor_id,
-                    idx=idx,
+                    idx=entry_wrapper.get("_page_original_idx", idx),
                 )
             )
 
@@ -597,48 +642,52 @@ def _build_queue_result(
             )
             # R-22 Phase 4: entry serialization extracted to helper
             # (can_* flags are computed inside _serialize_queue_entry)
-            entries.append(
-                _serialize_queue_entry(
-                    entry_type=entry_type,
-                    record_id=record_id,
-                    source=source,
-                    appointment_id_value=appointment_id_value,
-                    entry_visit_id=entry_visit_id,
-                    queue_entry_number=queue_entry_number,
-                    patient_id=patient_id,
-                    patient_name=patient_name,
-                    patient_birth_year=patient_birth_year,
-                    phone=phone,
-                    address=address,
-                    services=services,
-                    service_codes=service_codes,
-                    service_details=service_details,
-                    entry_wrapper=entry_wrapper,
-                    total_cost=total_cost,
-                    payment_status=payment_status,
-                    payment_type=payment_type,
-                    available_actions=available_actions,
-                    canonical_status=canonical_status,
-                    entry_queue_time=entry_queue_time,
-                    entry_updated_at=entry_updated_at,
-                    entry_display_time_kind=entry_display_time_kind,
-                    visit_time=visit_time,
-                    discount_mode=discount_mode,
-                    entry_data=entry_data,
-                    latest_lab_report=latest_lab_report,
-                    entry_department_key=entry_department_key,
-                    entry_department=entry_department,
-                    # W2-PR2: канонический день строки read-модели — день,
-                    # для которого построен лист (target_date запроса).
-                    record_date=today,
-                )
+            serialized_entry = _serialize_queue_entry(
+                entry_type=entry_type,
+                record_id=record_id,
+                source=source,
+                appointment_id_value=appointment_id_value,
+                entry_visit_id=entry_visit_id,
+                queue_entry_number=queue_entry_number,
+                patient_id=patient_id,
+                patient_name=patient_name,
+                patient_birth_year=patient_birth_year,
+                phone=phone,
+                address=address,
+                services=services,
+                service_codes=service_codes,
+                service_details=service_details,
+                entry_wrapper=entry_wrapper,
+                total_cost=total_cost,
+                payment_status=payment_status,
+                payment_type=payment_type,
+                available_actions=available_actions,
+                canonical_status=canonical_status,
+                entry_queue_time=entry_queue_time,
+                entry_updated_at=entry_updated_at,
+                entry_display_time_kind=entry_display_time_kind,
+                visit_time=visit_time,
+                discount_mode=discount_mode,
+                entry_data=entry_data,
+                latest_lab_report=latest_lab_report,
+                entry_department_key=entry_department_key,
+                entry_department=entry_department,
+                # W2-PR2: канонический день строки read-модели — день,
+                # для которого построен лист (target_date запроса).
+                record_date=today,
             )
+            if can_include_patient_gender:
+                patient = cached_patients.get(patient_id)
+                serialized_entry["patient_gender"] = (
+                    patient.sex if patient is not None else None
+                )
+            entries.append(serialized_entry)
 
         # R-22 Phase 4: queue payload construction extracted to helper
         queue_data = _build_queue_payload(
             queue_data=queue_data,
             specialty=specialty,
-            queue_number=queue_number,
+            queue_number=queue_data.get("_page_queue_number", queue_number),
             entries=entries,
         )
 
@@ -646,6 +695,216 @@ def _build_queue_result(
         queue_number += 1
 
     return result
+
+
+def _build_queue_result_page(
+    db: Session,
+    current_user,
+    queues_by_specialty: dict,
+    department_filter,
+    today,
+    *,
+    limit: int,
+    offset: int,
+) -> tuple[list, int]:
+    """Build one queue page after canonical ordering and global dedup.
+
+    Candidate selection intentionally mirrors ``_build_queue_result``:
+    specialty insertion order, per-specialty queue-time ordering, then one
+    global ``type + id`` dedup set.  Only the selected wrappers are passed to
+    the existing serializer, which keeps report/patient/service/metadata and
+    payment enrichment proportional to the requested page size.
+    """
+    from datetime import datetime
+
+    seen_entry_keys = set()
+    candidates = []
+    queue_number = 1
+
+    for specialty, queue_data in queues_by_specialty.items():
+        specialty_key = str(specialty or "").strip().lower()
+        if department_filter and specialty_key not in department_filter:
+            continue
+
+        entries_list = queue_data.get("entries", [])
+        if not entries_list:
+            continue
+
+        entries_list.sort(
+            key=lambda entry: (
+                entry.get("queue_time")
+                or entry.get("created_at")
+                or datetime.max,
+                (
+                    entry.get("data").id
+                    if hasattr(entry.get("data"), "id")
+                    else 0
+                ),
+            )
+        )
+
+        for idx, entry in enumerate(entries_list):
+            entry_type = entry.get("type")
+            entry_data = entry.get("data")
+            entry_id_val = getattr(entry_data, "id", "")
+            entry_key = f"{entry_type}_{entry_id_val}"
+            if entry_key in seen_entry_keys:
+                logger.debug(
+                    "get_today_queues: Пропущен дубликат: %s (тип: %s)",
+                    entry_key,
+                    entry_type,
+                )
+                continue
+
+            seen_entry_keys.add(entry_key)
+            # Preserve the canonical serializer's skip behavior before the
+            # page boundary. Visit service visibility is already known while
+            # grouping the day; the other processors only skip missing data.
+            if entry_data is None or entry.get("_page_serializable") is False:
+                continue
+            candidates.append((specialty, queue_data, queue_number, idx, entry))
+
+        # Preserve the canonical outer queue number even when this bucket's
+        # candidates are outside the requested page (or all deduplicated).
+        queue_number += 1
+
+    total = len(candidates)
+    selected_candidates = candidates[offset : offset + limit]
+    selected_queues: dict = {}
+
+    for specialty, queue_data, original_queue_number, original_idx, entry in (
+        selected_candidates
+    ):
+        selected_queue = selected_queues.get(specialty)
+        if selected_queue is None:
+            selected_queue = {
+                **queue_data,
+                "entries": [],
+                "_page_queue_number": original_queue_number,
+            }
+            selected_queues[specialty] = selected_queue
+
+        selected_queue["entries"].append(
+            {
+                **entry,
+                "_page_original_idx": original_idx,
+            }
+        )
+
+    result = _build_queue_result(
+        db=db,
+        current_user=current_user,
+        queues_by_specialty=selected_queues,
+        department_filter=department_filter,
+        today=today,
+    )
+    return result, total
+
+
+def _get_today_queues_payload(
+    *,
+    target_date: str | None,
+    department: str | None,
+    db: Session,
+    current_user,
+    limit: int | None = None,
+    offset: int = 0,
+) -> dict[str, Any]:
+    """Shared registrar payload builder with an optional internal row window."""
+    cache_missing = object()
+    previous_cache = db.info.get(_REGISTRAR_QUEUE_CACHE_KEY, cache_missing)
+    try:
+        today = _parse_queue_target_date(target_date, db)
+        department_filter = _normalize_department_filter(department)
+
+        visits, appointments, online_entries = _load_queue_data_for_date(db, today)
+        db.info[_REGISTRAR_QUEUE_CACHE_KEY] = _prime_registrar_queue_read_cache(
+            db, today, visits, appointments, online_entries
+        )
+
+        queues_by_specialty = {}
+        seen_visit_ids = set()
+        seen_appointment_ids = set()
+        _process_visits_for_queues(
+            db=db,
+            visits=visits,
+            today=today,
+            queues_by_specialty=queues_by_specialty,
+            seen_visit_ids=seen_visit_ids,
+        )
+        _process_online_queue_entries(
+            db, online_entries, visits, queues_by_specialty, seen_visit_ids
+        )
+        _process_legacy_appointments(
+            db, appointments, queues_by_specialty, seen_appointment_ids, today
+        )
+
+        total_entries = None
+        if limit is None:
+            result = _build_queue_result(
+                db=db,
+                current_user=current_user,
+                queues_by_specialty=queues_by_specialty,
+                department_filter=department_filter,
+                today=today,
+            )
+        else:
+            result, total_entries = _build_queue_result_page(
+                db=db,
+                current_user=current_user,
+                queues_by_specialty=queues_by_specialty,
+                department_filter=department_filter,
+                today=today,
+                limit=limit,
+                offset=offset,
+            )
+
+        payload = {
+            "queues": result,
+            "total_queues": len(result),
+            "date": today.isoformat(),
+            "timezone": "Asia/Tashkent",
+        }
+        if total_entries is not None:
+            payload["total_entries"] = total_entries
+        return payload
+    except Exception as e:
+        logger.error(
+            "get_today_queues: КРИТИЧЕСКАЯ ОШИБКА: %s: %s",
+            type(e).__name__,
+            e,
+            exc_info=True,
+        )
+        logger.exception("Registrar operation failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Внутренняя ошибка сервера. Подробности в журнале.",
+        )
+    finally:
+        if previous_cache is cache_missing:
+            db.info.pop(_REGISTRAR_QUEUE_CACHE_KEY, None)
+        else:
+            db.info[_REGISTRAR_QUEUE_CACHE_KEY] = previous_cache
+
+
+def get_today_queues_page(
+    *,
+    target_date: str | None,
+    department: str | None,
+    limit: int,
+    offset: int,
+    db: Session,
+    current_user,
+) -> dict[str, Any]:
+    """Internal bounded variant used by read-model facades such as Lab."""
+    return _get_today_queues_payload(
+        target_date=target_date,
+        department=department,
+        db=db,
+        current_user=current_user,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/registrar/queues/today", response_model=dict[str, Any])
@@ -681,71 +940,12 @@ def get_today_queues(
     - target_date: дата в формате YYYY-MM-DD (опционально, по умолчанию - сегодня)
     - department: фильтр по отделению (опционально)
     """
-    try:
-
-        # R-22 Phase 5: _same_patient_queue_entry_for_visit_id and _same_patient_queue_entry_for_visit
-        # promoted to module-level helpers (take db as first parameter).
-
-        # R-22: date parsing + department filter extracted to helpers
-        today = _parse_queue_target_date(target_date, db)
-        department_filter = _normalize_department_filter(department)
-
-        # R-22: data loading extracted to helper
-        visits, appointments, online_entries = _load_queue_data_for_date(db, today)
-
-        # Группируем записи по специальности
-        queues_by_specialty = {}
-        seen_visit_ids = set()  # Для отслеживания уже обработанных Visit
-        seen_appointment_ids = set()  # Для отслеживания уже обработанных Appointment
-        # Обрабатываем Visit (новая система)
-        # Process Visit records into queues_by_specialty
-        _process_visits_for_queues(
-            db=db,
-            visits=visits,
-            today=today,
-            queues_by_specialty=queues_by_specialty,
-            seen_visit_ids=seen_visit_ids,
-        )
-
-        # R-22 Phase 3: online entries processing extracted to helper
-        _process_online_queue_entries(
-            db, online_entries, visits, queues_by_specialty, seen_visit_ids
-        )
-
-        # R-22 Phase 3: appointment processing extracted to helper
-        _process_legacy_appointments(
-            db, appointments, queues_by_specialty, seen_appointment_ids, today
-        )
-
-        # Формируем результат
-        # Build the final result from queues_by_specialty
-        result = _build_queue_result(
-            db=db,
-            current_user=current_user,
-            queues_by_specialty=queues_by_specialty,
-            department_filter=department_filter,
-            today=today,
-        )
-
-        return {
-            "queues": result,
-            "total_queues": len(result),
-            "date": today.isoformat(),
-            "timezone": "Asia/Tashkent",
-        }
-
-    except Exception as e:
-        logger.error(
-            "get_today_queues: КРИТИЧЕСКАЯ ОШИБКА: %s: %s",
-            type(e).__name__,
-            e,
-            exc_info=True,
-        )
-        logger.exception("Registrar operation failed")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Внутренняя ошибка сервера. Подробности в журнале.",
-        )
+    return _get_today_queues_payload(
+        target_date=target_date,
+        department=department,
+        db=db,
+        current_user=current_user,
+    )
 
 
 # ===================== КАЛЕНДАРЬ ЗАПИСЕЙ =====================

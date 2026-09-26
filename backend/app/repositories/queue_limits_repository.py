@@ -8,6 +8,7 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.core.specialties import specialty_variants
+from app.crud.queue_resource_routing import effective_day_start_number
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
@@ -82,11 +83,15 @@ class QueueLimitsRepository:
     ) -> DailyQueue:
         queue = self.get_daily_queue(day=day, specialist_id=specialist_id)
         if not queue:
+            doctor = self.db.get(Doctor, specialist_id)
             queue = DailyQueue(
                 day=day,
                 specialist_id=specialist_id,
                 active=True,
                 max_online_entries=max_online_entries,
+                start_number=effective_day_start_number(
+                    self.db, doctor=doctor, queue_tag=None
+                ),
             )
             self.db.add(queue)
         return queue

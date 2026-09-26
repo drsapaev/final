@@ -673,3 +673,227 @@
   clip: rect(0, 0, 0, 0);
   border: 0;
 }
+
+/* ─── RQ-10 (S-08): partial QR join result — failed directions + honest hints ─── */
+.qj-failed-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--mac-error, red);
+  margin: 0 auto 20px;
+}
+
+.qj-success-footer {
+  font-size: var(--mac-font-size-sm, 13px);
+  color: var(--mac-text-tertiary, gray);
+  margin-bottom: var(--mac-spacing-6, 24px);
+  line-height: 1.5;
+}
+
+.qj-failed-box {
+  width: 100%;
+  margin-top: var(--mac-spacing-3, 12px);
+  margin-bottom: var(--mac-spacing-6, 24px);
+  padding: var(--mac-spacing-4, 16px);
+  background: color-mix(in srgb, var(--mac-warning, orange), transparent 92%);
+  border: 1px solid color-mix(in srgb, var(--mac-warning, orange), transparent 60%);
+  border-radius: var(--mac-radius-lg, 12px);
+  text-align: left;
+}
+
+.qj-failed-title {
+  font-size: var(--mac-font-size-sm, 13px);
+  font-weight: var(--mac-font-weight-semibold, 600);
+  color: var(--mac-text-primary, black);
+  margin-bottom: var(--mac-spacing-2, 8px);
+}
+
+.qj-failed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2, 8px);
+}
+
+.qj-failed-item {
+  background: color-mix(in srgb, var(--mac-warning, orange), transparent 84%);
+  border-radius: var(--mac-radius-md, 10px);
+  padding: var(--mac-spacing-2, 8px) var(--mac-spacing-3, 12px);
+}
+
+.qj-failed-direction {
+  font-size: var(--mac-font-size-sm, 13px);
+  font-weight: var(--mac-font-weight-semibold, 600);
+  color: var(--mac-text-primary, black);
+}
+
+.qj-failed-reason {
+  font-size: var(--mac-font-size-xs, 11px);
+  color: var(--mac-text-secondary, darkgray);
+  margin-top: var(--mac-spacing-1, 4px);
+}
+
+.qj-error-hint,
+.qj-error-advisory {
+  color: var(--mac-text-secondary, darkgray);
+  font-size: var(--mac-font-size-sm, 13px);
+  margin-top: var(--mac-spacing-2, 8px);
+  text-align: left;
+}
+
+/* RQ-18 follow-up round-2 (P1): explicit draft-owner confirmation on the
+   shared permanent route — the prompt reveals no PHI (no name/phone in
+   the text), tokens only (UI ratchet). */
+.qj-draft-confirm {
+  background: color-mix(in srgb, var(--mac-bg-secondary, white) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mac-text-tertiary, darkgray) 38%, transparent);
+  border-radius: var(--mac-radius-lg, 12px);
+  padding: var(--mac-spacing-3, 12px) var(--mac-spacing-4, 16px);
+  margin-bottom: var(--mac-spacing-4, 16px);
+  text-align: left;
+}
+
+.qj-draft-confirm-text {
+  margin: 0 0 var(--mac-spacing-3, 12px);
+  font-size: var(--mac-font-size-sm, 13px);
+  color: var(--mac-text-primary, black);
+  line-height: 1.45;
+}
+
+.qj-draft-confirm-actions {
+  display: flex;
+  gap: var(--mac-spacing-3, 12px);
+}
+
+.qj-draft-btn {
+  flex: 1;
+  padding: 10px 14px;
+  border: none;
+  border-radius: var(--mac-radius-md, 10px);
+  font-size: var(--mac-font-size-sm, 13px);
+  font-weight: var(--mac-font-weight-semibold, 600);
+  cursor: pointer;
+}
+
+.qj-draft-btn-primary {
+  /* Round-8 (Regression Audit Gate): the fallback chain carries NO raw
+     hex (cssHexOutsideTokens ratchet: a fallback #hex here moved it
+     743 -> 744 and turned the gate red) and NO bare var()
+     (varUsagesNoFallback ratchet) — accent-blue falls back to the
+     accent-strong TOKEN, then to the CSS system keyword currentcolor.
+     Both tokens ship from design-system/tokens.css; the last link never
+     fires in a normal build. */
+  background: var(--mac-accent-blue, var(--mac-accent-blue-strong, currentcolor));
+  color: var(--mac-text-on-accent, white);
+}
+
+.qj-draft-btn-secondary {
+  background: color-mix(in srgb, var(--mac-text-tertiary, darkgray) 16%, transparent);
+  color: var(--mac-text-primary, black);
+}
+
+/* RQ-18 follow-up round-4 (P1-1): the draft ownership challenge. */
+.qj-draft-challenge-error {
+  margin: var(--mac-spacing-2, 8px) 0 0;
+  font-size: var(--mac-font-size-xs, 11px);
+  color: var(--mac-error, red);
+  line-height: 1.4;
+}
+
+/* RQ-18 follow-up round-4 (P1-2): the reconcile panel — the previous
+   attempt's outcome is unknown; the mount never mints a new session. */
+.qj-reconcile {
+  background: color-mix(in srgb, var(--mac-warning, orange) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mac-warning, orange) 42%, transparent);
+  border-radius: var(--mac-radius-lg, 12px);
+  padding: var(--mac-spacing-3, 12px) var(--mac-spacing-4, 16px);
+  margin-bottom: var(--mac-spacing-4, 16px);
+  text-align: left;
+}
+
+.qj-reconcile-text {
+  margin: 0 0 var(--mac-spacing-2, 8px);
+  font-size: var(--mac-font-size-sm, 13px);
+  font-weight: var(--mac-font-weight-semibold, 600);
+  color: var(--mac-text-primary, black);
+  line-height: 1.45;
+}
+
+.qj-reconcile-hint {
+  margin: 0 0 var(--mac-spacing-3, 12px);
+  font-size: var(--mac-font-size-xs, 11px);
+  color: var(--mac-text-secondary, darkgray);
+  line-height: 1.45;
+}
+
+/* Round-10 (review P1): the ownerless-multiple-attempt ambiguity panel —
+   the outstanding attempts are listed for the explicit per-attempt check.
+   Ratchet-safe property chain (see .qj-draft-btn-primary): every var()
+   carries a fallback — NO bare var() (varUsagesNoFallback ratchet) and
+   NO raw hex (cssHexOutsideTokens ratchet); the terminal links are CSS
+   keywords / plain lengths. */
+.qj-ambiguity-list {
+  list-style: none;
+  margin: 0 0 var(--mac-spacing-2, 8px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2, 8px);
+}
+
+.qj-ambiguity-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mac-spacing-3, 12px);
+}
+
+.qj-ambiguity-item-label {
+  color: var(--mac-text-secondary, darkgray);
+  font-size: var(--mac-font-size-xs, 11px);
+}
+
+.qj-ambiguity-item-checked {
+  color: var(--mac-text-tertiary, darkgray);
+  font-size: var(--mac-font-size-xs, 11px);
+  white-space: nowrap;
+}
+
+/* Round-11 (review P1-2): the proven ``pending_unbound`` candidate —
+   the read-only probe verdict plus its explicit per-attempt discard. */
+.qj-ambiguity-item-unbound {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-2, 8px);
+}
+
+.qj-reconcile-actions {
+  display: flex;
+  gap: var(--mac-spacing-3, 12px);
+}
+
+/* RQ-18 follow-up round-4 (P2-1): the confirmed pre-execution refusal
+   recovery block inside the form error area. */
+.qj-preexec-recovery {
+  margin-top: var(--mac-spacing-3, 12px);
+  padding-top: var(--mac-spacing-3, 12px);
+  border-top: 1px solid color-mix(in srgb, var(--mac-error, red) 32%, transparent);
+}
+
+.qj-preexec-recovery .qj-error-advisory {
+  margin-bottom: var(--mac-spacing-3, 12px);
+}
+
+/* Round-4 (P1-1): the ownership-challenge input (ratchet: no inline styles). */
+.qj-draft-challenge-input {
+  width: 100%;
+  padding: var(--mac-spacing-3, 12px) var(--mac-spacing-4, 16px);
+  border: 1px solid color-mix(in srgb, var(--mac-text-secondary, darkgray) 24%, transparent);
+  border-radius: var(--mac-radius-lg, 12px);
+  font-size: var(--mac-font-size-xl, 18px);
+  letter-spacing: 0.2em;
+  background: var(--mac-bg-secondary, white);
+  color: var(--mac-text-primary, black);
+  outline: none;
+}

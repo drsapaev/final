@@ -43,6 +43,7 @@ def get_visits(
     try:
         from app.models.appointment import Appointment
         from app.models.clinic import Doctor
+        from app.models.department import Department
         from app.models.patient import Patient
         from app.models.service import Service
         from app.models.visit import Visit, VisitService
@@ -63,8 +64,13 @@ def get_visits(
                     Appointment.doctor_id == doctor_id
                 )
             if department:
+                # Round-6 (owner P1, PR #3340): `department` is the ORM
+                # RELATIONSHIP — comparing it to the string parameter raised
+                # ArgumentError and the broad except dropped the ENTIRE
+                # appointments block. Same repair as the round-5 canonical
+                # list: filter through the relationship predicate.
                 appointments_query = appointments_query.filter(
-                    Appointment.department == department
+                    Appointment.department.has(Department.key == department)
                 )
             if date_from:
                 try:
@@ -117,7 +123,17 @@ def get_visits(
                         doctor_id=appointment.doctor_id,
                         doctor_name=None,
                         doctor_specialty=None,
-                        department=appointment.department,
+                        # Round-6 (owner P1): unified department contract —
+                        # the legacy field maps the RELATIONSHIP to its
+                        # canonical key (a Department object here failed
+                        # response validation and the broad except silently
+                        # dropped the whole appointments block, hiding
+                        # portal-created bookings from the working registrar
+                        # read-model).
+                        department=appointment.department_key,
+                        department_id=appointment.department_id,
+                        department_key=appointment.department_key,
+                        department_name=appointment.department_name,
                         visit_date=appointment.appointment_date,
                         visit_time=appointment.appointment_time,
                         status=appointment.status,
@@ -211,7 +227,14 @@ def get_visits(
                     doctor_id=visit.doctor_id,
                     doctor_name=doctor_name,
                     doctor_specialty=doctor_specialty,
+                    # Round-6 (owner P1): Visit.department IS a plain string
+                    # column — it maps to the key field honestly; the display
+                    # label is not resolvable without a Department row lookup
+                    # and stays None for visit-sourced rows.
                     department=visit.department,
+                    department_id=visit.department_id,
+                    department_key=visit.department,
+                    department_name=None,
                     visit_date=visit.visit_date,
                     visit_time=visit.visit_time,
                     status=visit.status,
@@ -389,7 +412,15 @@ def _serialize_appointments_for_listing(
                 'patient_id': apt.patient_id,
                 'patient_fio': patient_fio,
                 'doctor_id': apt.doctor_id,
-                'department': apt.department,
+                # Round-6 (owner P1): `apt.department` is the ORM RELATIONSHIP
+                # — for the first portal-created row (non-NULL department_id)
+                # the dict carried a Department OBJECT and response encoding
+                # broke. Unified contract: legacy field = canonical key,
+                # plus the typed id/key/name triple.
+                'department': apt.department_key,
+                'department_id': apt.department_id,
+                'department_key': apt.department_key,
+                'department_name': apt.department_name,
                 'appointment_date': apt.appointment_date,
                 'appointment_time': apt.appointment_time,
                 'status': _preserve_operational_status_on_payment(apt.status),
@@ -582,7 +613,12 @@ def _serialize_visits_for_listing(
                 'patient_id': visit.patient_id,
                 'patient_fio': patient_fio,
                 'doctor_id': visit.doctor_id,
+                # Round-6 (owner P1): Visit.department is a plain string
+                # column — mapped to the key field; no label resolution.
                 'department': visit.department,
+                'department_id': visit.department_id,
+                'department_key': visit.department,
+                'department_name': None,
                 'appointment_date': visit.visit_date,
                 'appointment_time': visit.visit_time,
                 'status': _preserve_operational_status_on_payment(visit.status),

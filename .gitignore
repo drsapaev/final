@@ -186,3 +186,9 @@ _wt*/
 /_*.patch
 /_*.py
 /_*.sql
+
+# Session scratch: mutation-testing sandbox (not repo code, not for commit)
+backend/mutants_sim/
+
+# Session scratch: staging evidence JSON snapshots not merged into evidence/
+evidence/stage_e_inventory_20260912.json

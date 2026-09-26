@@ -1,0 +1,69 @@
+name: Build isolated staging frontend artifact
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Public, send-only frontend DSN; events use the staging environment.
+      STAGING_FRONTEND_SENTRY_DSN: https://57fde20209e223ec5a4a96e3a5a59fa2@o4511673323749376.ingest.us.sentry.io/4511673366282240
+    steps:
+      - name: Check out the dispatched commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify source revision
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
+
+      - name: Build the checked-in staging image
+        run: |
+          set -euo pipefail
+          docker build \
+            --file frontend/Dockerfile.staging \
+            --build-arg VITE_API_BASE=/api/v1 \
+            --build-arg VITE_API_URL=http://127.0.0.1:18082 \
+            --build-arg VITE_API_BASE_URL=http://127.0.0.1:18082 \
+            --build-arg VITE_WS_URL=ws://127.0.0.1:18082 \
+            --build-arg VITE_WS_HOST=127.0.0.1:18082 \
+            --build-arg "VITE_SENTRY_DSN=$STAGING_FRONTEND_SENTRY_DSN" \
+            --build-arg VITE_SENTRY_ENV=staging \
+            --tag "clinic-staging-frontend:$GITHUB_SHA" \
+            frontend
+
+      - name: Export static files with source and checksums
+        run: |
+          set -euo pipefail
+          container_id="$(docker create "clinic-staging-frontend:$GITHUB_SHA")"
+          trap 'docker rm "$container_id" >/dev/null' EXIT
+          mkdir -p artifact
+          docker cp "$container_id:/usr/share/nginx/html/." artifact/
+          rm -f artifact/50x.html  # stock nginx page, not part of Vite dist
+          test -s artifact/index.html
+          grep -R -F -q "$STAGING_FRONTEND_SENTRY_DSN" artifact/assets
+          printf '%s\n' "$GITHUB_SHA" > artifact/source.sha
+          (
+            cd artifact
+            find . -type f ! -path './SHA256SUMS' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+            sha256sum --check --status SHA256SUMS
+          )
+
+      - name: Upload isolated staging frontend artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: clinic-staging-frontend-${{ github.sha }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 3

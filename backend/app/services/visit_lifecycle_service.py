@@ -55,6 +55,7 @@ What this service does NOT own
 - ❌ Laboratory state → ``lab_reporting/``
 - ❌ Telegram integration → ``telegram_staff_action_adapter_service.py``
 """
+
 from __future__ import annotations
 
 import logging
@@ -108,10 +109,7 @@ class VisitLifecycleService:
             VisitNotFoundError: if the visit does not exist.
         """
         visit = (
-            self.db.query(Visit)
-            .filter(Visit.id == visit_id)
-            .with_for_update()
-            .first()
+            self.db.query(Visit).filter(Visit.id == visit_id).with_for_update().first()
         )
         if not visit:
             raise VisitNotFoundError(f"Visit {visit_id} not found")
@@ -130,6 +128,7 @@ class VisitLifecycleService:
         set_started_at: bool = True,
         set_finished_at: bool = True,
         commit: bool = True,
+        completion_specialty: str | None = None,
     ) -> Visit:
         """Transition a visit to a new status via the state machine.
 
@@ -145,6 +144,8 @@ class VisitLifecycleService:
                 transitioning to ``in_progress``.
             set_finished_at: If True, set ``visit.finished_at = now()`` when
                 transitioning to ``closed``, ``canceled``, or ``expired``.
+            completion_specialty: Optional queue-owned specialty context used
+                when a queue visit has incomplete specialty metadata.
             commit: If True (default), commit the transaction before
                 returning. If False, the caller is responsible for
                 committing — the mutation is staged but NOT persisted.
@@ -206,7 +207,6 @@ class VisitLifecycleService:
                 .scalar()
             )
             if pre_claimed is not None:
-
                 from app.tasks.lease import LEASE_TTL, REMINDER_IN_PROGRESS_DETAIL
 
                 if pre_claimed.tzinfo is None:
@@ -237,7 +237,6 @@ class VisitLifecycleService:
         if visit.status == "pending_confirmation" and hasattr(
             Visit, "reminder_claimed_at"
         ):
-
             from app.tasks.lease import LEASE_TTL, REMINDER_IN_PROGRESS_DETAIL
 
             claimed = visit.reminder_claimed_at
@@ -269,8 +268,7 @@ class VisitLifecycleService:
             # Reason is AUDIT DATA — stored in visit.notes (DB) below.
             # WARNING level auto-captured as Sentry breadcrumb → PII risk.
             logger.warning(
-                "visit.force_transition visit_id=%s current=%s target=%s "
-                "user_id=%s",
+                "visit.force_transition visit_id=%s current=%s target=%s user_id=%s",
                 visit_id,
                 visit.status,
                 target_status,
@@ -288,7 +286,9 @@ class VisitLifecycleService:
                 )
             # Clear finished_at when force-reopening a terminal status,
             # so duration metrics are not corrupted by the gap.
-            if visit.status in ("closed", "canceled", "expired") and hasattr(visit, "finished_at"):
+            if visit.status in ("closed", "canceled", "expired") and hasattr(
+                visit, "finished_at"
+            ):
                 visit.finished_at = None
         else:
             allowed, reason_code = is_valid_visit_transition(
@@ -317,12 +317,34 @@ class VisitLifecycleService:
                     },
                 )
 
+        # Completion policy lives at the lifecycle boundary so registrar,
+        # doctor queue, GraphQL, and batch callers cannot bypass the EMR
+        # requirement by choosing a different API surface. Queue callers may
+        # supply the specialty they are completing for when the Visit itself
+        # has incomplete specialty metadata.
+        if target_status == "completed" and visit.status != "completed":
+            from app.services.emr_completion_policy import require_saved_emr_for_visit
+
+            require_saved_emr_for_visit(
+                self.db,
+                visit,
+                specialty_override=completion_specialty,
+            )
+
         visit.status = target_status
 
         # Set timestamps based on the target status.
-        if target_status == "in_progress" and set_started_at and hasattr(visit, "started_at"):
+        if (
+            target_status == "in_progress"
+            and set_started_at
+            and hasattr(visit, "started_at")
+        ):
             visit.started_at = datetime.now(UTC)
-        if target_status in ("closed", "canceled", "expired") and set_finished_at and hasattr(visit, "finished_at"):
+        if (
+            target_status in ("closed", "canceled", "expired")
+            and set_finished_at
+            and hasattr(visit, "finished_at")
+        ):
             visit.finished_at = datetime.now(UTC)
 
         # Commit boundary: only commit if the caller did not request
@@ -368,6 +390,7 @@ class VisitLifecycleService:
         *,
         from_status: tuple[str, ...] | None = None,
         commit: bool = True,
+        completion_specialty: str | None = None,
     ) -> Visit:
         """Mark a visit as completed (doctor finished clinical work).
 
@@ -380,6 +403,8 @@ class VisitLifecycleService:
                 that want to restrict completion to specific starting
                 states (e.g. only ``in_progress`` → ``completed``).
             commit: See ``transition_status()`` docstring. Default True.
+            completion_specialty: Optional queue-owned specialty context used
+                when a queue visit has incomplete specialty metadata.
         """
         visit = self._load_visit_for_update(visit_id)
 
@@ -401,6 +426,7 @@ class VisitLifecycleService:
             target_status="completed",
             current_user=current_user,
             commit=commit,
+            completion_specialty=completion_specialty,
         )
 
     def cancel_visit(
@@ -520,7 +546,6 @@ class VisitLifecycleService:
                 .scalar()
             )
             if pre_claimed is not None:
-
                 from app.tasks.lease import LEASE_TTL, REMINDER_IN_PROGRESS_DETAIL
 
                 if pre_claimed.tzinfo is None:
@@ -543,7 +568,6 @@ class VisitLifecycleService:
         if visit.status == "pending_confirmation" and hasattr(
             Visit, "reminder_claimed_at"
         ):
-
             from app.tasks.lease import LEASE_TTL, REMINDER_IN_PROGRESS_DETAIL
 
             claimed = visit.reminder_claimed_at

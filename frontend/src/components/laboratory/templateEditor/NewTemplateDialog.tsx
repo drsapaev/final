@@ -55,14 +55,14 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (codeConflict) {
+    if (saving || codeConflict) {
       return; // L-L-1 fix: блокируем отправку если code уже существует
     }
     onCreate(form);
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={saving ? () => {} : onClose} maxWidth="sm" fullWidth>
       <DialogTitle>{t('misc.ntd_novyy_shablon')}</DialogTitle>
       <DialogContent>
         <form onSubmit={handleSubmit} id="new-template-form" className="ltw-form-grid">
@@ -76,6 +76,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm((prev) => ({ ...prev, code: e.target.value }))}
               placeholder={t('misc.ntd_napr_hematology_basic')}
               className="ltw-input-full"
+              disabled={saving}
               required
             />
             {/* L-L-1 fix: inline-валидация уникальности code */}
@@ -96,6 +97,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm((prev) => ({ ...prev, name: e.target.value }))}
               placeholder={t('misc.ntd_napr_obschiy_analiz_krovi')}
               className="ltw-input-full"
+              disabled={saving}
               required
             />
           </div>
@@ -107,6 +109,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
               value={form.family}
               onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm((prev) => ({ ...prev, family: e.target.value }))}
               className="macos-input ltw-input-full"
+              disabled={saving}
             >
               <option value="hematology">{t('misc.ntd_gematologiya')}</option>
               <option value="biochemistry">{t('misc.ntd_biohimiya')}</option>
@@ -128,12 +131,13 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
               placeholder={t('misc.ntd_kratkoe_opisanie_shablona')}
               minRows={3}
               className="ltw-input-full"
+              disabled={saving}
             />
           </div>
         </form>
       </DialogContent>
       <DialogActions>
-        <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button variant="outline" onClick={onClose} disabled={saving}>{t('common.cancel')}</Button>
         <Button
           variant="primary"
           type="submit"

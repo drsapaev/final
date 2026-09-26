@@ -53,6 +53,13 @@ export interface CartService {
   service_code?: string;
   code?: string;
   is_consultation?: boolean;
+  // RQ-05.b: поля из DTO каталога (GET /registrar/services), по которым
+  // рисуется селектор врача: флаг обязательности и профиль отделения.
+  requires_doctor?: boolean;
+  department_key?: string;
+  // RQ-08.a: серверные допустимые специальности врача (null — не применимо);
+  // приоритетный путь фильтра врача, UI не зависит от alias-таблицы.
+  accepted_specialties?: string[] | null;
   price?: number;
   duration?: number;
   [key: string]: unknown;
@@ -256,7 +263,9 @@ const CartStepV2 = ({
 
   const normalizedDoctorsData = useMemo(() => {
     if (Array.isArray(doctorsData)) {
-      return doctorsData.filter(Boolean);
+      return doctorsData.filter((doctor): doctor is CartDoctor =>
+        Boolean(doctor && typeof doctor === 'object' && !Array.isArray(doctor) && doctor.id != null)
+      );
     }
 
     if (!doctorsData || typeof doctorsData !== 'object') {
@@ -265,7 +274,9 @@ const CartStepV2 = ({
 
     return Object.values(doctorsData)
       .flatMap((value) => (Array.isArray(value) ? value : [value]))
-      .filter(Boolean);
+      .filter((doctor): doctor is CartDoctor =>
+        Boolean(doctor && typeof doctor === 'object' && !Array.isArray(doctor) && doctor.id != null)
+      );
   }, [doctorsData]);
 
   const consultationRows = useMemo(() =>
@@ -286,16 +297,25 @@ const CartStepV2 = ({
   filter((r): r is NonNullable<typeof r> => r !== null),
   [cart?.items, servicesData, normalizedDoctorsData, getServiceName, repeatEligibilityByItemId]);
 
-  const getDoctorDisplayName = useCallback((doctor: Record<string, unknown>) => {
+  const getDoctorDisplayName = useCallback((doctor: CartDoctor) => {
     if (!doctor) return '';
     return (
       (doctor.user as Record<string, unknown>)?.full_name ||
       (doctor.user as Record<string, unknown>)?.username ||
       doctor.full_name ||
       doctor.name ||
-      t('misc.csv_vrach_doctor_id', { id: doctor.id })
+      t('misc.aw_doctor_hash', { id: doctor.id })
     );
-  }, []);
+  }, [t]);
+
+  const getDoctorOptionLabel = useCallback((doctor: CartDoctor) => {
+    const parts = [String(getDoctorDisplayName(doctor))];
+    if (doctor.specialty) parts.push(String(doctor.specialty));
+    if (doctor.cabinet != null && String(doctor.cabinet).trim()) {
+      parts.push(String(t('misc.aw_doctor_cabinet', { cabinet: doctor.cabinet })));
+    }
+    return parts.filter(Boolean).join(' · ');
+  }, [getDoctorDisplayName, t]);
 
   return (
     // UX Audit R-3.3: main container inline style → .cart-step-v2 class
@@ -497,11 +517,12 @@ const CartStepV2 = ({
             const service = servicesData?.find((s) => s.id === item.service_id);
             const requiresDoctor = Boolean(service?.requires_doctor || service?.is_consultation);
 
-            // PR-23 P0 #1 / W2-PR2: фильтр врачей по specialty/department_key —
-            // SSOT-хелпер без fallback «показать всех» (пустой список — валидный
-            // ответ: ADR-001, владелец очереди = выбранный врач).
-            const serviceDepartmentKey = String(service?.department_key || '').toLowerCase().trim();
-            const filteredDoctors = filterDoctorsForService(normalizedDoctorsData, serviceDepartmentKey);
+            // PR-23 P0 #1 / W2-PR2 / RQ-08.a: фильтр врачей по серверной
+            // eligibility — запись каталога несёт accepted_specialties (тот же
+            // код, что серверный гейт RQ-05.a); fallback на alias-таблицу —
+            // только при отсутствии серверных данных. Пустой список — валидный
+            // ответ: ADR-001, владелец очереди = выбранный врач.
+            const filteredDoctors = filterDoctorsForService(normalizedDoctorsData, service);
             const doctorOptions = filteredDoctors;
 
             return (
@@ -584,7 +605,7 @@ const CartStepV2 = ({
                         <option value="">{t('misc.csv_vyberite_vracha')}</option>
                         {doctorOptions.map((doctor, index) =>
                     <option key={`${doctor.id ?? 'doctor'}-${doctor.specialty ?? ''}-${index}`} value={doctor.id}>
-                            {String(getDoctorDisplayName(doctor))}{doctor.specialty ? ` · ${doctor.specialty}` : t('misc.csv_doctor_cabinet_kab_doctor_ca')}
+                            {getDoctorOptionLabel(doctor)}
                           </option>)}
                       </select>
                       {filteredDoctors.length === 0 && normalizedDoctorsData.length > 0 && (
