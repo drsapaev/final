@@ -38,7 +38,9 @@ def _make_actor(
     suffix = secrets.token_hex(6)
     user = User(
         username=f"dental_media_{suffix}",
-        email=f"dental_media_{suffix}@example.test",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all.
+        email=None,
         full_name="Synthetic Dental Clinician",
         hashed_password=get_password_hash("not-a-real-user-password"),
         role=role,
@@ -403,3 +405,631 @@ def test_dental_media_view_rejects_storage_paths_outside_configured_root(
     )
     assert response.status_code == 404
     assert response.content != b"synthetic outside file"
+
+
+# ---------------------------------------------------------------------------
+# PR #3439 corrective follow-up regression block (P1-1 / P1-2 / P2 verdict).
+# ---------------------------------------------------------------------------
+
+
+def _make_bare_user(
+    db_session: Session,
+    *,
+    role: str = "dentist",
+    is_superuser: bool = False,
+) -> User:
+    """A clinician-role user WITHOUT any Doctor profile (legacy-fallback world)."""
+    suffix = secrets.token_hex(6)
+    user = User(
+        username=f"dental_bare_{suffix}",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all.
+        email=None,
+        full_name="Synthetic Bare Clinician",
+        hashed_password=get_password_hash("not-a-real-user-password"),
+        role=role,
+        is_active=True,
+        is_superuser=is_superuser,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+def _make_colliding_victim_doctor(
+    db_session: Session, *, doctor_id: int
+) -> tuple[User, Doctor]:
+    """Victim clinician whose Doctor.id equals an unrelated User.id."""
+    suffix = secrets.token_hex(6)
+    victim_user = User(
+        username=f"dental_victim_{suffix}",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all.
+        email=None,
+        full_name="Synthetic Victim Dentist",
+        hashed_password=get_password_hash("not-a-real-user-password"),
+        role="dentist",
+        is_active=True,
+        is_superuser=False,
+    )
+    db_session.add(victim_user)
+    db_session.flush()
+    victim_doctor = Doctor(
+        id=doctor_id,
+        user_id=victim_user.id,
+        specialty="dentistry",
+        active=True,
+        cabinet="406",
+    )
+    db_session.add(victim_doctor)
+    db_session.commit()
+    db_session.refresh(victim_user)
+    db_session.refresh(victim_doctor)
+    return victim_user, victim_doctor
+
+
+def test_legacy_user_id_fallback_cannot_open_foreign_dental_archive(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """P1-1: Visit.doctor_id stores Doctor.id, never User.id — the legacy
+    `visit.doctor_id == user.id` fallback must not authorize a dentist whose
+    bare User.id collides with another clinician's Doctor.id."""
+    attacker = _make_bare_user(db_session, role="dentist")
+    attacker_id = attacker.id
+    db_session.expunge(attacker)
+
+    victim_user, victim_doctor = _make_colliding_victim_doctor(
+        db_session, doctor_id=attacker_id
+    )
+    victim_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=victim_doctor.id
+    )
+    upload = _upload(
+        client,
+        headers=_headers(victim_user),
+        patient_id=test_patient.id,
+        visit_id=victim_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+    media_id = upload.json()["id"]
+
+    list_response = client.get(
+        "/api/v1/dental/media",
+        params={"patient_id": test_patient.id, "visit_id": victim_visit.id},
+        headers=_headers(attacker),
+    )
+    assert list_response.status_code == 404, list_response.text
+
+    content_response = client.get(
+        f"/api/v1/dental/media/{media_id}/content",
+        params={"visit_id": victim_visit.id},
+        headers=_headers(attacker),
+    )
+    assert content_response.status_code == 404, content_response.text
+
+    edit_response = client.patch(
+        f"/api/v1/dental/media/{media_id}",
+        json={"title": "attacker rename"},
+        headers=_headers(attacker),
+    )
+    assert edit_response.status_code == 403, edit_response.text
+
+    delete_response = client.delete(
+        f"/api/v1/dental/media/{media_id}",
+        headers=_headers(attacker),
+    )
+    assert delete_response.status_code == 403, delete_response.text
+
+    # The legitimate treating clinician keeps full access.
+    victim_list = client.get(
+        "/api/v1/dental/media",
+        params={"patient_id": test_patient.id, "visit_id": victim_visit.id},
+        headers=_headers(victim_user),
+    )
+    assert victim_list.status_code == 200, victim_list.text
+    assert {item["id"] for item in victim_list.json()["items"]} == {media_id}
+
+
+def test_generic_file_surface_fail_closed_for_dental_media(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """P1-2: a dental-media tagged file must be unreachable through the
+    generic /files surface — including for its own generic-surface owner —
+    and must remain reachable through the dental surface. The owner uses the
+    canonical "Doctor" role spelling (explicitly allowed by #3439): that is
+    exactly the identity the generic endpoints' role gates let through."""
+    owner, owner_doctor = _make_actor(db_session, role="Doctor")
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+    upload = _upload(
+        client,
+        headers=_headers(owner),
+        patient_id=test_patient.id,
+        visit_id=owner_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+    media_id = upload.json()["id"]
+
+    outsider, _outsider_doctor = _make_actor(db_session)
+
+    generic_get = client.get(f"/api/v1/files/{media_id}", headers=_headers(owner))
+    assert generic_get.status_code == 403, generic_get.text
+
+    generic_download = client.get(
+        f"/api/v1/files/{media_id}/download", headers=_headers(owner)
+    )
+    assert generic_download.status_code == 403, generic_download.text
+
+    generic_preview = client.get(
+        f"/api/v1/files/{media_id}/preview", headers=_headers(owner)
+    )
+    assert generic_preview.status_code == 403, generic_preview.text
+
+    generic_shares = client.get(
+        f"/api/v1/files/{media_id}/shares", headers=_headers(owner)
+    )
+    assert generic_shares.status_code == 403, generic_shares.text
+
+    generic_share = client.post(
+        f"/api/v1/files/{media_id}/share",
+        json={
+            "shared_with_user_id": outsider.id,
+            "permission": "private",
+        },
+        headers=_headers(owner),
+    )
+    assert generic_share.status_code == 403, generic_share.text
+
+    generic_update = client.put(
+        f"/api/v1/files/{media_id}",
+        data={"title": "generic rename"},
+        headers=_headers(owner),
+    )
+    assert generic_update.status_code == 403, generic_update.text
+
+    generic_replace = client.put(
+        f"/api/v1/files/{media_id}/content",
+        files={
+            "file": (
+                "replacement.jpg",
+                BytesIO(b"\xff\xd8\xffreplacement image"),
+                "image/jpeg",
+            )
+        },
+        headers=_headers(owner),
+    )
+    assert generic_replace.status_code == 403, generic_replace.text
+
+    generic_delete = client.delete(
+        f"/api/v1/files/{media_id}", headers=_headers(owner)
+    )
+    assert generic_delete.status_code == 403, generic_delete.text
+
+    generic_export = client.post(
+        "/api/v1/files/export",
+        json={"file_ids": [media_id], "format": "zip"},
+        headers=_headers(owner),
+    )
+    assert generic_export.status_code == 403, generic_export.text
+
+    # A share-based stranger cannot reach the file through the generic surface.
+    stranger_get = client.get(f"/api/v1/files/{media_id}", headers=_headers(outsider))
+    assert stranger_get.status_code in {403, 404}, stranger_get.text
+
+    # The dental surface keeps serving and editing the same record.
+    dental_content = client.get(
+        f"/api/v1/dental/media/{media_id}/content",
+        params={"visit_id": owner_visit.id},
+        headers=_headers(owner),
+    )
+    assert dental_content.status_code == 200, dental_content.text
+    assert dental_content.content == b"\xff\xd8\xffsynthetic dental image"
+
+    dental_edit = client.patch(
+        f"/api/v1/dental/media/{media_id}",
+        json={"title": "dental surface rename"},
+        headers=_headers(owner),
+    )
+    assert dental_edit.status_code == 200, dental_edit.text
+
+    dental_delete = client.delete(
+        f"/api/v1/dental/media/{media_id}", headers=_headers(owner)
+    )
+    assert dental_delete.status_code == 200, dental_delete.text
+
+    db_session.expire_all()
+    deleted_row = db_session.query(File).filter(File.id == media_id).one()
+    assert deleted_row.status == FileStatus.DELETED
+
+
+def test_dentistry_role_spelling_reaches_specialty_check(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """P2: doctor-family spellings from the IAM SSOT must not be rejected by
+    the local hardcode before the dental specialty check."""
+    clinician = _make_bare_user(db_session, role="dentistry")
+    suffix = secrets.token_hex(6)
+    doctor = Doctor(
+        user_id=clinician.id,
+        specialty="dentistry",
+        active=True,
+        cabinet=f"4{secrets.randbelow(90) + 10}",
+    )
+    db_session.add(doctor)
+    db_session.commit()
+    db_session.refresh(doctor)
+    visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=doctor.id
+    )
+
+    response = client.get(
+        "/api/v1/dental/media",
+        params={"patient_id": test_patient.id, "visit_id": visit.id},
+        headers=_headers(clinician),
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_superadmin_role_passes_admin_gate_on_dental_visit(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """P2: a superuser whose role string is the canonical SuperAdmin must not
+    fall through the literal Admin check into a 403 on a dental visit."""
+    suffix = secrets.token_hex(6)
+    superadmin = User(
+        username=f"dental_superadmin_{suffix}",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all.
+        email=None,
+        full_name="Synthetic Super Admin",
+        hashed_password=get_password_hash("not-a-real-user-password"),
+        role="SuperAdmin",
+        is_active=True,
+        is_superuser=True,
+    )
+    db_session.add(superadmin)
+    db_session.commit()
+    db_session.refresh(superadmin)
+
+    owner, owner_doctor = _make_actor(db_session)
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+
+    response = client.get(
+        "/api/v1/dental/media",
+        params={"patient_id": test_patient.id, "visit_id": owner_visit.id},
+        headers=_headers(superadmin),
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_generic_list_and_search_exclude_protected_dental_media(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """Owner verdict on a7ec002e (P1): the generic reader surfaces —
+    GET /files/ (list) and POST /files/search — must exclude protected-domain
+    rows at the query level (before pagination/count/facets), the same way the
+    item-level surfaces fail closed via ensure_generic_surface_allowed().
+    A dental-media tagged file must not be listed or searchable by its own
+    generic-surface owner, while ordinary files of the same owner stay
+    visible (the exclusion must not over-filter)."""
+    owner, owner_doctor = _make_actor(db_session, role="Doctor")
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+
+    upload = _upload(
+        client,
+        headers=_headers(owner),
+        patient_id=test_patient.id,
+        visit_id=owner_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+    media_id = upload.json()["id"]
+
+    control = client.post(
+        "/api/v1/files/upload",
+        files={
+            "file": (
+                "control-note.txt",
+                BytesIO(b"plain control document"),
+                "text/plain",
+            )
+        },
+        data={"file_type": "document", "title": "control document"},
+        headers=_headers(owner),
+    )
+    assert control.status_code in (200, 201), control.text
+    control_id = control.json()["id"]
+
+    # LIST surface: the protected row must not appear (owner scope).
+    listing = client.get("/api/v1/files/", headers=_headers(owner))
+    assert listing.status_code == 200, listing.text
+    listed_ids = {f["id"] for f in listing.json()["files"]}
+    assert media_id not in listed_ids, (
+        "protected dental media leaked through generic list"
+    )
+    assert control_id in listed_ids, "control file must stay listed"
+
+    # SEARCH surface (owner scope => strict equality is meaningful).
+    search = client.post("/api/v1/files/search", json={}, headers=_headers(owner))
+    assert search.status_code == 200, search.text
+    searched_ids = {f["id"] for f in search.json()["files"]}
+    assert media_id not in searched_ids, (
+        "protected dental media leaked through generic search"
+    )
+    assert control_id in searched_ids, "control file must stay searchable"
+
+    # An admin reader must not pull the protected row through search either.
+    admin, _admin_doctor = _make_actor(db_session, role="Admin")
+    admin_search = client.post(
+        "/api/v1/files/search", json={}, headers=_headers(admin)
+    )
+    assert admin_search.status_code == 200, admin_search.text
+    admin_ids = {f["id"] for f in admin_search.json()["files"]}
+    assert media_id not in admin_ids, (
+        "protected dental media leaked through admin generic search"
+    )
+
+
+def test_search_facets_scoped_to_base_query_not_whole_table(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """Owner verdict on e7fe45cac (P2): /files/search facets (file_types,
+    permissions) must aggregate over the SAME base query as total/page —
+    non-admin owner scope, requested search filters and the protected-domain
+    exclusion — not over the whole files table. Separate unscoped aggregate
+    queries leak global metadata (counts of foreign and protected rows) to
+    readers whose files[] payload is correctly scoped."""
+    owner, owner_doctor = _make_actor(db_session, role="Doctor")
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+
+    # Protected dental media owned by the reader: image/xray + private.
+    upload = _upload(
+        client,
+        headers=_headers(owner),
+        patient_id=test_patient.id,
+        visit_id=owner_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+
+    control = client.post(
+        "/api/v1/files/upload",
+        files={
+            "file": (
+                "scoped-note.txt",
+                BytesIO(b"scoped control document"),
+                "text/plain",
+            )
+        },
+        data={"file_type": "document", "title": "scoped control"},
+        headers=_headers(owner),
+    )
+    assert control.status_code in (200, 201), control.text
+    control_id = control.json()["id"]
+
+    # Foreign ordinary image of a file_type the owner does not have: its
+    # type/permission aggregates must not surface in the owner's facets.
+    foreign, _foreign_doctor = _make_actor(db_session, role="Doctor")
+    foreign_file = client.post(
+        "/api/v1/files/upload",
+        files={
+            "file": (
+                "foreign-scan.png",
+                BytesIO(b"\x89PNG\r\n\x1a\n synthetic foreign scan"),
+                "image/png",
+            )
+        },
+        data={"file_type": "image", "title": "foreign image"},
+        headers=_headers(foreign),
+    )
+    assert foreign_file.status_code in (200, 201), foreign_file.text
+
+    search = client.post("/api/v1/files/search", json={}, headers=_headers(owner))
+    assert search.status_code == 200, search.text
+    body = search.json()
+    assert body["total"] == 1, "owner scope: only the control document"
+    assert {f["id"] for f in body["files"]} == {control_id}
+
+    # Facets must mirror the scoped result set: no "image" from the foreign
+    # file, no image/xray from the protected dental row, single "private".
+    file_types = {
+        row["file_type"]: row["count"] for row in body["facets"]["file_types"]
+    }
+    assert file_types == {"document": 1}, file_types
+    permissions = {
+        row["permission"]: row["count"] for row in body["facets"]["permissions"]
+    }
+    assert permissions == {"private": 1}, permissions
+
+
+def test_generic_surfaces_classify_tags_by_exact_token_not_substring(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """Owner verdict on e7fe45cac (P2): the protected-tag exclusion on the
+    generic list/search must be an exact-tag check, not a substring (LIKE)
+    check. A generic file whose ordinary user tag merely CONTAINS a protected
+    tag as a substring (e.g. "dental-media:v1-backup") must stay visible on
+    GET /files/ and POST /files/search and readable via GET /files/{file_id} —
+    the query-level classification must agree with the item-level
+    protected_domain_tag() classification (one classification per file)."""
+    owner, _owner_doctor = _make_actor(db_session, role="Doctor")
+
+    lookalike = client.post(
+        "/api/v1/files/upload",
+        files={
+            "file": (
+                "backup-notes.txt",
+                BytesIO(b"ordinary backup document"),
+                "text/plain",
+            )
+        },
+        data={
+            "file_type": "document",
+            "title": "backup notes",
+            "tags": "dental-media:v1-backup, year-2026",
+        },
+        headers=_headers(owner),
+    )
+    assert lookalike.status_code in (200, 201), lookalike.text
+    lookalike_id = lookalike.json()["id"]
+
+    listing = client.get("/api/v1/files/", headers=_headers(owner))
+    assert listing.status_code == 200, listing.text
+    listed_ids = {f["id"] for f in listing.json()["files"]}
+    assert lookalike_id in listed_ids, (
+        "substring exclusion misclassified a lookalike user tag as protected"
+    )
+
+    search = client.post("/api/v1/files/search", json={}, headers=_headers(owner))
+    assert search.status_code == 200, search.text
+    searched_ids = {f["id"] for f in search.json()["files"]}
+    assert lookalike_id in searched_ids, (
+        "substring exclusion misclassified a lookalike user tag as protected"
+    )
+
+    fetched = client.get(f"/api/v1/files/{lookalike_id}", headers=_headers(owner))
+    assert fetched.status_code == 200, fetched.text
+
+
+def test_file_statistics_respect_protected_domain_boundary(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """Owner verdict on f0667b9b5 (P2): /files/statistics must mirror the same
+    protected-domain boundary as list/search. Protected dental rows must not
+    be counted in total_files/total_size/files_by_type/files_by_permission
+    nor surface in recent_uploads (FileOut carries file_path/file_hash and
+    patient/visit ids). recent_uploads must also be serialized through
+    FileOut.from_orm() — raw ORM rows fail FileStats response validation
+    (FileOut.tags expects list[str] while the column stores a JSON string),
+    so a tagged generic file in the window would 500 the whole endpoint."""
+    owner, owner_doctor = _make_actor(db_session, role="Doctor")
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+
+    upload = _upload(
+        client,
+        headers=_headers(owner),
+        patient_id=test_patient.id,
+        visit_id=owner_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+    media_id = upload.json()["id"]
+
+    # A generic file WITH tags: exercises the from_orm() serialization path
+    # (pre-fix this row alone would 500 the statistics response validation).
+    tagged = client.post(
+        "/api/v1/files/upload",
+        files={
+            "file": (
+                "tagged-note.txt",
+                BytesIO(b"tagged ordinary document"),
+                "text/plain",
+            )
+        },
+        data={"file_type": "document", "tags": "dental-media:v1-backup, keep"},
+        headers=_headers(owner),
+    )
+    assert tagged.status_code in (200, 201), tagged.text
+    tagged_id = tagged.json()["id"]
+
+    stats = client.get("/api/v1/files/statistics", headers=_headers(owner))
+    assert stats.status_code == 200, stats.text
+    body = stats.json()
+
+    # Aggregates mirror the scoped generic surface: the protected dental row
+    # (image/xray + private) is invisible to statistics.
+    assert body["total_files"] == 1, body["total_files"]
+    assert dict(body["files_by_type"]) == {"document": 1}, body["files_by_type"]
+    assert dict(body["files_by_permission"]) == {"private": 1}, (
+        body["files_by_permission"]
+    )
+    assert body["total_size"] > 0
+
+    recent_ids = [f["id"] for f in body["recent_uploads"]]
+    assert recent_ids == [tagged_id], recent_ids
+    assert media_id not in recent_ids, (
+        "protected dental media leaked through statistics recent_uploads"
+    )
+    # Serialized rows must be FileOut-shaped (tags parsed from JSON), not raw
+    # ORM fields — a JSON string here would mean the from_orm path was skipped.
+    assert all(
+        isinstance(f.get("tags"), list) or f.get("tags") is None
+        for f in body["recent_uploads"]
+    ), [f.get("tags") for f in body["recent_uploads"]]
+
+
+def test_superadmin_can_delete_dental_media_without_ownership(
+    client: TestClient,
+    db_session: Session,
+    test_patient: Patient,
+    dental_storage,
+):
+    """Owner verdict on a7ec002e (P2): a SuperAdmin passes the dental editor
+    gate via the IAM SSOT (is_admin_role), so the service-level
+    owner-or-Admin check (literal role == "Admin" in _is_admin) must not fall
+    through to a 404 for a non-owning SuperAdmin deleting a dental media
+    record."""
+    owner, owner_doctor = _make_actor(db_session)
+    owner_visit = _make_visit(
+        db_session, patient_id=test_patient.id, doctor_id=owner_doctor.id
+    )
+    upload = _upload(
+        client,
+        headers=_headers(owner),
+        patient_id=test_patient.id,
+        visit_id=owner_visit.id,
+    )
+    assert upload.status_code == 201, upload.text
+    media_id = upload.json()["id"]
+
+    suffix = secrets.token_hex(6)
+    superadmin = User(
+        username=f"dental_superadmin_del_{suffix}",
+        # AGENTS.md PII rules: email must never appear in plaintext in
+        # committed test fixtures — synthetic users carry no email at all.
+        email=None,
+        full_name="Synthetic Super Admin Deleter",
+        hashed_password=get_password_hash("not-a-real-user-password"),
+        role="SuperAdmin",
+        is_active=True,
+        is_superuser=True,
+    )
+    db_session.add(superadmin)
+    db_session.commit()
+    db_session.refresh(superadmin)
+
+    response = client.delete(
+        f"/api/v1/dental/media/{media_id}", headers=_headers(superadmin)
+    )
+    assert response.status_code == 200, response.text

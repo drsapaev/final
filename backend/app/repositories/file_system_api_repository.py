@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.crud.file_system import file_tags_exclusion_predicate
 from app.models.file_system import FileStatus
 
 
@@ -36,6 +38,7 @@ class FileSystemApiRepository:
         emr_id: int | None,
         emr_record_id: int | None,
         folder_id: int | None,
+        exclude_tags: Sequence[str] | None = None,
     ) -> int:
         query = self.db.query(file_model).filter(file_model.status != FileStatus.DELETED)
 
@@ -56,5 +59,14 @@ class FileSystemApiRepository:
             query = query.filter(file_model.emr_record_id == emr_record_id)
         if folder_id:
             query = query.filter(file_model.folder_id == folder_id)
+        # Protected-domain boundary: the count must mirror the list query —
+        # tagged clinical rows are excluded BEFORE count so total/pages stay
+        # consistent with the generic-surface boundary. Exact-token predicate
+        # (shared with crud list/search — одна классификация файла на всех
+        # поверхностях): см. file_tags_exclusion_predicate().
+        if exclude_tags:
+            query = query.filter(
+                file_tags_exclusion_predicate(file_model, exclude_tags)
+            )
 
         return query.count()
