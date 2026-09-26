@@ -54,6 +54,20 @@ const fireWindowFocus = () => {
   });
 };
 
+// RQ-27.b (S-28): network restoration and the panel manual-refresh button
+// both run the same throttled silent revalidation.
+const fireOnline = () => {
+  act(() => {
+    window.dispatchEvent(new Event('online'));
+  });
+};
+
+const fireSessionRefresh = () => {
+  act(() => {
+    window.dispatchEvent(new CustomEvent('registrar:session-refresh'));
+  });
+};
+
 describe('Tabs — RQ-27.a silent revalidation on return to the session', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -130,5 +144,103 @@ describe('Tabs — RQ-27.a silent revalidation on return to the session', () => 
       await new Promise((resolve) => setTimeout(resolve, 25));
     });
     expect(profilesCallCount()).toBe(1);
+  });
+
+  // ── RQ-27.b: integration of a NEW direction + understandable disable ──
+
+  it('picks up a NEW direction created in another session on revalidation', async () => {
+    const onProfilesLoaded = vi.fn();
+    const { container } = render(<Tabs onProfilesLoaded={onProfilesLoaded} />);
+    await waitFor(() => {
+      expect(profilesCallCount()).toBe(1);
+    });
+    expect(container.querySelectorAll('.tab-button.department')).toHaveLength(2);
+    expect(onProfilesLoaded).toHaveBeenLastCalledWith(expect.objectContaining({ length: 2 }));
+
+    // An administrator created a third profile in ANOTHER session: the
+    // silent revalidation integrates it as a new tab without any reload.
+    const THREE_PROFILES = {
+      data: {
+        success: true,
+        source: 'database',
+        profiles: [
+          ...PROFILES_RESPONSE.data.profiles,
+          { key: 'derma', title: 'Derma SYNTHETIC', title_ru: 'Дерма SYNTHETIC', queue_tags: ['derma'], icon: 'UserCheck', color: 'var(--mac-warning)' },
+        ],
+      },
+    };
+    vi.mocked(api.get).mockResolvedValue(THREE_PROFILES);
+    fireVisibilityChange();
+
+    await waitFor(() => {
+      expect(container.querySelectorAll('.tab-button.department')).toHaveLength(3);
+    });
+    expect(container.querySelector('[data-tab="derma"]')).not.toBeNull();
+    expect(onProfilesLoaded).toHaveBeenLastCalledWith(expect.objectContaining({ length: 3 }));
+  });
+
+  it('falls back to all departments when the ACTIVE tab is disabled in another session', async () => {
+    const onTabChange = vi.fn();
+    const { container } = render(<Tabs activeTab="cardio" onTabChange={onTabChange} />);
+    await waitFor(() => {
+      expect(profilesCallCount()).toBe(1);
+    });
+    expect(container.querySelector('[data-tab="cardio"]')).not.toBeNull();
+
+    // The active profile was disabled in ANOTHER session: the revalidation
+    // must not leave the registrar silently sitting on a stale empty filter —
+    // the understandable outcome is the all-departments view.
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        success: true,
+        source: 'database',
+        profiles: [PROFILES_RESPONSE.data.profiles[1]], // only 'lab' remains
+      },
+    });
+    fireVisibilityChange();
+
+    await waitFor(() => {
+      expect(onTabChange).toHaveBeenCalledWith(null);
+    });
+    expect(container.querySelector('[data-tab="cardio"]')).toBeNull();
+  });
+
+  it('never deselects the active tab on a FAILED revalidation', async () => {
+    const onTabChange = vi.fn();
+    render(<Tabs activeTab="cardio" onTabChange={onTabChange} />);
+    await waitFor(() => {
+      expect(profilesCallCount()).toBe(1);
+    });
+
+    vi.mocked(api.get).mockRejectedValue(new Error('offline during revalidation'));
+    fireVisibilityChange();
+
+    await waitFor(() => {
+      expect(profilesCallCount()).toBe(2);
+    });
+    // Success-path-only reset: a failed refresh (fallback set) must not
+    // deselect the user's tab.
+    expect(onTabChange).not.toHaveBeenCalled();
+  });
+
+  it('revalidates on online and manual session-refresh events with one throttle budget', async () => {
+    render(<Tabs />);
+    await waitFor(() => {
+      expect(profilesCallCount()).toBe(1);
+    });
+
+    fireOnline();
+    await waitFor(() => {
+      expect(profilesCallCount()).toBe(2);
+    });
+
+    // online + session-refresh + focus within the throttle window = one refresh
+    fireOnline();
+    fireSessionRefresh();
+    fireWindowFocus();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+    expect(profilesCallCount()).toBe(2);
   });
 });

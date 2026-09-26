@@ -100,6 +100,15 @@ const Tabs = ({
   // prefix for the aria-describedby targets — document-unique even with
   // multiple Tabs mounts (e.g. CSSTestPage).
   const uid = useId();
+  // RQ-27.b: the vanished-active-tab fallback below reads the LATEST
+  // activeTab/onTabChange through refs so loadQueueProfiles keeps a stable
+  // identity (adding activeTab to its deps would refetch profiles on every
+  // tab switch — S-28 extra-requests budget) while still observing the
+  // current selection state.
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const onTabChangeRef = useRef(onTabChange);
+  onTabChangeRef.current = onTabChange;
 
   // ⭐ SSOT: Загрузка профилей очередей (вкладок) из БД через API
   // Tabs определяются в backend, frontend только отображает
@@ -131,6 +140,18 @@ const Tabs = ({
 
       logger.info(`✅ SSOT: Loaded ${profilesData.length} queue profiles from API (source: ${response.data.source})`);
       setTabs(profilesData);
+
+      // RQ-27.b (S-28 disable row): the active direction may have been
+      // disabled/removed in ANOTHER session. Falling back to the
+      // all-departments view is the understandable outcome — the alternative
+      // is silently sitting on a filter whose profile no longer exists.
+      // Success path ONLY: a failed refresh (fallback set below) must never
+      // deselect the user's tab. Refs keep loadQueueProfiles identity stable.
+      const currentActive = activeTabRef.current;
+      if (currentActive && !profilesData.some((profile) => profile.key === currentActive)) {
+        logger.info(`Tabs: RQ-27.b active tab "${currentActive}" vanished from profiles — resetting to all departments`);
+        onTabChangeRef.current?.(null);
+      }
 
       // ⭐ SSOT: Notify parent component about loaded profiles for filtering
       if (onProfilesLoaded) {
@@ -219,6 +240,10 @@ const Tabs = ({
     // throttle collapses the focus+visibilitychange burst into one refresh
     // (extra-requests budget per ACCEPTANCE S-28). loadQueueProfiles already
     // replaces state only on success, so a failed refresh keeps current tabs.
+    // RQ-27.b (S-28 reconnect + manual refresh): the browser `online` event
+    // covers a network drop/restoration cycle that never lost focus, and the
+    // panel manual-refresh button dispatches `registrar:session-refresh` —
+    // both run the SAME throttled silent revalidation below.
     let lastFocusRefreshAt = 0;
     const FOCUS_REFRESH_MIN_INTERVAL_MS = 5000;
     const refreshIfDue = () => {
@@ -234,12 +259,16 @@ const Tabs = ({
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', refreshIfDue);
+    window.addEventListener('online', refreshIfDue);
+    window.addEventListener('registrar:session-refresh', refreshIfDue);
 
     return () => {
       window.removeEventListener('queue-profiles:updated', handleProfilesUpdate);
       window.removeEventListener('departments:updated', handleProfilesUpdate);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', refreshIfDue);
+      window.removeEventListener('online', refreshIfDue);
+      window.removeEventListener('registrar:session-refresh', refreshIfDue);
     };
   }, [loadQueueProfiles]);
 

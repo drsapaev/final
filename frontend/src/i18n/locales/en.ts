@@ -10485,6 +10485,7 @@ const en = {
     data_source_api: 'Data loaded from server',
     ds_error_message: 'Failed to load records. Check server connection.',
     ds_retry: 'Retry',
+    ds_refresh: 'Refresh session data',
     rp_worklist_stale_warning: 'Showing previously loaded data — the last refresh failed',
     rp_worklist_no_matches: 'No matches for the current search',
 

@@ -57,6 +57,23 @@ const fireWindowFocus = () => {
   });
 };
 
+// RQ-27.b (S-28 reconnect row): network restoration while the session never
+// lost focus/visibility (kiosk-like registrar workstation).
+const fireOnline = () => {
+  act(() => {
+    window.dispatchEvent(new Event('online'));
+  });
+};
+
+// RQ-27.b: the panel manual-refresh button dispatches this same-context
+// event — an understandable refresh that requires no window-event knowledge
+// from the user.
+const fireSessionRefresh = () => {
+  act(() => {
+    window.dispatchEvent(new CustomEvent('registrar:session-refresh'));
+  });
+};
+
 const catalogCallCount = () =>
   vi.mocked(api.get).mock.calls.filter(([url]) =>
     url === '/registrar/doctors' || url === '/registrar/services' || url === '/registrar/departments?active_only=true',
@@ -150,6 +167,77 @@ describe('useRegistrarData — RQ-27.a cross-session silent revalidation', () =>
     setDocumentVisibility('hidden');
     fireVisibilityChange();
     fireWindowFocus();
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+    expect(catalogCallCount()).toBe(3);
+  });
+
+  it('revalidates silently when the network connection is restored (online)', async () => {
+    const { result } = renderHook(() => useRegistrarData());
+
+    await act(async () => {
+      await result.current.loadIntegratedData();
+    });
+    expect(catalogCallCount()).toBe(3);
+
+    // RQ-27.b reconnect: a drop/restore cycle with the session continuously
+    // focused must still revalidate the catalog once — silently (no wipe,
+    // no toast on success or failure path semantics unchanged).
+    fireOnline();
+
+    await waitFor(() => {
+      expect(catalogCallCount()).toBe(6);
+    });
+    expect(result.current.doctors).toHaveLength(1);
+    expect(notify.error).not.toHaveBeenCalled();
+
+    // The 5s throttle also collapses an online+focus burst (browsers can
+    // fire both when the device regains connectivity) into one refresh.
+    fireOnline();
+    fireWindowFocus();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+    expect(catalogCallCount()).toBe(6);
+  });
+
+  it('revalidates on the manual session-refresh event and throttles the burst', async () => {
+    const { result } = renderHook(() => useRegistrarData());
+
+    await act(async () => {
+      await result.current.loadIntegratedData();
+    });
+    expect(catalogCallCount()).toBe(3);
+
+    fireSessionRefresh();
+
+    await waitFor(() => {
+      expect(catalogCallCount()).toBe(6);
+    });
+    expect(result.current.doctors).toHaveLength(1);
+
+    // Same throttle budget: session-refresh + visibility burst = one refresh.
+    fireSessionRefresh();
+    fireVisibilityChange();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+    expect(catalogCallCount()).toBe(6);
+  });
+
+  it('does not revalidate via online/session-refresh while the document is hidden', async () => {
+    const { result } = renderHook(() => useRegistrarData());
+
+    await act(async () => {
+      await result.current.loadIntegratedData();
+    });
+    expect(catalogCallCount()).toBe(3);
+
+    setDocumentVisibility('hidden');
+    fireOnline();
+    fireSessionRefresh();
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 25));
