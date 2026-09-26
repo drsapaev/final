@@ -5,7 +5,7 @@ API endpoints для подтверждения визитов через Telegr
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -141,34 +141,63 @@ def confirm_visit_by_pwa(
 
 
 @router.get("/visits/info/{token}", response_model=VisitInfoResponse)
-def get_visit_info_by_token(token: str, db: Session = Depends(get_db)):
+def get_visit_info_by_token(
+    token: str, response: Response, db: Session = Depends(get_db)
+):
     """Получение информации о визите по токену (без подтверждения).
 
     PR 3407 delta review P2: the legacy GET returns the same patient-safe
     card as the POST — the raw ``dict[str, Any]`` response_model is gone,
     so the shared service projection cannot leak internal fields here
     even if it regresses.
+
+    PR 3417 review residual P2: the card is bearer-capability PHI, so the
+    response is marked ``Cache-Control: private, no-store`` (same policy
+    as dental clinical content), and the 5xx error path is sanitized
+    exactly like the POST's — the service wraps raw exception text
+    (SQLAlchemy/DB internals) into its 500 detail, which must never
+    reach a public bearer-token caller.
     """
+    # Bearer-capability PHI must live only in the current response: keep
+    # browsers and intermediaries from caching the visit card.
+    response.headers["Cache-Control"] = "private, no-store"
     service = VisitConfirmationService(db)
 
     try:
         return service.get_visit_info(token)
     except VisitConfirmationDomainError as exc:
+        # Mirror the POST route: 5xx details from this service carry raw
+        # exception text; publish a generic message instead.
+        if exc.status_code >= 500:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail="Не удалось получить информацию о визите",
+                headers=exc.headers,
+            ) from None
         _raise_http_error(exc)
+    except Exception:
+        raise HTTPException(
+            status_code=500, detail="Не удалось получить информацию о визите"
+        ) from None
 
 
 @router.post("/visits/info", response_model=VisitInfoResponse)
 def post_visit_info_by_token(
-    request_body: VisitInfoRequest, db: Session = Depends(get_db)
+    request_body: VisitInfoRequest,
+    response: Response,
+    db: Session = Depends(get_db),
 ):
     """Read a public visit card without putting its bearer token in the URL."""
+    # Same PHI no-store policy as the legacy GET (PR 3417 review residual P2).
+    response.headers["Cache-Control"] = "private, no-store"
     service = VisitConfirmationService(db)
 
     try:
         return service.get_visit_info(request_body.token)
     except VisitConfirmationDomainError as exc:
-        # The service includes raw exception text in its 500 detail. Keep the
-        # existing GET contract unchanged, but do not expose it on this route.
+        # The service includes raw exception text in its 5xx detail; both
+        # public routes now publish the same generic message (the legacy
+        # GET mirrors this sanitization since the PR 3417 review).
         detail = (
             "Не удалось получить информацию о визите"
             if exc.status_code >= 500
