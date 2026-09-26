@@ -63,8 +63,16 @@ def _service(
     return service
 
 
-def _edit_quote(client, headers, patient_id: int, day, service_id: int, doctor_id=None):
-    item = {"service_id": service_id, "quantity": 1}
+def _edit_quote(
+    client,
+    headers,
+    patient_id: int,
+    day,
+    service_id: int,
+    doctor_id=None,
+    quantity: int = 1,
+):
+    item = {"service_id": service_id, "quantity": quantity}
     if doctor_id is not None:
         item["specialist_id"] = doctor_id
     return client.post(
@@ -83,9 +91,16 @@ def _edit_quote(client, headers, patient_id: int, day, service_id: int, doctor_i
 
 
 def _edit_save(
-    client, headers, patient_id: int, day, service_id: int, doctor_id=None, token=None
+    client,
+    headers,
+    patient_id: int,
+    day,
+    service_id: int,
+    doctor_id=None,
+    token=None,
+    quantity: int = 1,
 ):
-    item = {"service_id": service_id, "quantity": 1}
+    item = {"service_id": service_id, "quantity": quantity}
     if doctor_id is not None:
         item["specialist_id"] = doctor_id
     return client.post(
@@ -383,3 +398,276 @@ def test_qr_full_update_does_not_copy_existing_doctor_consultation_to_resource(
     db_session.refresh(doctor_entry)
     assert resource_entry.services == "[]"
     assert json.loads(doctor_entry.services)[0]["service_id"] == consultation.id
+
+
+# ── PR #3438 owner-verdict P1 (round 3): resource-owned services in edit-delta ──
+#
+# The catalog of THIS PR classifies a non-consultation requires_doctor service
+# whose queue_tag routes to an active QueueResource as resource-owned:
+# doctor_selection_required=false, regular wizard surface, books WITHOUT a
+# doctor into the resource queue (pinned for cart create in
+# tests/test_registrar_resource_service_classification.py::
+# test_k10_resource_service_books_without_doctor_into_resource_queue).
+#
+# The edit-delta addition guard treated the same service as doctor work and
+# 409-rejected ("нельзя добавить в ресурсную очередь") exactly what the
+# catalog offered — a read/write contract drift: the wizard's edit mode uses
+# the same catalog, so a registrar could see the service, try to add it, and
+# be rejected. The pins below restore parity with the cart write gate:
+#
+# - non-consultation + resource-owned → doctorless quote/save allowed, the
+#   entry lands in the resource queue, an increase of an existing
+#   resource-owned position bills only the delta;
+# - the same service with a supplied doctor → 409 (decorative doctor,
+#   the same fail-closed semantics as cart create);
+# - consultation on a resource tag → 409 (ambiguous class, unchanged);
+# - doctor-owned requires_doctor service → the doctor contract is unchanged.
+
+
+def _resource_pair(db_session, *, consultation: bool) -> tuple[Service, QueueResource]:
+    """A service on an ACTIVE registry resource tag.
+
+    Non-consultation shape mirrors canonical K10 «ЭКГ»: requires_doctor=True,
+    is_consultation=False, the tag has an active QueueResource row. The
+    consultation shape keeps this file's convention (requires_doctor=False)
+    and a cardiology department key.
+    """
+    suffix = uuid4().hex[:8]
+    tag = f"res_{suffix}"
+    service = Service(
+        code=f"RS_{suffix}",
+        service_code=f"RS{suffix}",
+        name=f"ЭКГ {suffix}",
+        price=Decimal("25000"),
+        active=True,
+        requires_doctor=not consultation,
+        is_consultation=consultation,
+        queue_tag=tag,
+        department_key="cardiology" if consultation else "echokg",
+    )
+    resource = QueueResource(
+        code=tag,
+        queue_tag=tag,
+        display_name="Тестовый ресурс",
+        active=True,
+    )
+    db_session.add_all([service, resource])
+    db_session.commit()
+    db_session.refresh(service)
+    db_session.refresh(resource)
+    return service, resource
+
+
+@pytest.mark.integration
+def test_edit_delta_quote_resource_service_without_doctor_is_quoted(
+    client, db_session, registrar_auth_headers, test_patient
+):
+    service, _resource = _resource_pair(db_session, consultation=False)
+    day = clinic_today(db_session)
+
+    quote = _edit_quote(
+        client, registrar_auth_headers, test_patient.id, day, service.id
+    )
+
+    assert quote.status_code == 200, quote.text
+    assert quote.json()["quote_token"]
+
+
+@pytest.mark.integration
+def test_edit_delta_save_resource_service_without_doctor_books_into_resource_queue(
+    client, db_session, registrar_auth_headers, test_patient
+):
+    service, resource = _resource_pair(db_session, consultation=False)
+    day = clinic_today(db_session)
+
+    quote = _edit_quote(
+        client, registrar_auth_headers, test_patient.id, day, service.id
+    )
+    assert quote.status_code == 200, quote.text
+    save = _edit_save(
+        client,
+        registrar_auth_headers,
+        test_patient.id,
+        day,
+        service.id,
+        token=quote.json()["quote_token"],
+    )
+    assert save.status_code == 200, save.text
+
+    visit = db_session.query(Visit).filter(Visit.patient_id == test_patient.id).one()
+    assert visit.doctor_id is None
+    entry = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == test_patient.id)
+        .one()
+    )
+    assert entry.queue.queue_resource_id == resource.id
+    assert entry.queue.specialist_id is None
+
+
+@pytest.mark.integration
+def test_edit_delta_increases_existing_resource_owned_position(
+    client, db_session, registrar_auth_headers, test_patient
+):
+    service, resource = _resource_pair(db_session, consultation=False)
+    day = clinic_today(db_session)
+
+    first_quote = _edit_quote(
+        client, registrar_auth_headers, test_patient.id, day, service.id
+    )
+    first_save = _edit_save(
+        client,
+        registrar_auth_headers,
+        test_patient.id,
+        day,
+        service.id,
+        token=first_quote.json()["quote_token"],
+    )
+    assert first_save.status_code == 200, first_save.text
+
+    entry = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == test_patient.id)
+        .one()
+    )
+    assert entry.queue.queue_resource_id == resource.id
+
+    quote = _edit_quote(
+        client, registrar_auth_headers, test_patient.id, day, service.id, quantity=2
+    )
+    assert quote.status_code == 200, quote.text
+    # only the INCREASE is billed: one extra unit at the catalog price
+    assert Decimal(str(quote.json()["total_amount"])) == Decimal("25000")
+
+    save = _edit_save(
+        client,
+        registrar_auth_headers,
+        test_patient.id,
+        day,
+        service.id,
+        quantity=2,
+        token=quote.json()["quote_token"],
+    )
+    assert save.status_code == 200, save.text
+
+    db_session.refresh(entry)
+    raw_services = entry.services
+    payloads = (
+        raw_services if isinstance(raw_services, list) else json.loads(raw_services)
+    )
+    total_qty = sum(
+        int(payload["quantity"])
+        for payload in payloads
+        if payload.get("service_id") == service.id
+    )
+    assert total_qty == 2
+    # the position stays on the resource queue — no doctor-queue fork
+    assert entry.queue.queue_resource_id == resource.id
+    assert entry.queue.specialist_id is None
+
+
+@pytest.mark.integration
+def test_edit_delta_resource_service_with_doctor_fails_closed(
+    client, db_session, registrar_auth_headers, test_patient
+):
+    service, _resource = _resource_pair(db_session, consultation=False)
+    doctor = _doctor(db_session)
+    day = clinic_today(db_session)
+
+    before_visits = (
+        db_session.query(Visit).filter(Visit.patient_id == test_patient.id).count()
+    )
+    before_entries = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == test_patient.id)
+        .count()
+    )
+
+    quote = _edit_quote(
+        client, registrar_auth_headers, test_patient.id, day, service.id, doctor.id
+    )
+    save = _edit_save(
+        client, registrar_auth_headers, test_patient.id, day, service.id, doctor.id
+    )
+
+    assert quote.status_code == 409, quote.text
+    assert save.status_code == 409, save.text
+    assert "ресурс" in quote.json()["detail"]
+    assert (
+        db_session.query(Visit).filter(Visit.patient_id == test_patient.id).count()
+        == before_visits
+    )
+    assert (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == test_patient.id)
+        .count()
+        == before_entries
+    )
+
+
+@pytest.mark.integration
+def test_edit_delta_consultation_on_resource_tag_stays_rejected(
+    client, db_session, registrar_auth_headers, test_patient
+):
+    service, _resource = _resource_pair(db_session, consultation=True)
+    day = clinic_today(db_session)
+
+    quote = _edit_quote(
+        client, registrar_auth_headers, test_patient.id, day, service.id
+    )
+    save = _edit_save(client, registrar_auth_headers, test_patient.id, day, service.id)
+
+    assert quote.status_code == 409, quote.text
+    assert save.status_code == 409, save.text
+    assert "ресурс" in quote.json()["detail"]
+    assert (
+        db_session.query(Visit).filter(Visit.patient_id == test_patient.id).count() == 0
+    )
+    assert (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == test_patient.id)
+        .count()
+        == 0
+    )
+
+
+@pytest.mark.integration
+def test_edit_delta_doctor_owned_service_keeps_doctor_contract(
+    client, db_session, registrar_auth_headers, test_patient
+):
+    doctor = _doctor(db_session)
+    service = _service(db_session, consultation=False, requires_doctor=True)
+    day = clinic_today(db_session)
+
+    doctorless = _edit_quote(
+        client, registrar_auth_headers, test_patient.id, day, service.id
+    )
+    assert doctorless.status_code == 400, doctorless.text
+    assert (
+        db_session.query(Visit).filter(Visit.patient_id == test_patient.id).count() == 0
+    )
+
+    quote = _edit_quote(
+        client, registrar_auth_headers, test_patient.id, day, service.id, doctor.id
+    )
+    assert quote.status_code == 200, quote.text
+    save = _edit_save(
+        client,
+        registrar_auth_headers,
+        test_patient.id,
+        day,
+        service.id,
+        doctor.id,
+        quote.json()["quote_token"],
+    )
+    assert save.status_code == 200, save.text
+
+    visit = db_session.query(Visit).filter(Visit.patient_id == test_patient.id).one()
+    assert visit.doctor_id == doctor.id
+    entry = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == test_patient.id)
+        .one()
+    )
+    assert entry.queue.specialist_id == doctor.id
+    assert entry.queue.queue_resource_id is None

@@ -15,6 +15,7 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
 )  # noqa: F401
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.online_queue import DailyQueue
+from app.services.registrar_doctor_eligibility import service_routes_to_resource_queue
 from app.services.registrar_wizard_queue_assignment_service import (
     DuplicateCartResourceQueueVisitsError,
 )
@@ -599,25 +600,36 @@ def _edit_delta_quote_context(
         # successful quote, then the mutation returns 400). The resolution
         # expression is IDENTICAL to _resolve_daily_queue (item specialist
         # or the service's default doctor) — no drift.
+        #
+        # PR #3438 owner-verdict P1 (round 3): mirror the command's NEW
+        # resource branch too — a resource-routed non-consultation service
+        # resolves to the resource queue WITHOUT a specialist (the save
+        # delegates to get_or_create_daily_queue's registry branch, which
+        # finds-or-creates the day's resource queue), so a missing doctor
+        # must not pre-reject the quote the catalog already offered.
         resolved_specialist_id = specialist_id or service.doctor_id
-        target_queue_exists = (
-            db.query(DailyQueue.id)
-            .filter(
-                DailyQueue.day == target_date,
-                DailyQueue.queue_tag == queue_tag,
-                DailyQueue.active.is_(True),
-            )
-            .first()
-            is not None
+        resource_routed = not service.is_consultation and (
+            service_routes_to_resource_queue(db, service, target_date)
         )
-        if not target_queue_exists and not resolved_specialist_id:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"No active queue exists for queue_tag={queue_tag}; "
-                    "specialist_id is required"
-                ),
+        if not resource_routed:
+            target_queue_exists = (
+                db.query(DailyQueue.id)
+                .filter(
+                    DailyQueue.day == target_date,
+                    DailyQueue.queue_tag == queue_tag,
+                    DailyQueue.active.is_(True),
+                )
+                .first()
+                is not None
             )
+            if not target_queue_exists and not resolved_specialist_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"No active queue exists for queue_tag={queue_tag}; "
+                        "specialist_id is required"
+                    ),
+                )
         return requested_qty, None
     if not payloads:
         return requested_qty, None

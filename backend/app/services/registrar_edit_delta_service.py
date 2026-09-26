@@ -23,6 +23,7 @@ from app.services.queue_service import queue_service
 from app.services.registrar_doctor_eligibility import (
     assert_doctor_eligible_for_service,
     service_requires_doctor_selection,
+    service_routes_to_resource_queue,
 )
 from app.services.service_mapping import get_service_code, normalize_service_code
 
@@ -725,6 +726,35 @@ class RegistrarEditDeltaService:
         if not service_requires_doctor_selection(service):
             return
 
+        # PR #3438 owner-verdict P1 (round 3): the SAME ownership rule as
+        # the cart write gate (assert_doctor_eligible_for_service) and the
+        # catalog decision (doctor_selection_required_for_surface). A
+        # NON-consultation doctor-selection service whose queue_tag routes
+        # to the resource axis (canonical K10 «ЭКГ»/ecg) is RESOURCE-OWNED:
+        # no doctor is required, the resource queue is the valid target,
+        # and the catalog of this same PR already shows it on the regular
+        # surface (doctor_selection_required=false). The checks below
+        # treated the resource axis itself as an error and 409-rejected
+        # exactly what the catalog offered — a read/write contract drift
+        # (the wizard's edit mode consumes the same catalog). A supplied
+        # doctor stays decorative-fail-closed — the assignment pass nulls
+        # the specialist for registry tags and the per-doctor worklist
+        # never counts the entry — with the same 409 semantics as cart
+        # create. Consultations keep the dedicated fail-closed checks
+        # below (ambiguous class, unchanged).
+        if not service.is_consultation and service_routes_to_resource_queue(
+            self.db, service, target_date
+        ):
+            if specialist_id is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Услугу «{service.name}» нельзя добавить к врачу: "
+                        "её очередь настроена как ресурсная"
+                    ),
+                )
+            return
+
         queue = entry.queue if entry else None
         if entry is not None and (
             queue is None
@@ -1134,6 +1164,29 @@ class RegistrarEditDeltaService:
         # легаси-поведение — активная очередь того же тега (в т.ч. owned
         # ресурсом по QD-2A), иначе громкий отказ вместо тихого «первая
         # попавшаяся».
+        #
+        # PR #3438 owner-verdict P1 (round 3): ресурсный тег — НЕ легаси
+        # случай: не-консультация с ресурсной маршрутизацией резолвится в
+        # ресурсную очередь БЕЗ врача через ТОТ ЖЕ канонический
+        # get_or_create_daily_queue (QD-2C registry-ветка: advisory-lock
+        # создания, капы/стартовый номер/кабинет из реестра), которым
+        # пользуется обычное создание корзины. Read-only поиск ниже не
+        # может создать ПЕРВУЮ ресурсную очередь дня и 400-ил бы бронирование,
+        # которое каталог уже предложил (doctorless-редактирование ресурсной
+        # услуги). Консультации сюда не доходят — гвард выше отвергает их
+        # fail-closed.
+        if (
+            queue_tag
+            and not service.is_consultation
+            and service_routes_to_resource_queue(self.db, service, target_date)
+        ):
+            return queue_service.get_or_create_daily_queue(
+                self.db,
+                day=target_date,
+                specialist_id=None,
+                queue_tag=queue_tag,
+                defaults={},
+            )
         existing = (
             self.db.query(DailyQueue)
             .filter(
