@@ -47,6 +47,8 @@ SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 
 sys.path.insert(0, str(BACKEND_DIR))
 
+from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
+
 
 def _candidate_admin_urls() -> list[str]:
     """Admin DSNs for scratch provisioning — LOCAL servers only."""
@@ -63,16 +65,18 @@ def _candidate_admin_urls() -> list[str]:
     env_url = os.getenv("DATABASE_URL", "").strip()
     if env_url:
         u = make_url(env_url)
-        if (u.host or "") in {"localhost", "127.0.0.1", "::1"}:
+        # PR #3468 audit P1: a libpq DSN can carry a comma-separated
+        # failover host list (netloc host or ?host= / ?hostaddr= query
+        # params). EVERY possible endpoint — not just the first failover
+        # target — must be local before scratch provisioning may run.
+        if u.host and is_local_admin_dsn(env_url):
             urls.append(
                 f"postgresql://{u.username}:{u.password}@{u.host}:{u.port}/postgres"
             )
-        elif not u.host and (u.query.get("host") or "").startswith(
-            ("/", "./")
-        ):
+        elif not u.host and is_local_admin_dsn(env_url):
             # Unix-socket DSN (userspace pgserver holder): the socket dir
-            # travels in the query string; still localhost-only by
-            # construction, so safe for scratch provisioning.
+            # travels in the query string; is_local_admin_dsn has verified
+            # every endpoint of the (possibly multi-host) list is local.
             urls.append(env_url)
 
     return urls
@@ -99,14 +103,38 @@ def _preprovisioned_local_url() -> str | None:
     u = make_url(env_url) if env_url else None
     if u is None:
         return None
-    is_local = (u.host or "") in {"localhost", "127.0.0.1", "::1"} or (
-        u.host is None and "host" in u.query
-    )
-    if not is_local:
+    # PR #3468 audit P1: "host" in u.query is not a locality proof — the
+    # query host may be a remote endpoint or a comma-separated failover
+    # list with a remote tail. Every possible endpoint must be local.
+    # (render_as_string(hide_password=False) keeps the 648a3a6 contract:
+    # str(URL) would mask the password as *** and break credentialed DSNs.)
+    if not is_local_admin_dsn(env_url):
         return None
-    return env_url if env_url.startswith("postgresql+psycopg") else str(
-        u.set(drivername="postgresql+psycopg")
+    return (
+        env_url
+        if env_url.startswith("postgresql+psycopg")
+        else u.set(drivername="postgresql+psycopg").render_as_string(
+            hide_password=False
+        )
     )
+
+
+def _drop_scratch_quietly(admin_url: str) -> None:
+    """Best-effort DROP of this process's run-unique scratch database.
+
+    PR #3468 audit P2: provisioning failure paths must not leak the scratch
+    database (a run-unique name can no longer be swept by the next run).
+    """
+    try:
+        with psycopg.connect(admin_url, autocommit=True) as c:
+            # WITH (FORCE) clears lingering connections (PG 13+), falling
+            # back to the plain form on older servers.
+            try:
+                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+            except psycopg.errors.SyntaxError:
+                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+    except Exception:  # noqa: BLE001
+        pass
 
 
 @pytest.fixture(scope="module")
@@ -141,7 +169,7 @@ def pg_engine():
 
     sa_url: str | None = None
     if admin_url is not None:
-        _conn, sa_url = _scratch_url(admin_url)
+        _conn, scratch_sa_url = _scratch_url(admin_url)
         try:
             with psycopg.connect(admin_url, autocommit=True) as c:
                 # No pre-drop: the run-unique name cannot pre-exist (a collision would
@@ -149,7 +177,7 @@ def pg_engine():
                 # is exactly the cross-run hazard this fixture used to carry.
                 c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
-            env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
+            env = dict(os.environ, DATABASE_URL=scratch_sa_url, TESTING="1")
             import subprocess  # noqa: E402
 
             r = subprocess.run(
@@ -169,14 +197,22 @@ def pg_engine():
                     f"DATABASE_URL",
                     file=sys.stderr,
                 )
-                sa_url = None
+            else:
+                sa_url = scratch_sa_url
         except Exception as exc:  # noqa: BLE001
             print(
                 f"[rq08] scratch provisioning failed ({exc!r}); falling "
                 f"back to pre-provisioned DATABASE_URL",
                 file=sys.stderr,
             )
-            sa_url = None
+        finally:
+            # PR #3468 audit P2: when the scratch path is abandoned (any
+            # pre-success failure — alembic rc != 0, exception, connection
+            # loss), the run-unique scratch database must not leak: the
+            # next run can no longer sweep it (the old fixed-name pre-drop
+            # used to), so the drop happens here, before the fallback.
+            if sa_url is None:
+                _drop_scratch_quietly(admin_url)
 
     if sa_url is None:
         sa_url = _preprovisioned_local_url()
@@ -187,30 +223,23 @@ def pg_engine():
             )
 
     engine = create_engine(sa_url, future=True)
-    with engine.connect() as conn:
-        version = conn.execute(text("select version_num from alembic_version")).scalar()
-    if not version:
-        pytest.skip(
-            "DATABASE_URL points at a local PostgreSQL without an alembic "
-            "schema — provision it with 'alembic upgrade head' first; the "
-            "fixture never creates schemas on a pre-provisioned database"
-        )
+    try:
+        with engine.connect() as conn:
+            version = conn.execute(text("select version_num from alembic_version")).scalar()
+        if not version:
+            pytest.skip(
+                "DATABASE_URL points at a local PostgreSQL without an alembic "
+                "schema — provision it with 'alembic upgrade head' first; the "
+                "fixture never creates schemas on a pre-provisioned database"
+            )
 
-    yield engine
-
-    engine.dispose()
-    if admin_url is not None and sa_url.split("?", 1)[0].endswith(SCRATCH_DB):
-        try:
-            with psycopg.connect(admin_url, autocommit=True) as c:
-                # Cleanup touches ONLY the run-unique database this process created;
-                # WITH (FORCE) clears lingering connections (PG 13+), falling back
-                # to the plain form on older servers.
-                try:
-                    c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
-                except psycopg.errors.SyntaxError:
-                    c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
-        except Exception:  # noqa: BLE001
-            pass
+        yield engine
+    finally:
+        # PR #3468 audit P2: covers pre-yield exits too (the schema skip
+        # above raises before the old post-yield teardown was reached).
+        engine.dispose()
+        if admin_url is not None and sa_url.split("?", 1)[0].endswith(SCRATCH_DB):
+            _drop_scratch_quietly(admin_url)
 
 
 @pytest.fixture
