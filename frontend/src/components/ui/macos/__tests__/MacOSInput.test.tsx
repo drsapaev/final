@@ -18,7 +18,7 @@ describe('Input', () => {
       />,
     );
 
-    const clearButton = screen.getByRole('button', { name: /clear input/i });
+    const clearButton = screen.getByRole('button', { name: /clear input|Очистить/i });
     expect(clearButton).toBeInTheDocument();
 
     fireEvent.click(clearButton);
@@ -35,6 +35,6 @@ describe('Input', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: /clear input/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /clear input|Очистить/i })).not.toBeInTheDocument();
   });
 });

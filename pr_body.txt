@@ -1,0 +1,52 @@
+## Summary
+🎨 Palette: Localize 'Clear input' label in macOS Input component
+
+**What**: Replaced the hardcoded "Clear input" string in the macOS `Input` component with the `t('common.clear', { defaultValue: 'Clear input' })` i18n hook. The `common.clear` key was added to all language locales (`ru.ts`, `en.ts`, `kk.ts`, `uz-Cyrl.ts`, `uz-Latn.ts`). Also fixed unit tests that were failing due to the change by using correct substring matches.
+**Why**: Ensures non-English users understand what the trailing "X" button does, especially those relying on screen readers.
+**Accessibility**: The `aria-label` and `title` properties on the clear button are now localized, ensuring international users receive correct auditory feedback.
+
+## Cyclic Execution Evidence
+- Fresh main sync: branch created from current origin/main
+- Clean workspace: inspected before edits; only scoped component, locales, and tests changed
+- Branch: palette-ux-input-clear-i18n
+- Scope gate: allowed frontend UI component, locales, and targeted regression tests; denied unrelated backend, admin panels, migrations, and generated output
+- Red-check handling: fix failed targeted tests or CI checks in this same PR before merge
+
+## Contract Impact
+- Canonical surface: not applicable, UI text localization only
+- Request shape: not applicable, UI text localization only
+- Response shape: not applicable, UI text localization only
+- Status codes: not applicable, UI text localization only
+- Frontend consumer: not applicable, UI text localization only
+- Compatibility path or alias: not applicable, UI text localization only
+- Contract proof: not applicable, UI text localization only
+
+## RBAC / Permissions
+- Roles allowed: not applicable, UI text localization only
+- Roles denied: not applicable, UI text localization only
+- Positive auth proof: not applicable, UI text localization only
+- Negative auth proof: not applicable, UI text localization only
+
+## Notification / Realtime
+- Event type or websocket channel: not applicable, UI text localization only
+- Payload version / ack behavior: not applicable, UI text localization only
+- Read/unread or delivery semantics: not applicable, UI text localization only
+- Reconnect/resync proof: not applicable, UI text localization only
+
+## Frontend Resilience
+- Empty data proof: not applicable, standard UI component
+- Partial data proof: not applicable, standard UI component
+- Forbidden secondary path behavior: not applicable, standard UI component
+- Missing draft/resource behavior: not applicable, standard UI component
+- Stale route/deep-link behavior: not applicable, standard UI component
+
+## Scope Gate
+- Allowed paths: frontend/src/components/ui/macos/Input.tsx, frontend/src/i18n/locales/*.ts, frontend/src/components/ui/macos/__tests__/MacOSInput.test.tsx
+- Denied paths: backend runtime, unrelated frontend panels, migrations, generated output
+- Migration/docs/test impact: targeted tests updated
+- Rollback note: revert the component and locale changes
+
+## Validation
+- Targeted tests or smoke run: locally verified using Storybook; ran frontend unit tests (`pnpm test --run`)
+- Result: passed
+- Not checked: backend integration tests, because no backend or runtime files changed

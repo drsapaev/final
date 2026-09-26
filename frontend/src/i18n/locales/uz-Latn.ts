@@ -73,6 +73,7 @@ const uzLatn = {
     density_spacious: 'Keng',
   },
   common: {
+    clear: 'Tozalash',
     save: 'Saqlash',
     save_draft: 'Qoralamani saqlash',
     cancel: 'Bekor qilish',

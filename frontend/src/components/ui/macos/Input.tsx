@@ -1,5 +1,6 @@
 import React, { type CSSProperties, type FocusEvent, type MouseEvent, type ComponentType } from 'react';
 import { XCircle } from 'lucide-react';
+import { useTranslation } from '@/i18n/useTranslation';
 type InputSize = 'sm' | 'md' | 'lg';
 type InputVariant = 'default' | 'filled' | 'error';
 type IconPosition = 'left' | 'right';
@@ -44,6 +45,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   onClear,   // Extract to prevent passing to input
   ...props
 }, ref) => {
+  const { t } = useTranslation();
   const [isFocused, setIsFocused] = React.useState<boolean>(false);
   const sizeStyles: Record<InputSize, CSSProperties> = {
     sm: {
@@ -185,8 +187,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
       {showClearButton && (
         <button
           type="button"
-          aria-label="Clear input"
-          title="Clear input"
+          aria-label={t('common.clear', { defaultValue: 'Clear input' })}
+          title={t('common.clear', { defaultValue: 'Clear input' })}
           style={clearButtonStyle}
           onClick={(e: MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
