@@ -95,7 +95,7 @@ stop condition to watch first: <условие>
 
 - [x] Task/PR 7: исправить серверную пагинацию и геометрию очереди. → #3347 (улучшено: #3349 page-before-enrichment)
 - [x] Task/PR 8: добавить точный server-rendered PDF preview без побочных эффектов. → #3462 (включая PDF-render hotfix NameError _load_weasyprint_components, найденный в PR1)
-- [ ] Final gate: выполнить сквозные backend/frontend/browser проверки после merge выбранных PR. — ОТКРЫТ: сквозной mocked-путь, живой smoke 5173→18000, полный STAGING_VALIDATION; дополнительно открыты operator-шаги stage-4 (деплой 0070) и product-decision gate по пробиркам.
+- [ ] Final gate: выполнить сквозные backend/frontend/browser проверки после merge выбранных PR. — ЧАСТИЧНО (2026-09-26, см. Final gate execution record): слои backend/frontend/browser-mocked зелёные на `614102d2f`; остаются непрерывный сквозной spec-путь (revise→history на browser-уровне), живой smoke 5173→18000, полный STAGING_VALIDATION; дополнительно открыты operator-шаги stage-4 (деплой 0070) и product-decision gate по пробиркам.
 
 ## Execution record (2026-09-26 — reconcile)
 
@@ -130,13 +130,55 @@ baseline при dispatch).
 
 Открыто вне runtime-объёма плана:
 
-- Финальный интеграционный gate: сквозной mocked Playwright-путь, живой
-  smoke 5173→18000, полный STAGING_VALIDATION перед заявлением «работает».
+- Финальный интеграционный gate: слои кода прогнаны зелёными (2026-09-26,
+  см. Final gate execution record ниже); остаются непрерывный сквозной
+  mocked-путь одной спекой (revise→history на browser-уровне), живой smoke
+  5173→18000, полный STAGING_VALIDATION перед заявлением «работает».
 - Product decision gate: учёт пробирок/образцов — сознательно не начинался,
   ждёт решения владельца (см. отдельный раздел плана).
 - Operator-шаги stage-4: staging validation → окно деплоя (`deploy_restart.ps1`
   применит 0070) → post-deploy smoke (`scripts/ops/lab_lineage_post_deploy_smoke.py`;
   на проде read-only checks 1–3 + census).
+
+### Final gate execution record (2026-09-26, частичный)
+
+Слои кода прогнаны на смерженном main `614102d2f` (host: Windows dev-хост;
+оба dev-сервера подняты вручную — см. инфра-заметку ниже):
+
+| Слой | Объект | Результат |
+|---|---|---|
+| Backend | `unit/test_lab_reporting_service.py` + `unit/test_lab_lineage_runtime.py` + `test_lab_reporting_api.py` (RBAC, проекция, locking, пагинация, preview, API-flow) | 66 passed |
+| Frontend | vitest `src/components/laboratory` | 238 passed (23 файла) |
+| Browser (mocked) | e2e `lab-dirty-guard` + `lab-preview-pdf` | 61 passed, 2 finding'а (разобраны ниже) |
+| Гигиена | `git diff --check`; local main = origin/main | чисто |
+
+Finding 1 (не блокер): `absorbs browser Back` упал в полном параллельном
+прогоне, прошёл изолированно — load-флейк под параллельным спавном воркеров,
+не дефект продукта.
+
+Finding 2 (не блокер, root-caused): `deferred stale recent-reports response
+cannot overwrite the fresh list (request epoch latest-wins)` падает
+детерминированно 3/3 на хостах с кросс-оригин `VITE_API_BASE_URL` в
+`.env.local`. Причина: processing-probe (из #3368, review round 2) читает
+`x-test-recent-reports` в page-JS через `response.headers.get()`, а helper
+`apiJson` не ставит `Access-Control-Expose-Headers` — при кросс-оригин
+запросе кастомный заголовок не экспонирован браузером, probe-лог пуст.
+Функциональный инвариант при этом корректен (Node-счётчики доставки растут,
+DOM подтверждает latest-wins). Спека входит в обязательный CI
+(`ci-cd-unified.yml`, блокирующий шаг `--retries=0`) и зелёная там, потому
+что CI-дев-сервер same-origin; сбой хост-специфичен. Финдинг передан
+владельцу probe: #3368 (issuecomment-5845317458).
+
+Инфра-заметка: второй webServer в `frontend/playwright.config.ts`
+(`VITE_API_BASE_URL=... npm run dev`, split-origin из #3390) использует
+Unix env-префикс и не стартует под Windows cmd; обход — поднять оба сервера
+вручную (`reuseExistingServer` подхватывает).
+
+Остаток Final gate: непрерывный сквозной mocked-путь одной спекой (очередь →
+создать → заполнить → сохранить → утвердить → preview/PDF → revise →
+история; revise-контракт сейчас покрыт на API-уровне в
+`test_lab_reporting_api_flow`, но не на browser-уровне), живой smoke
+5173→18000 (operator, окно stage-4), полный STAGING_VALIDATION (operator).
 
 ## Commit Plan
 
