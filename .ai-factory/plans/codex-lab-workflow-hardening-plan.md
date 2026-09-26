@@ -95,7 +95,7 @@ stop condition to watch first: <условие>
 
 - [x] Task/PR 7: исправить серверную пагинацию и геометрию очереди. → #3347 (улучшено: #3349 page-before-enrichment)
 - [x] Task/PR 8: добавить точный server-rendered PDF preview без побочных эффектов. → #3462 (включая PDF-render hotfix NameError _load_weasyprint_components, найденный в PR1)
-- [ ] Final gate: выполнить сквозные backend/frontend/browser проверки после merge выбранных PR. — ЧАСТИЧНО (2026-09-26, см. Final gate execution record): слои backend/frontend/browser-mocked зелёные на `614102d2f`; остаются непрерывный сквозной spec-путь (revise→history на browser-уровне), живой smoke 5173→18000, полный STAGING_VALIDATION; дополнительно открыты operator-шаги stage-4 (деплой 0070) и product-decision gate по пробиркам.
+- [ ] Final gate: выполнить сквозные backend/frontend/browser проверки после merge выбранных PR. — ЧАСТИЧНО (2026-09-26, см. Final gate execution record): слои backend/frontend/browser-mocked зелёные на `614102d2f`; непрерывный сквозной spec-путь (revise→history на browser-уровне) закрыт #3475 (lab-full-path.spec.ts, 64/64, CI-блокирующий инвариант); остаются живой smoke 5173→18000, полный STAGING_VALIDATION; дополнительно открыты operator-шаги stage-4 (деплой 0070) и product-decision gate по пробиркам.
 
 ## Execution record (2026-09-26 — reconcile)
 
@@ -131,9 +131,10 @@ baseline при dispatch).
 Открыто вне runtime-объёма плана:
 
 - Финальный интеграционный gate: слои кода прогнаны зелёными (2026-09-26,
-  см. Final gate execution record ниже); остаются непрерывный сквозной
-  mocked-путь одной спекой (revise→history на browser-уровне), живой smoke
-  5173→18000, полный STAGING_VALIDATION перед заявлением «работает».
+  см. Final gate execution record ниже); непрерывный сквозной mocked-путь
+  одной спекой (revise→history на browser-уровне) закрыт #3475; остаются
+  живой smoke 5173→18000, полный STAGING_VALIDATION перед заявлением
+  «работает».
 - Product decision gate: учёт пробирок/образцов — сознательно не начинался,
   ждёт решения владельца (см. отдельный раздел плана).
 - Operator-шаги stage-4: staging validation → окно деплоя (`deploy_restart.ps1`
@@ -176,9 +177,16 @@ Unix env-префикс и не стартует под Windows cmd; обход 
 
 Остаток Final gate: непрерывный сквозной mocked-путь одной спекой (очередь →
 создать → заполнить → сохранить → утвердить → preview/PDF → revise →
-история; revise-контракт сейчас покрыт на API-уровне в
-`test_lab_reporting_api_flow`, но не на browser-уровне), живой smoke
-5173→18000 (operator, окно stage-4), полный STAGING_VALIDATION (operator).
+история; revise-контракт был покрыт на API-уровне в
+`test_lab_reporting_api_flow`, но не на browser-уровне) — ЗАКРЫТО
+2026-09-26, PR #3475: `frontend/e2e/lab-full-path.spec.ts`, один непрерывный
+тест полного жизненного цикла бланка (очередь → создать → заполнить →
+сохранить → preview → утвердить → PDF-печать → revise → история, включая
+supersedes-связь и открытие оригинала из истории), мутационно
+верифицирован, 64/64 лабораторного контура, CI-блокирующий шаг + count
+invariant (ci-cd-unified.yml, прецедент lab-dirty-guard #3368). Остаются:
+живой smoke 5173→18000 (operator, окно stage-4), полный
+STAGING_VALIDATION (operator).
 
 ## Commit Plan
 
