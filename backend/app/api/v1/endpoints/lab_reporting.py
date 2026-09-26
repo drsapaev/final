@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.clinic import Doctor
+from app.models.lab import FINAL_INSTANCE_STATUSES
 from app.models.visit import Visit
 from app.schemas.lab_reporting import (
     LabCatalogAnalyteOut,
@@ -735,6 +736,118 @@ def download_lab_report_pdf(
             content=pdf_bytes,
             media_type="application/pdf",
             headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        )
+    except LabReportingDomainError as exc:
+        _handle_domain_error(exc)
+
+
+@router.get("/report-instances/{instance_id}/preview", response_model=dict[str, Any])
+def preview_lab_report_instance_pdf(
+    instance_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_roles("Admin", "Lab")),
+):
+    """PR8 (codex-lab-workflow-hardening-plan): серверный A4-preview того же
+    движка, что финальный PDF, ДО утверждения.
+
+    Контракт:
+    - доступ только Admin/Lab (врач получает результат через /pdf после
+      finalize; preview неутверждённых бланков — лабораторная поверхность);
+    - рендерятся ТЕКУЩИЕ СОХРАНЕННЫЕ значения (Save Draft до preview —
+      unsaved-черновик клиента на сервер не отправляется);
+    - watermark «Черновик» для неутверждённых статусов; утверждённые
+      рендерятся без watermark (эквивалент финального вида);
+    - Content-Disposition: inline + Cache-Control: private, no-store
+      (клиническое содержание);
+    - побочных эффектов нет: без mark-printed, уведомлений и финализации.
+    """
+    service = LabReportingService(db)
+    try:
+        instance = service.get_instance(instance_id)
+        watermark_text = (
+            "Черновик" if instance.status not in FINAL_INSTANCE_STATUSES else None
+        )
+        materialized_sections = service.materialize_instance(instance)
+        critical_findings = service.summarize_critical_findings(materialized_sections)
+        pdf_bytes = lab_report_pdf_service.render_report(
+            {
+                "template_name": instance.template.name,
+                "layout_preset": instance.template_version.layout_preset,
+                "page_settings": instance.template_version.page_settings or {},
+                "branding": instance.branding_snapshot or {},
+                "patient": instance.patient_snapshot or {},
+                "signers": instance.signer_snapshot or {},
+                "sections": materialized_sections,
+                "critical_findings": critical_findings,
+                "footer_notes": instance.template_version.footer_notes,
+                "report_date": (
+                    instance.finalized_at or instance.created_at or datetime.now(UTC)
+                ).strftime("%d.%m.%Y"),
+                "watermark_text": watermark_text,
+            }
+        )
+        filename = f"lab-report-{instance.id}-preview.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Cache-Control": "private, no-store",
+            },
+        )
+    except LabReportingDomainError as exc:
+        _handle_domain_error(exc)
+
+
+@router.get("/template-versions/{version_id}/preview", response_model=dict[str, Any])
+def preview_lab_template_version_pdf(
+    version_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_roles("Admin", "Lab")),
+):
+    """PR8: template preview — серверный A4-рендер СОХРАНЁННОЙ версии
+    шаблона до публикации.
+
+    Контракт:
+    - доступ только Admin/Lab (редакторская поверхность шаблонов);
+    - только синтетические placeholder-значения: patient-блок пуст, value
+      колонка — очевидный маркер, никаких данных реальных пациентов;
+    - неопубликованные версии (DRAFT) помечаются watermark «Черновик»;
+      PUBLISHED рендерится без watermark (это и есть печатный бланк);
+    - inline + no-store; рендерер тот же, что у финального PDF.
+    """
+    service = LabReportingService(db)
+    try:
+        version = service.repository.get_template_version(version_id)
+        if not version:
+            raise LabReportingDomainError(404, "Template version not found")
+        watermark_text = "Черновик" if version.status != "PUBLISHED" else None
+        sections = service.materialize_template_preview(version)
+        pdf_bytes = lab_report_pdf_service.render_report(
+            {
+                "template_name": version.template.name,
+                "layout_preset": version.layout_preset,
+                "page_settings": version.page_settings or {},
+                "branding": service._build_branding_snapshot(version),
+                # Никаких данных реальных пациентов: пустой patient-блок —
+                # шаблон сам отрисует подписи-прочерки полей.
+                "patient": {},
+                "signers": service._build_signer_snapshot(version),
+                "sections": sections,
+                "critical_findings": [],
+                "footer_notes": version.footer_notes,
+                "report_date": datetime.now(UTC).strftime("%d.%m.%Y"),
+                "watermark_text": watermark_text,
+            }
+        )
+        filename = f"lab-template-version-{version.id}-preview.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Cache-Control": "private, no-store",
+            },
         )
     except LabReportingDomainError as exc:
         _handle_domain_error(exc)

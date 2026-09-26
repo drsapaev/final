@@ -51123,6 +51123,108 @@
         }
       }
     },
+    "/api/v1/lab/report-instances/{instance_id}/preview": {
+      "get": {
+        "tags": [
+          "lab-reporting",
+          "lab-reporting"
+        ],
+        "summary": "Preview Lab Report Instance Pdf",
+        "description": "PR8 (codex-lab-workflow-hardening-plan): серверный A4-preview того же\nдвижка, что финальный PDF, ДО утверждения.\n\nКонтракт:\n- доступ только Admin/Lab (врач получает результат через /pdf после\n  finalize; preview неутверждённых бланков — лабораторная поверхность);\n- рендерятся ТЕКУЩИЕ СОХРАНЕННЫЕ значения (Save Draft до preview —\n  unsaved-черновик клиента на сервер не отправляется);\n- watermark «Черновик» для неутверждённых статусов; утверждённые\n  рендерятся без watermark (эквивалент финального вида);\n- Content-Disposition: inline + Cache-Control: private, no-store\n  (клиническое содержание);\n- побочных эффектов нет: без mark-printed, уведомлений и финализации.",
+        "operationId": "preview_lab_report_instance_pdf_api_v1_lab_report_instances__instance_id__preview_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Instance Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Preview Lab Report Instance Pdf Api V1 Lab Report Instances  Instance Id  Preview Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/template-versions/{version_id}/preview": {
+      "get": {
+        "tags": [
+          "lab-reporting",
+          "lab-reporting"
+        ],
+        "summary": "Preview Lab Template Version Pdf",
+        "description": "PR8: template preview — серверный A4-рендер СОХРАНЁННОЙ версии\nшаблона до публикации.\n\nКонтракт:\n- доступ только Admin/Lab (редакторская поверхность шаблонов);\n- только синтетические placeholder-значения: patient-блок пуст, value\n  колонка — очевидный маркер, никаких данных реальных пациентов;\n- неопубликованные версии (DRAFT) помечаются watermark «Черновик»;\n  PUBLISHED рендерится без watermark (это и есть печатный бланк);\n- inline + no-store; рендерер тот же, что у финального PDF.",
+        "operationId": "preview_lab_template_version_pdf_api_v1_lab_template_versions__version_id__preview_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Preview Lab Template Version Pdf Api V1 Lab Template Versions  Version Id  Preview Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/appointments/{appointment_id}/start-visit": {
       "post": {
         "tags": [
@@ -88370,6 +88472,11 @@
             "type": "boolean",
             "title": "Can Print",
             "default": false
+          },
+          "can_preview": {
+            "type": "boolean",
+            "title": "Can Preview",
+            "default": false
           }
         },
         "type": "object",
@@ -88516,6 +88623,11 @@
           "can_print": {
             "type": "boolean",
             "title": "Can Print",
+            "default": false
+          },
+          "can_preview": {
+            "type": "boolean",
+            "title": "Can Preview",
             "default": false
           }
         },

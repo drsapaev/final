@@ -19,7 +19,9 @@ export const LAB_REPORT_ACTION_CAN_FIELD = {
   // проигнорирует (нет UI-действия). Чтобы вернуть — добавить UI + тесты.
   finalize: 'can_finalize',
   revise: 'can_revise',
-  print: 'can_print'
+  print: 'can_print',
+  // PR8: серверный PDF-preview сохранённых значений до утверждения.
+  preview: 'can_preview'
 };
 
 export function hasLabReportAction(instance: Record<string, unknown> | null | undefined, action: string) {
