@@ -1498,6 +1498,13 @@ export type paths = {
          *     card as the POST — the raw ``dict[str, Any]`` response_model is gone,
          *     so the shared service projection cannot leak internal fields here
          *     even if it regresses.
+         *
+         *     PR 3417 review residual P2: the card is bearer-capability PHI, so the
+         *     response is marked ``Cache-Control: private, no-store`` (same policy
+         *     as dental clinical content), and the 5xx error path is sanitized
+         *     exactly like the POST's — the service wraps raw exception text
+         *     (SQLAlchemy/DB internals) into its 500 detail, which must never
+         *     reach a public bearer-token caller.
          */
         get: operations["get_visit_info_by_token_api_v1_visits_info__token__get"];
         put?: never;
