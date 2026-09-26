@@ -2807,7 +2807,7 @@ const uzLatn = {
     dept_sort_order: "Tartib bo'yicha",
     dept_load_failed: "Bo'limlarni yuklab bo'lmadi",
     dept_err_name_required: "Nomi majburiy va 2 ta belgidan uzun bo'lishi kerak",
-    dept_err_key_required: 'Kalit majburiy (minimum 2 ta belgi)',
+    dept_err_key_required: 'Kalit majburiy',
     dept_err_key_duplicate: "Bu kalitli bo'lim allaqachon mavjud",
     dept_err_key_pattern: "Kalit faqat kichik lotin harflari, raqamlar va pastki chiziqdan iborat bo'lishi, harf bilan boshlanishi va 50 belgidan oshmasligi kerak",
     dept_err_fix_form: "Formadagi xatolarni tuzating",

@@ -260,7 +260,11 @@ const DepartmentManagement = () => {
       if (!data.name_ru || String(data.name_ru ?? '').trim().length < 2) {
         errors.name_ru = t('admin2.dept_err_name_required');
       }
-      if (!data.key || String(data.key ?? '').trim().length < 2) {
+      if (!data.key || !String(data.key ?? '').trim()) {
+        // Round-5 review P2: the server contract (DepartmentCreate.key)
+        // is min_length=1 — a single lowercase letter is a VALID key, so
+        // the required check must only reject an empty/whitespace value;
+        // the pattern branch below enforces the rest of the contract.
         errors.key = t('admin2.dept_err_key_required');
       } else if (
         enforceKeyPattern &&

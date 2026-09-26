@@ -1,7 +1,8 @@
 /**
  * Round-2 review P2 (PR 3455): the DepartmentManagement create form must
  * mirror the server-side DepartmentCreate.key contract — lowercase latin
- * identifier `^[a-z][a-z0-9_]*$`, max 50 chars — so a value the UI presents
+ * identifier `^[a-z][a-z0-9_]*$`, min 1 char (a single letter is a valid
+ * key — round-5 review P2), max 50 chars — so a value the UI presents
  * as valid always survives the API boundary (instead of a post-submit 422
  * with no inline format guidance).
  *
@@ -98,7 +99,7 @@ const fillCreateForm = async (
   );
 };
 
-describe('DepartmentManagement create-form key contract (round-2 review P2)', () => {
+describe('DepartmentManagement create-form key contract (rounds 2 and 5 review P2)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedGet.mockImplementation(async (url: string) => {
@@ -151,5 +152,41 @@ describe('DepartmentManagement create-form key contract (round-2 review P2)', ()
     await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1));
     expect(mockedPost.mock.calls[0][0]).toBe('/admin/departments');
     expect(mockedPost.mock.calls[0][1]).toMatchObject({ key: 'cardio_lab2' });
+  });
+
+  it('accepts a single-character key — the server contract is min_length=1 (round-5 review P2)', async () => {
+    // The form used to require 2 characters and blocked a value the
+    // server accepts (e.g. `a`) before the API call — the mirror must
+    // follow the server's min_length=1, not a stricter local guess.
+    const user = userEvent.setup();
+    renderPanel();
+    await openAddForm(user);
+    await fillCreateForm(user, 'a');
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1));
+    expect(mockedPost.mock.calls[0][0]).toBe('/admin/departments');
+    expect(mockedPost.mock.calls[0][1]).toMatchObject({ key: 'a' });
+    expect(mockedToastError).not.toHaveBeenCalled();
+  });
+
+  it('still rejects an empty key inline and never calls the API (round-5 review P2)', async () => {
+    // Behavior-preservation leg: whitespace-only was rejected before the
+    // min-length change and must stay rejected — only the required
+    // message is shown, never the pattern message, and no API call.
+    const user = userEvent.setup();
+    renderPanel();
+    await openAddForm(user);
+    await fillCreateForm(user, ' ');
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    expect(
+      await screen.findByText(/Ключ обязателен/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/только строчные латинские буквы/),
+    ).not.toBeInTheDocument();
+    expect(mockedPost).not.toHaveBeenCalled();
+    expect(mockedToastError).toHaveBeenCalledWith('Исправьте ошибки в форме');
   });
 });

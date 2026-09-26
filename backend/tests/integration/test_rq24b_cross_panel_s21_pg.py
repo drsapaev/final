@@ -126,7 +126,14 @@ def _candidate_admin_urls() -> list[str]:
     (round-4 review P1): libpq resolves a service name from
     pg_service.conf into host/port/etc. at connect time, so a
     service-referencing candidate cannot be proven to dial the same
-    local address its scratch DSN reproduces. A remote admin DSN must
+    local address its scratch DSN reproduces. The environment gate is a
+    property of the ENVIRONMENT, not of one candidate's spelling
+    (round-5 review P1): the ``LOCAL_PG_SUPERUSER_PASSWORD`` candidate
+    spells a loopback host, yet libpq dials the environment-supplied
+    ``PGHOSTADDR`` when both ``host`` and ``hostaddr`` are present, and
+    a service definition can inject an unspelled ``hostaddr`` — so an
+    address-overriding environment rejects it exactly like an
+    auto-detected ``DATABASE_URL``. A remote admin DSN must
     be passed explicitly via the test-owned ``RQ24B_PG_ADMIN_URL``.
     """
     urls: list[str] = []
@@ -134,8 +141,28 @@ def _candidate_admin_urls() -> list[str]:
     def _normalized(raw: str) -> str:
         return raw.replace("postgresql+psycopg://", "postgresql://", 1)
 
+    def _env_can_re_dial() -> bool:
+        """True when the process environment can re-dial a DSN's address.
+
+        libpq fills omitted connection fields from the environment, and
+        two of them override the address a candidate would otherwise
+        dial — for EVERY auto-detected candidate shape, including one
+        that spells an explicit loopback host: with both ``host`` and
+        ``hostaddr`` present libpq dials ``hostaddr`` (``host`` is used
+        for authentication purposes only), so ``PGHOSTADDR`` (round-3
+        review P1) redirects even the ``LOCAL_PG_SUPERUSER_PASSWORD``
+        localhost candidate (round-5 review P1), and ``PGSERVICE``
+        (round-4 review P1) — the environment twin of ``?service=`` —
+        may inject any parameter the DSN leaves unspelled, including
+        ``hostaddr``. Fail-closed: any non-empty value of either
+        rejects.
+        """
+        return bool(os.getenv("PGHOSTADDR", "").strip()) or bool(
+            os.getenv("PGSERVICE", "").strip()
+        )
+
     def _is_local(url: str) -> bool:
-        """True only for addresses libpq dials locally (review P1, r1-r3)."""
+        """True only for addresses libpq dials locally (review P1, r1-r5)."""
         try:
             u = make_url(url)
         except Exception:  # noqa: BLE001 — a malformed env DSN (e.g. a
@@ -179,20 +206,13 @@ def _candidate_admin_urls() -> list[str]:
         if qvals.get("service"):
             return False
         # libpq fills omitted connection fields from the process
-        # environment (round-3 review P1): ``PGHOSTADDR`` supplies the
-        # dialed address even when the DSN spells a loopback or a socket
-        # directory, and ``PGHOST`` supplies the host for a hostless DSN
-        # — the probe, provisioning, teardown, and the Alembic
-        # subprocess all inherit them. Fail-closed: any ``PGHOSTADDR``
-        # presence rejects (symmetric with the DSN policy above).
-        if os.getenv("PGHOSTADDR", "").strip():
-            return False
-        # ``PGSERVICE`` (round-4 review P1) is the environment twin of
-        # ``?service=``: libpq loads the service definition for any DSN
-        # that leaves fields unspelled — a hostless or localhost DSN
-        # would silently dial wherever the service file points. Any
-        # non-empty value rejects (fail-closed).
-        if os.getenv("PGSERVICE", "").strip():
+        # environment — the probe, provisioning, teardown, and the
+        # Alembic subprocess all inherit them, and an address-
+        # overriding one re-dials every candidate shape alike
+        # (round-3/round-4/round-5 review P1s — see
+        # ``_env_can_re_dial`` for the libpq semantics). Fail-closed:
+        # any presence rejects.
+        if _env_can_re_dial():
             return False
         # ``?host=`` overrides the authority host — and libpq accepts
         # comma-separated FALLBACK hosts there (round-3 review P1):
@@ -207,6 +227,9 @@ def _candidate_admin_urls() -> list[str]:
             return all(_host_elem_local(h) for h in hosts)
         if u.host is not None:
             return all(_host_elem_local(h) for h in u.host.split(","))
+        # ``PGHOST`` (round-3 review P1) fills the host only when the
+        # DSN leaves it unspelled — the hostless shape — and may carry
+        # comma-separated fallback hosts itself.
         env_host = os.getenv("PGHOST", "")
         if env_host:
             return all(_host_elem_local(h) for h in env_host.split(","))
@@ -220,7 +243,15 @@ def _candidate_admin_urls() -> list[str]:
     if explicit:
         urls.append(_normalized(explicit))
     local_pw = os.getenv("LOCAL_PG_SUPERUSER_PASSWORD", "").strip()
-    if local_pw:
+    # Round-5 review P1: the localhost-superuser candidate must clear
+    # the SAME environment gate as an auto-detected ``DATABASE_URL`` —
+    # it spells a loopback host, but libpq dials the environment-
+    # supplied ``PGHOSTADDR`` when both are present, and a service
+    # definition can inject an unspelled ``hostaddr`` (``PGHOST`` is
+    # inert for this candidate: a DSN-spelled host always wins over
+    # the environment for that parameter, so only the hostless shape
+    # needs that check, inside ``_is_local``).
+    if local_pw and not _env_can_re_dial():
         urls.append(f"postgresql://postgres:{local_pw}@localhost:5432/postgres")
     env_url = os.getenv("DATABASE_URL", "").strip()
     if env_url and _is_local(_normalized(env_url)):
@@ -1256,14 +1287,20 @@ def test_cashier_sees_and_collects_the_payment(
 
 
 # ------------------------------------------------------------------
-# Review-round pins (rounds 1-4): the candidate-DSN guard and the
+# Review-round pins (rounds 1-5): the candidate-DSN guard and the
 # scratch-DSN address forms are pure functions of their inputs — these
 # pins run WITHOUT a PostgreSQL server and must stay green everywhere.
 # ------------------------------------------------------------------
 
 
 def _harness_env(monkeypatch, database_url: str | None) -> None:
-    """Isolate the guard from the host environment."""
+    """Isolate the guard from the host environment.
+
+    Every pin starts from this clean slate and then sets ONLY the
+    variables it judges — the round-5 pins re-set
+    ``LOCAL_PG_SUPERUSER_PASSWORD`` afterwards precisely so a host
+    export cannot decide which candidate set is under test.
+    """
     monkeypatch.delenv("RQ24B_PG_ADMIN_URL", raising=False)
     monkeypatch.delenv("LOCAL_PG_SUPERUSER_PASSWORD", raising=False)
     # libpq reads PGHOST/PGHOSTADDR from the environment (round-3 review
@@ -1490,3 +1527,61 @@ def test_service_file_locations_alone_do_not_reject(monkeypatch):
     monkeypatch.setenv("PGSERVICEFILE", service_file)
     monkeypatch.setenv("PGSYSCONFDIR", tempfile.gettempdir())
     assert _candidate_admin_urls() == ["postgresql:///clinic"]
+
+
+def test_local_superuser_candidate_added_in_a_clean_environment(monkeypatch):
+    """Round-5 P1 positive: the documented local-dev shape — a superuser
+    password with a clean environment — keeps the localhost candidate
+    (no over-rejection)."""
+    _harness_env(monkeypatch, None)
+    monkeypatch.setenv("LOCAL_PG_SUPERUSER_PASSWORD", "pw")
+    assert _candidate_admin_urls() == [
+        "postgresql://postgres:pw@localhost:5432/postgres"
+    ]
+
+
+def test_local_superuser_candidate_rejected_under_pg_hostaddr(monkeypatch):
+    """Round-5 P1: ``PGHOSTADDR`` re-dials even a spelled-loopback DSN.
+
+    libpq dials ``hostaddr`` when both ``host`` and ``hostaddr`` are
+    present, and the round-3 guard ran only for the auto-detected
+    ``DATABASE_URL`` — leaving this candidate able to CREATE/DROP
+    databases on an environment-supplied remote address.
+    """
+    _harness_env(monkeypatch, None)
+    monkeypatch.setenv("LOCAL_PG_SUPERUSER_PASSWORD", "pw")
+    monkeypatch.setenv("PGHOSTADDR", "10.20.30.40")
+    assert _candidate_admin_urls() == []
+
+
+def test_local_superuser_candidate_rejected_under_pgservice(monkeypatch):
+    """Round-5 P1: a service definition can inject ``hostaddr`` — the
+    one address parameter this candidate leaves unspelled — so
+    ``PGSERVICE`` re-dials it exactly like a hostless DSN."""
+    _harness_env(monkeypatch, None)
+    monkeypatch.setenv("LOCAL_PG_SUPERUSER_PASSWORD", "pw")
+    monkeypatch.setenv("PGSERVICE", "remote_service")
+    assert _candidate_admin_urls() == []
+
+
+def test_local_superuser_candidate_ignores_remote_pg_host(monkeypatch):
+    """Round-5 P1 boundary: ``PGHOST`` cannot re-dial THIS candidate — a
+    DSN-spelled host always wins over the environment for that
+    parameter — so a remote ``PGHOST`` alone must not over-reject it
+    (the hostless shape stays gated inside ``_is_local``)."""
+    _harness_env(monkeypatch, None)
+    monkeypatch.setenv("LOCAL_PG_SUPERUSER_PASSWORD", "pw")
+    monkeypatch.setenv("PGHOST", "db.internal")
+    assert _candidate_admin_urls() == [
+        "postgresql://postgres:pw@localhost:5432/postgres"
+    ]
+
+
+def test_pg_hostaddr_rejects_both_candidate_kinds_at_once(monkeypatch):
+    """Round-5 P1: one address-overriding environment rejects BOTH
+    auto-detected candidates together — the gate is a property of the
+    environment, not of one candidate's spelling."""
+    _harness_env(monkeypatch, "postgresql://u:p@localhost/postgres")
+    monkeypatch.setenv("LOCAL_PG_SUPERUSER_PASSWORD", "pw")
+    monkeypatch.setenv("PGHOSTADDR", "10.20.30.40")
+    assert _candidate_admin_urls() == []
