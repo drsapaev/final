@@ -48,6 +48,7 @@ from __future__ import annotations
 import os
 import sys
 import threading
+import uuid
 from datetime import datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -58,9 +59,12 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-SCRATCH_DB = "rq14_check"
+SCRATCH_DB_PREFIX = "rq14_check"
+SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 
 sys.path.insert(0, str(BACKEND_DIR))
+
+from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
 
 
 def _candidate_admin_urls() -> list[str]:
@@ -74,7 +78,12 @@ def _candidate_admin_urls() -> list[str]:
         urls.append(f"postgresql://postgres:{local_pw}@localhost:5432/postgres")
     env_url = os.getenv("DATABASE_URL", "").strip()
     if env_url:
-        urls.append(env_url)
+        # PR #3468 audit P1: DATABASE_URL is usable for scratch
+        # provisioning only when EVERY endpoint it can reach (netloc host,
+        # ?host= / ?hostaddr= failover lists) is local — a remote DSN must
+        # never receive CREATE/DROP DATABASE.
+        if is_local_admin_dsn(env_url):
+            urls.append(env_url)
     return urls
 
 
@@ -130,33 +139,49 @@ def pg_engine():
 
     psycopg_dsn, sa_url = _scratch_urls(admin_url)
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        # No pre-drop: the run-unique name cannot pre-exist (a collision would
+        # take 2**48 parallel runs), and dropping a fixed name unconditionally
+        # is exactly the cross-run hazard this fixture used to carry.
         c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
-    env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
-    import subprocess  # noqa: E402
+    # PR #3468 audit P2: from this point on a scratch database EXISTS on the
+    # admin server. Run-unique names mean the next run can no longer sweep a
+    # leaked database (the old fixed-name pre-drop used to), so every
+    # provisioning step between CREATE DATABASE and the yield is
+    # failure-safe: teardown runs on ALL exit paths — a pre-yield setup
+    # failure included — instead of only after a successful yield.
+    engine = None
+    try:
+        env = dict(os.environ, DATABASE_URL=sa_url, TESTING="1")
+        import subprocess  # noqa: E402
 
-    r = subprocess.run(
-        [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
-        capture_output=True,
-        text=True,
-        cwd=str(BACKEND_DIR),
-        env=env,
-    )
-    assert r.returncode == 0, r.stderr[-1500:]
+        r = subprocess.run(
+            [sys.executable, "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"],
+            capture_output=True,
+            text=True,
+            cwd=str(BACKEND_DIR),
+            env=env,
+        )
+        assert r.returncode == 0, r.stderr[-1500:]
 
-    engine = create_engine(sa_url, future=True)
-    with engine.connect() as conn:
-        version = conn.execute(text("select version_num from alembic_version")).scalar()
-        dialect = conn.execute(text("select version()")).scalar()
-    assert version, "alembic_version must be present after upgrade"
-    assert "PostgreSQL" in (dialect or ""), "RQ-14 proof requires real PostgreSQL"
-
-    yield engine
-
-    engine.dispose()
-    with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        engine = create_engine(sa_url, future=True)
+        with engine.connect() as conn:
+            version = conn.execute(text("select version_num from alembic_version")).scalar()
+            dialect = conn.execute(text("select version()")).scalar()
+        assert version, "alembic_version must be present after upgrade"
+        assert "PostgreSQL" in (dialect or ""), "RQ-14 proof requires real PostgreSQL"
+        yield engine
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with psycopg.connect(admin_url, autocommit=True) as c:
+            # Cleanup touches ONLY the run-unique database this process created;
+            # WITH (FORCE) clears lingering connections (PG 13+), falling back
+            # to the plain form on older servers.
+            try:
+                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+            except psycopg.errors.SyntaxError:
+                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
 
 
 @pytest.fixture

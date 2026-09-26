@@ -300,3 +300,75 @@ describe('queueProfileToCsvPayload', () => {
     });
   });
 });
+
+// RQ-26.b — the CSV contract verified against the new target/lifecycle
+// contracts (D-02 archive lifecycle, E-055 public-address registry).
+describe('RQ-26.b — lifecycle round-trip (target/lifecycle contracts)', () => {
+  it('preserves archived and hidden profiles through export → parse → payload', () => {
+    const source = [
+      { key: 'syn-active', title: 'Активный', is_active: true, show_on_qr_page: true, order: 1 },
+      { key: 'syn-archived', title: 'Архивный', is_active: false, show_on_qr_page: true, order: 2 },
+      { key: 'syn-hidden', title: 'Скрытый', is_active: true, show_on_qr_page: false, order: 3 },
+      {
+        key: 'syn-archived-hidden',
+        title: 'Архивный и скрытый',
+        is_active: false,
+        show_on_qr_page: false,
+        order: 4,
+      },
+    ];
+
+    const csv = buildQueueProfilesCsv(source);
+    const { rows, issues } = parseQueueProfilesCsv(csv);
+    expect(issues).toEqual([]);
+
+    const byKey = new Map(rows.map((row) => [row.key, row]));
+    expect(byKey.get('syn-archived')).toMatchObject({ isActive: false, showOnQrPage: true });
+    expect(byKey.get('syn-hidden')).toMatchObject({ isActive: true, showOnQrPage: false });
+    expect(byKey.get('syn-archived-hidden')).toMatchObject({
+      isActive: false,
+      showOnQrPage: false,
+    });
+
+    // D-02: the archive state reaches the PUT payload explicitly — it must
+    // never be defaulted away into a resurrection.
+    expect(queueProfileToCsvPayload(byKey.get('syn-archived') as never)).toMatchObject({
+      is_active: false,
+    });
+    expect(
+      queueProfileToCsvPayload(byKey.get('syn-archived-hidden') as never)
+    ).toMatchObject({ is_active: false, show_on_qr_page: false });
+  });
+
+  it('never lets a hand-edited public_code column reach the payload (E-055)', () => {
+    const csv = [
+      'key,title,public_code,is_active',
+      '"syn-x","С синтетическим кодом","aaaaaaaaaaaa","false"',
+    ].join('\n');
+
+    const { rows, issues } = parseQueueProfilesCsv(csv);
+    // unknown_column is a non-blocking warning: the rest of the row imports.
+    expect(rows).toHaveLength(1);
+    expect(issues.map((issue) => issue.code)).toContain('unknown_column');
+    expect(issues.find((issue) => issue.code === 'unknown_column')?.column).toBe(
+      'public_code'
+    );
+
+    // E-055 §3/§6: the address is server-SSOT (generated once, never
+    // admin-typed) — the payload builder must never forward registry fields.
+    const payload = queueProfileToCsvPayload(rows[0]);
+    expect(payload).toEqual({
+      key: 'syn-x',
+      title: 'С синтетическим кодом',
+      is_active: false,
+    });
+    expect(payload).not.toHaveProperty('public_code');
+  });
+
+  it('export headers stay within the stored profile contract (no registry fields)', () => {
+    const headerLine = buildQueueProfilesCsv([]).split('\n')[0];
+    expect(headerLine).toBe(QUEUE_PROFILES_CSV_HEADERS.join(','));
+    expect(headerLine).not.toContain('public_code');
+    expect(headerLine).not.toContain('permanent_address');
+  });
+});

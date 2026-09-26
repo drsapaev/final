@@ -298,11 +298,14 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert instance_response.status_code == 200
     instance = instance_response.json()
     assert instance["status"] == "DRAFT"
+    # PR8: "preview" добавлен к неутверждённым действиям (серверный
+    # A4-preview сохранённых значений до утверждения).
     assert set(instance["available_actions"]) == {
         "edit",
         "save_draft",
         "mark_ready",
         "finalize",
+        "preview",
     }
     assert instance["can_edit"] is True
     assert instance["can_save_draft"] is True
@@ -310,6 +313,7 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert instance["can_finalize"] is True
     assert instance["can_revise"] is False
     assert instance["can_print"] is False
+    assert instance["can_preview"] is True
     assert instance["signer_snapshot"]["lab_technician_name"] == "Test Admin"
     assert instance["signer_snapshot"]["approver_name"] == "Test Admin"
 
@@ -426,6 +430,7 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert finalized["can_finalize"] is False
     assert finalized["can_revise"] is True
     assert finalized["can_print"] is True
+    assert finalized["can_preview"] is False
 
     print_once_response = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/mark-printed",
@@ -438,6 +443,7 @@ def test_lab_reporting_api_flow(client, auth_headers, db_session, test_patient, 
     assert printed["can_edit"] is False
     assert printed["can_revise"] is True
     assert printed["can_print"] is True
+    assert printed["can_preview"] is False
 
     print_twice_response = client.post(
         f"/api/v1/lab/report-instances/{instance['id']}/mark-printed",
@@ -1486,13 +1492,22 @@ def test_registrar_lab_queue_page_bounds_enrichment_after_global_dedup(monkeypat
             non_ecg_count=page_non_ecg_services_count,
         )
     )
-    assert current_cardiology_branch_is_serializable is False
+    assert current_cardiology_branch_is_serializable is True
+    # Legacy ECG-name detection can create an ECG wrapper even when the
+    # exact queue_tag serializer has no ECG service to put in that slice.
+    ecg_branch_is_serializable = today_queues._serializer_will_emit_visit(
+        filter_services=True,
+        ecg_only=True,
+        ecg_count=page_ecg_services_count,
+        non_ecg_count=page_non_ecg_services_count,
+    )
+    assert ecg_branch_is_serializable is False
     skipped_visit = {
         "type": "visit",
         "data": SimpleNamespace(id=99),
         "created_at": datetime(2026, 9, 20, 8, 0),
         "queue_time": datetime(2026, 9, 20, 8, 0),
-        "_page_serializable": current_cardiology_branch_is_serializable,
+        "_page_serializable": ecg_branch_is_serializable,
     }
 
     queues_by_specialty = {
@@ -1609,3 +1624,238 @@ def test_registrar_lab_queue_page_bounds_enrichment_after_global_dedup(monkeypat
             "entries": [{"id": 4}],
         },
     ]
+
+
+# =============================================================================
+# PR 8 (codex-lab-workflow-hardening-plan): server-rendered PDF preview.
+#
+# Два сценария (план, PR 8):
+#   1. Template preview — синтетические placeholder values, никаких данных
+#      реального пациента: GET /lab/template-versions/{version_id}/preview.
+#   2. Draft report preview — текущие сохранённые значения конкретного
+#      instance, доступ только Admin/Lab: GET /lab/report-instances/{id}/preview.
+#
+# Инварианты: Content-Disposition: inline; watermark «Черновик» для
+# неутверждённого результата; preview не вызывает mark-printed, уведомление
+# или финализацию; renderer тот же, что у финального PDF
+# (lab_report_pdf_service.render_report).
+# =============================================================================
+
+
+def _patch_render_spy(captured: dict):
+    """Подменяет render_report singleton'а лабораторного PDF-сервиса,
+    чтобы запечатлеть контекст рендера (watermark/patient/placeholders)
+    и вернуть синтетические PDF-байты без реального рендера."""
+    from app.api.v1.endpoints import lab_reporting as lab_reporting_module
+
+    service = lab_reporting_module.lab_report_pdf_service
+    original = service.render_report
+
+    def _spy(context):
+        captured.clear()
+        captured.update(context)
+        return b"%PDF-synthetic-preview"
+
+    service.render_report = _spy
+    return service, original
+
+
+@pytest.mark.integration
+def test_draft_report_preview_renders_saved_values_inline_for_lab(
+    client,
+    db_session,
+) -> None:
+    """Draft preview: Lab открывает серверный A4-рендер сохранённых значений
+    без утверждения. inline + no-store; никаких побочных эффектов."""
+    _doctor_user, doctor = _create_doctor_user(db_session, label="preview_visit")
+    patient = _create_patient(db_session)
+    visit = _create_visit(db_session, patient_id=patient.id, doctor_id=doctor.id)
+    lab_user = _create_lab_user(db_session, label="preview")
+    lab_headers = {"Authorization": f"Bearer {_mint_access_token(lab_user)}"}
+
+    instance = _create_lab_report_instance(
+        client,
+        auth_headers=lab_headers,
+        patient_id=patient.id,
+        visit_id=visit.id,
+    )
+    bulk_response = client.post(
+        f"/api/v1/lab/report-instances/{instance['id']}/bulk-values",
+        headers=lab_headers,
+        json=[{"field_key": "hgb", "value_text": "SYNTHETIC_PREVIEW_VALUE"}],
+    )
+    assert bulk_response.status_code == 200, bulk_response.text
+    # bulk-values переводит бланк DRAFT -> IN_PROGRESS (существующая
+    # семантика); preview-контракт проверяет неизменность статуса.
+    status_before_preview = bulk_response.json()["instance"]["status"]
+
+    preview_response = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}/preview",
+        headers=lab_headers,
+    )
+    assert preview_response.status_code == 200, preview_response.text
+    assert preview_response.headers["content-type"] == "application/pdf"
+    assert "inline" in preview_response.headers["content-disposition"]
+    assert f"lab-report-{instance['id']}-preview.pdf" in preview_response.headers[
+        "content-disposition"
+    ]
+    assert preview_response.headers.get("cache-control") == "private, no-store"
+    assert preview_response.content.startswith(b"%PDF")
+
+    # Preview не мутирует instance: статус, таймстемпы и actions не меняются.
+    detail_response = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}",
+        headers=lab_headers,
+    )
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    assert detail["status"] == status_before_preview
+    assert detail["printed_at"] is None
+    assert detail["finalized_at"] is None
+    assert "preview" in detail["available_actions"]
+    assert detail["can_preview"] is True
+    assert detail["can_print"] is False
+
+
+@pytest.mark.integration
+def test_draft_report_preview_passes_watermark_and_saved_values(
+    client,
+    db_session,
+) -> None:
+    """Контекст рендера preview: watermark «Черновик» для DRAFT; значения —
+    сохранённые на сервере (bulk-values), а не клиентский unsaved draft."""
+    _doctor_user, doctor = _create_doctor_user(db_session, label="wm_visit")
+    patient = _create_patient(db_session)
+    visit = _create_visit(db_session, patient_id=patient.id, doctor_id=doctor.id)
+    lab_user = _create_lab_user(db_session, label="wm")
+    lab_headers = {"Authorization": f"Bearer {_mint_access_token(lab_user)}"}
+
+    instance = _create_lab_report_instance(
+        client,
+        auth_headers=lab_headers,
+        patient_id=patient.id,
+        visit_id=visit.id,
+    )
+    bulk_response = client.post(
+        f"/api/v1/lab/report-instances/{instance['id']}/bulk-values",
+        headers=lab_headers,
+        json=[{"field_key": "hgb", "value_text": "SYNTHETIC_WM_135"}],
+    )
+    assert bulk_response.status_code == 200, bulk_response.text
+
+    captured: dict = {}
+    service, original = _patch_render_spy(captured)
+    try:
+        preview_response = client.get(
+            f"/api/v1/lab/report-instances/{instance['id']}/preview",
+            headers=lab_headers,
+        )
+    finally:
+        service.render_report = original
+    assert preview_response.status_code == 200, preview_response.text
+    assert captured.get("watermark_text") == "Черновик"
+    rendered_values = [
+        field
+        for section in captured.get("sections") or []
+        for field in section.get("fields") or []
+        if field.get("field_key") == "hgb"
+    ]
+    assert rendered_values and rendered_values[0]["value_text"] == "SYNTHETIC_WM_135"
+
+    # FINALIZED instance preview: watermark не ставится (утверждённый
+    # результат уже имеет финальный вид; печать — отдельное действие).
+    finalize_response = client.post(
+        f"/api/v1/lab/report-instances/{instance['id']}/finalize",
+        headers=lab_headers,
+    )
+    assert finalize_response.status_code == 200
+    captured.clear()
+    service, original = _patch_render_spy(captured)
+    try:
+        finalized_preview = client.get(
+            f"/api/v1/lab/report-instances/{instance['id']}/preview",
+            headers=lab_headers,
+        )
+    finally:
+        service.render_report = original
+    assert finalized_preview.status_code == 200, finalized_preview.text
+    assert not captured.get("watermark_text")
+
+
+@pytest.mark.integration
+def test_draft_report_preview_denied_for_doctor_and_registrar(
+    client,
+    db_session,
+    registrar_user,
+) -> None:
+    """Доступ только Admin/Lab (план PR 8): владелец-врач и Registrar
+    получают 403 даже на свой визит — preview неутверждённых результатов
+    остаётся лабораторной поверхностью."""
+    doctor_user, doctor = _create_doctor_user(db_session, label="pv_denied")
+    patient = _create_patient(db_session)
+    visit = _create_visit(db_session, patient_id=patient.id, doctor_id=doctor.id)
+    lab_user = _create_lab_user(db_session, label="pvdenied")
+    lab_headers = {"Authorization": f"Bearer {_mint_access_token(lab_user)}"}
+
+    instance = _create_lab_report_instance(
+        client,
+        auth_headers=lab_headers,
+        patient_id=patient.id,
+        visit_id=visit.id,
+    )
+
+    doctor_headers = _doctor_headers(client, doctor_user)
+    doctor_preview = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}/preview",
+        headers=doctor_headers,
+    )
+    assert doctor_preview.status_code == 403
+
+    registrar_headers = {
+        "Authorization": f"Bearer {_mint_access_token(registrar_user)}"
+    }
+    registrar_preview = client.get(
+        f"/api/v1/lab/report-instances/{instance['id']}/preview",
+        headers=registrar_headers,
+    )
+    assert registrar_preview.status_code == 403
+
+
+
+
+@pytest.mark.integration
+def test_draft_report_preview_404_for_missing_instance(
+    client,
+    auth_headers,
+) -> None:
+    """404 для несуществующего instance (не 500): preview-маршрут
+    валидирует существование до рендера."""
+    response = client.get(
+        "/api/v1/lab/report-instances/999999/preview",
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.integration
+def test_template_version_preview_404_and_role_denied(
+    client,
+    auth_headers,
+    registrar_user,
+) -> None:
+    """404 для несуществующей версии; Registrar не имеет доступа к preview
+    шаблона (редакторская поверхность Admin/Lab)."""
+    missing = client.get(
+        "/api/v1/lab/template-versions/999999/preview",
+        headers=auth_headers,
+    )
+    assert missing.status_code == 404
+
+    registrar_headers = {
+        "Authorization": f"Bearer {_mint_access_token(registrar_user)}"
+    }
+    denied = client.get(
+        "/api/v1/lab/template-versions/1/preview",
+        headers=registrar_headers,
+    )
+    assert denied.status_code == 403

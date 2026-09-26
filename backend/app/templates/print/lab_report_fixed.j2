@@ -5,6 +5,9 @@
   <title>{{ branding.document_title or template_name }}</title>
 </head>
 <body>
+  {% if watermark_text %}
+  <div class="pdf-watermark">{{ watermark_text }}</div>
+  {% endif %}
   <div class="page">
     {% if oam_docx_mode %}
     {% set physical_section = sections[0] if sections else none %}

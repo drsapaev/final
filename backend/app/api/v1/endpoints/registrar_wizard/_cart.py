@@ -11,9 +11,11 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
     _check_repeat_visit_eligibility,
     _load_registration_discount_settings,
     _resolve_effective_discount_mode,
+    _revalidate_cart_doctor_eligibility_locked,
 )  # noqa: F401
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.models.online_queue import DailyQueue
+from app.services.registrar_doctor_eligibility import service_routes_to_resource_queue
 from app.services.registrar_wizard_queue_assignment_service import (
     DuplicateCartResourceQueueVisitsError,
 )
@@ -115,6 +117,20 @@ def create_cart_appointments(
             cart_data.visits,
             target_day=today,
         )
+
+        # PR #3438 review P1-2 (+ round-2 P1): revalidate doctor eligibility
+        # ON THE LOCKED snapshot, after the (day, tag) prelocks and BEFORE
+        # the first visit INSERT. The unlocked gate above can race a
+        # concurrent admin deactivation/demotion that commits between the
+        # check and this cart's single commit — the cart would then create
+        # a new visit and queue entry for an ineligible doctor. The locked
+        # re-read keeps the global lock order (tag prelocks -> User FOR
+        # SHARE -> Doctor FOR SHARE; users-first mirrors update_user's
+        # lock_user_candidate_state -> _sync_doctor_active) and holds the
+        # row locks until the commit below, so an eligibility-changing
+        # UPDATE either blocks (revalidated snapshot stays valid) or is
+        # already visible here (cart rejected before any write).
+        _revalidate_cart_doctor_eligibility_locked(db, cart_data.visits)
 
         created_visits = []
         created_visit_amounts: dict[int, Decimal] = {}
@@ -556,6 +572,23 @@ def _edit_delta_quote_context(
         # Команда конвертирует ValueError в 400 на эндпоинте; квота
         # отвечает тем же 400 с тем же сообщением — контракт один.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    payloads = (
+        edit_service._find_service_payloads(
+            edit_service._coerce_services(entry.services), service
+        )
+        if entry is not None
+        else []
+    )
+    existing_qty = sum(int(edit_service._payload_quantity(p)) for p in payloads)
+    if requested_qty > existing_qty:
+        edit_service._assert_doctor_eligibility_for_addition(
+            service=service,
+            specialist_id=specialist_id,
+            entry=entry,
+            target_date=target_date,
+        )
+
     if entry is None:
         # Codex R11 #3095 (P2): the command routes a no-entry edit to
         # _create_new_queue_entry → _resolve_daily_queue, which refuses
@@ -567,32 +600,39 @@ def _edit_delta_quote_context(
         # successful quote, then the mutation returns 400). The resolution
         # expression is IDENTICAL to _resolve_daily_queue (item specialist
         # or the service's default doctor) — no drift.
+        #
+        # PR #3438 owner-verdict P1 (round 3): mirror the command's NEW
+        # resource branch too — a resource-routed non-consultation service
+        # resolves to the resource queue WITHOUT a specialist (the save
+        # delegates to get_or_create_daily_queue's registry branch, which
+        # finds-or-creates the day's resource queue), so a missing doctor
+        # must not pre-reject the quote the catalog already offered.
         resolved_specialist_id = specialist_id or service.doctor_id
-        target_queue_exists = (
-            db.query(DailyQueue.id)
-            .filter(
-                DailyQueue.day == target_date,
-                DailyQueue.queue_tag == queue_tag,
-                DailyQueue.active.is_(True),
-            )
-            .first()
-            is not None
+        resource_routed = not service.is_consultation and (
+            service_routes_to_resource_queue(db, service, target_date)
         )
-        if not target_queue_exists and not resolved_specialist_id:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"No active queue exists for queue_tag={queue_tag}; "
-                    "specialist_id is required"
-                ),
+        if not resource_routed:
+            target_queue_exists = (
+                db.query(DailyQueue.id)
+                .filter(
+                    DailyQueue.day == target_date,
+                    DailyQueue.queue_tag == queue_tag,
+                    DailyQueue.active.is_(True),
+                )
+                .first()
+                is not None
             )
+            if not target_queue_exists and not resolved_specialist_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"No active queue exists for queue_tag={queue_tag}; "
+                        "specialist_id is required"
+                    ),
+                )
         return requested_qty, None
-    payloads = edit_service._find_service_payloads(
-        edit_service._coerce_services(entry.services), service
-    )
     if not payloads:
         return requested_qty, None
-    existing_qty = sum(int(edit_service._payload_quantity(p)) for p in payloads)
     delta = requested_qty - existing_qty
     if delta < 0:
         # Codex R12 PR 3118 (P2): гвард НЕ-редактируемого состояния зеркалится

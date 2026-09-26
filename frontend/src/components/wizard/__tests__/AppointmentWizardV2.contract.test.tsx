@@ -48,7 +48,9 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
       'useEffect(() => {',
     );
 
-    expect(servicesLoadBlock).toContain('await fetchRegistrarServices()');
+    // PR #3438 round-2 P2: каталог запрашивается для дня записи
+    // (catalogTargetDate), а не для серверного дефолта «сегодня».
+    expect(servicesLoadBlock).toContain('await fetchRegistrarServices(catalogTargetDate)');
     expect(doctorsLoadBlock).toContain('await fetchRegistrarDoctors()');
     expect(doctorsLoadBlock).toContain('setDoctorsData(doctors.map(');
     // RQ-05.b (codex P2 PR 3309): каталог идёт через типизированный wrapper
@@ -142,7 +144,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(source).toContain('updatePatient(patientId, { sex: selectedPatientSex })');
   });
 
-  it('filters services by tab profile tags and department without hiding catalog on all-tab', () => {
+  it('loads the complete catalog regardless of the parent queue tab', () => {
     const source = readCombinedWizardSource();
     const servicesLoadBlock = extractSourceBlock(
       source,
@@ -150,23 +152,10 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
       'const getServiceName = useCallback((item: CartItem): string => {',
     );
 
-    // RQ-03 (F-02): legacy map/helper kept for compatibility; catalog filtering
-    // now goes through getWizardServiceTabFilter — the «Все отделения» tab
-    // (null/'') must NOT restrict the catalog, profile tags are matched against
-    // service queue_tag and profile department_key against service department_key
-    // (tag ≠ department).
-    expect(source).toContain('WIZARD_DEPARTMENT_FILTER_KEYS');
-    expect(source).toContain('getWizardDepartmentFilterKeys');
-    expect(source).toContain('echokg');
-    expect(source).toContain('getWizardServiceTabFilter');
-    expect(servicesLoadBlock).toContain('getWizardServiceTabFilter(activeTab');
-    expect(servicesLoadBlock).toContain('if (serviceTabFilter)');
-    expect(servicesLoadBlock).toContain('serviceTagSet.has(queueTag)');
-    expect(servicesLoadBlock).toContain('serviceDepartmentSet.has(departmentKey)');
-    // Неклассифицированные услуги (без отдела и тега) остаются видимыми на любой вкладке.
-    expect(servicesLoadBlock).toContain('if (!departmentKey && !queueTag) return true;');
-    expect(servicesLoadBlock).not.toContain('getWizardDepartmentFilterKeys(activeTab');
-    expect(servicesLoadBlock).not.toContain('if (activeTab && activeTab !== \'all\')');
+    expect(servicesLoadBlock).toContain('groupServices.map(wizardServiceFromCatalogEntry)');
+    expect(servicesLoadBlock).toContain('setServicesData(allServices);');
+    expect(servicesLoadBlock).not.toContain('getWizardServiceTabFilter(activeTab');
+    expect(servicesLoadBlock).not.toContain("api.get('/queues/profiles");
   });
 
   it('loads all services in edit mode while keeping category tabs active', () => {
@@ -197,8 +186,8 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(initBlock).toContain('setActiveServiceCategory(activeTabToWizardCategory(activeTab));');
     expect(initBlock).toContain('setServiceSearchQuery(\'\');');
     expect(source).toContain('editMode={editMode}');
-    // PR-25: dynamic queueProfiles param; RQ-03 (F-02): tag/department-aware filter
-    expect(servicesLoadBlock).toContain('editMode ? null : getWizardServiceTabFilter(activeTab');
+    expect(servicesLoadBlock).toContain('setServicesData(allServices);');
+    expect(servicesLoadBlock).not.toContain('getWizardServiceTabFilter(activeTab');
     expect(displayedServicesBlock).not.toContain('if (editMode) {');
     expect(displayedServicesBlock).toContain('switch (activeCategory)');
     expect(displayedServicesBlock).toContain('case \'specialists\':');
@@ -249,10 +238,57 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(editSaveBlock).toContain('if (visits.length === 0 && editMode) {');
   });
 
-  it('uses stable unique keys for doctor options in cart rows', () => {
+  it('uses stable doctor and service identities for doctor cards', () => {
     const source = readCombinedWizardSource();
 
-    expect(source).toContain('doctorOptions.map((doctor, index)');
-    expect(source).toContain('key={`${doctor.id ?? \'doctor\'}-${doctor.specialty ?? \'\'}-${index}`}');
+    expect(source).toContain('key={String(doctor.id)}');
+    expect(source).toContain('key={`${String(doctor.id)}:${String(service.id)}`}');
+  });
+});
+
+// RQ-27.b (ACCEPTANCE S-28): "перед записью повторно проверена допустимость,
+// нет молчаливой записи в закрытое" — the wizard's pre-save revalidation
+// contract, pinned at source level (repo convention: source-block pins).
+// The open wizard must also stay ISOLATED from the RQ-27.a/.b catalog
+// revalidation (it owns its own services snapshot; input is never wiped by
+// a background refresh).
+describe('AppointmentWizardV2 pre-save revalidation contract (RQ-27.b, S-28)', () => {
+  it('requires a server quote token on every submit command (no write without admissibility)', () => {
+    const source = readWizardSource();
+    // The quote token rides the QR-update, edit-delta and create commands.
+    const quoteTokenSites = source.split('quoteToken: cartQuote?.quote_token').length - 1;
+    expect(quoteTokenSites).toBeGreaterThanOrEqual(2);
+  });
+
+  it('invalidates a rejected stale quote on 409 instead of resubmitting it', () => {
+    const source = readWizardSource();
+    // Codex R6 PR 3095 pattern, pinned so the create/update/edit-delta
+    // submit paths keep the invalidate + refetch semantics.
+    const invalidations = source.split('if (updErr.status === 409 || updErr.response?.status === 409) {').length - 1
+      + source.split('if (deltaErr.status === 409 || deltaErr.response?.status === 409) {').length - 1;
+    expect(invalidations).toBeGreaterThanOrEqual(2);
+    expect(source).toContain('setCartQuote(null)');
+    expect(source).toContain('setQuoteRefreshNonce((n) => n + 1)');
+  });
+
+  it('keeps the explicit unprocessable guards: re-add / reload prompts instead of a silent partial write', () => {
+    const source = readWizardSource();
+    // Cart items without service_id → explicit re-add prompt; visits without
+    // a valid service → explicit reload prompt. Both are early-return guards
+    // BEFORE any write command — the registrar keeps their input.
+    expect(source).toContain("t('misc.aw_services_unprocessable_readd')");
+    expect(source).toContain("t('misc.aw_services_unprocessable_reload')");
+  });
+
+  it('stays isolated from catalog revalidation: no subscription to refresh events (input is never wiped mid-edit)', () => {
+    const source = readWizardSource();
+    // The wizard owns its services snapshot and reloads ONLY on open/tab
+    // change/manual reload button. The RQ-27.a/.b revalidation events must
+    // never reach the wizard — otherwise a background refresh could clobber
+    // the unsaved draft.
+    expect(source).not.toContain("'registrar:session-refresh'");
+    expect(source).not.toContain("'queue-profiles:updated'");
+    expect(source).not.toContain("'departments:updated'");
+    expect(source).not.toContain("addEventListener('visibilitychange'");
   });
 });

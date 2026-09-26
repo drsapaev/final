@@ -165,6 +165,89 @@ class TestVisitConfirmationAPI:
         response_ref = operation["responses"]["200"]["content"]["application/json"]["schema"]
         assert response_ref["$ref"] == "#/components/schemas/VisitInfoResponse"
 
+    @pytest.mark.parametrize(
+        "failure, expected_status",
+        [
+            (
+                VisitConfirmationDomainError(
+                    status_code=500, detail="SYNTHETIC-SENSITIVE-DETAIL"
+                ),
+                500,
+            ),
+            (
+                VisitConfirmationDomainError(
+                    status_code=503, detail="Internal: SYNTHETIC-SENSITIVE-DETAIL"
+                ),
+                503,
+            ),
+            (RuntimeError("SYNTHETIC-SENSITIVE-DETAIL"), 500),
+            (
+                VisitConfirmationDomainError(
+                    status_code=500,
+                    detail="Ошибка получения информации о визите: SQLAlchemy SYNTHETIC-SENSITIVE-DETAIL",
+                ),
+                500,
+            ),
+            (RuntimeError("division by zero in SYNTHETIC-SENSITIVE-DETAIL"), 500),
+        ],
+    )
+    def test_get_visit_info_hides_internal_errors(
+        self, client, monkeypatch, failure, expected_status
+    ):
+        """PR 3417 review residual P2: the legacy GET is a public
+        bearer-token route, so its 5xx error path must be as patient-safe
+        as the POST's — the service wraps raw exception text
+        (SQLAlchemy/DB internals) into its 500 detail, and the legacy GET
+        used to forward it verbatim via ``_raise_http_error``.
+        """
+        def fail_read(_service, _token):
+            raise failure
+
+        monkeypatch.setattr(VisitConfirmationService, "get_visit_info", fail_read)
+        response = client.get("/api/v1/visits/info/synthetic-error-token")
+
+        assert response.status_code == expected_status
+        assert response.json() == {"detail": "Не удалось получить информацию о визите"}
+        assert "SYNTHETIC-SENSITIVE-DETAIL" not in response.text
+
+    @pytest.mark.parametrize("status_code", [500, 503])
+    def test_visit_info_get_post_error_parity_on_5xx(
+        self, client, monkeypatch, status_code
+    ):
+        """PR 3417 review residual P2: GET and POST are identical on the
+        successful card, so the 5xx error bodies must be identical too —
+        both sanitized, no raw internal exception text on either route.
+        """
+        def fail_read(_service, _token):
+            raise VisitConfirmationDomainError(
+                status_code=status_code,
+                detail=f"Ошибка получения информации о визите: SYNTHETIC-{status_code}",
+            )
+
+        monkeypatch.setattr(VisitConfirmationService, "get_visit_info", fail_read)
+        get_response = client.get("/api/v1/visits/info/synthetic-error-token")
+        post_response = client.post(
+            "/api/v1/visits/info", json={"token": "synthetic-error-token"}
+        )
+
+        assert get_response.status_code == post_response.status_code == status_code
+        assert get_response.json() == post_response.json()
+        assert get_response.json() == {"detail": "Не удалось получить информацию о визите"}
+
+    def test_visit_info_cards_are_not_cacheable(self, client, test_visit):
+        """PR 3417 review residual P2: the card is bearer-capability PHI
+        (patient/doctor names, services, totals), so GET and POST responses
+        must never be storable by browsers or intermediaries — same policy
+        as the dental clinical content (``Cache-Control: private, no-store``).
+        """
+        token = test_visit.confirmation_token
+        get_response = client.get(f"/api/v1/visits/info/{token}")
+        post_response = client.post("/api/v1/visits/info", json={"token": token})
+
+        assert get_response.status_code == post_response.status_code == 200
+        assert get_response.headers["cache-control"] == "private, no-store"
+        assert post_response.headers["cache-control"] == "private, no-store"
+
     def test_confirm_visit_telegram_success(self, client, test_visit, test_daily_queue):
         """Тест успешного подтверждения визита через Telegram"""
         response = client.post("/api/v1/telegram/visits/confirm", json={

@@ -68,6 +68,63 @@ class MaterializationMixin(LabReportingServiceMixinBase):
         return sections
 
 
+    def materialize_template_preview(
+        self, version: LabReportTemplateVersion
+    ) -> list[dict[str, Any]]:
+        """PR8 (codex-lab-workflow-hardening-plan): секции версии шаблона со
+        синтетическими placeholder-значениями.
+
+        Никаких данных реальных пациентов и никаких сохранённых значений
+        instance: value-колонка заполняется очевидным placeholder-маркером,
+        numeric-значения отсутствуют. Референсы резолвятся тем же rule
+        engine, что и в финальном рендере (без patient-контекста правила
+        зависящие от возраста/пола откатываются к статичному
+        reference_text поля).
+        """
+        context = self._build_rule_context({}, {})
+        sections: list[dict[str, Any]] = []
+        for section in sorted(version.sections, key=lambda item: item.sort_order):
+            rows = []
+            for field_def in sorted(section.fields, key=lambda item: item.sort_order):
+                if not self._is_visible(field_def.visibility_rule, context):
+                    continue
+                reference = self._resolve_reference(field_def, context)
+                rows.append(
+                    {
+                        "id": field_def.id,
+                        "analyte_code": field_def.analyte_code,
+                        "unit_code": field_def.unit_code,
+                        "field_key": field_def.field_key,
+                        "label": field_def.label,
+                        "value_type": field_def.value_type,
+                        "unit": self._resolve_field_unit(field_def),
+                        "required": field_def.required,
+                        "reference_mode": field_def.reference_mode,
+                        "reference_text": reference.get("text"),
+                        "visibility_rule": field_def.visibility_rule,
+                        "highlight_rule": field_def.highlight_rule,
+                        "value_text": TEMPLATE_PREVIEW_PLACEHOLDER,
+                        "value_numeric": None,
+                        "comment": None,
+                        "resolved_flag": None,
+                        "resolved_flag_source": None,
+                        "resolved_flag_severity": None,
+                        "resolved_flag_meta": None,
+                    }
+                )
+            sections.append(
+                {
+                    "id": section.id,
+                    "key": section.key,
+                    "title": section.title,
+                    "sort_order": section.sort_order,
+                    "section_style": section.section_style,
+                    "fields": rows,
+                }
+            )
+        return sections
+
+
     def summarize_critical_findings(
         self, materialized_sections: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:

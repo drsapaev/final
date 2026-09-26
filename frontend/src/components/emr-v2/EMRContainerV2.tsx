@@ -12,7 +12,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * - Sticky header
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useEMR } from '../../hooks/useEMR';
 import { useEMRAutosave } from '../../hooks/useEMRAutosave';
 import { useBeforeUnload } from '../../hooks/useNavigationGuard';
@@ -31,6 +31,7 @@ import { useAppData } from '../../contexts/AppDataContext';
 // ADR-0015: use useMcpClient hook instead of importing api/mcpClient directly.
 import { useMcpClient } from '../../hooks/useMcpClient';
 import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecialty';
+import { readSavedEMRForCompletion } from './emrCompletion';
 // Analytics is handled via handleTelemetry callback
 
 // Import modular sections
@@ -96,6 +97,10 @@ interface EMRContainerV2Props {
     patientId?: string | number | null;
     specialty?: string;
     patientName?: string;
+    isReadOnly?: boolean;
+    completionBusy?: boolean;
+    onComplete?: (savedData: Record<string, unknown>) => Promise<void> | void;
+    onCompletionBlocked?: () => void;
     ICD10Component?: React.ComponentType<Record<string, unknown>> | null;
     onPersisted?: () => void | Promise<void>;
 }
@@ -208,7 +213,32 @@ export async function persistAndSignEMR(actions: {
     }
 }
 
+export async function signSavedEMR(actions: {
+    confirm: () => Promise<boolean>;
+    rowVersion: number | null;
+    sign: (options: { rowVersion: number }) => Promise<unknown>;
+}): Promise<'cancelled' | 'sign_failed' | 'sign_attempted'> {
+    let confirmed: boolean;
+    try {
+        confirmed = await actions.confirm();
+    } catch {
+        confirmed = false;
+    }
+    if (!confirmed) return 'cancelled';
+    if (!Number.isInteger(actions.rowVersion) || !actions.rowVersion || actions.rowVersion < 1) {
+        return 'sign_failed';
+    }
+
+    try {
+        const signed = await actions.sign({ rowVersion: actions.rowVersion });
+        return isRejectedEMRWrite(signed) ? 'sign_failed' : 'sign_attempted';
+    } catch {
+        return 'sign_failed';
+    }
+}
+
 interface EMRHookResult {
+    emr: { id?: string | number; status?: string } | null;
     data: EMRDataShape | null;
     status: string;
     isDirty: boolean;
@@ -221,9 +251,10 @@ interface EMRHookResult {
     isAmended: boolean;
     accessDenied: boolean;
     version: number | null;
+    rowVersion: number;
     canUndo: boolean;
     canRedo: boolean;
-    loadEMR: () => Promise<unknown>;
+    loadEMR: (forceRefresh?: boolean) => Promise<unknown>;
     saveEMR: (opts?: Record<string, unknown>) => Promise<unknown>;
     signEMR: (opts?: { rowVersion?: number }) => Promise<unknown>;
     amendEMR: (reason: string, opts?: Record<string, unknown>) => Promise<unknown>;
@@ -234,7 +265,17 @@ interface EMRHookResult {
     forceOverwrite: () => Promise<unknown>;
 }
 
-export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null, onPersisted }: EMRContainerV2Props) {
+export function EMRContainerV2({
+    visitId,
+    patientId = null,
+    specialty,
+    isReadOnly = false,
+    completionBusy = false,
+    onComplete,
+    onCompletionBlocked,
+    ICD10Component = null,
+    onPersisted,
+}: EMRContainerV2Props) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
     const { t: rawT } = useTranslation();
@@ -243,6 +284,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     const mcpAPI = useMcpClient();
     const canonicalSpecialty = normalizeSpecialty(specialty);
     const {
+        emr,
         data,
         status,
         isDirty,
@@ -255,6 +297,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         isAmended,
         accessDenied,
         version,
+        rowVersion,
         canUndo,
         canRedo,
         loadEMR,
@@ -267,6 +310,31 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         reloadFromServer,
         forceOverwrite,
     } = useEMR(visitId, { specialty: canonicalSpecialty }) as EMRHookResult;
+    const [isPreparingCompletion, setIsPreparingCompletion] = useState(false);
+    const completionScopeRef = useRef({ visitId, active: true });
+    const editingDisabled = isReadOnly || isSigned || isPreparingCompletion || completionBusy;
+    const savedEMRStatus = String(emr?.status ?? '').trim().toLowerCase();
+    const canSignReadOnly = isReadOnly
+        && Boolean(emr?.id)
+        && savedEMRStatus !== ''
+        && savedEMRStatus !== 'draft'
+        && !isDirty
+        && !isLoading
+        && !isSaving
+        && !isSigned
+        && !accessDenied
+        && !conflict
+        && version !== null
+        && version > 0
+        && rowVersion > 0;
+
+    useEffect(() => {
+        const scope = { visitId, active: true };
+        completionScopeRef.current = scope;
+        return () => {
+            scope.active = false;
+        };
+    }, [visitId]);
 
     // Get current user (doctor) for history/AI suggestions
     const { currentUser } = useAppData() as { currentUser?: { id?: string | number | null } };
@@ -281,7 +349,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         saveEMR,
         debounceMs: DEBOUNCE.autosave,
         maxWaitMs: 30000,
-        enabled: !isSigned && !accessDenied,
+        enabled: !editingDisabled && !accessDenied,
     });
 
     // Navigation guard
@@ -326,10 +394,10 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     // 🔒 1. Strict Rules for Ghost Mode
     // Auto-disable if signed, amended, or conflict occurs
     React.useEffect(() => {
-        if (isSigned || isAmended || conflict) {
+        if (isSigned || isAmended || conflict || isReadOnly || isPreparingCompletion || completionBusy) {
             setExperimentalGhostMode(false);
         }
-    }, [isSigned, isAmended, conflict]);
+    }, [isSigned, isAmended, conflict, isReadOnly, isPreparingCompletion, completionBusy]);
 
     // Auto-disable on visit change
     React.useEffect(() => {
@@ -572,7 +640,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
     // Toggle Ghost Mode with validation
     const toggleGhostMode = () => {
-        if (isSigned || isAmended) {
+        if (isSigned || isAmended || isReadOnly || isPreparingCompletion || completionBusy) {
             // QW-03 (UX audit): replaced native alert() with notify.warning to keep
             // the visual style consistent with the rest of the app and to avoid
             // blocking the main thread.
@@ -603,25 +671,96 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
     // Actions
     const handleSign = useCallback(async () => {
-        const result = await persistAndSignEMR({
-            confirm: () => confirm({
-                title: t('misc.emr_sign_title'),
-                message: t('misc.emr_sign_message'),
-                description: t('misc.emr_sign_desc'),
-                confirmLabel: t('misc.emr_sign_confirm'),
-                cancelLabel: t('misc.cancel'),
-                intent: 'primary',
-            }),
-            save: saveEMR,
-            sign: signEMR,
-            onPersisted: refreshParentStatus,
+        if ((isReadOnly && !canSignReadOnly) || isPreparingCompletion || completionBusy) return;
+        const confirmSigning = () => confirm({
+            title: t('misc.emr_sign_title'),
+            message: t('misc.emr_sign_message'),
+            description: t('misc.emr_sign_desc'),
+            confirmLabel: t('misc.emr_sign_confirm'),
+            cancelLabel: t('misc.cancel'),
+            intent: 'primary',
         });
+        // R34 (PR 3433, P2 fix): the read-only sign path must use the optimistic-lock
+        // token (row_version), NOT the clinical revision (version). signSavedEMR
+        // validates the token; persistAndSignEMR derives row_version from the save
+        // response itself and refreshes the parent status after persisting.
+        const result = isReadOnly
+            ? await signSavedEMR({ confirm: confirmSigning, rowVersion, sign: signEMR })
+            : await persistAndSignEMR({
+                confirm: confirmSigning,
+                save: saveEMR,
+                sign: signEMR,
+                onPersisted: refreshParentStatus,
+            });
         if (result === 'save_failed') {
             logger.error('[EMR] Save-and-sign stopped because the save did not return a valid non-draft version');
         } else if (result === 'sign_failed') {
-            logger.error('[EMR] Save-and-sign stopped because signing failed');
+            logger.error('[EMR] Signing stopped because the signing request failed');
         }
-    }, [saveEMR, signEMR, confirm, refreshParentStatus, t]);
+    }, [
+        saveEMR,
+        signEMR,
+        confirm,
+        t,
+        isReadOnly,
+        isPreparingCompletion,
+        completionBusy,
+        canSignReadOnly,
+        rowVersion,
+        refreshParentStatus,
+    ]);
+
+    const handleCompleteVisit = useCallback(async () => {
+        if (
+            !onComplete
+            || isReadOnly
+            || isPreparingCompletion
+            || completionBusy
+            || isLoading
+            || isSaving
+            || accessDenied
+            || conflict
+            || !emr
+            || (isSigned && isDirty)
+        ) {
+            return;
+        }
+
+        const completionScope = completionScopeRef.current;
+        setIsPreparingCompletion(true);
+        try {
+            const savedData = await readSavedEMRForCompletion({
+                shouldSave:
+                    isDirty
+                    || !emr.id
+                    || String(emr.status ?? '').trim().toLowerCase() === 'draft',
+                save: () => saveEMR({ isDraft: false }),
+                reload: () => loadEMR(true),
+            });
+            if (!completionScope.active || completionScope.visitId !== visitId) return;
+            await onComplete(savedData);
+        } catch {
+            onCompletionBlocked?.();
+        } finally {
+            setIsPreparingCompletion(false);
+        }
+    }, [
+        onComplete,
+        isReadOnly,
+        isPreparingCompletion,
+        completionBusy,
+        isLoading,
+        isSaving,
+        accessDenied,
+        conflict,
+        emr,
+        isSigned,
+        isDirty,
+        saveEMR,
+        loadEMR,
+        onCompletionBlocked,
+        visitId,
+    ]);
 
     // Keyboard shortcuts (must be after handleSign declaration)
     useEMRKeyboard({
@@ -629,11 +768,11 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         onUndo: undo,
         onRedo: redo,
         onSign: handleSign,
-        canUndo,
-        canRedo,
-        canSave: isDirty && !isSaving,
-        canSign: !isDirty && !isSaving && !isSigned,
-        enabled: true,
+        canUndo: canUndo && !editingDisabled,
+        canRedo: canRedo && !editingDisabled,
+        canSave: isDirty && !isSaving && !editingDisabled,
+        canSign: !isDirty && !isSaving && !isSigned && (!isReadOnly || canSignReadOnly) && !completionBusy,
+        enabled: (!isReadOnly || canSignReadOnly) && !isPreparingCompletion && !completionBusy,
     });
 
     if (!visitId) {
@@ -676,6 +815,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     }
 
     const handleAmend = async () => {
+        if (editingDisabled) return;
         if (amendReason.trim().length >= 10) {
             await amendEMR(amendReason);
             setShowAmendForm(false);
@@ -749,7 +889,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             variant={experimentalGhostMode ? 'primary' : 'ghost'}
                             size="small"
                             onClick={toggleGhostMode}
-                            disabled={isSigned || isAmended}
+                            disabled={editingDisabled || isAmended}
                             title={isSigned ? t('misc.emr_ghost_unavailable_title') : t('misc.emr_ghost_title')}
                             aria-label={isSigned ? t('misc.emr_ghost_unavailable_aria') : t('misc.emr_ghost_aria')}
                             aria-pressed={experimentalGhostMode}
@@ -771,13 +911,13 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
                 {/* Toolbar */}
                 <div className="emr-v2-toolbar">
-                    <Button variant="ghost" size="small" onClick={undo} disabled={!canUndo} title={t('misc.emr_undo_title')} aria-label={t('misc.emr_undo_title')}>
+                    <Button variant="ghost" size="small" onClick={undo} disabled={!canUndo || editingDisabled} title={t('misc.emr_undo_title')} aria-label={t('misc.emr_undo_title')}>
                         <Undo2 size={14} aria-hidden="true" /> {t('misc.emr_undo')}
                     </Button>
-                    <Button variant="ghost" size="small" onClick={redo} disabled={!canRedo} title={t('misc.emr_redo_title')} aria-label={t('misc.emr_redo_title')}>
+                    <Button variant="ghost" size="small" onClick={redo} disabled={!canRedo || editingDisabled} title={t('misc.emr_redo_title')} aria-label={t('misc.emr_redo_title')}>
                         <Redo2 size={14} aria-hidden="true" /> {t('misc.emr_redo')}
                     </Button>
-                    <Button variant="ghost" size="small" onClick={loadEMR} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
+                    <Button variant="ghost" size="small" onClick={() => { void loadEMR(); }} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
                         <RefreshCw size={14} aria-hidden="true" /> {t('misc.emr_refresh')}
                     </Button>
                 </div>
@@ -819,14 +959,14 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     <ComplaintsSection
                         value={data?.complaints}
                         onChange={handleFieldChange('complaints')}
-                        disabled={isSigned}
+                        disabled={editingDisabled}
                         doctorId={doctorId}
                     />
 
                     <AnamnesisMorbiSection
                         value={data?.anamnesis_morbi}
                         onChange={handleFieldChange('anamnesis_morbi')}
-                        disabled={isSigned}
+                        disabled={editingDisabled}
                         doctorId={doctorId}
                         icd10Code={data?.icd10_code || ''}
                     />
@@ -834,7 +974,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     <AnamnesisVitaeSection
                         value={data?.anamnesis_vitae}
                         onChange={handleFieldChange('anamnesis_vitae')}
-                        disabled={isSigned}
+                        disabled={editingDisabled}
                         doctorId={doctorId}
                         vitals={data?.vitals || {}}
                         onVitalsChange={handleFieldChange('vitals')}
@@ -844,7 +984,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     <ExaminationSection
                         value={data?.examination}
                         onChange={handleFieldChange('examination')}
-                        disabled={isSigned}
+                        disabled={editingDisabled}
                         specialty={data?.specialty || 'general'}
                         icd10Code={data?.icd10_code || ''}
                         complaints={data?.complaints || ''}
@@ -861,7 +1001,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                         icd10Code={data?.icd10_code}
                         onDiagnosisChange={handleFieldChange('diagnosis')}
                         onIcd10Change={handleFieldChange('icd10_code')}
-                        disabled={isSigned}
+                        disabled={editingDisabled}
                         ICD10Component={ICD10Component}
                         doctorId={doctorId}
                         experimentalGhostMode={experimentalGhostMode}
@@ -882,7 +1022,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             ...(data?.medications || {}),
                             list
                         })}
-                        disabled={isSigned}
+                        disabled={editingDisabled}
                         specialty={data?.specialty || 'general'}
                         icd10Code={data?.icd10_code || ''}
                         complaints={data?.complaints || ''}
@@ -916,7 +1056,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     <RecommendationsSection
                         value={data?.recommendations}
                         onChange={handleFieldChange('recommendations')}
-                        disabled={isSigned}
+                        disabled={editingDisabled}
                         icd10Code={data?.icd10_code || ''}
                         defaultOpen={false}
                     />
@@ -924,7 +1064,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     <NotesSection
                         value={data?.notes}
                         onChange={handleFieldChange('notes')}
-                        disabled={isSigned}
+                        disabled={editingDisabled}
                         defaultOpen={false}
                     />
 
@@ -938,7 +1078,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                                 ...(data?.specialty_data || {}),
                                 [field]: value
                             })}
-                            disabled={isSigned}
+                            disabled={editingDisabled}
                             visitId={visitId}
                             patientId={patientId}
                         />
@@ -958,7 +1098,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                                 ...(data?.specialty_data || {}),
                                 [field]: value
                             })}
-                            disabled={isSigned}
+                            disabled={editingDisabled}
                             visitId={visitId}
                             patientId={patientId}
                         />
@@ -975,7 +1115,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                                 ...(data?.specialty_data || {}),
                                 [field]: value
                             })}
-                            disabled={isSigned}
+                            disabled={editingDisabled}
                         />
                     )}
 
@@ -986,7 +1126,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     <LabResultsSection
                         patientId={patientId}
                         visitId={visitId}
-                        disabled={isSigned}
+                        disabled={editingDisabled}
                     />
                 </div>
 
@@ -997,25 +1137,42 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             <Ban size={14} aria-hidden="true" /> {t('misc.emr_no_access_save')}
                         </div>
                     )}
-                    {!isSigned ? (
+                    {isReadOnly ? (
+                        <>
+                            <div className="emr-v2-signed-badge" role="status">
+                                <CheckCircle2 size={14} aria-hidden="true" /> {t('cardio.cardio_visit_readonly')}
+                            </div>
+                            {canSignReadOnly && (
+                                <button
+                                    className="emr-v2-btn emr-v2-btn--success"
+                                    onClick={handleSign}
+                                    disabled={isPreparingCompletion || completionBusy || isSaving}
+                                    title={t('misc.emr_sign_title')}
+                                    aria-label={t('misc.emr_sign_confirm')}
+                                >
+                                    <CheckCircle2 size={14} aria-hidden="true" /> {t('misc.emr_sign_confirm')}
+                                </button>
+                            )}
+                        </>
+                    ) : !isSigned ? (
                         <>
                             <button
                                 className="emr-v2-btn emr-v2-btn--primary"
                                 onClick={() => saveManually({ isDraft: false })}
-                            disabled={isSaving || !isDirty || accessDenied}
-                            aria-label={isSaving ? t('misc.emr_saving_aria') : t('misc.emr_save_aria')}
-                        >
-                            {isSaving ? (
-                                <><Save size={14} aria-hidden="true" /> {t('misc.emr_saving')}</>
-                            ) : (
-                                <><Save size={14} aria-hidden="true" /> {t('misc.emr_save')}</>
-                            )}
-                        </button>
+                                disabled={isSaving || !isDirty || accessDenied || editingDisabled}
+                                aria-label={isSaving ? t('misc.emr_saving_aria') : t('misc.emr_save_aria')}
+                            >
+                                {isSaving ? (
+                                    <><Save size={14} aria-hidden="true" /> {t('misc.emr_saving')}</>
+                                ) : (
+                                    <><Save size={14} aria-hidden="true" /> {t('misc.emr_save')}</>
+                                )}
+                            </button>
                             {/* UX Audit Doctor M-13: комбинированная кнопка «Сохранить и подписать». */}
                             <button
                                 className="emr-v2-btn emr-v2-btn--success"
                                 onClick={handleSign}
-                                disabled={isSaving || accessDenied}
+                                disabled={isSaving || accessDenied || editingDisabled}
                                 title={accessDenied ? t('misc.emr_no_access_save_title') : t('misc.emr_save_sign_title')}
                                 aria-label={t('misc.emr_save_sign_aria')}
                             >
@@ -1032,6 +1189,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                                 <button
                                     className="emr-v2-btn emr-v2-btn--warning"
                                     onClick={() => setShowAmendForm(true)}
+                                    disabled={editingDisabled}
                                     aria-label={t('misc.emr_amend_aria')}
                                 >
                                     <FilePenLine size={14} aria-hidden="true" /> {t('misc.emr_amend')}
@@ -1043,18 +1201,20 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                                         value={amendReason}
                                         onChange={(e) => setAmendReason(e.target.value)}
                                         placeholder={t('misc.emr_amend_reason_ph')}
+                                        disabled={editingDisabled}
                                     />
                                     <div className="emr-v2-amend-actions">
                                         <button
                                             className="emr-v2-btn emr-v2-btn--primary"
                                             onClick={handleAmend}
-                                            disabled={amendReason.trim().length < 10}
+                                            disabled={amendReason.trim().length < 10 || editingDisabled}
                                         >
                                             {t('misc.emr_save')}
                                         </button>
                                         <button
                                             className="emr-v2-btn"
                                             onClick={() => setShowAmendForm(false)}
+                                            disabled={editingDisabled}
                                         >
                                             {t('misc.cancel')}
                                         </button>
@@ -1062,6 +1222,28 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                                 </div>
                             )}
                         </>
+                    )}
+                    {!isReadOnly && onComplete && (
+                        <button
+                            className="emr-v2-btn emr-v2-btn--success"
+                            onClick={() => { void handleCompleteVisit(); }}
+                            disabled={
+                                isLoading
+                                || isSaving
+                                || isPreparingCompletion
+                                || completionBusy
+                                || accessDenied
+                                || Boolean(conflict)
+                                || !emr
+                                || (isSigned && isDirty)
+                            }
+                            aria-busy={isPreparingCompletion || completionBusy}
+                        >
+                            {isPreparingCompletion || completionBusy
+                                ? <RefreshCw size={14} aria-hidden="true" />
+                                : <CheckCircle2 size={14} aria-hidden="true" />}
+                            {t('cardio.cardio_visit_complete')}
+                        </button>
                     )}
                 </div>
             </div>
@@ -1096,7 +1278,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             )}
 
             {/* Conflict dialog */}
-            {Boolean(conflict) && (
+            {!isReadOnly && Boolean(conflict) && (
                 <EMRConflictDialog
                     conflict={conflict as Record<string, unknown> | null}
                     isSigned={isSigned}

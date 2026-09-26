@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -15,6 +15,18 @@ from app.models.patient import Patient
 from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.user import User
 from app.models.visit import Visit, VisitService
+
+
+@pytest.fixture(autouse=True)
+def _use_real_doctor_id_for_shared_queue_fixture(request, db_session):
+    """These QR tests need a doctor-owned queue, whose FK is Doctor.id."""
+    if "test_daily_queue" not in request.fixturenames:
+        return
+    doctor = request.getfixturevalue("test_doctor")
+    queue = request.getfixturevalue("test_daily_queue")
+    if queue.specialist_id != doctor.id:
+        queue.specialist_id = doctor.id
+        db_session.commit()
 
 
 def _create_queue_doctor(db_session, *, label: str) -> tuple[User, Doctor]:
@@ -402,8 +414,8 @@ def test_full_update_visit_id_aggregation_ignores_other_patient_queue_entry(
     db_session.add(other_visit)
     db_session.flush()
 
-    other_queue_time = datetime(2026, 5, 31, 7, 0, tzinfo=timezone.utc)
-    current_queue_time = datetime(2026, 5, 31, 10, 0, tzinfo=timezone.utc)
+    other_queue_time = datetime(2026, 5, 31, 7, 0, tzinfo=UTC)
+    current_queue_time = datetime(2026, 5, 31, 10, 0, tzinfo=UTC)
     other_entry = OnlineQueueEntry(
         queue_id=test_daily_queue.id,
         number=80,
@@ -528,7 +540,7 @@ def test_full_update_without_visit_id_ignores_unrelated_same_day_patient_entries
         session_id=None,
         source="online",
         status="waiting",
-        queue_time=datetime(2026, 5, 31, 9, 30, tzinfo=timezone.utc),
+        queue_time=datetime(2026, 5, 31, 9, 30, tzinfo=UTC),
         services=json.dumps([], ensure_ascii=False),
     )
     db_session.add_all([unrelated_entry, current_entry])
@@ -569,7 +581,7 @@ def test_full_update_without_visit_id_matches_same_session_phone_digits(
     test_daily_queue,
     test_service,
 ):
-    existing_queue_time = datetime(2026, 5, 31, 9, 0, tzinfo=timezone.utc)
+    existing_queue_time = datetime(2026, 5, 31, 9, 0, tzinfo=UTC)
     existing_entry = OnlineQueueEntry(
         queue_id=test_daily_queue.id,
         number=20,
@@ -606,7 +618,7 @@ def test_full_update_without_visit_id_matches_same_session_phone_digits(
         session_id=None,
         source="online",
         status="waiting",
-        queue_time=datetime(2026, 5, 31, 9, 5, tzinfo=timezone.utc),
+        queue_time=datetime(2026, 5, 31, 9, 5, tzinfo=UTC),
         services=json.dumps([], ensure_ascii=False),
     )
     db_session.add_all([existing_entry, current_entry])
@@ -661,7 +673,7 @@ def test_full_update_frontend_aggregated_ids_ignore_unrelated_queue_entry(
         session_id=None,
         source="online",
         status="waiting",
-        queue_time=datetime(2026, 5, 31, 9, 0, tzinfo=timezone.utc),
+        queue_time=datetime(2026, 5, 31, 9, 0, tzinfo=UTC),
         services=json.dumps(
             [
                 {
@@ -686,7 +698,7 @@ def test_full_update_frontend_aggregated_ids_ignore_unrelated_queue_entry(
         session_id=None,
         source="online",
         status="waiting",
-        queue_time=datetime(2026, 5, 31, 9, 5, tzinfo=timezone.utc),
+        queue_time=datetime(2026, 5, 31, 9, 5, tzinfo=UTC),
         services=json.dumps([], ensure_ascii=False),
     )
     db_session.add_all([unrelated_entry, current_entry])

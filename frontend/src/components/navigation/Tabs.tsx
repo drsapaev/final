@@ -24,6 +24,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import './Tabs.css';
 import { useTranslation } from '../../i18n/useTranslation';
+import type { Doctor } from '../../types/domain/clinic';
 
 // Маппинг иконок из lucide-react
 // ⭐ SSOT: icon names from QueueProfile.icon field
@@ -45,7 +46,8 @@ const iconMap = {
   Users
 };
 
-const defaultTabColor = 'var(--mac-accent)';
+const defaultTabColor = 'var(--mac-accent, currentColor)';
+const emptyDoctors: Doctor[] = [];
 
 const toGradient = (color: string) =>
   `linear-gradient(135deg, ${color}, color-mix(in srgb, ${color}, white 14%))`;
@@ -61,6 +63,9 @@ const toGradient = (color: string) =>
 export const tabButtonIdFor = (tabKey: string): string =>
   `${encodeURIComponent(tabKey)}-tab`;
 
+export const doctorTabButtonIdFor = (doctorId: number): string =>
+  `registrar-doctor-id-${doctorId}-tab`;
+
 type IconComponent = React.ComponentType<{ size?: number | string; className?: string }>;
 
 interface TabItem {
@@ -74,9 +79,14 @@ interface TabItem {
 
 interface TabsProps {
   activeTab?: string | null;
+  activeDoctorId?: number | null;
   onTabChange?: (tab: string | null) => void;
+  onDoctorChange?: (doctorId: number | null) => void;
   onProfilesLoaded?: (profiles: unknown[]) => void;
   departmentStats?: Record<string, unknown>;
+  doctorStats?: Record<string, unknown>;
+  doctorCountLabel?: string;
+  doctors?: Doctor[];
   language?: string;
   theme?: string;
   dynamicDepartments?: unknown[];
@@ -84,9 +94,14 @@ interface TabsProps {
 
 const Tabs = ({
   activeTab,
+  activeDoctorId = null,
   onTabChange,
+  onDoctorChange,
   onProfilesLoaded,
   departmentStats = {},
+  doctorStats = {},
+  doctorCountLabel,
+  doctors = emptyDoctors,
   language = 'ru',
   theme,
   dynamicDepartments
@@ -100,6 +115,27 @@ const Tabs = ({
   // prefix for the aria-describedby targets — document-unique even with
   // multiple Tabs mounts (e.g. CSSTestPage).
   const uid = useId();
+  // The registrar doctors API already excludes inactive, internal and
+  // incomplete profiles. Keep an explicit inactive guard for other callers.
+  const doctorTabs = doctors.filter((doctor) => doctor.is_active !== false &&
+    Number.isSafeInteger(Number(doctor.id)) && Number(doctor.id) > 0);
+  const doctorTabNames = doctorTabs.map((doctor) =>
+    doctor.user?.full_name || doctor.full_name || doctor.name ||
+    t('registrarPanel.qs_doctor_fallback', { id: Number(doctor.id) }));
+  const doctorNameCounts = new Map<string, number>();
+  doctorTabNames.forEach((name) => {
+    const key = name.trim().toLocaleLowerCase();
+    doctorNameCounts.set(key, (doctorNameCounts.get(key) || 0) + 1);
+  });
+  // RQ-27.b: the vanished-active-tab fallback below reads the LATEST
+  // activeTab/onTabChange through refs so loadQueueProfiles keeps a stable
+  // identity (adding activeTab to its deps would refetch profiles on every
+  // tab switch — S-28 extra-requests budget) while still observing the
+  // current selection state.
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const onTabChangeRef = useRef(onTabChange);
+  onTabChangeRef.current = onTabChange;
 
   // ⭐ SSOT: Загрузка профилей очередей (вкладок) из БД через API
   // Tabs определяются в backend, frontend только отображает
@@ -131,6 +167,18 @@ const Tabs = ({
 
       logger.info(`✅ SSOT: Loaded ${profilesData.length} queue profiles from API (source: ${response.data.source})`);
       setTabs(profilesData);
+
+      // RQ-27.b (S-28 disable row): the active direction may have been
+      // disabled/removed in ANOTHER session. Falling back to the
+      // all-departments view is the understandable outcome — the alternative
+      // is silently sitting on a filter whose profile no longer exists.
+      // Success path ONLY: a failed refresh (fallback set below) must never
+      // deselect the user's tab. Refs keep loadQueueProfiles identity stable.
+      const currentActive = activeTabRef.current;
+      if (currentActive && !profilesData.some((profile) => profile.key === currentActive)) {
+        logger.info(`Tabs: RQ-27.b active tab "${currentActive}" vanished from profiles — resetting to all departments`);
+        onTabChangeRef.current?.(null);
+      }
 
       // ⭐ SSOT: Notify parent component about loaded profiles for filtering
       if (onProfilesLoaded) {
@@ -219,6 +267,10 @@ const Tabs = ({
     // throttle collapses the focus+visibilitychange burst into one refresh
     // (extra-requests budget per ACCEPTANCE S-28). loadQueueProfiles already
     // replaces state only on success, so a failed refresh keeps current tabs.
+    // RQ-27.b (S-28 reconnect + manual refresh): the browser `online` event
+    // covers a network drop/restoration cycle that never lost focus, and the
+    // panel manual-refresh button dispatches `registrar:session-refresh` —
+    // both run the SAME throttled silent revalidation below.
     let lastFocusRefreshAt = 0;
     const FOCUS_REFRESH_MIN_INTERVAL_MS = 5000;
     const refreshIfDue = () => {
@@ -234,12 +286,16 @@ const Tabs = ({
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', refreshIfDue);
+    window.addEventListener('online', refreshIfDue);
+    window.addEventListener('registrar:session-refresh', refreshIfDue);
 
     return () => {
       window.removeEventListener('queue-profiles:updated', handleProfilesUpdate);
       window.removeEventListener('departments:updated', handleProfilesUpdate);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', refreshIfDue);
+      window.removeEventListener('online', refreshIfDue);
+      window.removeEventListener('registrar:session-refresh', refreshIfDue);
     };
   }, [loadQueueProfiles]);
 
@@ -252,8 +308,10 @@ const Tabs = ({
 
   // Обновление позиции индикатора
   useEffect(() => {
-    if (activeTab && tabsRef.current) {
-      const activeButton = tabsRef.current.querySelector(`[data-tab="${activeTab}"]`);
+    if ((activeTab || activeDoctorId != null) && tabsRef.current) {
+      const activeButton = activeDoctorId != null
+        ? tabsRef.current.querySelector(`[data-doctor-id="${activeDoctorId}"]`)
+        : tabsRef.current.querySelector(`[data-tab="${activeTab}"]`);
       if (activeButton) {
         const rect = activeButton.getBoundingClientRect();
         const containerRect = tabsRef.current.getBoundingClientRect();
@@ -267,21 +325,23 @@ const Tabs = ({
     } else {
       setIndicatorStyle({ opacity: 0 });
     }
-  }, [activeTab, tabs]);
+  }, [activeTab, activeDoctorId, tabs, doctors]);
 
   // Получение статистики для отдела
-  const getStats = (tabKey: string) => {
-    const stats = (departmentStats[tabKey] || {}) as Record<string, unknown>;
+  const getStats = (tabKey: string, doctor = false) => {
+    const stats = ((doctor ? doctorStats : departmentStats)[tabKey] || {}) as Record<string, unknown>;
     return {
       todayCount: Number(stats.todayCount ?? 0),
       hasActiveQueue: Boolean(stats.hasActiveQueue),
       hasPendingPayments: Boolean(stats.hasPendingPayments)
     };
   };
+  const countLabel = (doctor: boolean) => doctor && doctorCountLabel
+    ? doctorCountLabel : t('registrarPanel.today');
 
   // Рендер индикаторов статуса
-  const renderStatusIndicators = (tabKey: string) => {
-    const stats = getStats(tabKey);
+  const renderStatusIndicators = (tabKey: string, doctor = false) => {
+    const stats = getStats(tabKey, doctor);
     const indicators: React.ReactNode[] = [];
     if (stats.hasActiveQueue) {
       indicators.push(
@@ -324,7 +384,7 @@ const Tabs = ({
         <div
           key="count"
           className="status-indicator count"
-          title={`${t('registrarPanel.today')}: ${String(stats.todayCount ?? '')}`}>
+          title={`${countLabel(doctor)}: ${String(stats.todayCount ?? '')}`}>
 
           {String(stats.todayCount ?? '')}
         </div>
@@ -351,8 +411,8 @@ const Tabs = ({
   // whitespace-free, so the key is percent-encoded (injective +
   // deterministic, no cross-key collisions).
   const statusIdFor = (tabKey: string) => `${uid}-status-${encodeURIComponent(tabKey)}`;
-  const hasStatusFor = (tabKey: string) => {
-    const s = getStats(tabKey);
+  const hasStatusFor = (tabKey: string, doctor = false) => {
+    const s = getStats(tabKey, doctor);
     return s.hasActiveQueue || s.hasPendingPayments || s.todayCount > 0;
   };
   // AXE-MOB-1 (Codex P2 round 2, thread 3944985044): the description target
@@ -373,12 +433,12 @@ const Tabs = ({
   //     payments") — payment-specific, not the generic queue state word;
   //   - today count: registrarPanel.today + the count — this pairing IS
   //     semantically correct ("Сегодня: N" = appointments dated today).
-  const statusTextFor = (tabKey: string): string => {
-    const s = getStats(tabKey);
+  const statusTextFor = (tabKey: string, doctor = false): string => {
+    const s = getStats(tabKey, doctor);
     const parts: string[] = [];
     if (s.hasActiveQueue) parts.push(t('final.tgs_active_queue'));
     if (s.hasPendingPayments) parts.push(t('registrarPanel.pending_payments'));
-    if (s.todayCount > 0) parts.push(`${t('registrarPanel.today')}: ${s.todayCount}`);
+    if (s.todayCount > 0) parts.push(`${countLabel(doctor)}: ${s.todayCount}`);
     return parts.join(', ');
   };
 
@@ -408,7 +468,7 @@ const Tabs = ({
   };
 
   // Показываем заглушку пока загружаются вкладки
-  if (loading) {
+  if (loading && tabs.length === 0 && doctorTabs.length === 0) {
     return (
       <div className="modern-tabs">
         <div
@@ -449,7 +509,7 @@ const Tabs = ({
 
         {/* Кнопка t('misc.mt_vse_otdeleniya') */}
         <button
-          className={`tab-button all-departments ${!activeTab ? 'active' : ''}`}
+          className={`tab-button all-departments ${!activeTab && activeDoctorId == null ? 'active' : ''}`}
           onClick={() => onTabChange?.(null)}
           // AXE-MOB-1 (Mobile Chrome registrar:light/dark, axe button-name):
           // Tabs.css hides .tab-label at <=768px, collapsing this control to
@@ -458,7 +518,7 @@ const Tabs = ({
           // widths keeps WCAG 2.5.3 Label-in-Name satisfied).
           aria-label={t('queue.all_departments')}
           style={{
-            color: !activeTab ? 'var(--mac-accent)' : colors.text
+            color: !activeTab && activeDoctorId == null ? 'var(--mac-accent)' : colors.text
           }}>
 
           <div className="tab-icon">
@@ -489,7 +549,7 @@ const Tabs = ({
             aria-hidden="true"
             style={{
               ...indicatorStyle,
-              background: activeTab ? tabs.find((tb) => tb.key === activeTab)?.gradient : 'transparent'
+              background: activeDoctorId != null ? toGradient(defaultTabColor) : activeTab ? tabs.find((tb) => tb.key === activeTab)?.gradient : 'transparent'
             }} />
 
 
@@ -510,7 +570,7 @@ const Tabs = ({
                 // stays in the Tab sequence; with NO selection (the
                 // all-departments view) every tab remains tabbable,
                 // preserving today's keyboard order in the default view.
-                tabIndex={isActive || activeTab == null ? 0 : -1}
+                tabIndex={isActive || activeTab == null && activeDoctorId == null ? 0 : -1}
                 onKeyDown={(event) => onTabKeyDown(event, index)}
                 className={`tab-button department ${isActive ? 'active' : ''}`}
                 onClick={() => onTabChange?.(isActive ? null : tab.key)}
@@ -524,8 +584,8 @@ const Tabs = ({
                 aria-label={tab.label}
                 aria-describedby={hasStatusFor(tab.key) ? statusIdFor(tab.key) : undefined}
                 style={{
-                  color: isActive ? 'var(--mac-text-primary)' : colors.text,
-                  backgroundColor: isActive ? 'color-mix(in srgb, var(--mac-nav-item-active), transparent 70%)' : 'transparent',
+                  color: isActive ? 'var(--mac-text-primary, currentColor)' : colors.text,
+                  backgroundColor: isActive ? 'color-mix(in srgb, var(--mac-nav-item-active, currentColor), transparent 70%)' : 'transparent',
                   '--tab-color': tab.color,
                   '--tab-gradient': tab.gradient
                 } as CSSProperties}>
@@ -556,6 +616,51 @@ const Tabs = ({
                 <div className="ripple-effect" />
               </button>);
 
+          })}
+          {doctorTabs.length > 0 && tabs.length > 0 && (
+            <div className="tabs-divider" aria-hidden="true" style={{ backgroundColor: colors.border }} />
+          )}
+          {doctorTabs.map((doctor, index) => {
+            const doctorId = Number(doctor.id);
+            const name = doctorTabNames[index];
+            const label = (doctorNameCounts.get(name.trim().toLocaleLowerCase()) || 0) > 1
+              ? `${name} · #${doctorId}` : name;
+            const isActive = activeDoctorId === doctorId;
+            const statusKey = `doctor:${doctorId}`;
+            return (
+              <button
+                key={`doctor-${doctorId}`}
+                type="button"
+                data-doctor-id={doctorId}
+                id={doctorTabButtonIdFor(doctorId)}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls="main-content"
+                aria-label={label}
+                aria-describedby={hasStatusFor(String(doctorId), true) ? statusIdFor(statusKey) : undefined}
+                title={label}
+                tabIndex={isActive || activeTab == null && activeDoctorId == null ? 0 : -1}
+                onKeyDown={(event) => onTabKeyDown(event, tabs.length + index)}
+                onClick={() => onDoctorChange?.(isActive ? null : doctorId)}
+                className={`tab-button department doctor ${isActive ? 'active' : ''}`}
+                style={{
+                  color: isActive ? 'var(--mac-text-primary)' : colors.text,
+                  backgroundColor: isActive ? 'color-mix(in srgb, var(--mac-nav-item-active), transparent 70%)' : 'transparent',
+                  '--tab-color': defaultTabColor,
+                  '--tab-gradient': toGradient(defaultTabColor),
+                } as CSSProperties}>
+                <div className="tab-content">
+                  <div className="tab-icon"><UserCheck size={16} /></div>
+                  <span className="tab-label">{label}</span>
+                  <div className="status-indicators">{renderStatusIndicators(String(doctorId), true)}</div>
+                  {hasStatusFor(String(doctorId), true) && (
+                    <span id={statusIdFor(statusKey)} className="sr-only">
+                      {statusTextFor(String(doctorId), true)}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
           })}
         </div>
       </div>
