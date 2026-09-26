@@ -56,6 +56,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import time
 from pathlib import Path
 
 import psycopg
@@ -219,6 +220,27 @@ def pg_session(pg_engine):
     yield session
     session.rollback()
     session.close()
+
+
+@pytest.fixture(autouse=True)
+def _no_time_gate(monkeypatch):
+    """Neutralize the 07:00 same-day online-booking window (rq16d/rq24b
+    canon): the CSV lifecycle assertions are clock-independent, but the
+    public start-session refuses same-day anonymous joins before the
+    window (queue_svc._operations reads ONLINE_QUEUE_START_TIME off BOTH
+    the service class and the mixin base), so a backend suite executing
+    this module before 07:00 clinic-local time would fail
+    test_csv_archive_payload_… deterministically (2026-09-26 CI: two
+    Unified attempts died at 06:35/06:50 local on exactly that 400).
+    Patching the window to midnight makes the refusal branch
+    (``now.time() < time(0, 0)``) unreachable on any clock."""
+    from app.services.queue_svc import QueueBusinessService
+    from app.services.queue_svc._base import QueueBusinessServiceMixinBase
+
+    monkeypatch.setattr(QueueBusinessService, "ONLINE_QUEUE_START_TIME", time(0, 0))
+    monkeypatch.setattr(
+        QueueBusinessServiceMixinBase, "ONLINE_QUEUE_START_TIME", time(0, 0)
+    )
 
 
 @pytest.fixture
