@@ -951,6 +951,59 @@ jobs:
         fi
         echo "✓ Lab dirty-guard E2E count invariant intact: $PASSED passed, $SKIPPED skipped, $FAILED failed (expected ≥ $EXPECTED_COUNT)."
 
+    - name: 🧪 Lab full-path e2e (Chromium)
+      run: |
+        cd frontend
+        # Final gate remainder (codex-lab-workflow-hardening plan, §Final
+        # gate execution record): непрерывный сквозной mocked-путь одной
+        # спекой — очередь -> создать -> заполнить -> сохранить -> preview ->
+        # утвердить -> PDF-печать -> revise -> история. До этой спеки
+        # revise-контракт покрывался только на API-уровне
+        # (test_lab_reporting_api_flow); на browser-уровне revise встречался
+        # лишь mock-фикстурой available_actions. Отдельный блокирующий шаг
+        # по прецеденту lab-dirty-guard (UX-батч не трогаем: свой 131-count
+        # invariant). Спека мутационно верифицирована (сломанный
+        # revise/preview/finalize контракт падает в своей фазе) и стабильна
+        # с retries=0 (64/64 вместе с остальными lab-спеками).
+        set -o pipefail
+        npx playwright test e2e/lab-full-path.spec.ts --project=chromium --retries=0 2>&1 | tee lab-full-path-output.txt
+
+    - name: 🔒 Lab full-path E2E test count invariant
+      run: |
+        cd frontend
+        # Тот же контракт, что у lab-dirty-guard count invariant выше: спека
+        # реально исполнила все тесты — никаких тихих пропусков
+        # (философия инцидента PR #2715). Обновляйте EXPECTED_COUNT при
+        # осознанном добавлении/удалении тестов.
+        EXPECTED_COUNT=1
+        if [ ! -f lab-full-path-output.txt ]; then
+          echo "ERROR: lab-full-path-output.txt not found. The Lab full-path step may not have run."
+          exit 1
+        fi
+        FAILED_SUMMARY=$(grep -E "^\s+[0-9]+ failed" lab-full-path-output.txt | tail -1 || echo "0 failed")
+        PASSED_SUMMARY=$(grep -E "^\s+[0-9]+ passed" lab-full-path-output.txt | tail -1 || echo "0 passed")
+        SKIPPED_SUMMARY=$(grep -E "^\s+[0-9]+ skipped" lab-full-path-output.txt | tail -1 || echo "0 skipped")
+        echo "Playwright summary: $FAILED_SUMMARY $PASSED_SUMMARY $SKIPPED_SUMMARY"
+        PASSED=$(echo "$PASSED_SUMMARY" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "0")
+        SKIPPED=$(echo "$SKIPPED_SUMMARY" | grep -oE "[0-9]+ skipped" | grep -oE "[0-9]+" || echo "0")
+        FAILED=$(echo "$FAILED_SUMMARY" | grep -oE "[0-9]+ failed" | grep -oE "[0-9]+" || echo "0")
+        echo "Parsed: passed=$PASSED skipped=$SKIPPED failed=$FAILED"
+        if [ "$FAILED" != "0" ]; then
+          echo "ERROR: $FAILED test(s) failed. Lab full-path E2E must have 0 failures."
+          exit 1
+        fi
+        if [ "$SKIPPED" != "0" ]; then
+          echo "ERROR: $SKIPPED test(s) skipped. Lab full-path E2E must have 0 skipped (no test.fixme/test.skip allowed)."
+          echo "If a test was intentionally skipped, remove the skip and fix the test, or update EXPECTED_COUNT."
+          exit 1
+        fi
+        if [ "$PASSED" -lt "$EXPECTED_COUNT" ]; then
+          echo "ERROR: Only $PASSED tests passed, expected at least $EXPECTED_COUNT."
+          echo "This means some tests were silently excluded. Check for test.fixme/test.skip."
+          exit 1
+        fi
+        echo "✓ Lab full-path E2E count invariant intact: $PASSED passed, $SKIPPED skipped, $FAILED failed (expected ≥ $EXPECTED_COUNT)."
+
     - name: 📸 Update visual regression baseline snapshots (manual only)
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_snapshots == 'true'
       run: |
