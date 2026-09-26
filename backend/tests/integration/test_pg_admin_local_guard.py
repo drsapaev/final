@@ -13,6 +13,12 @@ two-source fixtures, ``_preprovisioned_local_url``) of every fixture module
 changed by PR #3468 — wiring level, all 16 files — plus the shared
 validator matrix (``tests._pg_admin_guard``). No PostgreSQL server is
 required: this is pure DSN-admission logic.
+
+Follow-up sibling PR: the two lock-proof fixtures that stayed on main
+(``test_schedule_create_lock_pg``, ``test_portal_department_booking_lock_pg``)
+carried the same P1 class — their DATABASE_URL branch admitted ANY ``?host=``
+value (no prefix check, no list parsing) and any loopback netloc with a
+non-local ``?hostaddr=``. They are wired into the same matrix below.
 """
 
 from __future__ import annotations
@@ -53,9 +59,17 @@ UNGUARDED_MODULES = [
     "test_rq16c_direction_public_address_pg",
     "test_rq16d_public_direction_runtime",
 ]
-ALL_FIXTURE_MODULES = SOCKET_AWARE_MODULES + UNGUARDED_MODULES + [
-    "test_rq14_qr_desk_owner_consistency_pg",  # characterization, unguarded
+# Sibling follow-up PR: the two lock-proof fixtures on main with the same
+# P1 class (any-``?host=`` admission + hostaddr bypass on loopback netloc).
+SIBLING_MODULES = [
+    "test_schedule_create_lock_pg",
+    "test_portal_department_booking_lock_pg",
 ]
+ALL_FIXTURE_MODULES = (
+    SOCKET_AWARE_MODULES + UNGUARDED_MODULES + SIBLING_MODULES + [
+        "test_rq14_qr_desk_owner_consistency_pg",  # characterization, unguarded
+    ]
+)
 TWO_SOURCE_MODULES = [  # fallback path via _preprovisioned_local_url
     "test_doctor_panel_queue_tag_visibility",
     "test_qr_selection_join_visibility",
@@ -128,7 +142,7 @@ def test_loopback_tcp_dsn_still_accepted(monkeypatch, modname):
     ), f"{modname} lost the loopback TCP candidate: {urls}"
 
 
-@pytest.mark.parametrize("modname", SOCKET_AWARE_MODULES)
+@pytest.mark.parametrize("modname", SOCKET_AWARE_MODULES + SIBLING_MODULES)
 def test_pure_local_socket_dsn_still_accepted(monkeypatch, modname):
     """Positive pin: the userspace pgserver socket DSN stays usable."""
     mod = _load(modname)
