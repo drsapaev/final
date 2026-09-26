@@ -829,15 +829,22 @@ def create_patient_portal_booking(
             raise _raise_scope_error(
                 exc, _booking_scope_status_code(exc.reason)
             ) from exc
-        # P1 (round 2): resolve BEFORE any mutation — unknown/inactive keys are a
-        # 400, never a silently-NULL routing context on the created row.
-        # Round-4 (owner P2): SSOT-NORMALIZED draft value (see preview).
-        # Round-12 parity note (PR #3386 merge): the resolution stays UP FRONT
-        # (the owner-reviewed #3402 order) — the Mini App surface keeps its
-        # eligibility-first ordering, the divergence is intentional and
-        # flagged for review.
-        department_row = _resolve_portal_department(db, preview.draft.department)
-
+        # P1 (round 2): unknown/inactive keys are a 400, never a
+        # silently-NULL routing context on the created row — the resolve
+        # below still runs BEFORE any mutation (the doctor lock and the
+        # eligibility read are non-mutating).
+        # Round-12 parity note (PR #3386 merge): the resolution stayed UP
+        # FRONT (the owner-reviewed #3402 order) with the divergence from
+        # the Mini App create flagged for review.
+        # Fresh-pass unification (owner directive, post-PR-3457): the
+        # submitted-key resolution moved INTO the post-eligibility branch —
+        # both create surfaces now share the Mini App's eligibility-first
+        # ordering (a request that is both ineligible-doctor AND
+        # bad-department answers the established 404/409
+        # doctor_not_eligible contract, not the request-shaped routing
+        # 400). The department-only branch resolves its own row: there is
+        # no eligibility gate on that path, so the request-shaped 400s
+        # still apply first.
         draft_payload = preview.draft.to_appointment_create_payload()
 
         if preview.draft.doctor_id is not None:
@@ -858,6 +865,12 @@ def create_patient_portal_booking(
                     },
                 ) from exc
 
+            # Fresh-pass unification: eligibility precedes the submitted-key
+            # resolution (Mini App create parity, resolve_booking_department
+            # SSOT helper — same request-shaped 400s, same normalized draft
+            # key).
+            department_row = _resolve_portal_department(db, preview.draft.department)
+
             if doctor_row is not None:
                 # Round-9 (owner P1): the persisted routing context is the
                 # doctor's CANONICAL department — resolved AFTER eligibility
@@ -870,6 +883,14 @@ def create_patient_portal_booking(
                 department_row = _resolve_doctor_routing_department(
                     doctor_row, department_row
                 )
+
+        else:
+            # Fresh-pass unification (department-only booking): no doctor
+            # means no eligibility gate, so the submitted key resolves HERE
+            # — the request-shaped 400s keep answering first on this path.
+            # The atomic FOR UPDATE re-validation still happens in
+            # `lock_department_for_booking` below, before the INSERT.
+            department_row = _resolve_portal_department(db, preview.draft.department)
 
         # Merged-#3340 follow-up (owner P1): the final routing department is
         # re-read under the booking row lock and `active` re-validated
