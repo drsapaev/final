@@ -280,4 +280,71 @@ describe('DermaVisitGallery', () => {
     });
     expect(screen.queryByRole('img')).toBeNull();
   });
+
+  it('runs AI analysis only on click with {visit_id, file_id} and shows the suggestion', async () => {
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') return listResponse([
+        { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+      ]);
+      if (url === '/files/5/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+    apiState.post.mockImplementation(async (url: string) => {
+      if (url === '/ai/v2/analyze-skin-file') {
+        return {
+          data: {
+            status: 'success',
+            data: { content: 'SYNTHETIC suggestion' },
+            provider: 'mock',
+            ai_notice: 'AI suggestions are advisory only',
+            requires_doctor_confirmation: true,
+            decision_boundary: 'suggestion_only',
+          },
+        };
+      }
+      throw new Error(`unexpected POST ${url}`);
+    });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+    // До клика анализа нет
+    expect(apiState.post).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_ai_button_aria:derma.derma_gallery_category_examination' }));
+    await waitFor(() => {
+      expect(apiState.post).toHaveBeenCalledTimes(1);
+      expect(apiState.post).toHaveBeenCalledWith('/ai/v2/analyze-skin-file', { visit_id: 900, file_id: 5 });
+    });
+    await waitFor(() => {
+      expect(screen.getByText('SYNTHETIC suggestion')).toBeTruthy();
+      expect(screen.getByText('derma.derma_gallery_ai_confirmation')).toBeTruthy();
+      expect(screen.getByText('AI suggestions are advisory only')).toBeTruthy();
+    });
+  });
+
+  it('keeps photos accessible when AI analysis fails with 503', async () => {
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') return listResponse([
+        { id: 5, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+      ]);
+      if (url === '/files/5/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+    apiState.post.mockRejectedValueOnce(new Error('503 feature disabled'));
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_ai_button_aria:derma.derma_gallery_category_examination' }));
+    await waitFor(() => {
+      expect(screen.getByText('derma.derma_gallery_ai_error')).toBeTruthy();
+    });
+    // Фото остаётся доступным после ошибки/503
+    expect(screen.getByRole('img')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'derma.derma_gallery_delete_aria:derma.derma_gallery_category_examination' })).toBeTruthy();
+  });
 });

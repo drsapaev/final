@@ -16,8 +16,9 @@ Each model enforces field types, length limits, and enum constraints.
 """
 
 from typing import Any
+import base64
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
@@ -31,6 +32,7 @@ from app.schemas.ai_gateway import (
     AnalyzeComplaintsRequest,
     AnalyzeDocumentRequest,
     AnalyzeECGRequest,
+    AnalyzeSkinFileRequest,
     AnalyzeSkinRequest,
     DifferentialDiagnosisRequest,
     DrugInteractionRequest,
@@ -210,6 +212,74 @@ async def analyze_skin(
         specialty="dermatology"
     )
 
+    return response
+
+
+@router.post("/analyze-skin-file", response_model=AIResponse, dependencies=[Depends(RequireAiFeature("ai_complaint_analysis"))])
+async def analyze_skin_file(
+    request: AnalyzeSkinFileRequest,
+    current_user: User = Depends(require_ai_permission(AIPermission.ANALYZE_IMAGE)),
+    db: Session = Depends(get_db)
+):
+    """
+    Анализ СОХРАНЁННОГО фото визита (пункт 9 плана аудита дерматологии).
+
+    Клиент передаёт только {visit_id, file_id}; байты изображения сервер
+    загружает сам после проверки доступа. Ответ — только подсказка:
+    обязательные корневые поля requires_doctor_confirmation=True,
+    decision_boundary="suggestion_only", ai_notice гарантируются моделью
+    AIResponse. Результат никогда не записывается в ЭМК автоматически.
+
+    Requires: ANALYZE_IMAGE permission (Doctor, Dermatologist)
+    Feature flag: ai_complaint_analysis (503 when disabled)
+    """
+    from app.api.v1.endpoints.file_system import (
+        _dermatology_visit_is_owned,
+        _is_dermatology_user,
+    )
+    from app.crud.file_system import file as file_crud
+    from app.services.file_system_service import get_file_system_service
+
+    candidate = file_crud.get(db, id=request.file_id)
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Файл не найден или нет доступа")
+
+    # Привязка к визиту: файл должен принадлежать указанному визиту.
+    if candidate.visit_id != request.visit_id:
+        raise HTTPException(status_code=404, detail="Файл не найден или нет доступа")
+
+    # Доступ зеркалирует GET /files/{file_id}: derma — только свой визит,
+    # затем ownership/share-проверка сервисного слоя (чужие приватные файлы
+    # других врачей недоступны — расширение доступа не производится).
+    if _is_dermatology_user(current_user):
+        if not _dermatology_visit_is_owned(
+            db,
+            current_user,
+            patient_id=candidate.patient_id,
+            visit_id=candidate.visit_id,
+        ):
+            raise HTTPException(status_code=404, detail="Файл не найден или нет доступа")
+
+    service = get_file_system_service()
+    file_obj = service.get_file(db, request.file_id, current_user.id)
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="Файл не найден или нет доступа")
+
+    if not (file_obj.mime_type or "").startswith("image/"):
+        raise HTTPException(status_code=400, detail="Файл должен быть изображением")
+
+    content, _filename, _mime_type = service.download_file(
+        db, request.file_id, current_user.id
+    )
+    image_data = base64.b64encode(content).decode("ascii")
+
+    gateway = get_ai_gateway()
+    response = await gateway.execute(
+        task_type=AITaskType.SKIN_ANALYSIS,
+        payload={"image_data": image_data},
+        user_id=current_user.id,
+        specialty="dermatology",
+    )
     return response
 
 

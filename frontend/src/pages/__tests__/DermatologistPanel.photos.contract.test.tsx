@@ -101,9 +101,21 @@ describe('dermatologist visit photos contract (item 8)', () => {
     }
   });
 
-  it('does not auto-run AI analysis on upload (item 9 preview: click-only)', () => {
-    expect(gallery).not.toContain('/ai/');
-    expect(gallery).not.toContain('analyzeSkin');
-    expect(gallery).not.toContain('useEMRAI');
+  it('does not auto-run AI analysis on upload; analysis is click-only via analyze-skin-file (item 9)', () => {
+    const galleryCode = gallery
+      .replace(/\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    // Пункт 9: анализ только по нажатию, POST /ai/v2/analyze-skin-file
+    expect(galleryCode).toContain('(\'/ai/v2/analyze-skin-file\'');
+    expect(galleryCode).toContain('handleAnalyze');
+    expect(galleryCode).toContain('void handleAnalyze(photo.id)');
+    expect(galleryCode).toContain('visit_id,');
+    expect(galleryCode).toContain('file_id,');
+    // Подсказка никогда не пишется в ЭМК: у галереи нет onChange/specialty_data
+    expect(galleryCode).not.toContain('specialty_data');
+    expect(galleryCode).not.toContain('onChange?.(\'photos\'');
+    // Загрузка фото не запускает анализ
+    expect(galleryCode).not.toContain('useEMRAI');
+    expect(galleryCode).not.toContain('/ai/skin-analyze');
   });
 });

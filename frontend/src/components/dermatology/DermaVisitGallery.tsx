@@ -10,7 +10,7 @@
  * - псевдозагрузки File/blob: в JSON ЭМК нет — галерея не пишет в specialty_data.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, Image as ImageIcon, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { AlertCircle, Image as ImageIcon, RefreshCw, Sparkles, Trash2, Upload, X } from 'lucide-react';
 import { api } from '../../api/client';
 import notify from '../../services/notify';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
@@ -56,6 +56,13 @@ interface DermaVisitGalleryProps {
   disabled?: boolean;
 }
 
+interface SkinFileAnalysisState {
+  fileId: number;
+  status: 'loading' | 'done' | 'error';
+  suggestion?: string;
+  aiNotice?: string;
+}
+
 const LIST_PAGE_SIZE = 100;
 
 export function DermaVisitGallery({ patientId, visitId, disabled = false }: DermaVisitGalleryProps) {
@@ -66,6 +73,7 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
   const [uploading, setUploading] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [activeCategory, setActiveCategory] = useState<DermaPhotoCategory>('examination');
+  const [analysis, setAnalysis] = useState<SkinFileAnalysisState | null>(null);
   const objectUrlsRef = useRef<Set<string>>(new Set());
   const loadSeqRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -157,6 +165,36 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
     }
   }, [activeCategory, patientId, visitId, loadGallery, t]);
 
+  // AI-анализ сохранённого фото — ТОЛЬКО по нажатию (пункт 9 плана аудита).
+  // Ответ — подсказка: показывается в панели и никогда не записывается в ЭМК
+  // (компонент не имеет onChange в specialty_data). Ошибка/503 не ломают галерею.
+  const handleAnalyze = useCallback(async (photoId: number) => {
+    setAnalysis({ fileId: photoId, status: 'loading' });
+    try {
+      const response = await api.post<{
+        status?: string;
+        data?: { content?: unknown };
+        ai_notice?: string;
+        requires_doctor_confirmation?: boolean;
+        decision_boundary?: string;
+      }>('/ai/v2/analyze-skin-file', {
+        visit_id: visitId,
+        file_id: photoId,
+      });
+      const payload = response.data ?? {};
+      const content = payload.data?.content;
+      setAnalysis({
+        fileId: photoId,
+        status: 'done',
+        suggestion: typeof content === 'string' && content.trim() ? content : '',
+        aiNotice: typeof payload.ai_notice === 'string' ? payload.ai_notice : '',
+      });
+    } catch (error) {
+      logger.error('[DermaVisitGallery] AI analysis failed:', error);
+      setAnalysis({ fileId: photoId, status: 'error' });
+    }
+  }, [visitId]);
+
   const handleDelete = useCallback(async (photoId: number) => {
     try {
       await api.delete(`/files/${photoId}`);
@@ -241,16 +279,53 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
                 <div className="derma-gallery-item-placeholder" aria-label={t('derma.derma_gallery_photo_alt', { category: t(`derma.derma_gallery_category_${photo.category}`) })}>
                   <ImageIcon size={24} aria-hidden="true" />
                 </div>}
-              {!disabled &&
+              <div className="derma-gallery-item-actions">
                 <button
                   type="button"
-                  className="derma-gallery-delete"
-                  aria-label={t('derma.derma_gallery_delete_aria', { category: t(`derma.derma_gallery_category_${photo.category}`) })}
-                  onClick={() => void handleDelete(photo.id)}>
-                  <Trash2 size={14} aria-hidden="true" />
-                </button>}
+                  className="derma-gallery-analyze"
+                  aria-label={t('derma.derma_gallery_ai_button_aria', { category: t(`derma.derma_gallery_category_${photo.category}`) })}
+                  title={t('derma.derma_gallery_ai_button')}
+                  disabled={disabled || (analysis?.status === 'loading')}
+                  onClick={() => void handleAnalyze(photo.id)}>
+                  <Sparkles size={14} aria-hidden="true" />
+                </button>
+                {!disabled &&
+                  <button
+                    type="button"
+                    className="derma-gallery-delete"
+                    aria-label={t('derma.derma_gallery_delete_aria', { category: t(`derma.derma_gallery_category_${photo.category}`) })}
+                    onClick={() => void handleDelete(photo.id)}>
+                    <Trash2 size={14} aria-hidden="true" />
+                  </button>}
+              </div>
             </div>
           ))}
+        </div>}
+
+      {/* Подсказка AI — только по нажатию, никогда не записывается в ЭМК (пункт 9) */}
+      {analysis &&
+        <div className="derma-gallery-analysis" role="status" aria-live="polite">
+          <div className="derma-gallery-analysis-header">
+            <span className="derma-gallery-analysis-title">{t('derma.derma_gallery_ai_result_title')}</span>
+            <button
+              type="button"
+              className="derma-gallery-analysis-close"
+              aria-label={t('derma.derma_gallery_ai_close')}
+              onClick={() => setAnalysis(null)}>
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+          {analysis.status === 'loading' &&
+            <p className="derma-gallery-analysis-hint">{t('derma.derma_gallery_ai_analyzing')}</p>}
+          {analysis.status === 'error' &&
+            <p className="derma-gallery-analysis-error" role="alert">{t('derma.derma_gallery_ai_error')}</p>}
+          {analysis.status === 'done' &&
+            <>
+              <p className="derma-gallery-analysis-confirmation">{t('derma.derma_gallery_ai_confirmation')}</p>
+              <pre className="derma-gallery-analysis-content">{analysis.suggestion || t('derma.derma_gallery_ai_empty')}</pre>
+              {analysis.aiNotice &&
+                <p className="derma-gallery-analysis-notice">{analysis.aiNotice}</p>}
+            </>}
         </div>}
     </section>
   );
