@@ -2,6 +2,7 @@
 
 Branch: coordination artifact only; каждый исполняемый PR создаётся от свежего `origin/main`
 Created: 2026-09-12
+Status: EXECUTED 2026-09-13…2026-09-26 — все 8 runtime-PR смержены; см. «Execution record» ниже
 
 ## Settings
 
@@ -80,21 +81,62 @@ stop condition to watch first: <условие>
 
 ### Phase 1 — безопасность и целостность данных
 
-- [ ] Task/PR 1: восстановить чтение instance и PDF ролью Lab, сохранив doctor ownership.
-- [ ] Task/PR 2: актуализировать legacy-проекцию после revise и дополнительных бланков.
-- [ ] Task/PR 3: сохранить comments и сделать autosave/optimistic locking достоверными.
+- [x] Task/PR 1: восстановить чтение instance и PDF ролью Lab, сохранив doctor ownership. → #3231
+- [x] Task/PR 2: актуализировать legacy-проекцию после revise и дополнительных бланков. → #3235 (позже заменена lineage-программой C→A+: #3257/#3330/#3332)
+- [x] Task/PR 3: сохранить comments и сделать autosave/optimistic locking достоверными. → #3240
 
 ### Phase 2 — создание и заполнение бланков
 
-- [ ] Task/PR 4: валидировать текущий draft норм и корректно хранить нулевые границы.
-- [ ] Task/PR 5: защитить dirty state и сразу открывать новый шаблон.
-- [ ] Task/PR 6: добавить серверно разрешённое действие «Добавить бланк».
+- [x] Task/PR 4: валидировать текущий draft норм и корректно хранить нулевые границы. → #3247
+- [x] Task/PR 5: защитить dirty state и сразу открывать новый шаблон. → #3251
+- [x] Task/PR 6: добавить серверно разрешённое действие «Добавить бланк». → #3346
 
 ### Phase 3 — очередь, печать и сквозное доказательство
 
-- [ ] Task/PR 7: исправить серверную пагинацию и геометрию очереди.
-- [ ] Task/PR 8: добавить точный server-rendered PDF preview без побочных эффектов.
-- [ ] Final gate: выполнить сквозные backend/frontend/browser проверки после merge выбранных PR.
+- [x] Task/PR 7: исправить серверную пагинацию и геометрию очереди. → #3347 (улучшено: #3349 page-before-enrichment)
+- [x] Task/PR 8: добавить точный server-rendered PDF preview без побочных эффектов. → #3462 (включая PDF-render hotfix NameError _load_weasyprint_components, найденный в PR1)
+- [ ] Final gate: выполнить сквозные backend/frontend/browser проверки после merge выбранных PR. — ОТКРЫТ: сквозной mocked-путь, живой smoke 5173→18000, полный STAGING_VALIDATION; дополнительно открыты operator-шаги stage-4 (деплой 0070) и product-decision gate по пробиркам.
+
+## Execution record (2026-09-26 — reconcile)
+
+Все runtime-PR выполнены по протоколу (отдельный worktree/ветка от свежего
+origin/main, gate, red-check → fix, targeted-валидация, evidence в PR body).
+
+Runtime-цепочка (в порядке merge):
+
+| Этап | PR | Merge-коммит |
+|---|---|---|
+| PR1 Lab read/PDF RBAC | #3231 | `1c96f081f` |
+| PR2 legacy-проекция | #3235 | `4df2fdc44` |
+| PR3 draft integrity | #3240 | `dd250c28a` |
+| PR4 reference-rule validation | #3247 | `33caf1140` |
+| PR5 dirty-state guard + createTemplate | #3251 | `b5c547776` |
+| PR6 add-blank action | #3346 | `10edc4d45` |
+| PR7 queue pagination + measurement | #3347 | `128304868` (улучшен #3349) |
+| PR8 PDF preview + render hotfix | #3462 | `c53cd9886` |
+
+Расширение программы — lineage legacy-проекции lab_results (решение владельца
+C → A+, контракт: `.ai-factory/plans/lab-results-lineage-decision.md`):
+
+| Этап | PR | Merge-коммит |
+|---|---|---|
+| C — защита от перезаписи | #3257 | `fa83dcbd6` |
+| A+ миграция (0070) | #3330 | `3a167392a` |
+| A+ runtime (lineage-проекция) | #3332 | `eaaa08f89` |
+| Stage-4 tooling + hotfixes | #3334/#3337/#3342 | `92c5767e3`/`fb7fb4042`/`9cddfcf49` |
+
+Инфраструктурное сопровождение: #3348 (upload регенерированных visual
+baseline при dispatch).
+
+Открыто вне runtime-объёма плана:
+
+- Финальный интеграционный gate: сквозной mocked Playwright-путь, живой
+  smoke 5173→18000, полный STAGING_VALIDATION перед заявлением «работает».
+- Product decision gate: учёт пробирок/образцов — сознательно не начинался,
+  ждёт решения владельца (см. отдельный раздел плана).
+- Operator-шаги stage-4: staging validation → окно деплоя (`deploy_restart.ps1`
+  применит 0070) → post-deploy smoke (`scripts/ops/lab_lineage_post_deploy_smoke.py`;
+  на проде read-only checks 1–3 + census).
 
 ## Commit Plan
 
