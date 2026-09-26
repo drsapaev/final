@@ -17,16 +17,45 @@
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterEach, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import i18n from '../../i18n';
+import uzLocale from '../../i18n/locales/uz-Latn';
+import { tInterpolate } from '../../i18n/useTranslation';
 
-// The uz-Latn bundle loads lazily and the i18n singleton is shared between
-// test files inside one worker — drop it afterwards so the
-// "unused locale resources stay unloaded" invariant pinned by
-// src/i18n/__tests__/adapter.test.ts keeps holding.
+// Round-15: the uz-Latn assertions must NOT touch the shared i18n store.
+// Loading the lazy bundle here leaks into src/i18n/__tests__/adapter.test.ts
+// ("unused locale resources stay unloaded" invariant) through the
+// single-fork shared singleton — and a pending lazy backend callback can
+// even re-add the bundle AFTER cleanup. So instead of loadLanguages() this
+// file spies getFixedT: 'uz-Latn' resolves over the statically imported
+// locale module, every other language keeps the real store-backed t().
+const realGetFixedT = i18n.getFixedT.bind(i18n) as (
+  lng: string,
+  ns?: unknown,
+  opts?: unknown,
+) => ReturnType<typeof i18n.getFixedT>;
+
+function resolveLocaleValue(locale: Record<string, unknown>, key: string): string {
+  const value = key
+    .split('.')
+    .reduce<unknown>((acc, part) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[part] : undefined), locale);
+  return typeof value === 'string' ? value : key;
+}
+
+beforeAll(() => {
+  vi.spyOn(i18n, 'getFixedT').mockImplementation(((lng: string, ns?: string, opts?: Record<string, unknown>) => {
+    if (lng === 'uz-Latn') {
+      const uzT = (key: string, params?: Record<string, unknown>) =>
+        tInterpolate(resolveLocaleValue(uzLocale as unknown as Record<string, unknown>, String(key)), params || {});
+      return uzT as unknown as ReturnType<typeof realGetFixedT>;
+    }
+    return realGetFixedT(lng, ns, opts);
+  }) as typeof i18n.getFixedT);
+});
+
 afterAll(() => {
-  i18n.removeResourceBundle('uz-Latn', 'translation');
+  vi.restoreAllMocks();
 });
 
 const { apiPost } = vi.hoisted(() => ({ apiPost: vi.fn() }));
@@ -212,10 +241,9 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
   });
 
   it('shows the Uzbek department name on the uz-Latn UI — label comes from the payload name_uz (round-15 P2)', async () => {
-    // The uz-Latn bundle loads on demand (documented fallback uz-Latn → ru);
-    // an Uzbek booking form assumes the bundle is present — the observed
-    // divergence is that the SELECTOR stayed Russian even then.
-    await i18n.loadLanguages('uz-Latn');
+    // The uz-Latn display language resolves over the statically imported
+    // locale (store untouched — see the getFixedT spy above); the observed
+    // divergence was that the SELECTOR stayed Russian even on an Uzbek form.
     (window as unknown as { Telegram?: unknown }).Telegram = {
       WebApp: { initData: 'test-init-data-payload' },
     };
