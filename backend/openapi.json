@@ -4449,7 +4449,7 @@
           "visit-confirmation"
         ],
         "summary": "Get Visit Info By Token",
-        "description": "Получение информации о визите по токену (без подтверждения).\n\nPR 3407 delta review P2: the legacy GET returns the same patient-safe\ncard as the POST — the raw ``dict[str, Any]`` response_model is gone,\nso the shared service projection cannot leak internal fields here\neven if it regresses.",
+        "description": "Получение информации о визите по токену (без подтверждения).\n\nPR 3407 delta review P2: the legacy GET returns the same patient-safe\ncard as the POST — the raw ``dict[str, Any]`` response_model is gone,\nso the shared service projection cannot leak internal fields here\neven if it regresses.\n\nPR 3417 review residual P2: the card is bearer-capability PHI, so the\nresponse is marked ``Cache-Control: private, no-store`` (same policy\nas dental clinical content), and the 5xx error path is sanitized\nexactly like the POST's — the service wraps raw exception text\n(SQLAlchemy/DB internals) into its 500 detail, which must never\nreach a public bearer-token caller.",
         "operationId": "get_visit_info_by_token_api_v1_visits_info__token__get",
         "parameters": [
           {
