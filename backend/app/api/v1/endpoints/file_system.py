@@ -47,7 +47,10 @@ from app.schemas.file_system import (
     FileUploadRequest,
 )
 from app.services.file_system_api_service import FileSystemApiService
-from app.services.file_system_service import get_file_system_service
+from app.services.file_system_service import (
+    PROTECTED_FILE_DOMAIN_TAGS,
+    get_file_system_service,
+)
 from app.utils.file_validator import validate_upload_file
 
 router = APIRouter()
@@ -485,6 +488,10 @@ async def get_files(
             emr_id=emr_id,
             folder_id=folder_id,
             owner_id=owner_id,
+            # Protected-domain boundary (dental-media etc.): tagged clinical
+            # rows never appear on the generic list surface — excluded at the
+            # query level so pagination stays consistent.
+            exclude_tags=sorted(PROTECTED_FILE_DOMAIN_TAGS),
         )
 
         total = FileSystemApiService(db).count_files(
@@ -497,6 +504,7 @@ async def get_files(
             emr_id=emr_id,
             emr_record_id=None,
             folder_id=folder_id,
+            exclude_tags=sorted(PROTECTED_FILE_DOMAIN_TAGS),
         )
         pages = (total + size - 1) // size
 
@@ -544,6 +552,11 @@ async def update_file(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Нет прав для изменения файла",
             )
+
+        # Protected-domain boundary (dental-media etc.): metadata/permission/tag
+        # changes must go through the owning specialty surface, otherwise a
+        # generic update could retag or unprotect a clinical file.
+        get_file_system_service().ensure_generic_surface_allowed(db_file)
 
         # Парсим теги
         tags_list = None
@@ -713,6 +726,10 @@ async def get_file_shares(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Нет прав для просмотра совместных использований",
             )
+
+        # Protected-domain boundary (dental-media etc.): share management of
+        # clinical files must go through the owning specialty surface.
+        get_file_system_service().ensure_generic_surface_allowed(db_file)
 
         shares = file_share.get_file_shares(db, file_id=file_id)
 

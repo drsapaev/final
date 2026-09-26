@@ -37,6 +37,7 @@ vi.mock('../../../utils/tokenManager', () => ({
 }));
 vi.mock('../../../services/queue', () => ({
   queueService: {
+    startVisit: vi.fn(async () => ({ success: true, patient_id: 23, visit_id: 77, status: 'in_progress' })),
     completeVisit: vi.fn(async () => ({ success: true })),
     callNextWaiting: vi.fn(async () => ({ success: true, entry: { number: 7 } })),
   },
@@ -118,6 +119,65 @@ describe('useDentistActions (PR-UI-15-5) — handlePatientSelect routing', () =>
     expect(notify.info).toHaveBeenCalledWith('dental.no_active_visit');
     expect(deps.handleTabChange).toHaveBeenCalledWith('patients');
     expect(deps.handleTabChange).not.toHaveBeenCalledWith('visit');
+  });
+});
+
+describe('useDentistActions — start a called queue patient', () => {
+  it('starts the canonical queue entry, opens its returned visit, and keeps the queue entry id for completion', async () => {
+    const deps = makeDeps();
+    const { result } = renderHook(() => useDentistActions(deps));
+
+    let started = false;
+    await act(async () => {
+      started = await result.current.handleStartQueueVisit({ id: 91, name: 'Synthetic', number: 8 });
+    });
+
+    expect(queueService.startVisit).toHaveBeenCalledWith(91);
+    expect(started).toBe(true);
+    expect(deps.setSelectedPatient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 23,
+        patient_id: 23,
+        visit_id: 77,
+        doctor_queue_entry_id: 91,
+        queue_entry_id: 91,
+        patient_name: 'Synthetic',
+        source: 'queue',
+      }),
+    );
+    expect(deps.handleTabChange).toHaveBeenCalledWith('visit');
+    expect(notify.error).not.toHaveBeenCalled();
+  });
+
+  it('does not call the backend when the queue entry id is missing', async () => {
+    const deps = makeDeps();
+    const { result } = renderHook(() => useDentistActions(deps));
+
+    let started = true;
+    await act(async () => {
+      started = await result.current.handleStartQueueVisit({ name: 'Synthetic' });
+    });
+
+    expect(started).toBe(false);
+    expect(queueService.startVisit).not.toHaveBeenCalled();
+    expect(deps.setSelectedPatient).not.toHaveBeenCalled();
+    expect(notify.error).toHaveBeenCalledWith('dental.no_queue_id_for_visit');
+  });
+
+  it('keeps the queue open and reports incomplete start responses', async () => {
+    vi.mocked(queueService.startVisit).mockResolvedValueOnce({ success: true, patient_id: 23 } as never);
+    const deps = makeDeps();
+    const { result } = renderHook(() => useDentistActions(deps));
+
+    let started = true;
+    await act(async () => {
+      started = await result.current.handleStartQueueVisit({ id: 91, name: 'Synthetic' });
+    });
+
+    expect(started).toBe(false);
+    expect(deps.setSelectedPatient).not.toHaveBeenCalled();
+    expect(deps.handleTabChange).not.toHaveBeenCalledWith('visit');
+    expect(notify.error).toHaveBeenCalledWith('dental.dental_panel_start_visit_failed');
   });
 });
 

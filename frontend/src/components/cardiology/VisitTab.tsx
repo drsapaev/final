@@ -5,17 +5,17 @@
  * Renders the "Приём" (visit) tab content:
  *   1. Patient info card (name, phone, EMR audit badge from P-019)
  *   2. EMR container (EMRContainerV2 with all sections)
- *   3. Action buttons (Cancel + Complete visit)
+ *   3. Visit actions (completion lives alongside the EMR controls)
  *
  * When no patient is selected, renders an empty state.
  */
 
-import { User, FileText, RefreshCw, Save, Calendar, Phone } from 'lucide-react';
+import { User, FileText, Calendar, Phone } from 'lucide-react';
 import { Button, Card, AppEmpty } from '../ui/macos';
 import { EMRContainerV2 } from '../emr-v2/EMRContainerV2';
 import { formatRegistrarDate, formatRegistrarDateTime } from '../../utils/dateUtils';
 import { useTranslation } from '../../i18n/useTranslation';
-import React from "react";
+import React from 'react';
 
 export function VisitTab({
   selectedPatient,
@@ -23,6 +23,7 @@ export function VisitTab({
   loading = false,
   onCancel,
   onComplete,
+  onCompletionBlocked,
   onGoToAppointments,
   getColor,
   getFontSize,
@@ -34,6 +35,7 @@ export function VisitTab({
     number?: string | number;
     phone?: string;
     visit_id?: number | string;
+    status?: string | null;
   } | null;
   emr?: {
     id?: number | string;
@@ -45,12 +47,14 @@ export function VisitTab({
   } | null;
   loading?: boolean;
   onCancel: () => void;
-  onComplete: () => void;
+  onComplete: (savedData: Record<string, unknown>) => Promise<void> | void;
+  onCompletionBlocked?: () => void;
   onGoToAppointments: () => void;
   getColor: (key: string) => string;
   getFontSize: (key: string) => string;
 }): React.JSX.Element | null {
   const { t: rawT } = useTranslation(); const t = rawT;
+  const isCompleted = ['served', 'completed', 'done'].includes(String(selectedPatient?.status ?? '').toLowerCase());
   // Empty state: no patient selected
   if (!selectedPatient) {
     return (
@@ -145,16 +149,18 @@ export function VisitTab({
           visitId={selectedPatient?.visit_id ?? ''}
           patientId={selectedPatient?.patient?.id || selectedPatient?.patient_id}
           specialty="cardiology"
+          isReadOnly={isCompleted}
+          completionBusy={loading}
+          onComplete={isCompleted ? undefined : onComplete}
+          onCompletionBlocked={onCompletionBlocked}
         />
       </Card>
 
       {/* Action buttons */}
       <Card className="cardio-card-padded">
         <div className="flex justify-end" style={{ gap: 'var(--mac-spacing-3)' }}>
-          <Button variant="outline" onClick={onCancel}>{t('cardio.cardio_visit_cancel')}</Button>
-          <Button onClick={onComplete} disabled={loading}>
-            {loading ? <RefreshCw size={16} className="cardio-icon-mr" /> : <Save size={16} className="cardio-icon-mr" />}
-            {t('cardio.cardio_visit_complete')}
+          <Button variant="outline" onClick={onCancel} disabled={loading}>
+            {t(isCompleted ? 'cardio.cardio_visit_back_to_queue' : 'cardio.cardio_visit_cancel')}
           </Button>
         </div>
       </Card>

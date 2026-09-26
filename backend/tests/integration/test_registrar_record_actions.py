@@ -5,10 +5,58 @@ from datetime import date, datetime
 import pytest
 
 from app.models.appointment import Appointment
+from app.models.clinic import Doctor
+from app.models.emr_v2 import EMRRecord
 from app.models.online_queue import OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.payment import Payment
+from app.models.user import User
 from app.models.visit import Visit
+
+
+def _create_cardiology_visit(
+    db_session,
+    *,
+    doctor_user: User,
+    patient: Patient,
+    emr_status: str | None = None,
+):
+    doctor = Doctor(
+        user_id=doctor_user.id,
+        specialty="cardiology",
+        active=True,
+    )
+    visit = Visit(
+        patient_id=patient.id,
+        doctor=doctor,
+        visit_date=date.today(),
+        status="in_progress",
+        source="desk",
+    )
+    db_session.add(visit)
+    db_session.flush()
+    if emr_status is not None:
+        db_session.add(
+            EMRRecord(
+                patient_id=patient.id,
+                visit_id=visit.id,
+                created_by=doctor_user.id,
+                status=emr_status,
+                data={},
+            )
+        )
+    db_session.commit()
+    db_session.refresh(visit)
+    return visit
+
+
+def _doctor_headers(client, doctor_user: User) -> dict[str, str]:
+    response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": doctor_user.username, "password": "doctor123"},
+    )
+    assert response.status_code == 200
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 @pytest.mark.integration
@@ -67,6 +115,70 @@ def test_registrar_record_action_rejects_doctor_mark_paid(
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("emr_status", [None, "draft"])
+def test_registrar_record_action_rejects_cardiology_completion_without_saved_emr(
+    client,
+    db_session,
+    test_doctor_user,
+    test_patient,
+    emr_status,
+):
+    visit = _create_cardiology_visit(
+        db_session,
+        doctor_user=test_doctor_user,
+        patient=test_patient,
+        emr_status=emr_status,
+    )
+
+    response = client.post(
+        "/api/v1/registrar/records/actions",
+        headers=_doctor_headers(client, test_doctor_user),
+        json={"action": "complete", "record_kind": "visit", "record_id": visit.id},
+    )
+
+    # The batch action API keeps its HTTP 200 envelope and reports a
+    # per-record lifecycle conflict in the result item.
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["success"] is False
+    assert payload["failed_count"] == 1
+    assert payload["results"][0]["success"] is False
+    assert "сохраните ЭМК" in payload["results"][0]["error"]
+    db_session.refresh(visit)
+    assert visit.status == "in_progress"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("emr_status", "expected_status"),
+    [(None, 409), ("draft", 409), ("in_progress", 200)],
+)
+def test_direct_registrar_completion_uses_shared_cardiology_emr_policy(
+    client,
+    db_session,
+    test_doctor_user,
+    test_patient,
+    emr_status,
+    expected_status,
+):
+    visit = _create_cardiology_visit(
+        db_session,
+        doctor_user=test_doctor_user,
+        patient=test_patient,
+        emr_status=emr_status,
+    )
+
+    response = client.post(
+        f"/api/v1/registrar/visits/{visit.id}/complete",
+        headers=_doctor_headers(client, test_doctor_user),
+    )
+
+    assert response.status_code == expected_status, response.text
+    db_session.refresh(visit)
+    assert visit.status == ("completed" if expected_status == 200 else "in_progress")
+
+
+@pytest.mark.integration
 def test_queue_mark_paid_without_visit_id_does_not_pay_unrelated_patient_visit(
     client,
     db_session,
@@ -121,9 +233,7 @@ def test_queue_mark_paid_without_visit_id_does_not_pay_unrelated_patient_visit(
     assert entry.discount_mode == "paid"
     assert unrelated_visit.status == "open"
     assert (
-        db_session.query(Payment)
-        .filter(Payment.visit_id == unrelated_visit.id)
-        .count()
+        db_session.query(Payment).filter(Payment.visit_id == unrelated_visit.id).count()
         == 0
     )
 
@@ -185,9 +295,7 @@ def test_queue_mark_paid_rejects_entry_linked_to_other_patient_visit(
     assert entry.status == "waiting"
     assert other_visit.status == "open"
     assert (
-        db_session.query(Payment)
-        .filter(Payment.visit_id == other_visit.id)
-        .count()
+        db_session.query(Payment).filter(Payment.visit_id == other_visit.id).count()
         == 0
     )
 
@@ -269,4 +377,3 @@ def test_legacy_queue_start_endpoint_does_not_fallback_to_appointment_id(
 
     db_session.refresh(appointment)
     assert appointment.status == "paid"
-

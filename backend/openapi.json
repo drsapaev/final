@@ -329,7 +329,7 @@
           "patients"
         ],
         "summary": "Create Patient Portal Booking",
-        "description": "Create one trusted patient-portal appointment (own scope only).\n\nMirrors the Mini App creation contract: same draft validation, same\nper-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same\n409 on occupied slots, same lifecycle eligibility for the doctor.\n\nP2 (round 2): the `Idempotency-Key` header is REQUIRED. The global\nidempotency middleware only protects requests that carry a key —\nwithout a mandated key a lost response + automatic browser retry of a\ndate-only/department-only request (no doctor slot lock applies) would\ncreate duplicate appointments. Same key + same payload replays the\ncommitted 201; same key + changed payload is a 409.\n\nP2 (round 3): creation goes through the portal-INTERNAL\n`PatientPortalAppointmentCreate` — the persisted `department_id` is the\nserver-resolved FK from `_resolve_portal_department`, never a\nclient-owned field (the shared `AppointmentCreate` no longer accepts\none, closing the legacy-endpoint bypass).",
+        "description": "Create one trusted patient-portal appointment (own scope only).\n\nMirrors the Mini App creation contract: same draft validation, same\nper-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same\n409 on occupied slots, same lifecycle eligibility for the doctor.\n\nMerged-#3340 follow-up (P1): the FINAL routing department is re-read\nwith ``populate_existing().with_for_update()`` in THIS transaction and\nits ``active`` re-validated before the INSERT — the persisted routing\ncontext can no longer reference a department that a concurrently\ncommitted admin transaction deactivated (or deleted).\n\nP2 (round 2): the `Idempotency-Key` header is REQUIRED. The global\nidempotency middleware only protects requests that carry a key —\nwithout a mandated key a lost response + automatic browser retry of a\ndate-only/department-only request (no doctor slot lock applies) would\ncreate duplicate appointments. Same key + same payload replays the\ncommitted 201; same key + changed payload is a 409.\n\nP2 (round 3): creation goes through the portal-INTERNAL\n`PatientPortalAppointmentCreate` — the persisted `department_id` is the\nserver-resolved FK from `_resolve_portal_department`, never a\nclient-owned field (the shared `AppointmentCreate` no longer accepts\none, closing the legacy-endpoint bypass).",
         "operationId": "create_patient_portal_booking_api_v1_patients_booking_post",
         "security": [
           {
@@ -4449,7 +4449,7 @@
           "visit-confirmation"
         ],
         "summary": "Get Visit Info By Token",
-        "description": "Получение информации о визите по токену (без подтверждения).\n\nPR 3407 delta review P2: the legacy GET returns the same patient-safe\ncard as the POST — the raw ``dict[str, Any]`` response_model is gone,\nso the shared service projection cannot leak internal fields here\neven if it regresses.",
+        "description": "Получение информации о визите по токену (без подтверждения).\n\nPR 3407 delta review P2: the legacy GET returns the same patient-safe\ncard as the POST — the raw ``dict[str, Any]`` response_model is gone,\nso the shared service projection cannot leak internal fields here\neven if it regresses.\n\nPR 3417 review residual P2: the card is bearer-capability PHI, so the\nresponse is marked ``Cache-Control: private, no-store`` (same policy\nas dental clinical content), and the 5xx error path is sanitized\nexactly like the POST's — the service wraps raw exception text\n(SQLAlchemy/DB internals) into its 500 detail, which must never\nreach a public bearer-token caller.",
         "operationId": "get_visit_info_by_token_api_v1_visits_info__token__get",
         "parameters": [
           {
@@ -42172,6 +42172,50 @@
         }
       }
     },
+    "/api/v1/telegram/mini-app/booking/departments": {
+      "post": {
+        "tags": [
+          "telegram-webhook"
+        ],
+        "summary": "List Mini App Booking Departments",
+        "description": "Round-12 (owner P1, PR #3386 review): ACTIVE departments for the\nMini App booking form's department selector.\n\nThe form submits the canonical `Department.key` picked from THIS list —\na localized free-text label (\"Кардиология\") is not a `Department.key`\nand would be refused with 400 `department_unknown` by the routing\ncontract. Same authenticated identity surface as the booking endpoints\nthemselves (initData primary, entry token allowed); no PHI is returned.",
+        "operationId": "telegram_mini_app_list_booking_departments",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramMiniAppBookingDepartmentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Telegram Mini App List Booking Departments"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/telegram/mini-app/appointments/preview": {
       "post": {
         "tags": [
@@ -48582,6 +48626,297 @@
         }
       }
     },
+    "/api/v1/dental/media": {
+      "post": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Загрузить стоматологическое фото или рентген",
+        "operationId": "upload_dental_media_api_v1_dental_media_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_dental_media_api_v1_dental_media_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DentalMediaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Список стоматологических снимков пациента",
+        "operationId": "list_dental_media_api_v1_dental_media_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "visit_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DentalMediaList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dental/media/{media_id}/content": {
+      "get": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Защищённый просмотр стоматологического снимка",
+        "operationId": "view_dental_media_api_v1_dental_media__media_id__content_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          },
+          {
+            "name": "visit_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "image/jpeg": {},
+              "image/png": {},
+              "application/pdf": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dental/media/{media_id}": {
+      "patch": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Изменить метаданные стоматологического снимка",
+        "operationId": "update_dental_media_api_v1_dental_media__media_id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DentalMediaUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DentalMediaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "dental",
+          "dental"
+        ],
+        "summary": "Мягко удалить стоматологический снимок",
+        "operationId": "delete_dental_media_api_v1_dental_media__media_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Media Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Delete Dental Media Api V1 Dental Media  Media Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/dental/examinations": {
       "get": {
         "tags": [
@@ -50790,6 +51125,108 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Download Lab Report Pdf Api V1 Lab Report Instances  Instance Id  Pdf Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/report-instances/{instance_id}/preview": {
+      "get": {
+        "tags": [
+          "lab-reporting",
+          "lab-reporting"
+        ],
+        "summary": "Preview Lab Report Instance Pdf",
+        "description": "PR8 (codex-lab-workflow-hardening-plan): серверный A4-preview того же\nдвижка, что финальный PDF, ДО утверждения.\n\nКонтракт:\n- доступ только Admin/Lab (врач получает результат через /pdf после\n  finalize; preview неутверждённых бланков — лабораторная поверхность);\n- рендерятся ТЕКУЩИЕ СОХРАНЕННЫЕ значения (Save Draft до preview —\n  unsaved-черновик клиента на сервер не отправляется);\n- watermark «Черновик» для неутверждённых статусов; утверждённые\n  рендерятся без watermark (эквивалент финального вида);\n- Content-Disposition: inline + Cache-Control: private, no-store\n  (клиническое содержание);\n- побочных эффектов нет: без mark-printed, уведомлений и финализации.",
+        "operationId": "preview_lab_report_instance_pdf_api_v1_lab_report_instances__instance_id__preview_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Instance Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Preview Lab Report Instance Pdf Api V1 Lab Report Instances  Instance Id  Preview Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lab/template-versions/{version_id}/preview": {
+      "get": {
+        "tags": [
+          "lab-reporting",
+          "lab-reporting"
+        ],
+        "summary": "Preview Lab Template Version Pdf",
+        "description": "PR8: template preview — серверный A4-рендер СОХРАНЁННОЙ версии\nшаблона до публикации.\n\nКонтракт:\n- доступ только Admin/Lab (редакторская поверхность шаблонов);\n- только синтетические placeholder-значения: patient-блок пуст, value\n  колонка — очевидный маркер, никаких данных реальных пациентов;\n- неопубликованные версии (DRAFT) помечаются watermark «Черновик»;\n  PUBLISHED рендерится без watermark (это и есть печатный бланк);\n- inline + no-store; рендерер тот же, что у финального PDF.",
+        "operationId": "preview_lab_template_version_pdf_api_v1_lab_template_versions__version_id__preview_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Preview Lab Template Version Pdf Api V1 Lab Template Versions  Version Id  Preview Get"
                 }
               }
             }
@@ -72448,6 +72885,89 @@
         ],
         "title": "Body_upload_clinic_logo_api_v1_admin_clinic_logo_post"
       },
+      "Body_upload_dental_media_api_v1_dental_media_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "patient_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Visit Id"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "photo",
+              "xray"
+            ],
+            "title": "Category"
+          },
+          "tooth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooth"
+          },
+          "capture_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Date"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "patient_id",
+          "visit_id",
+          "category"
+        ],
+        "title": "Body_upload_dental_media_api_v1_dental_media_post"
+      },
       "Body_upload_file_api_v1_files_upload_post": {
         "properties": {
           "file": {
@@ -75865,6 +76385,212 @@
         ],
         "title": "DentalExaminationRequest",
         "description": "Request body for POST /dental/examinations.\n\nBased on frontend DentistPanelUnified.jsx examinationForm:\npatient_id, examination_date, oral_hygiene, caries_status,\nperiodontal_status, occlusion, missing_teeth, dental_plaque,\ngingival_bleeding, diagnosis, recommendations."
+      },
+      "DentalMediaList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DentalMediaOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size"
+        ],
+        "title": "DentalMediaList"
+      },
+      "DentalMediaOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "photo",
+              "xray"
+            ],
+            "title": "Category"
+          },
+          "tooth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooth"
+          },
+          "capture_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Date"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "type": "integer",
+            "title": "Visit Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "category",
+          "tooth",
+          "capture_date",
+          "mime_type",
+          "file_size",
+          "patient_id",
+          "visit_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DentalMediaOut",
+        "description": "Storage-safe representation of a dental media record."
+      },
+      "DentalMediaUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "photo",
+                  "xray"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "tooth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tooth"
+          },
+          "capture_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DentalMediaUpdate"
       },
       "DentalPriceOverrideRequest": {
         "properties": {
@@ -87765,6 +88491,11 @@
             "type": "boolean",
             "title": "Can Print",
             "default": false
+          },
+          "can_preview": {
+            "type": "boolean",
+            "title": "Can Preview",
+            "default": false
           }
         },
         "type": "object",
@@ -87911,6 +88642,11 @@
           "can_print": {
             "type": "boolean",
             "title": "Can Print",
+            "default": false
+          },
+          "can_preview": {
+            "type": "boolean",
+            "title": "Can Preview",
             "default": false
           }
         },
@@ -108212,6 +108948,46 @@
         ],
         "title": "TelegramMiniAppAppointmentPreviewRequest"
       },
+      "TelegramMiniAppBookingDepartmentsRequest": {
+        "properties": {
+          "initData": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initdata"
+          },
+          "entryToken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entrytoken"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          }
+        },
+        "type": "object",
+        "title": "TelegramMiniAppBookingDepartmentsRequest",
+        "description": "Round-12 (owner P1, PR #3386 review): auth shape for the booking\ndepartments reference endpoint.\n\nThe Mini App booking form no longer free-types a department name (a\nlocalized label like \"Кардиология\" is NOT the canonical `Department.key`\nthe routing contract resolves); it picks from THIS endpoint's list, so\nthe submitted value is always a canonical key. Same identity contract\nas the booking endpoints themselves (initData primary, entry token\nallowed) — the reference data rides the SAME authenticated surface it\nfeeds, and the error reasons match the booking scope contract."
+      },
       "TelegramMiniAppPatientCabinetSummaryRequest": {
         "properties": {
           "initData": {
@@ -115337,6 +116113,9 @@
         "properties": {
           "key": {
             "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*$",
             "title": "Key"
           },
           "name_ru": {

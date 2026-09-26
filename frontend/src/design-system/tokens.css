@@ -133,8 +133,8 @@
   --mac-card-border: rgba(27, 46, 73, 0.14);
   --mac-nav-item-bg: rgba(244, 249, 255, 0.82);
   --mac-nav-item-hover: #e0ebf8;
-  --mac-nav-item-active: var(--mac-accent-blue);
-  --mac-nav-item-active-border: var(--mac-accent-blue);
+  --mac-nav-item-active: var(--mac-accent-blue-strong);
+  --mac-nav-item-active-border: var(--mac-accent-blue-strong);
   --mac-nav-item-active-text: var(--mac-text-on-accent);
   --mac-main-shell-bg: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
   --mac-main-shell-border: rgba(27, 46, 73, 0.12);
@@ -172,7 +172,7 @@
   --mac-bg-content: #f4f7fb;
   --mac-bg-sidebar: #e7eef7;
   --mac-bg-toolbar: rgba(246, 250, 255, 0.94);
-  
+
   /* macOS Gradients */
   --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(95, 149, 255, 0.08), transparent 50%), linear-gradient(180deg, #f1f6fc 0%, #dfe8f3 100%);
   --mac-gradient-sidebar: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
@@ -229,7 +229,7 @@
   --mac-duration-normal: 200ms;
   --mac-duration-slow: 250ms;
   --mac-duration-slower: 300ms;
-  
+
   /* macOS Animation Easing */
   --mac-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --mac-ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -287,7 +287,7 @@
     --mac-bg-content: #2c2c2e;
     --mac-bg-sidebar: #2c2c2e;
     --mac-bg-toolbar: #1c1c1e;
-    
+
     /* macOS Gradients - Dark Mode */
     --mac-gradient-window: linear-gradient(180deg, #1c1c1e 0%, #2c2c2e 100%);
     --mac-gradient-sidebar: linear-gradient(180deg, #2c2c2e 0%, #3a3a3c 100%);
@@ -328,8 +328,8 @@
   --mac-card-border: rgba(27, 46, 73, 0.14);
   --mac-nav-item-bg: rgba(244, 249, 255, 0.82);
   --mac-nav-item-hover: #e0ebf8;
-  --mac-nav-item-active: var(--mac-accent-blue);
-  --mac-nav-item-active-border: var(--mac-accent-blue);
+  --mac-nav-item-active: var(--mac-accent-blue-strong);
+  --mac-nav-item-active-border: var(--mac-accent-blue-strong);
   --mac-nav-item-active-text: var(--mac-text-on-accent);
   --mac-main-shell-bg: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
   --mac-main-shell-border: rgba(27, 46, 73, 0.12);
@@ -345,7 +345,7 @@
   --mac-bg-content: #f4f7fb;
   --mac-bg-sidebar: #e7eef7;
   --mac-bg-toolbar: rgba(246, 250, 255, 0.94);
-  
+
   /* macOS Gradients - Light Mode */
   --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(95, 149, 255, 0.08), transparent 50%), linear-gradient(180deg, #f1f6fc 0%, #dfe8f3 100%);
   --mac-gradient-sidebar: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
@@ -393,8 +393,8 @@
   --mac-card-border: rgba(255, 255, 255, 0.08);
   --mac-nav-item-bg: rgba(255, 255, 255, 0.03);
   --mac-nav-item-hover: rgba(255, 255, 255, 0.08);
-  --mac-nav-item-active: var(--mac-accent-blue);
-  --mac-nav-item-active-border: var(--mac-accent-blue);
+  --mac-nav-item-active: var(--mac-accent-blue-strong);
+  --mac-nav-item-active-border: var(--mac-accent-blue-strong);
   --mac-nav-item-active-text: var(--mac-text-on-accent);
   --mac-main-shell-bg: linear-gradient(180deg, #2c2c2e 0%, #3a3a3c 100%);
   --mac-main-shell-border: rgba(255, 255, 255, 0.06);
@@ -405,7 +405,7 @@
   --mac-bg-content: #2c2c2e;
   --mac-bg-sidebar: #2c2c2e;
   --mac-bg-toolbar: #1c1c1e;
-  
+
   /* macOS Gradients - Dark Mode */
   --mac-gradient-window: linear-gradient(180deg, #1c1c1e 0%, #2c2c2e 100%);
   --mac-gradient-sidebar: linear-gradient(180deg, #2c2c2e 0%, #3a3a3c 100%);

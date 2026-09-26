@@ -1594,6 +1594,301 @@ class TestClinicCalendarDateValidation:
         assert created.status_code == 201, created.json()
 
 
+class TestPortalBookingRound12:
+    """Round-12 (PR #3386 review): atomic routing + contract ordering on the
+    JWT portal surface. The FINAL department row is re-validated under FOR
+    UPDATE next to the INSERT (an admin deactivate/delete racing the
+    booking cannot persist a routing context pointing at a non-active
+    department). Fresh-pass unification (owner directive, post-PR-3457):
+    the up-front submitted-key resolution moved INTO the post-eligibility
+    branch — both create surfaces now share the Mini App's
+    eligibility-first ordering (the flagged divergence is closed)."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def test_create_revalidates_department_under_lock(
+        self,
+        client: TestClient,
+        linked_patient_headers,
+        db_session: Session,
+        test_patient,
+        test_doctor,
+        portal_department,
+        monkeypatch,
+    ):
+        # P1: the create path calls the lock_department_for_booking
+        # re-validation and answers the SAME department_inactive contract
+        # instead of persisting a stale routing context. NOTE: this
+        # sqlite harness runs the "admin" mutation on the SAME session —
+        # commit() expires the identity map, so this pin proves the
+        # WIRING, not the two-session race. The real cross-transaction
+        # identity-map proof (stale active=True surviving FOR UPDATE
+        # without populate_existing) lives in
+        # tests/integration/test_booking_department_lock_pg.py.
+        import app.api.v1.endpoints.patient_portal as portal_module
+
+        test_doctor.department_id = portal_department.id
+        db_session.commit()
+        db_session.refresh(test_doctor)
+
+        real_routing = portal_module._resolve_doctor_routing_department
+
+        def racing_admin_deactivation(doctor_row, submitted_row):
+            resolved = real_routing(doctor_row, submitted_row)
+            portal_department.active = False
+            db_session.commit()
+            return resolved
+
+        monkeypatch.setattr(
+            portal_module,
+            "_resolve_doctor_routing_department",
+            racing_admin_deactivation,
+        )
+
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "r12-lock-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": portal_department.key,
+            },
+        )
+        assert response.status_code == 400, response.json()
+        assert response.json()["detail"]["reason"] == "department_inactive"
+        assert db_session.query(Appointment).count() == 0, (
+            "a raced deactivation never materializes an appointment with a "
+            "stale routing context"
+        )
+
+    def test_create_eligibility_precedes_submitted_key_resolve(
+        self,
+        client: TestClient,
+        linked_patient_headers,
+        db_session: Session,
+        test_patient,
+        test_doctor,
+    ):
+        # Fresh-pass unification (owner directive, post-PR-3457): the portal
+        # create path moved its submitted-key resolution AFTER the
+        # eligibility gate — exact parity with the Mini App create
+        # (test_telegram_webhook_security::test_routing_follows_doctor_not_
+        # eligible). A request that is both ineligible-doctor AND
+        # bad-department now answers the established 409
+        # doctor_not_eligible contract, NOT the request-shaped routing 400.
+        # The resolve itself is still before any mutation, so either way
+        # nothing persists.
+        test_doctor.active = False
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "r12-order-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": "nonexistent-department",
+            },
+        )
+        assert response.status_code == 409, response.json()
+        assert response.json()["detail"]["reason"] == "doctor_not_eligible"
+        assert db_session.query(Appointment).count() == 0
+
+    def test_lock_department_for_booking_semantics(
+        self, db_session: Session, portal_department, monkeypatch
+    ):
+        # Unit contract of the atomic re-validation helper itself: an active
+        # row passes through, a deactivated row is a controlled 400, a
+        # deleted row is department_unknown (never an IntegrityError/500),
+        # None passes through (departmentless booking).
+        from fastapi import HTTPException
+
+        from app.services.appointment_booking_routing import lock_department_for_booking
+
+        assert lock_department_for_booking(db_session, None) is None
+
+        locked = lock_department_for_booking(db_session, portal_department)
+        assert int(locked.id) == int(portal_department.id)
+
+        portal_department.active = False
+        db_session.commit()
+        with pytest.raises(HTTPException) as inactive_exc:
+            lock_department_for_booking(db_session, portal_department)
+        assert inactive_exc.value.detail == {"reason": "department_inactive"}
+
+        db_session.delete(portal_department)
+        db_session.commit()
+        with pytest.raises(HTTPException) as deleted_exc:
+            lock_department_for_booking(db_session, portal_department)
+        assert deleted_exc.value.detail == {"reason": "department_unknown"}
+
+
+class TestPortalBookingEligibilityFirstParity:
+    """Fresh-pass owner directive (post-PR-3457): unify the CREATE paths of
+    the Patient Portal and the Telegram Mini App on the eligibility-first
+    ordering. The submitted-department resolution moved AFTER the
+    doctor_not_eligible gate, so the combined-bad request answers the
+    established 409 on BOTH surfaces; every other routing contract
+    (request-shaped 400s for department-only and eligible-doctor requests)
+    is preserved byte-for-byte."""
+
+    future_date = str(date.today() + timedelta(days=3))
+
+    def test_create_eligible_doctor_bad_department_still_400(
+        self,
+        client: TestClient,
+        linked_patient_headers,
+        db_session: Session,
+        test_doctor,
+    ):
+        # Ordering only shifts the ELIGIBILITY-vs-routing tie: an eligible
+        # doctor with a bad submitted key still answers the request-shaped
+        # 400 (the resolve now happens right after the eligibility gate).
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "efp-1"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": "nonexistent-department",
+            },
+        )
+        assert response.status_code == 400, response.json()
+        assert response.json()["detail"]["reason"] == "department_unknown"
+        assert db_session.query(Appointment).count() == 0
+
+    def test_create_ineligible_doctor_valid_department_409(
+        self,
+        client: TestClient,
+        linked_patient_headers,
+        db_session: Session,
+        test_doctor,
+        portal_department,
+    ):
+        # The eligibility 409/40x keeps precedence over the routing path
+        # even when the submitted key is perfectly valid.
+        test_doctor.active = False
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "efp-2"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": portal_department.key,
+            },
+        )
+        assert response.status_code == 409, response.json()
+        assert response.json()["detail"]["reason"] == "doctor_not_eligible"
+        assert db_session.query(Appointment).count() == 0
+
+    def test_create_ineligible_doctor_no_department_409(
+        self,
+        client: TestClient,
+        linked_patient_headers,
+        db_session: Session,
+        test_doctor,
+    ):
+        # Departmentless doctor-booking: no submitted key to resolve, the
+        # eligibility gate answers on its own (unchanged contract).
+        test_doctor.active = False
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "efp-3"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+            },
+        )
+        assert response.status_code == 409, response.json()
+        assert response.json()["detail"]["reason"] == "doctor_not_eligible"
+        assert db_session.query(Appointment).count() == 0
+
+    def test_create_department_only_unknown_key_400(
+        self,
+        client: TestClient,
+        linked_patient_headers,
+        db_session: Session,
+    ):
+        # Department-only booking (no doctorId): there is no eligibility
+        # gate, so the submitted key resolves where the request-shaped 400s
+        # always applied — unchanged contract, now owned by the explicit
+        # department-only branch.
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "efp-4"},
+            json={
+                "appointmentDate": self.future_date,
+                "department": "nonexistent-department",
+            },
+        )
+        assert response.status_code == 400, response.json()
+        assert response.json()["detail"]["reason"] == "department_unknown"
+        assert db_session.query(Appointment).count() == 0
+
+    def test_create_department_only_inactive_key_400(
+        self,
+        client: TestClient,
+        linked_patient_headers,
+        db_session: Session,
+        portal_department,
+    ):
+        # Same shape with a DEACTIVATED key: request-shaped 400 preserved.
+        portal_department.active = False
+        db_session.commit()
+
+        response = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "efp-5"},
+            json={
+                "appointmentDate": self.future_date,
+                "department": portal_department.key,
+            },
+        )
+        assert response.status_code == 400, response.json()
+        assert response.json()["detail"]["reason"] == "department_inactive"
+        assert db_session.query(Appointment).count() == 0
+
+    def test_create_combined_bad_denial_audit_follows_eligibility(
+        self,
+        client: TestClient,
+        linked_patient_headers,
+        db_session: Session,
+        test_patient,
+        test_doctor,
+    ):
+        # The denied audit trail must record the reason the API actually
+        # answered: doctor_not_eligible now that eligibility precedes the
+        # routing resolve (parity with the Mini App denial audit).
+        test_doctor.active = False
+        db_session.commit()
+
+        denied = client.post(
+            "/api/v1/patients/booking",
+            headers={**linked_patient_headers, "Idempotency-Key": "efp-6"},
+            json={
+                "appointmentDate": self.future_date,
+                "doctorId": test_doctor.id,
+                "department": "nonexistent-department",
+            },
+        )
+        assert denied.status_code == 409, denied.json()
+        row = (
+            db_session.query(PatientAccessAuditLog)
+            .filter(
+                PatientAccessAuditLog.subject_patient_id == test_patient.id,
+                PatientAccessAuditLog.outcome == "denied",
+            )
+            .order_by(PatientAccessAuditLog.id.desc())
+            .first()
+        )
+        assert row is not None, "the denial must leave a trail row"
+        assert row.extra_data["reason"] == "doctor_not_eligible"
+
+
 class TestInactiveCanonicalDepartmentRouting:
     """Round-10 owner P1 (PR #3340): `_resolve_doctor_routing_department`
     returned the doctor's canonical department WITHOUT an `active` check —

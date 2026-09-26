@@ -376,3 +376,94 @@ middleware + the published OpenAPI surface):
   middleware already processed keyed previews (the operation-scoping
   contract exercises it), so the generated TypeScript now describes the
   real outcomes.
+
+Round-11 parity (follow-up after PR #3340 merged, applies to the Telegram
+Mini App booking endpoints):
+
+- Canonical doctor-department routing on the Mini App surface: the shared
+  booking helper (`_build_mini_app_appointment_booking_preview_from_request`,
+  used by BOTH `POST /telegram/mini-app/appointments/preview` and
+  `POST /telegram/mini-app/appointments`) now resolves the SAME routing
+  context the portal got in rounds 9-10. The routing resolvers moved to
+  the shared SSOT service `app/services/appointment_booking_routing.py`
+  (`resolve_booking_department`, `resolve_doctor_routing_department`,
+  `attach_department_id`); the portal keeps behavior-identical aliases.
+  Contract (identical 400 reasons on both surfaces, BEFORE any mutation):
+  `department_unknown` / `department_inactive` (submitted key),
+  `doctor_department_missing` (doctor without a canonical department — an
+  explicit refusal, never a NULL routing context),
+  `doctor_department_mismatch` (submitted department is not the doctor's
+  own), `department_inactive` on the CANONICAL path (round-10 owner P1
+  parity). Create re-resolves on the LOCKED doctor row AFTER eligibility
+  and BEFORE the slot check, and persists `department_id` through the
+  internal `PatientPortalAppointmentCreate` schema — a Mini App
+  doctor-booking no longer stores `department_id = NULL` (the
+  department-pop follow-up flagged in round 2).
+- Preview/create routing agreement: the preview response echoes the
+  resolved `appointment.department_id` (additive field,
+  `response_model=dict[str, Any]` — no OpenAPI/api.ts churn), and the
+  create response's `preview` payload carries the same value, so a
+  patient always sees the routing context the row actually got.
+- Clinic-local calendar on the Mini App surface: the booking past-day
+  check receives `today=clinic_today(db)` (Asia/Tashkent queue-settings
+  SSOT) — the round-9 owner P2 fix now covers BOTH patient-facing
+  surfaces. On a UTC host between 00:00 and 04:59 Tashkent time the
+  previous clinic day is refused (`400 appointment_date_in_past`) instead
+  of being accepted by the host's `date.today()`.
+- Denial audit parity: routing refusals on the Mini App surface write
+  `outcome="denied"` `patient_access_audit` rows with the failing reason
+  (same SSOT pattern as the portal's round-3 denied rows); success rows
+  carry the resolved `department_id`.
+
+Round-12 (PR #3386 review: canonical keys end-to-end, atomic routing):
+
+- The Mini App booking form no longer free-types a department name. A
+  localized label ("Кардиология") is NOT a `Department.key`, so a normal
+  user input would be refused with `400 department_unknown` after the
+  routing contract landed. The form's department field is now a SELECTOR
+  fed by a new authenticated reference endpoint,
+  `POST /telegram/mini-app/booking/departments`
+  (`operation_id=telegram_mini_app_list_booking_departments`): it returns
+  `{ departments: [{ key, name, name_uz }] }` — ACTIVE rows only, `name`
+  is the clinic's own `name_ru` (Russian-first default) and `name_uz`
+  (round-15, owner P2) is the clinic's own Uzbek name so the uz-Latn
+  selector renders in the same language as the rest of the form.
+  The selector submits the canonical `key`; on endpoint failure the form
+  degrades to "без отделения" (a departmentless booking stays valid) and
+  never falls back to free text. Identity contract mirrors the booking
+  endpoints (initData primary, entry token allowed); no PHI is returned.
+- Atomic routing check (P1): the `active` validation in
+  `resolve_booking_department` / the canonical path is a plain read, so an
+  admin deactivate/delete could commit between the check and the
+  appointment INSERT, persisting a routing context that points at a
+  non-active department. The create endpoints now re-validate the FINAL
+  department row under `FOR UPDATE` inside the booking transaction
+  (`lock_department_for_booking`): a department-only create resolves its
+  row `for_update=True`; a doctor-booking locks the CANONICAL row by id
+  right before persisting. A racing admin change either commits first
+  (controlled 400 `department_inactive`, or `department_unknown` when the
+  row was deleted outright — never an IntegrityError/500) or commits after
+  the booking.
+- Routing vs eligibility ordering (P2): on BOTH create surfaces the
+  routing resolution now runs AFTER the established `doctor_not_eligible`
+  gate (the Mini App helper gained `resolve_routing=False` for the create
+  endpoint; the portal create moved its submitted-key resolution into the
+  post-eligibility branch). A request that is both ineligible-doctor AND
+  bad-department answers the established 404/409 `doctor_not_eligible`
+  contract, not a 400. Routing refusals on the Mini App create flow keep
+  their `outcome="denied"` audit rows (the create endpoint writes them
+  itself now that routing moved out of the shared helper).
+  Fresh-pass unification (post-PR-3457, owner directive): this ordering
+  had been briefly reverted on the portal by the PR-3402 rebase (the
+  up-front resolution returned, flagged as an "intentional divergence");
+  it is re-applied now, and the portal denial audit row for the
+  combined-bad request records `doctor_not_eligible` — the reason the
+  API actually answered. The department-only branch resolves the
+  submitted key itself (no eligibility gate applies on that path, so the
+  request-shaped 400s keep answering first there).
+- Patient-safe frontend errors (P2): the Mini App booking panel maps the
+  new reasons to actionable Russian copy (`department_unknown`,
+  `department_inactive`, `doctor_department_missing`,
+  `doctor_department_mismatch`, plus `doctor_not_eligible`) in
+  `patientUtils.ts` — a refused request no longer falls back to the
+  generic "Не удалось обработать заявку" line.

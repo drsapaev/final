@@ -1,31 +1,28 @@
-import { Card } from '../../../components/ui/macos';
+import { Button, Card } from '../../../components/ui/macos';
 import DentalVisitScreen from '../../../components/dental/DentalVisitScreen';
 import type { SelectedPatient } from '../dentistContracts';
-import { dentalCardKeyDown } from '../dentistCardA11y';
 
 /**
  * PR-UI-15-6: the visits tab view — verbatim JSX of the former
  * DentistPanelUnified.renderVisits (registrar/cashier/doctor views
  * decomposition precedent).
  *
- * Queue-selected patient → the single DentalVisitScreen; otherwise the
- * existing patient selection path.
+ * Queue-selected patient → the single DentalVisitScreen; otherwise point
+ * back to the single patient search surface.
  */
 export default function DentistVisitsView({
   selectedPatient,
-  patients,
   loading,
   onCompleteVisit,
-  onPatientSelect,
   onBackToQueue,
+  onGoToPatients,
   tI18n,
 }: {
   selectedPatient: SelectedPatient | Record<string, unknown> | null;
-  patients: SelectedPatient[];
   loading: boolean;
   onCompleteVisit: () => void;
-  onPatientSelect: (patient: SelectedPatient | Record<string, unknown> | null) => void;
   onBackToQueue: () => void;
+  onGoToPatients: () => void;
   tI18n: (key: string, params?: Record<string, unknown>) => string;
 }) {
   // Если выбран пациент из очереди - показываем минималистичный DentalVisitScreen
@@ -40,45 +37,17 @@ export default function DentistVisitsView({
     );
   }
 
-  // Иначе показываем список пациентов для выбора протокола
+  // Keep patient search in the Patients tab; do not duplicate patient cards here.
   return (
-    <div className="dental-flex-col dental-gap-24">
+    <div className="dental-flex-col dental-gap-16">
       <Card padding="large">
-        <h3 className="dental-text-primary">{tI18n('dental.dental_panel_visits_title')}</h3>
-        <p className="dental-text-desc dental-text-secondary">
-          {tI18n('dental.dental_panel_visits_subtitle')}
-        </p>
-
-        <div className="dental-grid-auto-fill-250">
-          {patients.map((patient) =>
-          <div
-            key={patient.id}
-            role="button"
-            tabIndex={0}
-            aria-label={tI18n('dental.dental_panel_aria_visit')}
-            className="dental-card-btn"
-            onClick={() => onPatientSelect(patient)}
-            onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => dentalCardKeyDown(event, () => onPatientSelect(patient))}
-            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
-              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-            }}
-            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
-              e.currentTarget.style.background = 'transparent';
-            }}>
-
-              <div className="dental-flex dental-gap-12">
-                <div className="dental-icon-bg dental-icon-bg-purple dental-icon-bg-full">
-                  <span className="dental-text-value dental-text-white">
-                    {patient.name?.charAt(0)}
-                  </span>
-                </div>
-                <div>
-                  <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-secondary">{tI18n('dental.dental_panel_visit_action')}</p>
-                </div>
-              </div>
-            </div>
-          )}
+        <h2 className="dental-text-primary">{tI18n('dental.dental_panel_visits_title')}</h2>
+        <p className="dental-text-desc dental-text-secondary">{tI18n('dental.dental_panel_visits_subtitle')}</p>
+        <div className="dental-flex dental-gap-8 dental-mt-16">
+          <Button variant="outline" onClick={onGoToPatients}>{tI18n('dental.dental_dpt_title')}</Button>
+          <Button variant="outline" onClick={onBackToQueue}>
+            {tI18n('dental.dental_dpt_go_queue')}
+          </Button>
         </div>
       </Card>
     </div>);

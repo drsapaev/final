@@ -8,12 +8,12 @@
  *
  * Supported shortcuts (only when not focused in input/textarea):
  * - Ctrl+1: switch to queue tab
- * - Ctrl+2: switch to appointments tab
- * - Ctrl+3: switch to visit tab
- * - Ctrl+4: switch to ecg tab
- * - Ctrl+5: switch to blood tab
- * - F5: refresh data (reload appointments)
- * - Escape: close any open modal
+ * - Ctrl+2: switch to visit tab
+ * - Ctrl+3: switch to patients tab
+ * - Ctrl+4: switch to ai tab
+ * - Ctrl+5: switch to blood tab (legacy view, kept for muscle memory)
+ * - F5: refresh data (reloads appointments/queue data)
+ * - Escape: close open form / schedule-next modal
  *
  * @param {Object} handlers
  * @param {Function} handlers.setActiveTab - switches tab
@@ -45,11 +45,16 @@ export const useCardiologistHotkeys = ({
       // Tab switching: Ctrl+1 through Ctrl+5
       if (isCtrl && ['1', '2', '3', '4', '5'].includes(e.key)) {
         e.preventDefault();
+        // Cardioplan slice 5: hotkeys now match the four visible sidebar
+        // sections (queue, visit, patients, ai). Ctrl+5 keeps the former
+        // blood view reachable as a legacy-compatible transition; the old
+        // tabs (appointments/ecg/history) still render via back-compat
+        // branches, so deep links and muscle memory keep working.
         const tabMap = {
           '1': 'queue',
-          '2': 'appointments',
-          '3': 'visit',
-          '4': 'ecg',
+          '2': 'visit',
+          '3': 'patients',
+          '4': 'ai',
           '5': 'blood',
         };
         const tab = tabMap[e.key as keyof typeof tabMap];

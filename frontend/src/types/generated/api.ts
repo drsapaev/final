@@ -173,6 +173,12 @@ export type paths = {
          *     per-doctor FOR UPDATE slot reservation taken BEFORE eligibility, same
          *     409 on occupied slots, same lifecycle eligibility for the doctor.
          *
+         *     Merged-#3340 follow-up (P1): the FINAL routing department is re-read
+         *     with ``populate_existing().with_for_update()`` in THIS transaction and
+         *     its ``active`` re-validated before the INSERT — the persisted routing
+         *     context can no longer reference a department that a concurrently
+         *     committed admin transaction deactivated (or deleted).
+         *
          *     P2 (round 2): the `Idempotency-Key` header is REQUIRED. The global
          *     idempotency middleware only protects requests that carry a key —
          *     without a mandated key a lost response + automatic browser retry of a
@@ -1492,6 +1498,13 @@ export type paths = {
          *     card as the POST — the raw ``dict[str, Any]`` response_model is gone,
          *     so the shared service projection cannot leak internal fields here
          *     even if it regresses.
+         *
+         *     PR 3417 review residual P2: the card is bearer-capability PHI, so the
+         *     response is marked ``Cache-Control: private, no-store`` (same policy
+         *     as dental clinical content), and the 5xx error path is sanitized
+         *     exactly like the POST's — the service wraps raw exception text
+         *     (SQLAlchemy/DB internals) into its 500 detail, which must never
+         *     reach a public bearer-token caller.
          */
         get: operations["get_visit_info_by_token_api_v1_visits_info__token__get"];
         put?: never;
@@ -14487,6 +14500,33 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/telegram/mini-app/booking/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List Mini App Booking Departments
+         * @description Round-12 (owner P1, PR #3386 review): ACTIVE departments for the
+         *     Mini App booking form's department selector.
+         *
+         *     The form submits the canonical `Department.key` picked from THIS list —
+         *     a localized free-text label ("Кардиология") is not a `Department.key`
+         *     and would be refused with 400 `department_unknown` by the routing
+         *     contract. Same authenticated identity surface as the booking endpoints
+         *     themselves (initData primary, entry token allowed); no PHI is returned.
+         */
+        post: operations["telegram_mini_app_list_booking_departments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/telegram/mini-app/appointments/preview": {
         parameters: {
             query?: never;
@@ -16832,6 +16872,59 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dental/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Список стоматологических снимков пациента */
+        get: operations["list_dental_media_api_v1_dental_media_get"];
+        put?: never;
+        /** Загрузить стоматологическое фото или рентген */
+        post: operations["upload_dental_media_api_v1_dental_media_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dental/media/{media_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Защищённый просмотр стоматологического снимка */
+        get: operations["view_dental_media_api_v1_dental_media__media_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dental/media/{media_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Мягко удалить стоматологический снимок */
+        delete: operations["delete_dental_media_api_v1_dental_media__media_id__delete"];
+        options?: never;
+        head?: never;
+        /** Изменить метаданные стоматологического снимка */
+        patch: operations["update_dental_media_api_v1_dental_media__media_id__patch"];
+        trace?: never;
+    };
     "/api/v1/dental/examinations": {
         parameters: {
             query?: never;
@@ -17359,6 +17452,67 @@ export type paths = {
         };
         /** Download Lab Report Pdf */
         get: operations["download_lab_report_pdf_api_v1_lab_report_instances__instance_id__pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/report-instances/{instance_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Lab Report Instance Pdf
+         * @description PR8 (codex-lab-workflow-hardening-plan): серверный A4-preview того же
+         *     движка, что финальный PDF, ДО утверждения.
+         *
+         *     Контракт:
+         *     - доступ только Admin/Lab (врач получает результат через /pdf после
+         *       finalize; preview неутверждённых бланков — лабораторная поверхность);
+         *     - рендерятся ТЕКУЩИЕ СОХРАНЕННЫЕ значения (Save Draft до preview —
+         *       unsaved-черновик клиента на сервер не отправляется);
+         *     - watermark «Черновик» для неутверждённых статусов; утверждённые
+         *       рендерятся без watermark (эквивалент финального вида);
+         *     - Content-Disposition: inline + Cache-Control: private, no-store
+         *       (клиническое содержание);
+         *     - побочных эффектов нет: без mark-printed, уведомлений и финализации.
+         */
+        get: operations["preview_lab_report_instance_pdf_api_v1_lab_report_instances__instance_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lab/template-versions/{version_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Lab Template Version Pdf
+         * @description PR8: template preview — серверный A4-рендер СОХРАНЁННОЙ версии
+         *     шаблона до публикации.
+         *
+         *     Контракт:
+         *     - доступ только Admin/Lab (редакторская поверхность шаблонов);
+         *     - только синтетические placeholder-значения: patient-блок пуст, value
+         *       колонка — очевидный маркер, никаких данных реальных пациентов;
+         *     - неопубликованные версии (DRAFT) помечаются watermark «Черновик»;
+         *       PUBLISHED рендерится без watermark (это и есть печатный бланк);
+         *     - inline + no-store; рендерер тот же, что у финального PDF.
+         */
+        get: operations["preview_lab_template_version_pdf_api_v1_lab_template_versions__version_id__preview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -24694,6 +24848,28 @@ export type components = {
             /** File */
             file: string;
         };
+        /** Body_upload_dental_media_api_v1_dental_media_post */
+        Body_upload_dental_media_api_v1_dental_media_post: {
+            /** File */
+            file: string;
+            /** Patient Id */
+            patient_id: number;
+            /** Visit Id */
+            visit_id: number;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "photo" | "xray";
+            /** Tooth */
+            tooth?: string | null;
+            /** Capture Date */
+            capture_date?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+        };
         /** Body_upload_file_api_v1_files_upload_post */
         Body_upload_file_api_v1_files_upload_post: {
             /** File */
@@ -25995,6 +26171,69 @@ export type components = {
              * @default
              */
             recommendations: string;
+        };
+        /** DentalMediaList */
+        DentalMediaList: {
+            /** Items */
+            items: components["schemas"]["DentalMediaOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
+        /**
+         * DentalMediaOut
+         * @description Storage-safe representation of a dental media record.
+         */
+        DentalMediaOut: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string | null;
+            /** Description */
+            description: string | null;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "photo" | "xray";
+            /** Tooth */
+            tooth: string | null;
+            /** Capture Date */
+            capture_date: string | null;
+            /** Mime Type */
+            mime_type: string;
+            /** File Size */
+            file_size: number;
+            /** Patient Id */
+            patient_id: number;
+            /** Visit Id */
+            visit_id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** DentalMediaUpdate */
+        DentalMediaUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Category */
+            category?: ("photo" | "xray") | null;
+            /** Tooth */
+            tooth?: string | null;
+            /** Capture Date */
+            capture_date?: string | null;
         };
         /** DentalPriceOverrideRequest */
         DentalPriceOverrideRequest: {
@@ -30334,6 +30573,11 @@ export type components = {
              * @default false
              */
             can_print: boolean;
+            /**
+             * Can Preview
+             * @default false
+             */
+            can_preview: boolean;
         };
         /** LabReportInstanceSummaryOut */
         LabReportInstanceSummaryOut: {
@@ -30407,6 +30651,11 @@ export type components = {
              * @default false
              */
             can_print: boolean;
+            /**
+             * Can Preview
+             * @default false
+             */
+            can_preview: boolean;
         };
         /** LabReportInstanceUpdate */
         LabReportInstanceUpdate: {
@@ -38182,6 +38431,27 @@ export type components = {
             notes?: string | null;
             /** Services */
             services?: string[] | null;
+        };
+        /**
+         * TelegramMiniAppBookingDepartmentsRequest
+         * @description Round-12 (owner P1, PR #3386 review): auth shape for the booking
+         *     departments reference endpoint.
+         *
+         *     The Mini App booking form no longer free-types a department name (a
+         *     localized label like "Кардиология" is NOT the canonical `Department.key`
+         *     the routing contract resolves); it picks from THIS endpoint's list, so
+         *     the submitted value is always a canonical key. Same identity contract
+         *     as the booking endpoints themselves (initData primary, entry token
+         *     allowed) — the reference data rides the SAME authenticated surface it
+         *     feeds, and the error reasons match the booking scope contract.
+         */
+        TelegramMiniAppBookingDepartmentsRequest: {
+            /** Initdata */
+            initData?: string | null;
+            /** Entrytoken */
+            entryToken?: string | null;
+            /** Section */
+            section?: string | null;
         };
         /** TelegramMiniAppPatientCabinetSummaryRequest */
         TelegramMiniAppPatientCabinetSummaryRequest: {
@@ -66847,6 +67117,41 @@ export interface operations {
             };
         };
     };
+    telegram_mini_app_list_booking_departments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramMiniAppBookingDepartmentsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     telegram_mini_app_preview_appointment_booking: {
         parameters: {
             query?: never;
@@ -70746,6 +71051,176 @@ export interface operations {
             };
         };
     };
+    list_dental_media_api_v1_dental_media_get: {
+        parameters: {
+            query: {
+                patient_id: number;
+                visit_id: number;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DentalMediaList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_dental_media_api_v1_dental_media_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_dental_media_api_v1_dental_media_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DentalMediaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    view_dental_media_api_v1_dental_media__media_id__content_get: {
+        parameters: {
+            query: {
+                visit_id: number;
+            };
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": unknown;
+                    "image/png": unknown;
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_dental_media_api_v1_dental_media__media_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_dental_media_api_v1_dental_media__media_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DentalMediaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DentalMediaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_dental_examinations_api_v1_dental_examinations_get: {
         parameters: {
             query?: {
@@ -71930,6 +72405,72 @@ export interface operations {
             header?: never;
             path: {
                 instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_lab_report_instance_pdf_api_v1_lab_report_instances__instance_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_lab_template_version_pdf_api_v1_lab_template_versions__version_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: number;
             };
             cookie?: never;
         };

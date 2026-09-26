@@ -245,3 +245,50 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(source).toContain('key={`${String(doctor.id)}:${String(service.id)}`}');
   });
 });
+
+// RQ-27.b (ACCEPTANCE S-28): "перед записью повторно проверена допустимость,
+// нет молчаливой записи в закрытое" — the wizard's pre-save revalidation
+// contract, pinned at source level (repo convention: source-block pins).
+// The open wizard must also stay ISOLATED from the RQ-27.a/.b catalog
+// revalidation (it owns its own services snapshot; input is never wiped by
+// a background refresh).
+describe('AppointmentWizardV2 pre-save revalidation contract (RQ-27.b, S-28)', () => {
+  it('requires a server quote token on every submit command (no write without admissibility)', () => {
+    const source = readWizardSource();
+    // The quote token rides the QR-update, edit-delta and create commands.
+    const quoteTokenSites = source.split('quoteToken: cartQuote?.quote_token').length - 1;
+    expect(quoteTokenSites).toBeGreaterThanOrEqual(2);
+  });
+
+  it('invalidates a rejected stale quote on 409 instead of resubmitting it', () => {
+    const source = readWizardSource();
+    // Codex R6 PR 3095 pattern, pinned so the create/update/edit-delta
+    // submit paths keep the invalidate + refetch semantics.
+    const invalidations = source.split('if (updErr.status === 409 || updErr.response?.status === 409) {').length - 1
+      + source.split('if (deltaErr.status === 409 || deltaErr.response?.status === 409) {').length - 1;
+    expect(invalidations).toBeGreaterThanOrEqual(2);
+    expect(source).toContain('setCartQuote(null)');
+    expect(source).toContain('setQuoteRefreshNonce((n) => n + 1)');
+  });
+
+  it('keeps the explicit unprocessable guards: re-add / reload prompts instead of a silent partial write', () => {
+    const source = readWizardSource();
+    // Cart items without service_id → explicit re-add prompt; visits without
+    // a valid service → explicit reload prompt. Both are early-return guards
+    // BEFORE any write command — the registrar keeps their input.
+    expect(source).toContain("t('misc.aw_services_unprocessable_readd')");
+    expect(source).toContain("t('misc.aw_services_unprocessable_reload')");
+  });
+
+  it('stays isolated from catalog revalidation: no subscription to refresh events (input is never wiped mid-edit)', () => {
+    const source = readWizardSource();
+    // The wizard owns its services snapshot and reloads ONLY on open/tab
+    // change/manual reload button. The RQ-27.a/.b revalidation events must
+    // never reach the wizard — otherwise a background refresh could clobber
+    // the unsaved draft.
+    expect(source).not.toContain("'registrar:session-refresh'");
+    expect(source).not.toContain("'queue-profiles:updated'");
+    expect(source).not.toContain("'departments:updated'");
+    expect(source).not.toContain("addEventListener('visibilitychange'");
+  });
+});
