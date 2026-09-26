@@ -22,11 +22,13 @@ drops it at the end; skips (NOT_RUN, plan P0) when no disposable
 PostgreSQL server is reachable. ``DATABASE_URL`` is accepted for
 automatic provisioning only for local servers — an explicit loopback
 host, a hostless unix-socket DSN, or a ``?host=`` that is a
-socket-directory path or a loopback name; address-altering parameters
+socket-directory path or a loopback name; hidden address sources
 (``?hostaddr=``, a remote ``?host=`` entry — including inside a
-comma-separated fallback list — or an address-overriding
-``PGHOSTADDR``/remote-``PGHOST`` environment) are rejected, so a remote
-admin DSN must be
+comma-separated fallback list — an address-overriding
+``PGHOSTADDR``/remote-``PGHOST`` environment, or a
+``?service=``/``PGSERVICE`` reference, which lets pg_service.conf
+supply the actually dialed address) are rejected, so a remote admin
+DSN must be
 passed explicitly via the test-owned ``RQ24B_PG_ADMIN_URL``. SQLite is
 never a substitute here. The HTTP surfaces run
 through the real FastAPI app (TestClient) against that scratch
@@ -120,8 +122,12 @@ def _candidate_admin_urls() -> list[str]:
     entries inside a comma-separated fallback list; the address-altering
     ``?hostaddr=`` is rejected outright (round-2 review P1), as is an
     address-overriding ``PGHOSTADDR``/remote-``PGHOST`` environment
-    (round-3 review P1). A remote admin DSN must be passed explicitly
-    via the test-owned ``RQ24B_PG_ADMIN_URL``.
+    (round-3 review P1), and any ``?service=``/``PGSERVICE`` reference
+    (round-4 review P1): libpq resolves a service name from
+    pg_service.conf into host/port/etc. at connect time, so a
+    service-referencing candidate cannot be proven to dial the same
+    local address its scratch DSN reproduces. A remote admin DSN must
+    be passed explicitly via the test-owned ``RQ24B_PG_ADMIN_URL``.
     """
     urls: list[str] = []
 
@@ -164,6 +170,14 @@ def _candidate_admin_urls() -> list[str]:
         # rejects the parameter outright (fail-closed).
         if qvals.get("hostaddr"):
             return False
+        # ``?service=`` (round-4 review P1) resolves host/port/etc. from
+        # pg_service.conf at connect time; ``_scratch_urls()`` does not
+        # inspect or reproduce the service contract, so the scratch DSN
+        # may dial a DIFFERENT address than the probe did. ANY presence
+        # of the parameter — any case, repeated form, even alongside an
+        # explicit localhost — rejects the candidate (fail-closed).
+        if qvals.get("service"):
+            return False
         # libpq fills omitted connection fields from the process
         # environment (round-3 review P1): ``PGHOSTADDR`` supplies the
         # dialed address even when the DSN spells a loopback or a socket
@@ -172,6 +186,13 @@ def _candidate_admin_urls() -> list[str]:
         # subprocess all inherit them. Fail-closed: any ``PGHOSTADDR``
         # presence rejects (symmetric with the DSN policy above).
         if os.getenv("PGHOSTADDR", "").strip():
+            return False
+        # ``PGSERVICE`` (round-4 review P1) is the environment twin of
+        # ``?service=``: libpq loads the service definition for any DSN
+        # that leaves fields unspelled — a hostless or localhost DSN
+        # would silently dial wherever the service file points. Any
+        # non-empty value rejects (fail-closed).
+        if os.getenv("PGSERVICE", "").strip():
             return False
         # ``?host=`` overrides the authority host — and libpq accepts
         # comma-separated FALLBACK hosts there (round-3 review P1):
@@ -1235,7 +1256,7 @@ def test_cashier_sees_and_collects_the_payment(
 
 
 # ------------------------------------------------------------------
-# Review-round pins (rounds 1-2): the candidate-DSN guard and the
+# Review-round pins (rounds 1-4): the candidate-DSN guard and the
 # scratch-DSN address forms are pure functions of their inputs — these
 # pins run WITHOUT a PostgreSQL server and must stay green everywhere.
 # ------------------------------------------------------------------
@@ -1249,6 +1270,13 @@ def _harness_env(monkeypatch, database_url: str | None) -> None:
     # P1) — the pins must judge the guard, not whatever the host exports.
     monkeypatch.delenv("PGHOSTADDR", raising=False)
     monkeypatch.delenv("PGHOST", raising=False)
+    # Service configuration is another hidden address source (round-4
+    # review P1): PGSERVICE feeds parameters into any DSN, and the
+    # service-file locations must not leak between pins even though
+    # they carry no address by themselves.
+    monkeypatch.delenv("PGSERVICE", raising=False)
+    monkeypatch.delenv("PGSERVICEFILE", raising=False)
+    monkeypatch.delenv("PGSYSCONFDIR", raising=False)
     if database_url is None:
         monkeypatch.delenv("DATABASE_URL", raising=False)
     else:
@@ -1410,4 +1438,52 @@ def test_pghost_env_with_local_socket_dir_keeps_hostless_accepted(monkeypatch):
     """Round-3 P1 positive: PGHOST at a local socket dir stays a candidate."""
     _harness_env(monkeypatch, "postgresql:///clinic")
     monkeypatch.setenv("PGHOST", "/var/run/postgresql")
+    assert _candidate_admin_urls() == ["postgresql:///clinic"]
+
+
+def test_env_dsn_with_service_param_is_rejected(monkeypatch):
+    """Round-4 P1: ``?service=`` may resolve the dialed host from
+    pg_service.conf — the guard cannot prove where it points."""
+    _harness_env(monkeypatch, "postgresql:///postgres?service=remote_service")
+    assert _candidate_admin_urls() == []
+
+
+def test_env_dsn_with_uppercase_service_param_cannot_bypass(monkeypatch):
+    """Round-4 P1: conninfo parameter names are case-insensitive."""
+    _harness_env(
+        monkeypatch, "postgresql://u:p@localhost/postgres?SERVICE=remote_service"
+    )
+    assert _candidate_admin_urls() == []
+
+
+def test_env_dsn_with_repeated_service_params_is_rejected(monkeypatch):
+    """Round-4 P1: repeated service keys parse into a sequence — the
+    normalized guard must reject that form too."""
+    _harness_env(monkeypatch, "postgresql:///postgres?service=a&service=b")
+    assert _candidate_admin_urls() == []
+
+
+def test_pgservice_env_rejects_even_a_local_looking_dsn(monkeypatch):
+    """Round-4 P1: a non-empty PGSERVICE feeds parameters into ANY DSN —
+    even one that spells an explicit localhost authority."""
+    _harness_env(monkeypatch, "postgresql://u:p@localhost/postgres")
+    monkeypatch.setenv("PGSERVICE", "remote_service")
+    assert _candidate_admin_urls() == []
+
+
+def test_pgservice_env_rejects_a_hostless_dsn_too(monkeypatch):
+    """Round-4 P1: a hostless DSN is exactly the shape a service
+    definition fills in — it must never auto-provision."""
+    _harness_env(monkeypatch, "postgresql:///postgres")
+    monkeypatch.setenv("PGSERVICE", "remote_service")
+    assert _candidate_admin_urls() == []
+
+
+def test_service_file_locations_alone_do_not_reject(monkeypatch):
+    """Round-4 P1 boundary: PGSERVICEFILE/PGSYSCONFDIR select WHERE
+    service definitions may live, not an address — a DSN that spells no
+    service stays a candidate (no over-rejection)."""
+    _harness_env(monkeypatch, "postgresql:///clinic")
+    monkeypatch.setenv("PGSERVICEFILE", "/tmp/synthetic_pg_service.conf")
+    monkeypatch.setenv("PGSYSCONFDIR", "/tmp")
     assert _candidate_admin_urls() == ["postgresql:///clinic"]
