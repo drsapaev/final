@@ -55,6 +55,7 @@ import './AppointmentWizardV2.css';
 // PatientStepV2 и CartStepV2 вынесены в отдельные файлы для уменьшения размера.
 import PatientStepV2 from './PatientStepV2';
 import CartStepV2 from './CartStepV2';
+import type { CartService } from './CartStepV2';
 // PR-45 / High-15: extracted sub-components to reduce god component size
 import EditModeBanner from './EditModeBanner';
 import StepProgressIndicator from './StepProgressIndicator';
@@ -103,12 +104,6 @@ interface DoctorData {
   full_name?: string;
   specialty?: string;
   department?: string;
-  [k: string]: unknown;
-}
-
-interface QueueProfileDto {
-  key?: string;
-  queue_tags?: unknown[];
   [k: string]: unknown;
 }
 
@@ -204,6 +199,9 @@ import {
   isPhoneDuplicateErrorMessage,
   // Fix C (cart atomicity): ключ идемпотентности для финального сабмита корзины.
   createIdempotencyKey,
+  repeatPreviewCandidateKey,
+  resolveQrLockedDoctorId,
+  addServiceToWizardCart,
   cartIdempotencyGuard,
   groupCartItemsByVisit,
   TOAST_WARNING_STYLE,
@@ -225,7 +223,6 @@ import {
   getWizardDepartmentForService,
   resolveInitialPatientId,
   findCardPersistMismatches,
-  getWizardServiceTabFilter,
   serviceCodeToWizardCategory,
   activeTabToWizardCategory,
   resolveInitialServiceCategory,
@@ -241,7 +238,7 @@ const AppointmentWizardV2 = ({
   onComplete,
   isProcessing = false,
   setIsProcessing = (_v: boolean) => {}, // Дефолтная функция-заглушка
-  activeTab = null, // ✅ ДОБАВЛЯЕМ activeTab для фильтрации услуг по отделению
+  activeTab = null,
   editMode = false, // ✨ НОВОЕ: Режим редактирования
   initialData = null // ✨ НОВОЕ: Данные для редактирования
 }: WizardProps) => {
@@ -350,8 +347,6 @@ const AppointmentWizardV2 = ({
   const [doctorsData, setDoctorsData] = useState<DoctorData[]>([]);
   const [filteredServices, setFilteredServices] = useState<ServiceData[]>([]);
   const [showAllServices, setShowAllServices] = useState(false);
-  // PR-25: queue profiles for dynamic department filtering
-  const [queueProfiles, setQueueProfiles] = useState<QueueProfileDto[]>([]);
   const [formattedBirthDate, setFormattedBirthDate] = useState('');
   const [repeatEligibilityByItemId, setRepeatEligibilityByItemId] = useState({} as Record<string, unknown>);
   const [isRepeatEligibilityLoading, setIsRepeatEligibilityLoading] = useState(false);
@@ -903,25 +898,27 @@ const AppointmentWizardV2 = ({
 
   // ===================== ЗАГРУЗКА ДАННЫХ =====================
 
+  // PR 3438 review round-2 P2: каталог услуг запрашивается ДЛЯ ДНЯ ЗАПИСИ.
+  // Владелец очереди услуги (doctor_selection_required /
+  // doctor_booking_available) вычисляется backend'ом date-aware: в edit-
+  // режиме это день редактируемой записи (resolveEditRecordDate — тот же
+  // SSOT, что edit-квота/сабмит), в новой записи — сегодняшний локальный
+  // день, которым addToCart штампует visit_date. Без target_date каталог
+  // отвечал бы для серверного «сегодня» независимо от даты записи —
+  // read/write drift: каталог обещает resource-owned без врача, а
+  // save-гейт на другой день требует врача → 400 на сохранении.
+  const catalogTargetDate = useMemo(
+    () => (editMode ? resolveEditRecordDate(initialData) : null) ?? getLocalISODate(),
+    [editMode, initialData]
+  );
+
   const loadServices = useCallback(async () => {
     try {
       // Codex P2 PR 3309 / RQ-05.b: каталог идёт через типизированный
       // wrapper — RegistrarCatalogService доезжает до потребителя, и
-      // переименование/удаление requires_doctor в DTO ломает компиляцию,
-      // а не молча пропускает шаг 2 без врача.
-      const data = await fetchRegistrarServices();
-
-        // PR-25: load queue profiles for dynamic department filtering
-        let profiles: QueueProfileDto[] = queueProfiles;
-        if (profiles.length === 0) {
-          try {
-            const profilesRes = await api.get('/queues/profiles?active_only=true') as import('axios').AxiosResponse<Record<string, unknown>>;
-            profiles = (profilesRes.data?.profiles as QueueProfileDto[]) || [];
-            setQueueProfiles(profiles);
-          } catch (e: unknown) {
-            logger.error('Failed to load queue profiles for filter:', e);
-          }
-        }
+      // переименование/удаление doctor_selection_required в DTO ломает
+      // компиляцию, а не молча пропускает шаг 2 без врача.
+      const data = await fetchRegistrarServices(catalogTargetDate);
 
         // Извлекаем все услуги из групп — конверсия из типизированного DTO
         // через SSOT-адаптер wizardServiceFromCatalogEntry (codex P2 PR 3309).
@@ -934,33 +931,14 @@ const AppointmentWizardV2 = ({
           });
         }
 
-        // ✅ ФИЛЬТРАЦИЯ ПО ВКЛАДКЕ: RQ-03 (F-02) — «Все отделения»/null НЕ
-        // ограничивает каталог; теги профиля сравниваются с queue_tag услуги,
-        // department_key профиля — с department_key услуги (тег ≠ отделение:
-        // ecg-услуга с department_key='cardiology' больше не пропадает с
-        // вкладки ЭКГ). Неклассифицированные услуги (без отдела и тега)
-        // видимы на любой вкладке — прежнее поведение строк без department_key.
-        // PR-25: dynamic queueProfiles; RQ-03: getWizardServiceTabFilter.
-        const serviceTabFilter = editMode ? null : getWizardServiceTabFilter(activeTab, profiles);
-        if (serviceTabFilter) {
-          const serviceTagSet = new Set(serviceTabFilter.tags);
-          const serviceDepartmentSet = new Set(serviceTabFilter.departmentKeys);
-          allServices = allServices.filter((service) => {
-            const departmentKey = String(service.department_key || service.departmentKey || '').trim().toLowerCase();
-            const queueTag = String(service.queue_tag || service.queueTag || '').trim().toLowerCase();
-            if (!departmentKey && !queueTag) return true;
-            if (queueTag && serviceTagSet.has(queueTag)) return true;
-            if (departmentKey && serviceDepartmentSet.has(departmentKey)) return true;
-            return false;
-          });
-        }
-
+        // Каталог мастера охватывает все отделения: вкладка очереди снаружи
+        // не должна скрывать других врачей и их услуги на шаге выбора.
         setServicesData(allServices);
         setFilteredServices(allServices);
     } catch (error: unknown) {
       logger.error('Ошибка загрузки услуг:', error);
     }
-  }, [activeTab, editMode, queueProfiles]);
+  }, [catalogTargetDate]);
 
   // ===================== РЕЗОЛВИНГ УСЛУГ (SSOT) =====================
 
@@ -1155,9 +1133,10 @@ const AppointmentWizardV2 = ({
         }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
         const mergedMap = { ...initialMap };
+        const candidateKeys = new Set(previewCandidates.map((candidate) => candidate.candidate_key));
         ((response?.data?.items as Array<{ candidate_key?: string | number; eligible?: boolean; reason?: string; repeat_discount_percent?: number; repeat_window_days?: number }>) || []).forEach((resultItem) => {
-          const key = Number(resultItem?.candidate_key);
-          if (!Number.isNaN(key)) {
+          const key = repeatPreviewCandidateKey(resultItem?.candidate_key);
+          if (key !== null && candidateKeys.has(key)) {
             mergedMap[key] = {
               eligible: Boolean(resultItem?.eligible),
               reason: resultItem?.reason || '',
@@ -1174,8 +1153,8 @@ const AppointmentWizardV2 = ({
         logger.error('❌ Ошибка preview повторной скидки:', error);
         const fallbackMap = { ...initialMap };
         previewCandidates.forEach((candidate) => {
-          const key = Number(candidate.candidate_key);
-          if (!Number.isNaN(key)) {
+          const key = repeatPreviewCandidateKey(candidate.candidate_key);
+          if (key !== null) {
             fallbackMap[key] = {
               eligible: false,
               reason: t('misc.aw_repeat_check_failed'),
@@ -1231,6 +1210,13 @@ const AppointmentWizardV2 = ({
     const queueEntryId = resolveOnlineQueueEntryId(initialData, recordKind, effectiveSource);
     return Boolean(queueEntryId);
   }, [editMode, initialData]);
+
+  // QR full-update keeps the entry's queue owner and has no doctor field.
+  // undefined means another route; null means resource or unknown owner.
+  const qrLockedDoctorId = useMemo(
+    () => resolveQrLockedDoctorId(fullUpdateQuoteRoute, initialData),
+    [fullUpdateQuoteRoute, initialData],
+  );
 
   // ===================== FIX D: КВОТА ЦЕН КОРЗИНЫ =====================
 
@@ -1436,33 +1422,25 @@ const AppointmentWizardV2 = ({
 
   // ===================== КОРЗИНА =====================
 
-  const addToCart = (service: ServiceData) => {
+  const addToCart = (service: CartService, doctor: DoctorData | null = null) => {
     // ✅ SSOT: Всегда используем данные из servicesData
-    const serviceFromData = servicesData.find((s) => s.id === service.id) || service;
-
-    const newItem = {
-      id: Date.now(), // Временный ID для React keys
-      service_id: serviceFromData.id,
-      service_name: serviceFromData.name, // ✅ SSOT: Полное название из servicesData
-      service_price: serviceFromData.price,
-      quantity: 1,
-      doctor_id: serviceFromData.requires_doctor ? null : undefined,
-      visit_date: (() => {
-        // ✅ Используем локальную дату, а не UTC
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      })(),
-      visit_time: null
-    };
+    if (service.id == null) return;
+    const serviceFromData = servicesData.find((s) => String(s.id) === String(service.id));
+    if (!serviceFromData) return;
+    if (qrLockedDoctorId !== undefined && doctor &&
+      (qrLockedDoctorId === null || String(doctor.id) !== String(qrLockedDoctorId))) return;
 
     setWizardData((prev) => ({
       ...prev,
       cart: {
         ...prev.cart,
-        items: [...prev.cart.items, newItem]
+        items: addServiceToWizardCart(
+          prev.cart.items,
+          serviceFromData,
+          doctor,
+          createIdempotencyKey(),
+          getLocalISODate(),
+        )
       }
     }));
 
@@ -1591,8 +1569,8 @@ const AppointmentWizardV2 = ({
       if (wizardData.cart.items.length === 0) {
         newErrors.cart = t('misc.aw_cart_empty');
       }
-      // RQ-05.b: гейт «врач обязателен ровно там, где требует сервер» —
-      // SSOT-хелпер по DTO-флагу requires_doctor каталога (F-04).
+      // Гейт «врач обязателен ровно там, где требует сервер» —
+      // SSOT-хелпер по DTO-флагу doctor_selection_required каталога.
       const missingDoctors = findMissingDoctorItems(
         wizardData.cart.items,
         servicesData
@@ -2863,7 +2841,15 @@ const AppointmentWizardV2 = ({
 
   const getResourceQueueTagByService = (serviceId: string | number): string | null => {
     const service = servicesData.find((candidate) => candidate.id === serviceId);
-    if (!service || service.requires_doctor) return null;
+    if (!service) return null;
+    // PR 3438 review P1-1: серверное решение владеет классификацией —
+    // ресурсная услуга (doctor_selection_required=false, напр. K10/ecg)
+    // группируется по её resource-тегу; fallback для легаси-ответов без
+    // поля — прежняя семантика по сырому requires_doctor.
+    const doctorPerformed = typeof service.doctor_selection_required === 'boolean'
+      ? service.doctor_selection_required
+      : Boolean(service.requires_doctor);
+    if (doctorPerformed) return null;
     const queueTag = String(service.queue_tag || '').trim();
     return queueTag || null;
   };
@@ -3298,6 +3284,7 @@ const AppointmentWizardV2 = ({
               onReloadServices={loadServices}
               getServiceName={getServiceName} // ✅ SSOT: Передаем функцию для получения названий услуг
               editMode={editMode}
+              lockedDoctorId={qrLockedDoctorId}
               activeCategory={activeServiceCategory}
               setActiveCategory={setActiveServiceCategory}
               searchQuery={serviceSearchQuery}

@@ -1,18 +1,16 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
-from app.services.user_mgmt._base import is_doctor_profile_incomplete
-from app.core.specialties import specialty_variants
-
 from app.api.v1.endpoints.registrar_integration._helpers import *  # noqa
-
-# RQ-08.a: UI-потребление серверной eligibility — accepted_specialties
-# каталога вычисляются ТОЙ ЖЕ функцией, что и серверный гейт корзины
-# (_assert_cart_doctor_eligibility, RQ-05.a): список в UI и запрет при
-# сохранении буквально совпадают (один код, один SSOT).
-from app.api.v1.endpoints.registrar_wizard._helpers import (
-    _accepted_specialty_variants_for_department_key,
+from app.models.clinic import Schedule
+from app.services.registrar_doctor_eligibility import (
+    accepted_specialty_variants_for_department_key,
+    doctor_booking_unavailable_reason,
+    doctor_selection_required_for_surface,
+    is_named_eligible_real_doctor,
+    resource_routed_tags_for_day,
 )
 
 
@@ -20,6 +18,15 @@ from app.api.v1.endpoints.registrar_wizard._helpers import (
 def get_registrar_services(
     specialty: str | None = Query(None, description="Фильтр по специальности"),
     active_only: bool = Query(True, description="Только активные услуги"),
+    target_date: date | None = Query(
+        None,
+        description=(
+            "День, для которого вычисляется владелец очереди каждой услуги "
+            "(resource-routing truth); по умолчанию — сегодня. Дата важна "
+            "для деактивационно-устойчивой поверхности: уже открытая "
+            "ресурсная очередь дня остаётся владельцем тега"
+        ),
+    ),
     db: Session = Depends(get_db),
     # Разрешаем доступ также профильным ролям врачей
     current_user: User = Depends(
@@ -52,6 +59,21 @@ def get_registrar_services(
             query = query.filter(Service.active == True)
 
         services = query.all()
+
+        # One routing-truth read for the whole catalog. PR #3438 review
+        # P1-1/P2: the same ownership rule the cart command gate checks at
+        # save time — an ACTIVE registry row for the exact tag OR the day's
+        # existing resource-owned surface (deactivation-proof). Without a
+        # target_date the registrar surface books for TODAY, so the default
+        # is today: a registry row deactivated mid-day cannot make the
+        # catalog promise a doctor booking the write gate will 409.
+        # PR #3438 review round-2 P2: "today" is the CLINIC day (queue
+        # timezone SSOT, clinic_today) — the host process date.today()
+        # drifts from Asia/Tashkent between 19:00Z and midnight, silently
+        # re-classifying the default-day catalog for a different day than
+        # the one the registrar is booking.
+        booking_day = target_date or crud_clinic.clinic_today(db)
+        routed_resource_tags = resource_routed_tags_for_day(db, booking_day)
 
         # Получаем маппинг услуг к отделениям
         dept_services = (
@@ -114,9 +136,17 @@ def get_registrar_services(
                 # RQ-05 (F-04): каталог регистратуры обязан передавать
                 # requires_doctor, чтобы выбор врача был обязательным ровно
                 # там, где его требует сервер (S-03).
-                "requires_doctor": bool(
-                    getattr(service, 'requires_doctor', False)
+                "requires_doctor": bool(getattr(service, 'requires_doctor', False)),
+                "doctor_selection_required": doctor_selection_required_for_surface(
+                    db,
+                    service,
+                    booking_day,
+                    resource_routed_tags=routed_resource_tags,
                 ),
+                "doctor_booking_available": doctor_booking_unavailable_reason(
+                    service, routed_resource_tags
+                )
+                is None,
                 "group": None,  # Добавим группу для frontend
             }
 
@@ -130,7 +160,7 @@ def get_registrar_services(
             # связи и поля услуги (админ-эндпоинт это позволяет) UI обязан
             # зеркалить именно серверный запрет, иначе предложит врача,
             # которого POST /registrar/cart отклонит.
-            _accepted = _accepted_specialty_variants_for_department_key(
+            _accepted = accepted_specialty_variants_for_department_key(
                 getattr(service, 'department_key', None)
             )
             service_data["accepted_specialties"] = (
@@ -222,32 +252,72 @@ def get_registrar_doctors(
         # QD-1.1 (queue resource role cleanup, Codex round-4 P2): the
         # registrar doctor selector hides synthetic queue-resource rows —
         # picking one would fail booking eligibility with a guaranteed 409.
-        doctors = crud_clinic.get_doctors(
-            db, active_only=True, exclude_internal_only=True
-        )
+        # The CRUD method defaults to a 100-row cap. Page its canonical
+        # eligibility query so every active real doctor reaches the wizard,
+        # including those after incomplete/internal profiles in ID order.
+        doctors = []
+        page_size = 100
+        while True:
+            page = crud_clinic.get_doctors(
+                db,
+                skip=len(doctors),
+                limit=page_size,
+                active_only=True,
+                eligible_only=True,
+                exclude_internal_only=True,
+            )
+            doctors.extend(page)
+            if len(page) < page_size:
+                break
 
-        # Lifecycle invariant (decision #5 / Codex P1-D): auto-created
-        # incomplete profiles (specialty="general" sentinel) are NOT
-        # clinical-eligible — the registrar must not be able to select them
-        # as specialty doctors or assign patients to them until an admin
-        # completes the profile with a real specialty. Admin visibility is
-        # preserved via /admin/doctors (profile_incomplete flag).
+        owner_ids = [doctor.user_id for doctor in doctors if doctor.user_id]
+        owners = (
+            {
+                owner.id: owner
+                for owner in db.query(User).filter(User.id.in_(owner_ids)).all()
+            }
+            if owner_ids
+            else {}
+        )
+        # A registration card must identify a named, active clinician.
+        # Historical orphaned profiles and blank names need admin repair.
         doctors = [
-            d for d in doctors if not is_doctor_profile_incomplete(d.specialty)
+            doctor
+            for doctor in doctors
+            if is_named_eligible_real_doctor(doctor, owners.get(doctor.user_id))
         ]
 
         if specialty:
             # D-1 canonical vocabulary: match any dental-family spelling
             # ("dental" filter must find canonical "dentistry" rows and
             # vice versa) instead of the historical exact comparison.
-            wanted = set(specialty_variants(specialty))
-            doctors = [d for d in doctors if (d.specialty or "") in wanted]
+            wanted = accepted_specialty_variants_for_department_key(specialty) or set()
+            doctors = [
+                doctor
+                for doctor in doctors
+                if (doctor.specialty or "").strip().lower() in wanted
+            ]
+
+        schedules_by_doctor: dict[int, list[Schedule]] = {}
+        if with_schedule and doctors:
+            for schedule in (
+                db.query(Schedule)
+                .filter(
+                    Schedule.doctor_id.in_([doctor.id for doctor in doctors]),
+                    Schedule.active.is_(True),
+                )
+                .order_by(Schedule.doctor_id, Schedule.weekday)
+                .all()
+            ):
+                schedules_by_doctor.setdefault(schedule.doctor_id, []).append(schedule)
 
         result = []
         for doctor in doctors:
+            owner = owners[doctor.user_id]
             doctor_data = {
                 "id": doctor.id,
                 "user_id": doctor.user_id,
+                "full_name": owner.full_name.strip(),
                 "specialty": doctor.specialty,
                 "cabinet": doctor.cabinet,
                 "price_default": (
@@ -257,20 +327,14 @@ def get_registrar_doctors(
                 "max_online_per_day": doctor.max_online_per_day,
                 "user": (
                     {
-                        "full_name": (
-                            doctor.user.full_name
-                            if doctor.user
-                            else f"Врач #{doctor.id}"
-                        ),
-                        "username": doctor.user.username if doctor.user else None,
+                        "full_name": owner.full_name.strip(),
+                        "username": owner.username,
                     }
-                    if doctor.user
-                    else None
                 ),
             }
 
             if with_schedule:
-                schedules = crud_clinic.get_doctor_schedules(db, doctor.id)
+                schedules = schedules_by_doctor.get(doctor.id, [])
                 doctor_data["schedules"] = [
                     {
                         "id": schedule.id,
@@ -324,4 +388,3 @@ def get_registrar_doctors(
 
 
 # ===================== НАСТРОЙКИ ОЧЕРЕДИ ДЛЯ РЕГИСТРАТУРЫ =====================
-

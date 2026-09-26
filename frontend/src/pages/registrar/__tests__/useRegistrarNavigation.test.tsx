@@ -172,6 +172,53 @@ describe('useRegistrarNavigation (PR-UI-13-5)', () => {
     expect(hook.current.activeTab).toBe(null);
   });
 
+  it('keeps doctor selection separate from department links and preserves other filters', async () => {
+    const { hook } = renderNavigationHook('/registrar?dept=cardio&q=ali&status=waiting&date=2026-09-25');
+    await act(async () => { hook.current.setActiveDoctorId(42); });
+    expect(hook.current.activeTab).toBe(null);
+    expect(hook.current.activeDoctorId).toBe(42);
+    expect(hook.current.searchParams.get('dept')).toBe(null);
+    expect(hook.current.searchParams.get('doctor_id')).toBe('42');
+    expect(hook.current.searchParams.get('q')).toBe('ali');
+    expect(hook.current.searchParams.get('status')).toBe('waiting');
+    expect(hook.current.searchParams.get('date')).toBe('2026-09-25');
+    await act(async () => { hook.current.setActiveTab('derma'); });
+    expect(hook.current.searchParams.get('doctor_id')).toBe(null);
+    expect(hook.current.searchParams.get('dept')).toBe('derma');
+  });
+
+  it('restores doctor and profile selection through Back and Forward', async () => {
+    const { hook } = renderNavigationHook('/registrar?dept=cardio');
+    await act(async () => { hook.current.setActiveDoctorId(7); });
+    expect(hook.current.activeDoctorId).toBe(7);
+    await act(async () => { hook.current.navigate(-1); });
+    expect(hook.current.activeDoctorId).toBe(null);
+    expect(hook.current.activeTab).toBe('cardio');
+    await act(async () => { hook.current.navigate(1); });
+    expect(hook.current.activeDoctorId).toBe(7);
+    expect(hook.current.activeTab).toBe(null);
+  });
+
+  it('uses a valid doctor_id when an incoming link also contains dept', async () => {
+    const { hook } = renderNavigationHook('/registrar?dept=cardio&doctor_id=7&q=x');
+    await waitFor(() => expect(hook.current.searchParams.get('dept')).toBe(null));
+    expect(hook.current.activeDoctorId).toBe(7);
+    expect(hook.current.searchParams.get('q')).toBe('x');
+  });
+
+  it('drops malformed doctor_id from an incoming department link', async () => {
+    const { hook } = renderNavigationHook('/registrar?dept=cardio&doctor_id=abc&q=x');
+    await waitFor(() => expect(hook.current.searchParams.get('doctor_id')).toBe(null));
+    expect(hook.current.activeTab).toBe('cardio');
+    expect(hook.current.searchParams.get('q')).toBe('x');
+  });
+
+  it('leaves /registrar/queue query parameters untouched', () => {
+    const { hook } = renderNavigationHook('/registrar/queue?dept=cardio&doctor_id=abc');
+    expect(hook.current.searchParams.get('dept')).toBe('cardio');
+    expect(hook.current.searchParams.get('doctor_id')).toBe('abc');
+  });
+
   // RQ-20.b (child slice): explicit reset of the active status filter —
   // only ?status= is removed; the other params (and the selected tab)
   // survive; push semantics let Back restore the filter (RQ-20.a contract).

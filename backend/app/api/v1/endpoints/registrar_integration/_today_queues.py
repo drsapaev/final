@@ -31,6 +31,7 @@ from app.api.v1.endpoints.registrar_integration._queue_ops import (  # noqa: F40
     _process_visit_entry,
     _register_bucket_doctor,
     _resolve_queue_entry_metadata,
+    _resolve_registrar_row_owner,
     _same_patient_queue_entry_for_visit,
     _serialize_queue_entry,
 )
@@ -112,7 +113,7 @@ def _serializer_will_emit_visit(
     non_ecg_count: int,
 ) -> bool:
     """Mirror the current visit serializer's service-filter branch."""
-    if filter_services or ecg_only:
+    if ecg_only:
         return ecg_count > 0
     return non_ecg_count > 0
 
@@ -206,6 +207,7 @@ def _process_visits_for_queues(
                     "queue_time": visit_queue_time,  # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
                     "filter_services": True,  # Флаг для фильтрации услуг при обработке
                     "ecg_only": True,  # Только ЭКГ услуги для этой записи
+                    "_visit_service_slice": "ecg",
                     "_page_serializable": _serializer_will_emit_visit(
                         filter_services=True,
                         ecg_only=True,
@@ -234,6 +236,7 @@ def _process_visits_for_queues(
                     "queue_time": visit_queue_time,  # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
                     "filter_services": True,  # Флаг для фильтрации услуг при обработке
                     "ecg_only": False,  # Исключаем ЭКГ услуги
+                    "_visit_service_slice": "non_ecg",
                     "_page_serializable": _serializer_will_emit_visit(
                         filter_services=True,
                         ecg_only=False,
@@ -404,6 +407,14 @@ def _collect_lab_report_summaries(
     return latest_lab_reports_by_visit, include_lab_report_summary
 
 
+def _entry_dedupe_key(entry: dict) -> tuple:
+    """Keep both service slices of one unlinked mixed Visit visible."""
+    entry_type = entry.get("type")
+    entry_id = getattr(entry.get("data"), "id", "")
+    slice_key = entry.get("_visit_service_slice") if entry_type == "visit" else None
+    return entry_type, entry_id, slice_key
+
+
 def _build_queue_result(
     db: Session,
     current_user,
@@ -459,8 +470,7 @@ def _build_queue_result(
         for idx, entry in enumerate(entries_list):
             entry_type = entry.get("type")
             entry_data = entry.get("data")
-            entry_id_val = getattr(entry_data, "id", "")
-            entry_key = f"{entry_type}_{entry_id_val}"
+            entry_key = _entry_dedupe_key(entry)
             # R-22 fix: entry_wrapper is alias for entry (used in result serialization)
             entry_wrapper = entry
             # Пропускаем дубликаты
@@ -640,6 +650,14 @@ def _build_queue_result(
                 visit_id=entry_visit_id,
                 patient_id=patient_id,
             )
+            queue_owner_kind, queue_owner_id, daily_queue_id = (
+                _resolve_registrar_row_owner(
+                    db=db,
+                    entry_type=entry_type,
+                    entry_data=entry_data,
+                    service_details=service_details,
+                )
+            )
             # R-22 Phase 4: entry serialization extracted to helper
             # (can_* flags are computed inside _serialize_queue_entry)
             serialized_entry = _serialize_queue_entry(
@@ -672,6 +690,9 @@ def _build_queue_result(
                 latest_lab_report=latest_lab_report,
                 entry_department_key=entry_department_key,
                 entry_department=entry_department,
+                queue_owner_kind=queue_owner_kind,
+                queue_owner_id=queue_owner_id,
+                daily_queue_id=daily_queue_id,
                 # W2-PR2: канонический день строки read-модели — день,
                 # для которого построен лист (target_date запроса).
                 record_date=today,
@@ -746,8 +767,7 @@ def _build_queue_result_page(
         for idx, entry in enumerate(entries_list):
             entry_type = entry.get("type")
             entry_data = entry.get("data")
-            entry_id_val = getattr(entry_data, "id", "")
-            entry_key = f"{entry_type}_{entry_id_val}"
+            entry_key = _entry_dedupe_key(entry)
             if entry_key in seen_entry_keys:
                 logger.debug(
                     "get_today_queues: Пропущен дубликат: %s (тип: %s)",
