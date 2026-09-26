@@ -683,6 +683,10 @@ def _mini_app_booking_departments_payload(db: Session) -> dict[str, Any]:
     display name is the clinic's own `name_ru` — the Mini App booking
     surface is Russian-first (same choice as every other patient-facing
     string there).
+
+    Round-15 (owner P2): the clinic's `name_uz` rides along so the
+    uz-Latn shell renders the selector in the same language as the rest
+    of the form; RU display keeps using `name`.
     """
     department_rows = (
         db.query(Department)
@@ -692,7 +696,12 @@ def _mini_app_booking_departments_payload(db: Session) -> dict[str, Any]:
     )
     return {
         "departments": [
-            {"key": row.key, "name": row.name_ru} for row in department_rows
+            {
+                "key": row.key,
+                "name": row.name_ru,
+                "name_uz": row.name_uz,
+            }
+            for row in department_rows
         ]
     }
 

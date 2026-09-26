@@ -1230,9 +1230,9 @@ def test_department_bulk_delete_blocked_when_queue_history_exists(
     """Bulk delete with one blocked department must fail CLOSED with 409
     and leave EVERY department (including the clean ones) untouched."""
     headers = _dep_headers(pg_admin_user)
-    blocked = _create_department(pg_client, headers, "bulkA")
-    clean = _create_department(pg_client, headers, "bulkB")
-    seeded = _seed_waiting_entry_for_department(pg_session, blocked["key"], "bulkA")
+    blocked = _create_department(pg_client, headers, "bulk_a")
+    clean = _create_department(pg_client, headers, "bulk_b")
+    seeded = _seed_waiting_entry_for_department(pg_session, blocked["key"], "bulk_a")
 
     resp = pg_client.request(
         "DELETE",
@@ -1286,8 +1286,8 @@ def test_department_bulk_delete_without_queue_history_cascades(
     """Clean departments delete in bulk with the SAME cascade as the
     single endpoint: the 1:1 profile is removed, not orphaned."""
     headers = _dep_headers(pg_admin_user)
-    d1 = _create_department(pg_client, headers, "bulkC")
-    d2 = _create_department(pg_client, headers, "bulkD")
+    d1 = _create_department(pg_client, headers, "bulk_c")
+    d2 = _create_department(pg_client, headers, "bulk_d")
 
     from app.models.queue_profile import QueueProfile
 

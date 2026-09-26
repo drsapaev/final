@@ -424,8 +424,10 @@ Round-12 (PR #3386 review: canonical keys end-to-end, atomic routing):
   fed by a new authenticated reference endpoint,
   `POST /telegram/mini-app/booking/departments`
   (`operation_id=telegram_mini_app_list_booking_departments`): it returns
-  `{ departments: [{ key, name }] }` — ACTIVE rows only, `name` is the
-  clinic's own `name_ru` (the Mini App booking surface is Russian-first).
+  `{ departments: [{ key, name, name_uz }] }` — ACTIVE rows only, `name`
+  is the clinic's own `name_ru` (Russian-first default) and `name_uz`
+  (round-15, owner P2) is the clinic's own Uzbek name so the uz-Latn
+  selector renders in the same language as the rest of the form.
   The selector submits the canonical `key`; on endpoint failure the form
   degrades to "без отделения" (a departmentless booking stays valid) and
   never falls back to free text. Identity contract mirrors the booking
