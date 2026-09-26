@@ -10481,6 +10481,7 @@ const uzLatn = {
     data_source_api: 'Ma\'lumotlar serverdan yuklandi',
     ds_error_message: 'Yozuvlarni yuklab bo\'lmadi. Serverga ulanishni tekshiring.',
     ds_retry: 'Qayta urinish',
+    ds_refresh: "Sessiya ma'lumotlarini yangilash",
     rp_worklist_stale_warning: 'Oldin yuklangan ma\'lumotlar ko\'rsatilmoqda — oxirgi yangilash amalga oshmadi',
     rp_worklist_no_matches: 'Joriy so\'rov bo\'yicha moslik topilmadi',
 
