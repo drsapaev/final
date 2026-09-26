@@ -1181,7 +1181,10 @@ def test_service_file_locations_alone_do_not_reject(monkeypatch):
     """Round-4 P1 boundary: PGSERVICEFILE/PGSYSCONFDIR select WHERE
     service definitions may live, not an address — a DSN that spells no
     service stays a candidate (no over-rejection)."""
+    import tempfile
+
+    service_file = str(Path(tempfile.gettempdir()) / "synthetic_pg_service.conf")
     _harness_env(monkeypatch, "postgresql:///clinic")
-    monkeypatch.setenv("PGSERVICEFILE", "/tmp/synthetic_pg_service.conf")
-    monkeypatch.setenv("PGSYSCONFDIR", "/tmp")
+    monkeypatch.setenv("PGSERVICEFILE", service_file)
+    monkeypatch.setenv("PGSYSCONFDIR", tempfile.gettempdir())
     assert _candidate_admin_urls() == ["postgresql:///clinic"]
