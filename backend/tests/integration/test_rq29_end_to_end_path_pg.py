@@ -53,6 +53,14 @@ merged real-PG cross-panel harness precedent) and
 tests/integration/test_rq26b_csv_lifecycle_contract_pg.py (the profile
 PUT/archive contract precedent).
 
+ONE continuous test (owner review round 1): the whole combined path
+(world setup + steps 2-9) runs inside a single pytest test —
+``test_rq29_combined_path`` — and the step artifacts flow through
+explicit arguments and return values. There is NO module-level
+cross-test carry and NO hidden pytest-order dependence: the module
+holds exactly one test, so collection order, ``-k`` targeted execution
+and ``xdist`` distribution cannot desynchronize the scenario.
+
 Run::
 
     cd backend && DATABASE_URL=postgresql+psycopg://clinic:pw@localhost:5432/clinicdb \
@@ -462,16 +470,6 @@ def _auth_headers(user) -> dict[str, str]:
     return {"Authorization": f"Bearer {mint_access_token(user)}"}
 
 
-# Cross-test carry for the ONE continuous combined path: the world
-# fixture is function-scoped (fresh app overrides/monkeypatches per
-# test — the rq24b precedent), but the scenario steps run in file order
-# on ONE module database, and later steps consume the artifacts created
-# by earlier ones (the cart, the queue ids, the saved join ticket).
-# Only plain JSON data (ids, response dicts) is carried — never ORM
-# instances bound to a closed session.
-_CARRIED: dict = {}
-
-
 def _ws_state(pg_client, user, board_id: str = "main_board") -> dict:
     """One REAL websocket session: initial_state on connect."""
     from tests.conftest import mint_access_token
@@ -545,7 +543,8 @@ def world(pg_session, pg_client):
             headers=admin_h,
         )
         if resp.status_code == 400 and "уже привязан" in resp.text:
-            # idempotent world (function-scoped fixture on one module DB)
+            # idempotent world guard (the branches make the world safe
+            # to rebuild; a run gets a fresh scratch DB either way)
             continue
         assert resp.status_code in (200, 201), resp.text
         body = resp.json()
@@ -707,7 +706,6 @@ def world(pg_session, pg_client):
         patient = resp.json()
 
     return {
-        **_CARRIED,
         "admin": admin,
         "registrar": registrar,
         "doctor_user": doctor_user,
@@ -726,10 +724,11 @@ def world(pg_session, pg_client):
     }
 
 
-# === RQ-29 combined-path tests (one continuous scenario) ===
+# === RQ-29 combined-path step helpers (the ONE continuous test at the
+# bottom of the module calls them in order, passing state explicitly) ===
 
 
-def test_step1_admin_setup_and_direction_are_reachable(world):
+def _step1_admin_setup_and_direction_are_reachable(world):
     """Steps 1-2 of the combined path: the REAL admin API connected a
     doctor of an EXISTING catalog specialty (0051), a doctorless resource
     with the RQ-17 activation gate, and the NEW direction's permanent
@@ -744,7 +743,7 @@ def test_step1_admin_setup_and_direction_are_reachable(world):
     assert world["resource"]["default_cabinet"] == "204"
 
 
-def test_step2_admin_edits_service_and_registrar_finds_patient(
+def _step2_admin_edits_service_and_registrar_finds_patient(
     pg_client, world
 ):
     """Steps 2-3 of the combined path: the admin RETURNS TO EDITING the
@@ -783,7 +782,7 @@ def test_step2_admin_edits_service_and_registrar_finds_patient(
     assert matches[0]["id"] == world["patient"]["id"]
 
 
-def test_step3_wizard_cart_refusal_then_confirmed_quote_success(
+def _step3_wizard_cart_refusal_then_confirmed_quote_success(
     pg_client, pg_session, world
 ):
     """Steps 2-3 of the combined path: the wizard cart refuses a
@@ -831,12 +830,46 @@ def test_step3_wizard_cart_refusal_then_confirmed_quote_success(
         "payment_method": "cash",
         "quote_token": quote["quote_token"],
     }
+
+    # DB-side partial-state proof (owner review P2): the "no partial
+    # state" claim is asserted on the DATABASE, not only through the
+    # HTTP status — the refused save must create no Invoice, no Visit
+    # and no OnlineQueueEntry rows for this patient.
+    from app.models.billing import Invoice
+    from app.models.online_queue import OnlineQueueEntry
+    from app.models.visit import Visit
+
+    patient_id = world["patient"]["id"]
+
+    def _partial_state_counts() -> dict[str, int]:
+        return {
+            "invoices": pg_session.query(Invoice)
+            .filter(Invoice.patient_id == patient_id)
+            .count(),
+            "visits": pg_session.query(Visit)
+            .filter(Visit.patient_id == patient_id)
+            .count(),
+            "queue_entries": pg_session.query(OnlineQueueEntry)
+            .filter(OnlineQueueEntry.patient_id == patient_id)
+            .count(),
+        }
+
+    before_refusal = _partial_state_counts()
+    assert before_refusal == {"invoices": 0, "visits": 0, "queue_entries": 0}, (
+        "the synthetic patient must be fresh before the refused save"
+    )
+
     resp = pg_client.post(CART_PATH, json=cart_payload, headers=registrar_h)
     assert resp.status_code == 400, (
         f"requires_doctor service must refuse a doctorless save, "
         f"got {resp.status_code}: {resp.text[:300]}"
     )
     assert "требует выбора врача" in resp.text
+    after_refusal = _partial_state_counts()
+    assert after_refusal == before_refusal, (
+        f"the refused requires_doctor save must not create partial state "
+        f"(before={before_refusal}, after={after_refusal})"
+    )
 
     # The registrar fixes the required link (doctor of the SAME
     # specialty, active — the eligibility contract).
@@ -883,15 +916,16 @@ def test_step3_wizard_cart_refusal_then_confirmed_quote_success(
     )
     assert resource_queue.specialist_id is None
 
-    # Carry the step artifacts for the later steps of the ONE continuous
-    # path (the world fixture is function-scoped; the module DB keeps
-    # the rows, this dict keeps their ids).
-    _CARRIED["cart"] = cart
-    _CARRIED["doctor_queue_id"] = doctor_queue.id
-    _CARRIED["resource_queue_id"] = resource_queue.id
+    # Return the step artifacts to the continuous-path caller (explicit
+    # state passing — owner review P1: no module-level carry).
+    return {
+        "cart": cart,
+        "doctor_queue_id": doctor_queue.id,
+        "resource_queue_id": resource_queue.id,
+    }
 
 
-def test_step4_direction_qr_partial_join_repeat_and_probe(
+def _step4_direction_qr_partial_join_repeat_and_probe(
     pg_client, pg_session, world
 ):
     """Step 4 + 7 of the combined path: the patient records through the
@@ -968,12 +1002,11 @@ def test_step4_direction_qr_partial_join_repeat_and_probe(
         "the repeated command must not create duplicate tickets"
     )
 
-    _CARRIED["direction_ticket"] = ticket
-    _CARRIED["direction_session_payload"] = payload
+    return {"direction_ticket": ticket, "direction_session_payload": payload}
 
 
-def test_step5_performer_scope_consistency_and_second_session(
-    pg_client, pg_session, world
+def _step5_performer_scope_consistency_and_second_session(
+    pg_client, pg_session, world, step3
 ):
     """Steps 5-6 of the combined path: the ticket reaches the RIGHT
     performer (the dermatology doctor sees nothing), numbers/cabinets
@@ -990,7 +1023,7 @@ def test_step5_performer_scope_consistency_and_second_session(
     assert doctor_body["queue_exists"] is True
     cart_numbers = {
         assignment["number"]
-        for assignments in world["cart"]["queue_numbers"].values()
+        for assignments in step3["cart"]["queue_numbers"].values()
         for assignment in assignments
         if assignment.get("queue_tag") == DOCTOR_SPECIALTY
     }
@@ -1073,11 +1106,11 @@ def test_step5_performer_scope_consistency_and_second_session(
     assert resp.status_code == 200, resp.text
     assert resp.json().get("entries"), "second session lost the lab work"
 
-    world["board_state_numbers"] = sorted(str(n) for n in by_number)
+    return {"board_numbers": sorted(str(n) for n in by_number)}
 
 
-def test_step6_archive_closes_future_joins_preserves_today(
-    pg_client, pg_session, world
+def _step6_archive_closes_future_joins_preserves_today(
+    pg_client, pg_session, world, step3
 ):
     """Step 8 of the combined path: archiving the direction (the REAL
     profile PUT, rq26b contract) refuses future public joins with the
@@ -1109,13 +1142,13 @@ def test_step6_archive_closes_future_joins_preserves_today(
     # doctor-axis queue and the resource queue still hold their entries.
     doctor_queue = (
         pg_session.query(OnlineQueueEntry)
-        .filter(OnlineQueueEntry.queue_id == world["doctor_queue_id"])
+        .filter(OnlineQueueEntry.queue_id == step3["doctor_queue_id"])
         .count()
     )
     assert doctor_queue >= 1, "archive must not wipe today's doctor-axis tickets"
     resource_count = (
         pg_session.query(OnlineQueueEntry)
-        .filter(OnlineQueueEntry.queue_id == world["resource_queue_id"])
+        .filter(OnlineQueueEntry.queue_id == step3["resource_queue_id"])
         .count()
     )
     assert resource_count >= 1, "archive must not wipe today's resource tickets"
@@ -1129,8 +1162,8 @@ def test_step6_archive_closes_future_joins_preserves_today(
     assert buckets.get(DOCTOR_SPECIALTY), "archive must not hide the live doctor queue"
 
 
-def test_step7_partial_payment_then_partial_service_cancel(
-    pg_client, pg_session, world
+def _step7_partial_payment_then_partial_service_cancel(
+    pg_client, pg_session, world, step3
 ):
     """Step 9 of the combined path: a supported PARTIAL payment (the
     allocation lands oldest-first, the remaining debt stays visible) and
@@ -1153,7 +1186,7 @@ def test_step7_partial_payment_then_partial_service_cancel(
     )
     assert target is not None, "the cashier must see the cart patient's bill"
     visit_ids = target["visit_ids"]
-    assert set(visit_ids) == set(world["cart"]["visit_ids"])
+    assert set(visit_ids) == set(step3["cart"]["visit_ids"])
 
     resp = pg_client.post(
         CASHIER_GROUPED,
@@ -1169,10 +1202,25 @@ def test_step7_partial_payment_then_partial_service_cancel(
     payment = resp.json()
     assert payment["allocations"] and payment["payments"]
 
-    # The allocation landed on the OLDEST visit only (server-owned):
-    # exactly one visit carries payments, the rest stay payable.
+    # The allocation landed on the OLDEST visit only (server-owned).
+    # Owner review P2: the oldest-first claim must be PROVEN, not
+    # implied by "one visit" — the cashier sorts allocation candidates
+    # by (created_at, id); the test resolves the same identity from the
+    # DB rows and pins it exactly.
+    from app.models.visit import Visit
+
+    cart_visits = pg_session.query(Visit).filter(Visit.id.in_(visit_ids)).all()
+    assert len(cart_visits) == len(set(visit_ids)), "cart visits must exist"
+    oldest_visit = min(cart_visits, key=lambda v: (v.created_at, v.id))
     paid_visit_ids = {a["visit_id"] for a in payment["allocations"]}
-    assert len(paid_visit_ids) == 1, payment["allocations"]
+    assert paid_visit_ids == {oldest_visit.id}, (
+        f"the allocation must land on the OLDEST visit "
+        f"(id={oldest_visit.id}, created_at={oldest_visit.created_at}) of "
+        f"{sorted(visit_ids)}, got {sorted(paid_visit_ids)}"
+    )
+    assert sum(float(a["amount"]) for a in payment["allocations"]) == 30000.0, (
+        payment["allocations"]
+    )
     resp = pg_client.get(CASHIER_PENDING, headers=cashier_h)
     assert resp.status_code == 200, resp.text
     rows2 = resp.json().get("items") or resp.json().get("payments") or []
@@ -1336,4 +1384,41 @@ def world_doctor_id_resolved(pg_session, username: str) -> int:
     )
     assert row is not None, f"doctor for user {username} must exist"
     return row.id
+
+
+# === RQ-29 combined path — the ONE continuous test ==================
+
+
+def test_rq29_combined_path(pg_client, pg_session, world):
+    """The whole combined path (ACCEPTANCE steps 1-9) as ONE continuous
+    scenario: the admin setup, the wizard cart with the refused
+    required-doctor save, the direction QR join with one refused extra
+    choice, the performer-scope consistency, the archive gate, and the
+    partial payment/cancellation legs — in file order, on one disposable
+    PostgreSQL database.
+
+    Owner review P1 fix: the artifacts of each step flow to the next
+    step through explicit arguments and return values — there is no
+    module-level ``_CARRIED`` carry and no cross-test state, so the
+    module cannot depend on pytest collection order. There is exactly
+    ONE test in this module: targeted execution (``pytest ... -k
+    rq29_combined_path``) runs the same continuous path.
+    """
+    _step1_admin_setup_and_direction_are_reachable(world)
+    _step2_admin_edits_service_and_registrar_finds_patient(pg_client, world)
+    step3 = _step3_wizard_cart_refusal_then_confirmed_quote_success(
+        pg_client, pg_session, world
+    )
+    _step4_direction_qr_partial_join_repeat_and_probe(
+        pg_client, pg_session, world
+    )
+    _step5_performer_scope_consistency_and_second_session(
+        pg_client, pg_session, world, step3
+    )
+    _step6_archive_closes_future_joins_preserves_today(
+        pg_client, pg_session, world, step3
+    )
+    _step7_partial_payment_then_partial_service_cancel(
+        pg_client, pg_session, world, step3
+    )
 
