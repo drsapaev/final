@@ -312,6 +312,48 @@ describe('TelegramMiniAppPatientShell booking department selector (P1, round-14)
     });
   });
 
+  it('clears a stale selected department when a successful refetch no longer lists it (round-16 P2)', async () => {
+    (window as unknown as { Telegram?: unknown }).Telegram = {
+      WebApp: { initData: 'test-init-data-payload' },
+    };
+    let departmentsCalls = 0;
+    apiPost.mockImplementation((url: string, body: Record<string, any>) => {
+      if (url === MANIFEST_URL) return Promise.resolve({ data: linkedManifest });
+      if (url === DEPARTMENTS_URL) {
+        departmentsCalls += 1;
+        if (departmentsCalls >= 2) {
+          // The refetch SUCCEEDS, but cardio was deactivated in the
+          // meantime: the ACTIVE reference now lists only derma.
+          return Promise.resolve({ data: { departments: [departmentRows[1]] } });
+        }
+        return Promise.resolve({ data: { departments: departmentRows } });
+      }
+      if (url === PREVIEW_URL) return routeApiPostByUrl(PREVIEW_URL, body);
+      return Promise.resolve({ data: {} });
+    });
+
+    renderBookSurface('?section=appointments');
+    await selectDepartmentByName('Кардиология');
+
+    // Leave the booking section (no refetch happens there) and come back —
+    // the refetch succeeds, so the selector no longer offers "Кардиология".
+    // The custom Select renders the placeholder for an unmatched value, so
+    // the UI LOOKS departmentless even while the form state still carries
+    // the stale key — the divergence is only observable in the payload.
+    fireEvent.click(screen.getByLabelText('Открытый раздел: Визиты'));
+    fireEvent.click(screen.getByLabelText('Открытый раздел: Запись'));
+    await waitFor(() => expect(departmentsCalls).toBe(2));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить черновик' }));
+    await waitFor(() => {
+      expect(apiPost).toHaveBeenCalledWith(
+        PREVIEW_URL,
+        expect.objectContaining({ department: undefined }),
+        expect.anything(),
+      );
+    });
+  });
+
   it('degrades gracefully when the department reference endpoint fails — form stays usable without departments', async () => {
     (window as unknown as { Telegram?: unknown }).Telegram = {
       WebApp: { initData: 'test-init-data-payload' },

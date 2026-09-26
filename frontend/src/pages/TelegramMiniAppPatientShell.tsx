@@ -800,11 +800,22 @@ function TelegramMiniAppPatientShell() {
       .then((response) => {
         if (!isMounted) return;
         const rows = response.data?.departments;
-        setBookingDepartmentOptions(
-          Array.isArray(rows)
-            ? rows.filter((row: MiniAppDepartmentOption) => row && typeof row.key === 'string' && row.key)
-            : [],
-        );
+        const nextOptions = Array.isArray(rows)
+          ? rows.filter((row: MiniAppDepartmentOption) => row && typeof row.key === 'string' && row.key)
+          : [];
+        setBookingDepartmentOptions(nextOptions);
+        // Round-16 (owner P2): a SUCCESSFUL refetch can still drop the
+        // previously selected key from the ACTIVE reference (department
+        // deactivated/removed while the patient was away). The selector
+        // no longer lists that key, so the form state must not keep riding
+        // along with it — sync back to the departmentless mode, mirroring
+        // the failure branch below.
+        setAppointmentPreviewForm((prev) => {
+          if (!prev.department) return prev;
+          return nextOptions.some((row) => row.key === prev.department)
+            ? prev
+            : { ...prev, department: '' };
+        });
       })
       .catch(() => {
         if (!isMounted) return;
