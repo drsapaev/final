@@ -160,3 +160,122 @@
 .derma-gallery-delete:focus-visible {
   opacity: 1;
 }
+
+/* AI-подсказка по сохранённому фото — пункт 9 (только по клику) */
+
+.derma-gallery-item-actions {
+  position: absolute;
+  top: var(--mac-spacing-2);
+  right: var(--mac-spacing-2);
+  display: flex;
+  gap: var(--mac-spacing-1);
+}
+
+.derma-gallery-analyze,
+.derma-gallery-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--mac-radius-full);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--mac-duration-normal) var(--mac-ease);
+}
+
+.derma-gallery-analyze {
+  background: var(--mac-accent);
+  color: var(--mac-text-on-accent);
+}
+
+.derma-gallery-delete {
+  background: var(--mac-danger);
+  color: var(--mac-text-on-accent);
+}
+
+.derma-gallery-item:hover .derma-gallery-analyze,
+.derma-gallery-item:hover .derma-gallery-delete,
+.derma-gallery-analyze:focus-visible,
+.derma-gallery-delete:focus-visible {
+  opacity: 1;
+}
+
+.derma-gallery-analyze:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.derma-gallery-analysis {
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  background: var(--mac-background-secondary);
+  padding: var(--mac-spacing-3) var(--mac-spacing-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2);
+}
+
+.derma-gallery-analysis-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mac-spacing-2);
+}
+
+.derma-gallery-analysis-title {
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-primary);
+}
+
+.derma-gallery-analysis-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--mac-text-secondary);
+  border-radius: var(--mac-radius-full);
+  cursor: pointer;
+}
+
+.derma-gallery-analysis-close:hover {
+  background: var(--mac-card-hover-bg);
+}
+
+.derma-gallery-analysis-hint,
+.derma-gallery-analysis-confirmation,
+.derma-gallery-analysis-notice {
+  margin: 0;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+}
+
+.derma-gallery-analysis-confirmation {
+  color: var(--mac-warning);
+  font-weight: var(--mac-font-weight-medium);
+}
+
+.derma-gallery-analysis-error {
+  margin: 0;
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-danger);
+}
+
+.derma-gallery-analysis-content {
+  margin: 0;
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-sm);
+  background: var(--mac-background-tertiary);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+}

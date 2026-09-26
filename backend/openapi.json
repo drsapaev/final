@@ -22107,6 +22107,53 @@
         ]
       }
     },
+    "/api/v1/ai/v2/analyze-skin-file": {
+      "post": {
+        "tags": [
+          "ai-gateway"
+        ],
+        "summary": "Analyze Skin File",
+        "description": "Анализ СОХРАНЁННОГО фото визита (пункт 9 плана аудита дерматологии).\n\nКлиент передаёт только {visit_id, file_id}; байты изображения сервер\nзагружает сам после проверки доступа. Ответ — только подсказка:\nобязательные корневые поля requires_doctor_confirmation=True,\ndecision_boundary=\"suggestion_only\", ai_notice гарантируются моделью\nAIResponse. Результат никогда не записывается в ЭМК автоматически.\n\nRequires: ANALYZE_IMAGE permission (Doctor, Dermatologist)\nFeature flag: ai_complaint_analysis (503 when disabled)",
+        "operationId": "analyze_skin_file_api_v1_ai_v2_analyze_skin_file_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeSkinFileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/ai/v2/analyze-ecg": {
       "post": {
         "tags": [
@@ -69869,6 +69916,29 @@
         ],
         "title": "AnalyzeECGRequest",
         "description": "Request body for POST /ai/analyze-ecg."
+      },
+      "AnalyzeSkinFileRequest": {
+        "properties": {
+          "visit_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Visit Id",
+            "description": "Visit the photo belongs to"
+          },
+          "file_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "File Id",
+            "description": "Saved file id from /files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visit_id",
+          "file_id"
+        ],
+        "title": "AnalyzeSkinFileRequest",
+        "description": "Request body for POST /ai/v2/analyze-skin-file (derma audit item 9).\n\nThe image is a SAVED file from the file API: the server loads its bytes\nafter access checks; the client never sends image content."
       },
       "AnalyzeSkinRequest": {
         "properties": {

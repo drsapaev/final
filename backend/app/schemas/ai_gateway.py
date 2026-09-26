@@ -133,6 +133,17 @@ class AnalyzeSkinRequest(BaseModel):
         return v
 
 
+class AnalyzeSkinFileRequest(BaseModel):
+    """Request body for POST /ai/v2/analyze-skin-file (derma audit item 9).
+
+    The image is a SAVED file from the file API: the server loads its bytes
+    after access checks; the client never sends image content.
+    """
+
+    visit_id: int = Field(..., ge=1, description="Visit the photo belongs to")
+    file_id: int = Field(..., ge=1, description="Saved file id from /files")
+
+
 class AnalyzeECGRequest(BaseModel):
     """Request body for POST /ai/analyze-ecg."""
 
