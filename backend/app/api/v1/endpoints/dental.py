@@ -24,6 +24,11 @@ from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.core.roles import (
+    DOCTOR_FAMILY_GATE_ROLES,
+    is_admin_role,
+    is_doctor_role_spelling,
+)
 from app.core.specialties import (
     DENTAL_CANONICAL_SPECIALTY,
     canonical_specialty,
@@ -43,20 +48,19 @@ from app.schemas.dental import (
 from app.schemas.file_system import FilePermissionEnum, FileTypeEnum, FileUploadRequest
 from app.services.audit_service import log_audit_event
 from app.services.dental_api_service import DentalApiDomainError, DentalApiService
-from app.services.file_system_service import get_file_system_service
+from app.services.file_system_service import DENTAL_MEDIA_TAG, get_file_system_service
 from app.utils.file_validator import validate_upload_file
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/dental", tags=["dental"])
 
-DENTAL_CLINICIAN_ROLES = ("Admin", "Doctor", "dentist")
+DENTAL_CLINICIAN_ROLES = ("Admin", *DOCTOR_FAMILY_GATE_ROLES)
 DENTAL_PERSISTENCE_NOT_IMPLEMENTED_DETAIL = (
     "Dental examination/treatment persistence is not implemented on this endpoint. "
     "Use the canonical visit protocol or odontogram workflow until a durable dental "
     "record contract is added."
 )
-DENTAL_MEDIA_TAG = "dental-media:v1"
 DENTAL_MEDIA_EXTENSIONS = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
@@ -160,7 +164,7 @@ def _require_dental_visit(
         raise HTTPException(status_code=404, detail="Визит не найден или нет доступа")
 
     visit_doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
-    if user.role == "Admin":
+    if is_admin_role(user.role):
         if (
             visit_doctor
             and canonical_specialty(visit_doctor.specialty)
@@ -169,7 +173,7 @@ def _require_dental_visit(
             return visit
         raise HTTPException(status_code=404, detail="Визит не найден или нет доступа")
 
-    if user.role not in {"Doctor", "dentist"}:
+    if not is_doctor_role_spelling(user.role):
         raise HTTPException(
             status_code=403, detail="Нет доступа к стоматологическому архиву"
         )
@@ -186,9 +190,6 @@ def _require_dental_visit(
             )
         if visit.doctor_id == doctor.id:
             return visit
-    elif user.role == "dentist" and visit.doctor_id == user.id:
-        # Compatibility for historical visits storing the clinician user id.
-        return visit
 
     raise HTTPException(status_code=404, detail="Визит не найден или нет доступа")
 
@@ -213,9 +214,9 @@ def _require_dental_file_context(db: Session, file_obj: StoredFile) -> None:
 
 
 def _require_dental_media_editor(db: Session, user: User, file_obj: StoredFile) -> None:
-    if user.role == "Admin":
+    if is_admin_role(user.role):
         return
-    if file_obj.owner_id != user.id or user.role not in {"Doctor", "dentist"}:
+    if file_obj.owner_id != user.id or not is_doctor_role_spelling(user.role):
         raise HTTPException(status_code=403, detail="Нет прав для изменения снимка")
     doctor = (
         db.query(Doctor)
@@ -223,9 +224,6 @@ def _require_dental_media_editor(db: Session, user: User, file_obj: StoredFile) 
         .first()
     )
     if doctor and canonical_specialty(doctor.specialty) == DENTAL_CANONICAL_SPECIALTY:
-        return
-    visit = db.query(Visit).filter(Visit.id == file_obj.visit_id).first()
-    if user.role == "dentist" and visit and visit.doctor_id == user.id:
         return
     raise HTTPException(
         status_code=403, detail="Только стоматолог может изменить снимок"
@@ -594,7 +592,9 @@ def delete_dental_media(
     file_obj = _get_dental_media_file(db, media_id)
     _require_dental_file_context(db, file_obj)
     _require_dental_media_editor(db, user, file_obj)
-    deleted = get_file_system_service().delete_file(db, media_id, user.id)
+    deleted = get_file_system_service().delete_file(
+        db, media_id, user.id, allow_protected_domain=True
+    )
     if not deleted:
         raise HTTPException(status_code=404, detail="Снимок не найден или уже удалён")
     _audit_dental_media_event(
