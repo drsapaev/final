@@ -4,6 +4,9 @@ Behavioral contract:
 - {visit_id, file_id} only; the server loads the saved image bytes itself.
 - Access mirrors GET /files/{file_id}: derma — own visit only; ownership/share
   check for everyone; other doctors' private photos stay inaccessible.
+- Domain predicate (review follow-up to #3478/#3479): only dermatology
+  photos — images tagged dermatology+photo — are analyzable; arbitrary
+  visit images are rejected with 400 before any AI provider call.
 - ANALYZE_IMAGE permission required; feature flag ai_complaint_analysis
   gates the endpoint with 503.
 - Response is the canonical AIResponse with the mandatory safety root fields
@@ -135,7 +138,23 @@ def _create_actor(db_session, client, patient, *, role, suffix):
     return user, doctor, visit, headers
 
 
-def _upload_photo(client, *, headers, patient_id, visit_id, content=b"\xff\xd8\xffsynthetic dermatology photo"):
+def _upload_photo(
+    client,
+    *,
+    headers,
+    patient_id,
+    visit_id,
+    content=b"\xff\xd8\xffsynthetic dermatology photo",
+    tags: str | None = "dermatology,photo,examination",
+):
+    data = {
+        "file_type": "image",
+        "permission": "private",
+        "patient_id": str(patient_id),
+        "visit_id": str(visit_id),
+    }
+    if tags is not None:
+        data["tags"] = tags
     return client.post(
         "/api/v1/files/upload",
         files={
@@ -145,12 +164,7 @@ def _upload_photo(client, *, headers, patient_id, visit_id, content=b"\xff\xd8\x
                 "image/jpeg",
             )
         },
-        data={
-            "file_type": "image",
-            "permission": "private",
-            "patient_id": str(patient_id),
-            "visit_id": str(visit_id),
-        },
+        data=data,
         headers=headers,
     )
 
@@ -282,8 +296,63 @@ class TestAnalyzeSkinFile:
                 "permission": "private",
                 "patient_id": str(test_patient.id),
                 "visit_id": str(visit.id),
+                # Документ помечен дерма-тегами: изолируем именно MIME-проверку —
+                # доменный предикат тегов здесь проходит, а изображения нет.
+                "tags": "dermatology,photo,examination",
             },
             headers=headers,
+        )
+        assert upload_response.status_code == 200
+        file_id = upload_response.json()["id"]
+
+        response = client.post(
+            ENDPOINT,
+            json={"visit_id": visit.id, "file_id": file_id},
+            headers=headers,
+        )
+        assert response.status_code == 400
+        assert gateway.calls == []
+
+    def test_untagged_visit_image_is_rejected(
+        self, client: TestClient, db_session: Session, test_patient, gateway
+    ):
+        """Доменный предикат: изображение визита без дерма-тегов — не фото
+        осмотра: 400 до любого вызова AI-провайдера."""
+        _, _, visit, headers = _create_actor(
+            db_session, client, test_patient, role="derma", suffix=secrets.token_hex(8)
+        )
+        upload_response = _upload_photo(
+            client,
+            headers=headers,
+            patient_id=test_patient.id,
+            visit_id=visit.id,
+            tags=None,
+        )
+        assert upload_response.status_code == 200
+        file_id = upload_response.json()["id"]
+
+        response = client.post(
+            ENDPOINT,
+            json={"visit_id": visit.id, "file_id": file_id},
+            headers=headers,
+        )
+        assert response.status_code == 400
+        assert gateway.calls == []
+
+    def test_image_missing_photo_tag_is_rejected(
+        self, client: TestClient, db_session: Session, test_patient, gateway
+    ):
+        """Теги dermatology И photo обязательны оба: одного
+        специальностного тега недостаточно — 400, провайдер не вызывается."""
+        _, _, visit, headers = _create_actor(
+            db_session, client, test_patient, role="derma", suffix=secrets.token_hex(8)
+        )
+        upload_response = _upload_photo(
+            client,
+            headers=headers,
+            patient_id=test_patient.id,
+            visit_id=visit.id,
+            tags="dermatology",
         )
         assert upload_response.status_code == 200
         file_id = upload_response.json()["id"]
