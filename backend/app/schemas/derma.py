@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import Field
 
@@ -63,3 +64,22 @@ class DermaProcedureOut(ORMModel):
     total_cost: float | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+# --- P2-4b: unified history surface (EMR specialty_data + legacy fallback) ---
+#
+# The derma history GETs now union two read-only sources:
+#   source="emr"    — rows projected out of dermatology EMRRecord
+#                     (EMR v2, data.specialty_data); id is the synthetic
+#                     string "emr-<emr_record_id>" (procedures append
+#                     "-<index>" per entry inside the visit EMR);
+#   source="legacy" — read-only rows from the closed legacy tables
+#                     derma_examinations / derma_procedures (id int).
+class DermaExaminationHistoryOut(DermaExaminationOut):
+    id: int | str
+    source: Literal["emr", "legacy"] = "legacy"
+
+
+class DermaProcedureHistoryOut(DermaProcedureOut):
+    id: int | str
+    source: Literal["emr", "legacy"] = "legacy"

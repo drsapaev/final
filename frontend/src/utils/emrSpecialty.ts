@@ -33,6 +33,10 @@ const SPECIALTY_SKELETONS: Record<string, Record<string, unknown>> = {
         skin_type: '',
         conditions: [],
         localization: {},
+        // P2-4b: cosmetic procedures performed during the visit are appended
+        // here by the derma panel (list of entries; backend mirrors this
+        // skeleton in backend/app/services/emr_contract.py).
+        procedures: [],
     },
     dentistry: {
         tooth_status: {},

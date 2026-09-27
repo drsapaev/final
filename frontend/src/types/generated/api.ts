@@ -16811,8 +16811,14 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * Осмотры кожи
-         * @description Получить список осмотров кожи
+         * Осмотры кожи (история: ЭМК + legacy)
+         * @description История осмотров кожи (review follow-up P2-4b).
+         *
+         *     Объединяет два read-only источника: осмотры из specialty_data ЭМК
+         *     (emr/v2, specialty=dermatology, source="emr") и read-only строки
+         *     закрытой legacy-таблицы derma_examinations (source="legacy").
+         *     Скоупинг пациентов идентичен прежнему контракту; результат —
+         *     newest-first с отсечкой limit.
          */
         get: operations["get_skin_examinations_api_v1_derma_examinations_get"];
         put?: never;
@@ -16824,7 +16830,8 @@ export type paths = {
          *     сохраняются в specialty_data ЭМК (emr/v2). Возврат 410 до любого
          *     доступа к БД — fail-closed для всех ролей, включая Admin: двойная
          *     запись (legacy + ЭМК) расщепляла клинические данные по двум таблицам.
-         *     Чтение истории — GET /derma/examinations — не изменяется.
+         *     Чтение истории — GET /derma/examinations — объединяет ЭМК-осмотры
+         *     и read-only legacy-строки (P2-4b).
          */
         post: operations["create_skin_examination_api_v1_derma_examinations_post"];
         delete?: never;
@@ -16841,8 +16848,14 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * Косметические процедуры
-         * @description Получить список косметических процедур
+         * Косметические процедуры (история: ЭМК + legacy)
+         * @description История косметических процедур (review follow-up P2-4b).
+         *
+         *     Объединяет два read-only источника: процедуры из specialty_data.procedures
+         *     ЭМК (emr/v2, specialty=dermatology, source="emr") и read-only строки
+         *     закрытой legacy-таблицы derma_procedures (source="legacy").
+         *     Скоупинг пациентов идентичен прежнему контракту; результат —
+         *     newest-first с отсечкой limit.
          */
         get: operations["get_cosmetic_procedures_api_v1_derma_procedures_get"];
         put?: never;
@@ -16851,11 +16864,12 @@ export type paths = {
          * @description Устаревший эндпоинт записи (review follow-up P2-4a к #3448).
          *
          *     Таблица derma_procedures объявлена read-only (история): новые
-         *     косметические процедуры сохраняются в specialty_data ЭМК (emr/v2).
-         *     Возврат 410 до любого доступа к БД — fail-closed для всех ролей,
-         *     включая Admin: двойная запись (legacy + ЭМК) расщепляла клинические
-         *     данные по двум таблицам. Чтение истории — GET /derma/procedures —
-         *     не изменяется.
+         *     косметические процедуры сохраняются в specialty_data.procedures ЭМК
+         *     (emr/v2). Возврат 410 до любого доступа к БД — fail-closed для всех
+         *     ролей, включая Admin: двойная запись (legacy + ЭМК) расщепляла
+         *     клинические данные по двум таблицам. Чтение истории —
+         *     GET /derma/procedures — объединяет ЭМК-процедуры и read-only
+         *     legacy-строки (P2-4b).
          */
         post: operations["create_cosmetic_procedure_api_v1_derma_procedures_post"];
         delete?: never;
@@ -26671,6 +26685,46 @@ export type components = {
             /** Treatment Plan */
             treatment_plan?: string | null;
         };
+        /** DermaExaminationHistoryOut */
+        DermaExaminationHistoryOut: {
+            /** Id */
+            id: number | string;
+            /** Patient Id */
+            patient_id: number;
+            /** Visit Id */
+            visit_id?: number | null;
+            /** Doctor Id */
+            doctor_id?: number | null;
+            /**
+             * Examination Date
+             * Format: date
+             */
+            examination_date: string;
+            /** Skin Type */
+            skin_type: string;
+            /** Skin Condition */
+            skin_condition?: string | null;
+            /** Lesions */
+            lesions?: string | null;
+            /** Distribution */
+            distribution?: string | null;
+            /** Symptoms */
+            symptoms?: string | null;
+            /** Diagnosis */
+            diagnosis?: string | null;
+            /** Treatment Plan */
+            treatment_plan?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /**
+             * Source
+             * @default legacy
+             * @enum {string}
+             */
+            source: "emr" | "legacy";
+        };
         /** DermaExaminationOut */
         DermaExaminationOut: {
             /** Id */
@@ -26728,6 +26782,44 @@ export type components = {
             follow_up?: string | null;
             /** Total Cost */
             total_cost?: number | null;
+        };
+        /** DermaProcedureHistoryOut */
+        DermaProcedureHistoryOut: {
+            /** Id */
+            id: number | string;
+            /** Patient Id */
+            patient_id: number;
+            /** Visit Id */
+            visit_id?: number | null;
+            /** Doctor Id */
+            doctor_id?: number | null;
+            /**
+             * Procedure Date
+             * Format: date
+             */
+            procedure_date: string;
+            /** Procedure Type */
+            procedure_type: string;
+            /** Area Treated */
+            area_treated?: string | null;
+            /** Products Used */
+            products_used?: string | null;
+            /** Results */
+            results?: string | null;
+            /** Follow Up */
+            follow_up?: string | null;
+            /** Total Cost */
+            total_cost?: number | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /**
+             * Source
+             * @default legacy
+             * @enum {string}
+             */
+            source: "emr" | "legacy";
         };
         /** DermaProcedureOut */
         DermaProcedureOut: {
@@ -70942,7 +71034,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DermaExaminationOut"][];
+                    "application/json": components["schemas"]["DermaExaminationHistoryOut"][];
                 };
             };
             /** @description Validation Error */
@@ -71007,7 +71099,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DermaProcedureOut"][];
+                    "application/json": components["schemas"]["DermaProcedureHistoryOut"][];
                 };
             };
             /** @description Validation Error */

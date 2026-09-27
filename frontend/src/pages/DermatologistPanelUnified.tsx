@@ -29,6 +29,7 @@ import { queueService } from '../services/queue';
 import { printService } from '../services/print';
 import { getApiBaseUrl } from '../api/runtime';
 import { api } from '../api/client';  // PR-53: replace raw fetch with axios
+import { saveCosmeticProcedureToEmr } from '../api/dermaProcedures';
 import type { AxiosResponse } from 'axios';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
@@ -1313,7 +1314,9 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  // Обработка косметической процедуры
+  // Обработка косметической процедуры — сохранение в ЭМК (P2-4b):
+  // legacy POST /derma/procedures закрыт (410, P2-4a), процедура
+  // дописывается в specialty_data.procedures визитной ЭМК (emr/v2).
   const handleCosmeticProcedureSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const patientId = currentAppointment?.patient_id;
@@ -1323,31 +1326,28 @@ const DermatologistPanelUnified = () => {
       return;
     }
     try {
-      const payload = {
-        ...cosmeticProcedure,
-        patient_id: patientId,
-        visit_id: visitId,
-      };
-      const response = (await api.post('/derma/procedures', payload)) as AxiosResponse<Record<string, unknown>>;
-
-      if (response.status < 400) {
-        setShowCosmeticForm(false);
-        setCosmeticProcedure({
-          patient_id: '',
-          visit_id: '',
-          procedure_date: '',
-          procedure_type: '',
-          area_treated: '',
-          products_used: '',
-          results: '',
-          follow_up: ''
-        });
-        loadPatientData();
-        notify.success(t('derma.procedure_saved'));
-      } else {
-        logger.error('[Dermatology] Cosmetic procedure save rejected', { statusCode: response.status });
-        notify.error(t('derma.procedure_save_failed'));
-      }
+      await saveCosmeticProcedureToEmr(visitId, {
+        procedure_date: cosmeticProcedure.procedure_date,
+        procedure_type: cosmeticProcedure.procedure_type,
+        area_treated: cosmeticProcedure.area_treated || undefined,
+        products_used: cosmeticProcedure.products_used || undefined,
+        results: cosmeticProcedure.results || undefined,
+        follow_up: cosmeticProcedure.follow_up || undefined,
+        recorded_at: new Date().toISOString(),
+      });
+      setShowCosmeticForm(false);
+      setCosmeticProcedure({
+        patient_id: '',
+        visit_id: '',
+        procedure_date: '',
+        procedure_type: '',
+        area_treated: '',
+        products_used: '',
+        results: '',
+        follow_up: ''
+      });
+      loadPatientData();
+      notify.success(t('derma.procedure_saved'));
     } catch (error: unknown) {
       logger.error('[Dermatology] Cosmetic procedure save failed', safeErrorMetadata(error));
       notify.error(t('derma.procedure_save_failed'));

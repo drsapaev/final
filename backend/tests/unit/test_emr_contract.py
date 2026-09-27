@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.services.emr_contract import (
+    build_specialty_skeleton,
     canonical_emr_to_legacy_payload,
     legacy_emr_to_v2_data,
     normalize_emr_data,
@@ -18,6 +19,16 @@ class TestEMRContract:
         assert normalize_specialty("cardio") == "cardiology"
         assert normalize_specialty("stomatology") == "dentistry"
         assert normalize_specialty("laboratory") == "lab"
+
+    def test_dermatology_skeleton_includes_procedures_array(self):
+        """P2-4b: cosmetic procedures live in specialty_data.procedures of
+        the visit EMR — the skeleton reserves the key on both sides of the
+        contract (backend emr_contract.py and frontend emrSpecialty.ts)."""
+        skeleton = build_specialty_skeleton("dermatology")
+        assert skeleton["procedures"] == []
+        # normalize must preserve the key for fresh drafts as well
+        payload = normalize_emr_data({"specialty": "dermatology"})
+        assert payload["specialty_data"]["procedures"] == []
 
     def test_normalize_emr_data_enforces_required_fields(self):
         payload = normalize_emr_data({"complaints": "Pain"}, fallback_specialty="derma")

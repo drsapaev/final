@@ -48245,8 +48245,8 @@
           "derma",
           "derma"
         ],
-        "summary": "Осмотры кожи",
-        "description": "Получить список осмотров кожи",
+        "summary": "Осмотры кожи (история: ЭМК + legacy)",
+        "description": "История осмотров кожи (review follow-up P2-4b).\n\nОбъединяет два read-only источника: осмотры из specialty_data ЭМК\n(emr/v2, specialty=dermatology, source=\"emr\") и read-only строки\nзакрытой legacy-таблицы derma_examinations (source=\"legacy\").\nСкоупинг пациентов идентичен прежнему контракту; результат —\nnewest-first с отсечкой limit.",
         "operationId": "get_skin_examinations_api_v1_derma_examinations_get",
         "security": [
           {
@@ -48291,7 +48291,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/DermaExaminationOut"
+                    "$ref": "#/components/schemas/DermaExaminationHistoryOut"
                   },
                   "title": "Response Get Skin Examinations Api V1 Derma Examinations Get"
                 }
@@ -48316,7 +48316,7 @@
           "derma"
         ],
         "summary": "Создать осмотр кожи",
-        "description": "Устаревший эндпоинт записи (review follow-up P2-4a к #3448).\n\nТаблица derma_examinations объявлена read-only (история): новые осмотры\nсохраняются в specialty_data ЭМК (emr/v2). Возврат 410 до любого\nдоступа к БД — fail-closed для всех ролей, включая Admin: двойная\nзапись (legacy + ЭМК) расщепляла клинические данные по двум таблицам.\nЧтение истории — GET /derma/examinations — не изменяется.",
+        "description": "Устаревший эндпоинт записи (review follow-up P2-4a к #3448).\n\nТаблица derma_examinations объявлена read-only (история): новые осмотры\nсохраняются в specialty_data ЭМК (emr/v2). Возврат 410 до любого\nдоступа к БД — fail-closed для всех ролей, включая Admin: двойная\nзапись (legacy + ЭМК) расщепляла клинические данные по двум таблицам.\nЧтение истории — GET /derma/examinations — объединяет ЭМК-осмотры\nи read-only legacy-строки (P2-4b).",
         "operationId": "create_skin_examination_api_v1_derma_examinations_post",
         "security": [
           {
@@ -48363,8 +48363,8 @@
           "derma",
           "derma"
         ],
-        "summary": "Косметические процедуры",
-        "description": "Получить список косметических процедур",
+        "summary": "Косметические процедуры (история: ЭМК + legacy)",
+        "description": "История косметических процедур (review follow-up P2-4b).\n\nОбъединяет два read-only источника: процедуры из specialty_data.procedures\nЭМК (emr/v2, specialty=dermatology, source=\"emr\") и read-only строки\nзакрытой legacy-таблицы derma_procedures (source=\"legacy\").\nСкоупинг пациентов идентичен прежнему контракту; результат —\nnewest-first с отсечкой limit.",
         "operationId": "get_cosmetic_procedures_api_v1_derma_procedures_get",
         "security": [
           {
@@ -48409,7 +48409,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/DermaProcedureOut"
+                    "$ref": "#/components/schemas/DermaProcedureHistoryOut"
                   },
                   "title": "Response Get Cosmetic Procedures Api V1 Derma Procedures Get"
                 }
@@ -48434,7 +48434,7 @@
           "derma"
         ],
         "summary": "Создать косметическую процедуру",
-        "description": "Устаревший эндпоинт записи (review follow-up P2-4a к #3448).\n\nТаблица derma_procedures объявлена read-only (история): новые\nкосметические процедуры сохраняются в specialty_data ЭМК (emr/v2).\nВозврат 410 до любого доступа к БД — fail-closed для всех ролей,\nвключая Admin: двойная запись (legacy + ЭМК) расщепляла клинические\nданные по двум таблицам. Чтение истории — GET /derma/procedures —\nне изменяется.",
+        "description": "Устаревший эндпоинт записи (review follow-up P2-4a к #3448).\n\nТаблица derma_procedures объявлена read-only (история): новые\nкосметические процедуры сохраняются в specialty_data.procedures ЭМК\n(emr/v2). Возврат 410 до любого доступа к БД — fail-closed для всех\nролей, включая Admin: двойная запись (legacy + ЭМК) расщепляла\nклинические данные по двум таблицам. Чтение истории —\nGET /derma/procedures — объединяет ЭМК-процедуры и read-only\nlegacy-строки (P2-4b).",
         "operationId": "create_cosmetic_procedure_api_v1_derma_procedures_post",
         "security": [
           {
@@ -77689,6 +77689,163 @@
         ],
         "title": "DermaExaminationCreate"
       },
+      "DermaExaminationHistoryOut": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Id"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Id"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          },
+          "examination_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Examination Date"
+          },
+          "skin_type": {
+            "type": "string",
+            "title": "Skin Type"
+          },
+          "skin_condition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skin Condition"
+          },
+          "lesions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lesions"
+          },
+          "distribution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distribution"
+          },
+          "symptoms": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symptoms"
+          },
+          "diagnosis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnosis"
+          },
+          "treatment_plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treatment Plan"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "emr",
+              "legacy"
+            ],
+            "title": "Source",
+            "default": "legacy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "patient_id",
+          "examination_date",
+          "skin_type"
+        ],
+        "title": "DermaExaminationHistoryOut"
+      },
       "DermaExaminationOut": {
         "properties": {
           "id": {
@@ -77925,6 +78082,152 @@
           "procedure_type"
         ],
         "title": "DermaProcedureCreate"
+      },
+      "DermaProcedureHistoryOut": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Id"
+          },
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "visit_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Id"
+          },
+          "doctor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Id"
+          },
+          "procedure_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Procedure Date"
+          },
+          "procedure_type": {
+            "type": "string",
+            "title": "Procedure Type"
+          },
+          "area_treated": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Treated"
+          },
+          "products_used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Products Used"
+          },
+          "results": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Results"
+          },
+          "follow_up": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up"
+          },
+          "total_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "emr",
+              "legacy"
+            ],
+            "title": "Source",
+            "default": "legacy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "patient_id",
+          "procedure_date",
+          "procedure_type"
+        ],
+        "title": "DermaProcedureHistoryOut"
       },
       "DermaProcedureOut": {
         "properties": {

@@ -42,6 +42,9 @@ SPECIALTY_SKELETONS: dict[str, dict[str, Any]] = {
         "skin_type": "",
         "conditions": [],
         "localization": {},
+        # P2-4b: cosmetic procedures performed during the visit are appended
+        # here by the derma panel (list of dicts, see derma history contract).
+        "procedures": [],
     },
     "dentistry": {
         "tooth_status": {},

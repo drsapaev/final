@@ -33,6 +33,8 @@ const procedureForm = source('components/dermatology/DermaExamsTab.tsx');
 const patientsTab = source('components/dermatology/DermaPatientsTab.tsx');
 const historyTab = source('components/dermatology/DermaHistoryTab.tsx');
 const historyHook = source('pages/useDermatologyPatientHistory.ts');
+const procedureApi = source('api/dermaProcedures.ts');
+const emrSpecialtyUtils = source('utils/emrSpecialty.ts');
 
 describe('dermatologist clinical forms contract', () => {
   it('stores one skin examination in EMR specialty data and leaves diagnosis to the main EMR section', () => {
@@ -52,6 +54,25 @@ describe('dermatologist clinical forms contract', () => {
     expect(historyHook).not.toContain('api.post(\'/derma/examinations\'');
     expect(patientsTab).not.toContain('onOpenExam');
     expect(patientsTab).not.toContain('onOpenProcedure');
+  });
+
+  it('saves cosmetic procedures into the visit EMR instead of the closed legacy endpoint (P2-4b)', () => {
+    // The legacy POST /derma/procedures is gone (410, P2-4a) — the panel
+    // must not call it and must append procedures to the visit EMR.
+    expect(panel).not.toContain('api.post(\'/derma/procedures\'');
+    expect(panel).toContain('saveCosmeticProcedureToEmr(');
+    expect(historyHook).not.toContain('api.post(\'/derma/procedures\'');
+    // The append path uses the emr/v2 visit contract with the procedures
+    // array inside specialty_data, mirroring the backend skeleton.
+    // NOTE: normalizeSource collapses `prop: literalValue` patterns, so the
+    // payload keys are pinned as bare names here; the exact values
+    // (row_version passthrough, is_draft: true) are pinned behaviorally in
+    // src/api/__tests__/dermaProcedures.test.ts.
+    expect(procedureApi).toContain('procedures: [...procedures, entry]');
+    expect(procedureApi).toContain('/v2/emr/${visitId}`');
+    expect(procedureApi).toContain('row_version');
+    expect(procedureApi).toContain('is_draft');
+    expect(emrSpecialtyUtils).toContain('procedures: []');
   });
 
   it('renders the clinical cosmetic form only in the active visit and omits price fields', () => {

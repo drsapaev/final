@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -14,15 +14,19 @@ from app.core.i18n import t  # noqa: F401
 from app.models.clinic import Doctor
 from app.models.derma_examination import DermaExamination
 from app.models.derma_procedure import DermaProcedure
+from app.models.emr_v2 import EMRRecord
 from app.models.user import User
 from app.models.visit import Visit
 from app.schemas.derma import (
     DermaExaminationCreate,
+    DermaExaminationHistoryOut,
     DermaExaminationOut,
     DermaProcedureCreate,
+    DermaProcedureHistoryOut,
     DermaProcedureOut,
 )
 from app.services.derma_api_service import DermaApiDomainError, DermaApiService
+from app.services.emr_contract import extract_diagnosis_main
 
 router = APIRouter(prefix="/derma", tags=["derma"])
 logger = logging.getLogger(__name__)
@@ -99,19 +103,234 @@ def _ensure_doctor_can_access_patient(db: Session, patient_id: int, user: User) 
         raise HTTPException(status_code=403, detail="Access denied")
 
 
+# P2-4b: the dermatology filter lives inside the EMR JSON column and cannot
+# run as portable SQL across the sqlite test harness and PG JSONB, so the
+# candidate records are fetched recency-capped and filtered in Python.
+EMR_HISTORY_SCAN_CAP = 500
+_EXAM_TEXT_FIELDS = (
+    "skin_type",
+    "skin_condition",
+    "lesions",
+    "distribution",
+    "symptoms",
+    "treatment_plan",
+)
+
+
+def _emr_candidate_records(
+    db: Session, user: User, patient_id: int | None
+) -> list[EMRRecord]:
+    """Active EMR records visible to the user, newest-first, recency-capped.
+
+    Mirrors the patient scoping of the legacy GET surface exactly: doctors
+    are limited to patients of their own visits, admins see everything
+    (optionally narrowed to one patient).
+    """
+    query = db.query(EMRRecord).filter(EMRRecord.is_active.is_(True))
+    if patient_id is not None:
+        if not _is_admin_user(user):
+            _ensure_doctor_can_access_patient(db, patient_id, user)
+        query = query.filter(EMRRecord.patient_id == patient_id)
+    elif not _is_admin_user(user):
+        allowed_patient_ids = _doctor_allowed_patient_ids(db, user)
+        if not allowed_patient_ids:
+            return []
+        query = query.filter(EMRRecord.patient_id.in_(allowed_patient_ids))
+    return (
+        query.order_by(desc(EMRRecord.created_at), desc(EMRRecord.id))
+        .limit(EMR_HISTORY_SCAN_CAP)
+        .all()
+    )
+
+
+def _derma_exam_has_content(
+    specialty_data: dict[str, Any], diagnosis_main: str | None
+) -> bool:
+    """An empty derma EMR (fresh skeleton draft) must not pollute history."""
+    if diagnosis_main:
+        return True
+    for field in _EXAM_TEXT_FIELDS:
+        value = specialty_data.get(field)
+        if isinstance(value, str) and value.strip():
+            return True
+    localization = specialty_data.get("localization")
+    if isinstance(localization, dict):
+        if any(isinstance(v, str) and v.strip() for v in localization.values()):
+            return True
+    return False
+
+
+def _str_or_none(value: Any) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _parse_iso_date(value: Any) -> date | None:
+    if isinstance(value, str) and value.strip():
+        try:
+            return date.fromisoformat(value[:10])
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return parsed.replace(tzinfo=None)
+        except ValueError:
+            return None
+    return None
+
+
+def _derma_emr_visits(
+    db: Session, records: list[EMRRecord]
+) -> dict[int, Visit]:
+    visit_ids = {r.visit_id for r in records if r.visit_id is not None}
+    if not visit_ids:
+        return {}
+    return {v.id: v for v in db.query(Visit).filter(Visit.id.in_(visit_ids)).all()}
+
+
+def _fallback_exam_date(visit: Visit | None, record: EMRRecord) -> date:
+    visit_date = getattr(visit, "visit_date", None)
+    if visit_date:
+        return visit_date
+    if record.created_at:
+        return record.created_at.date()
+    return date.today()
+
+
+def _emr_examination_rows(
+    db: Session, user: User, patient_id: int | None
+) -> list[DermaExaminationHistoryOut]:
+    records = _emr_candidate_records(db, user, patient_id)
+    if not records:
+        return []
+    visits = _derma_emr_visits(db, records)
+    rows: list[DermaExaminationHistoryOut] = []
+    for record in records:
+        data = record.data if isinstance(record.data, dict) else {}
+        if data.get("specialty") != "dermatology":
+            continue
+        specialty_data = data.get("specialty_data")
+        if not isinstance(specialty_data, dict):
+            specialty_data = {}
+        diagnosis_main = extract_diagnosis_main(data)
+        if not _derma_exam_has_content(specialty_data, diagnosis_main):
+            continue
+        visit = visits.get(record.visit_id)
+        rows.append(
+            DermaExaminationHistoryOut(
+                id=f"emr-{record.id}",
+                source="emr",
+                patient_id=record.patient_id,
+                visit_id=record.visit_id,
+                doctor_id=getattr(visit, "doctor_id", None),
+                examination_date=_fallback_exam_date(visit, record),
+                skin_type=str(specialty_data.get("skin_type") or ""),
+                skin_condition=_str_or_none(specialty_data.get("skin_condition")),
+                lesions=_str_or_none(specialty_data.get("lesions")),
+                distribution=_str_or_none(specialty_data.get("distribution")),
+                symptoms=_str_or_none(specialty_data.get("symptoms")),
+                diagnosis=diagnosis_main,
+                treatment_plan=_str_or_none(specialty_data.get("treatment_plan")),
+                created_at=record.created_at,
+                updated_at=record.updated_at,
+            )
+        )
+    return rows
+
+
+def _emr_procedure_rows(
+    db: Session, user: User, patient_id: int | None
+) -> list[DermaProcedureHistoryOut]:
+    records = _emr_candidate_records(db, user, patient_id)
+    if not records:
+        return []
+    visits = _derma_emr_visits(db, records)
+    rows: list[DermaProcedureHistoryOut] = []
+    for record in records:
+        data = record.data if isinstance(record.data, dict) else {}
+        if data.get("specialty") != "dermatology":
+            continue
+        specialty_data = data.get("specialty_data")
+        if not isinstance(specialty_data, dict):
+            continue
+        entries = specialty_data.get("procedures")
+        if not isinstance(entries, list):
+            continue
+        visit = visits.get(record.visit_id)
+        fallback_date = _fallback_exam_date(visit, record)
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                continue
+            procedure_type = entry.get("procedure_type")
+            if not isinstance(procedure_type, str) or not procedure_type.strip():
+                continue
+            rows.append(
+                DermaProcedureHistoryOut(
+                    id=f"emr-{record.id}-{index}",
+                    source="emr",
+                    patient_id=record.patient_id,
+                    visit_id=record.visit_id,
+                    doctor_id=getattr(visit, "doctor_id", None),
+                    procedure_date=(
+                        _parse_iso_date(entry.get("procedure_date")) or fallback_date
+                    ),
+                    procedure_type=procedure_type,
+                    area_treated=_str_or_none(entry.get("area_treated")),
+                    products_used=_str_or_none(entry.get("products_used")),
+                    results=_str_or_none(entry.get("results")),
+                    follow_up=_str_or_none(entry.get("follow_up")),
+                    total_cost=None,
+                    created_at=(
+                        _parse_iso_datetime(entry.get("recorded_at"))
+                        or record.created_at
+                    ),
+                    updated_at=None,
+                )
+            )
+    return rows
+
+
+def _merge_history_rows(legacy_rows: list, emr_rows: list, limit: int) -> list:
+    """Union both read-only history sources, newest first, then cap."""
+    def _sort_key(row):
+        created = row.created_at or datetime.min
+        if getattr(created, "tzinfo", None) is not None:
+            created = created.replace(tzinfo=None)
+        return (
+            row.examination_date
+            if hasattr(row, "examination_date")
+            else row.procedure_date,
+            created,
+            str(row.id),
+        )
+
+    merged = sorted([*legacy_rows, *emr_rows], key=_sort_key, reverse=True)
+    return merged[:limit]
+
+
 @router.get(
     "/examinations",
-    summary="Осмотры кожи",
-    response_model=list[DermaExaminationOut],
+    summary="Осмотры кожи (история: ЭМК + legacy)",
+    response_model=list[DermaExaminationHistoryOut],
 )
 async def get_skin_examinations(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: int | None = None,
-) -> list[DermaExaminationOut]:
+) -> list[DermaExaminationHistoryOut]:
     """
-    Получить список осмотров кожи
+    История осмотров кожи (review follow-up P2-4b).
+
+    Объединяет два read-only источника: осмотры из specialty_data ЭМК
+    (emr/v2, specialty=dermatology, source="emr") и read-only строки
+    закрытой legacy-таблицы derma_examinations (source="legacy").
+    Скоупинг пациентов идентичен прежнему контракту; результат —
+    newest-first с отсечкой limit.
     """
     try:
         query = db.query(DermaExamination)
@@ -127,15 +346,18 @@ async def get_skin_examinations(
         if patient_id is not None:
             query = query.filter(DermaExamination.patient_id == patient_id)
 
-        examinations = (
-            query.order_by(
+        legacy_rows = [
+            DermaExaminationHistoryOut.model_validate(row)
+            for row in query.order_by(
                 desc(DermaExamination.examination_date),
                 desc(DermaExamination.created_at),
                 desc(DermaExamination.id),
             )
             .limit(limit)
             .all()
-        )
+        ]
+        emr_rows = _emr_examination_rows(db, user, patient_id)
+        examinations = _merge_history_rows(legacy_rows, emr_rows, limit)
         logger.info(
             "[derma.examinations] listed examinations user_id=%s patient_id=%s count=%s",
             getattr(user, "id", None),
@@ -172,7 +394,8 @@ async def create_skin_examination(
     сохраняются в specialty_data ЭМК (emr/v2). Возврат 410 до любого
     доступа к БД — fail-closed для всех ролей, включая Admin: двойная
     запись (legacy + ЭМК) расщепляла клинические данные по двум таблицам.
-    Чтение истории — GET /derma/examinations — не изменяется.
+    Чтение истории — GET /derma/examinations — объединяет ЭМК-осмотры
+    и read-only legacy-строки (P2-4b).
     """
     logger.warning(
         "[derma.examinations] rejected legacy write user_id=%s",
@@ -189,17 +412,23 @@ async def create_skin_examination(
 
 @router.get(
     "/procedures",
-    summary="Косметические процедуры",
-    response_model=list[DermaProcedureOut],
+    summary="Косметические процедуры (история: ЭМК + legacy)",
+    response_model=list[DermaProcedureHistoryOut],
 )
 async def get_cosmetic_procedures(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: int | None = None,
-) -> list[DermaProcedureOut]:
+) -> list[DermaProcedureHistoryOut]:
     """
-    Получить список косметических процедур
+    История косметических процедур (review follow-up P2-4b).
+
+    Объединяет два read-only источника: процедуры из specialty_data.procedures
+    ЭМК (emr/v2, specialty=dermatology, source="emr") и read-only строки
+    закрытой legacy-таблицы derma_procedures (source="legacy").
+    Скоупинг пациентов идентичен прежнему контракту; результат —
+    newest-first с отсечкой limit.
     """
     try:
         query = db.query(DermaProcedure)
@@ -215,15 +444,18 @@ async def get_cosmetic_procedures(
         if patient_id is not None:
             query = query.filter(DermaProcedure.patient_id == patient_id)
 
-        procedures = (
-            query.order_by(
+        legacy_rows = [
+            DermaProcedureHistoryOut.model_validate(row)
+            for row in query.order_by(
                 desc(DermaProcedure.procedure_date),
                 desc(DermaProcedure.created_at),
                 desc(DermaProcedure.id),
             )
             .limit(limit)
             .all()
-        )
+        ]
+        emr_rows = _emr_procedure_rows(db, user, patient_id)
+        procedures = _merge_history_rows(legacy_rows, emr_rows, limit)
         logger.info(
             "[derma.procedures] listed procedures user_id=%s patient_id=%s count=%s",
             getattr(user, "id", None),
@@ -257,11 +489,12 @@ async def create_cosmetic_procedure(
     Устаревший эндпоинт записи (review follow-up P2-4a к #3448).
 
     Таблица derma_procedures объявлена read-only (история): новые
-    косметические процедуры сохраняются в specialty_data ЭМК (emr/v2).
-    Возврат 410 до любого доступа к БД — fail-closed для всех ролей,
-    включая Admin: двойная запись (legacy + ЭМК) расщепляла клинические
-    данные по двум таблицам. Чтение истории — GET /derma/procedures —
-    не изменяется.
+    косметические процедуры сохраняются в specialty_data.procedures ЭМК
+    (emr/v2). Возврат 410 до любого доступа к БД — fail-closed для всех
+    ролей, включая Admin: двойная запись (legacy + ЭМК) расщепляла
+    клинические данные по двум таблицам. Чтение истории —
+    GET /derma/procedures — объединяет ЭМК-процедуры и read-only
+    legacy-строки (P2-4b).
     """
     logger.warning(
         "[derma.procedures] rejected legacy write user_id=%s",
