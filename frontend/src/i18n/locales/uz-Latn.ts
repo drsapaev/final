@@ -1210,6 +1210,8 @@ const uzLatn = {
     derma_gallery_uploaded: "Rasm yuklandi",
     derma_gallery_upload_failed: "Rasmni yuklash amalga oshmadi",
     derma_gallery_load_error: "Saqlangan rasmlarni yuklash amalga oshmadi",
+    derma_gallery_load_more: "Yana ko‘rsatish",
+    derma_gallery_load_more_failed: "Qo‘shimcha rasmlarni yuklash amalga oshmadi",
     derma_gallery_loading: "Rasmlar yuklanmoqda…",
     derma_gallery_empty: "Saqlangan rasmlar yo‘q",
     derma_gallery_retry: "Qayta urinish",

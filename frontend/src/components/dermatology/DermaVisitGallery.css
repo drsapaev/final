@@ -113,6 +113,32 @@
   gap: var(--mac-spacing-3);
 }
 
+/* Пагинация списка (follow-up P2-2): центрированная кнопка следующей
+ * страницы под сеткой; токены дизайн-системы, без хардкода цветов. */
+.derma-gallery-load-more {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  border: 1px solid var(--mac-border);
+  background: var(--mac-background-secondary);
+  color: var(--mac-text-primary);
+  border-radius: var(--mac-radius-md);
+  padding: var(--mac-spacing-2) var(--mac-spacing-4);
+  font-size: var(--mac-font-size-sm);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.derma-gallery-load-more:hover:not(:disabled) {
+  background: var(--mac-card-hover-bg);
+}
+
+.derma-gallery-load-more:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .derma-gallery-item {
   position: relative;
   aspect-ratio: 1 / 1;

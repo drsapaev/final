@@ -1293,6 +1293,8 @@ const ru = {
     derma_gallery_uploaded: 'Фото загружено',
     derma_gallery_upload_failed: 'Не удалось загрузить фото',
     derma_gallery_load_error: 'Не удалось загрузить сохранённые фото',
+    derma_gallery_load_more: 'Показать ещё',
+    derma_gallery_load_more_failed: 'Не удалось загрузить больше фото',
     derma_gallery_loading: 'Загрузка фото…',
     derma_gallery_empty: 'Нет сохранённых фото',
     derma_gallery_retry: 'Повторить',

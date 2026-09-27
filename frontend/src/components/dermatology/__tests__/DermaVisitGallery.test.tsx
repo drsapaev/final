@@ -6,6 +6,9 @@
  *   (доменный предикат dermatology+photo+file_type=image применяется сервером
  *   в derma-ветке; клиентский MIME-фильтр — вторая линия),
  *   превью — авторизованный blob-запрос GET /files/{id}/preview;
+ * - пагинация по серверному контракту FileList (follow-up P2-2): первая
+ *   страница — при открытии (page: 1), следующие — кнопкой «Показать ещё»
+ *   (page: N+1) с аппендом без дублей; кнопка исчезает, когда загружено всё;
  * - категории осмотр/до/после берутся из тегов файла;
  * - загрузка сохранённых файлов при открытии, objectURL освобождаются при смене
  *   пациента/визита и размонтировании;
@@ -15,6 +18,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import notify from '../../../services/notify';
 
 const apiState = vi.hoisted(() => ({
   get: vi.fn(),
@@ -93,7 +97,7 @@ describe('DermaVisitGallery', () => {
     render(<DermaVisitGallery patientId={42} visitId={900} />);
 
     await waitFor(() => {
-      expect(apiState.get).toHaveBeenCalledWith('/files/', { params: { patient_id: 42, visit_id: 900, size: 100 } });
+      expect(apiState.get).toHaveBeenCalledWith('/files/', { params: { patient_id: 42, visit_id: 900, size: 100, page: 1 } });
     });
     await waitFor(() => {
       expect(apiState.get).toHaveBeenCalledWith('/files/1/preview', { responseType: 'blob' });
@@ -217,6 +221,82 @@ describe('DermaVisitGallery', () => {
     });
   });
 
+  it('appends the next page without duplicates and hides the button when everything is loaded', async () => {
+    let page = 1;
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') {
+        if (page === 1) {
+          return { data: { files: [
+            { id: 1, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+            { id: 2, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+          ], total: 3 } };
+        }
+        // Страница 2: id 2 повторяется (сдвиг границы страницы) + новое id 3
+        return { data: { files: [
+          { id: 2, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+          { id: 3, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+        ], total: 3 } };
+      }
+      if (/^\/files\/\d+\/preview$/.test(url)) return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(2);
+    });
+
+    // total(3) > загружено(2): кнопка следующей страницы видна
+    const loadMoreButton = screen.getByRole('button', { name: 'derma.derma_gallery_load_more' });
+    page = 2;
+    fireEvent.click(loadMoreButton);
+
+    await waitFor(() => {
+      expect(apiState.get).toHaveBeenCalledWith('/files/', { params: { patient_id: 42, visit_id: 900, size: 100, page: 2 } });
+    });
+    // Аппенд без дублей: 1, 2, 3 — ровно три карточки
+    await waitFor(() => {
+      expect(screen.getAllByRole('img').length).toBe(3);
+    });
+    // Всё загружено (3 из 3): кнопка исчезает
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'derma.derma_gallery_load_more' })).toBeNull();
+    });
+  });
+
+  it('keeps the gallery usable when loading the next page fails', async () => {
+    let page = 1;
+    apiState.get.mockImplementation(async (url: string) => {
+      if (url === '/files/') {
+        if (page === 1) {
+          return { data: { files: [
+            { id: 1, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
+          ], total: 2 } };
+        }
+        throw new Error('page 2 unavailable');
+      }
+      if (url === '/files/1/preview') return { data: imageBlob };
+      throw new Error(`unexpected GET ${url}`);
+    });
+
+    render(<DermaVisitGallery patientId={42} visitId={900} />);
+    await waitFor(() => {
+      expect(screen.getByRole('img')).toBeTruthy();
+    });
+
+    page = 2;
+    fireEvent.click(screen.getByRole('button', { name: 'derma.derma_gallery_load_more' }));
+
+    await waitFor(() => {
+      expect(notify.error).toHaveBeenCalledWith('derma.derma_gallery_load_more_failed');
+    });
+    // Ошибка подгрузки не ломает галерею: фото доступно, error-состояния нет,
+    // кнопка остаётся для повторной попытки
+    expect(screen.getByRole('img')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'derma.derma_gallery_load_more' })).toBeTruthy();
+  });
+
   it('revokes object urls and reloads when the patient or visit changes', async () => {
     let filesById: Record<number, Array<Record<string, unknown>>> = {
       42: [{ id: 1, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] }],
@@ -244,7 +324,7 @@ describe('DermaVisitGallery', () => {
       expect(revokeObjectURLMock).toHaveBeenCalled();
     });
     await waitFor(() => {
-      expect(apiState.get).toHaveBeenCalledWith('/files/', { params: { patient_id: 77, visit_id: 901, size: 100 } });
+      expect(apiState.get).toHaveBeenCalledWith('/files/', { params: { patient_id: 77, visit_id: 901, size: 100, page: 1 } });
     });
   });
 

@@ -1222,6 +1222,8 @@ const uzCyrl = {
     derma_gallery_uploaded: 'Расм юкланди',
     derma_gallery_upload_failed: 'Расмни юклаш амалга ошмади',
     derma_gallery_load_error: 'Сақланган расмларни юклаш амалга ошмади',
+    derma_gallery_load_more: 'Яна кўрсатиш',
+    derma_gallery_load_more_failed: 'Қўшимча расмларни юклаш амалга ошмади',
     derma_gallery_loading: 'Расмлар юкланмоқда…',
     derma_gallery_empty: 'Сақланган расмлар йўқ',
     derma_gallery_retry: 'Қайта уриниш',

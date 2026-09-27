@@ -1211,6 +1211,8 @@ const kk = {
     derma_gallery_uploaded: 'Фото жүктелді',
     derma_gallery_upload_failed: 'Фотоны жүктеу сәтсіз аяқталды',
     derma_gallery_load_error: 'Сақталған фотоларды жүктеу сәтсіз аяқталды',
+    derma_gallery_load_more: 'Тағы көрсету',
+    derma_gallery_load_more_failed: 'Қосымша фотоларды жүктеу сәтсіз аяқталды',
     derma_gallery_loading: 'Фотолар жүктелуде…',
     derma_gallery_empty: 'Сақталған фото жоқ',
     derma_gallery_retry: 'Қайта талпыну',

@@ -1211,6 +1211,8 @@ const en = {
     derma_gallery_uploaded: 'Photo uploaded',
     derma_gallery_upload_failed: 'Failed to upload photo',
     derma_gallery_load_error: 'Failed to load saved photos',
+    derma_gallery_load_more: 'Show more',
+    derma_gallery_load_more_failed: 'Could not load more photos',
     derma_gallery_loading: 'Loading photos…',
     derma_gallery_empty: 'No saved photos',
     derma_gallery_retry: 'Retry',
