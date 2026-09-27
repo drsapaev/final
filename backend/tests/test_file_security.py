@@ -74,12 +74,15 @@ def _upload_test_photo(
     patient_id: int | None,
     visit_id: int | None,
     permission="private",
+    tags: str | None = None,
 ):
     file_data = {"file_type": "image", "permission": permission}
     if patient_id is not None:
         file_data["patient_id"] = str(patient_id)
     if visit_id is not None:
         file_data["visit_id"] = str(visit_id)
+    if tags is not None:
+        file_data["tags"] = tags
 
     return client.post(
         "/api/v1/files/upload",
@@ -564,6 +567,7 @@ class TestFileSecurity:
             headers=headers,
             patient_id=test_patient.id,
             visit_id=visit.id,
+            tags="dermatology,photo,examination",
         )
         assert upload_response.status_code == 200
         file_id = upload_response.json()["id"]
@@ -638,6 +642,100 @@ class TestFileSecurity:
             ).status_code
             == 400
         )
+
+    def test_dermatology_file_list_returns_only_tagged_dermatology_photos(
+        self,
+        client: TestClient,
+        db_session: Session,
+        test_patient,
+        admin_auth_headers,
+    ):
+        """Доменный предикат derma-ветки GET /files/ (follow-up ревью
+        #3478/#3479): возвращаются ТОЛЬКО фото дерматологического осмотра —
+        изображения с тегами dermatology И photo. Остальные файлы визита
+        (без тегов, без тега photo, не изображения) дерматологу не видны,
+        но остаются на generic-поверхности администратора."""
+        _, _, visit, headers = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="derma",
+            suffix=secrets.token_hex(8),
+        )
+
+        tagged_photo = _upload_test_photo(
+            client,
+            headers=headers,
+            patient_id=test_patient.id,
+            visit_id=visit.id,
+            tags="dermatology,photo,examination",
+        )
+        assert tagged_photo.status_code == 200
+        tagged_photo_id = tagged_photo.json()["id"]
+
+        untagged_photo = _upload_test_photo(
+            client,
+            headers=headers,
+            patient_id=test_patient.id,
+            visit_id=visit.id,
+        )
+        assert untagged_photo.status_code == 200
+
+        specialty_only_photo = _upload_test_photo(
+            client,
+            headers=headers,
+            patient_id=test_patient.id,
+            visit_id=visit.id,
+            tags="dermatology",
+        )
+        assert specialty_only_photo.status_code == 200
+
+        tagged_document = client.post(
+            "/api/v1/files/upload",
+            files={
+                "file": (
+                    "derma-report.pdf",
+                    BytesIO(b"%PDF-1.4 synthetic dermatology report"),
+                    "application/pdf",
+                )
+            },
+            data={
+                "file_type": "document",
+                "permission": "private",
+                "patient_id": str(test_patient.id),
+                "visit_id": str(visit.id),
+                "tags": "dermatology,photo,examination",
+            },
+            headers=headers,
+        )
+        assert tagged_document.status_code == 200
+
+        derma_list = client.get(
+            "/api/v1/files/",
+            params={"patient_id": test_patient.id, "visit_id": visit.id},
+            headers=headers,
+        )
+        assert derma_list.status_code == 200
+        body = derma_list.json()
+        assert [item["id"] for item in body["files"]] == [tagged_photo_id]
+        assert body["total"] == 1
+        assert body["pages"] == 1
+
+        # Generic-поверхность администратора не изменена: все файлы визита
+        # (включая нетегированные и документы) остаются доступны.
+        admin_list = client.get(
+            "/api/v1/files/",
+            params={"patient_id": test_patient.id, "visit_id": visit.id},
+            headers=admin_auth_headers,
+        )
+        assert admin_list.status_code == 200
+        admin_ids = {item["id"] for item in admin_list.json()["files"]}
+        assert {
+            tagged_photo_id,
+            untagged_photo.json()["id"],
+            specialty_only_photo.json()["id"],
+            tagged_document.json()["id"],
+        }.issubset(admin_ids)
 
     def test_dermatology_upload_rejects_mismatched_patient_and_visit(
         self, client: TestClient, db_session: Session, test_patient

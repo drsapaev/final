@@ -22113,7 +22113,7 @@
           "ai-gateway"
         ],
         "summary": "Analyze Skin File",
-        "description": "Анализ СОХРАНЁННОГО фото визита (пункт 9 плана аудита дерматологии).\n\nКлиент передаёт только {visit_id, file_id}; байты изображения сервер\nзагружает сам после проверки доступа. Ответ — только подсказка:\nобязательные корневые поля requires_doctor_confirmation=True,\ndecision_boundary=\"suggestion_only\", ai_notice гарантируются моделью\nAIResponse. Результат никогда не записывается в ЭМК автоматически.\n\nRequires: ANALYZE_IMAGE permission (Doctor, Dermatologist)\nFeature flag: ai_complaint_analysis (503 when disabled)",
+        "description": "Анализ СОХРАНЁННОГО фото визита (пункт 9 плана аудита дерматологии).\n\nКлиент передаёт только {visit_id, file_id}; байты изображения сервер\nзагружает сам после проверки доступа. Доменный предикат (follow-up\nревью #3478/#3479): анализу подлежат только фото дерматологического\nосмотра — изображения с тегами dermatology и photo; произвольные\nизображения визита отклоняются с 400 до вызова AI-провайдера.\nОтвет — только подсказка: обязательные корневые поля\nrequires_doctor_confirmation=True, decision_boundary=\"suggestion_only\",\nai_notice гарантируются моделью AIResponse. Результат никогда не\nзаписывается в ЭМК автоматически.\n\nRequires: ANALYZE_IMAGE permission (Doctor, Dermatologist)\nFeature flag: ai_complaint_analysis (503 when disabled)",
         "operationId": "analyze_skin_file_api_v1_ai_v2_analyze_skin_file_post",
         "requestBody": {
           "content": {
@@ -46367,7 +46367,7 @@
           "file-system"
         ],
         "summary": "Get Files",
-        "description": "Получить список файлов",
+        "description": "Получить список файлов.\n\nДля дерматолога поверхность является доменной (галерея фото визита):\nвозвращаются ТОЛЬКО фото дерматологического осмотра его визита —\nизображения с тегами ``dermatology`` и ``photo`` (file_type=image).\nОстальные файлы визита остаются доступными через generic-поверхности\n(Admin/Doctor/Patient) без изменений.",
         "operationId": "get_files_api_v1_files__get",
         "security": [
           {

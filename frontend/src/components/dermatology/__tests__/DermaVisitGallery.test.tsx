@@ -2,7 +2,9 @@
  * DermaVisitGallery — тесты галереи фото текущего визита (пункт 8 плана аудита).
  *
  * Контракт:
- * - /files — единственный источник фото: список GET /files/?patient_id&visit_id,
+ * - /files — единственный источник фото: список GET /files/?patient_id&visit_id
+ *   (доменный предикат dermatology+photo+file_type=image применяется сервером
+ *   в derma-ветке; клиентский MIME-фильтр — вторая линия),
  *   превью — авторизованный blob-запрос GET /files/{id}/preview;
  * - категории осмотр/до/после берутся из тегов файла;
  * - загрузка сохранённых файлов при открытии, objectURL освобождаются при смене
@@ -82,7 +84,7 @@ describe('DermaVisitGallery', () => {
       if (url === '/files/') return listResponse([
         { id: 1, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'], title: 'photo-1.jpg' },
         { id: 2, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'before'], title: 'photo-2.jpg' },
-        { id: 3, mime_type: 'application/pdf', tags: ['dermatology', 'report'] }, // не изображение — скрыто
+        { id: 3, mime_type: 'application/pdf', tags: ['dermatology', 'report'] }, // не изображение — скрыто (MIME-фильтр — вторая линия)
       ]);
       if (url === '/files/1/preview' || url === '/files/2/preview') return { data: imageBlob };
       throw new Error(`unexpected GET ${url}`);
@@ -115,7 +117,7 @@ describe('DermaVisitGallery', () => {
         { id: 1, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'examination'] },
         { id: 2, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'before'] },
         { id: 3, mime_type: 'image/jpeg', tags: ['dermatology', 'photo', 'after'] },
-        { id: 4, mime_type: 'image/jpeg', tags: ['other'] }, // без тега категории → осмотр
+        { id: 4, mime_type: 'image/jpeg', tags: ['dermatology', 'photo'] }, // без тега категории (сервер такие отдаёт) → осмотр
       ]);
       if (/^\/files\/\d+\/preview$/.test(url)) return { data: imageBlob };
       throw new Error(`unexpected GET ${url}`);

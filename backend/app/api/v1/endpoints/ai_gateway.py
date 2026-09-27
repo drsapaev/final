@@ -225,16 +225,21 @@ async def analyze_skin_file(
     Анализ СОХРАНЁННОГО фото визита (пункт 9 плана аудита дерматологии).
 
     Клиент передаёт только {visit_id, file_id}; байты изображения сервер
-    загружает сам после проверки доступа. Ответ — только подсказка:
-    обязательные корневые поля requires_doctor_confirmation=True,
-    decision_boundary="suggestion_only", ai_notice гарантируются моделью
-    AIResponse. Результат никогда не записывается в ЭМК автоматически.
+    загружает сам после проверки доступа. Доменный предикат (follow-up
+    ревью #3478/#3479): анализу подлежат только фото дерматологического
+    осмотра — изображения с тегами dermatology и photo; произвольные
+    изображения визита отклоняются с 400 до вызова AI-провайдера.
+    Ответ — только подсказка: обязательные корневые поля
+    requires_doctor_confirmation=True, decision_boundary="suggestion_only",
+    ai_notice гарантируются моделью AIResponse. Результат никогда не
+    записывается в ЭМК автоматически.
 
     Requires: ANALYZE_IMAGE permission (Doctor, Dermatologist)
     Feature flag: ai_complaint_analysis (503 when disabled)
     """
     from app.api.v1.endpoints.file_system import (
         _dermatology_visit_is_owned,
+        _file_has_dermatology_photo_tags,
         _is_dermatology_user,
     )
     from app.crud.file_system import file as file_crud
@@ -267,6 +272,16 @@ async def analyze_skin_file(
 
     if not (file_obj.mime_type or "").startswith("image/"):
         raise HTTPException(status_code=400, detail="Файл должен быть изображением")
+
+    # Доменный предикат: анализируем только фото дерматологического осмотра
+    # (теги dermatology+photo), зеркально списочной поверхности derma-ветки
+    # GET /files/. Произвольные изображения визита (например, вложения без
+    # дерма-тегов) отклоняются до любого вызова AI-провайдера.
+    if not _file_has_dermatology_photo_tags(file_obj):
+        raise HTTPException(
+            status_code=400,
+            detail="Файл не является фото дерматологического осмотра",
+        )
 
     content, _filename, _mime_type = service.download_file(
         db, request.file_id, current_user.id
