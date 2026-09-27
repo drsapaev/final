@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from app.schemas.base import ORMModel
 
@@ -63,3 +64,41 @@ class DermaProcedureOut(ORMModel):
     total_cost: float | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+# --- Unified derma history (review follow-up P2-4b, canonical server-side union) ---
+#
+# The derma history GETs union two read-only sources server-side:
+#   source="emr"    — rows projected out of dermatology EMRRecord (emr/v2,
+#                     data.specialty == "dermatology"); id is the synthetic
+#                     string "emr-<emr_record_id>" (procedures append
+#                     "-<index>" per entry inside specialty_data.cosmetic_procedures);
+#   source="legacy" — read-only rows of the closed legacy tables
+#                     derma_examinations / derma_procedures (id int).
+class DermaExaminationHistoryOut(DermaExaminationOut):
+    id: int | str
+    source: Literal["emr", "legacy"] = "legacy"
+
+
+class DermaProcedureHistoryOut(DermaProcedureOut):
+    id: int | str
+    source: Literal["emr", "legacy"] = "legacy"
+
+
+# Page envelope mirrors the canonical FileList pagination contract
+# (GET /files: total/page/size/pages) so history consumers get an explicit
+# completeness signal instead of a silently truncated list.
+class DermaExaminationHistoryPage(BaseModel):
+    items: list[DermaExaminationHistoryOut]
+    total: int
+    page: int
+    size: int
+    pages: int
+
+
+class DermaProcedureHistoryPage(BaseModel):
+    items: list[DermaProcedureHistoryOut]
+    total: int
+    page: int
+    size: int
+    pages: int

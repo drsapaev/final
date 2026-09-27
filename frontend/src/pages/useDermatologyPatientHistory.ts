@@ -28,35 +28,30 @@ export interface DermatologyCosmeticProcedure {
 }
 
 /**
- * P2-4b: the dermatology clinical history reads the EMR (emr/v2) as the
- * canonical source — GET /v2/emr/patient/{id} summaries plus per-visit
- * hydration (dentist protocol precedent) — and keeps the legacy
- * /derma/examinations + /derma/procedures tables as a read-only fallback
- * for pre-cutover rows (their write endpoints return 410 since P2-4a).
- * Both sources are merged, most recent first.
+ * P2-4b canonical (review follow-up on #3490/#3491): the dermatology
+ * clinical history is a server-side union — GET /derma/examinations and
+ * GET /derma/procedures merge dermatology EMR rows (specialty_data) with
+ * the closed legacy tables and return the canonical page/size/total/pages
+ * envelope (FileList contract). The hook only pages through that union:
+ * no client-side EMR fetching, no per-source limits, and `total` is the
+ * exact history size, so the UI always knows whether the listing is
+ * complete («Показать ещё»).
  */
 
-interface EmrRecord {
-  id: number | string;
-  created_at?: string | null;
-  diagnosis_main?: string | null;
-  data?: {
-    specialty?: string | null;
-    specialty_data?: Record<string, unknown> | null;
-  } | null;
-}
-
-interface DermatologyEmrHistory {
-  skinExaminations: DermatologySkinExamination[];
-  cosmeticProcedures: DermatologyCosmeticProcedure[];
-}
+const HISTORY_PAGE_SIZE = 20;
 
 interface PatientHistorySnapshot {
   patientId: string | null;
   appointments: DermatologyAppointmentHistoryItem[];
   skinExaminations: DermatologySkinExamination[];
+  skinExaminationsTotal: number;
+  skinExaminationsNextPage: number;
   cosmeticProcedures: DermatologyCosmeticProcedure[];
+  cosmeticProceduresTotal: number;
+  cosmeticProceduresNextPage: number;
   loading: boolean;
+  loadingMoreExaminations: boolean;
+  loadingMoreProcedures: boolean;
   error: boolean;
 }
 
@@ -64,135 +59,54 @@ const emptySnapshot: PatientHistorySnapshot = {
   patientId: null,
   appointments: [],
   skinExaminations: [],
+  skinExaminationsTotal: 0,
+  skinExaminationsNextPage: 1,
   cosmeticProcedures: [],
+  cosmeticProceduresTotal: 0,
+  cosmeticProceduresNextPage: 1,
   loading: false,
+  loadingMoreExaminations: false,
+  loadingMoreProcedures: false,
   error: false,
 };
-
-const EMR_HISTORY_SUMMARY_LIMIT = 20;
-const LEGACY_HISTORY_LIMIT = 10;
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? value as T[] : [];
 }
 
-function textValue(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function emrDatePart(record: EmrRecord): string {
-  return String(record.created_at || '').slice(0, 10);
-}
-
-function mapEmrExaminations(records: EmrRecord[]): DermatologySkinExamination[] {
-  const examinations: DermatologySkinExamination[] = [];
-  for (const record of records) {
-    const data = record.data || {};
-    if (data.specialty !== 'dermatology') continue;
-
-    const specialtyData = data.specialty_data || {};
-    const skinType = textValue(specialtyData.skin_type);
-    const skinCondition = textValue(specialtyData.skin_condition);
-    const diagnosis = textValue(record.diagnosis_main);
-    if (!skinType && !skinCondition && !diagnosis) continue;
-
-    examinations.push({
-      id: `emr-${record.id}`,
-      examination_date: emrDatePart(record),
-      ...(skinType ? { skin_type: skinType } : {}),
-      ...(skinCondition ? { skin_condition: skinCondition } : {}),
-      ...(diagnosis ? { diagnosis } : {}),
-    });
+/** Parse the canonical history envelope; an unexpected bare array is
+ * treated as a single page with total = items.length (defensive only —
+ * the server contract is the page envelope). */
+function parseHistoryPage<T>(payload: unknown): { items: T[]; total: number } {
+  if (Array.isArray(payload)) {
+    return { items: payload as T[], total: payload.length };
   }
-  return examinations;
-}
-
-function mapEmrProcedures(records: EmrRecord[]): DermatologyCosmeticProcedure[] {
-  const procedures: DermatologyCosmeticProcedure[] = [];
-  for (const record of records) {
-    const data = record.data || {};
-    if (data.specialty !== 'dermatology') continue;
-
-    const rawProcedures = data.specialty_data?.cosmetic_procedures;
-    if (!Array.isArray(rawProcedures)) continue;
-
-    rawProcedures.forEach((entry, index) => {
-      if (!entry || typeof entry !== 'object') return;
-      const item = entry as Record<string, unknown>;
-      const procedureDate = textValue(item.procedure_date);
-      const procedureType = textValue(item.procedure_type);
-      if (!procedureDate && !procedureType) return;
-
-      procedures.push({
-        id: `emr-${record.id}-${index}`,
-        ...(procedureDate ? { procedure_date: procedureDate } : {}),
-        ...(procedureType ? { procedure_type: procedureType } : {}),
-        ...(textValue(item.area_treated) ? { area_treated: textValue(item.area_treated) } : {}),
-      });
-    });
+  if (payload && typeof payload === 'object') {
+    const envelope = payload as { items?: unknown; total?: unknown };
+    const items = Array.isArray(envelope.items) ? envelope.items as T[] : [];
+    const total = typeof envelope.total === 'number' ? envelope.total : items.length;
+    return { items, total };
   }
-  return procedures;
+  return { items: [], total: 0 };
 }
 
-async function loadDermatologyEmrHistory(patientId: string): Promise<DermatologyEmrHistory> {
-  const summaryResponse = await api.get(`/v2/emr/patient/${encodeURIComponent(patientId)}`, {
-    params: { limit: EMR_HISTORY_SUMMARY_LIMIT },
+async function fetchHistoryPage<T>(
+  endpoint: string,
+  patientId: string,
+  page: number,
+): Promise<{ items: T[]; total: number }> {
+  const response = await api.get(endpoint, {
+    params: { patient_id: patientId, page, size: HISTORY_PAGE_SIZE },
   });
-  const summaries = Array.isArray(summaryResponse.data)
-    ? summaryResponse.data as Array<{ visit_id?: unknown }>
-    : [];
-
-  const records = await Promise.all(
-    summaries.map(async (summary) => {
-      const visitId = summary?.visit_id;
-      if (visitId === undefined || visitId === null || visitId === '') return null;
-      try {
-        const emrResponse = await api.get(`/v2/emr/${encodeURIComponent(String(visitId))}`, {
-          validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
-        });
-        if (emrResponse.status === 404) return null;
-        return emrResponse.data as EmrRecord;
-      } catch {
-        return null;
-      }
-    }),
-  );
-
-  const validRecords = records.filter((record): record is EmrRecord => Boolean(record));
-  return {
-    skinExaminations: mapEmrExaminations(validRecords),
-    cosmeticProcedures: mapEmrProcedures(validRecords),
-  };
+  return parseHistoryPage<T>(response.data);
 }
 
-function examinationDate(examination: DermatologySkinExamination): string {
-  return String(examination.exam_date || examination.examination_date || '').slice(0, 10);
-}
-
-function sortExaminationsByDateDesc(
-  list: DermatologySkinExamination[],
-): DermatologySkinExamination[] {
-  return [...list].sort((left, right) => {
-    const leftDate = examinationDate(left);
-    const rightDate = examinationDate(right);
-    if (leftDate === rightDate) return 0;
-    if (!leftDate) return 1;
-    if (!rightDate) return -1;
-    return rightDate.localeCompare(leftDate);
-  });
-}
-
-function sortProceduresByDateDesc(
-  list: DermatologyCosmeticProcedure[],
-): DermatologyCosmeticProcedure[] {
-  return [...list].sort((left, right) => {
-    const leftDate = String(left.procedure_date || '').slice(0, 10);
-    const rightDate = String(right.procedure_date || '').slice(0, 10);
-    if (leftDate === rightDate) return 0;
-    if (!leftDate) return 1;
-    if (!rightDate) return -1;
-    return rightDate.localeCompare(leftDate);
-  });
+/** Append a page without duplicates (id is int for legacy rows and the
+ * synthetic "emr-<record>[-<index>]" string for EMR rows). */
+function mergeById<T extends { id: string | number }>(existing: T[], incoming: T[]): T[] {
+  const seen = new Set(existing.map((row) => String(row.id)));
+  const appended = incoming.filter((row) => !seen.has(String(row.id)));
+  return appended.length ? [...existing, ...appended] : existing;
 }
 
 /** Load history only for the selected patient and discard responses from older selections. */
@@ -210,49 +124,48 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
     }
 
     let active = true;
-    setSnapshot({ ...emptySnapshot, loading: true });
+    setSnapshot({ ...emptySnapshot, patientId: normalizedPatientId, loading: true });
 
     void Promise.allSettled([
       api.get(`/patients/${encodeURIComponent(normalizedPatientId)}/appointments`),
-      loadDermatologyEmrHistory(normalizedPatientId),
-      api.get('/derma/examinations', { params: { patient_id: normalizedPatientId, limit: LEGACY_HISTORY_LIMIT } }),
-      api.get('/derma/procedures', { params: { patient_id: normalizedPatientId, limit: LEGACY_HISTORY_LIMIT } }),
-    ]).then(([appointmentsResult, emrResult, examinationsResult, proceduresResult]) => {
+      fetchHistoryPage<DermatologySkinExamination>(
+        '/derma/examinations', normalizedPatientId, 1,
+      ),
+      fetchHistoryPage<DermatologyCosmeticProcedure>(
+        '/derma/procedures', normalizedPatientId, 1,
+      ),
+    ]).then(([appointmentsResult, examinationsResult, proceduresResult]) => {
       if (!active) return;
 
-      if (emrResult.status === 'rejected') {
+      if (examinationsResult.status === 'rejected' || proceduresResult.status === 'rejected') {
         logger.warn(
-          '[DermaHistory] EMR history unavailable, showing legacy rows only',
+          '[DermaHistory] history page unavailable for patient',
           { patientId: normalizedPatientId },
         );
       }
 
-      const emrHistory = emrResult.status === 'fulfilled'
-        ? emrResult.value
-        : { skinExaminations: [], cosmeticProcedures: [] };
       const appointments = appointmentsResult.status === 'fulfilled'
         ? asArray<DermatologyAppointmentHistoryItem>(appointmentsResult.value.data)
         : [];
-      const legacyExaminations = examinationsResult.status === 'fulfilled'
-        ? asArray<DermatologySkinExamination>(examinationsResult.value.data)
-        : [];
-      const legacyProcedures = proceduresResult.status === 'fulfilled'
-        ? asArray<DermatologyCosmeticProcedure>(proceduresResult.value.data)
-        : [];
+      const examinationsPage = examinationsResult.status === 'fulfilled'
+        ? examinationsResult.value
+        : { items: [] as DermatologySkinExamination[], total: 0 };
+      const proceduresPage = proceduresResult.status === 'fulfilled'
+        ? proceduresResult.value
+        : { items: [] as DermatologyCosmeticProcedure[], total: 0 };
 
       setSnapshot({
+        ...emptySnapshot,
         patientId: normalizedPatientId,
         appointments,
-        skinExaminations: sortExaminationsByDateDesc([
-          ...emrHistory.skinExaminations,
-          ...legacyExaminations,
-        ]),
-        cosmeticProcedures: sortProceduresByDateDesc([
-          ...emrHistory.cosmeticProcedures,
-          ...legacyProcedures,
-        ]),
+        skinExaminations: examinationsPage.items,
+        skinExaminationsTotal: examinationsPage.total,
+        skinExaminationsNextPage: 2,
+        cosmeticProcedures: proceduresPage.items,
+        cosmeticProceduresTotal: proceduresPage.total,
+        cosmeticProceduresNextPage: 2,
         loading: false,
-        error: [appointmentsResult, emrResult, examinationsResult, proceduresResult]
+        error: [appointmentsResult, examinationsResult, proceduresResult]
           .some((result) => result.status === 'rejected'),
       });
     });
@@ -262,6 +175,74 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
     };
   }, [normalizedPatientId, reloadVersion]);
 
+  const loadMoreExaminations = useCallback(() => {
+    if (
+      snapshot.loading || snapshot.loadingMoreExaminations
+      || snapshot.patientId !== normalizedPatientId
+      || snapshot.skinExaminations.length >= snapshot.skinExaminationsTotal
+    ) return;
+
+    const patientId = snapshot.patientId as string;
+    const nextPage = snapshot.skinExaminationsNextPage;
+    setSnapshot((prev) => ({ ...prev, loadingMoreExaminations: true }));
+    void fetchHistoryPage<DermatologySkinExamination>('/derma/examinations', patientId, nextPage)
+      .then((page) => {
+        setSnapshot((current) => (
+          current.patientId === patientId
+            ? {
+              ...current,
+              skinExaminations: mergeById(current.skinExaminations, page.items),
+              skinExaminationsTotal: page.total,
+              skinExaminationsNextPage: nextPage + 1,
+              loadingMoreExaminations: false,
+            }
+            : current
+        ));
+      })
+      .catch(() => {
+        logger.warn('[DermaHistory] failed to load more examinations', { patientId });
+        setSnapshot((current) => (
+          current.patientId === patientId
+            ? { ...current, loadingMoreExaminations: false }
+            : current
+        ));
+      });
+  }, [snapshot, normalizedPatientId]);
+
+  const loadMoreProcedures = useCallback(() => {
+    if (
+      snapshot.loading || snapshot.loadingMoreProcedures
+      || snapshot.patientId !== normalizedPatientId
+      || snapshot.cosmeticProcedures.length >= snapshot.cosmeticProceduresTotal
+    ) return;
+
+    const patientId = snapshot.patientId as string;
+    const nextPage = snapshot.cosmeticProceduresNextPage;
+    setSnapshot((prev) => ({ ...prev, loadingMoreProcedures: true }));
+    void fetchHistoryPage<DermatologyCosmeticProcedure>('/derma/procedures', patientId, nextPage)
+      .then((page) => {
+        setSnapshot((current) => (
+          current.patientId === patientId
+            ? {
+              ...current,
+              cosmeticProcedures: mergeById(current.cosmeticProcedures, page.items),
+              cosmeticProceduresTotal: page.total,
+              cosmeticProceduresNextPage: nextPage + 1,
+              loadingMoreProcedures: false,
+            }
+            : current
+        ));
+      })
+      .catch(() => {
+        logger.warn('[DermaHistory] failed to load more procedures', { patientId });
+        setSnapshot((current) => (
+          current.patientId === patientId
+            ? { ...current, loadingMoreProcedures: false }
+            : current
+        ));
+      });
+  }, [snapshot, normalizedPatientId]);
+
   const reload = useCallback(() => setReloadVersion((version) => version + 1), []);
   const isCurrentPatient = Boolean(normalizedPatientId && snapshot.patientId === normalizedPatientId);
 
@@ -269,6 +250,16 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
     appointments: isCurrentPatient ? snapshot.appointments : [],
     skinExaminations: isCurrentPatient ? snapshot.skinExaminations : [],
     cosmeticProcedures: isCurrentPatient ? snapshot.cosmeticProcedures : [],
+    skinExaminationsTotal: isCurrentPatient ? snapshot.skinExaminationsTotal : 0,
+    cosmeticProceduresTotal: isCurrentPatient ? snapshot.cosmeticProceduresTotal : 0,
+    hasMoreExaminations: isCurrentPatient
+      && snapshot.skinExaminations.length < snapshot.skinExaminationsTotal,
+    hasMoreProcedures: isCurrentPatient
+      && snapshot.cosmeticProcedures.length < snapshot.cosmeticProceduresTotal,
+    loadingMoreExaminations: isCurrentPatient && snapshot.loadingMoreExaminations,
+    loadingMoreProcedures: isCurrentPatient && snapshot.loadingMoreProcedures,
+    loadMoreExaminations,
+    loadMoreProcedures,
     loading: Boolean(normalizedPatientId) && (!isCurrentPatient || snapshot.loading),
     ready: isCurrentPatient && !snapshot.loading,
     error: isCurrentPatient && snapshot.error,
