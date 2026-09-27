@@ -48475,6 +48475,74 @@
         }
       }
     },
+    "/api/v1/derma/history": {
+      "get": {
+        "tags": [
+          "derma",
+          "derma"
+        ],
+        "summary": "История дерматологии: осмотры + процедуры (ЭМК + legacy)",
+        "description": "Единый read-model истории дерматологии (triage P2 follow-up к #3491).\n\nОбе секции (examinations, procedures) проецируются из ОДНОГО скана\nЭМК-кандидатов и ОДНОЙ загрузки Visit-набора; RBAC-скоуп\n(разрешённые пациенты врача) резолвится ОДИН раз и кормит и ЭМК-скан,\nи оба legacy-запроса. Фронтенд-хук истории читает оба раздела одним\nзапросом вместо пары гранулярных GET /derma/examinations и\nGET /derma/procedures, каждый из которых сканировал ЭМК независимо.\nСкоупинг пациентов, объединение источников (ЭМК + read-only legacy)\nи порядок — идентичны гранулярным GET; ``limit`` применяется к каждой\nсекции отдельно после полного union.",
+        "operationId": "get_derma_history_api_v1_derma_history_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DermaHistoryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/derma/price-override": {
       "post": {
         "tags": [
@@ -77986,6 +78054,27 @@
           "skin_type"
         ],
         "title": "DermaExaminationOut"
+      },
+      "DermaHistoryOut": {
+        "properties": {
+          "examinations": {
+            "items": {
+              "$ref": "#/components/schemas/DermaExaminationHistoryOut"
+            },
+            "type": "array",
+            "title": "Examinations"
+          },
+          "procedures": {
+            "items": {
+              "$ref": "#/components/schemas/DermaProcedureHistoryOut"
+            },
+            "type": "array",
+            "title": "Procedures"
+          }
+        },
+        "type": "object",
+        "title": "DermaHistoryOut",
+        "description": "Единый read-model истории дерматологии (triage P2 follow-up).\n\nОбе секции объединяют ЭМК- и legacy-строки (newest-first, limit на\nсекцию) и проецируются из одного скана ЭМК-кандидатов — фронтенд-хук\nистории читает оба раздела одним запросом."
       },
       "DermaProcedureCreate": {
         "properties": {

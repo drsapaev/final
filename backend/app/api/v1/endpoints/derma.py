@@ -21,6 +21,7 @@ from app.schemas.derma import (
     DermaExaminationCreate,
     DermaExaminationHistoryOut,
     DermaExaminationOut,
+    DermaHistoryOut,
     DermaProcedureCreate,
     DermaProcedureHistoryOut,
     DermaProcedureOut,
@@ -105,8 +106,16 @@ def _ensure_doctor_can_access_patient(db: Session, patient_id: int, user: User) 
 
 # P2-4b: the dermatology filter lives inside the EMR JSON column and cannot
 # run as portable SQL across the sqlite test harness and PG JSONB, so the
-# candidate records are fetched recency-capped and filtered in Python.
-EMR_HISTORY_SCAN_CAP = 500
+# candidate records are fetched and filtered in Python.
+#
+# Triage P1 (owner review of #3491): the candidate scan is DELIBERATELY
+# UNBOUNDED — no recency cap here. History rows are ordered by
+# (examination/procedure date, created_at, id); the date may come from the
+# linked Visit, one EMR may expand into several procedure rows and an EMR
+# may carry no derma content at all, so a record-level cap cannot keep the
+# final ``limit`` window equivalent to a full-history scan: older derma
+# records would silently disappear from medical history. The only cap is
+# the user-facing ``limit``, applied after the full union.
 _EXAM_TEXT_FIELDS = (
     "skin_type",
     "skin_condition",
@@ -117,30 +126,46 @@ _EXAM_TEXT_FIELDS = (
 )
 
 
+def _emr_candidate_records_scoped(
+    db: Session, patient_ids: set[int] | None
+) -> list[EMRRecord]:
+    """Core EMR scan for a pre-resolved patient scope (RBAC by caller).
+
+    ``None`` means no patient filter (admin surface), a set narrows the
+    scan; an empty set yields no records.
+
+    Exhaustive by design (triage P1): the scan MUST NOT be recency-capped.
+    The final history ordering keys (visit-derived dates, expandable
+    procedure entries) are not correlated with the fetch order, so any
+    record-level cap would make the history silently incomplete.
+    """
+    query = db.query(EMRRecord).filter(EMRRecord.is_active.is_(True))
+    if patient_ids is not None:
+        if not patient_ids:
+            return []
+        query = query.filter(EMRRecord.patient_id.in_(patient_ids))
+    return query.order_by(desc(EMRRecord.created_at), desc(EMRRecord.id)).all()
+
+
 def _emr_candidate_records(
     db: Session, user: User, patient_id: int | None
 ) -> list[EMRRecord]:
-    """Active EMR records visible to the user, newest-first, recency-capped.
+    """Active EMR records visible to the user, newest-first.
 
     Mirrors the patient scoping of the legacy GET surface exactly: doctors
     are limited to patients of their own visits, admins see everything
     (optionally narrowed to one patient).
     """
-    query = db.query(EMRRecord).filter(EMRRecord.is_active.is_(True))
     if patient_id is not None:
         if not _is_admin_user(user):
             _ensure_doctor_can_access_patient(db, patient_id, user)
-        query = query.filter(EMRRecord.patient_id == patient_id)
-    elif not _is_admin_user(user):
+        return _emr_candidate_records_scoped(db, {patient_id})
+    if not _is_admin_user(user):
         allowed_patient_ids = _doctor_allowed_patient_ids(db, user)
         if not allowed_patient_ids:
             return []
-        query = query.filter(EMRRecord.patient_id.in_(allowed_patient_ids))
-    return (
-        query.order_by(desc(EMRRecord.created_at), desc(EMRRecord.id))
-        .limit(EMR_HISTORY_SCAN_CAP)
-        .all()
-    )
+        return _emr_candidate_records_scoped(db, allowed_patient_ids)
+    return _emr_candidate_records_scoped(db, None)
 
 
 def _derma_exam_has_content(
@@ -201,13 +226,22 @@ def _fallback_exam_date(visit: Visit | None, record: EMRRecord) -> date:
     return date.today()
 
 
-def _emr_examination_rows(
+def _derma_emr_snapshot(
     db: Session, user: User, patient_id: int | None
-) -> list[DermaExaminationHistoryOut]:
+) -> tuple[list[EMRRecord], dict[int, Visit]]:
+    """Single EMR candidate scan + single Visit load (triage P2).
+
+    Both history sections (examinations and procedures) are projected from
+    this one snapshot, so a combined read costs one EMR query and one
+    Visit query instead of two of each.
+    """
     records = _emr_candidate_records(db, user, patient_id)
-    if not records:
-        return []
-    visits = _derma_emr_visits(db, records)
+    return records, _derma_emr_visits(db, records)
+
+
+def _emr_examination_rows(
+    records: list[EMRRecord], visits: dict[int, Visit]
+) -> list[DermaExaminationHistoryOut]:
     rows: list[DermaExaminationHistoryOut] = []
     for record in records:
         data = record.data if isinstance(record.data, dict) else {}
@@ -243,12 +277,8 @@ def _emr_examination_rows(
 
 
 def _emr_procedure_rows(
-    db: Session, user: User, patient_id: int | None
+    records: list[EMRRecord], visits: dict[int, Visit]
 ) -> list[DermaProcedureHistoryOut]:
-    records = _emr_candidate_records(db, user, patient_id)
-    if not records:
-        return []
-    visits = _derma_emr_visits(db, records)
     rows: list[DermaProcedureHistoryOut] = []
     for record in records:
         data = record.data if isinstance(record.data, dict) else {}
@@ -356,7 +386,8 @@ async def get_skin_examinations(
             .limit(limit)
             .all()
         ]
-        emr_rows = _emr_examination_rows(db, user, patient_id)
+        records, visits = _derma_emr_snapshot(db, user, patient_id)
+        emr_rows = _emr_examination_rows(records, visits)
         examinations = _merge_history_rows(legacy_rows, emr_rows, limit)
         logger.info(
             "[derma.examinations] listed examinations user_id=%s patient_id=%s count=%s",
@@ -454,7 +485,8 @@ async def get_cosmetic_procedures(
             .limit(limit)
             .all()
         ]
-        emr_rows = _emr_procedure_rows(db, user, patient_id)
+        records, visits = _derma_emr_snapshot(db, user, patient_id)
+        emr_rows = _emr_procedure_rows(records, visits)
         procedures = _merge_history_rows(legacy_rows, emr_rows, limit)
         logger.info(
             "[derma.procedures] listed procedures user_id=%s patient_id=%s count=%s",
@@ -507,6 +539,107 @@ async def create_cosmetic_procedure(
             "ЭМК. Таблица derma_procedures доступна только для чтения (история)."
         ),
     )
+
+
+@router.get(
+    "/history",
+    summary="История дерматологии: осмотры + процедуры (ЭМК + legacy)",
+    response_model=DermaHistoryOut,
+)
+async def get_derma_history(
+    db: Session = Depends(deps.get_db),
+    user: User = Depends(deps.require_roles(*DERMA_ROLES)),
+    limit: int = Query(100, ge=1, le=1000),
+    patient_id: int | None = None,
+) -> DermaHistoryOut:
+    """
+    Единый read-model истории дерматологии (triage P2 follow-up к #3491).
+
+    Обе секции (examinations, procedures) проецируются из ОДНОГО скана
+    ЭМК-кандидатов и ОДНОЙ загрузки Visit-набора; RBAC-скоуп
+    (разрешённые пациенты врача) резолвится ОДИН раз и кормит и ЭМК-скан,
+    и оба legacy-запроса. Фронтенд-хук истории читает оба раздела одним
+    запросом вместо пары гранулярных GET /derma/examinations и
+    GET /derma/procedures, каждый из которых сканировал ЭМК независимо.
+    Скоупинг пациентов, объединение источников (ЭМК + read-only legacy)
+    и порядок — идентичны гранулярным GET; ``limit`` применяется к каждой
+    секции отдельно после полного union.
+    """
+    try:
+        # RBAC is resolved exactly once for the whole read-model: the same
+        # patient scope feeds the EMR scan and both legacy queries.
+        if not _is_admin_user(user):
+            allowed_patient_ids = _doctor_allowed_patient_ids(db, user)
+            if patient_id is not None:
+                if patient_id not in allowed_patient_ids:
+                    raise HTTPException(status_code=403, detail="Access denied")
+                scope_ids: set[int] | None = {patient_id}
+            else:
+                if not allowed_patient_ids:
+                    return DermaHistoryOut(examinations=[], procedures=[])
+                scope_ids = allowed_patient_ids
+        else:
+            scope_ids = {patient_id} if patient_id is not None else None
+
+        records = _emr_candidate_records_scoped(db, scope_ids)
+        visits = _derma_emr_visits(db, records)
+        exam_emr_rows = _emr_examination_rows(records, visits)
+        procedure_emr_rows = _emr_procedure_rows(records, visits)
+
+        exam_query = db.query(DermaExamination)
+        procedure_query = db.query(DermaProcedure)
+        if scope_ids is not None:
+            exam_query = exam_query.filter(
+                DermaExamination.patient_id.in_(scope_ids)
+            )
+            procedure_query = procedure_query.filter(
+                DermaProcedure.patient_id.in_(scope_ids)
+            )
+
+        legacy_exam_rows = [
+            DermaExaminationHistoryOut.model_validate(row)
+            for row in exam_query.order_by(
+                desc(DermaExamination.examination_date),
+                desc(DermaExamination.created_at),
+                desc(DermaExamination.id),
+            )
+            .limit(limit)
+            .all()
+        ]
+        legacy_procedure_rows = [
+            DermaProcedureHistoryOut.model_validate(row)
+            for row in procedure_query.order_by(
+                desc(DermaProcedure.procedure_date),
+                desc(DermaProcedure.created_at),
+                desc(DermaProcedure.id),
+            )
+            .limit(limit)
+            .all()
+        ]
+        history = DermaHistoryOut(
+            examinations=_merge_history_rows(legacy_exam_rows, exam_emr_rows, limit),
+            procedures=_merge_history_rows(
+                legacy_procedure_rows, procedure_emr_rows, limit
+            ),
+        )
+        logger.info(
+            "[derma.history] listed history user_id=%s patient_id=%s "
+            "examinations=%s procedures=%s",
+            getattr(user, "id", None),
+            patient_id,
+            len(history.examinations),
+            len(history.procedures),
+        )
+        return history
+    except SQLAlchemyError:
+        logger.exception(
+            "[derma.history] failed to list history user_id=%s patient_id=%s",
+            getattr(user, "id", None),
+            patient_id,
+        )
+        raise HTTPException(
+            status_code=500, detail="Internal server error"
+        )
 
 
 @router.post(

@@ -16878,6 +16878,36 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/derma/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * История дерматологии: осмотры + процедуры (ЭМК + legacy)
+         * @description Единый read-model истории дерматологии (triage P2 follow-up к #3491).
+         *
+         *     Обе секции (examinations, procedures) проецируются из ОДНОГО скана
+         *     ЭМК-кандидатов и ОДНОЙ загрузки Visit-набора; RBAC-скоуп
+         *     (разрешённые пациенты врача) резолвится ОДИН раз и кормит и ЭМК-скан,
+         *     и оба legacy-запроса. Фронтенд-хук истории читает оба раздела одним
+         *     запросом вместо пары гранулярных GET /derma/examinations и
+         *     GET /derma/procedures, каждый из которых сканировал ЭМК независимо.
+         *     Скоупинг пациентов, объединение источников (ЭМК + read-only legacy)
+         *     и порядок — идентичны гранулярным GET; ``limit`` применяется к каждой
+         *     секции отдельно после полного union.
+         */
+        get: operations["get_derma_history_api_v1_derma_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/derma/price-override": {
         parameters: {
             query?: never;
@@ -26758,6 +26788,20 @@ export type components = {
             created_at?: string | null;
             /** Updated At */
             updated_at?: string | null;
+        };
+        /**
+         * DermaHistoryOut
+         * @description Единый read-model истории дерматологии (triage P2 follow-up).
+         *
+         *     Обе секции объединяют ЭМК- и legacy-строки (newest-first, limit на
+         *     секцию) и проецируются из одного скана ЭМК-кандидатов — фронтенд-хук
+         *     истории читает оба раздела одним запросом.
+         */
+        DermaHistoryOut: {
+            /** Examinations */
+            examinations?: components["schemas"]["DermaExaminationHistoryOut"][];
+            /** Procedures */
+            procedures?: components["schemas"]["DermaProcedureHistoryOut"][];
         };
         /** DermaProcedureCreate */
         DermaProcedureCreate: {
@@ -71133,6 +71177,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DermaProcedureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_derma_history_api_v1_derma_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                patient_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DermaHistoryOut"];
                 };
             };
             /** @description Validation Error */

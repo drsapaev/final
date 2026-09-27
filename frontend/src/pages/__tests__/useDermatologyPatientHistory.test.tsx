@@ -35,18 +35,34 @@ describe('useDermatologyPatientHistory', () => {
     });
   });
 
-  it('requests each history source with the selected patient ID', async () => {
-    mockedGet.mockResolvedValue(response([]));
+  it('requests the combined derma history and appointments with the selected patient ID', async () => {
+    mockedGet.mockResolvedValue(response({}));
     const { result } = renderHook(() => useDermatologyPatientHistory(42));
 
     await waitFor(() => expect(result.current.ready).toBe(true));
     expect(mockedGet).toHaveBeenNthCalledWith(1, '/patients/42/appointments');
-    expect(mockedGet).toHaveBeenNthCalledWith(2, '/derma/examinations', {
+    expect(mockedGet).toHaveBeenNthCalledWith(2, '/derma/history', {
       params: { patient_id: '42', limit: 10 },
     });
-    expect(mockedGet).toHaveBeenNthCalledWith(3, '/derma/procedures', {
-      params: { patient_id: '42', limit: 10 },
+    expect(mockedGet).toHaveBeenCalledTimes(2);
+  });
+
+  it('splits the combined derma history response into both sections', async () => {
+    mockedGet.mockImplementation((url) => {
+      if (String(url).includes('/appointments')) {
+        return Promise.resolve(response([{ id: 7, appointment_date: '2026-01-05' }])) as never;
+      }
+      return Promise.resolve(response({
+        examinations: [{ id: 'emr-1', diagnosis: 'SYNTHETIC-Diagnosis' }],
+        procedures: [{ id: 'emr-1-0', procedure_type: 'SYNTHETIC-Procedure' }],
+      })) as never;
     });
+    const { result } = renderHook(() => useDermatologyPatientHistory(42));
+
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(result.current.appointments).toEqual([{ id: 7, appointment_date: '2026-01-05' }]);
+    expect(result.current.skinExaminations).toEqual([{ id: 'emr-1', diagnosis: 'SYNTHETIC-Diagnosis' }]);
+    expect(result.current.cosmeticProcedures).toEqual([{ id: 'emr-1-0', procedure_type: 'SYNTHETIC-Procedure' }]);
   });
 
   it('hides the previous patient history immediately and ignores its late response', async () => {
@@ -67,24 +83,28 @@ describe('useDermatologyPatientHistory', () => {
       { initialProps: { patientId: '1' as string | null } },
     );
 
-    await waitFor(() => expect(requests.get('1')).toHaveLength(3));
+    await waitFor(() => expect(requests.get('1')).toHaveLength(2));
     rerender({ patientId: '2' });
-    await waitFor(() => expect(requests.get('2')).toHaveLength(3));
+    await waitFor(() => expect(requests.get('2')).toHaveLength(2));
     expect(result.current.appointments).toEqual([]);
     expect(result.current.skinExaminations).toEqual([]);
     expect(result.current.cosmeticProcedures).toEqual([]);
 
     await act(async () => {
       requests.get('2')?.[0].resolve(response([{ id: 22, appointment_date: '2026-01-02' }]));
-      requests.get('2')?.[1].resolve(response([{ id: 22, diagnosis: 'SYNTHETIC-Diagnosis-2' }]));
-      requests.get('2')?.[2].resolve(response([{ id: 22, procedure_type: 'SYNTHETIC-Procedure-2' }]));
+      requests.get('2')?.[1].resolve(response({
+        examinations: [{ id: 22, diagnosis: 'SYNTHETIC-Diagnosis-2' }],
+        procedures: [{ id: 22, procedure_type: 'SYNTHETIC-Procedure-2' }],
+      }));
     });
     await waitFor(() => expect(result.current.ready).toBe(true));
 
     await act(async () => {
       requests.get('1')?.[0].resolve(response([{ id: 11, appointment_date: '2025-01-01' }]));
-      requests.get('1')?.[1].resolve(response([{ id: 11, diagnosis: 'SYNTHETIC-Diagnosis-1' }]));
-      requests.get('1')?.[2].resolve(response([{ id: 11, procedure_type: 'SYNTHETIC-Procedure-1' }]));
+      requests.get('1')?.[1].resolve(response({
+        examinations: [{ id: 11, diagnosis: 'SYNTHETIC-Diagnosis-1' }],
+        procedures: [{ id: 11, procedure_type: 'SYNTHETIC-Procedure-1' }],
+      }));
     });
 
     expect(result.current.appointments).toEqual([{ id: 22, appointment_date: '2026-01-02' }]);

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import event
 
 from app.core.security import get_password_hash
 from app.models.clinic import Doctor
@@ -390,7 +391,9 @@ def _create_emr(
     visit: Visit,
     user: User,
     data: dict,
+    created_at: datetime | None = None,
 ) -> EMRRecord:
+    extra = {"created_at": created_at} if created_at is not None else {}
     emr = EMRRecord(
         patient_id=patient.id,
         visit_id=visit.id,
@@ -398,11 +401,54 @@ def _create_emr(
         data=data,
         status="draft",
         created_by=user.id,
+        **extra,
     )
     db_session.add(emr)
     db_session.commit()
     db_session.refresh(emr)
     return emr
+
+
+def _create_emr_fillers(
+    db_session,
+    *,
+    patient: Patient,
+    doctor: Doctor,
+    user: User,
+    count: int,
+    base_created_at: datetime,
+) -> None:
+    """Non-derma active EMRs, one per visit, each newer than the previous.
+
+    Used by the triage-P1 regression: with a recency cap in place these
+    newer records would push older derma EMRs out of the scan window.
+    """
+    visits = [
+        Visit(
+            patient_id=patient.id,
+            doctor_id=doctor.id,
+            visit_date=date.today(),
+            status="open",
+            source="desk",
+            department="dermatology",
+        )
+        for _ in range(count)
+    ]
+    db_session.add_all(visits)
+    db_session.commit()
+    db_session.add_all(
+        EMRRecord(
+            patient_id=patient.id,
+            visit_id=visit.id,
+            version=1,
+            data={"specialty": "cardiology"},
+            status="draft",
+            created_by=user.id,
+            created_at=base_created_at + timedelta(minutes=index),
+        )
+        for index, visit in enumerate(visits)
+    )
+    db_session.commit()
 
 
 def _derma_emr_data() -> dict:
@@ -619,3 +665,267 @@ class TestDermaEmrHistory:
         )
         assert procedures_response.status_code == 200
         assert procedures_response.json() == []
+
+    def test_emr_history_scan_is_exhaustive_beyond_500_emrs(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_visit,
+        test_doctor,
+        admin_user,
+    ):
+        """Triage P1 (#3491 review): recency-cap удалён — история
+        эквивалентна полному union. Старая дерматологическая ЭМК обязана
+        оставаться в истории, даже когда в скоупе пациента 505 более
+        новых активных ЭМК (ранее cap 500 стоял ДО фильтра
+        specialty="dermatology" и до формирования строк процедур)."""
+        target_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        target = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=target_visit,
+            user=admin_user,
+            data=_derma_emr_data(),
+            created_at=datetime(2025, 1, 5, 9, 0, 0),
+        )
+        _create_emr_fillers(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+            user=admin_user,
+            count=505,
+            base_created_at=datetime(2026, 1, 1, 10, 0, 0),
+        )
+
+        exams_response = client.get(
+            f"/api/v1/derma/examinations?patient_id={test_patient.id}&limit=10",
+            headers=auth_headers,
+        )
+        assert exams_response.status_code == 200
+        assert f"emr-{target.id}" in [item["id"] for item in exams_response.json()]
+
+        procedures_response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&limit=10",
+            headers=auth_headers,
+        )
+        assert procedures_response.status_code == 200
+        procedure_ids = [item["id"] for item in procedures_response.json()]
+        assert f"emr-{target.id}-0" in procedure_ids
+        assert f"emr-{target.id}-1" in procedure_ids
+
+        history_response = client.get(
+            f"/api/v1/derma/history?patient_id={test_patient.id}&limit=10",
+            headers=auth_headers,
+        )
+        assert history_response.status_code == 200
+        history_payload = history_response.json()
+        assert f"emr-{target.id}" in [
+            item["id"] for item in history_payload["examinations"]
+        ]
+        assert f"emr-{target.id}-0" in [
+            item["id"] for item in history_payload["procedures"]
+        ]
+
+    def test_doctor_wide_history_scan_is_exhaustive_across_patients(
+        self,
+        client,
+        db_session,
+    ):
+        """Triage P1 (#3491 review): без patient_id капа не существует и на
+        весь набор разрешённых пациентов врача — ЭМК другого пациента
+        врача остаётся в истории за 505 более новых ЭМК первого пациента
+        (ранее cap применялся к скану всей выборки врача)."""
+        own_user, own_doctor = _create_doctor_user(db_session, label="p1scan")
+        patient_a = _create_patient(db_session, label="p1scana")
+        patient_b = _create_patient(db_session, label="p1scanb")
+
+        target_visit = _create_visit(db_session, patient=patient_b, doctor=own_doctor)
+        target_b = _create_emr(
+            db_session,
+            patient=patient_b,
+            visit=target_visit,
+            user=own_user,
+            data=_derma_emr_data(),
+            created_at=datetime(2025, 1, 5, 9, 0, 0),
+        )
+        _create_emr_fillers(
+            db_session,
+            patient=patient_a,
+            doctor=own_doctor,
+            user=own_user,
+            count=505,
+            base_created_at=datetime(2026, 1, 1, 10, 0, 0),
+        )
+        headers = _doctor_headers(client, own_user)
+
+        exams_response = client.get("/api/v1/derma/examinations?limit=20", headers=headers)
+        assert exams_response.status_code == 200
+        exams = exams_response.json()
+        assert f"emr-{target_b.id}" in [item["id"] for item in exams]
+        assert {item["patient_id"] for item in exams} == {patient_b.id}
+
+        procedures_response = client.get("/api/v1/derma/procedures?limit=20", headers=headers)
+        assert procedures_response.status_code == 200
+        procedure_ids = [item["id"] for item in procedures_response.json()]
+        assert f"emr-{target_b.id}-0" in procedure_ids
+        assert f"emr-{target_b.id}-1" in procedure_ids
+
+        history_response = client.get("/api/v1/derma/history?limit=20", headers=headers)
+        assert history_response.status_code == 200
+        history_payload = history_response.json()
+        assert f"emr-{target_b.id}" in [
+            item["id"] for item in history_payload["examinations"]
+        ]
+        assert f"emr-{target_b.id}-0" in [
+            item["id"] for item in history_payload["procedures"]
+        ]
+
+    def test_derma_history_combined_endpoint_single_scan(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_visit,
+        test_doctor,
+        admin_user,
+    ):
+        """Triage P2 (#3491 review): GET /derma/history — один скан
+        emr_records и одна загрузка visits обслуживают обе секции; секции
+        идентичны гранулярным GET; скоупинг тот же (чужой patient_id —
+        403)."""
+        emr_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        emr = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=emr_visit,
+            user=admin_user,
+            data=_derma_emr_data(),
+        )
+        legacy_exam = DermaExamination(
+            patient_id=test_patient.id,
+            visit_id=test_visit.id,
+            doctor_id=admin_user.id,
+            examination_date=date.today() - timedelta(days=1),
+            skin_type="dry",
+            diagnosis="legacy diagnosis",
+        )
+        legacy_procedure = DermaProcedure(
+            patient_id=test_patient.id,
+            visit_id=test_visit.id,
+            doctor_id=admin_user.id,
+            procedure_date=date.today() - timedelta(days=1),
+            procedure_type="legacy peel",
+            total_cost=99000,
+        )
+        db_session.add_all([legacy_exam, legacy_procedure])
+        db_session.commit()
+
+        statements: list[str] = []
+
+        def _record_statement(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement.lower())
+
+        engine = db_session.get_bind()
+        event.listen(engine, "before_cursor_execute", _record_statement)
+        try:
+            history_response = client.get(
+                f"/api/v1/derma/history?patient_id={test_patient.id}&limit=10",
+                headers=auth_headers,
+            )
+        finally:
+            event.remove(engine, "before_cursor_execute", _record_statement)
+        assert history_response.status_code == 200
+        payload = history_response.json()
+
+        emr_scans = [s for s in statements if "from emr_records" in s]
+        assert len(emr_scans) == 1, (
+            f"combined history must scan emr_records exactly once, got {len(emr_scans)}"
+        )
+        visit_loads = [s for s in statements if "from visits" in s]
+        assert len(visit_loads) == 1, (
+            f"combined history must load visits exactly once, got {len(visit_loads)}"
+        )
+
+        assert [item["id"] for item in payload["examinations"]] == [
+            f"emr-{emr.id}",
+            legacy_exam.id,
+        ]
+        assert [item["id"] for item in payload["procedures"]] == [
+            f"emr-{emr.id}-0",
+            f"emr-{emr.id}-1",
+            legacy_procedure.id,
+        ]
+
+        exams_response = client.get(
+            f"/api/v1/derma/examinations?patient_id={test_patient.id}&limit=10",
+            headers=auth_headers,
+        )
+        procs_response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&limit=10",
+            headers=auth_headers,
+        )
+        assert exams_response.status_code == 200
+        assert procs_response.status_code == 200
+        assert payload["examinations"] == exams_response.json()
+        assert payload["procedures"] == procs_response.json()
+
+        other_user, _other_doctor = _create_doctor_user(db_session, label="p24bcomb")
+        foreign_headers = _doctor_headers(client, other_user)
+        foreign_response = client.get(
+            f"/api/v1/derma/history?patient_id={test_patient.id}&limit=10",
+            headers=foreign_headers,
+        )
+        assert foreign_response.status_code == 403
+
+    def test_derma_history_combined_doctor_scope_resolved_once(
+        self,
+        client,
+        db_session,
+    ):
+        """Triage P2 (#3491 review): комбинированная история для врача —
+        тот же профиль: один скан emr_records, одна загрузка Visit-данных
+        и ОДНОКРАТНЫЙ резолв RBAC-скоупа разрешённых пациентов (без фикса
+        скоуп-запрос visits.doctor_id выполнялся бы повторно для legacy
+        секций)."""
+        own_user, own_doctor = _create_doctor_user(db_session, label="p24bcombdoc")
+        own_patient = _create_patient(db_session, label="p24bcombdoc")
+        own_visit = _create_visit(db_session, patient=own_patient, doctor=own_doctor)
+        emr = _create_emr(
+            db_session,
+            patient=own_patient,
+            visit=own_visit,
+            user=own_user,
+            data=_derma_emr_data(),
+        )
+        headers = _doctor_headers(client, own_user)
+
+        statements: list[str] = []
+
+        def _record_statement(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement.lower())
+
+        engine = db_session.get_bind()
+        event.listen(engine, "before_cursor_execute", _record_statement)
+        try:
+            history_response = client.get(
+                "/api/v1/derma/history?limit=20", headers=headers
+            )
+        finally:
+            event.remove(engine, "before_cursor_execute", _record_statement)
+        assert history_response.status_code == 200
+        payload = history_response.json()
+        assert f"emr-{emr.id}" in [item["id"] for item in payload["examinations"]]
+        assert f"emr-{emr.id}-0" in [item["id"] for item in payload["procedures"]]
+
+        assert len([s for s in statements if "from emr_records" in s]) == 1, (
+            "combined history must scan emr_records exactly once"
+        )
+        assert len([s for s in statements if "visits.doctor_id in" in s]) == 1, (
+            "RBAC allowed-patients scope must be resolved exactly once"
+        )
+        assert len([s for s in statements if "visits.id in" in s]) == 1, (
+            "combined history must load Visit data exactly once"
+        )

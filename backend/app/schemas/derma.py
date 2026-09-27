@@ -83,3 +83,15 @@ class DermaExaminationHistoryOut(DermaExaminationOut):
 class DermaProcedureHistoryOut(DermaProcedureOut):
     id: int | str
     source: Literal["emr", "legacy"] = "legacy"
+
+
+class DermaHistoryOut(ORMModel):
+    """Единый read-model истории дерматологии (triage P2 follow-up).
+
+    Обе секции объединяют ЭМК- и legacy-строки (newest-first, limit на
+    секцию) и проецируются из одного скана ЭМК-кандидатов — фронтенд-хук
+    истории читает оба раздела одним запросом.
+    """
+
+    examinations: list[DermaExaminationHistoryOut] = Field(default_factory=list)
+    procedures: list[DermaProcedureHistoryOut] = Field(default_factory=list)

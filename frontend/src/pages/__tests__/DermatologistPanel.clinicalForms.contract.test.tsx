@@ -50,7 +50,12 @@ describe('dermatologist clinical forms contract', () => {
 
   it('keeps legacy examinations read-only in patient history', () => {
     expect(panel).not.toContain('api.post(\'/derma/examinations\'');
-    expect(historyHook).toContain('api.get(\'/derma/examinations\'');
+    // Triage P2 (owner review of #3491): the hook reads the combined
+    // GET /derma/history read-model (one EMR scan on the server) instead
+    // of two granular GETs that each scanned the EMR independently.
+    expect(historyHook).toContain('api.get(\'/derma/history\'');
+    expect(historyHook).not.toContain('api.get(\'/derma/examinations\'');
+    expect(historyHook).not.toContain('api.get(\'/derma/procedures\'');
     expect(historyHook).not.toContain('api.post(\'/derma/examinations\'');
     expect(patientsTab).not.toContain('onOpenExam');
     expect(patientsTab).not.toContain('onOpenProcedure');

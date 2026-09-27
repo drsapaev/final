@@ -67,20 +67,25 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
 
     void Promise.allSettled([
       api.get(`/patients/${encodeURIComponent(normalizedPatientId)}/appointments`),
-      api.get('/derma/examinations', { params: { patient_id: normalizedPatientId, limit: 10 } }),
-      api.get('/derma/procedures', { params: { patient_id: normalizedPatientId, limit: 10 } }),
-    ]).then(([appointmentsResult, examinationsResult, proceduresResult]) => {
+      // Triage P2 (owner review of #3491): both derma history sections are
+      // served by one combined read-model endpoint — a single EMR scan and
+      // a single Visit load on the server instead of two independent scans
+      // in GET /derma/examinations and GET /derma/procedures.
+      api.get('/derma/history', { params: { patient_id: normalizedPatientId, limit: 10 } }),
+    ]).then(([appointmentsResult, historyResult]) => {
       if (!active) return;
 
       const appointments = appointmentsResult.status === 'fulfilled'
         ? asArray<DermatologyAppointmentHistoryItem>(appointmentsResult.value.data)
         : [];
-      const skinExaminations = examinationsResult.status === 'fulfilled'
-        ? asArray<DermatologySkinExamination>(examinationsResult.value.data)
-        : [];
-      const cosmeticProcedures = proceduresResult.status === 'fulfilled'
-        ? asArray<DermatologyCosmeticProcedure>(proceduresResult.value.data)
-        : [];
+      const historyData = historyResult.status === 'fulfilled'
+        ? (historyResult.value.data as {
+            examinations?: unknown;
+            procedures?: unknown;
+          } | null)
+        : null;
+      const skinExaminations = asArray<DermatologySkinExamination>(historyData?.examinations);
+      const cosmeticProcedures = asArray<DermatologyCosmeticProcedure>(historyData?.procedures);
 
       setSnapshot({
         patientId: normalizedPatientId,
@@ -88,7 +93,7 @@ export function useDermatologyPatientHistory(patientId: string | number | null |
         skinExaminations,
         cosmeticProcedures,
         loading: false,
-        error: [appointmentsResult, examinationsResult, proceduresResult]
+        error: [appointmentsResult, historyResult]
           .some((result) => result.status === 'rejected'),
       });
     });
