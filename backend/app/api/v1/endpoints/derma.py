@@ -622,20 +622,22 @@ async def get_derma_history(
                 legacy_procedure_rows, procedure_emr_rows, limit
             ),
         )
+        # CodeQL py/clear-text-logging-sensitive-data: patient_id belongs to
+        # the medical-data taint scope (it feeds the EMR scan), so the log
+        # carries only the section counts and a boolean scoping flag —
+        # no raw identifiers (same convention as the granular GETs).
         logger.info(
-            "[derma.history] listed history user_id=%s patient_id=%s "
-            "examinations=%s procedures=%s",
-            getattr(user, "id", None),
-            patient_id,
+            "[derma.history] listed history examinations=%s procedures=%s "
+            "patient_scoped=%s",
             len(history.examinations),
             len(history.procedures),
+            patient_id is not None,
         )
         return history
     except SQLAlchemyError:
         logger.exception(
-            "[derma.history] failed to list history user_id=%s patient_id=%s",
-            getattr(user, "id", None),
-            patient_id,
+            "[derma.history] failed to list history (patient_scoped=%s)",
+            patient_id is not None,
         )
         raise HTTPException(
             status_code=500, detail="Internal server error"
