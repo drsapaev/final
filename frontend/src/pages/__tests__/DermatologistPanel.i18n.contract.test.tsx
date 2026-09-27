@@ -11,30 +11,33 @@ const translationsSource = normalizeSource(fs.readFileSync(path.join(ROOT, 'i18n
 
 describe('DermatologistPanel STRAT#33 — i18n migration', () => {
   it('imports useTranslation from i18n adapter', () => {
-    expect(source).toContain("from '../i18n/useTranslation'");
+    expect(source).toContain('from \'../i18n/useTranslation\'');
     expect(source).toContain('useTranslation');
   });
   it('instantiates tI18n via useTranslation()', () => {
-    expect(source).toContain("const { t: tI18n } = useTranslation()");
+    expect(source).toContain('const { t: tI18n } = useTranslation()');
   });
   it('uses i18n keys for confirm dialog', () => {
     // Contract: confirm dialog must use i18n translation keys, not hardcoded strings.
     // The variable name (tI18n vs t alias) is an implementation detail.
-    expect(source).toContain("'derma.complete_visit_title'");
-    expect(source).toContain("'derma.complete_visit_confirm'");
-    expect(source).toContain("'derma.cancel'");
+    expect(source).toContain('\'derma.complete_visit_title\'');
+    expect(source).toContain('\'derma.complete_visit_confirm\'');
+    expect(source).toContain('\'derma.cancel\'');
   });
   it('uses i18n keys for notify messages', () => {
     // Contract: notify messages must use i18n translation keys, not hardcoded strings.
-    expect(source).toContain("'derma.session_expired'");
-    expect(source).toContain("'derma.visit_completed'");
-    expect(source).toContain("'derma.prescription_saved'");
-    expect(source).toContain("'derma.procedure_saved'");
+    // P2-4b: the standalone cosmetic-procedure form is gone (procedures live in
+    // the EMR specialty section with its own autosave), so the panel no longer
+    // notifies derma.procedure_saved — the pin moves to the keys it still uses.
+    expect(source).toContain('\'derma.session_expired\'');
+    expect(source).toContain('\'derma.visit_completed\'');
+    expect(source).toContain('\'derma.prescription_saved\'');
+    expect(source).not.toContain('\'derma.procedure_saved\'');
   });
   it('does not contain hardcoded Russian notify strings', () => {
-    expect(source).not.toContain("notify.error('Сессия истекла");
-    expect(source).not.toContain("notify.success('Прием завершен успешно')");
-    expect(source).not.toContain("notify.success('Рецепт сохранен успешно!')");
+    expect(source).not.toContain('notify.error(\'Сессия истекла');
+    expect(source).not.toContain('notify.success(\'Прием завершен успешно\')');
+    expect(source).not.toContain('notify.success(\'Рецепт сохранен успешно!\')');
   });
   it('labTranslations has derma.* namespace', () => {
     expect(translationsSource).toContain('derma: {');
