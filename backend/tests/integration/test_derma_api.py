@@ -812,3 +812,220 @@ class TestDermaEmrHistory:
             assert [item["id"] for item in payload["items"]] == [
                 seeded_exams[offset].id for offset in expected_ids
             ]
+
+
+@pytest.mark.integration
+class TestDermaP3CanonicalKey:
+    """P3 decision on the #3490/#3491 reconciliation: one canonical write key
+    (specialty_data.cosmetic_procedures); specialty_data.procedures is a
+    transitional legacy READ alias, union-deduplicated against the canonical
+    array by a content fingerprint — never by array index. Phase C (alias
+    removal) happens only after the stored-data audit; until then legacy-keyed
+    records must stay visible without duplication."""
+
+    def test_union_of_both_keys_with_fingerprint_dedup(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """Both keys in ONE record: canonical entries pass verbatim, a legacy
+        entry identical to a canonical one is deduplicated by fingerprint,
+        a legacy entry sharing only the type but differing in date survives,
+        and invalid legacy entries are skipped without hiding the rest."""
+        visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        today = date.today().isoformat()
+        other_day = (date.today() + timedelta(days=2)).isoformat()
+        canonical_entry = {
+            "procedure_date": today,
+            "procedure_type": "Мезотерапия",
+            "area_treated": "Лицо",
+            "products_used": "HA gel",
+            "results": "Гиперемия слабая",
+            "follow_up": "Контроль 14 дней",
+        }
+        emr = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "cosmetic_procedures": [
+                        canonical_entry,  # canonical[0]: entry A
+                        {  # canonical[1]: entry B
+                            "procedure_date": today,
+                            "procedure_type": "Чистка",
+                            "area_treated": "Лоб",
+                        },
+                    ],
+                    "procedures": [
+                        dict(canonical_entry),  # legacy[0]: duplicate of A -> dedup
+                        {  # legacy[1]: distinct entry -> kept (id legacy-1)
+                            "procedure_date": other_day,
+                            "procedure_type": "Ботокс",
+                            "area_treated": "Лоб",
+                        },
+                        {  # legacy[2]: same TYPE as A, different date -> kept
+                            "procedure_date": other_day,
+                            "procedure_type": "Мезотерапия",
+                            "area_treated": "Лицо",
+                        },
+                        {"procedure_type": "   "},  # legacy[3]: blank type -> skip
+                        "garbage-string",  # legacy[4]: not a dict -> skip
+                    ],
+                },
+            },
+        )
+
+        response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=50",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        # A + B + legacy[1] + legacy[2]; duplicate A and invalid entries gone.
+        assert payload["total"] == 4
+        row_ids = {item["id"] for item in payload["items"]}
+        assert row_ids == {
+            f"emr-{emr.id}-0",  # canonical A
+            f"emr-{emr.id}-1",  # canonical B
+            f"emr-{emr.id}-legacy-1",  # legacy Ботокс
+            f"emr-{emr.id}-legacy-2",  # legacy Мезотерапия (other date)
+        }
+        # Fingerprint is content-based: same type with a different date is
+        # NOT merged, so "Мезотерапия" legitimately appears twice.
+        types = [item["procedure_type"] for item in payload["items"]]
+        assert types.count("Мезотерапия") == 2
+        assert types.count("Чистка") == 1
+        assert types.count("Ботокс") == 1
+        # Every row stays bound to its record and visit.
+        assert all(item["visit_id"] == visit.id for item in payload["items"])
+        assert all(item["total_cost"] is None for item in payload["items"])
+
+    def test_legacy_only_record_stays_visible_in_history(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """Transition safety: an EMR written by a pre-P3 writer that stored
+        entries ONLY under the legacy key must still surface in
+        /derma/procedures and in the combined /derma/history, with every
+        field, the visit binding and honest totals intact."""
+        legacy_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        legacy_emr = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=legacy_visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "procedures": [
+                        {
+                            "procedure_date": date.today().isoformat(),
+                            "procedure_type": "Дарсонваль",
+                            "area_treated": "Спина",
+                            "products_used": "—",
+                            "results": "Без осложнений",
+                            "follow_up": "Курс 5 сеансов",
+                        },
+                    ],
+                },
+            },
+        )
+        canonical_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=canonical_visit,
+            user=admin_user,
+            data=_derma_emr_data(),  # canonical key only (editor shape)
+        )
+
+        procedures_response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=50",
+            headers=auth_headers,
+        )
+        assert procedures_response.status_code == 200
+        procedures_payload = procedures_response.json()
+        # 1 legacy-keyed entry + 2 canonical entries of _derma_emr_data().
+        assert procedures_payload["total"] == 3
+        by_id = {item["id"]: item for item in procedures_payload["items"]}
+        legacy_row = by_id[f"emr-{legacy_emr.id}-legacy-0"]
+        assert legacy_row["procedure_type"] == "Дарсонваль"
+        assert legacy_row["area_treated"] == "Спина"
+        assert legacy_row["products_used"] == "—"
+        assert legacy_row["results"] == "Без осложнений"
+        assert legacy_row["follow_up"] == "Курс 5 сеансов"
+        assert legacy_row["source"] == "emr"
+        assert legacy_row["visit_id"] == legacy_visit.id
+        assert legacy_row["total_cost"] is None
+
+        # Idempotent re-read: no duplicates appear, the union is stable.
+        reread_response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=50",
+            headers=auth_headers,
+        )
+        assert reread_response.status_code == 200
+        reread_payload = reread_response.json()
+        assert reread_payload["total"] == procedures_payload["total"]
+        assert {item["id"] for item in reread_payload["items"]} == set(by_id)
+
+    def test_garbage_key_shapes_yield_no_rows_and_honest_total(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """Non-list arrays, empty arrays and entries without a usable type
+        produce zero rows; total/pages stay honest."""
+        # NB: emr_records.visit_id is UNIQUE — one EMR per visit.
+        first_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=first_visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "cosmetic_procedures": [],
+                    "procedures": "not-a-list",
+                },
+            },
+        )
+        second_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=second_visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "procedures": [{"area_treated": "no type here"}, 42],
+                },
+            },
+        )
+
+        response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=10",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["items"] == []
+        assert payload["total"] == 0
+        assert payload["pages"] == 0
