@@ -7654,10 +7654,14 @@ export type paths = {
          * @description Анализ СОХРАНЁННОГО фото визита (пункт 9 плана аудита дерматологии).
          *
          *     Клиент передаёт только {visit_id, file_id}; байты изображения сервер
-         *     загружает сам после проверки доступа. Ответ — только подсказка:
-         *     обязательные корневые поля requires_doctor_confirmation=True,
-         *     decision_boundary="suggestion_only", ai_notice гарантируются моделью
-         *     AIResponse. Результат никогда не записывается в ЭМК автоматически.
+         *     загружает сам после проверки доступа. Доменный предикат (follow-up
+         *     ревью #3478/#3479): анализу подлежат только фото дерматологического
+         *     осмотра — изображения с тегами dermatology и photo; произвольные
+         *     изображения визита отклоняются с 400 до вызова AI-провайдера.
+         *     Ответ — только подсказка: обязательные корневые поля
+         *     requires_doctor_confirmation=True, decision_boundary="suggestion_only",
+         *     ai_notice гарантируются моделью AIResponse. Результат никогда не
+         *     записывается в ЭМК автоматически.
          *
          *     Requires: ANALYZE_IMAGE permission (Doctor, Dermatologist)
          *     Feature flag: ai_complaint_analysis (503 when disabled)
@@ -16224,7 +16228,13 @@ export type paths = {
         };
         /**
          * Get Files
-         * @description Получить список файлов
+         * @description Получить список файлов.
+         *
+         *     Для дерматолога поверхность является доменной (галерея фото визита):
+         *     возвращаются ТОЛЬКО фото дерматологического осмотра его визита —
+         *     изображения с тегами ``dermatology`` и ``photo`` (file_type=image).
+         *     Остальные файлы визита остаются доступными через generic-поверхности
+         *     (Admin/Doctor/Patient) без изменений.
          */
         get: operations["get_files_api_v1_files__get"];
         put?: never;

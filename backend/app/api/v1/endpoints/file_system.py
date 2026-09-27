@@ -3,6 +3,7 @@ API endpoints для файловой системы
 """
 
 import io
+import json
 import logging
 import os
 import shutil
@@ -23,13 +24,15 @@ from fastapi import (
     status,
 )
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func
+from sqlalchemy import ColumnElement, desc, func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.audit import extract_model_changes
 from app.core.i18n import t  # noqa: F401
 from app.models.clinic import Doctor
+from app.models.file_system import File as StoredFile
+from app.models.file_system import FileStatus, FileType
 from app.models.user import User
 from app.models.visit import Visit
 from app.schemas.file_system import (
@@ -101,6 +104,47 @@ def _require_dermatology_file_visit_access(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found or access denied",
         )
+
+
+# Dermatology visit-photo domain predicate (review follow-up to #3478/#3479).
+# A dermatology photo is the only file class the dermatology gallery may
+# list and the skin-analysis endpoint may consume: an image explicitly
+# tagged with BOTH the specialty tag and the media-class tag. The predicate
+# is enforced server-side (query level for lists, item level for the AI
+# path), so the gallery's client-side MIME check is defense-in-depth
+# instead of the boundary.
+DERMATOLOGY_PHOTO_REQUIRED_TAGS: tuple[str, ...] = ("dermatology", "photo")
+
+
+def _dermatology_photo_tag_predicates(
+    model: type[StoredFile],
+) -> list[ColumnElement[bool]]:
+    """Query-level «tags contain every required tag» (exact-token match).
+
+    ``StoredFile.tags`` — Text-колонка с JSON-массивом, поэтому закавыченный
+    token-``contains`` повторяет exact-token паттерн
+    ``file_tags_exclusion_predicate`` (одна классификация файла на всех
+    поверхностях) вместо наивного substring-поиска. NULL-теги предикат
+    не проходят — fail-closed в сторону «не показать».
+    """
+    return [
+        model.tags.contains(json.dumps(tag), autoescape=True)
+        for tag in DERMATOLOGY_PHOTO_REQUIRED_TAGS
+    ]
+
+
+def _file_has_dermatology_photo_tags(file_obj: Any) -> bool:
+    """Item-level зеркало запросного предиката (членство тега в JSON)."""
+    tags = file_obj.tags
+    if isinstance(tags, str):
+        try:
+            tags = json.loads(tags)
+        except (json.JSONDecodeError, TypeError):
+            return False
+    if not isinstance(tags, list):
+        return False
+    parsed = {tag for tag in tags if isinstance(tag, str)}
+    return set(DERMATOLOGY_PHOTO_REQUIRED_TAGS).issubset(parsed)
 
 
 IMPORT_ARCHIVE_READ_CHUNK_BYTES = 1024 * 1024
@@ -450,7 +494,14 @@ async def get_files(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Doctor", "Patient", "derma")),
 ):
-    """Получить список файлов"""
+    """Получить список файлов.
+
+    Для дерматолога поверхность является доменной (галерея фото визита):
+    возвращаются ТОЛЬКО фото дерматологического осмотра его визита —
+    изображения с тегами ``dermatology`` и ``photo`` (file_type=image).
+    Остальные файлы визита остаются доступными через generic-поверхности
+    (Admin/Doctor/Patient) без изменений.
+    """
     try:
         from app.crud.file_system import file
 
@@ -458,6 +509,7 @@ async def get_files(
         from app.services.authorization.staff import staff_authorization_service
 
         owner_id = current_user.id
+        dermatology_photo_scope = False
         if _is_dermatology_user(current_user):
             if patient_id is None or visit_id is None:
                 raise HTTPException(
@@ -474,38 +526,62 @@ async def get_files(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Visit not found or access denied",
                 )
+            dermatology_photo_scope = True
         elif staff_authorization_service.can_manage_files(current_user):
             owner_id = None  # Admin sees all files
 
-        files = file.get_multi(
-            db=db,
-            skip=(page - 1) * size,
-            limit=size,
-            file_type=file_type,
-            patient_id=patient_id,
-            appointment_id=appointment_id,
-            visit_id=visit_id,
-            emr_id=emr_id,
-            folder_id=folder_id,
-            owner_id=owner_id,
-            # Protected-domain boundary (dental-media etc.): tagged clinical
-            # rows never appear on the generic list surface — excluded at the
-            # query level so pagination stays consistent.
-            exclude_tags=sorted(PROTECTED_FILE_DOMAIN_TAGS),
-        )
+        if dermatology_photo_scope:
+            # Доменный предикат (follow-up ревью #3478/#3479): derma-ветка
+            # возвращает ТОЛЬКО фото визита — изображения с тегами
+            # dermatology+photo. Фильтр на уровне запроса, total считается
+            # из того же запроса (консистентная пагинация); MIME-фильтр
+            # галереи — вторая линия, а не граница. Generic-поверхности не
+            # изменяются.
+            photo_query = db.query(StoredFile).filter(
+                StoredFile.status != FileStatus.DELETED,
+                StoredFile.patient_id == patient_id,
+                StoredFile.visit_id == visit_id,
+                StoredFile.owner_id == owner_id,
+                StoredFile.file_type == FileType.IMAGE,
+                *_dermatology_photo_tag_predicates(StoredFile),
+            )
+            total = photo_query.count()
+            files = (
+                photo_query.order_by(desc(StoredFile.created_at), desc(StoredFile.id))
+                .offset((page - 1) * size)
+                .limit(size)
+                .all()
+            )
+        else:
+            files = file.get_multi(
+                db=db,
+                skip=(page - 1) * size,
+                limit=size,
+                file_type=file_type,
+                patient_id=patient_id,
+                appointment_id=appointment_id,
+                visit_id=visit_id,
+                emr_id=emr_id,
+                folder_id=folder_id,
+                owner_id=owner_id,
+                # Protected-domain boundary (dental-media etc.): tagged clinical
+                # rows never appear on the generic list surface — excluded at the
+                # query level so pagination stays consistent.
+                exclude_tags=sorted(PROTECTED_FILE_DOMAIN_TAGS),
+            )
 
-        total = FileSystemApiService(db).count_files(
-            file_model=file.model,
-            owner_id=owner_id,
-            file_type=file_type,
-            patient_id=patient_id,
-            appointment_id=appointment_id,
-            visit_id=visit_id,
-            emr_id=emr_id,
-            emr_record_id=None,
-            folder_id=folder_id,
-            exclude_tags=sorted(PROTECTED_FILE_DOMAIN_TAGS),
-        )
+            total = FileSystemApiService(db).count_files(
+                file_model=file.model,
+                owner_id=owner_id,
+                file_type=file_type,
+                patient_id=patient_id,
+                appointment_id=appointment_id,
+                visit_id=visit_id,
+                emr_id=emr_id,
+                emr_record_id=None,
+                folder_id=folder_id,
+                exclude_tags=sorted(PROTECTED_FILE_DOMAIN_TAGS),
+            )
         pages = (total + size - 1) // size
 
         return FileList(

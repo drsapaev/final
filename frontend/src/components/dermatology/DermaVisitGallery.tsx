@@ -2,7 +2,10 @@
  * DermaVisitGallery — галерея фото текущего визита (план аудита дерматологии, пункт 8).
  *
  * Единственный источник фото — файловый API `/files`:
- * - при открытии загружает список сохранённых файлов визита (GET /files/?patient_id&visit_id);
+ * - при открытии загружает список фото дерматологического осмотра визита
+ *   (GET /files/?patient_id&visit_id): доменный предикат — теги
+ *   dermatology+photo и file_type=image — применяется СЕРВЕРОМ в derma-ветке
+ *   списка; клиентский MIME-фильтр ниже — вторая линия, а не граница;
  * - приватное превью получает авторизованным запросом (GET /files/{id}/preview, blob);
  * - временные objectURL освобождаются при размонтировании и смене пациента/визита;
  * - категории «осмотр»/«до»/«после» хранятся в существующих тегах файла
@@ -28,8 +31,10 @@ export function dermaPhotoCategoryOf(tags: unknown, mimeType?: unknown): DermaPh
   if (list.includes('before')) return 'before';
   if (list.includes('after')) return 'after';
   if (list.includes('examination')) return 'examination';
-  // Файлы без тега категории (например, загруженные до аудита) считаются
-  // фото осмотра — это фото визита, а не снимки процедур «до/после».
+  // Серверный доменный предикат гарантирует теги dermatology+photo, но не
+  // всегда тег категории: файлы без категории (например, помеченные через
+  // API без examination/before/after) считаются фото осмотра — это фото
+  // визита, а не снимки процедур «до/после».
   void mimeType;
   return 'examination';
 }
@@ -96,6 +101,9 @@ export function DermaVisitGallery({ patientId, visitId, disabled = false }: Derm
       if (seq !== loadSeqRef.current) return;
       const raw = listResponse.data;
       const files = Array.isArray(raw) ? raw : (raw?.files ?? []);
+      // Вторая линия (не граница): сервер уже вернул только фото осмотра
+      // (теги dermatology+photo, file_type=image); клиентский MIME-фильтр
+      // страхует от нарушения контракта сервера.
       const imageFiles = files.filter((file) => String(file?.mime_type ?? '').startsWith('image/'));
       releaseObjectUrls();
       setPhotos(imageFiles.map((file) => ({
