@@ -762,6 +762,14 @@ const DermatologistPanelUnified = () => {
     appointments: patientAppointmentsHistory,
     skinExaminations,
     cosmeticProcedures,
+    skinExaminationsTotal,
+    cosmeticProceduresTotal,
+    hasMoreExaminations,
+    hasMoreProcedures,
+    loadingMoreExaminations,
+    loadingMoreProcedures,
+    loadMoreExaminations,
+    loadMoreProcedures,
     loading: patientHistoryLoading,
     ready: patientHistoryReady,
     error: patientHistoryError,
@@ -1354,6 +1362,14 @@ const DermatologistPanelUnified = () => {
               appointments={patientAppointmentsHistory}
               skinExaminations={skinExaminations}
               cosmeticProcedures={cosmeticProcedures}
+              skinExaminationsTotal={skinExaminationsTotal}
+              cosmeticProceduresTotal={cosmeticProceduresTotal}
+              hasMoreExaminations={hasMoreExaminations}
+              hasMoreProcedures={hasMoreProcedures}
+              loadingMoreExaminations={loadingMoreExaminations}
+              loadingMoreProcedures={loadingMoreProcedures}
+              onLoadMoreExaminations={loadMoreExaminations}
+              onLoadMoreProcedures={loadMoreProcedures}
               historyLoading={patientHistoryLoading}
               historyReady={patientHistoryReady}
               historyError={patientHistoryError}
