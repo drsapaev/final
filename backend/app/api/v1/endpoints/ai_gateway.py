@@ -239,11 +239,13 @@ async def analyze_skin_file(
     """
     from app.api.v1.endpoints.file_system import (
         _dermatology_visit_is_owned,
-        _file_has_dermatology_photo_tags,
         _is_dermatology_user,
     )
     from app.crud.file_system import file as file_crud
-    from app.services.file_system_service import get_file_system_service
+    from app.services.file_system_service import (
+        file_has_dermatology_photo_tags,
+        get_file_system_service,
+    )
 
     candidate = file_crud.get(db, id=request.file_id)
     if not candidate:
@@ -266,7 +268,16 @@ async def analyze_skin_file(
             raise HTTPException(status_code=404, detail="Файл не найден или нет доступа")
 
     service = get_file_system_service()
-    file_obj = service.get_file(db, request.file_id, current_user.id)
+    # Protected-domain read (review follow-up P2-3): dermatology visit photos
+    # carry the versioned domain tag and are fail-closed on the generic file
+    # surface. This endpoint IS the owning specialty surface for them: by this
+    # point it has already enforced the visit binding, the derma visit
+    # ownership (for derma users), and below the MIME + domain-tag checks, so
+    # the mechanical reads are allowed to pass the protected boundary (same
+    # specialty-surface contract as delete_file's allow_protected_domain).
+    file_obj = service.get_file(
+        db, request.file_id, current_user.id, allow_protected_domain=True
+    )
     if not file_obj:
         raise HTTPException(status_code=404, detail="Файл не найден или нет доступа")
 
@@ -277,14 +288,14 @@ async def analyze_skin_file(
     # (теги dermatology+photo), зеркально списочной поверхности derma-ветки
     # GET /files/. Произвольные изображения визита (например, вложения без
     # дерма-тегов) отклоняются до любого вызова AI-провайдера.
-    if not _file_has_dermatology_photo_tags(file_obj):
+    if not file_has_dermatology_photo_tags(file_obj):
         raise HTTPException(
             status_code=400,
             detail="Файл не является фото дерматологического осмотра",
         )
 
     content, _filename, _mime_type = service.download_file(
-        db, request.file_id, current_user.id
+        db, request.file_id, current_user.id, allow_protected_domain=True
     )
     image_data = base64.b64encode(content).decode("ascii")
 
