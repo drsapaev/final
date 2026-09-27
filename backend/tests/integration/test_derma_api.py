@@ -82,9 +82,29 @@ def _doctor_headers(client, user: User) -> dict[str, str]:
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
+EXAMINATION_PAYLOAD = {
+    "examination_date": date.today().isoformat(),
+    "skin_type": "combination",
+    "skin_condition": "Чувствительная кожа",
+    "lesions": "Локальная эритема",
+    "diagnosis": "Розацеа под вопросом",
+    "treatment_plan": "Мягкий уход и повторный контроль",
+}
+
+PROCEDURE_PAYLOAD = {
+    "procedure_date": date.today().isoformat(),
+    "procedure_type": "laser",
+    "area_treated": "Щеки",
+    "products_used": "Cooling gel",
+    "results": "Покраснение минимальное",
+    "follow_up": "Контроль через 14 дней",
+    "total_cost": 125000,
+}
+
+
 @pytest.mark.integration
 class TestDermaApi:
-    def test_create_and_list_skin_examinations(
+    def test_legacy_examination_writes_are_gone_but_reads_still_list(
         self,
         client,
         db_session,
@@ -93,52 +113,54 @@ class TestDermaApi:
         test_visit,
         admin_user,
     ):
-        payload = {
-            "patient_id": test_patient.id,
-            "visit_id": test_visit.id,
-            "examination_date": date.today().isoformat(),
-            "skin_type": "combination",
-            "skin_condition": "Чувствительная кожа",
-            "lesions": "Локальная эритема",
-            "diagnosis": "Розацеа под вопросом",
-            "treatment_plan": "Мягкий уход и повторный контроль",
-        }
+        """P2-4a: POST /derma/examinations закрыт (410) для всех ролей —
+        таблица read-only, новые осмотры живут в specialty_data ЭМК.
+        GET-чтение истории не изменилось: заранее засеянные строки
+        возвращаются владельцу-админу без изменений."""
+        seeded = DermaExamination(
+            patient_id=test_patient.id,
+            visit_id=test_visit.id,
+            doctor_id=admin_user.id,
+            examination_date=date.today(),
+            skin_type="combination",
+            skin_condition="Чувствительная кожа",
+            lesions="Локальная эритема",
+            diagnosis="Розацеа под вопросом",
+            treatment_plan="Мягкий уход и повторный контроль",
+        )
+        db_session.add(seeded)
+        db_session.commit()
+        db_session.refresh(seeded)
 
-        create_response = client.post(
+        write_response = client.post(
             "/api/v1/derma/examinations",
-            json=payload,
+            json={
+                **EXAMINATION_PAYLOAD,
+                "patient_id": test_patient.id,
+                "visit_id": test_visit.id,
+            },
             headers=auth_headers,
         )
-
-        assert create_response.status_code == 201
-        created = create_response.json()
-        assert created["patient_id"] == test_patient.id
-        assert created["visit_id"] == test_visit.id
-        assert created["doctor_id"] == admin_user.id
-        assert created["skin_type"] == "combination"
-
-        persisted = (
+        assert write_response.status_code == 410
+        assert "ЭМК" in write_response.json()["detail"]
+        assert (
             db_session.query(DermaExamination)
-            .filter(DermaExamination.id == created["id"])
-            .first()
+            .filter(DermaExamination.patient_id == test_patient.id)
+            .count()
+            == 1
         )
-        assert persisted is not None
-        assert persisted.patient_id == test_patient.id
-        assert persisted.visit_id == test_visit.id
-        assert persisted.diagnosis == payload["diagnosis"]
 
         list_response = client.get(
             f"/api/v1/derma/examinations?patient_id={test_patient.id}&limit=10",
             headers=auth_headers,
         )
-
         assert list_response.status_code == 200
         listed = list_response.json()
-        assert len(listed) == 1
-        assert listed[0]["id"] == created["id"]
+        assert [item["id"] for item in listed] == [seeded.id]
         assert listed[0]["patient_id"] == test_patient.id
+        assert listed[0]["diagnosis"] == seeded.diagnosis
 
-    def test_create_and_list_derma_procedures(
+    def test_legacy_procedure_writes_are_gone_but_reads_still_list(
         self,
         client,
         db_session,
@@ -147,51 +169,117 @@ class TestDermaApi:
         test_visit,
         admin_user,
     ):
-        payload = {
-            "patient_id": test_patient.id,
-            "visit_id": test_visit.id,
-            "procedure_date": date.today().isoformat(),
-            "procedure_type": "laser",
-            "area_treated": "Щеки",
-            "products_used": "Cooling gel",
-            "results": "Покраснение минимальное",
-            "follow_up": "Контроль через 14 дней",
-            "total_cost": 125000,
-        }
+        """P2-4a: POST /derma/procedures закрыт (410) для всех ролей —
+        таблица read-only, новые процедуры живут в specialty_data ЭМК.
+        GET-чтение истории не изменилось."""
+        seeded = DermaProcedure(
+            patient_id=test_patient.id,
+            visit_id=test_visit.id,
+            doctor_id=admin_user.id,
+            procedure_date=date.today(),
+            procedure_type="laser",
+            area_treated="Щеки",
+            products_used="Cooling gel",
+            results="Покраснение минимальное",
+            follow_up="Контроль через 14 дней",
+            total_cost=125000,
+        )
+        db_session.add(seeded)
+        db_session.commit()
+        db_session.refresh(seeded)
 
-        create_response = client.post(
+        write_response = client.post(
             "/api/v1/derma/procedures",
-            json=payload,
+            json={
+                **PROCEDURE_PAYLOAD,
+                "patient_id": test_patient.id,
+                "visit_id": test_visit.id,
+            },
             headers=auth_headers,
         )
-
-        assert create_response.status_code == 201
-        created = create_response.json()
-        assert created["patient_id"] == test_patient.id
-        assert created["visit_id"] == test_visit.id
-        assert created["doctor_id"] == admin_user.id
-        assert created["total_cost"] == 125000
-
-        persisted = (
+        assert write_response.status_code == 410
+        assert "ЭМК" in write_response.json()["detail"]
+        assert (
             db_session.query(DermaProcedure)
-            .filter(DermaProcedure.id == created["id"])
-            .first()
+            .filter(DermaProcedure.patient_id == test_patient.id)
+            .count()
+            == 1
         )
-        assert persisted is not None
-        assert persisted.patient_id == test_patient.id
-        assert persisted.visit_id == test_visit.id
-        assert persisted.procedure_type == payload["procedure_type"]
 
         list_response = client.get(
             f"/api/v1/derma/procedures?patient_id={test_patient.id}&limit=10",
             headers=auth_headers,
         )
-
         assert list_response.status_code == 200
         listed = list_response.json()
-        assert len(listed) == 1
-        assert listed[0]["id"] == created["id"]
+        assert [item["id"] for item in listed] == [seeded.id]
         assert listed[0]["patient_id"] == test_patient.id
+        assert listed[0]["procedure_type"] == seeded.procedure_type
+
+    def test_legacy_write_endpoints_are_gone_for_doctor_role(
+        self,
+        client,
+        db_session,
+    ):
+        """P2-4a: fail-closed для врача (Doctor) на своих и чужих пациентах —
+        410 возвращается ДО каких-либо ownership-проверок, эндпоинт исчез
+        как источник записи; новые данные создаются только в ЭМК."""
+        own_user, own_doctor = _create_doctor_user(db_session, label="own")
+        _other_user, other_doctor = _create_doctor_user(db_session, label="other")
+        own_patient = _create_patient(db_session, label="own")
+        other_patient = _create_patient(db_session, label="other")
+        own_visit = _create_visit(db_session, patient=own_patient, doctor=own_doctor)
+        other_visit = _create_visit(
+            db_session, patient=other_patient, doctor=other_doctor
+        )
+        headers = _doctor_headers(client, own_user)
+
+        own_exam_write = client.post(
+            "/api/v1/derma/examinations",
+            json={
+                **EXAMINATION_PAYLOAD,
+                "patient_id": own_patient.id,
+                "visit_id": own_visit.id,
+            },
+            headers=headers,
+        )
+        assert own_exam_write.status_code == 410
+
+        foreign_exam_write = client.post(
+            "/api/v1/derma/examinations",
+            json={
+                **EXAMINATION_PAYLOAD,
+                "patient_id": other_patient.id,
+                "visit_id": other_visit.id,
+            },
+            headers=headers,
+        )
+        assert foreign_exam_write.status_code == 410
+
+        own_procedure_write = client.post(
+            "/api/v1/derma/procedures",
+            json={
+                **PROCEDURE_PAYLOAD,
+                "patient_id": own_patient.id,
+                "visit_id": own_visit.id,
+            },
+            headers=headers,
+        )
+        assert own_procedure_write.status_code == 410
+
+        foreign_procedure_write = client.post(
+            "/api/v1/derma/procedures",
+            json={
+                **PROCEDURE_PAYLOAD,
+                "patient_id": other_patient.id,
+                "visit_id": other_visit.id,
+            },
+            headers=headers,
+        )
+        assert foreign_procedure_write.status_code == 410
+
+        assert db_session.query(DermaExamination).count() == 0
+        assert db_session.query(DermaProcedure).count() == 0
 
     def test_doctor_derma_records_are_limited_to_owned_patients(
         self,
@@ -268,66 +356,14 @@ class TestDermaApi:
         )
         assert foreign_procedure_read_response.status_code == 403
 
-        foreign_exam_write_response = client.post(
-            "/api/v1/derma/examinations",
-            json={
-                "patient_id": other_patient.id,
-                "visit_id": other_visit.id,
-                "examination_date": date.today().isoformat(),
-                "skin_type": "dry",
-                "diagnosis": "must not be written",
-            },
-            headers=headers,
-        )
-        assert foreign_exam_write_response.status_code == 403
-
-        foreign_procedure_write_response = client.post(
-            "/api/v1/derma/procedures",
-            json={
-                "patient_id": other_patient.id,
-                "visit_id": other_visit.id,
-                "procedure_date": date.today().isoformat(),
-                "procedure_type": "laser",
-                "total_cost": 300000,
-            },
-            headers=headers,
-        )
-        assert foreign_procedure_write_response.status_code == 403
-
-        own_exam_write_response = client.post(
-            "/api/v1/derma/examinations",
-            json={
-                "patient_id": own_patient.id,
-                "visit_id": own_visit.id,
-                "examination_date": date.today().isoformat(),
-                "skin_type": "combination",
-                "diagnosis": "owned write",
-            },
-            headers=headers,
-        )
-        assert own_exam_write_response.status_code == 201
-        assert own_exam_write_response.json()["patient_id"] == own_patient.id
-
-        own_procedure_write_response = client.post(
-            "/api/v1/derma/procedures",
-            json={
-                "patient_id": own_patient.id,
-                "visit_id": own_visit.id,
-                "procedure_date": date.today().isoformat(),
-                "procedure_type": "laser",
-                "total_cost": 110000,
-            },
-            headers=headers,
-        )
-        assert own_procedure_write_response.status_code == 201
-        assert own_procedure_write_response.json()["patient_id"] == own_patient.id
-
-    def test_create_skin_examination_rejects_missing_patient(
+    def test_legacy_examination_write_rejects_missing_patient_with_gone(
         self,
         client,
         auth_headers,
         test_visit,
     ):
+        """P2-4a: 410 возвращается ДО валидации пациента — эндпоинт записи
+        исчез целиком, любых полезных нагрузок, включая некорректные."""
         payload = {
             "patient_id": 999999,
             "visit_id": test_visit.id,
@@ -341,5 +377,4 @@ class TestDermaApi:
             headers=auth_headers,
         )
 
-        assert response.status_code == 404
-        assert response.json()["detail"] == "Пациент не найден"
+        assert response.status_code == 410

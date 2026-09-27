@@ -14,7 +14,6 @@ from app.core.i18n import t  # noqa: F401
 from app.models.clinic import Doctor
 from app.models.derma_examination import DermaExamination
 from app.models.derma_procedure import DermaProcedure
-from app.models.patient import Patient
 from app.models.user import User
 from app.models.visit import Visit
 from app.schemas.derma import (
@@ -54,30 +53,6 @@ class PriceOverrideResponse(BaseModel):
     details: str | None
     status: str
     created_at: datetime
-
-
-def _validate_derma_context(
-    db: Session,
-    *,
-    patient_id: int,
-    visit_id: int | None,
-) -> Visit | None:
-    patient = db.get(Patient, patient_id)
-    if patient is None:
-        raise HTTPException(status_code=404, detail=t("patient.not_found"))
-
-    if visit_id is None:
-        return None
-
-    visit = db.get(Visit, visit_id)
-    if visit is None:
-        raise HTTPException(status_code=404, detail=t("visit.not_found"))
-    if visit.patient_id != patient_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Визит не принадлежит выбранному пациенту",
-        )
-    return visit
 
 
 def _is_admin_user(user: User) -> bool:
@@ -121,13 +96,6 @@ def _ensure_doctor_can_access_patient(db: Session, patient_id: int, user: User) 
     if _is_admin_user(user):
         return
     if patient_id not in _doctor_allowed_patient_ids(db, user):
-        raise HTTPException(status_code=403, detail="Access denied")
-
-
-def _ensure_doctor_can_access_visit(db: Session, visit: Visit, user: User) -> None:
-    if _is_admin_user(user):
-        return
-    if visit.doctor_id not in _doctor_allowed_doctor_ids(db, user):
         raise HTTPException(status_code=403, detail="Access denied")
 
 
@@ -198,57 +166,25 @@ async def create_skin_examination(
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
 ) -> DermaExaminationOut:
     """
-    Создать новый осмотр кожи
-    """
-    try:
-        visit = _validate_derma_context(
-            db,
-            patient_id=examination_data.patient_id,
-            visit_id=examination_data.visit_id,
-        )
-        if visit is None:
-            _ensure_doctor_can_access_patient(db, examination_data.patient_id, user)
-        else:
-            _ensure_doctor_can_access_visit(db, visit, user)
+    Устаревший эндпоинт записи (review follow-up P2-4a к #3448).
 
-        examination = DermaExamination(
-            patient_id=examination_data.patient_id,
-            visit_id=examination_data.visit_id,
-            doctor_id=getattr(user, "id", None),
-            examination_date=examination_data.examination_date,
-            skin_type=examination_data.skin_type,
-            skin_condition=examination_data.skin_condition,
-            lesions=examination_data.lesions,
-            distribution=examination_data.distribution,
-            symptoms=examination_data.symptoms,
-            diagnosis=examination_data.diagnosis,
-            treatment_plan=examination_data.treatment_plan,
-        )
-        db.add(examination)
-        db.commit()
-        db.refresh(examination)
-        logger.info(
-            "[derma.examinations] created examination_id=%s patient_id=%s visit_id=%s user_id=%s",
-            examination.id,
-            examination.patient_id,
-            examination.visit_id,
-            getattr(user, "id", None),
-        )
-        return examination
-    except HTTPException:
-        db.rollback()
-        raise
-    except SQLAlchemyError:
-        db.rollback()
-        logger.exception(
-            "[derma.examinations] failed to create examination user_id=%s patient_id=%s visit_id=%s",
-            getattr(user, "id", None),
-            examination_data.patient_id,
-            examination_data.visit_id,
-        )
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+    Таблица derma_examinations объявлена read-only (история): новые осмотры
+    сохраняются в specialty_data ЭМК (emr/v2). Возврат 410 до любого
+    доступа к БД — fail-closed для всех ролей, включая Admin: двойная
+    запись (legacy + ЭМК) расщепляла клинические данные по двум таблицам.
+    Чтение истории — GET /derma/examinations — не изменяется.
+    """
+    logger.warning(
+        "[derma.examinations] rejected legacy write user_id=%s",
+        getattr(user, "id", None),
+    )
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail=(
+            "Эндпоинт закрыт: осмотры кожи сохраняются в specialty_data ЭМК. "
+            "Таблица derma_examinations доступна только для чтения (история)."
+        ),
+    )
 
 
 @router.get(
@@ -318,56 +254,26 @@ async def create_cosmetic_procedure(
     user: User = Depends(deps.require_roles(*DERMA_ROLES)),
 ) -> DermaProcedureOut:
     """
-    Создать новую косметическую процедуру
-    """
-    try:
-        visit = _validate_derma_context(
-            db,
-            patient_id=procedure_data.patient_id,
-            visit_id=procedure_data.visit_id,
-        )
-        if visit is None:
-            _ensure_doctor_can_access_patient(db, procedure_data.patient_id, user)
-        else:
-            _ensure_doctor_can_access_visit(db, visit, user)
+    Устаревший эндпоинт записи (review follow-up P2-4a к #3448).
 
-        procedure = DermaProcedure(
-            patient_id=procedure_data.patient_id,
-            visit_id=procedure_data.visit_id,
-            doctor_id=getattr(user, "id", None),
-            procedure_date=procedure_data.procedure_date,
-            procedure_type=procedure_data.procedure_type,
-            area_treated=procedure_data.area_treated,
-            products_used=procedure_data.products_used,
-            results=procedure_data.results,
-            follow_up=procedure_data.follow_up,
-            total_cost=procedure_data.total_cost,
-        )
-        db.add(procedure)
-        db.commit()
-        db.refresh(procedure)
-        logger.info(
-            "[derma.procedures] created procedure_id=%s patient_id=%s visit_id=%s user_id=%s",
-            procedure.id,
-            procedure.patient_id,
-            procedure.visit_id,
-            getattr(user, "id", None),
-        )
-        return procedure
-    except HTTPException:
-        db.rollback()
-        raise
-    except SQLAlchemyError:
-        db.rollback()
-        logger.exception(
-            "[derma.procedures] failed to create procedure user_id=%s patient_id=%s visit_id=%s",
-            getattr(user, "id", None),
-            procedure_data.patient_id,
-            procedure_data.visit_id,
-        )
-        raise HTTPException(
-            status_code=500, detail="Internal server error"
-        )
+    Таблица derma_procedures объявлена read-only (история): новые
+    косметические процедуры сохраняются в specialty_data ЭМК (emr/v2).
+    Возврат 410 до любого доступа к БД — fail-closed для всех ролей,
+    включая Admin: двойная запись (legacy + ЭМК) расщепляла клинические
+    данные по двум таблицам. Чтение истории — GET /derma/procedures —
+    не изменяется.
+    """
+    logger.warning(
+        "[derma.procedures] rejected legacy write user_id=%s",
+        getattr(user, "id", None),
+    )
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail=(
+            "Эндпоинт закрыт: косметические процедуры сохраняются в specialty_data "
+            "ЭМК. Таблица derma_procedures доступна только для чтения (история)."
+        ),
+    )
 
 
 @router.post(

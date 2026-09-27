@@ -16818,7 +16818,13 @@ export type paths = {
         put?: never;
         /**
          * Создать осмотр кожи
-         * @description Создать новый осмотр кожи
+         * @description Устаревший эндпоинт записи (review follow-up P2-4a к #3448).
+         *
+         *     Таблица derma_examinations объявлена read-only (история): новые осмотры
+         *     сохраняются в specialty_data ЭМК (emr/v2). Возврат 410 до любого
+         *     доступа к БД — fail-closed для всех ролей, включая Admin: двойная
+         *     запись (legacy + ЭМК) расщепляла клинические данные по двум таблицам.
+         *     Чтение истории — GET /derma/examinations — не изменяется.
          */
         post: operations["create_skin_examination_api_v1_derma_examinations_post"];
         delete?: never;
@@ -16842,7 +16848,14 @@ export type paths = {
         put?: never;
         /**
          * Создать косметическую процедуру
-         * @description Создать новую косметическую процедуру
+         * @description Устаревший эндпоинт записи (review follow-up P2-4a к #3448).
+         *
+         *     Таблица derma_procedures объявлена read-only (история): новые
+         *     косметические процедуры сохраняются в specialty_data ЭМК (emr/v2).
+         *     Возврат 410 до любого доступа к БД — fail-closed для всех ролей,
+         *     включая Admin: двойная запись (legacy + ЭМК) расщепляла клинические
+         *     данные по двум таблицам. Чтение истории — GET /derma/procedures —
+         *     не изменяется.
          */
         post: operations["create_cosmetic_procedure_api_v1_derma_procedures_post"];
         delete?: never;
