@@ -51,6 +51,7 @@ from app.schemas.file_system import (
 )
 from app.services.file_system_api_service import FileSystemApiService
 from app.services.file_system_service import (
+    DERMATOLOGY_PHOTO_REQUIRED_TAGS,
     PROTECTED_FILE_DOMAIN_TAGS,
     get_file_system_service,
 )
@@ -109,11 +110,12 @@ def _require_dermatology_file_visit_access(
 # Dermatology visit-photo domain predicate (review follow-up to #3478/#3479).
 # A dermatology photo is the only file class the dermatology gallery may
 # list and the skin-analysis endpoint may consume: an image explicitly
-# tagged with BOTH the specialty tag and the media-class tag. The predicate
-# is enforced server-side (query level for lists, item level for the AI
-# path), so the gallery's client-side MIME check is defense-in-depth
-# instead of the boundary.
-DERMATOLOGY_PHOTO_REQUIRED_TAGS: tuple[str, ...] = ("dermatology", "photo")
+# tagged with BOTH the specialty tag and the media-class tag (the pair is
+# owned by app.services.file_system_service together with the versioned
+# DERMA_PHOTO_DOMAIN_TAG protected stamp). The predicate is enforced
+# server-side (query level for lists, item level for the AI path), so the
+# gallery's client-side MIME check is defense-in-depth instead of the
+# boundary.
 
 
 def _dermatology_photo_tag_predicates(
@@ -131,20 +133,6 @@ def _dermatology_photo_tag_predicates(
         model.tags.contains(json.dumps(tag), autoescape=True)
         for tag in DERMATOLOGY_PHOTO_REQUIRED_TAGS
     ]
-
-
-def _file_has_dermatology_photo_tags(file_obj: Any) -> bool:
-    """Item-level зеркало запросного предиката (членство тега в JSON)."""
-    tags = file_obj.tags
-    if isinstance(tags, str):
-        try:
-            tags = json.loads(tags)
-        except (json.JSONDecodeError, TypeError):
-            return False
-    if not isinstance(tags, list):
-        return False
-    parsed = {tag for tag in tags if isinstance(tag, str)}
-    return set(DERMATOLOGY_PHOTO_REQUIRED_TAGS).issubset(parsed)
 
 
 IMPORT_ARCHIVE_READ_CHUNK_BYTES = 1024 * 1024
@@ -347,7 +335,16 @@ async def get_file(
             _require_dermatology_file_visit_access(db, current_user, candidate)
 
         service = get_file_system_service()
-        file_obj = service.get_file(db, file_id, current_user.id)
+        # Dermatology visit photos are a protected file domain (review
+        # follow-up P2-3): after the derma branch has enforced visit ownership
+        # above, the specialty-surface read is allowed to pass the protected
+        # boundary (same contract as delete_file's allow_protected_domain).
+        file_obj = service.get_file(
+            db,
+            file_id,
+            current_user.id,
+            allow_protected_domain=_is_dermatology_user(current_user),
+        )
 
         if not file_obj:
             raise HTTPException(
@@ -383,8 +380,14 @@ async def download_file(
             _require_dermatology_file_visit_access(db, current_user, candidate)
 
         service = get_file_system_service()
+        # Protected-domain bypass mirrors the derma branch of GET /files/{id}:
+        # visit ownership is enforced above, so the specialty-surface download
+        # may pass the boundary (dermatology visit photos, review P2-3).
         file_content, filename, mime_type = service.download_file(
-            db, file_id, current_user.id
+            db,
+            file_id,
+            current_user.id,
+            allow_protected_domain=_is_dermatology_user(current_user),
         )
 
         return StreamingResponse(
@@ -419,7 +422,15 @@ async def preview_file(
             _require_dermatology_file_visit_access(db, current_user, candidate)
 
         service = get_file_system_service()
-        file_obj = service.get_file(db, file_id, current_user.id)
+        # Protected-domain bypass mirrors the derma branch of GET /files/{id}:
+        # visit ownership is enforced above, so the specialty-surface preview
+        # may pass the boundary (dermatology visit photos, review P2-3).
+        file_obj = service.get_file(
+            db,
+            file_id,
+            current_user.id,
+            allow_protected_domain=_is_dermatology_user(current_user),
+        )
 
         if not file_obj:
             raise HTTPException(
@@ -435,7 +446,10 @@ async def preview_file(
             )
 
         file_content, filename, mime_type = service.download_file(
-            db, file_id, current_user.id
+            db,
+            file_id,
+            current_user.id,
+            allow_protected_domain=_is_dermatology_user(current_user),
         )
 
         return StreamingResponse(
@@ -738,8 +752,18 @@ async def delete_file(
         filename = db_file.filename
 
         # ✅ FIX: Выполняем удаление ПЕРЕД логированием аудита
+        # Protected-domain bypass follows the delete_file specialty-surface
+        # contract (dental precedent): the derma branch has enforced visit
+        # ownership above, so dermatology visit photos stay deletable from
+        # the owning visit while remaining fail-closed for everyone else
+        # (review follow-up P2-3).
         service = get_file_system_service()
-        success = service.delete_file(db, file_id, current_user.id)
+        success = service.delete_file(
+            db,
+            file_id,
+            current_user.id,
+            allow_protected_domain=_is_dermatology_user(current_user),
+        )
 
         if not success:
             raise HTTPException(

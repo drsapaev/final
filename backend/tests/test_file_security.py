@@ -653,8 +653,14 @@ class TestFileSecurity:
         """Доменный предикат derma-ветки GET /files/ (follow-up ревью
         #3478/#3479): возвращаются ТОЛЬКО фото дерматологического осмотра —
         изображения с тегами dermatology И photo. Остальные файлы визита
-        (без тегов, без тега photo, не изображения) дерматологу не видны,
-        но остаются на generic-поверхности администратора."""
+        (без тегов, без тега photo, не изображения) дерматологу не видны.
+
+        P2-3: файлы с парой тегов dermatology+photo получают серверный
+        штамп защищённого домена dermatology-photo:v1, поэтому на
+        generic-поверхности администратора их больше НЕТ (контракт
+        зеркалирует dental-media): нетегированные файлы визита остаются
+        видимы, доменные — обслуживаются только специализированной
+        дерма-поверхностью."""
         _, _, visit, headers = _create_file_access_actor(
             db_session,
             client,
@@ -721,8 +727,9 @@ class TestFileSecurity:
         assert body["total"] == 1
         assert body["pages"] == 1
 
-        # Generic-поверхность администратора не изменена: все файлы визита
-        # (включая нетегированные и документы) остаются доступны.
+        # P2-3: admin generic-список исключает строки защищённого домена
+        # (штамп ставится и на фото, и на документ с парой тегов —
+        # fail-closed классификация), нетегированные файлы остаются.
         admin_list = client.get(
             "/api/v1/files/",
             params={"patient_id": test_patient.id, "visit_id": visit.id},
@@ -730,12 +737,271 @@ class TestFileSecurity:
         )
         assert admin_list.status_code == 200
         admin_ids = {item["id"] for item in admin_list.json()["files"]}
-        assert {
-            tagged_photo_id,
-            untagged_photo.json()["id"],
-            specialty_only_photo.json()["id"],
-            tagged_document.json()["id"],
-        }.issubset(admin_ids)
+        untagged_photo_id = untagged_photo.json()["id"]
+        specialty_only_photo_id = specialty_only_photo.json()["id"]
+        tagged_document_id = tagged_document.json()["id"]
+        assert {untagged_photo_id, specialty_only_photo_id}.issubset(admin_ids)
+        assert tagged_photo_id not in admin_ids
+        assert tagged_document_id not in admin_ids
+
+    def test_dermatology_photo_upload_is_stamped_with_protected_domain_tag(
+        self, client: TestClient, db_session: Session, test_patient
+    ):
+        """P2-3: серверная (fail-closed) классификация дерма-фото. Любая
+        загрузка, удовлетворяющая доменному предикату (теги dermatology+photo),
+        получает версионированный штамп dermatology-photo:v1 от сервиса —
+        независимо от того, кто и через какую поверхность отправил запрос.
+        Клиент не может «забыть» штамп и оставить клиническое фото видимым
+        на generic-поверхности. Штампование идемпотентно и не затрагивает
+        файлы без полной пары тегов."""
+        _, _, visit, derma_headers = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="derma",
+            suffix=secrets.token_hex(8),
+        )
+
+        pair_upload = _upload_test_photo(
+            client,
+            headers=derma_headers,
+            patient_id=test_patient.id,
+            visit_id=visit.id,
+            tags="dermatology,photo,examination",
+        )
+        assert pair_upload.status_code == 200, pair_upload.text
+        assert "dermatology-photo:v1" in pair_upload.json()["tags"]
+        assert set(pair_upload.json()["tags"]) >= {"dermatology", "photo", "examination"}
+
+        # Идемпотентность: повторная загрузка с уже проставленным штампом
+        # не дублирует его.
+        stamped_upload = _upload_test_photo(
+            client,
+            headers=derma_headers,
+            patient_id=test_patient.id,
+            visit_id=visit.id,
+            tags="dermatology,photo,dermatology-photo:v1",
+        )
+        assert stamped_upload.status_code == 200, stamped_upload.text
+        assert stamped_upload.json()["tags"].count("dermatology-photo:v1") == 1
+
+        # Штамп ставит и generic-поверхность (Doctor): классификация
+        # серверная, а не атрибут дерма-клиента.
+        _, _, doctor_visit, doctor_headers = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="Doctor",
+            suffix=secrets.token_hex(8),
+        )
+        doctor_pair_upload = _upload_test_photo(
+            client,
+            headers=doctor_headers,
+            patient_id=test_patient.id,
+            visit_id=doctor_visit.id,
+            tags="dermatology,photo",
+        )
+        assert doctor_pair_upload.status_code == 200, doctor_pair_upload.text
+        assert "dermatology-photo:v1" in doctor_pair_upload.json()["tags"]
+
+        # Без полной пары тегов штамп не ставится.
+        untagged_upload = _upload_test_photo(
+            client,
+            headers=doctor_headers,
+            patient_id=test_patient.id,
+            visit_id=doctor_visit.id,
+        )
+        assert untagged_upload.status_code == 200, untagged_upload.text
+        assert "dermatology-photo:v1" not in untagged_upload.json()["tags"]
+
+        specialty_only_upload = _upload_test_photo(
+            client,
+            headers=doctor_headers,
+            patient_id=test_patient.id,
+            visit_id=doctor_visit.id,
+            tags="dermatology",
+        )
+        assert specialty_only_upload.status_code == 200, specialty_only_upload.text
+        assert "dermatology-photo:v1" not in specialty_only_upload.json()["tags"]
+
+    def test_generic_file_surface_fail_closed_for_dermatology_photos(
+        self, client: TestClient, db_session: Session, test_patient
+    ):
+        """P2-3: дерма-фото (пара тегов dermatology+photo → серверный штамп
+        dermatology-photo:v1) недоступно через generic /files — в том числе
+        его владельцу-врачу с канонической ролью Doctor: чтение, предпросмотр,
+        скачивание, переименование, замена контента, шеринг, экспорт и
+        удаление закрыты (403), а строки нет в списке/поиске/статистике.
+        Контракт зеркалирует dental-media (P1-2); файл обслуживает только
+        специализированная дерма-поверхность (регрессия —
+        test_dermatology_user_can_access_photo_on_owned_visit)."""
+        _, _doctor, visit, headers = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="Doctor",
+            suffix=secrets.token_hex(8),
+        )
+
+        marker = secrets.token_hex(8)
+        tagged_upload = client.post(
+            "/api/v1/files/upload",
+            files={
+                "file": (
+                    "clinical-photo.jpg",
+                    BytesIO(b"\xff\xd8\xffclinical dermatology photo"),
+                    "image/jpeg",
+                )
+            },
+            data={
+                "file_type": "image",
+                "permission": "private",
+                "patient_id": str(test_patient.id),
+                "visit_id": str(visit.id),
+                "tags": "dermatology,photo",
+                "title": f"derma-protected-{marker}",
+            },
+            headers=headers,
+        )
+        assert tagged_upload.status_code == 200, tagged_upload.text
+        assert "dermatology-photo:v1" in tagged_upload.json()["tags"]
+        photo_id = tagged_upload.json()["id"]
+
+        control_upload = client.post(
+            "/api/v1/files/upload",
+            files={
+                "file": (
+                    "control-image.jpg",
+                    BytesIO(b"\xff\xd8\xffgeneric control image"),
+                    "image/jpeg",
+                )
+            },
+            data={
+                "file_type": "image",
+                "permission": "private",
+                "patient_id": str(test_patient.id),
+                "visit_id": str(visit.id),
+                "title": f"generic-control-{marker}",
+            },
+            headers=headers,
+        )
+        assert control_upload.status_code == 200, control_upload.text
+        control_id = control_upload.json()["id"]
+
+        outsider, _, _, outsider_headers = _create_file_access_actor(
+            db_session,
+            client,
+            test_patient,
+            role="Doctor",
+            suffix=secrets.token_hex(8),
+        )
+
+        generic_get = client.get(f"/api/v1/files/{photo_id}", headers=headers)
+        assert generic_get.status_code == 403, generic_get.text
+
+        generic_download = client.get(
+            f"/api/v1/files/{photo_id}/download", headers=headers
+        )
+        assert generic_download.status_code == 403, generic_download.text
+
+        generic_preview = client.get(
+            f"/api/v1/files/{photo_id}/preview", headers=headers
+        )
+        assert generic_preview.status_code == 403, generic_preview.text
+
+        generic_shares = client.get(
+            f"/api/v1/files/{photo_id}/shares", headers=headers
+        )
+        assert generic_shares.status_code == 403, generic_shares.text
+
+        generic_share = client.post(
+            f"/api/v1/files/{photo_id}/share",
+            json={
+                "shared_with_user_id": outsider.id,
+                "permission": "private",
+            },
+            headers=headers,
+        )
+        assert generic_share.status_code == 403, generic_share.text
+
+        generic_update = client.put(
+            f"/api/v1/files/{photo_id}",
+            data={"title": "generic rename"},
+            headers=headers,
+        )
+        assert generic_update.status_code == 403, generic_update.text
+
+        generic_replace = client.put(
+            f"/api/v1/files/{photo_id}/content",
+            files={
+                "file": (
+                    "replacement.jpg",
+                    BytesIO(b"\xff\xd8\xffreplacement image"),
+                    "image/jpeg",
+                )
+            },
+            headers=headers,
+        )
+        assert generic_replace.status_code == 403, generic_replace.text
+
+        generic_delete = client.delete(
+            f"/api/v1/files/{photo_id}", headers=headers
+        )
+        assert generic_delete.status_code == 403, generic_delete.text
+
+        generic_export = client.post(
+            "/api/v1/files/export",
+            json={"file_ids": [photo_id], "format": "zip"},
+            headers=headers,
+        )
+        assert generic_export.status_code == 403, generic_export.text
+
+        # Посторонний врач не получает файл через generic-поверхность.
+        stranger_get = client.get(
+            f"/api/v1/files/{photo_id}",
+            headers=outsider_headers,
+        )
+        assert stranger_get.status_code in {403, 404}, stranger_get.text
+
+        # Список владельца: защищённое фото скрыто, контрольный файл виден.
+        owner_list = client.get(
+            "/api/v1/files/",
+            params={"patient_id": test_patient.id, "visit_id": visit.id},
+            headers=headers,
+        )
+        assert owner_list.status_code == 200, owner_list.text
+        owner_ids = {item["id"] for item in owner_list.json()["files"]}
+        assert photo_id not in owner_ids
+        assert control_id in owner_ids
+
+        # Поиск: защищённое фото не находится по уникальному заголовку,
+        # контрольный файл — находится (positive control).
+        protected_search = client.post(
+            "/api/v1/files/search",
+            json={"query": f"derma-protected-{marker}"},
+            headers=headers,
+        )
+        assert protected_search.status_code == 200, protected_search.text
+        assert protected_search.json()["total"] == 0
+        assert protected_search.json()["files"] == []
+
+        control_search = client.post(
+            "/api/v1/files/search",
+            json={"query": f"generic-control-{marker}"},
+            headers=headers,
+        )
+        assert control_search.status_code == 200, control_search.text
+        assert control_search.json()["total"] == 1
+        assert {item["id"] for item in control_search.json()["files"]} == {control_id}
+
+        # Статистика владельца не агрегирует и не показывает защищённую строку.
+        statistics = client.get("/api/v1/files/statistics", headers=headers)
+        assert statistics.status_code == 200, statistics.text
+        stats_body = statistics.json()
+        assert stats_body["total_files"] == 1
+        recent_ids = {item["id"] for item in stats_body["recent_uploads"]}
+        assert photo_id not in recent_ids
+        assert control_id in recent_ids
 
     def test_dermatology_upload_rejects_mismatched_patient_and_visit(
         self, client: TestClient, db_session: Session, test_patient

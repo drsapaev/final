@@ -61,7 +61,41 @@ FILE_READ_CHUNK_BYTES = 1024 * 1024
 # the generic /files surface cannot perform. Owner- or share-based access in
 # the generic surface is NOT a valid authorization for such files.
 DENTAL_MEDIA_TAG = "dental-media:v1"
-PROTECTED_FILE_DOMAIN_TAGS: frozenset[str] = frozenset({DENTAL_MEDIA_TAG})
+
+# Dermatology visit-photo domain (review follow-up P2-3 to #3478/#3479).
+# The domain predicate that defines "a dermatology examination photo" is the
+# REQUIRED tag pair below (enforced server-side by the derma branch of
+# GET /files/ and by the skin-analysis endpoint since the P2-1 follow-up).
+# Any file that satisfies the predicate is stamped with the versioned domain
+# tag at upload time and joins the protected set, so clinical photos never
+# surface through the generic /files list/search/statistics and are
+# fail-closed on direct generic access — mirroring the dental media boundary.
+DERMATOLOGY_PHOTO_REQUIRED_TAGS: tuple[str, ...] = ("dermatology", "photo")
+DERMA_PHOTO_DOMAIN_TAG = "dermatology-photo:v1"
+
+PROTECTED_FILE_DOMAIN_TAGS: frozenset[str] = frozenset(
+    {DENTAL_MEDIA_TAG, DERMA_PHOTO_DOMAIN_TAG}
+)
+
+
+def file_has_dermatology_photo_tags(file_obj: Any) -> bool:
+    """Item-level domain predicate: tags contain BOTH required tags.
+
+    Parses the JSON Text column the same way ``FileSystemService._parse_file_tags``
+    does, so the item-level classification matches the query-level predicate used
+    by the derma branch of ``GET /files/`` (one file — one classification on every
+    surface).
+    """
+    tags = file_obj.tags
+    if isinstance(tags, str):
+        try:
+            tags = json.loads(tags)
+        except (json.JSONDecodeError, TypeError):
+            return False
+    if not isinstance(tags, list):
+        return False
+    parsed = {str(tag) for tag in tags if isinstance(tag, str)}
+    return set(DERMATOLOGY_PHOTO_REQUIRED_TAGS).issubset(parsed)
 
 
 class FileSystemService:
@@ -426,6 +460,21 @@ class FileSystemService:
                 # Если строка, преобразуем в FileTypeEnum
                 file_type_value = FileTypeEnum(file_type_value)
 
+            # Protected-domain stamping (review follow-up P2-3): any upload that
+            # satisfies the dermatology-photo domain predicate (both required
+            # tags present) is stamped with the versioned domain tag BY THE
+            # SERVER, regardless of which client or surface sent the request.
+            # This keeps the protected classification fail-closed: a client
+            # cannot omit the domain tag and leave a clinical photo visible on
+            # the generic /files surface. Idempotent for re-uploads that
+            # already carry the stamp.
+            normalized_tags = list(file_data.tags or [])
+            if (
+                file_has_dermatology_photo_tags(file_data)
+                and DERMA_PHOTO_DOMAIN_TAG not in normalized_tags
+            ):
+                normalized_tags.append(DERMA_PHOTO_DOMAIN_TAG)
+
             file_create_data = FileCreate(
                 filename=file_data.filename,
                 original_filename=upload_file.filename,
@@ -436,7 +485,7 @@ class FileSystemService:
                 file_hash=file_hash,
                 title=file_data.title,
                 description=file_data.description,
-                tags=file_data.tags,
+                tags=normalized_tags,
                 permission=file_data.permission,
                 patient_id=file_data.patient_id,
                 appointment_id=file_data.appointment_id,
@@ -482,9 +531,22 @@ class FileSystemService:
             )
 
     def get_file(
-        self, db: Session, file_id: int, user_id: int | None = None
+        self,
+        db: Session,
+        file_id: int,
+        user_id: int | None = None,
+        allow_protected_domain: bool = False,
     ) -> File | None:
-        """Получить файл"""
+        """Получить файл.
+
+        Protected-domain files (e.g. dental media, dermatology visit photos)
+        are rejected here unless the caller is the owning specialty surface
+        passing ``allow_protected_domain=True`` — the specialty surface (the
+        derma branch of the generic endpoints after its own visit-ownership
+        check, or the skin-analysis endpoint after its domain checks) enforces
+        its clinical policy before delegating the mechanical read to this
+        method (same contract as ``delete_file``).
+        """
         db_file = file.get(db, id=file_id)
         if not db_file or self._is_deleted_file(db_file):
             return None
@@ -495,7 +557,8 @@ class FileSystemService:
 
         # Protected-domain boundary: even a legitimate generic-surface owner or
         # share holder must use the owning specialty surface for tagged files.
-        self.ensure_generic_surface_allowed(db_file)
+        if not allow_protected_domain:
+            self.ensure_generic_surface_allowed(db_file)
 
         # Логируем доступ
         if user_id:
@@ -580,10 +643,20 @@ class FileSystemService:
         return False
 
     def download_file(
-        self, db: Session, file_id: int, user_id: int | None = None
+        self,
+        db: Session,
+        file_id: int,
+        user_id: int | None = None,
+        allow_protected_domain: bool = False,
     ) -> tuple[bytes, str, str]:
-        """Скачать файл"""
-        db_file = self.get_file(db, file_id, user_id)
+        """Скачать файл.
+
+        ``allow_protected_domain`` follows the same specialty-surface contract
+        as ``get_file``/``delete_file`` and is proxied to the underlying read.
+        """
+        db_file = self.get_file(
+            db, file_id, user_id, allow_protected_domain=allow_protected_domain
+        )
         if not db_file:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
