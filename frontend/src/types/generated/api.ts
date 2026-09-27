@@ -16854,9 +16854,11 @@ export type paths = {
          *
          *     Объединяет два read-only источника: процедуры из
          *     specialty_data.cosmetic_procedures ЭМК (emr/v2, specialty=dermatology,
-         *     source="emr", total_cost=None — цена не хранится в ЭМК) и строки закрытой
-         *     legacy-таблицы derma_procedures (source="legacy"). Скоупинг пациентов
-         *     идентичен прежнему контракту. Пагинация — канонический конверт
+         *     source="emr", total_cost=None — цена не хранится в ЭМК; канонический
+         *     ключ записи по решению P3, legacy-ключ specialty_data.procedures читается
+         *     временно как alias с дедупликацией по content-fingerprint) и строки
+         *     закрытой legacy-таблицы derma_procedures (source="legacy"). Скоупинг
+         *     пациентов идентичен прежнему контракту. Пагинация — канонический конверт
          *     page/size/total/pages (контракт GET /files): total точен по обоим
          *     источникам, без скрытых усечений.
          */
