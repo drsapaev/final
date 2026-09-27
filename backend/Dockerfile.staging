@@ -12,7 +12,8 @@ WORKDIR /app
 
 RUN pip install --upgrade pip
 COPY requirements.txt /app/requirements.txt
-RUN pip install -r requirements.txt
+COPY requirements-monitoring.txt /app/requirements-monitoring.txt
+RUN pip install -r requirements.txt -r requirements-monitoring.txt
 
 COPY . /app/
 

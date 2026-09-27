@@ -245,7 +245,9 @@ class AppointmentsMixin(NotificationSenderMixinBase):
                 patient_phone=patient_phone,
                 visit_date=appointment_datetime,
                 doctor_name=doctor_name,
-                department=appointment.department or specialty,
+                # Round-6 (owner P1, PR #3340): map the ORM relationship to
+                # its canonical key — a Department object rendered as garbage.
+                department=appointment.department_key or specialty,
                 db=db,
                 patient_id=appointment.patient_id,
             )

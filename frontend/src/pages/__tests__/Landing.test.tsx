@@ -104,12 +104,12 @@ describe('Landing', () => {
     await user.click(uzOption);
 
     expect(
-      screen.getByRole('heading', {
+      await screen.findByRole('heading', {
         name: /EMR, navbat va tolovlarni bitta ritmda ushlab turadigan yagona klinika boshqaruv tizimi/i
       })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', {
+      await screen.findByRole('heading', {
         name: /Klinikaning real yonalishlari uchun modulli arxitektura/i
       })
     ).toBeInTheDocument();

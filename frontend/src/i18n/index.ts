@@ -1,7 +1,7 @@
 /**
- * i18n/index.js — single source of truth for frontend internationalization.
+ * i18n/index.ts — single source of truth for frontend internationalization.
  *
- * Initializes react-i18next with locale resources from ./locales/{ru,uz-Latn,uz-Cyrl,en,kk}.js
+ * Bundles Russian as the fallback and loads other locale resources on demand.
  *
  * Supported languages (BCP 47):
  *   ru        — Russian (default, base locale)
@@ -10,8 +10,8 @@
  *   en        — English
  *   kk        — Kazakh
  *
- * Usage in main.jsx:
- *   import './i18n';   // side-effect: initializes react-i18next
+ * Usage in main.tsx (after extracting activation credentials from the URL):
+ *   await loadPersistedLanguage();
  *
  * Usage in components:
  *   import { useTranslation } from '../i18n/useTranslation';
@@ -21,12 +21,9 @@
  */
 
 import i18n from 'i18next';
+import type { BackendModule } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import ru from './locales/ru';
-import uzLatn from './locales/uz-Latn';
-import uzCyrl from './locales/uz-Cyrl';
-import en from './locales/en';
-import kk from './locales/kk';
 
 export const SUPPORTED_LANGUAGES = ['ru', 'uz-Latn', 'uz-Cyrl', 'en', 'kk'];
 export const DEFAULT_LANGUAGE = 'ru';
@@ -48,18 +45,46 @@ function getInitialLanguage() {
   return DEFAULT_LANGUAGE;
 }
 
-i18n.use(initReactI18next).init({
+// Capture this before Russian initialization can emit languageChanged. Importing
+// this module must not request a locale chunk: the activation URL is scrubbed in
+// main.tsx before loadPersistedLanguage() starts any dynamic import.
+const initialLanguage = getInitialLanguage();
+
+const lazyLocales: Record<string, () => Promise<{ default: Record<string, unknown> }>> = {
+  'uz-Latn': () => import('./locales/uz-Latn'),
+  'uz-Cyrl': () => import('./locales/uz-Cyrl'),
+  en: () => import('./locales/en'),
+  kk: () => import('./locales/kk'),
+};
+
+const localeBackend: BackendModule = {
+  type: 'backend',
+  init() {},
+  read(language, namespace, callback) {
+    const load = namespace === 'translation' ? lazyLocales[language] : undefined;
+    if (!load) {
+      callback(new Error(`Unsupported locale resource: ${language}/${namespace}`), null);
+      return;
+    }
+    void load().then(
+      ({ default: translations }) => callback(null, translations),
+      (error: unknown) => callback(error instanceof Error ? error : new Error('Locale load failed'), null),
+    );
+  },
+};
+
+const initialization = i18n.use(localeBackend).use(initReactI18next).init({
   resources: {
     ru: { translation: ru },
-    'uz-Latn': { translation: uzLatn },
-    'uz-Cyrl': { translation: uzCyrl },
-    en: { translation: en },
-    kk: { translation: kk },
   },
-  lng: getInitialLanguage(),
+  partialBundledLanguages: true,
+  initAsync: false,
+  maxRetries: 0,
+  lng: DEFAULT_LANGUAGE,
+  supportedLngs: SUPPORTED_LANGUAGES,
+  load: 'currentOnly',
   fallbackLng: DEFAULT_LANGUAGE,
-  // For uz-Cyrl, fall back to uz-Latn first, then ru.
-  // i18next supports per-language fallback chains.
+  ns: ['translation'],
   fallbackNS: 'translation',
   defaultNS: 'translation',
   interpolation: {
@@ -77,12 +102,40 @@ i18n.use(initReactI18next).init({
   saveMissing: false,
 });
 
-// Persist language changes to localStorage (legacy-compatible keys).
-i18n.on('languageChanged', (lng) => {
+function persistLanguage(language: string) {
   if (typeof window === 'undefined') return;
-  // Persist under both the new code and the legacy 'uz' alias
-  window.localStorage?.setItem('language', lng);
-  window.localStorage?.setItem('app_language', lng);
+  window.localStorage?.setItem('language', language);
+  window.localStorage?.setItem('app_language', language);
+}
+
+let startupLanguageResolved = false;
+
+// Keep direct changeLanguage() callers working, including after a chunk fails.
+i18n.on('languageChanged', (lng) => {
+  if (!startupLanguageResolved) return;
+  if (lng !== DEFAULT_LANGUAGE && !i18n.hasResourceBundle(lng, 'translation')) {
+    void i18n.changeLanguage(DEFAULT_LANGUAGE);
+    return;
+  }
+  persistLanguage(lng);
 });
+
+/** Resolve the saved language before React mounts, or render in Russian. */
+export async function loadPersistedLanguage(): Promise<void> {
+  try {
+    await initialization;
+    if (initialLanguage !== DEFAULT_LANGUAGE) {
+      await i18n.changeLanguage(initialLanguage);
+      if (!i18n.hasResourceBundle(initialLanguage, 'translation')) {
+        await i18n.changeLanguage(DEFAULT_LANGUAGE);
+      }
+    }
+  } catch {
+    await i18n.changeLanguage(DEFAULT_LANGUAGE);
+  } finally {
+    startupLanguageResolved = true;
+    if (initialLanguage !== DEFAULT_LANGUAGE) persistLanguage(i18n.language);
+  }
+}
 
 export default i18n;

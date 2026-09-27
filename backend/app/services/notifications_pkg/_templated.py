@@ -253,7 +253,9 @@ class TemplatedMixin(NotificationSenderMixinBase):
                 else ""
             ),
             "doctor_name": appointment.doctor_name or "врач",
-            "department": appointment.department or "отделение",
+            # Round-6 (owner P1, PR #3340): the ORM attribute is a Department
+            # OBJECT once department_id is persisted — map the canonical key.
+            "department": appointment.department_key or "отделение",
             "clinic_name": "Медицинская клиника",
             "clinic_phone": "+998 90 123 45 67",
         }

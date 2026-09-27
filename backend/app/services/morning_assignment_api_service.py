@@ -253,27 +253,49 @@ class MorningAssignmentApiService:
 
     def get_queue_summary_payload(self, *, target_date: date) -> dict:
         queues = self.repository.list_daily_queues(day=target_date)
+        load_lookups = getattr(self.repository, "load_queue_summary_lookups", None)
+        lookups = load_lookups(queues) if callable(load_lookups) else None
+        if lookups is None:
+            entry_counts: dict[int, int] = {}
+            doctor_names: dict[int, str | None] = {}
+            resource_names: dict[int, str] = {}
+        else:
+            entry_counts, doctor_names, resource_names = lookups
+
         queue_summary = []
 
         for queue in queues:
-            entries_count = self.repository.count_queue_entries(queue_id=queue.id)
+            if lookups is None:
+                entries_count = self.repository.count_queue_entries(queue_id=queue.id)
+            else:
+                entries_count = entry_counts.get(queue.id, 0)
             # QD-2C (Codex round-15 P2): resource-очередь (specialist
             # NULL) — владелец из реестра (display_name), не «ID:None»
             # в админ-сводке; врач-очереди байт-идентичны. getattr:
             # юнит-стабы (SimpleNamespace) — round-8/10 конвенция.
             resource_id = getattr(queue, "queue_resource_id", None)
             if resource_id is not None:
-                resource = getattr(queue, "queue_resource", None)
-                doctor_name = (
-                    resource.display_name if resource is not None else "Ресурс очереди"
-                )
+                if lookups is None:
+                    resource = getattr(queue, "queue_resource", None)
+                    doctor_name = (
+                        resource.display_name
+                        if resource is not None
+                        else "Ресурс очереди"
+                    )
+                else:
+                    doctor_name = resource_names.get(resource_id, "Ресурс очереди")
             else:
-                doctor = self.repository.get_doctor(queue.specialist_id)
-                doctor_name = (
-                    doctor.user.full_name
-                    if doctor and doctor.user
-                    else f"ID:{queue.specialist_id}"
-                )
+                if lookups is None:
+                    doctor = self.repository.get_doctor(queue.specialist_id)
+                    doctor_name = (
+                        doctor.user.full_name
+                        if doctor and doctor.user
+                        else f"ID:{queue.specialist_id}"
+                    )
+                else:
+                    doctor_name = doctor_names.get(
+                        queue.specialist_id, f"ID:{queue.specialist_id}"
+                    )
             queue_summary.append(
                 {
                     "queue_id": queue.id,

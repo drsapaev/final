@@ -43,7 +43,8 @@ describe('DentistPanel STRAT#34 — i18n migration', () => {
   it('uses tI18n() for notify messages', () => {
     expect(source).toContain("tI18n('dental.session_expired')");
     expect(source).toContain("tI18n('dental.visit_completed')");
-    expect(source).toContain("tI18n('dental.icd_added_from_ai')");
+    expect(source).toContain("'ai-assistant': 'visit'");
+    expect(source).not.toContain('DentistAIAssistantView');
   });
   it('does not contain hardcoded Russian notify strings', () => {
     expect(source).not.toContain("notify.error('Сессия истекла");

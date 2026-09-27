@@ -68,7 +68,7 @@ Then follow the execution mode rules in `AGENTS.md`.
 
 For `direct_execute`, the local gate is not required, but the boundaries still are.
 
-For `gate` or `gate_known_root_cause`, run:
+For mandatory `gate` or `gate_known_root_cause` modes, run:
 
 ```powershell
 cd C:\final\ai\langgraph
@@ -82,7 +82,9 @@ cd C:\final\ai\langgraph
 .\scripts\run_agent_gate.ps1 "<task>" --known-root-cause "<relative/path.py>"
 ```
 
-Use the launcher instead of bare `python` or `py`; it validates Python 3.11+ and skips broken local launcher state. For other local Python commands in this Windows checkout, prefer `C:\final\scripts\run_python.ps1`. If the gate cannot run, stop and report instead of improvising.
+Use the launcher instead of bare `python` or `py`; it validates Python 3.11+ and skips broken local launcher state. For other local Python commands in this Windows checkout, prefer `C:\final\scripts\run_python.ps1`. If a mandatory gate cannot run, stop and report instead of improvising.
+
+For GPT-6 UI/API work that does not change DB schema/migrations, authentication/RBAC/security, production configuration/deployment, queue ownership/fairness, or clinical lifecycle/signature rules, use `advisory_gate` from `AGENTS.md`. Running the gate is optional; its first-touch list and stop conditions are context only. Ground the scope in canonical source, tests, user intent, and the pre-work boundaries. A misroute alone does not block the task.
 
 ## Skill Routing
 

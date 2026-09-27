@@ -98,6 +98,7 @@ class FileSystemApiService:
         emr_id: int | None,
         emr_record_id: int | None,
         folder_id: int | None,
+        exclude_tags: list[str] | None = None,
     ) -> int:
         return self.repository.count_files(
             file_model=file_model,
@@ -109,6 +110,7 @@ class FileSystemApiService:
             emr_id=emr_id,
             emr_record_id=emr_record_id,
             folder_id=folder_id,
+            exclude_tags=exclude_tags,
         )
 
     def rollback(self) -> None:

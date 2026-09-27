@@ -50,6 +50,7 @@ const SYNTHETIC_SERVICES = [
   // Прочее: неклассифицированная услуга без category_code/service_code —
   // обязана оставаться видимой явно (S-05: «неклассифицированное видно»).
   { id: 8, name: 'Синтетическая допуслуга', is_consultation: false, price: 5000 },
+  { id: 9, name: 'Врачебная процедура', category_code: 'P', service_code: 'P09', requires_doctor: true, doctor_selection_required: true, price: 25000 },
 ];
 
 const CATEGORIES = ['specialists', 'laboratory', 'procedures', 'other'];
@@ -59,7 +60,7 @@ const buildProps = (activeCategory: string) => ({
   onAddToCart: vi.fn(),
   onRemoveFromCart: vi.fn(),
   servicesData: SYNTHETIC_SERVICES,
-  doctorsData: [],
+  doctorsData: [{ id: 101, user: { full_name: 'Иванов Иван' }, specialty: 'cardiology' }],
   errors: undefined,
   activeCategory,
   searchQuery: '',
@@ -106,6 +107,11 @@ describe('RQ-07: вкладка «Специалисты» классифици�
   it('регрессионный контроль: legacy ЭКГ K10 остается на «Специалистах»', () => {
     const names = namesFor('specialists');
     expect(names.has('Электрокардиограмма')).toBe(true);
+  });
+
+  it('услуга с requires_doctor находится у врача на «Специалистах» независимо от категории P', () => {
+    expect(namesFor('specialists').has('Врачебная процедура')).toBe(true);
+    expect(namesFor('procedures').has('Врачебная процедура')).toBe(false);
   });
 
   it('текст «Консультационный контроль...» НЕ переносит процедуру P в «Специалистов»', () => {

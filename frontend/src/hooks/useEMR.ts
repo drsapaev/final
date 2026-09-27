@@ -1,6 +1,6 @@
 /**
  * useEMR - Core EMR v2 hook
- * 
+ *
  * Features:
  * - Load EMR by visit_id
  * - Save with optimistic locking (row_version)
@@ -60,7 +60,7 @@ const toEMRApiError = (err: unknown): EMRApiError => {
 
 /**
  * useEMR Hook
- * 
+ *
  * @param {number} visitId - Visit ID to load EMR for
  * @param {Object} options - Configuration options
  * @param {boolean} options.autoLoad - Auto-load on mount (default: true)
@@ -279,7 +279,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
     // =========================================================================
     // SIGN EMR
     // =========================================================================
-    const signEMR = useCallback(async () => {
+    const signEMR = useCallback(async (options: { rowVersion?: number } = {}) => {
         if (writeAccessDeniedRef.current) {
             logger.info('[FIX:EMR403] signEMR skipped because access was already denied', {
                 visitId,
@@ -297,7 +297,7 @@ export function useEMR(visitId: number | string | null, { autoLoad = true, speci
         try {
             const payload = {
                 data: normalizeEMRData(state.data, specialty),
-                row_version: state.rowVersion,
+                row_version: options.rowVersion ?? state.rowVersion,
                 client_session_id: clientSessionId.current,
             };
 

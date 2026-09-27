@@ -1,0 +1,206 @@
+/**
+ * ConfirmVisitPage — public PWA visit-confirmation screen (PR 3390 review
+ * round, P1: the SMS invitation deep link needs a live route).
+ *
+ * Styling rules honoured here:
+ *  - all colors via var(--mac-*) design tokens (no hex — UI baseline ratchet);
+ *  - no inline style props in the TSX (UI baseline ratchet);
+ *  - spacing via var(--mac-*) (stylelint declaration-property-value list).
+ */
+
+/* ─── Base layout ─── */
+.cv-page {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding: var(--mac-spacing-6) var(--mac-spacing-4) var(--mac-spacing-8);
+}
+
+.cv-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 480px;
+    gap: var(--mac-spacing-5);
+    padding: var(--mac-spacing-8) var(--mac-spacing-6);
+    background: var(--mac-card-bg);
+    border: 1px solid var(--mac-card-border);
+    border-radius: var(--mac-radius-xl);
+    box-shadow: var(--mac-main-shell-shadow);
+}
+
+/* ─── Text styles ─── */
+.cv-title {
+    margin: 0;
+    font-size: var(--mac-font-size-2xl);
+    font-weight: var(--mac-font-weight-semibold);
+    letter-spacing: -0.02em;
+    color: var(--mac-text-primary);
+}
+
+.cv-subtitle {
+    margin: 0;
+    font-size: var(--mac-font-size-md);
+    line-height: 1.5;
+    color: var(--mac-text-secondary);
+}
+
+/* ─── Visit card fields ─── */
+.cv-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-4);
+}
+
+.cv-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-1);
+}
+
+.cv-label {
+    font-size: var(--mac-font-size-sm);
+    font-weight: var(--mac-font-weight-medium);
+    color: var(--mac-text-secondary);
+}
+
+.cv-value {
+    font-size: var(--mac-font-size-lg);
+    font-weight: var(--mac-font-weight-semibold);
+    color: var(--mac-text-primary);
+}
+
+.cv-inline-icon {
+    width: 18px;
+    height: 18px;
+    margin-right: var(--mac-spacing-1);
+    color: var(--mac-text-secondary);
+    vertical-align: -3px;
+}
+
+/* ─── Services list ─── */
+.cv-services {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cv-service-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--mac-spacing-3);
+    font-size: var(--mac-font-size-md);
+    color: var(--mac-text-primary);
+}
+
+.cv-service-qty {
+    color: var(--mac-text-secondary);
+    font-size: var(--mac-font-size-sm);
+}
+
+.cv-total-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--mac-spacing-3);
+    padding-top: var(--mac-spacing-3);
+    border-top: 1px solid var(--mac-card-border);
+}
+
+.cv-total-value {
+    font-size: var(--mac-font-size-xl);
+    font-weight: var(--mac-font-weight-semibold);
+    color: var(--mac-text-primary);
+}
+
+/* ─── Status blocks (checking / invalid / done) ─── */
+.cv-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--mac-spacing-3);
+    padding: var(--mac-spacing-6) 0;
+    text-align: center;
+}
+
+.cv-status-icon {
+    width: 48px;
+    height: 48px;
+}
+
+.cv-status-icon-error {
+    color: var(--mac-accent-red);
+}
+
+.cv-status-icon-ok {
+    color: var(--mac-accent-green);
+}
+
+.cv-status-icon-muted {
+    color: var(--mac-text-secondary);
+}
+
+.cv-status-text {
+    margin: 0;
+    font-size: var(--mac-font-size-md);
+    color: var(--mac-text-primary);
+}
+
+.cv-status-hint {
+    margin: 0;
+    font-size: var(--mac-font-size-sm);
+    line-height: 1.5;
+    color: var(--mac-text-secondary);
+}
+
+/* ─── Errors / actions ─── */
+.cv-error {
+    padding: var(--mac-spacing-3) var(--mac-spacing-4);
+    border-radius: var(--mac-radius-md);
+    background: var(--mac-accent-red-bg);
+    color: var(--mac-text-primary);
+    font-size: var(--mac-font-size-sm);
+    line-height: 1.5;
+}
+
+.cv-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-2);
+}
+
+/* ─── Queue numbers on success ─── */
+.cv-queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mac-spacing-2);
+    width: 100%;
+}
+
+.cv-queue-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mac-spacing-3);
+    padding: var(--mac-spacing-3) var(--mac-spacing-4);
+    border-radius: var(--mac-radius-md);
+    background: var(--mac-accent-blue-bg);
+}
+
+.cv-queue-tag {
+    display: flex;
+    align-items: center;
+    gap: var(--mac-spacing-2);
+    font-size: var(--mac-font-size-sm);
+    color: var(--mac-text-secondary);
+}
+
+.cv-queue-number {
+    font-size: var(--mac-font-size-xl);
+    font-weight: var(--mac-font-weight-semibold);
+    color: var(--mac-text-primary);
+}

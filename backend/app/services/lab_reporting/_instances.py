@@ -278,7 +278,9 @@ class InstancesMixin(LabReportingServiceMixinBase):
     def instance_available_actions(self, instance: LabReportInstance) -> list[str]:
         actions: list[str] = []
         if instance.status not in FINAL_INSTANCE_STATUSES:
-            actions.extend(["edit", "save_draft", "mark_ready", "finalize"])
+            # PR8: preview — серверный A4-рендер сохранённых значений без
+            # утверждения (endpoint /report-instances/{id}/preview, Admin/Lab).
+            actions.extend(["edit", "save_draft", "mark_ready", "finalize", "preview"])
         if instance.status in FINAL_INSTANCE_STATUSES:
             actions.extend(["revise", "print"])
         return actions
@@ -293,6 +295,9 @@ class InstancesMixin(LabReportingServiceMixinBase):
             "can_finalize": "finalize" in actions,
             "can_revise": "revise" in actions,
             "can_print": "print" in actions,
+            # PR8: preview доступен только неутверждённым бланкам; после
+            # finalize используется print (+ /pdf без watermark).
+            "can_preview": "preview" in actions,
         }
 
 

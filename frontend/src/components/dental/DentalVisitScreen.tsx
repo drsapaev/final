@@ -32,19 +32,19 @@ import { useTranslation } from '../../i18n/useTranslation';
  *   - Встроен в экран, не отдельная вкладка
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import type { CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Button, Card, Badge, Input, Textarea, Label,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Typography, Box, Alert, Skeleton,
 } from '../ui/macos';
 import {
-  Stethoscope, CheckCircle, ChevronDown, ChevronUp,
-  Brain,
+  ArrowLeft, Stethoscope, CheckCircle, ChevronDown, ChevronUp,
+  Brain, Plus, Trash2,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import logger from '../../utils/logger';
+import { normalizeVisitProtocolRecord } from './VisitProtocol';
 import notify from '../../services/notify';
 import TeethChart from '../dental/TeethChart';
 import ToothModal from '../dental/ToothModal';
@@ -72,6 +72,7 @@ const EMPTY_EMR_DATA = {
     periodontal_pockets: {},
     measurements: {},
     radiographs: {},
+    visit_protocol: {},
   },
   recommendations: '',
   notes: '',
@@ -79,18 +80,12 @@ const EMPTY_EMR_DATA = {
 
 const loadExistingEMR = async (visitId: string | number) => {
   if (!visitId) return null;
-  try {
-    const response = await apiClient.get(`/v2/emr/${visitId}`, {
-      silent: true,
-      validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
-    } as Record<string, unknown>);
-    if (response.status === 404) return null;
-    return response.data;
-  } catch (error) {
-    const err = error as { message?: string };
-    logger.warn('[DentalVisitScreen] Failed to load EMR', { visitId, error: err?.message });
-    return null;
-  }
+  const response = await apiClient.get(`/v2/emr/${visitId}`, {
+    silent: true,
+    validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
+  } as Record<string, unknown>);
+  if (response.status === 404) return null;
+  return response.data as { data?: Record<string, unknown>; row_version?: number };
 };
 
 const saveEMR = async (visitId: string | number, data: unknown, rowVersion: unknown, isDraft = true) => {
@@ -102,17 +97,28 @@ const saveEMR = async (visitId: string | number, data: unknown, rowVersion: unkn
   return response.data;
 };
 
+const isSameVisit = (left: string | number | null | undefined, right: string | number | null | undefined) =>
+  left !== null && left !== undefined && right !== null && right !== undefined && String(left) === String(right);
+
+const getHttpStatus = (error: unknown): number | undefined => {
+  if (!error || typeof error !== 'object') return undefined;
+  const response = (error as { response?: { status?: unknown } }).response;
+  return typeof response?.status === 'number' ? response.status : undefined;
+};
+
 // =============================================================================
 // Sub-components
 // =============================================================================
 
 interface PatientHeaderProps {
   patient: Record<string, unknown> | null;
-  onCompleteVisit: () => void;
+  onCompleteVisit: () => void | Promise<void>;
+  onBackToQueue?: () => void | Promise<void>;
+  backDisabled?: boolean;
   loading?: boolean;
 }
 
-const PatientHeader = ({ patient, onCompleteVisit, loading }: PatientHeaderProps) => {
+const PatientHeader = ({ patient, onCompleteVisit, onBackToQueue, backDisabled, loading }: PatientHeaderProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT;
   const patientName =
@@ -145,14 +151,26 @@ const PatientHeader = ({ patient, onCompleteVisit, loading }: PatientHeaderProps
           )}
         </div>
       </div>
-      <Button
-        variant="primary"
-        onClick={onCompleteVisit}
-        disabled={loading}
-        aria-label={t('dental.dental_dvs_aria_complete')}>
-        <CheckCircle size={16} style={{ marginRight: 6 }} aria-hidden="true" />
-        {loading ? t('dental.dental_dvs_saving') : t('dental.dental_dvs_complete_visit')}
-      </Button>
+      <div className="dental-flex dental-gap-12">
+        {onBackToQueue && (
+          <Button
+            variant="outline"
+            onClick={() => { void onBackToQueue(); }}
+            disabled={backDisabled}
+            aria-label={t('doctor.tab_queue')}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            {t('doctor.tab_queue')}
+          </Button>
+        )}
+        <Button
+          variant="primary"
+          onClick={() => { void onCompleteVisit(); }}
+          disabled={loading}
+          aria-label={t('dental.dental_dvs_aria_complete')}>
+          <CheckCircle size={16} style={{ marginRight: 6 }} aria-hidden="true" />
+          {loading ? t('dental.dental_dvs_saving') : t('dental.dental_dvs_complete_visit')}
+        </Button>
+      </div>
     </div>
   );
 };
@@ -405,6 +423,274 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }: Collap
 };
 
 
+type VisitProtocolRecord = Record<string, unknown>;
+type VisitProtocolUpdater = (current: VisitProtocolRecord) => VisitProtocolRecord;
+type VisitProtocolUpdate = (update: VisitProtocolUpdater) => void;
+
+const VisitProtocolSections = ({
+  value,
+  onUpdate,
+  disabled,
+}: {
+  value: VisitProtocolRecord;
+  onUpdate: VisitProtocolUpdate;
+  disabled?: boolean;
+}) => {
+  const { t: rawT } = useTranslation();
+  const t = rawT;
+  const entries = (field: string) => Array.isArray(value[field])
+    ? (value[field] as unknown[]).map(normalizeVisitProtocolRecord)
+    : [];
+  const updateField = (field: string, nextValue: unknown) => {
+    onUpdate((current) => ({ ...current, [field]: nextValue }));
+  };
+  const updateArrayItem = (field: string, index: number, patch: VisitProtocolRecord) => {
+    onUpdate((current) => {
+      const currentItems = Array.isArray(current[field])
+        ? current[field] as unknown[]
+        : [];
+      return {
+        ...current,
+        [field]: currentItems.map((item, itemIndex) => itemIndex === index
+          ? { ...normalizeVisitProtocolRecord(item), ...patch }
+          : item),
+      };
+    });
+  };
+  const addArrayItem = (field: string, item: VisitProtocolRecord) => {
+    onUpdate((current) => ({
+      ...current,
+      [field]: [...(Array.isArray(current[field]) ? current[field] as unknown[] : []), item],
+    }));
+  };
+  const removeArrayItem = (field: string, index: number) => {
+    onUpdate((current) => {
+      const currentItems = Array.isArray(current[field])
+        ? current[field] as unknown[]
+        : [];
+      return { ...current, [field]: currentItems.filter((_, itemIndex) => itemIndex !== index) };
+    });
+  };
+  const inputValue = (item: VisitProtocolRecord, field: string) => String(item[field] ?? '');
+  const procedures = entries('procedures');
+  const materials = entries('materials');
+  const anesthesia = entries('anesthesia');
+  const radiographs = entries('radiographs');
+  const prescriptions = entries('prescriptions');
+  const nextVisit = normalizeVisitProtocolRecord(value.nextVisit);
+
+  return (
+    <section className="dental-flex-col dental-gap-12" aria-labelledby="dental-visit-protocol-title">
+      <div>
+        <h3 id="dental-visit-protocol-title" className="dental-text-primary">
+          {t('dental.dental_vp_title')}
+        </h3>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_subtitle')}</p>
+      </div>
+
+      <details>
+        <summary>{t('dental.dental_vp_tab_procedures')}</summary>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_proc_subtitle')}</p>
+        <div className="dental-flex-col dental-gap-12">
+          {procedures.map((procedure, index) => (
+            <div className="dental-flex-col dental-gap-12" key={`procedure-${index}`}>
+              <Input
+                aria-label={`${t('dental.dental_vp_proc_label_name')} ${index + 1}`}
+                value={inputValue(procedure, 'name')}
+                onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('procedures', index, { name: event.target.value })}
+                disabled={disabled}
+              />
+              <Input
+                type="time"
+                aria-label={t('dental.dental_vp_proc_aria_start', { index: index + 1 })}
+                value={inputValue(procedure, 'startTime')}
+                onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('procedures', index, { startTime: event.target.value })}
+                disabled={disabled}
+              />
+              <Input
+                type="time"
+                aria-label={t('dental.dental_vp_proc_aria_end', { index: index + 1 })}
+                value={inputValue(procedure, 'endTime')}
+                onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('procedures', index, { endTime: event.target.value })}
+                disabled={disabled}
+              />
+              <Input
+                aria-label={t('dental.dental_vp_proc_aria_teeth', { index: index + 1 })}
+                value={inputValue(procedure, 'teeth')}
+                placeholder={t('dental.dental_vp_proc_ph_teeth')}
+                onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('procedures', index, { teeth: event.target.value })}
+                disabled={disabled}
+              />
+              <Textarea
+                aria-label={t('dental.dental_vp_proc_aria_desc', { index: index + 1 })}
+                value={inputValue(procedure, 'description')}
+                placeholder={t('dental.dental_vp_proc_ph_desc')}
+                onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('procedures', index, { description: event.target.value })}
+                disabled={disabled}
+              />
+              <label className="dental-flex dental-gap-12">
+                <input
+                  type="checkbox"
+                  aria-label={t('dental.dental_vp_proc_aria_completed', { index: index + 1 })}
+                  checked={Boolean(procedure.completed)}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateArrayItem('procedures', index, { completed: event.target.checked })}
+                  disabled={disabled}
+                />
+                {t('dental.dental_vp_proc_chk_completed')}
+              </label>
+              <label className="dental-flex dental-gap-12">
+                <input
+                  type="checkbox"
+                  aria-label={t('dental.dental_vp_proc_aria_complications', { index: index + 1 })}
+                  checked={Boolean(procedure.complications)}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateArrayItem('procedures', index, { complications: event.target.checked })}
+                  disabled={disabled}
+                />
+                {t('dental.dental_vp_proc_chk_complications')}
+              </label>
+              <Button variant="outline" size="small" onClick={() => removeArrayItem('procedures', index)} disabled={disabled}>
+                <Trash2 size={14} aria-hidden="true" />
+                {t('dental.dental_vp_proc_aria_remove', { index: index + 1 })}
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="small" onClick={() => addArrayItem('procedures', { name: '', teeth: '', description: '' })} disabled={disabled}>
+            <Plus size={14} aria-hidden="true" />
+            {t('dental.dental_vp_proc_btn_add')}
+          </Button>
+        </div>
+      </details>
+
+      <details>
+        <summary>{t('dental.dental_vp_tab_materials')}</summary>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_mat_subtitle')}</p>
+        <div className="dental-flex-col dental-gap-12">
+          {materials.map((material, index) => (
+            <div className="dental-flex-col dental-gap-12" key={`material-${index}`}>
+              <Input aria-label={t('dental.dental_vp_mat_aria_name', { index: index + 1 })} value={inputValue(material, 'name')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('materials', index, { name: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_mat_aria_quantity', { index: index + 1 })} value={inputValue(material, 'quantity')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('materials', index, { quantity: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_mat_aria_batch', { index: index + 1 })} value={inputValue(material, 'batch')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('materials', index, { batch: event.target.value })} disabled={disabled} />
+              <Textarea aria-label={t('dental.dental_vp_mat_aria_notes', { index: index + 1 })} value={inputValue(material, 'notes')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('materials', index, { notes: event.target.value })} disabled={disabled} />
+              <Button variant="outline" size="small" onClick={() => removeArrayItem('materials', index)} disabled={disabled}>
+                <Trash2 size={14} aria-hidden="true" />
+                {t('dental.dental_vp_mat_aria_remove', { index: index + 1 })}
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="small" onClick={() => addArrayItem('materials', { name: '', quantity: '', batch: '', notes: '' })} disabled={disabled}>
+            <Plus size={14} aria-hidden="true" />
+            {t('dental.dental_vp_mat_btn_add')}
+          </Button>
+        </div>
+      </details>
+
+      <details>
+        <summary>{t('dental.dental_vp_tab_anesthesia')}</summary>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_anes_subtitle')}</p>
+        <div className="dental-flex-col dental-gap-12">
+          {anesthesia.map((item, index) => (
+            <div className="dental-flex-col dental-gap-12" key={`anesthesia-${index}`}>
+              <Input aria-label={t('dental.dental_vp_anes_aria_drug', { index: index + 1 })} value={inputValue(item, 'drug')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('anesthesia', index, { drug: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_anes_aria_dose', { index: index + 1 })} value={inputValue(item, 'dose')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('anesthesia', index, { dose: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_anes_label_method')} value={inputValue(item, 'method')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('anesthesia', index, { method: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_anes_aria_area', { index: index + 1 })} value={inputValue(item, 'area')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('anesthesia', index, { area: event.target.value })} disabled={disabled} />
+              <label className="dental-flex dental-gap-12">
+                <input
+                  type="checkbox"
+                  aria-label={t('dental.dental_vp_anes_aria_effective', { index: index + 1 })}
+                  checked={Boolean(item.effective)}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateArrayItem('anesthesia', index, { effective: event.target.checked })}
+                  disabled={disabled}
+                />
+                {t('dental.dental_vp_anes_chk_effective')}
+              </label>
+              <label className="dental-flex dental-gap-12">
+                <input
+                  type="checkbox"
+                  aria-label={t('dental.dental_vp_anes_aria_complications', { index: index + 1 })}
+                  checked={Boolean(item.complications)}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateArrayItem('anesthesia', index, { complications: event.target.checked })}
+                  disabled={disabled}
+                />
+                {t('dental.dental_vp_anes_chk_complications')}
+              </label>
+              <Button variant="outline" size="small" onClick={() => removeArrayItem('anesthesia', index)} disabled={disabled}>
+                <Trash2 size={14} aria-hidden="true" />
+                {t('dental.dental_vp_anes_aria_remove', { index: index + 1 })}
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="small" onClick={() => addArrayItem('anesthesia', { drug: '', dose: '', method: '', area: '' })} disabled={disabled}>
+            <Plus size={14} aria-hidden="true" />
+            {t('dental.dental_vp_anes_btn_add')}
+          </Button>
+        </div>
+      </details>
+
+      <details>
+        <summary>{t('dental.dental_vp_tab_radiographs')}</summary>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_radio_subtitle')}</p>
+        <div className="dental-flex-col dental-gap-12">
+          {radiographs.map((item, index) => (
+            <div className="dental-flex-col dental-gap-12" key={`radiograph-${index}`}>
+              <Input aria-label={t('dental.dental_vp_radio_label_type')} value={inputValue(item, 'type')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('radiographs', index, { type: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_radio_aria_area', { index: index + 1 })} value={inputValue(item, 'area')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('radiographs', index, { area: event.target.value })} disabled={disabled} />
+              <Textarea aria-label={t('dental.dental_vp_radio_aria_findings', { index: index + 1 })} value={inputValue(item, 'findings')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('radiographs', index, { findings: event.target.value })} disabled={disabled} />
+              <Button variant="outline" size="small" onClick={() => removeArrayItem('radiographs', index)} disabled={disabled}>
+                <Trash2 size={14} aria-hidden="true" />
+                {t('dental.dental_vp_radio_aria_remove', { index: index + 1 })}
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="small" onClick={() => addArrayItem('radiographs', { type: '', area: '', findings: '' })} disabled={disabled}>
+            <Plus size={14} aria-hidden="true" />
+            {t('dental.dental_vp_radio_btn_add')}
+          </Button>
+        </div>
+      </details>
+
+      <details>
+        <summary>{t('dental.dental_vp_tab_prescriptions')}</summary>
+        <p className="dental-text-desc dental-text-secondary">{t('dental.dental_vp_rx_subtitle')}</p>
+        <div className="dental-flex-col dental-gap-12">
+          {prescriptions.map((item, index) => (
+            <div className="dental-flex-col dental-gap-12" key={`prescription-${index}`}>
+              <Input aria-label={t('dental.dental_vp_rx_aria_medication', { index: index + 1 })} value={inputValue(item, 'medication')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('prescriptions', index, { medication: event.target.value })} disabled={disabled} />
+              <Input aria-label={t('dental.dental_vp_rx_aria_dosage', { index: index + 1 })} value={inputValue(item, 'dosage')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('prescriptions', index, { dosage: event.target.value })} disabled={disabled} />
+              <Textarea aria-label={t('dental.dental_vp_rx_aria_instructions', { index: index + 1 })} value={inputValue(item, 'instructions')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateArrayItem('prescriptions', index, { instructions: event.target.value })} disabled={disabled} />
+              <Button variant="outline" size="small" onClick={() => removeArrayItem('prescriptions', index)} disabled={disabled}>
+                <Trash2 size={14} aria-hidden="true" />
+                {t('dental.dental_vp_rx_aria_remove', { index: index + 1 })}
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="small" onClick={() => addArrayItem('prescriptions', { medication: '', dosage: '', instructions: '' })} disabled={disabled}>
+            <Plus size={14} aria-hidden="true" />
+            {t('dental.dental_vp_rx_btn_add')}
+          </Button>
+          <Textarea
+            aria-label={t('dental.dental_vp_aria_recommendations')}
+            value={String(value.recommendations ?? '')}
+            placeholder={t('dental.dental_vp_ph_recommendations')}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateField('recommendations', event.target.value)}
+            disabled={disabled}
+          />
+        </div>
+      </details>
+
+      <details>
+        <summary>{t('dental.dental_vp_next_visit_title')}</summary>
+        <div className="dental-flex-col dental-gap-12">
+          <Input type="date" aria-label={t('dental.dental_vp_next_visit_aria_date')} value={String(nextVisit.date ?? '')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...normalizeVisitProtocolRecord(current.nextVisit), date: event.target.value } }))} disabled={disabled} />
+          <Input type="time" aria-label={t('dental.dental_vp_next_visit_aria_time')} value={String(nextVisit.time ?? '')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...normalizeVisitProtocolRecord(current.nextVisit), time: event.target.value } }))} disabled={disabled} />
+          <Input aria-label={t('dental.dental_vp_next_visit_aria_purpose')} value={String(nextVisit.purpose ?? '')} placeholder={t('dental.dental_vp_next_visit_ph_purpose')} onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdate((current) => ({ ...current, nextVisit: { ...normalizeVisitProtocolRecord(current.nextVisit), purpose: event.target.value } }))} disabled={disabled} />
+        </div>
+      </details>
+    </section>
+  );
+};
+
+
 interface VisitHistoryProps {
   history: Array<Record<string, unknown>>;
   loading?: boolean;
@@ -524,19 +810,31 @@ const AISuggestionDialog = ({ open, onClose, onApply, anamnesis }: AISuggestionD
 const DentalVisitScreen = ({
   patient,
   onCompleteVisit,
+  onBackToQueue,
   loading: parentLoading,
 }: {
   patient?: { visit_id?: string | number; patient_id?: string | number; id?: string | number; patient?: { id?: string | number } };
-  onCompleteVisit?: () => void;
+  onCompleteVisit?: (latestDraft: Record<string, unknown>) => void | Promise<void>;
+  onBackToQueue?: () => void | Promise<void>;
   loading?: boolean;
   [k: string]: unknown;
 }) => {
   const { t: rawT } = useTranslation();
-  const t = rawT;
+  // The project adapter creates a new t wrapper on every render. Keep the
+  // loader callbacks stable while still using the current locale function.
+  const translationRef = useRef(rawT);
+  translationRef.current = rawT;
+  const t = useCallback(
+    (key: string, params?: Record<string, unknown>) => translationRef.current(key, params),
+    [],
+  );
   const [emrData, setEmrData] = useState(EMPTY_EMR_DATA);
-  const [rowVersion, setRowVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [loadError, setLoadError] = useState<'missing_visit' | 'load' | null>(null);
+  const [saveError, setSaveError] = useState<'conflict' | 'save' | null>(null);
+  const [loadedVisitId, setLoadedVisitId] = useState<string | number | null>(null);
   const [selectedTooth, setSelectedTooth] = useState<{ number: string | number; data: Record<string, unknown> } | null>(null);
   const [toothModalOpen, setToothModalOpen] = useState(false);
   const [showAIDialog, setShowAIDialog] = useState(false);
@@ -550,110 +848,301 @@ const DentalVisitScreen = ({
     patient?.id ||
     null;
 
-  // Load EMR on mount
+  const latestDraftRef = useRef<typeof EMPTY_EMR_DATA>(EMPTY_EMR_DATA);
+  const rowVersionRef = useRef(0);
+  const loadedVisitIdRef = useRef<string | number | null>(null);
+  const retryCompletionRef = useRef(false);
+  const loadSequenceRef = useRef(0);
+  const historySequenceRef = useRef(0);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // A failed EMR read must not be treated as an empty draft. Keep the visit
+  // open and require a successful read before editing or completing it.
   const loadEMR = useCallback(async () => {
-    if (!visitId) {
+    const requestSequence = ++loadSequenceRef.current;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setLoading(true);
+    setSaving(false);
+    setCompleting(false);
+    setLoadError(null);
+    setSaveError(null);
+    retryCompletionRef.current = false;
+    setLoadedVisitId(null);
+    loadedVisitIdRef.current = null;
+    latestDraftRef.current = EMPTY_EMR_DATA;
+    rowVersionRef.current = 0;
+    setEmrData(EMPTY_EMR_DATA);
+
+    if (visitId === null || visitId === undefined || visitId === '') {
+      setLoadError('missing_visit');
       setLoading(false);
       return;
     }
-    setLoading(true);
+
     try {
       const existing = await loadExistingEMR(visitId);
-      if (existing) {
-        const data = existing.data || EMPTY_EMR_DATA;
-        setEmrData({
-          ...EMPTY_EMR_DATA,
-          ...data,
-          specialty_data: {
-            ...EMPTY_EMR_DATA.specialty_data,
-            ...(data.specialty_data || {}),
-          },
-        });
-        setRowVersion(existing.row_version || 0);
-      } else {
-        setEmrData({ ...EMPTY_EMR_DATA });
-        setRowVersion(0);
+      if (requestSequence !== loadSequenceRef.current) return;
+
+      const rowVersion = existing?.row_version;
+      if (existing && (typeof rowVersion !== 'number' || !Number.isInteger(rowVersion))) {
+        throw new Error('Invalid EMR version response');
       }
-    } catch (error) {
-      const err = error as { message?: string } | undefined;
-      logger.error('[DentalVisitScreen] loadEMR failed', { error: err?.message });
+
+      const data = (existing?.data || EMPTY_EMR_DATA) as typeof EMPTY_EMR_DATA;
+      const specialtyData = data.specialty_data || EMPTY_EMR_DATA.specialty_data;
+      const protocolData = specialtyData.visit_protocol || (data as Record<string, unknown>).visit_protocol;
+      const nextDraft = {
+        ...EMPTY_EMR_DATA,
+        ...data,
+        specialty_data: {
+          ...EMPTY_EMR_DATA.specialty_data,
+          ...specialtyData,
+          visit_protocol: protocolData || EMPTY_EMR_DATA.specialty_data.visit_protocol,
+        },
+      };
+      latestDraftRef.current = nextDraft;
+      rowVersionRef.current = rowVersion ?? 0;
+      loadedVisitIdRef.current = visitId;
+      setLoadedVisitId(visitId);
+      setEmrData(nextDraft);
+    } catch {
+      if (requestSequence !== loadSequenceRef.current) return;
+      logger.warn('[DentalVisitScreen] loadEMR failed');
+      setLoadError('load');
       notify.error(t('dental2.visit_map_load_failed'));
     } finally {
-      setLoading(false);
+      if (requestSequence === loadSequenceRef.current) setLoading(false);
     }
   }, [visitId, t]);
 
   // Load patient history
   const loadHistory = useCallback(async () => {
-    if (!patientId) return;
+    const requestSequence = ++historySequenceRef.current;
+    if (!patientId) {
+      setHistory([]);
+      setHistoryLoading(false);
+      return;
+    }
+    setHistory([]);
     setHistoryLoading(true);
     try {
       const response = await apiClient.get(`/v2/emr/patient/${patientId}`, {
         silent: true,
         validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
       } as Record<string, unknown>);
+      if (requestSequence !== historySequenceRef.current) return;
       if (response.status === 404) {
         setHistory([]);
       } else {
         const summaries = response.data?.summaries || response.data || [];
         setHistory(Array.isArray(summaries) ? summaries : []);
       }
-    } catch (error) {
-      const err = error as { message?: string } | undefined;
-      logger.warn('[DentalVisitScreen] loadHistory failed', { error: err?.message });
+    } catch {
+      if (requestSequence !== historySequenceRef.current) return;
+      logger.warn('[DentalVisitScreen] loadHistory failed');
       setHistory([]);
     } finally {
-      setHistoryLoading(false);
+      if (requestSequence === historySequenceRef.current) setHistoryLoading(false);
     }
   }, [patientId]);
 
   useEffect(() => {
-    loadEMR();
-    loadHistory();
+    void loadEMR();
+    void loadHistory();
+    return () => {
+      loadSequenceRef.current += 1;
+      historySequenceRef.current += 1;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
   }, [loadEMR, loadHistory]);
 
-  // Auto-save EMR draft (debounced via 1.5s timeout on field changes)
-  const [saveTimer, setSaveTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
-  const scheduleAutosave = useCallback((nextData: typeof EMPTY_EMR_DATA) => {
-    if (saveTimer) clearTimeout(saveTimer);
-    const timer = setTimeout(async () => {
-      if (!visitId) return;
-      setSaving(true);
-      try {
-        const result = await saveEMR(visitId, nextData, rowVersion, true);
-        setRowVersion(result.row_version || rowVersion);
-      } catch (error) {
-        const err = error as { message?: string } | undefined;
-        logger.warn('[DentalVisitScreen] autosave failed', { error: err?.message });
-      } finally {
-        setSaving(false);
+  const persistDraft = useCallback((targetVisitId: string | number, snapshot: typeof EMPTY_EMR_DATA) => {
+    const operation = saveQueueRef.current.catch(() => undefined).then(async () => {
+      if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        throw new Error('Visit changed before EMR save');
       }
-    }, 1500);
-    setSaveTimer(timer);
-  }, [saveTimer, visitId, rowVersion]);
 
-  // Field change handlers
-  const updateField = useCallback((field: string, value: unknown) => {
-    setEmrData(prev => {
-      const next = { ...prev, [field]: value } as typeof prev;
-      scheduleAutosave(next);
-      return next;
+      const response = await saveEMR(targetVisitId, snapshot, rowVersionRef.current, true) as { row_version?: unknown };
+      if (typeof response.row_version !== 'number' || !Number.isInteger(response.row_version)) {
+        throw new Error('EMR save response is missing row_version');
+      }
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        rowVersionRef.current = response.row_version;
+      }
     });
+    saveQueueRef.current = operation.then(() => undefined, () => undefined);
+    return operation;
+  }, []);
+
+  // Keep draft writes sequential so each POST uses the version returned by
+  // the previous successful save.
+  const scheduleAutosave = useCallback((nextData: typeof EMPTY_EMR_DATA) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const scheduledVisitId = visitId;
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      if (scheduledVisitId === null || scheduledVisitId === undefined || !isSameVisit(loadedVisitIdRef.current, scheduledVisitId)) return;
+
+      setSaving(true);
+      void persistDraft(scheduledVisitId, nextData).then(() => {
+        if (isSameVisit(loadedVisitIdRef.current, scheduledVisitId)) setSaveError(null);
+      }).catch((error: unknown) => {
+        if (!isSameVisit(loadedVisitIdRef.current, scheduledVisitId)) return;
+        setSaveError(getHttpStatus(error) === 409 ? 'conflict' : 'save');
+        logger.warn('[DentalVisitScreen] autosave failed');
+        notify.error(t('dental2.visit_protocol_save_failed'));
+      }).finally(() => {
+        if (isSameVisit(loadedVisitIdRef.current, scheduledVisitId)) setSaving(false);
+      });
+    }, 1500);
+  }, [persistDraft, t, visitId]);
+
+  const updateField = useCallback((field: string, value: unknown) => {
+    const next = { ...latestDraftRef.current, [field]: value } as typeof EMPTY_EMR_DATA;
+    latestDraftRef.current = next;
+    setEmrData(next);
+    setSaveError(null);
+    scheduleAutosave(next);
   }, [scheduleAutosave]);
 
   const updateSpecialtyData = useCallback((field: string, value: unknown) => {
-    setEmrData(prev => {
-      const next = {
-        ...prev,
-        specialty_data: {
-          ...prev.specialty_data,
-          [field]: value,
-        },
-      } as typeof prev;
-      scheduleAutosave(next);
-      return next;
-    });
+    const next = {
+      ...latestDraftRef.current,
+      specialty_data: {
+        ...latestDraftRef.current.specialty_data,
+        [field]: value,
+      },
+    } as typeof EMPTY_EMR_DATA;
+    latestDraftRef.current = next;
+    setEmrData(next);
+    setSaveError(null);
+    scheduleAutosave(next);
   }, [scheduleAutosave]);
+
+  const updateVisitProtocol = useCallback((update: VisitProtocolUpdater) => {
+    const current = normalizeVisitProtocolRecord(latestDraftRef.current.specialty_data.visit_protocol);
+    updateSpecialtyData('visit_protocol', update(current));
+  }, [updateSpecialtyData]);
+
+  const handleCompleteVisit = useCallback(async () => {
+    const targetVisitId = visitId;
+    if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') {
+      setLoadError('missing_visit');
+      return;
+    }
+    if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+      setLoadError('load');
+      return;
+    }
+
+    const snapshot = latestDraftRef.current;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setCompleting(true);
+    setSaveError(null);
+    retryCompletionRef.current = false;
+    try {
+      await persistDraft(targetVisitId, snapshot);
+    } catch (error: unknown) {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        setSaveError(getHttpStatus(error) === 409 ? 'conflict' : 'save');
+        retryCompletionRef.current = true;
+        logger.warn('[DentalVisitScreen] save before completion failed');
+        notify.error(t('dental2.visit_protocol_save_failed'));
+      }
+      setCompleting(false);
+      return;
+    }
+
+    if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+      setSaveError(null);
+      try {
+        await onCompleteVisit?.(snapshot);
+      } catch {
+        logger.warn('[DentalVisitScreen] queue completion callback failed');
+      }
+    }
+    setCompleting(false);
+  }, [onCompleteVisit, persistDraft, t, visitId]);
+
+  const handleBackToQueue = useCallback(async () => {
+    if (!onBackToQueue) return;
+    const targetVisitId = visitId;
+    if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') {
+      await onBackToQueue();
+      return;
+    }
+    if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+      await onBackToQueue();
+      return;
+    }
+
+    const snapshot = latestDraftRef.current;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setCompleting(true);
+    setSaveError(null);
+    try {
+      await persistDraft(targetVisitId, snapshot);
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        await onBackToQueue();
+      }
+    } catch (error: unknown) {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        setSaveError(getHttpStatus(error) === 409 ? 'conflict' : 'save');
+        logger.warn('[DentalVisitScreen] save before queue navigation failed');
+        notify.error(t('dental2.visit_protocol_save_failed'));
+      }
+    } finally {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) setCompleting(false);
+    }
+  }, [onBackToQueue, persistDraft, t, visitId]);
+
+  const handleRetrySave = useCallback(async () => {
+    if (retryCompletionRef.current) {
+      await handleCompleteVisit();
+      return;
+    }
+
+    const targetVisitId = visitId;
+    if (targetVisitId === null || targetVisitId === undefined || targetVisitId === '') {
+      setLoadError('missing_visit');
+      return;
+    }
+    if (!isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+      setLoadError('load');
+      return;
+    }
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setSaving(true);
+    try {
+      await persistDraft(targetVisitId, latestDraftRef.current);
+      setSaveError(null);
+    } catch (error: unknown) {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) {
+        setSaveError(getHttpStatus(error) === 409 ? 'conflict' : 'save');
+        logger.warn('[DentalVisitScreen] retry save failed');
+        notify.error(t('dental2.visit_protocol_save_failed'));
+      }
+    } finally {
+      if (isSameVisit(loadedVisitIdRef.current, targetVisitId)) setSaving(false);
+    }
+  }, [handleCompleteVisit, persistDraft, t, visitId]);
 
   // Tooth click → open ToothModal
   const handleToothClick = useCallback((toothNumber: string | number, toothData: Record<string, unknown> | null) => {
@@ -681,7 +1170,9 @@ const DentalVisitScreen = ({
     notify.success(t('dental.dental_dvs_icd10_added', { code: icd10Code }));
   }, [updateField, t]);
 
-  const isLoading = loading || parentLoading;
+  const isEMRLoaded = isSameVisit(loadedVisitId, visitId);
+  const isLoading = loading || parentLoading || (Boolean(visitId) && !isEMRLoaded && !loadError);
+  const fieldsDisabled = completing || !isEMRLoaded;
   const toothStatus = emrData.specialty_data?.tooth_status || {};
 
   return (
@@ -689,11 +1180,37 @@ const DentalVisitScreen = ({
       <Card padding="default">
         <PatientHeader
           patient={patient as Record<string, unknown> | null}
-          onCompleteVisit={onCompleteVisit || (() => {})}
-          loading={saving || parentLoading}
+          onCompleteVisit={handleCompleteVisit}
+          onBackToQueue={onBackToQueue ? handleBackToQueue : undefined}
+          backDisabled={completing || Boolean(parentLoading) || (loading && !loadError)}
+          loading={saving || completing || parentLoading || !isEMRLoaded || Boolean(loadError)}
         />
 
-        {isLoading ? (
+        {loadError && (
+          <Alert
+            type="error"
+            description={loadError === 'missing_visit' ? t('dental.protocol_needs_visit_id') : t('dental2.visit_map_load_failed')}
+            action={(
+              <Button variant="outline" onClick={() => { void loadEMR(); }}>
+                {t('doctor.btn_retry')}
+              </Button>
+            )}
+          />
+        )}
+
+        {saveError && (
+          <Alert
+            type="error"
+            description={t('dental2.visit_protocol_save_failed')}
+            action={(
+              <Button variant="outline" onClick={() => { void handleRetrySave(); }} disabled={saving || completing}>
+                {t('doctor.btn_retry')}
+              </Button>
+            )}
+          />
+        )}
+
+        {loadError ? null : isLoading ? (
           <div style={{ padding: 20 }}>
             <Skeleton style={{ height: 60, marginBottom: 12 }} />
             <Skeleton style={{ height: 200, marginBottom: 12 }} />
@@ -705,7 +1222,7 @@ const DentalVisitScreen = ({
             <AnamnesisSection
               value={emrData.anamnesis_morbi || emrData.complaints || ''}
               onChange={(v: string) => updateField('anamnesis_morbi', v)}
-              disabled={saving}
+              disabled={fieldsDisabled}
             />
 
             {/* Diagnosis + ICD-10 + AI button */}
@@ -715,7 +1232,7 @@ const DentalVisitScreen = ({
               onDiagnosisChange={(v) => updateField('diagnosis', v)}
               onIcd10Change={(v) => updateField('icd10_code', v)}
               onAISuggestion={handleAISuggestion}
-              disabled={saving}
+              disabled={fieldsDisabled}
             />
 
             {/* Tooth chart — основная рабочая область */}
@@ -726,7 +1243,7 @@ const DentalVisitScreen = ({
               <TeethChart
                 initialData={toothStatus}
                 onToothClick={handleToothClick}
-                readOnly={false}
+                readOnly={fieldsDisabled}
               />
               <ToothSummary toothStatus={toothStatus} />
             </div>
@@ -738,7 +1255,13 @@ const DentalVisitScreen = ({
                 ...(emrData.specialty_data?.hygiene_indices || {}),
                 [field]: value,
               })}
-              disabled={saving}
+              disabled={fieldsDisabled}
+            />
+
+            <VisitProtocolSections
+              value={normalizeVisitProtocolRecord(emrData.specialty_data?.visit_protocol)}
+              onUpdate={updateVisitProtocol}
+              disabled={fieldsDisabled}
             />
 
             {/* Visit history — read-only */}

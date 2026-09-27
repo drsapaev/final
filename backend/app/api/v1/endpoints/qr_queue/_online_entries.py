@@ -148,11 +148,7 @@ def _full_update_find_and_validate_entry(
             status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
         )
 
-    logger.info(
-        "[full_update_online_entry] Запись найдена: %s, phone=%s",
-        entry.patient_name,
-        entry.phone,
-    )
+    logger.info("[full_update_online_entry] Запись найдена: id=%d", entry.id)
 
     _ensure_doctor_can_mutate_queue_entry(
         db,
@@ -168,31 +164,15 @@ def _full_update_patient_data(entry, patient_data: dict):
     """Update patient name, phone, birth_year, address on the queue entry."""
     if patient_data.get("patient_name"):
         entry.patient_name = patient_data["patient_name"]
-        logger.info(
-            "[full_update_online_entry] Обновлено ФИО: %s",
-            entry.patient_name,
-        )
 
     if patient_data.get("phone"):
         entry.phone = patient_data["phone"]
-        logger.info(
-            "[full_update_online_entry] Обновлен телефон: %s",
-            entry.phone,
-        )
 
     if patient_data.get("birth_year") is not None:
         entry.birth_year = patient_data["birth_year"]
-        logger.info(
-            "[full_update_online_entry] Обновлен год рождения: %s",
-            entry.birth_year,
-        )
 
     if patient_data.get("address"):
         entry.address = patient_data["address"]
-        logger.info(
-            "[full_update_online_entry] Обновлен адрес: %s",
-            entry.address,
-        )
 
 
 def _full_update_visit_type(entry, request):
@@ -253,11 +233,7 @@ def _full_update_sync_patient_and_entries(
             if patient_data.get('address'):
                 patient.address = patient_data['address']
 
-            logger.info(
-                "[full_update_online_entry] Пациент обновлен: %s %s",
-                patient.last_name,
-                patient.first_name,
-            )
+            logger.info("[full_update_online_entry] Пациент обновлен: id=%d", patient.id)
 
             # Keep duplicate service entries in the same visit/session aligned.
             # Patient-wide sync can rewrite unrelated historical/future entries.
@@ -471,26 +447,19 @@ def _full_update_finalize_and_respond(
             db.rollback()
 
             logger.error(
-                "[full_update_online_entry] ❌ Ошибка при коммите: %s: %s",
+                "[full_update_online_entry] Ошибка при коммите: %s",
                 type(commit_error).__name__,
-                str(commit_error),
-                exc_info=True,
             )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Ошибка сохранения изменений: {str(commit_error)}",
+                detail="Ошибка сохранения изменений",
             )
 
     except HTTPException:
         raise
     except Exception as e:
 
-        logger.error(
-            "[full_update_online_entry] Ошибка: %s: %s",
-            type(e).__name__,
-            str(e),
-            exc_info=True,
-        )
+        logger.error("[full_update_online_entry] Ошибка: %s", type(e).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
@@ -1285,10 +1254,9 @@ def _full_update_collect_existing_services(
     )
 
     logger.info(
-        "[full_update_online_entry] ⭐ DEBUG: entry.patient_id=%s, final_aggregated_ids=%s, entry.services=%s",
-        entry.patient_id,
-        final_aggregated_ids,
-        entry.services[:200] if entry.services else None,
+        "[full_update_online_entry] entry_id=%d, aggregated_entries=%d",
+        entry.id,
+        len(final_aggregated_ids),
     )
 
     # Section 4.3: Scan entries for existing services
@@ -1316,8 +1284,54 @@ def _full_update_resolve_target_queue_id(
     Otherwise, fall back to the entry's original queue_id.
     """
     from app.models.online_queue import DailyQueue
+    from app.services.registrar_doctor_eligibility import (
+        assert_doctor_eligible_for_service,
+        service_requires_doctor_selection,
+    )
 
     default_queue_id = entry.queue_id
+    if service_requires_doctor_selection(service):
+        # The request has no doctor selector. Preserve the source queue's
+        # doctor; a resource QR entry may still add a non-consultation service
+        # assigned to the catalog's default doctor (existing cross-tag flow).
+        source_queue = entry.queue
+        source_doctor_id = source_queue.specialist_id if source_queue else None
+        if service.is_consultation and (
+            source_queue is None
+            or source_doctor_id is None
+            or source_queue.queue_resource_id is not None
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Консультацию «{service.name}» нельзя добавить в очередь без врача",
+            )
+        doctor_id = source_doctor_id or service.doctor_id
+        assert_doctor_eligible_for_service(
+            db,
+            service,
+            doctor_id,
+            target_date=source_queue.day if source_queue else None,
+        )
+        if not service.queue_tag:
+            if source_doctor_id is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Услуге «{service.name}» нужна очередь врача",
+                )
+            return default_queue_id
+        doctor_queue = queue_service.get_or_create_daily_queue(
+            db,
+            day=source_queue.day,
+            specialist_id=doctor_id,
+            queue_tag=service.queue_tag,
+        )
+        if service.is_consultation and doctor_queue.specialist_id != source_doctor_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Услугу «{service.name}» нельзя направить в очередь другого врача",
+            )
+        return doctor_queue.id
+
     if not service.queue_tag:
         return default_queue_id
 
@@ -1606,6 +1620,8 @@ def _full_update_create_independent_entries(
                         discount_mode=request.discount_mode or "none",
                         notes=f"QR-регистрация: {entry.patient_name}",
                     )
+                    if consultation_service_id is not None:
+                        visit.doctor_id = entry.queue.specialist_id
                     entry.visit_id = visit.id
                     logger.info(
                         "[full_update_online_entry] ⭐ FIX 2: Создан Visit ID=%d для QR-записи ID=%d",
@@ -1965,6 +1981,83 @@ def _full_update_process_services(
     return services_list, service_codes_list, total_amount, visit
 
 
+def _full_update_assert_doctor_services(
+    db: Session,
+    entry,
+    request: FullUpdateOnlineEntryRequest,
+) -> None:
+    """Validate every doctor-required target row before any mutation.
+
+    An existing service ID may come from another entry in the same session;
+    it does not prove that this entry already owns that doctor's work.
+    """
+    from app.crud.queue_resource_routing import tag_routes_to_resource
+    from app.models.service import Service
+    from app.services.registrar_doctor_eligibility import (
+        assert_doctor_eligible_for_service,
+        service_requires_doctor_selection,
+    )
+
+    requested_ids = {
+        int(item["service_id"])
+        for item in request.services
+        if item.get("service_id") is not None
+    }
+    services = {
+        service.id: service
+        for service in db.query(Service).filter(Service.id.in_(requested_ids)).all()
+    }
+    for item in request.services:
+        service_id = int(item["service_id"])
+        service = services.get(service_id)
+        if service is None or not service_requires_doctor_selection(service):
+            continue
+        source_queue = entry.queue
+        source_doctor_id = source_queue.specialist_id if source_queue else None
+        if service.is_consultation and (
+            source_queue is None
+            or source_doctor_id is None
+            or source_queue.queue_resource_id is not None
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Консультацию «{service.name}» нельзя добавить в очередь без врача",
+            )
+        if service.is_consultation and source_queue is not None:
+            target_tag = service.queue_tag or service.department_key
+            surface = (
+                tag_routes_to_resource(db, target_tag, source_queue.day)
+                if target_tag
+                else None
+            )
+            if surface is not None and surface.queue_resource_id is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Консультацию «{service.name}» нельзя добавить в ресурсную очередь",
+                )
+        doctor_id = source_doctor_id or service.doctor_id
+        selected_doctor = item.get("specialist_id", item.get("doctor_id"))
+        if selected_doctor is not None:
+            try:
+                selected_doctor = int(selected_doctor)
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Некорректный идентификатор врача в услуге",
+                ) from None
+        if selected_doctor is not None and selected_doctor != doctor_id:
+            raise HTTPException(
+                status_code=400,
+                detail="При обновлении QR-записи нельзя сменить врача выбранной очереди",
+            )
+        assert_doctor_eligible_for_service(
+            db,
+            service,
+            doctor_id,
+            target_date=source_queue.day if source_queue else None,
+        )
+
+
 @router.put("/online-entry/{entry_id}/full-update", response_model=dict[str, Any])
 def full_update_online_entry(
     entry_id: int,
@@ -1994,11 +2087,10 @@ def full_update_online_entry(
 
 
         logger.info(
-            "[full_update_online_entry] Обновление записи ID=%d, Данные пациента: %s, Тип визита: %s, Услуги: %s",
+            "[full_update_online_entry] Обновление записи ID=%d, тип визита=%s, услуг=%d",
             entry_id,
-            request.patient_data,
             request.visit_type,
-            request.services,
+            len(request.services or []),
         )
 
         # 1-3. Find entry, update patient data, update visit type
@@ -2081,6 +2173,8 @@ def full_update_online_entry(
             )
         request.services = [_merged_rows[_k] for _k in _merged_order]
 
+        _full_update_assert_doctor_services(db, entry, request)
+
         # Codex R4 #3095 (P1): bind the confirmed quote to the command —
         # revalidate prices BEFORE any mutation. Item-level conversion mirrors
         # the per-line int() the command stores (see total_amount accumulation).
@@ -2141,12 +2235,7 @@ def full_update_online_entry(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(
-            "[full_update_online_entry] Ошибка: %s: %s",
-            type(e).__name__,
-            str(e),
-            exc_info=True,
-        )
+        logger.error("[full_update_online_entry] Ошибка: %s", type(e).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",

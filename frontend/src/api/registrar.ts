@@ -166,8 +166,8 @@ export async function fetchRegistrarQueueSettings(): Promise<QueueSettings> {
  * Per-service entry of GET /registrar/services (значения services_by_group).
  * RQ-05.b: типизировано по актуальному DTO бэкенда
  * (api/v1/endpoints/registrar_integration/_services_doctors.py), включая
- * requires_doctor (RQ-05, F-04) — по этому флагу мастер записи делает
- * выбор врача обязательным ровно там, где его требует сервер (S-03).
+ * doctor_selection_required — каноническое решение сервера об обязательном
+ * выборе врача на втором шаге мастера записи.
  */
 export interface RegistrarCatalogService {
   id: string | number;
@@ -185,6 +185,10 @@ export interface RegistrarCatalogService {
   is_consultation?: boolean;
   /** RQ-05 (F-04): сервер требует выбор врача для этой услуги. */
   requires_doctor: boolean;
+  /** Серверное решение: для записи услуги требуется конкретный врач. */
+  doctor_selection_required: boolean;
+  /** Можно записать к врачу через текущую настройку очереди услуги. */
+  doctor_booking_available: boolean;
   /**
    * RQ-08.a: серверные допустимые специальности врача для department_key —
    * вычислены той же функцией, что и серверный гейт корзины (RQ-05.a).
@@ -209,10 +213,25 @@ export interface RegistrarServicesResponse {
 
 /**
  * Загрузить справочник услуг регистратуры, сгруппированный по specialty/group.
+ *
+ * PR #3438 review round-2 P2: `targetDate` — день записи ('YYYY-MM-DD'),
+ * для которого backend вычисляет владельца очереди каждой услуги
+ * (`doctor_selection_required` / `doctor_booking_available`). Без него
+ * backend отвечает для дня по умолчанию (клиник-день «сегодня») — каталог
+ * и write-gate расходятся, если регистратор оформляет запись на другой
+ * день (правка существующей/будущей записи): каталог обещает resource-
+ * owned без врача, а save-гейт требует врача → 400 на сохранении.
+ *
+ * @param targetDate День записи ('YYYY-MM-DD') или null/undefined —
+ *                  день по умолчанию на стороне сервера.
  * @returns {Promise<RegistrarServicesResponse>}
  */
-export async function fetchRegistrarServices(): Promise<RegistrarServicesResponse> {
-  const response = await api.get('/registrar/services');
+export async function fetchRegistrarServices(
+  targetDate?: string | null
+): Promise<RegistrarServicesResponse> {
+  const response = await api.get('/registrar/services', {
+    params: targetDate ? { target_date: targetDate } : undefined,
+  });
   return response.data as RegistrarServicesResponse;
 }
 

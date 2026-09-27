@@ -248,6 +248,12 @@ export function buildChecklist(
   resources: ChecklistResourceDto[],
   entryMethodsByProfileKey: Record<string, EntryMethodsDto | null> = {},
   doctors: ChecklistDoctorDto[] = [],
+  // RQ-18 follow-up round-3 (P2): post-provision recheck answers override
+  // the entry-methods flag per profile (undefined = no answer yet,
+  // boolean = proven, null = recheck failed → honest unknown). Kept
+  // SEPARATE from the methods map: an unknown must never destroy the
+  // last-known payload, or the row could never leave unknown again.
+  postProvisionSupportByProfileKey: Record<string, boolean | null | undefined> = {},
 ): Checklist {
   const checklist: Checklist = {};
   const tags = collectKnownTags(services, profiles, resources);
@@ -281,10 +287,18 @@ export function buildChecklist(
 
     let permanentAddress: boolean | null = null;
     const profileKey = owningProfile?.key;
-    if (owningProfileVisible && profileKey && entryMethodsByProfileKey[profileKey]) {
-      permanentAddress = readPermanentAddressSupported(
-        entryMethodsByProfileKey[profileKey],
-      );
+    if (owningProfileVisible && profileKey) {
+      // RQ-18 follow-up round-3 (P2): a recheck answer (true/false/unknown)
+      // is the freshest truth for this profile; without one, the last
+      // known entry-methods payload stays authoritative.
+      const recheckOverride = postProvisionSupportByProfileKey[profileKey];
+      if (recheckOverride !== undefined) {
+        permanentAddress = recheckOverride;
+      } else if (entryMethodsByProfileKey[profileKey]) {
+        permanentAddress = readPermanentAddressSupported(
+          entryMethodsByProfileKey[profileKey],
+        );
+      }
     }
 
     const axis: DirectionAxis = activeResource

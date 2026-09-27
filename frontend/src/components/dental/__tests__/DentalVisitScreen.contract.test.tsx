@@ -8,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
 const PANEL_PATH = path.resolve(__dirname, '../../../pages/DentistPanelUnified.tsx');
+const DIALOGS_PATH = path.resolve(__dirname, '../../../pages/dentist/views/DentistDialogsLayer.tsx');
 
 const readSource = (fileName: string) =>
   fs.readFileSync(path.join(ROOT, fileName), 'utf8').replace(/\r\n/g, '\n');
@@ -107,6 +108,7 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
     expect(source).toContain('AnamnesisSection');
     expect(source).toContain('ToothSummary');
     expect(source).toContain('CollapsibleExtras');
+    expect(source).toContain('VisitProtocolSections');
     expect(source).toContain('VisitHistory');
 
     // Anamnesis must be a Textarea (1-2 строки), not a heavy form.
@@ -118,13 +120,37 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
     expect(source).toContain('useState(false)');
   });
 
-  it('passes onCompleteVisit through to PatientHeader (wired to C-1/C-3 confirm)', () => {
+  it('completes only through the save-before-queue handler', () => {
     const source = readSource('DentalVisitScreen.tsx');
 
-    // Strict:true migration added `|| (() => {})` fallback so the prop is
-    // always a function (PatientHeader propTypes mark it as isRequired).
-    expect(source).toContain('onCompleteVisit={onCompleteVisit || (() => {})}');
+    expect(source).toContain('onCompleteVisit={handleCompleteVisit}');
+    expect(source.indexOf('await persistDraft(targetVisitId, snapshot)')).toBeLessThan(
+      source.indexOf('await onCompleteVisit?.(snapshot)'),
+    );
     expect(source).toContain('Завершить визит');
+  });
+
+  it('stores embedded protocol edits under specialty_data.visit_protocol', () => {
+    const source = readSource('DentalVisitScreen.tsx');
+    expect(source).toContain('updateSpecialtyData(\'visit_protocol\', update(current))');
+    expect(source).toContain('<VisitProtocolSections');
+    expect(source).toContain('visit_protocol: protocolData || EMPTY_EMR_DATA.specialty_data.visit_protocol');
+  });
+
+  it('saves the draft before returning to the queue and keeps queue close separate', () => {
+    const source = readSource('DentalVisitScreen.tsx');
+    expect(source).toContain('onBackToQueue={onBackToQueue ? handleBackToQueue : undefined}');
+    expect(source.indexOf('await persistDraft(targetVisitId, snapshot)')).toBeLessThan(
+      source.indexOf('await onBackToQueue();'),
+    );
+    expect(source).toContain('onCompleteVisit={handleCompleteVisit}');
+  });
+
+  it('does not render the second protocol modal or completion action', () => {
+    const dialogs = fs.readFileSync(DIALOGS_PATH, 'utf8').replace(/\r\n/g, '\n');
+    expect(dialogs).not.toContain('import VisitProtocol from');
+    expect(dialogs).not.toContain('<VisitProtocol');
+    expect(dialogs).not.toContain('handleCompleteVisit');
   });
 
   it('DentistPanelUnified uses DentalVisitScreen in renderVisits when patient is selected', () => {
@@ -135,6 +161,7 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
     expect(source).toContain('<DentalVisitScreen');
     // The panel wires the completion flow into the view.
     expect(readPanel()).toContain('onCompleteVisit={handleCompleteVisit}');
+    expect(readPanel()).toContain('onStartVisit={handleStartQueueVisit}');
 
     // Must NOT use the old EMRContainerV2 for selectedPatient visits
     // (EMRContainerV2 may still be imported for other uses, but not in renderVisits).

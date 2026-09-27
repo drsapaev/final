@@ -769,6 +769,86 @@ export const createIdempotencyKey = (): string => {
   return `cart-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
+/** Repeat preview echoes cart item IDs, which may be strings or numbers. */
+export const repeatPreviewCandidateKey = (value: string | number | null | undefined): string | null =>
+  value == null ? null : String(value);
+
+/** QR full-update retains the entry's owner; a specialty bucket is not an owner. */
+export const resolveQrLockedDoctorId = (
+  isFullUpdateRoute: boolean,
+  record: Record<string, unknown> | null | undefined,
+): string | number | null | undefined => {
+  if (!isFullUpdateRoute) return undefined;
+  if (record?.queue_owner_kind !== 'doctor') return null;
+  const ownerId = record.queue_owner_id;
+  if (typeof ownerId === 'number') return Number.isFinite(ownerId) && ownerId > 0 ? ownerId : null;
+  if (typeof ownerId === 'string') return ownerId.trim() || null;
+  return null;
+};
+
+export interface WizardCartSelectionItem {
+  id?: string | number;
+  service_id?: string | number;
+  service_name?: string;
+  service_price?: number;
+  quantity?: number;
+  doctor_id?: string | number | null;
+  doctor_name?: string;
+  visit_date?: string;
+  visit_time?: string | null;
+  _new_for_wizard?: boolean;
+  [key: string]: unknown;
+}
+
+export interface WizardCartSelectionDoctor {
+  id?: string | number;
+  name?: string;
+  full_name?: string;
+  user?: { full_name?: string; username?: string } | null;
+  [key: string]: unknown;
+}
+
+export const getWizardDoctorDisplayName = (doctor: WizardCartSelectionDoctor): string =>
+  String(doctor.user?.full_name || doctor.full_name || doctor.name || doctor.user?.username || `Врач #${doctor.id}`);
+
+/** One interaction adds or increments the exact (service, doctor) pair. */
+export const addServiceToWizardCart = (
+  items: WizardCartSelectionItem[],
+  service: { id?: string | number; name: string; price?: number; doctor_selection_required?: boolean; doctor_booking_available?: boolean },
+  doctor: WizardCartSelectionDoctor | null,
+  itemId: string,
+  visitDate: string,
+): WizardCartSelectionItem[] => {
+  // PR #3438 review P1-1: doctor_booking_available=false блокирует только
+  // запись К ВРАЧУ (флаг — про doctor-owned очередь услуги). Ресурсная
+  // услуга (doctor_selection_required=false, напр. K10/ecg) легально
+  // добавляется в корзину БЕЗ врача — общий список остаётся кликабельным.
+  if (service.id == null ||
+    (doctor?.id != null && service.doctor_booking_available === false) ||
+    (service.doctor_selection_required && doctor?.id == null)) return items;
+  const doctorId = doctor?.id ?? null;
+  const existingIndex = items.findIndex((item) =>
+    String(item.service_id) === String(service.id) && String(item.doctor_id ?? '') === String(doctorId ?? '')
+  );
+  if (existingIndex >= 0) {
+    return items.map((item, index) => index === existingIndex
+      ? { ...item, quantity: (item.quantity || 1) + 1 }
+      : item);
+  }
+  return [...items, {
+    id: itemId,
+    service_id: service.id,
+    service_name: service.name,
+    service_price: service.price,
+    quantity: 1,
+    doctor_id: doctorId,
+    doctor_name: doctor ? getWizardDoctorDisplayName(doctor) : undefined,
+    visit_date: visitDate,
+    visit_time: null,
+    _new_for_wizard: true,
+  }];
+};
+
 // Codex R2 PR 3092 (P1): ключ привязан к снимку payload первой попытки.
 // Чистая гвардия: 'bind' — первая попытка (ключ + снимок), 'proceed' —
 // повтор с теми же данными (кэш backend вернёт сохранённый ответ),
@@ -940,8 +1020,8 @@ const DEPARTMENT_CODE_MAPPING: Record<string, string> = {
   'O': 'procedures' // Прочие процедуры → вкладка procedures
 };
 
-// RQ-05.b: позиции корзины, у которых сервер требует врача (DTO-флаг
-// requires_doctor из GET /registrar/services, F-04), а врач не выбран.
+// Позиции корзины, у которых сервер требует врача (DTO-флаг
+// doctor_selection_required из GET /registrar/services), а врач не выбран.
 // Чистая функция: извлечена из AppointmentWizardV2.validateStep — гейт
 // шага 2 «выбор обязателен ровно там, где его требует сервер» (S-03).
 // Паритет с прежним инлайн-гейтом: услуга, отсутствующая в каталоге
@@ -954,7 +1034,7 @@ export interface MissingDoctorItemLike {
 
 export interface MissingDoctorServiceLike {
   id?: string | number;
-  requires_doctor?: boolean;
+  doctor_selection_required?: boolean;
   [key: string]: unknown;
 }
 
@@ -966,14 +1046,14 @@ export const findMissingDoctorItems = (
   if (!Array.isArray(services) || services.length === 0) return [];
 
   return items.filter((item) => {
-    const service = services.find((s) => s.id === item.service_id);
-    return Boolean(service?.requires_doctor) && !item.doctor_id;
+    const service = services.find((s) => String(s.id) === String(item.service_id));
+    return Boolean(service?.doctor_selection_required) && !item.doctor_id;
   });
 };
 
 // RQ-05.b (codex P2 PR 3309): типизированная конверсия записи каталога
-// GET /registrar/services в форму мастера. Флаг requires_doctor переносится
-// ЯВНО — смена DTO-контракта ломает компиляцию, а не молча пропускает шаг 2
+// GET /registrar/services в форму мастера. Флаг doctor_selection_required
+// переносится ЯВНО — смена DTO-контракта ломает компиляцию, а не пропускает шаг 2
 // без врача. Nullable-строки DTO нормализуются в undefined.
 export interface WizardCatalogServiceData {
   id?: string | number;
@@ -985,6 +1065,8 @@ export interface WizardCatalogServiceData {
   price?: number;
   is_consultation?: boolean;
   requires_doctor?: boolean;
+  doctor_selection_required: boolean;
+  doctor_booking_available: boolean;
   /**
    * RQ-08.a: ТРИ состояния серверной eligibility:
    * - string[] — серверный набор допустимых специальностей (гейт-паритет);
@@ -1017,6 +1099,8 @@ export const wizardServiceFromCatalogEntry = (
   ...entry,
   requires_doctor: Boolean(entry.requires_doctor),
   is_consultation: Boolean(entry.is_consultation),
+  doctor_selection_required: Boolean(entry.doctor_selection_required),
+  doctor_booking_available: Boolean(entry.doctor_booking_available),
   service_code: entry.service_code ?? undefined,
   queue_tag: entry.queue_tag ?? undefined,
   category_code: entry.category_code ?? undefined,
@@ -1625,10 +1709,11 @@ export const buildEditOriginalServiceIdentity = (
 // Предикат «новая услуга» для edit-дельты — ТОТ ЖЕ, что в сабмите
 // handleComplete (original_queue_id + serviceIds/Codes/Names).
 export const isEditDeltaNewItem = (
-  item: { original_queue_id?: unknown; service_id?: unknown },
+  item: { original_queue_id?: unknown; service_id?: unknown; _new_for_wizard?: unknown },
   service: WizardServiceRecord | undefined,
   identity: EditOriginalServiceIdentity,
 ): boolean => {
+  if (item._new_for_wizard === true) return true;
   const hasExistingQueueIdentity = Boolean(item.original_queue_id);
   const inIds = identity.serviceIds.has(item.service_id);
   const inCodes = service?.service_code

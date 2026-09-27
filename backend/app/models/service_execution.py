@@ -44,6 +44,36 @@ Creating/completing a ServiceExecution does NOT close the Visit:
 ``visits.status`` is governed by the visit lifecycle, never by
 service-level execution (owner contract: "выполнить услугу" != "закрыть
 визит").
+
+Corrective follow-up (owner verdict on the merged #3355 + #3358 runtime,
+P1 — immutable execution-to-station routing): the attempt now stores the
+ROUTING SNAPSHOT of the station it was validated against at start:
+- ``queue_resource_id`` — the QueueResource row whose station the D3
+  gate passed for THIS attempt (creation-time fact; deliberately a plain
+  value, NOT a live FK — a registry-row deletion must not orphan the
+  execution history, the snapshot is a historical fact);
+- ``routing_queue_tag_snapshot`` — the ``resource.queue_tag`` captured at
+  start (historical audit axis; the station identity proof pairs with
+  ``queue_resource_id``);
+- ``routing_service_id`` — the ``visit_service.service_id`` the attempt
+  was validated for (binds the routing proof to the exact billed line:
+  a hand-repointed ``visit_service_id`` no longer matches the snapshot
+  and fails closed — the codex round-1 cross-station guard survives the
+  catalog-mutation immunity).
+Terminal authorization checks the snapshot + the entry<->visit_service
+integrity, NOT the CURRENT catalog: ``Service.queue_tag`` is a штатно
+mutable field (canonical/batch update re-tag), and a mid-flight re-tag
+used to make the attempt unfinishable (terminal 403 + invisible to
+drain discovery + the 0072 partial unique one-active index blocking
+every retry). Migration 0073 BACKFILLS every ``in_progress`` row whose
+chain still corroborates the D3 routing at upgrade time (rows whose
+chain does not resolve, or whose current catalog contradicts the
+routing, stay NULL — no widening of authorization); such remaining NULL
+rows keep the legacy current-catalog D3 re-check. Rollout discipline:
+the backfill covers rows existing at upgrade time only — rows written
+by pre-upgrade workers during a rolling deployment stay NULL until
+their first legacy-consistent touch, so catalog re-tags stay frozen
+until the old version is fully replaced (the formal rollout barrier).
 """
 
 from __future__ import annotations
@@ -138,6 +168,26 @@ class ServiceExecution(Base):
     # Human-readable reason when status = 'incomplete' (the N2-3 brief
     # will formalize the transition matrix; the column lands now).
     incomplete_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    # Corrective follow-up (owner verdict P1 — immutable execution-to-
+    # station routing): creation-time routing snapshot. Nullable: rows
+    # written before migration 0073 get the upgrade-time backfill when
+    # their chain corroborates the routing (see the module docstring);
+    # unresolvable rows keep the legacy current-catalog D3 re-check on
+    # their terminal paths. See the module docstring for why these are
+    # plain values, not live FKs.
+    queue_resource_id: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    routing_queue_tag_snapshot: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+    )
+    routing_service_id: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
 
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=True

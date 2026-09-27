@@ -128,6 +128,7 @@ def test_cart_and_graphql_join_complete_without_deadlock(
             username=f"cart_doc_{suffix}",
             hashed_password="!disabled:test",
             role="Doctor",
+            full_name="Synthetic Cart Doctor",
             is_active=True,
         )
         seed.add_all([admin_user, doctor_user])

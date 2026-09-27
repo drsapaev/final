@@ -25,6 +25,7 @@ The N2-3 brief decisions pinned here:
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -32,6 +33,8 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.crud.clinic import clinic_today
+from app.models.appointment import Appointment
+from app.models.department import Department
 from app.models.nurse_workplace import NurseWorkplaceAssignment
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueResource
 from app.models.patient import Patient
@@ -144,6 +147,7 @@ def _entry(
     status: str = "waiting",
     priority: int = 0,
     visit: Visit | None = None,
+    called_by: int | None = None,
 ) -> OnlineQueueEntry:
     entry = OnlineQueueEntry(
         queue_id=queue.id,
@@ -154,6 +158,8 @@ def _entry(
         priority=priority,
         source="desk",
         visit_id=visit.id if visit else None,
+        called_by_user_id=called_by,
+        called_at=datetime.now(UTC) if called_by is not None else None,
     )
     db.add(entry)
     db.commit()
@@ -1079,6 +1085,402 @@ class TestReadPlane:
 
 
 # ----------------------------------------------------------------------------
+# H. N2-5 owner review round (P1): the server-derived D1 handover predicate
+# ----------------------------------------------------------------------------
+
+
+class TestHandoverPredicate:
+    """The board tells the tablet WHICH active entries are actionable.
+
+    The start/terminal endpoints authorize ANY assigned nurse of the
+    station, but a foreign entry may only surface as an action surface
+    when the SERVER proves the takeover: the claim owner (called_by)
+    no longer holds an ACTIVE assignment on THIS station — or never
+    existed (the admin-called display-board flow). An owner still
+    working keeps her entry read-only for the colleagues."""
+
+    def test_revoked_owner_leaves_the_entry_actionable(self, db_session: Session):
+        # The owner's exact scenario: A calls the patient, her assignment
+        # is revoked before the service starts; B (active assignment on
+        # the same station) must see a takeover surface, not a dead end.
+        owner = _nurse(db_session, "n25_hand_owner_revoked")
+        colleague = _nurse(db_session, "n25_hand_colleague_revoked")
+        resource = _resource(db_session, "handover1")
+        _assignment(db_session, owner, resource, active=False)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        entry = _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Галина Передача"),
+            status="called",
+            called_by=owner.id,
+        )
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = next(e for e in state["active"] if e["id"] == entry.id)
+        assert foreign["is_my_claim"] is False
+        assert foreign["claim_owner_assignment_active"] is False
+        assert foreign["actionable_by_current_user"] is True
+        assert state["my_entry"] is None
+
+    def test_active_owner_keeps_the_entry_read_only_for_colleagues(
+        self, db_session: Session
+    ):
+        owner = _nurse(db_session, "n25_hand_owner_active")
+        colleague = _nurse(db_session, "n25_hand_colleague_active")
+        resource = _resource(db_session, "handover2")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        entry = _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Иван Занят"),
+            status="in_progress",
+            called_by=owner.id,
+        )
+
+        service = NurseServingApiService(db_session)
+        colleague_view = service.get_station_state(colleague.id, resource.id)
+        foreign = next(e for e in colleague_view["active"] if e["id"] == entry.id)
+        assert foreign["claim_owner_assignment_active"] is True
+        assert foreign["actionable_by_current_user"] is False
+        assert colleague_view["my_entry"] is None
+        # The owner herself still sees her claim as the current patient.
+        owner_view = service.get_station_state(owner.id, resource.id)
+        assert owner_view["my_entry"] is not None
+        assert owner_view["my_entry"]["actionable_by_current_user"] is True
+        assert owner_view["my_entry"]["claim_owner_assignment_active"] is True
+
+    def test_own_claim_is_actionable(self, db_session: Session):
+        nurse = _nurse(db_session, "n25_hand_own")
+        resource = _resource(db_session, "handover3")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Оксана Своя"),
+            status="called",
+            called_by=nurse.id,
+        )
+        state = NurseServingApiService(db_session).get_station_state(
+            nurse.id, resource.id
+        )
+        assert state["my_entry"] is not None
+        assert state["my_entry"]["claim_owner_assignment_active"] is True
+        assert state["my_entry"]["actionable_by_current_user"] is True
+
+    def test_admin_called_entry_without_owner_is_actionable(self, db_session: Session):
+        # The display-board admin call: called_by is NULL — every
+        # assigned nurse may start it (the start_entry contract).
+        nurse = _nurse(db_session, "n25_hand_admincall")
+        resource = _resource(db_session, "handover4")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Пётр Админ"),
+            status="called",
+        )
+        state = NurseServingApiService(db_session).get_station_state(
+            nurse.id, resource.id
+        )
+        assert state["my_entry"] is None
+        entry = state["active"][0]
+        assert entry["called_by_user_id"] is None
+        assert entry["claim_owner_assignment_active"] is False
+        assert entry["actionable_by_current_user"] is True
+
+    def test_owner_working_on_another_station_does_not_block_the_takeover(
+        self, db_session: Session
+    ):
+        # The ownership check is STATION-scoped: A lost THIS station's
+        # assignment but still works another one — the entry she called
+        # here stays takeover-eligible for this station's assigned staff.
+        owner = _nurse(db_session, "n25_hand_owner_moved")
+        colleague = _nurse(db_session, "n25_hand_colleague_moved")
+        this_station = _resource(db_session, "handover5")
+        other_station = _resource(db_session, "handover5_other")
+        _assignment(db_session, owner, other_station)
+        _assignment(db_session, colleague, this_station)
+        queue = _station_queue(db_session, this_station)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Леонид Межстанция"),
+            status="in_progress",
+            called_by=owner.id,
+        )
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, this_station.id
+        )
+        foreign = state["active"][0]
+        assert foreign["claim_owner_assignment_active"] is False
+        assert foreign["actionable_by_current_user"] is True
+
+    def test_waiting_and_terminal_rows_do_not_carry_the_predicate(
+        self, db_session: Session
+    ):
+        nurse = _nurse(db_session, "n25_hand_shapes")
+        resource = _resource(db_session, "handover6")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        waiting = _entry(db_session, queue, 1, patient=_patient(db_session, "Wait N25"))
+        # A terminal row that REALLY surfaces on the board: a visit with
+        # a pending station service -> late_pending.
+        served_visit = _visit(
+            db_session,
+            _patient(db_session, "Done N25"),
+            department=resource.queue_tag,
+        )
+        svc = _service(db_session, "HAND6", queue_tag=resource.queue_tag)
+        _visit_service(db_session, served_visit, svc)
+        served = _entry(
+            db_session,
+            queue,
+            2,
+            patient=_patient(db_session, "Done N25"),
+            status="served",
+            visit=served_visit,
+            called_by=nurse.id,
+        )
+        state = NurseServingApiService(db_session).get_station_state(
+            nurse.id, resource.id
+        )
+        waiting_item = next(e for e in state["waiting"] if e["id"] == waiting.id)
+        assert "claim_owner_assignment_active" not in waiting_item
+        assert "actionable_by_current_user" not in waiting_item
+        terminal_item = next(e for e in state["late_pending"] if e["id"] == served.id)
+        assert terminal_item is not None
+        assert "claim_owner_assignment_active" not in terminal_item
+        assert "actionable_by_current_user" not in terminal_item
+
+    def test_full_takeover_flow_through_the_predicate(self, db_session: Session):
+        # End-to-end D1 handover from the colleague's chair: the board
+        # says actionable -> start -> execute -> complete flips the entry.
+        owner = _nurse(db_session, "n25_flow_owner")
+        colleague = _nurse(db_session, "n25_flow_colleague")
+        resource = _resource(db_session, "handover7")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Марина Приём")
+        entry = _entry(db_session, queue, 1, patient=patient, called_by=owner.id)
+        service = NurseServingApiService(db_session)
+        service.call_next(owner.id, resource.id)
+
+        # The owner's shift ends mid-flight: assignment revoked BEFORE
+        # the service started; the colleague's board flags the takeover.
+        owner_assignment = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == owner.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .one()
+        )
+        owner_assignment.is_active = False
+        db_session.commit()
+
+        state = service.get_station_state(colleague.id, resource.id)
+        assert state["active"][0]["actionable_by_current_user"] is True
+
+        start = service.start_entry(colleague.id, resource.id, entry.id)
+        assert start["status"] == "in_progress"
+        assert start["idempotent"] is False
+
+        visit = db_session.get(Visit, entry.visit_id)
+        svc = _service(db_session, "HAND1", queue_tag=resource.queue_tag)
+        vs = _visit_service(db_session, visit, svc)
+        execution = service.create_execution(
+            colleague.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=vs.id,
+        )
+        completion = service.complete_execution(colleague.id, execution["id"])
+        assert completion["entry_served"] is True
+        assert completion["entry_served_by_user_id"] == colleague.id
+        db_session.refresh(entry)
+        assert entry.status == "served"
+
+    def test_deactivated_owner_with_active_assignment_leaves_entry_actionable(
+        self, db_session: Session
+    ):
+        # Review round 3 (P1): the user lifecycle deactivates the OWNER's
+        # account WITHOUT touching NurseWorkplaceAssignment (only the
+        # Doctor mirror exists in update_user) — the assignment row stays
+        # is_active=True while its user is already locked out by
+        # require_active_roles("Nurse"). An assignment row alone must not
+        # keep the patient stranded: the colleague sees the takeover.
+        owner = _nurse(db_session, "n25_hand_owner_deactivated")
+        colleague = _nurse(db_session, "n25_hand_colleague_deactivated")
+        resource = _resource(db_session, "handover8")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        entry = _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Вера Отключена"),
+            status="called",
+            called_by=owner.id,
+        )
+        owner.is_active = False
+        db_session.commit()
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = next(e for e in state["active"] if e["id"] == entry.id)
+        assert foreign["claim_owner_assignment_active"] is False
+        assert foreign["actionable_by_current_user"] is True
+
+    def test_demoted_owner_with_active_assignment_leaves_entry_actionable(
+        self, db_session: Session
+    ):
+        # Review round 3 (P1): same lifecycle hole via demotion — the
+        # owner's role flips to Registrar while the assignment row stays
+        # ACTIVE. The serving endpoint would 403 her; the board must not
+        # render her patient as "обслуживается другим сотрудником".
+        owner = _nurse(db_session, "n25_hand_owner_demoted")
+        colleague = _nurse(db_session, "n25_hand_colleague_demoted")
+        resource = _resource(db_session, "handover9")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        entry = _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Григорий Понижен"),
+            status="in_progress",
+            called_by=owner.id,
+        )
+        owner.role = "Registrar"
+        db_session.commit()
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = next(e for e in state["active"] if e["id"] == entry.id)
+        assert foreign["claim_owner_assignment_active"] is False
+        assert foreign["actionable_by_current_user"] is True
+
+    def test_case_drifted_role_still_counts_when_account_is_eligible(
+        self, db_session: Session
+    ):
+        # The roles SSOT normalizer (case/whitespace) applies to the
+        # owner's role too — a legacy-stored 'nurse ' spelling with an
+        # otherwise eligible account keeps the entry read-only (the
+        # endpoint gate is case-insensitive the same way).
+        owner = _user(db_session, "n25_hand_owner_casedrift", "nurse ")
+        colleague = _nurse(db_session, "n25_hand_colleague_casedrift")
+        resource = _resource(db_session, "handover10")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Елена Дрейф"),
+            status="called",
+            called_by=owner.id,
+        )
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = state["active"][0]
+        assert foreign["claim_owner_assignment_active"] is True
+        assert foreign["actionable_by_current_user"] is False
+
+    def test_superuser_owner_with_active_assignment_stays_read_only(
+        self, db_session: Session
+    ):
+        # Review round 4 (P2): the staff superuser bypass. require_roles()
+        # admits an ACTIVE superuser regardless of the stored role — the
+        # serving endpoint would let this owner keep working her entry
+        # (the same bypass test_no_assignment_is_403_even_for_superuser
+        # documents: the superuser passes the role gate, the assignment
+        # ROW is the only thing that stops her). UserUpdateRequest can
+        # produce the world: role=Admin + is_superuser=true over an
+        # untouched ACTIVE Nurse assignment. The board predicate must
+        # mirror that authorization — the entry stays read-only, NOT a
+        # takeover offer on a live claim.
+        owner = _user(db_session, "n25_hand_owner_superuser", "Admin")
+        owner.is_superuser = True
+        db_session.commit()
+        colleague = _nurse(db_session, "n25_hand_colleague_superuser")
+        resource = _resource(db_session, "handover11")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Иван Привилегированный"),
+            status="in_progress",
+            called_by=owner.id,
+        )
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = state["active"][0]
+        assert foreign["claim_owner_assignment_active"] is True
+        assert foreign["actionable_by_current_user"] is False
+
+    def test_deactivated_superuser_owner_leaves_entry_actionable(
+        self, db_session: Session
+    ):
+        # Review round 4 (P2), the negative edge of the same predicate:
+        # the superuser bypass lives INSIDE require_roles — composing it
+        # with the active check is what require_active_roles does, and a
+        # deactivated account is locked out regardless of the flag. The
+        # predicate keeps the is_active conjunct BEFORE the bypass: an
+        # inactive superuser owner is still stranding the patient — the
+        # colleague sees the takeover.
+        owner = _user(db_session, "n25_hand_owner_superuser_off", "Admin")
+        owner.is_superuser = True
+        owner.is_active = False
+        db_session.commit()
+        colleague = _nurse(db_session, "n25_hand_colleague_superuser_off")
+        resource = _resource(db_session, "handover12")
+        _assignment(db_session, owner, resource)
+        _assignment(db_session, colleague, resource)
+        queue = _station_queue(db_session, resource)
+        _entry(
+            db_session,
+            queue,
+            1,
+            patient=_patient(db_session, "Ольга Отключённая"),
+            status="called",
+            called_by=owner.id,
+        )
+
+        state = NurseServingApiService(db_session).get_station_state(
+            colleague.id, resource.id
+        )
+        foreign = state["active"][0]
+        assert foreign["claim_owner_assignment_active"] is False
+        assert foreign["actionable_by_current_user"] is True
+
+
+# ----------------------------------------------------------------------------
 # I. codex round-1 regressions (station chain / visit-day transfer / replay)
 # ----------------------------------------------------------------------------
 
@@ -1599,8 +2001,15 @@ class TestCodexRound3BoardQueryBudget:
         n_done: int,
     ) -> tuple[User, QueueResource]:
         nurse = _nurse(db, f"n23_budget_{suffix}")
+        # N2-5 owner review round: the board carries claim owners now —
+        # a colleague with her own active assignment alternates the
+        # called_by attribution so the handover-predicate batch query
+        # actually RUNS in both worlds (the constant-budget pin keeps
+        # its teeth on the new lookup too).
+        colleague = _nurse(db, f"n23_budget_peer_{suffix}")
         resource = _resource(db, f"budget_{suffix}")
         _assignment(db, nurse, resource)
+        _assignment(db, colleague, resource)
         queue = _station_queue(db, resource)
         svc = _service(db, f"BUD{suffix}", queue_tag=resource.queue_tag)
         number = 0
@@ -1615,6 +2024,7 @@ class TestCodexRound3BoardQueryBudget:
                 patient=patient,
                 status="in_progress",
                 visit=visit,
+                called_by=(nurse.id if i % 2 == 0 else colleague.id),
             )
             _visit_service(db, visit, svc)
         for i in range(n_late):
@@ -1679,8 +2089,1370 @@ class TestCodexRound3BoardQueryBudget:
         assert boards[0]["counts"]["late_pending"] == 2
         assert len(boards[1]["active"]) == 6
         assert boards[1]["counts"]["late_pending"] == 8
+        # The handover predicate really is populated on every active row:
+        # the READER's own claims (even rows) stay actionable, while the
+        # colleague's claims (odd rows) keep her ACTIVE assignment —
+        # claim_owner_assignment_active=True and read-only for the reader.
+        for board in boards:
+            for index, item in enumerate(board["active"]):
+                assert item["claim_owner_assignment_active"] is True
+                assert item["actionable_by_current_user"] is (index % 2 == 0)
 
         # CONSTANT budget: the 22-row board costs the SAME SQL as the
-        # 6-row one (3 lookups + 3 entry lists + 2 enrichment batches).
+        # 6-row one (3 lookups + 3 entry lists + 2 enrichment batches +
+        # 1 claim-owner assignment batch — the N2-5 handover lookup).
         assert counts[0] == counts[1]
         assert counts[0] <= 12
+
+
+# ----------------------------------------------------------------------------
+# N2-3 follow-up (N2-5 §8): drain-recovery discovery
+# ----------------------------------------------------------------------------
+class TestDrainRecoveryDiscovery:
+    """The reload-discovery loop the graceful drain was missing.
+
+    Before this endpoint a mid-flight deactivation collapsed the read
+    plane to "no workplace" (empty workplaces list) + 403 board, so a
+    RELOADED tablet could not rediscover the in_progress execution the
+    drain still lets the starter finish — empirically proven on main
+    (the N2-5 §8 gate scenario).
+    """
+
+    def test_discovery_surfaces_own_execution_after_deactivation(self, db_session):
+        nurse = _nurse(db_session, "n2dr_a")
+        resource = _resource(db_session, "procedures_dr")
+        _assignment(db_session, nurse, resource, cabinet="7")
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Drain")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        execution = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        exec_id = execution["id"]
+
+        # mid-flight deactivation
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        # the read plane the reload has:
+        items, total = svc.list_workplaces(nurse.id)
+        assert total == 0
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            svc.get_station_state(nurse.id, resource.id)
+        _expect(exc, 403)
+
+        # the discovery closes the loop:
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        item = payload["items"][0]
+        assert item["execution"]["id"] == exec_id
+        assert item["execution"]["status"] == "in_progress"
+        assert item["execution"]["attempt_no"] == 1
+        assert item["station"]["queue_resource_id"] == resource.id
+        assert item["station"]["effective_cabinet"] == "7"
+        assert item["entry"]["entry_id"] == entry.id
+        assert item["entry"]["number"] == 1
+        assert item["entry"]["patient_name"] == "Drain"
+        assert item["service"]["visit_service_id"] == visit.services[0].id
+        assert item["service"]["name"] == f"Service {service.code}"
+
+        # and the drain is reachable end-to-end through the discovery id
+        result = svc.complete_execution(nurse.id, exec_id)
+        assert result["status"] == "completed"
+
+        # terminal work disappears from the discovery
+        assert svc.list_draining_executions(nurse.id)["total"] == 0
+
+    def test_discovery_is_empty_while_assignment_is_active(self, db_session):
+        nurse = _nurse(db_session, "n2dr_b")
+        resource = _resource(db_session, "procedures_dr2")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Active")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc2", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        # ACTIVE assignment: the board is the surface, no drain duplicate
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload == {"items": [], "total": 0}
+
+    def test_discovery_never_surfaces_another_nurses_work(self, db_session):
+        nurse_a = _nurse(db_session, "n2dr_starter")
+        nurse_b = _nurse(db_session, "n2dr_other")
+        resource = _resource(db_session, "procedures_dr3")
+        _assignment(db_session, nurse_a, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Cross")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc3", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse_a.id, resource.id, entry.id)
+        svc.create_execution(
+            nurse_a.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        # A's assignment deactivated mid-flight
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse_a.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        # B (never assigned here at all) must NOT discover A's execution
+        assert svc.list_draining_executions(nurse_b.id) == {"items": [], "total": 0}
+        # ...while A still can
+        assert svc.list_draining_executions(nurse_a.id)["total"] == 1
+
+    def test_discovery_tracks_only_the_latest_in_progress_attempt(
+        self,
+        db_session,
+    ):
+        nurse = _nurse(db_session, "n2dr_retry")
+        resource = _resource(db_session, "procedures_dr4")
+        _assignment(db_session, nurse, resource)
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Retry")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "dr_proc4", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        first = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        # abort the first attempt, then re-claim (attempt 2)
+        svc.incomplete_execution(
+            nurse.id, first["id"], reason="пациент временно отложил"
+        )
+        second = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        assert second["attempt_no"] == 2
+
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        item = payload["items"][0]
+        assert item["execution"]["id"] == second["id"]
+        assert item["execution"]["attempt_no"] == 2
+        assert item["execution"]["status"] == "in_progress"
+
+    # ------------------------------------------------------------------
+    # owner-review round (PR #3358): an ACTIVE assignment alone is NOT
+    # proof the board covers the execution — P1
+    # ------------------------------------------------------------------
+    def test_reassignment_next_day_still_discovers_the_execution(
+        self, db_session, monkeypatch
+    ):
+        """P1 pin: day rollover + re-assignment -> the discovery returns.
+
+        The old predicate (\"an active assignment exists -> the board
+        covers it\") hid the day-D execution once the nurse was
+        re-assigned: the board resolves TODAY's queue and never shows
+        the day-D entry, so a RELOADED tablet had no way to obtain the
+        execution id again — the terminal drain stayed authorized but
+        unreachable, and the in_progress row kept blocking retries
+        through the partial unique index.
+        """
+        import app.services.nurse_serving_api_service as svc_module
+
+        nurse = _nurse(db_session, "n2dr_reatt")
+        resource = _resource(db_session, "procedures_reatt")
+        _assignment(db_session, nurse, resource, cabinet="7")
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Reatt")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "reatt_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        execution = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        exec_id = execution["id"]
+
+        # mid-flight deactivation ...
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+        # ... then the administrator re-assigns the SAME pair (the
+        # partial unique permits a new active row per pair).
+        _assignment(db_session, nurse, resource, cabinet="12")
+
+        # the day rolls over: the board now resolves tomorrow's queue
+        tomorrow = clinic_today(db_session) + timedelta(days=1)
+        monkeypatch.setattr(svc_module, "clinic_today", lambda _db: tomorrow)
+
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        assert payload["items"][0]["execution"]["id"] == exec_id
+        # the terminal drain is STILL reachable through the discovered id
+        result = svc.complete_execution(nurse.id, exec_id)
+        assert result["status"] == "completed"
+
+    def test_reassignment_same_day_board_provably_covers_no_duplicate(self, db_session):
+        """Guard: same-day re-assignment + the entry still active on
+        TODAY's queue -> the board REALLY covers it (my_entry carries
+        in_progress_execution_id), so the discovery adds no duplicate."""
+        nurse = _nurse(db_session, "n2dr_reatt_same")
+        resource = _resource(db_session, "procedures_reatt_same")
+        _assignment(db_session, nurse, resource, cabinet="7")
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "ReattSame")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "reatt_same_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        # the canonical claim flow: waiting -> called (called_by = nurse)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="waiting", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        claimed = svc.call_next(nurse.id, resource.id)
+        assert claimed["entry"]["id"] == entry.id
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        execution = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        exec_id = execution["id"]
+
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+        _assignment(db_session, nurse, resource, cabinet="12")
+
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload == {"items": [], "total": 0}
+
+        # ... and the exclusion is JUSTIFIED: the board (which the active
+        # assignment now opens) surfaces the execution id itself.
+        board = svc.get_station_state(nurse.id, resource.id)
+        assert board["my_entry"] is not None
+        assert board["my_entry"]["id"] == entry.id
+        service_execution_ids = [
+            item["in_progress_execution_id"] for item in board["my_entry"]["services"]
+        ]
+        assert exec_id in service_execution_ids
+
+    def test_day_rollover_without_reassignment_still_discovers(
+        self, db_session, monkeypatch
+    ):
+        """Guard: the plain day rollover (no re-assignment at all) keeps
+        the execution discoverable — the board of the NEW day cannot
+        show the day-D entry either."""
+        import app.services.nurse_serving_api_service as svc_module
+
+        nurse = _nurse(db_session, "n2dr_roll")
+        resource = _resource(db_session, "procedures_roll")
+        _assignment(db_session, nurse, resource, cabinet="3")
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Roll")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "roll_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        execution = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        tomorrow = clinic_today(db_session) + timedelta(days=1)
+        monkeypatch.setattr(svc_module, "clinic_today", lambda _db: tomorrow)
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        assert payload["items"][0]["execution"]["id"] == execution["id"]
+
+    # ------------------------------------------------------------------
+    # owner-review round (PR #3358): effective_cabinet = the assignment
+    # PROVABLY in effect at execution start — P2
+    # ------------------------------------------------------------------
+    def test_draining_cabinet_is_the_assignment_in_effect_at_start(self, db_session):
+        """P2 pin: the temporal resolution — the cabinet override of the
+        assignment that authorized the start, NOT the latest
+        re-assignment's value (assignment #1 cabinet 7 -> execution
+        started -> #1 deactivated -> #2 cabinet 12 -> #2 deactivated ->
+        recovery must answer cabinet 7)."""
+        nurse = _nurse(db_session, "n2dr_cab")
+        resource = _resource(db_session, "procedures_cab")
+        anchor = datetime.now(UTC)
+        first = NurseWorkplaceAssignment(
+            user_id=nurse.id,
+            queue_resource_id=resource.id,
+            cabinet_override="7",
+            is_active=True,
+            created_at=anchor - timedelta(hours=2),
+        )
+        db_session.add(first)
+        db_session.commit()
+
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "Cabinet")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "cab_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        execution = svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        exec_id = execution["id"]
+
+        # a LATER re-assignment in another cabinet (created AFTER the
+        # execution started), then BOTH rows deactivated.
+        second = NurseWorkplaceAssignment(
+            user_id=nurse.id,
+            queue_resource_id=resource.id,
+            cabinet_override="12",
+            is_active=True,
+            created_at=anchor + timedelta(hours=1),
+        )
+        db_session.add(second)
+        db_session.commit()
+        first.is_active = False
+        second.is_active = False
+        db_session.commit()
+
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        item = payload["items"][0]
+        assert item["execution"]["id"] == exec_id
+        assert item["station"]["effective_cabinet"] == "7"
+
+    def test_draining_cabinet_is_null_without_a_provable_snapshot(self, db_session):
+        """P2 pin: the assignment that authorized the start carried NO
+        override -> effective_cabinet is None. The resource's CURRENT
+        default_cabinet is not a provable historical snapshot (it is
+        mutable after the fact) — a possibly-wrong cabinet must not be
+        presented as the recovery context."""
+        nurse = _nurse(db_session, "n2dr_cab_null")
+        resource = _resource(db_session, "procedures_cab_null")
+        _assignment(db_session, nurse, resource)  # cabinet_override=None
+        queue = _station_queue(db_session, resource)
+        patient = _patient(db_session, "CabNull")
+        visit = _visit(db_session, patient, department="procedures")
+        service = _service(db_session, "cab_null_proc", queue_tag=resource.queue_tag)
+        _visit_service(db_session, visit, service)
+        entry = _entry(
+            db_session, queue, 1, patient=patient, status="called", visit=visit
+        )
+
+        svc = NurseServingApiService(db_session)
+        svc.start_entry(nurse.id, resource.id, entry.id)
+        svc.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry.id,
+            visit_service_id=visit.services[0].id,
+        )
+        row = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        row.is_active = False
+        db_session.commit()
+
+        payload = svc.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        assert payload["items"][0]["station"]["effective_cabinet"] is None
+
+    # ------------------------------------------------------------------
+    # owner-review round (PR #3358): the polling discovery keeps a
+    # CONSTANT query budget — P2 (the tablet polls every 30 seconds)
+    # ------------------------------------------------------------------
+    def test_draining_query_count_is_constant_in_executions(self, db_session):
+        """P2 pin: 1 draining execution costs the SAME SQL as 4 draining
+        executions on 4 different stations — entries/queues/resources/
+        visit services/services/assignments/today queues load in ONE
+        IN-batch each; the old code ran a per-execution N+1 (the row
+        list grows with every unfinished attempt)."""
+
+        def _world(suffix: str, stations: int) -> User:
+            nurse = _nurse(db_session, f"n2dr_qc_{suffix}")
+            for index in range(stations):
+                resource = _resource(db_session, f"procedures_qc_{suffix}_{index}")
+                _assignment(db_session, nurse, resource)
+                queue = _station_queue(db_session, resource)
+                patient = _patient(db_session, f"QC{suffix}{index}")
+                visit = _visit(db_session, patient, department="procedures")
+                service = _service(
+                    db_session, f"qc_{suffix}_{index}", queue_tag=resource.queue_tag
+                )
+                _visit_service(db_session, visit, service)
+                entry = _entry(
+                    db_session,
+                    queue,
+                    1,
+                    patient=patient,
+                    status="called",
+                    visit=visit,
+                )
+                svc = NurseServingApiService(db_session)
+                svc.start_entry(nurse.id, resource.id, entry.id)
+                svc.create_execution(
+                    nurse.id,
+                    resource.id,
+                    queue_entry_id=entry.id,
+                    visit_service_id=visit.services[0].id,
+                )
+                row = (
+                    db_session.query(NurseWorkplaceAssignment)
+                    .filter(
+                        NurseWorkplaceAssignment.user_id == nurse.id,
+                        NurseWorkplaceAssignment.queue_resource_id == resource.id,
+                    )
+                    .first()
+                )
+                row.is_active = False
+                db_session.commit()
+            return nurse
+
+        nurse_one = _world("one", stations=1)
+        nurse_many = _world("many", stations=4)
+
+        svc = NurseServingApiService(db_session)
+        bind = db_session.get_bind()
+
+        def _counted(user_id: int) -> tuple[dict[str, Any], int]:
+            state: dict[str, int] = {"queries": 0}
+
+            def _count(*_args: object, **_kwargs: object) -> None:
+                state["queries"] += 1
+
+            event.listen(bind, "before_cursor_execute", _count)
+            try:
+                payload = svc.list_draining_executions(user_id)
+            finally:
+                event.remove(bind, "before_cursor_execute", _count)
+            return payload, state["queries"]
+
+        payload_one, count_one = _counted(nurse_one.id)
+        payload_many, count_many = _counted(nurse_many.id)
+
+        # the worlds really do differ in draining rows (the pin has teeth)
+        assert payload_one["total"] == 1
+        assert payload_many["total"] == 4
+
+        # CONSTANT budget: 4 unfinished attempts on 4 stations cost the
+        # SAME SQL as 1 (the batches just carry more ids).
+        assert count_one == count_many
+        assert count_one <= 16
+
+
+# ----------------------------------------------------------------------------
+# Corrective follow-up (owner verdict on the merged #3355 + #3358 runtime):
+# P1 — precise Visit<->Appointment pairing on the day transfer
+# ----------------------------------------------------------------------------
+class TestOwnerFollowupAppointmentPairing:
+    """The owner's repro: ONE patient, TWO doctorless same-day appointments
+    (laboratory + procedures, different departments, no time). The old
+    bulk UPDATE matched BOTH rows and moved the lab appointment together
+    with the procedures transfer. The pairing is now narrowed by the
+    visit's department axis, locked, moves EXACTLY ONE row and fails
+    closed on ambiguity."""
+
+    @staticmethod
+    def _departments(db: Session) -> tuple[Department, Department]:
+        lab = Department(key="lab", name_ru="Лаборатория")
+        procedures = Department(key="procedures", name_ru="Процедуры")
+        db.add_all([lab, procedures])
+        db.commit()
+        db.refresh(lab)
+        db.refresh(procedures)
+        return lab, procedures
+
+    def _world(
+        self,
+        db: Session,
+        *,
+        visit_department_id: int | None,
+        day,
+    ):
+
+        nurse = _nurse(db, "cfu_pair_nurse")
+        resource = _resource(db, "procedures", tag="procedures")
+        _assignment(db, nurse, resource)
+        queue = _station_queue(db, resource)
+        patient = _patient(db, "Pairing")
+        visit = _visit(db, patient, department="procedures", day=day)
+        if visit_department_id is not None:
+            visit.department_id = visit_department_id
+            db.commit()
+        entry = _entry(db, queue, 1, patient=patient, visit=visit)
+        service = NurseServingApiService(db)
+        service.call_next(nurse.id, resource.id)
+        return nurse, resource, patient, visit, entry, service
+
+    def test_transfer_moves_only_the_same_department_appointment_fk_axis(
+        self, db_session: Session
+    ):
+        from datetime import timedelta
+
+        lab, procedures = self._departments(db_session)
+        today = clinic_today(db_session)
+        nurse, resource, patient, visit, entry, service = self._world(
+            db_session,
+            visit_department_id=procedures.id,
+            day=today - timedelta(days=1),
+        )
+        a_lab = Appointment(
+            patient_id=patient.id,
+            appointment_date=visit.visit_date,
+            appointment_time=None,
+            doctor_id=None,
+            status="confirmed",
+            department_id=lab.id,
+        )
+        a_proc = Appointment(
+            patient_id=patient.id,
+            appointment_date=visit.visit_date,
+            appointment_time=None,
+            doctor_id=None,
+            status="confirmed",
+            department_id=procedures.id,
+        )
+        db_session.add_all([a_lab, a_proc])
+        db_session.commit()
+
+        result = service.start_entry(nurse.id, resource.id, entry.id)
+        assert result["visit_id"] == visit.id
+        db_session.refresh(visit)
+        assert visit.visit_date == today
+        # The procedures appointment followed its visit; the laboratory
+        # appointment of the same patient/day stayed on its own day.
+        db_session.refresh(a_proc)
+        db_session.refresh(a_lab)
+        assert a_proc.appointment_date == today
+        assert a_lab.appointment_date == today - timedelta(days=1)
+
+    def test_transfer_moves_only_the_same_department_appointment_key_axis(
+        self, db_session: Session
+    ):
+        from datetime import timedelta
+
+        lab, procedures = self._departments(db_session)
+        today = clinic_today(db_session)
+        # visit.department_id stays NULL: the canonical FK is resolved
+        # from the department STRING (queue tag -> Department.key).
+        nurse, resource, patient, visit, entry, service = self._world(
+            db_session, visit_department_id=None, day=today - timedelta(days=1)
+        )
+        a_lab = Appointment(
+            patient_id=patient.id,
+            appointment_date=visit.visit_date,
+            appointment_time=None,
+            doctor_id=None,
+            status="confirmed",
+            department_id=lab.id,
+        )
+        a_proc = Appointment(
+            patient_id=patient.id,
+            appointment_date=visit.visit_date,
+            appointment_time=None,
+            doctor_id=None,
+            status="confirmed",
+            department_id=procedures.id,
+        )
+        db_session.add_all([a_lab, a_proc])
+        db_session.commit()
+
+        result = service.start_entry(nurse.id, resource.id, entry.id)
+        assert result["visit_id"] == visit.id
+        db_session.refresh(a_proc)
+        db_session.refresh(a_lab)
+        assert a_proc.appointment_date == today
+        assert a_lab.appointment_date == today - timedelta(days=1)
+
+    def test_ambiguous_pairing_fails_closed_nothing_moves(self, db_session: Session):
+        from datetime import timedelta
+
+        _lab, procedures = self._departments(db_session)
+        today = clinic_today(db_session)
+        yesterday = today - timedelta(days=1)
+        nurse, resource, patient, visit, entry, service = self._world(
+            db_session, visit_department_id=procedures.id, day=yesterday
+        )
+        # TWO live appointments match even the narrowed pairing (same
+        # department, doctorless, no time): the transfer must fail
+        # closed instead of bulk-moving both rows.
+        a_one = Appointment(
+            patient_id=patient.id,
+            appointment_date=yesterday,
+            appointment_time=None,
+            doctor_id=None,
+            status="confirmed",
+            department_id=procedures.id,
+        )
+        a_two = Appointment(
+            patient_id=patient.id,
+            appointment_date=yesterday,
+            appointment_time=None,
+            doctor_id=None,
+            status="confirmed",
+            department_id=procedures.id,
+        )
+        db_session.add_all([a_one, a_two])
+        db_session.commit()
+
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            service.start_entry(nurse.id, resource.id, entry.id)
+        _expect(exc, 409)
+        db_session.rollback()
+        db_session.refresh(visit)
+        assert visit.visit_date == yesterday  # the visit did not move
+        db_session.refresh(a_one)
+        db_session.refresh(a_two)
+        assert a_one.appointment_date == yesterday  # nothing moved
+        assert a_two.appointment_date == yesterday
+
+    # ------------------------------------------------------------------
+    # codex round-1 (PR #3367): the staged eligibility contract
+    # ------------------------------------------------------------------
+    def test_null_department_appointment_still_follows_its_visit(
+        self, db_session: Session
+    ):
+        """codex round-1 P2: a uniquely-matching appointment that predates
+        the department axis (department_id NULL) must still follow its
+        visit — a strict FK-only predicate would strand it on the old
+        day and recreate the round-43 duplicate-visit risk."""
+        from datetime import timedelta
+
+        _lab, procedures = self._departments(db_session)
+        today = clinic_today(db_session)
+        nurse, resource, patient, visit, entry, service = self._world(
+            db_session, visit_department_id=procedures.id, day=today - timedelta(days=1)
+        )
+        legacy_appointment = Appointment(
+            patient_id=patient.id,
+            appointment_date=visit.visit_date,
+            appointment_time=None,
+            doctor_id=None,
+            status="confirmed",
+            department_id=None,  # the pre-department-axis pairing row
+        )
+        db_session.add(legacy_appointment)
+        db_session.commit()
+
+        result = service.start_entry(nurse.id, resource.id, entry.id)
+        assert result["visit_id"] == visit.id
+        db_session.refresh(legacy_appointment)
+        assert legacy_appointment.appointment_date == today  # it followed
+
+    def test_unresolvable_visit_never_moves_a_scoped_foreign_appointment(
+        self, db_session: Session
+    ):
+        """codex round-1 P1: a legacy visit whose department resolves to
+        NOTHING must never fall back to the broad set — a lone SCOPED
+        appointment of a known department is provably not this visit's
+        pair, and moving it is exactly the cross-department corruption
+        the verdict forbids."""
+        from datetime import timedelta
+
+        lab, _procedures = self._departments(db_session)
+        today = clinic_today(db_session)
+        # department string that maps to no Department row: unresolvable.
+        nurse, resource, patient, visit, entry, service = self._world(
+            db_session, visit_department_id=None, day=today - timedelta(days=1)
+        )
+        visit.department = "tag_unknown_queue"
+        db_session.commit()
+        foreign_scoped = Appointment(
+            patient_id=patient.id,
+            appointment_date=visit.visit_date,
+            appointment_time=None,
+            doctor_id=None,
+            status="confirmed",
+            department_id=lab.id,  # provably the lab department's pair
+        )
+        db_session.add(foreign_scoped)
+        db_session.commit()
+
+        result = service.start_entry(nurse.id, resource.id, entry.id)
+        assert result["visit_id"] == visit.id
+        db_session.refresh(visit)
+        assert visit.visit_date == today  # the visit itself still moves
+        db_session.refresh(foreign_scoped)
+        # ...but the lab appointment NEVER follows an unresolvable visit.
+        assert foreign_scoped.appointment_date == today - timedelta(days=1)
+
+
+# ----------------------------------------------------------------------------
+# Corrective follow-up (owner verdict on the merged runtime):
+# P1 — immutable execution-to-station routing (Service retag mid-flight)
+# ----------------------------------------------------------------------------
+class TestOwnerFollowupRoutingSnapshot:
+    """The owner's repro: nurse starts execution X on station A; an admin
+    validly re-tags the Service A->B mid-flight; the terminal endpoint
+    consulted the CURRENT catalog, answered 403 and the draining surface
+    skipped the row — X stayed in_progress forever with the one-active
+    index blocking every retry. The attempt now persists the routing
+    snapshot and the terminal/drain paths prove routing from IT."""
+
+    def _started_execution(self, db: Session, *, suffix: str = "cfu_rt"):
+        nurse = _nurse(db, f"{suffix}_nurse")
+        resource = _resource(db, f"{suffix}_station_a", tag=f"tag_{suffix}_a")
+        _assignment(db, nurse, resource)
+        queue = _station_queue(db, resource)
+        patient = _patient(db, f"{suffix.title()}")
+        entry = _entry(db, queue, 1, patient=patient)
+        service = NurseServingApiService(db)
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry.id)
+        visit = db.get(Visit, entry.visit_id)
+        svc = _service(db, f"{suffix.upper()}", queue_tag=resource.queue_tag)
+        vs = _visit_service(db, visit, svc)
+        execution = service.create_execution(
+            nurse.id, resource.id, queue_entry_id=entry.id, visit_service_id=vs.id
+        )
+        return nurse, resource, svc, entry, visit, vs, execution
+
+    @staticmethod
+    def _retag(db: Session, svc: Service, new_tag: str) -> None:
+        svc.queue_tag = new_tag
+        db.commit()
+        db.refresh(svc)
+
+    def test_execution_persists_the_routing_snapshot(self, db_session: Session):
+        nurse, resource, svc, entry, visit, vs, execution = self._started_execution(
+            db_session
+        )
+        assert nurse is not None and visit is not None and vs is not None
+        row = db_session.get(ServiceExecution, execution["id"])
+        assert row.queue_resource_id == resource.id
+        assert row.routing_queue_tag_snapshot == resource.queue_tag
+        assert row.routing_service_id == svc.id
+        assert row.routing_service_id == vs.service_id
+
+    def test_starter_completes_after_service_retag(self, db_session: Session):
+        nurse, resource, svc, entry, visit, vs, execution = self._started_execution(
+            db_session, suffix="cfu_rt_c"
+        )
+        assert resource is not None and visit is not None and vs is not None
+        # Valid admin action mid-flight: the canonical re-tag commits a
+        # new queue_tag (no in-progress check exists on that surface).
+        self._retag(db_session, svc, "tag_elsewhere")
+        result = NurseServingApiService(db_session).complete_execution(
+            nurse.id, execution["id"]
+        )
+        assert result["status"] == "completed"
+        db_session.refresh(entry)
+        assert entry.status == "served"  # the last-completer flip still works
+
+    def test_starter_incompletes_after_service_retag(self, db_session: Session):
+        nurse, resource, svc, entry, visit, vs, execution = self._started_execution(
+            db_session, suffix="cfu_rt_i"
+        )
+        assert resource is not None and visit is not None
+        self._retag(db_session, svc, "tag_elsewhere")
+        service = NurseServingApiService(db_session)
+        result = service.incomplete_execution(
+            nurse.id, execution["id"], reason="прибор занят"
+        )
+        assert result["status"] == "incomplete"
+        db_session.refresh(entry)
+        assert entry.status == "in_progress"  # incomplete never flips
+        # And the retry (a NEW attempt) is gated by the CURRENT catalog:
+        # the re-tagged service no longer routes here, so a fresh start
+        # on this station is a 400 — the old attempt stays finishable,
+        # new work follows the new routing.
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            service.create_execution(
+                nurse.id,
+                resource.id,
+                queue_entry_id=entry.id,
+                visit_service_id=vs.id,
+            )
+        _expect(exc, 400)
+
+    def test_retagged_execution_stays_in_drain_discovery(self, db_session: Session):
+        nurse, resource, svc, entry, visit, vs, execution = self._started_execution(
+            db_session, suffix="cfu_rt_d"
+        )
+        # Mid-flight deactivation + re-tag: the exact stranding pair.
+        self._retag(db_session, svc, "tag_elsewhere")
+        assignment = (
+            db_session.query(NurseWorkplaceAssignment)
+            .filter(
+                NurseWorkplaceAssignment.user_id == nurse.id,
+                NurseWorkplaceAssignment.queue_resource_id == resource.id,
+            )
+            .first()
+        )
+        assignment.is_active = False
+        db_session.commit()
+
+        service = NurseServingApiService(db_session)
+        payload = service.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        assert payload["items"][0]["execution"]["id"] == execution["id"]
+        assert payload["items"][0]["station"]["queue_resource_id"] == resource.id
+        # ...and the starter can still finish it through the drain.
+        result = service.complete_execution(nurse.id, execution["id"])
+        assert result["status"] == "completed"
+        db_session.refresh(entry)
+        assert entry.status == "served"
+
+    def test_same_nurse_reclaim_after_retag_is_a_noop(self, db_session: Session):
+        nurse, resource, svc, entry, visit, vs, execution = self._started_execution(
+            db_session, suffix="cfu_rt_r"
+        )
+        assert visit is not None and vs is not None
+        self._retag(db_session, svc, "tag_elsewhere")
+        # The tablet's repeat POST must re-claim HER in-progress attempt
+        # (200/created=False), not answer the catalog 400 — the attempt
+        # is still legally hers to finish.
+        result = NurseServingApiService(db_session).create_execution(
+            nurse.id, resource.id, queue_entry_id=entry.id, visit_service_id=vs.id
+        )
+        assert result["created"] is False
+        assert result["id"] == execution["id"]
+
+    def test_other_station_nurse_cannot_complete_retagged_execution(
+        self, db_session: Session
+    ):
+        nurse_a, resource_a, svc, entry, visit, vs_a, execution = (
+            self._started_execution(db_session, suffix="cfu_rt_x")
+        )
+        assert nurse_a is not None and entry is not None and visit is not None
+        assert vs_a is not None and resource_a is not None
+        # The re-tag moved the service to station B; a nurse ASSIGNED to
+        # B is not the starter and holds no assignment on A (the
+        # snapshot station) — no completion through either axis.
+        resource_b = _resource(db_session, "cfu_rt_station_b", tag="tag_elsewhere")
+        nurse_b = _nurse(db_session, "cfu_rt_nurse_b")
+        _assignment(db_session, nurse_b, resource_b)
+        self._retag(db_session, svc, "tag_elsewhere")
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            NurseServingApiService(db_session).complete_execution(
+                nurse_b.id, execution["id"]
+            )
+        _expect(exc, 403)
+
+    def test_hand_repointed_visit_service_is_refused_under_snapshot(
+        self, db_session: Session
+    ):
+        # The codex round-1 cross-station guard must SURVIVE the catalog
+        # immunity: repointing the attempt's visit_service_id at a
+        # B-routed line of the same visit breaks the routing_service_id
+        # binding and fails closed.
+        (
+            nurse_a,
+            resource_a,
+            svc_a,
+            entry,
+            visit,
+            vs_a,
+            execution,
+        ) = self._started_execution(db_session, suffix="cfu_rt_s")
+        assert nurse_a is not None and resource_a is not None
+        assert svc_a is not None and vs_a is not None
+        resource_b = _resource(db_session, "cfu_rt_st_b", tag="tag_cfu_rt_s_b")
+        svc_b = _service(db_session, "CFURT_S_B", queue_tag=resource_b.queue_tag)
+        b_vs = _visit_service(db_session, visit, svc_b)
+        db_session.query(ServiceExecution).filter(
+            ServiceExecution.id == execution["id"]
+        ).update({"visit_service_id": b_vs.id})
+        db_session.commit()
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            NurseServingApiService(db_session).complete_execution(
+                nurse_a.id, execution["id"]
+            )
+        _expect(exc, 403)
+        db_session.refresh(entry)
+        assert entry.status == "in_progress"  # no empty-station flip
+
+    # ------------------------------------------------------------------
+    # codex round-1 (PR #3367): the idempotent re-claim is station-bound
+    # ------------------------------------------------------------------
+    def test_cross_station_reclaim_is_not_a_noop(self, db_session: Session):
+        """codex round-1 P1: a nurse assigned to BOTH stations must not be
+        handed station A's in-progress execution by a station B POST —
+        the no-op is bound to the attempt's snapshot station, so the
+        cross-station request falls to the catalog D3 gate (400 while
+        the service still routes only to A)."""
+        nurse, resource_a, svc, entry_a, visit, vs_a, execution = (
+            self._started_execution(db_session, suffix="cfu_rt_cs")
+        )
+        assert visit is not None and vs_a is not None
+        resource_b = _resource(db_session, "cfu_rt_cs_station_b", tag="tag_cfu_rt_cs_b")
+        _assignment(db_session, nurse, resource_b)
+        queue_b = _station_queue(db_session, resource_b)
+        entry_b = _entry(
+            db_session,
+            queue_b,
+            1,
+            patient=db_session.get(Patient, entry_a.patient_id),
+            visit=visit,
+        )
+        entry_b.status = "in_progress"
+        db_session.commit()
+
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            NurseServingApiService(db_session).create_execution(
+                nurse.id,
+                resource_b.id,
+                queue_entry_id=entry_b.id,
+                visit_service_id=vs_a.id,
+            )
+        _expect(exc, 400)  # D3: the service still routes only to station A
+        row = db_session.get(ServiceExecution, execution["id"])
+        assert row.status == "in_progress"  # A's attempt untouched
+        assert row.queue_resource_id == resource_a.id
+
+    def test_cross_station_reclaim_after_retag_is_409_with_station_context(
+        self, db_session: Session
+    ):
+        """The re-tagged variant: the service NOW routes to B, so the
+        station-B request passes the catalog gate — but the live attempt
+        is bound to A by its snapshot. The answer is a 409 carrying the
+        station context, never a silent adoption of A's work."""
+        nurse, resource_a, svc, entry_a, visit, vs_a, execution = (
+            self._started_execution(db_session, suffix="cfu_rt_cr")
+        )
+        assert visit is not None and vs_a is not None
+        resource_b = _resource(
+            db_session, "cfu_rt_cr_station_b", tag="tag_elsewhere_cr"
+        )
+        _assignment(db_session, nurse, resource_b)
+        queue_b = _station_queue(db_session, resource_b)
+        entry_b = _entry(
+            db_session,
+            queue_b,
+            1,
+            patient=db_session.get(Patient, entry_a.patient_id),
+            visit=visit,
+        )
+        entry_b.status = "in_progress"
+        # re-tag the service onto station B's tag mid-flight
+        self._retag(db_session, svc, resource_b.queue_tag)
+
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            NurseServingApiService(db_session).create_execution(
+                nurse.id,
+                resource_b.id,
+                queue_entry_id=entry_b.id,
+                visit_service_id=vs_a.id,
+            )
+        _expect(exc, 409)
+        assert "другом рабочем месте" in exc.value.detail
+        row = db_session.get(ServiceExecution, execution["id"])
+        assert row.status == "in_progress"
+        assert row.queue_resource_id == resource_a.id  # still bound to A
+
+    def test_legacy_cross_station_reclaim_is_not_a_noop(self, db_session: Session):
+        """codex round-2 P1: a LEGACY (pre-0073, NULL-snapshot) attempt is
+        station-bound through its own queue entry's queue — attempts load
+        by visit_service_id and the entry gate only scopes the REQUEST,
+        so an unconditional same-starter no-op handed station A's legacy
+        attempt to a station B POST. The legacy resolution axis closes
+        it: the attempt's entry resolves to another station -> NOT a
+        no-op -> the catalog D3 gate answers 400."""
+        nurse, resource_a, svc, entry_a, visit, vs_a, _execution = (
+            self._started_execution(db_session, suffix="cfu_rt_lg")
+        )
+        assert visit is not None and vs_a is not None
+        # Strip the snapshot: simulate the pre-0073 row.
+        db_session.query(ServiceExecution).filter(
+            ServiceExecution.visit_service_id == vs_a.id
+        ).update(
+            {
+                "queue_resource_id": None,
+                "routing_queue_tag_snapshot": None,
+                "routing_service_id": None,
+            }
+        )
+        db_session.commit()
+        resource_b = _resource(db_session, "cfu_rt_lg_station_b", tag="tag_cfu_rt_lg_b")
+        _assignment(db_session, nurse, resource_b)
+        queue_b = _station_queue(db_session, resource_b)
+        entry_b = _entry(
+            db_session,
+            queue_b,
+            1,
+            patient=db_session.get(Patient, entry_a.patient_id),
+            visit=visit,
+        )
+        entry_b.status = "in_progress"
+        db_session.commit()
+
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            NurseServingApiService(db_session).create_execution(
+                nurse.id,
+                resource_b.id,
+                queue_entry_id=entry_b.id,
+                visit_service_id=vs_a.id,
+            )
+        _expect(exc, 400)  # D3: the service still routes only to station A
+        legacy_row = (
+            db_session.query(ServiceExecution)
+            .filter(ServiceExecution.visit_service_id == vs_a.id)
+            .one()
+        )
+        assert legacy_row.status == "in_progress"  # untouched
+
+    def test_legacy_same_station_reclaim_stays_a_noop(self, db_session: Session):
+        """The legacy binding must not over-tighten: a pre-0073 attempt of
+        THIS station's queue (via its entry's queue) still re-claims."""
+        nurse, resource_a, svc, entry_a, visit, vs_a, execution = (
+            self._started_execution(db_session, suffix="cfu_rt_ls")
+        )
+        assert visit is not None and vs_a is not None
+        db_session.query(ServiceExecution).filter(
+            ServiceExecution.visit_service_id == vs_a.id
+        ).update(
+            {
+                "queue_resource_id": None,
+                "routing_queue_tag_snapshot": None,
+                "routing_service_id": None,
+            }
+        )
+        db_session.commit()
+        result = NurseServingApiService(db_session).create_execution(
+            nurse.id, resource_a.id, queue_entry_id=entry_a.id, visit_service_id=vs_a.id
+        )
+        assert result["created"] is False
+        assert result["id"] == execution["id"]
+
+    # ------------------------------------------------------------------
+    # owner verdict round-2 (PR #3367): the drain's board-coverage proof
+    # and the entry-bound re-claim
+    # ------------------------------------------------------------------
+    def test_retag_with_live_assignment_keeps_one_discoverable_surface(
+        self, db_session: Session
+    ):
+        """Owner verdict round-2 P1 (PR #3367): the re-tag scenario WITHOUT
+        the deactivation. The assignment stays active, the entry stays on
+        today's queue in an active status — the drain's board-cover triple
+        held while the board's current-catalog fold had ALREADY dropped
+        the re-tagged line: the execution id vanished from BOTH read
+        surfaces at once. The board genuinely hides the line (the re-tag
+        moved the work), and the drain — the recovery surface — must
+        surface the id: exactly one discoverable surface, and the starter
+        can still finish the attempt."""
+        nurse, resource, svc, entry, visit, vs, execution = self._started_execution(
+            db_session, suffix="cfu_rt_bc"
+        )
+        assert visit is not None and vs is not None
+        self._retag(db_session, svc, "tag_elsewhere_bc")
+
+        service = NurseServingApiService(db_session)
+        # The board: the active entry's fold carries NO station line
+        # anymore (the re-tagged service is another station's concern).
+        state = service.get_station_state(nurse.id, resource.id)
+        assert state["counts"]["in_progress"] == 1
+        assert state["active"][0]["services"] == []
+        # The drain: the honest board-visibility proof keeps the id
+        # discoverable (pre-fix the triple alone excluded it here).
+        payload = service.list_draining_executions(nurse.id)
+        assert payload["total"] == 1
+        assert payload["items"][0]["execution"]["id"] == execution["id"]
+        assert payload["items"][0]["station"]["queue_resource_id"] == resource.id
+        # ...and the starter can still finish it.
+        result = service.complete_execution(nurse.id, execution["id"])
+        assert result["status"] == "completed"
+        db_session.refresh(entry)
+        assert entry.status == "served"
+
+    def test_same_station_reclaim_through_new_entry_is_409(self, db_session: Session):
+        """Owner verdict round-2 P1 (PR #3367): no_show is a QUEUE-level
+        transition — it deliberately leaves ServiceExecutions untouched —
+        so a restored / re-ticketed visit carries a NEW entry E2 while
+        the old in_progress attempt is still bound to E1. Attempts load
+        by visit_service_id, so the same nurse's POST through E2 used to
+        adopt E1's attempt as an idempotent no-op; the subsequent
+        completion acted on E1 while E2 stayed active. The no-op is
+        ENTRY-bound: the cross-entry re-claim fails closed with 409
+        (before the catalog gate), the old attempt stays untouched, and
+        the recovery is finishing the old attempt by its own id."""
+        nurse, resource, svc, entry_e1, visit, vs, execution = self._started_execution(
+            db_session, suffix="cfu_rt_eb"
+        )
+        assert visit is not None and vs is not None
+        # The cross-surface reality: E1 goes terminal (an admin restore /
+        # another surface's queue-level transition) while its execution
+        # stays in_progress — no_show semantics, executions untouched.
+        entry_e1.status = "no_show"
+        db_session.commit()
+        # The rejoin: a NEW active ticket of the same visit, same station.
+        queue = db_session.get(DailyQueue, entry_e1.queue_id)
+        entry_e2 = _entry(
+            db_session,
+            queue,
+            2,
+            patient=db_session.get(Patient, entry_e1.patient_id),
+            visit=visit,
+            status="in_progress",
+        )
+
+        with pytest.raises(NurseServingApiDomainError) as exc:
+            NurseServingApiService(db_session).create_execution(
+                nurse.id,
+                resource.id,
+                queue_entry_id=entry_e2.id,
+                visit_service_id=vs.id,
+            )
+        _expect(exc, 409)
+        assert str(execution["id"]) in exc.value.detail
+        # Nothing was adopted: the old attempt keeps its binding.
+        row = db_session.get(ServiceExecution, execution["id"])
+        assert row.status == "in_progress"
+        assert row.queue_entry_id == entry_e1.id
+        # The recovery: the old attempt is finished by its own id; the
+        # terminal entry's flip guard no-ops and E2 is untouched.
+        result = NurseServingApiService(db_session).complete_execution(
+            nurse.id, execution["id"]
+        )
+        assert result["status"] == "completed"
+        db_session.refresh(entry_e1)
+        assert entry_e1.status == "no_show"
+        db_session.refresh(entry_e2)
+        assert entry_e2.status == "in_progress"
+
+
+# ----------------------------------------------------------------------------
+# Corrective follow-up (owner verdict on the merged runtime):
+# P2 — late_pending must not outlive the re-ticket it asks for
+# ----------------------------------------------------------------------------
+class TestOwnerFollowupLatePendingRejoin:
+    """The owner's repro: E1 served + late service -> E1 in late_pending;
+    the registrar re-tickets the visit (E2 waiting/called/in_progress);
+    E1 KEPT sitting in late_pending next to the live E2 — a false
+    "still needs re-ticketing" signal. The suppression must be
+    IMMEDIATE (the moment E2 exists), not eventual (after completion)."""
+
+    def _served_with_late_service(self, db: Session, *, suffix: str):
+        nurse = _nurse(db, f"{suffix}_nurse")
+        resource = _resource(db, f"{suffix}_station")
+        _assignment(db, nurse, resource)
+        queue = _station_queue(db, resource)
+        patient = _patient(db, suffix.title())
+        entry = _entry(db, queue, 1, patient=patient)
+        service = NurseServingApiService(db)
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry.id)
+        visit = db.get(Visit, entry.visit_id)
+        svc = _service(db, f"{suffix.upper()}1", queue_tag=resource.queue_tag)
+        vs = _visit_service(db, visit, svc)
+        execution = service.create_execution(
+            nurse.id, resource.id, queue_entry_id=entry.id, visit_service_id=vs.id
+        )
+        service.complete_execution(nurse.id, execution["id"])
+        late_svc = _service(db, f"{suffix.upper()}2", queue_tag=resource.queue_tag)
+        late_vs = _visit_service(db, visit, late_svc)
+        return nurse, resource, queue, visit, entry, late_vs, service
+
+    def test_reticketed_visit_leaves_late_pending_immediately(
+        self, db_session: Session
+    ):
+        nurse, resource, queue, visit, entry, late_vs, service = (
+            self._served_with_late_service(db_session, suffix="cfu_lpr")
+        )
+        # Before the re-ticket: the late work IS signalled.
+        state = service.get_station_state(nurse.id, resource.id)
+        assert state["counts"]["late_pending"] == 1
+        assert [item["id"] for item in state["late_pending"]] == [entry.id]
+
+        # The registrar re-tickets the same visit: E2 waiting.
+        entry2 = _entry(
+            db_session,
+            queue,
+            2,
+            patient=db_session.get(Patient, entry.patient_id),
+            visit=visit,
+        )
+
+        state = service.get_station_state(nurse.id, resource.id)
+        # E1 disappears IMMEDIATELY — the rejoin has happened.
+        assert state["counts"]["late_pending"] == 0
+        assert [item["id"] for item in state["waiting"]] == [entry2.id]
+
+        # E2 walks the queue: called -> active entry carries the pending
+        # late service (the desk sees the real work, not a stale signal).
+        service.call_next(nurse.id, resource.id)
+        state = service.get_station_state(nurse.id, resource.id)
+        assert state["counts"]["late_pending"] == 0
+        active_ids = [item["id"] for item in state["active"]]
+        assert active_ids == [entry2.id]
+        e2_services = state["active"][0]["services"]
+        pending_ids = {s["visit_service_id"] for s in e2_services if s["pending"]}
+        assert pending_ids == {late_vs.id}  # the late work rides on E2 now
+
+    def test_terminal_entry_without_pending_station_services_stays_out(
+        self, db_session: Session
+    ):
+        # Volume guard (P2-B): served entries whose visits have NO
+        # station-routed pending services never materialize at all —
+        # the SQL-level candidate query is the only late-work surface.
+        nurse, resource, queue, visit, entry, late_vs, service = (
+            self._served_with_late_service(db_session, suffix="cfu_lp2")
+        )
+        # Finish the late service through the rejoin flow.
+        entry2 = _entry(
+            db_session,
+            queue,
+            2,
+            patient=db_session.get(Patient, entry.patient_id),
+            visit=visit,
+        )
+        service.call_next(nurse.id, resource.id)
+        service.start_entry(nurse.id, resource.id, entry2.id)
+        late_execution = service.create_execution(
+            nurse.id,
+            resource.id,
+            queue_entry_id=entry2.id,
+            visit_service_id=late_vs.id,
+        )
+        result = service.complete_execution(nurse.id, late_execution["id"])
+        assert result["entry_served"] is True
+        state = service.get_station_state(nurse.id, resource.id)
+        assert state["counts"]["late_pending"] == 0
+        assert state["active"] == []
+
+    def test_multiple_terminal_tickets_yield_one_late_pending_card(
+        self, db_session: Session
+    ):
+        """Owner verdict round-2 P2 (PR #3367): EVERY terminal entry of the
+        visit matched the pending predicate, so E1 served -> late service
+        -> E2 rejoin -> E2 no_show left BOTH terminal entries in
+        late_pending (no live rejoin, one pending service) — one card per
+        terminal ticket, and the card list grew with every rejoin cycle.
+        ONE representative per visit_id: the LATEST ticket (max id), the
+        one the registrar's re-ticket chain actually left behind."""
+        nurse, resource, queue, visit, entry_e1, late_vs, service = (
+            self._served_with_late_service(db_session, suffix="cfu_lpd")
+        )
+        patient = db_session.get(Patient, entry_e1.patient_id)
+
+        # First rejoin cycle: E2 called -> no_show (queue-level; the
+        # pending late service is deliberately untouched).
+        entry_e2 = _entry(db_session, queue, 2, patient=patient, visit=visit)
+        service.call_next(nurse.id, resource.id)
+        service.mark_entry_no_show(nurse.id, resource.id, entry_e2.id)
+
+        state = service.get_station_state(nurse.id, resource.id)
+        assert state["counts"]["late_pending"] == 1
+        assert [item["id"] for item in state["late_pending"]] == [entry_e2.id]
+
+        # Second rejoin cycle: E3 -> no_show too. Still ONE card — the
+        # latest terminal ticket, never a growing stack.
+        entry_e3 = _entry(db_session, queue, 3, patient=patient, visit=visit)
+        service.call_next(nurse.id, resource.id)
+        service.mark_entry_no_show(nurse.id, resource.id, entry_e3.id)
+
+        state = service.get_station_state(nurse.id, resource.id)
+        assert state["counts"]["late_pending"] == 1
+        assert [item["id"] for item in state["late_pending"]] == [entry_e3.id]

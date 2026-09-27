@@ -86,6 +86,7 @@ const QueueView = React.memo(({
 
         <CardContent>
           <ModernQueueManager
+            mode="registrar"
             selectedDate={searchParams.get('date') || getLocalDateString()}
             selectedDoctor={searchParams.get('doctor') || ''}
             searchQuery={searchParams.get('q') || ''}

@@ -5,7 +5,10 @@
  */
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
-import { generatePath, useNavigate } from 'react-router-dom';
+import { generatePath } from 'react-router-dom';
+// PR 3351: guarded navigate — глобальный поиск уводит с /lab на роуты
+// пациентов; при несохранённых lab-черновиках — dirty-guard.
+import { useGuardedLabNavigate } from '../laboratory/LabDirtyGuardContext';
 // ADR-0015: import api from api/client directly (api/index.ts barrel is also
 // flagged by the boundary scanner because it lives under api/). Both api/client
 // and the barrel re-export the same axios instance.
@@ -106,7 +109,7 @@ function useDebounce(value: string, delay: number) {
 
 function GlobalSearchBarInner({ className = '' }: GlobalSearchBarProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
-  const navigate = useNavigate();
+  const navigate = useGuardedLabNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);

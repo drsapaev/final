@@ -78,8 +78,11 @@ class TelegramMiniAppSessionScope:
     """Application identity scope bound to an existing Telegram account link."""
 
     scope_type: TelegramMiniAppScopeType
-    telegram_user_id: int
-    telegram_chat_id: int
+    # M4 patient portal (PR-C1): JWT web sessions construct a patient scope
+    # without any Telegram identity. All Telegram-sourced scopes keep passing
+    # real ids; only the patient-portal endpoints build scopes with None here.
+    telegram_user_id: int | None = None
+    telegram_chat_id: int | None = None
     patient_id: int | None = None
     staff_user_id: int | None = None
     staff_role: str | None = None

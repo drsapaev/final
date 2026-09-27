@@ -75,17 +75,25 @@ class EMRV2Service:
 
     def get_by_id(self, db: Session, emr_id: int) -> EMRRecord | None:
         """Get EMR by ID"""
-        return db.query(EMRRecord).filter(
-            EMRRecord.id == emr_id,
-            EMRRecord.is_active == True,
-        ).first()
+        return (
+            db.query(EMRRecord)
+            .filter(
+                EMRRecord.id == emr_id,
+                EMRRecord.is_active == True,
+            )
+            .first()
+        )
 
     def get_by_visit(self, db: Session, visit_id: int) -> EMRRecord | None:
         """Get EMR by visit ID (primary lookup)"""
-        return db.query(EMRRecord).filter(
-            EMRRecord.visit_id == visit_id,
-            EMRRecord.is_active == True,
-        ).first()
+        return (
+            db.query(EMRRecord)
+            .filter(
+                EMRRecord.visit_id == visit_id,
+                EMRRecord.is_active == True,
+            )
+            .first()
+        )
 
     def get_by_patient(
         self, db: Session, patient_id: int, limit: int = 100
@@ -118,10 +126,14 @@ class EMRV2Service:
         self, db: Session, emr_id: int, version: int
     ) -> EMRRevision | None:
         """Get specific revision"""
-        return db.query(EMRRevision).filter(
-            EMRRevision.emr_id == emr_id,
-            EMRRevision.version == version,
-        ).first()
+        return (
+            db.query(EMRRevision)
+            .filter(
+                EMRRevision.emr_id == emr_id,
+                EMRRevision.version == version,
+            )
+            .first()
+        )
 
     # ==========================================================================
     # WRITE Operations
@@ -174,6 +186,7 @@ class EMRV2Service:
             normalized_data,
             user_id,
             client_session_id,
+            is_draft,
         )
 
     def _create_emr(
@@ -183,6 +196,7 @@ class EMRV2Service:
         data: dict[str, Any],
         user_id: int,
         client_session_id: str | None = None,
+        is_draft: bool = True,
     ) -> EMRRecord:
         """Create new EMR"""
         normalized_data = self._normalize_data(data)
@@ -203,7 +217,7 @@ class EMRV2Service:
             data=normalized_data,
             diagnosis_main=diagnosis_main,
             icd10_code=icd10_code,
-            status="draft",
+            status="draft" if is_draft else "in_progress",
             created_by=user_id,
             created_at=datetime.now(UTC),
             row_version=1,
@@ -277,9 +291,7 @@ class EMRV2Service:
         )
         # ✅ CRITICAL: Signed EMRs cannot be modified via save - must use amend
         if emr.status == "signed":
-            raise EMRSignedError(
-                "Cannot edit signed EMR. Use amend endpoint instead."
-            )
+            raise EMRSignedError("Cannot edit signed EMR. Use amend endpoint instead.")
 
         # EMR-AUDIT-28 P0-3: row_version=0 больше не обходить optimistic
         # locking. Раньше frontend отправлял row_version=0 при force=true,
@@ -293,9 +305,7 @@ class EMRV2Service:
                 and emr.updated_by == user_id
             ):
                 # Same session, same user - autosave conflict, allow
-                logger.debug(
-                    f"Same-session conflict resolved for EMR {emr.id}"
-                )
+                logger.debug(f"Same-session conflict resolved for EMR {emr.id}")
             else:
                 # Different user or session - real conflict
                 raise ConcurrencyError(
@@ -429,7 +439,9 @@ class EMRV2Service:
             treatment = data.get("treatment") or ""
             if not treatment:
                 medications = data.get("medications", {})
-                treatment = medications.get("text", "") if isinstance(medications, dict) else ""
+                treatment = (
+                    medications.get("text", "") if isinstance(medications, dict) else ""
+                )
 
             if not icd10_code or not treatment:
                 return
@@ -444,10 +456,14 @@ class EMRV2Service:
             treatment_hash = DoctorTreatmentTemplate.compute_hash(normalized)
 
             # Проверяем существующий шаблон
-            existing = db.query(DoctorTreatmentTemplate).filter(
-                DoctorTreatmentTemplate.doctor_id == doctor_id,
-                DoctorTreatmentTemplate.treatment_hash == treatment_hash,
-            ).first()
+            existing = (
+                db.query(DoctorTreatmentTemplate)
+                .filter(
+                    DoctorTreatmentTemplate.doctor_id == doctor_id,
+                    DoctorTreatmentTemplate.treatment_hash == treatment_hash,
+                )
+                .first()
+            )
 
             if existing:
                 existing.usage_count += 1
@@ -458,6 +474,7 @@ class EMRV2Service:
                 )
             else:
                 import uuid
+
                 template = DoctorTreatmentTemplate(
                     id=str(uuid.uuid4()),
                     doctor_id=doctor_id,
@@ -722,24 +739,30 @@ class EMRV2Service:
             new_val = new_data.get(key)
 
             if key not in old_data:
-                changes.append({
-                    "field": key,
-                    "change_type": "added",
-                    "new_value": new_val,
-                })
+                changes.append(
+                    {
+                        "field": key,
+                        "change_type": "added",
+                        "new_value": new_val,
+                    }
+                )
             elif key not in new_data:
-                changes.append({
-                    "field": key,
-                    "change_type": "removed",
-                    "old_value": old_val,
-                })
+                changes.append(
+                    {
+                        "field": key,
+                        "change_type": "removed",
+                        "old_value": old_val,
+                    }
+                )
             elif old_val != new_val:
-                changes.append({
-                    "field": key,
-                    "change_type": "modified",
-                    "old_value": old_val,
-                    "new_value": new_val,
-                })
+                changes.append(
+                    {
+                        "field": key,
+                        "change_type": "modified",
+                        "old_value": old_val,
+                        "new_value": new_val,
+                    }
+                )
 
         return changes
 
@@ -794,12 +817,16 @@ class EMRV2Service:
         rate_limit_minutes = 5
         cutoff_time = datetime.now(UTC) - timedelta(minutes=rate_limit_minutes)
 
-        recent_view = db.query(EMRAuditLog).filter(
-            EMRAuditLog.emr_id == emr.id,
-            EMRAuditLog.user_id == user_id,
-            EMRAuditLog.action == action,
-            EMRAuditLog.timestamp > cutoff_time,
-        ).first()
+        recent_view = (
+            db.query(EMRAuditLog)
+            .filter(
+                EMRAuditLog.emr_id == emr.id,
+                EMRAuditLog.user_id == user_id,
+                EMRAuditLog.action == action,
+                EMRAuditLog.timestamp > cutoff_time,
+            )
+            .first()
+        )
 
         if recent_view:
             # Already logged a view recently, skip

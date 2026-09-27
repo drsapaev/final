@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import './dentistry.css';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
@@ -15,7 +15,6 @@ import '../styles/animations.css';
 import notify from '../services/notify';
 // STRAT#34: useTranslation adapter for confirm/notify i18n.
 import { useTranslation } from '../i18n/useTranslation';
-import type { Appointment } from '../types/domain/clinic';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDentalHotkeys } from '../hooks/useDentalHotkeys';
@@ -29,7 +28,6 @@ import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 // bootstrap) extracted verbatim to ./dentist/dentistContracts.
 import {
   invalidateDentistPanelCaches,
-  type SelectedPatient,
   type DoctorPanelState,
 } from './dentist/dentistContracts';
 // PR-UI-15-3: worklist data lifecycle (queues/today fetch + DTO mapping +
@@ -51,9 +49,11 @@ import { useDentistActions } from './dentist/useDentistActions';
 // cashier 14-5 / doctor 15-2 precedent).
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import DentistVisitsView from './dentist/views/DentistVisitsView';
-import DentistPhotosView from './dentist/views/DentistPhotosView';
-import DentistAIAssistantView from './dentist/views/DentistAIAssistantView';
 import DentistDialogsLayer from './dentist/views/DentistDialogsLayer';
+import PhotoArchive from '../components/dental/PhotoArchive';
+
+const DENTIST_VALID_TABS = ['queue', 'visit', 'patients', 'photos'];
+const DENTIST_TAB_ALIASES = { visits: 'visit', appointments: 'patients', 'ai-assistant': 'visit' };
 
 /**
  * Объединенная стоматологическая панель с полным функционалом
@@ -86,19 +86,27 @@ const DentistPanelUnified = () => {
     selectedPatient,
     setSelectedPatient,
   } = useDoctorPanelState({
-    // Phase 4: sidebar reduced to 4 tabs — queue / visit / patients / photos.
+    // Keep only workflows backed by safe, working persistence.
     defaultTab: 'queue',
     visitDeepLinkTab: 'visit',
     patientDeepLinkTab: 'patients',
+    validTabs: DENTIST_VALID_TABS,
+    tabAliases: DENTIST_TAB_ALIASES,
   }) as DoctorPanelState;
 
   // STRAT#34: useTranslation adapter for confirm/notify i18n.
   // PR-UI-15-3: moved above the worklist hook — the hook needs tI18n for the
   // DTO labels (hook order stays consistent across renders).
-  const { t: tI18n } = useTranslation();
+  const { t: rawTI18n } = useTranslation();
+  // The worklist loader is an effect dependency, so keep its translation
+  // callback stable while reading the latest locale after a language change.
+  const translationRef = useRef(rawTI18n);
+  translationRef.current = rawTI18n;
+  const tI18n = useCallback(
+    (key: string, params?: Record<string, unknown>) => translationRef.current(key, params),
+    [],
+  );
 
-  // PR-UI-15-6: handleCardKeyDown moved verbatim to ./dentist/dentistCardA11y
-  // (shared by the extracted card-grid views).
   const [loading, setLoading] = useState(true);
   // P-009: selectedPatient / setSelectedPatient now come from useDoctorPanelState
   // PR-UI-15-4: savedVisitProtocols + protocol loaders/persist/reopen moved
@@ -128,7 +136,7 @@ const DentistPanelUnified = () => {
     showTreatmentPlanner, setShowTreatmentPlanner,
     showPatientCard, setShowPatientCard,
     showDiagnosisForm, setShowDiagnosisForm,
-    showVisitProtocol, setShowVisitProtocol,
+    setShowVisitProtocol,
     showPhotoArchive, setShowPhotoArchive,
     showProtocolTemplates, setShowProtocolTemplates,
     showReports, setShowReports,
@@ -137,7 +145,7 @@ const DentistPanelUnified = () => {
     selectedServiceForPrice, setSelectedServiceForPrice,
     selectedTooth, setSelectedTooth,
     toothModalOpen, setToothModalOpen,
-    protocolTemplateDraft, setProtocolTemplateDraft,
+    setProtocolTemplateDraft,
     scheduleNextModal, setScheduleNextModal,
   } = useDentistDialogs();
 
@@ -189,14 +197,11 @@ const DentistPanelUnified = () => {
   // исходной панели (effect-ordering: сначала инвалидация кэшей BS-42,
   // затем hydrate-эффект; иначе протоколы могли бы читаться из устаревшего
   // кэша при быстром переключении пациентов).
-  // PR-UI-15-6: savedVisitProtocols / reopenVisitProtocol are no longer
-  // destructured here — their only panel consumer was the unreachable
-  // reports render removed this increment (the EMR v2 protocol surface
-  // stays alive via persistVisitProtocol + the VisitProtocol modal, and the
-  // loaders stay available on the hook API).
+  // Saved-protocol browsing and the old protocol modal were removed from the
+  // visit flow. Keep the loader for legacy protocol hydration and cache
+  // invalidation until that compatibility path is retired separately.
   const {
     loadDentistVisitProtocolByVisitId,
-    persistVisitProtocol,
   } = useDentistVisitProtocols({
     tI18n,
     selectedPatient,
@@ -233,11 +238,9 @@ const DentistPanelUnified = () => {
   // (the handlers stay available on the hook API).
   const {
     handlePatientSelect,
+    handleStartQueueVisit,
     handleCompleteVisit,
-    handleVisitProtocol,
-    handlePhotoArchive,
     handleProtocolTemplateSelect,
-    handleDentalChart,
   } = useDentistActions({
     tI18n,
     confirm,
@@ -395,9 +398,8 @@ const DentistPanelUnified = () => {
     />;
   const renderPatients = () =>
     <DentalPatientsTab
-      patients={patients as unknown as Array<Record<string, unknown>>}
       onSelectPatient={handlePatientSelect as unknown as (patient: Record<string, unknown>) => void}
-      onDentalChart={handleDentalChart as unknown as (patient: Record<string, unknown>) => void}
+      onGoToQueue={() => handleTabChange('queue')}
     />;
   // PR-UI-15-6: renderAppointments / renderDiagnoses / renderTemplates /
   // renderReports / renderDentalChart removed — unreachable after the
@@ -416,29 +418,25 @@ const DentistPanelUnified = () => {
   const renderVisits = () =>
     <DentistVisitsView
       selectedPatient={selectedPatient}
-      patients={patients}
       loading={loading}
       onCompleteVisit={handleCompleteVisit}
-      onVisitProtocol={handleVisitProtocol}
+      onGoToPatients={() => handleTabChange('patients')}
       onBackToQueue={() => {
         setSelectedPatient(null);
         handleTabChange('queue');
       }}
       tI18n={tI18n} />;
 
-  // PR-UI-15-6: renderPhotos → views/DentistPhotosView (verbatim JSX).
-  const renderPhotos = () =>
-    <DentistPhotosView
-      patients={patients}
-      onPhotoArchive={handlePhotoArchive}
-      tI18n={tI18n} />;
-
-  // Рендер планов лечения
-
-
-  // PR-UI-15-6: renderAIAssistant → views/DentistAIAssistantView
-  // (verbatim JSX).
-  const renderAIAssistant = () => <DentistAIAssistantView tI18n={tI18n} />;
+  const renderPhotos = () => (
+    <PhotoArchive
+      key={`${selectedPatient?.patient_id || selectedPatient?.patient?.id || 'none'}:${selectedPatient?.visit_id || 'none'}`}
+      patientId={selectedPatient?.patient_id || selectedPatient?.patient?.id}
+      visitId={selectedPatient?.visit_id}
+      patientName={selectedPatient?.patient_name || selectedPatient?.patient_fio || selectedPatient?.name || ''}
+      onGoToPatients={() => handleTabChange('patients')}
+      onGoToQueue={() => handleTabChange('queue')}
+    />
+  );
 
   // Рендер контента
   const renderContent = () => {
@@ -448,24 +446,18 @@ const DentistPanelUnified = () => {
           <QueueIntegration
             specialistId={String(user?.doctor_id || user?.specialist_id || '')}
             specialty="dentistry"
-            onPatientSelect={handlePatientSelect}
-            onStartVisit={(appointment: Appointment) => {
-              setSelectedPatient(appointment as unknown as SelectedPatient);
-              handleTabChange('visit');
-            }} />);
+            onStartVisit={handleStartQueueVisit} />);
 
 
       case 'patients':
         return renderPatients();
+      case 'photos':
+        return renderPhotos();
       case 'visit':
       case 'visits':
         // Phase 4: 'visit' is the new sidebar tab; 'visits' kept as
         // alias for back-compat with deep links and old saved URLs.
         return renderVisits();
-      case 'photos':
-        return renderPhotos();
-      case 'ai-assistant':
-        return renderAIAssistant();
       default:
         return renderDashboard();
     }
@@ -509,7 +501,6 @@ const DentistPanelUnified = () => {
         tI18n={tI18n}
         user={user as Record<string, unknown> | null | undefined}
         selectedPatient={selectedPatient}
-        protocolTemplateDraft={protocolTemplateDraft}
         dentalChartData={dentalChartData}
         selectedTooth={selectedTooth}
         selectedServiceForPrice={selectedServiceForPrice}
@@ -518,7 +509,6 @@ const DentistPanelUnified = () => {
         confirmDialog={confirmDialog}
         showPatientCard={showPatientCard}
         showDiagnosisForm={showDiagnosisForm}
-        showVisitProtocol={showVisitProtocol}
         showPhotoArchive={showPhotoArchive}
         showProtocolTemplates={showProtocolTemplates}
         showReports={showReports}
@@ -528,7 +518,6 @@ const DentistPanelUnified = () => {
         toothModalOpen={toothModalOpen}
         setShowPatientCard={setShowPatientCard}
         setShowDiagnosisForm={setShowDiagnosisForm}
-        setShowVisitProtocol={setShowVisitProtocol}
         setShowPhotoArchive={setShowPhotoArchive}
         setShowProtocolTemplates={setShowProtocolTemplates}
         setShowReports={setShowReports}
@@ -541,9 +530,6 @@ const DentistPanelUnified = () => {
         setSelectedServiceForPrice={setSelectedServiceForPrice}
         setScheduleNextModal={setScheduleNextModal}
         setSessionWarning={setSessionWarning}
-        setProtocolTemplateDraft={setProtocolTemplateDraft}
-        persistVisitProtocol={persistVisitProtocol}
-        handleCompleteVisit={handleCompleteVisit}
         handleProtocolTemplateSelect={handleProtocolTemplateSelect}
       />
     </div>);

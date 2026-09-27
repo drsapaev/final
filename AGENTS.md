@@ -11,6 +11,7 @@ Primary repo-level operating rules for Codex, Cursor agents, Claude Code style a
 - Architecture: see `docs/adr/ADR-001-queue-ownership-and-specialty-architecture.md` for queue ownership and specialty routing decisions.
 - Frontend: React 19, Vite, React Router, TypeScript (strict) / TSX.
 - Runtime defaults: backend `18000`, frontend `5173`, staging Postgres `55432`.
+- This Windows host also has isolated Linux staging in WSL2 Ubuntu 24.04 with Docker Compose. Production still runs from Windows `C:\final` on `:18000`; staging uses a separate Compose project, database, and host ports (backend `:18001`, frontend `:18080`, Postgres `:55432` in the current setup), with synthetic data only. Staging may be stopped; verify it before use. See `docs/runbooks/AGENT_SESSION_WORKTREES.md`.
 - Context SSOT: `.ai-factory/DESCRIPTION.md`, `.ai-factory/ARCHITECTURE.md`, this file, and the canonical source/test files found for the task.
 - Active local dev-brain tooling lives outside runtime in `ai/langgraph`.
 - `ai/llamaindex` and `ai/lightrag` are not guaranteed to exist in this checkout; use them only after verifying the directories and commands are present.
@@ -97,6 +98,13 @@ production host (uvicorn :18000 behind Cloudflare Tunnel). Rules:
   your worktree, not the main tree. `_wt*/` is gitignored.
 - Mechanics (venv reuse, test runs from a worktree, deploy procedure):
   `docs/runbooks/AGENT_SESSION_WORKTREES.md`.
+
+## First-Screen Latency Guardrail
+
+- For Registrar, Admin, and Doctor panel changes, measure time until actual rows or queue content appear, including a cold first visit and repeated navigation. Backend process startup time is a different measurement.
+- Inspect browser asset/API waterfalls and backend/DB timings before attributing a delay to one service. Keep independent requests parallel where safe; avoid duplicate prerequisite requests and loading inactive panel tabs on the first screen.
+- A closed `/ws/queue` socket must leave its receive loop, cancel its heartbeat, and leave its room. Run `backend/tests/unit/test_queue_ws_disconnect.py` for queue WebSocket changes; never log raw query strings, tokens, or broadcast payloads.
+- Use `docs/runbooks/SCREEN_LATENCY_REGRESSION.md` for the focused check and record comparable before/after evidence from synthetic staging or user-provided timing.
 
 ## Skill Routing Policy
 
@@ -187,8 +195,10 @@ The local dev-brain is an advisory memory, retrieval, guardrail, and evidence la
 
 - Use direct execution for narrow, local, known-root-cause tasks with no risky domain, ownership ambiguity, or canonical/legacy ambiguity.
 - Use dossier-style repo grounding for graph-heavy context building when ownership or SSOT discovery matters but a strict execution gate would be too heavy.
-- Use handoff/gate only for risky execution tasks, multi-file contract changes, or domains listed under Strict Mode Triggers.
-- If `agent_gate.py` misroutes or excludes a confirmed root-cause file, retry at most once with `--known-root-cause`, then use `narrow_override` instead of looping on the gate.
+- For GPT-6, use `advisory_gate` for UI/API work that does not change database schema or migrations, authentication/RBAC/security, production configuration or deployment, queue ownership/fairness, or clinical lifecycle/signature rules. The gate is optional context in this mode; canonical source, tests, the user-approved scope, and the explicit pre-work boundaries determine the patch.
+- Keep a mandatory gate for database schema/migrations, authentication/RBAC/security, production configuration/deployment, and changes to queue ownership/fairness or clinical lifecycle/signature rules. Other agent models continue to use the existing gate rules.
+- In advisory mode, a gate misroute, omitted test path, failed run, or narrow `first_touch_files` list does not by itself block work. Correct the scope from source and tests; stop only for a real ownership, safety, or validation ambiguity.
+- For a mandatory gate, if `agent_gate.py` misroutes or excludes a confirmed root-cause file, retry at most once with `--known-root-cause`, then use `narrow_override` only with explicit human or repo-approved basis.
 - Treat repeated gate misroutes as a dev-brain rule bug to fix, not as a reason to keep blocking the product task.
 - Keep durable project memory in concise repo rules, runbooks, evidence logs, and canonical source/test anchors rather than expanding `AGENTS.md` into a full history dump.
 
@@ -197,6 +207,7 @@ The local dev-brain is an advisory memory, retrieval, guardrail, and evidence la
 Before any execution task, first choose exactly one mode:
 
 - `direct_execute`: local narrow task, root cause known, likely one file or very small slice, no risky domain, no ownership ambiguity, no canonical/legacy ambiguity, no expected scope creep. Do not run `agent_gate.py`.
+- `advisory_gate`: GPT-6 only, for UI/API work within the exception above. Name canonical anchors, allowed files, validation, and stop conditions manually; gate execution is optional and its output is advisory.
 - `gate`: risky task, unclear root cause, likely multi-file impact, frontend/backend ownership ambiguity, canonical/legacy ambiguity, scope-creep risk, or handoff-style brief needed.
 - `gate_known_root_cause`: risky task with a confirmed root-cause file; use the gate but anchor it with `--known-root-cause`.
 - `narrow_override`: only after `agent_gate.py` misroutes, one retry still misses the confirmed root-cause file, and there is explicit human or repo-approved basis for a narrow bypass.
@@ -243,13 +254,11 @@ cd C:\final\ai\langgraph
 
 Use `scripts\run_agent_gate.ps1` instead of calling `python` or `py` directly. The launcher validates a Python 3.11+ interpreter, skips broken `.venv`/Windows Store aliases, and can fall back to the bundled pgAdmin Python.
 
-- If the gate says handoff is required, read the generated `Ready-to-send execution prompt` before editing.
-- Execute only inside the prompt's `First-touch files`.
-- Treat the prompt's `Stop conditions` as hard stops.
-- Do not broaden scope without returning a report to the user.
-- If the gate fails or cannot run, stop and report instead of editing.
-- If the gate returns a misroute or misses the confirmed root-cause file, retry at most once with `--known-root-cause`.
-- If the retry still misses the confirmed file, switch to `narrow_override`: edit only the approved narrow file set, preserve stop conditions, do not expand scope, and report the override in the task outcome.
+- For a mandatory gate, read the generated `Ready-to-send execution prompt` before editing when handoff is required, stay within its `First-touch files`, and treat its `Stop conditions` as hard stops.
+- For a mandatory gate, if it fails or cannot run, stop and report instead of editing. If it misroutes, retry at most once with `--known-root-cause`; if the retry still misses the confirmed file, use `narrow_override` only with approved basis and report the override.
+- For both modes, do not silently broaden the manually declared task scope; stop and report if source evidence requires a materially wider or ambiguous change.
+- For `advisory_gate`, the command is optional. If run, do not treat its first-touch list or stop conditions as an edit allowlist; use the manually documented canonical sources, user scope, and tests. A gate misroute alone is not a stop condition.
+- The advisory exception never applies when the task changes database schema/migrations, authentication/RBAC/security, production configuration/deployment, queue ownership/fairness, or clinical lifecycle/signature rules.
 - When a LightRAG/dev-brain evaluation entry is explicitly created, include `gate_misroute`, `override_used`, and `known_root_cause_file` when applicable.
 - Do not use `agent_gate.py` as a ritual for every small safe task.
 

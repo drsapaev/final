@@ -3,11 +3,12 @@
  * Кнопка чата для хедера (macOS стиль)
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
-import ChatWindow from './ChatWindow';
 import { useTranslation } from '../../i18n/useTranslation';
+
+const ChatWindow = lazy(() => import('./ChatWindow'));
 
 /**
  * Кнопка открытия чата с бейджем непрочитанных сообщений
@@ -15,6 +16,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 const ChatButton = () => {
   const { t: rawT } = useTranslation(); const t = rawT;
     const [isOpen, setIsOpen] = useState(false);
+    const [hasOpened, setHasOpened] = useState(false);
     const { unreadCount, isConnected, loadMessages } = useChat();
     // PR-68 / P0-1: listen for 'openChat' CustomEvent from desktop notifications
     const pendingUserIdRef = useRef<number | null>(null);
@@ -22,6 +24,7 @@ const ChatButton = () => {
     useEffect(() => {
         const handleOpenChat = (event: Event) => {
             const customEvent = event as CustomEvent<{ userId?: number }>;
+            setHasOpened(true);
             setIsOpen(true);
             if (customEvent?.detail?.userId) {
                 pendingUserIdRef.current = customEvent.detail.userId;
@@ -42,7 +45,10 @@ const ChatButton = () => {
     return (
         <>
             <button
-                onClick={() => setIsOpen(true)}
+                onClick={() => {
+                    setHasOpened(true);
+                    setIsOpen(true);
+                }}
                 title={isConnected ? t('chatMessages') : t('chatMessagesOffline')}
                 aria-label={isConnected ? t('chatOpen') : t('chatOpenOffline')}
                 style={{
@@ -92,7 +98,11 @@ const ChatButton = () => {
                 )}
             </button>
 
-            <ChatWindow isOpen={isOpen} onClose={() => setIsOpen(false)} />
+            {hasOpened && (
+                <Suspense fallback={<span role="status" aria-live="polite">{t('common.loading')}</span>}>
+                    <ChatWindow isOpen={isOpen} onClose={() => setIsOpen(false)} />
+                </Suspense>
+            )}
         </>
     );
 };

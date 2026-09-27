@@ -144,12 +144,16 @@ export default defineConfig(({ mode }) => ({
     // needs it is visited.
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'recharts': ['recharts'],
-          'sentry': ['@sentry/react'],
-          'markdown': ['react-markdown'],
-          'i18n': ['i18next', 'react-i18next'],
+        manualChunks(id) {
+          const modulePath = id.replaceAll('\\', '/');
+          const inPackage = (name: string) => modulePath.includes(`/node_modules/${name}/`);
+
+          // Keep shared React/clsx modules out of optional route chunks.
+          if (['react', 'react-dom', 'react-router-dom', 'clsx'].some(inPackage)) return 'react-vendor';
+          if (inPackage('recharts')) return 'recharts';
+          if (inPackage('@sentry/react')) return 'sentry';
+          if (inPackage('react-markdown')) return 'markdown';
+          if (inPackage('i18next') || inPackage('react-i18next')) return 'i18n';
         },
       },
     },

@@ -200,10 +200,21 @@ export const labReportingApi = {
     return request(`/lab/report-instances/${instanceId}`);
   },
 
-  createInstance(payload: Record<string, unknown>) {
+  createInstance(
+    payload: Record<string, unknown>,
+    options: { idempotencyKey?: string } = {},
+  ) {
+    // PR 3351 (review round 9, P1): устойчивый Idempotency-Key операции
+    // создания. IdempotencyMiddleware — opt-in: без заголовка POST просто
+    // проходит в хендлер и каждый ретрай коммитит НОВЫЙ бланк. С ключом
+    // потерянный ответ (502 proxy / crash вкладки / retry после reload)
+    // безопасен: повтор с тем же ключом получает закоммиченный ответ.
     return request('/lab/report-instances', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      ...(options.idempotencyKey
+        ? { headers: { 'Idempotency-Key': options.idempotencyKey } }
+        : {}),
     });
   },
 
@@ -269,6 +280,34 @@ export const labReportingApi = {
     });
     if (!response.ok) {
       throw new Error(`Не удалось сформировать PDF: ${response.status}`);
+    }
+    return response.blob();
+  },
+
+  // PR8 (codex-lab-workflow-hardening-plan): серверный A4-preview того же
+  // движка, что финальный PDF, ДО утверждения. Никаких побочных эффектов:
+  // без mark-printed/уведомлений/финализации — просто blob для просмотра.
+  // Рендерятся сохранённые значения (Save Draft до preview).
+  async previewInstancePdf(instanceId: string | number) {
+    const token = tokenManager.getAccessToken();
+    const response = await fetch(`${API_V1_BASE}/lab/report-instances/${instanceId}/preview`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!response.ok) {
+      throw new Error(`Не удалось сформировать предпросмотр: ${response.status}`);
+    }
+    return response.blob();
+  },
+
+  // PR8: template preview — рендер СОХРАНЁННОЙ версии шаблона со
+  // синтетическими placeholder-значениями (без данных пациентов).
+  async previewTemplateVersionPdf(versionId: string | number) {
+    const token = tokenManager.getAccessToken();
+    const response = await fetch(`${API_V1_BASE}/lab/template-versions/${versionId}/preview`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!response.ok) {
+      throw new Error(`Не удалось сформировать предпросмотр шаблона: ${response.status}`);
     }
     return response.blob();
   }

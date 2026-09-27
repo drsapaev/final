@@ -48,6 +48,35 @@ def test_doctor_history_route_is_not_shadowed_by_visit_id(
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("is_draft", "expected_status"),
+    [(True, "draft"), (False, "in_progress")],
+)
+def test_first_emr_save_honors_draft_flag(
+    client,
+    auth_headers,
+    test_visit,
+    is_draft,
+    expected_status,
+):
+    response = client.post(
+        f"/api/v1/v2/emr/{test_visit.id}",
+        headers=auth_headers,
+        json={
+            "data": {
+                "complaints": "Synthetic EMR save contract",
+                "specialty": "dermatology",
+            },
+            "row_version": 0,
+            "is_draft": is_draft,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == expected_status
+
+
+@pytest.mark.unit
 def test_doctor_cannot_save_emr_for_another_doctors_visit(client, db_session):
     attacker_user = User(
         id=9601,
@@ -210,10 +239,7 @@ def test_lab_role_cannot_write_emr_v2_records(
 
     assert response.status_code == 403, response.text
     assert (
-        db_session.query(EMRRecord)
-        .filter(EMRRecord.visit_id == visit.id)
-        .count()
-        == 0
+        db_session.query(EMRRecord).filter(EMRRecord.visit_id == visit.id).count() == 0
     )
 
 

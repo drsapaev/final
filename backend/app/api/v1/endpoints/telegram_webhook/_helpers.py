@@ -986,6 +986,14 @@ MINI_APP_BOOKING_REQUEST_ERROR_REASONS = frozenset(
         "doctor_id_invalid",
         "department_too_long",
         "notes_too_long",
+        # Round-11 (PR #3340 parity): the Mini App booking endpoints resolve
+        # the SAME canonical routing context as the JWT portal — unknown/
+        # inactive submitted departments and doctor-routing contradictions
+        # are the SAME request-shaped 400s on both surfaces.
+        "department_unknown",
+        "department_inactive",
+        "doctor_department_missing",
+        "doctor_department_mismatch",
     }
 )
 MINI_APP_FORMS_REQUEST_ERROR_REASONS = frozenset(

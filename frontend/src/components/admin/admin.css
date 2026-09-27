@@ -13066,3 +13066,16 @@ button[class*="admin-btn"]:active:not(:disabled) {
   color: var(--mac-text-secondary, rgba(110, 110, 115, 1));
   margin: 0;
 }
+
+/* RQ-18 follow-up (P2-4): sibling tag rows of the SAME owning profile
+   show a pointer to the row that carries the QR block — one block per
+   profile key, no independent duplicate states. */
+.admin-sdx-qr-dedupe-note {
+  font-size: var(--mac-font-size-xs, 12px);
+  color: var(--mac-text-secondary, rgba(110, 110, 115, 1));
+  background: color-mix(in srgb, var(--mac-bg-secondary, rgba(246, 246, 248, 1)) 60%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--mac-text-tertiary, rgba(160, 160, 165, 1)) 45%, transparent);
+  border-radius: var(--mac-radius-md, 10px);
+  padding: 8px 10px;
+  margin: 0;
+}

@@ -26,6 +26,44 @@ class TokensMixin(AuthenticationServiceMixinBase):
         self.max_login_attempts = 5
         self.lockout_duration_minutes = 15
 
+    @staticmethod
+    def _login_user_payload(db: Session, user: User) -> dict[str, Any]:
+        """Build the staff profile used for the post-login route decision.
+
+        Doctor specialty is owned by the active ``Doctor`` profile, not by
+        ``User.role``.  Returning only the generic role made the frontend fall
+        back to ``/doctor`` immediately after login, so specialty panels (and
+        their EMR workflow) never mounted until another profile request ran.
+        """
+        specialty = None
+        doctor_id = None
+        cabinet = None
+        if getattr(user, "role", None) in ("Doctor", "cardio", "derma", "dentist"):
+            from app.models.clinic import Doctor
+
+            doctor = (
+                db.query(Doctor)
+                .filter(Doctor.user_id == user.id, Doctor.active.is_(True))
+                .first()
+            )
+            if doctor:
+                specialty = doctor.specialty
+                doctor_id = doctor.id
+                cabinet = doctor.cabinet
+
+        return {
+            "id": user.id,
+            "username": user.username,
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active,
+            "is_superuser": user.is_superuser,
+            "specialty": specialty,
+            "doctor_id": doctor_id,
+            "cabinet": cabinet,
+        }
+
     def _secret_for(self, token_type: str) -> str:
         if token_type == "refresh":
             return settings.REFRESH_TOKEN_SECRET or settings.SECRET_KEY
@@ -307,15 +345,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
             return {
                 "success": True,
                 "message": "Требуется настройка 2FA",
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "full_name": user.full_name,
-                    "email": user.email,
-                    "role": user.role,
-                    "is_active": user.is_active,
-                    "is_superuser": user.is_superuser,
-                },
+                "user": self._login_user_payload(db, user),
                 "tokens": None,
                 "requires_2fa": False,
                 "requires_2fa_setup": True,
@@ -349,15 +379,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
             return {
                 "success": True,
                 "message": "Требуется подтверждение 2FA",
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "full_name": user.full_name,
-                    "email": user.email,
-                    "role": user.role,
-                    "is_active": user.is_active,
-                    "is_superuser": user.is_superuser,
-                },
+                "user": self._login_user_payload(db, user),
                 "tokens": None,
                 "requires_2fa": True,
                 "two_factor_method": two_factor_method,
@@ -402,15 +424,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
         return {
             "success": True,
             "message": "Успешный вход",
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "full_name": user.full_name,
-                "email": user.email,
-                "role": user.role,
-                "is_active": user.is_active,
-                "is_superuser": user.is_superuser,
-            },
+            "user": self._login_user_payload(db, user),
             "tokens": {
                 "access_token": access_token,
                 "refresh_token": refresh_token,

@@ -91,6 +91,18 @@ class NurseServingEntryResponse(BaseModel):
     served_at: datetime | None = None
     visit_id: int | None = None
     is_my_claim: bool = False
+    # N2-5 owner review round (P1, the D1 handover): populated for the
+    # ACTIVE entries of the station board only — whether the entry's
+    # claim owner (called_by) still holds an ACTIVE assignment on THIS
+    # station, and whether the CURRENT user may act on the entry: her
+    # own claim, or the owner's assignment is gone (the start/terminal
+    # endpoints sanction the takeover; an admin-called entry with no
+    # claim owner is actionable for every assigned nurse). None = the
+    # predicate does not apply (waiting / terminal rows). The UI must
+    # NEVER derive actionability for a foreign entry without these —
+    # a still-assigned owner's work stays read-only.
+    claim_owner_assignment_active: bool | None = None
+    actionable_by_current_user: bool | None = None
     # Populated for the active (called/in_progress) entries: the
     # station-routed services of the entry's visit with their execution
     # state — the tablet's "what is left to perform" list.
@@ -231,3 +243,62 @@ class NurseServingEntryActionResponse(BaseModel):
     entry_id: int
     new_status: str
     reason: str | None = None
+
+
+# N2-3 follow-up (N2-5 §8): the drain-recovery discovery read path. A
+# mid-flight assignment deactivation empties the workplaces list and 403s
+# the station board, so a RELOADED tablet had no way to rediscover the
+# in_progress execution the graceful drain still lets the starter finish.
+class NurseServingDrainingStationRef(BaseModel):
+    """The station a draining execution belongs to (display context)."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    queue_resource_id: int
+    resource_code: str | None = None
+    resource_display_name: str | None = None
+    # Historical D2 resolution: the cabinet override of the assignment
+    # in effect at execution start (temporal resolution, None when no
+    # provable snapshot) — display-only context, never an authorization.
+    effective_cabinet: str | None = None
+
+
+class NurseServingDrainingEntryRef(BaseModel):
+    """The queue entry context of a draining execution."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    entry_id: int
+    number: int
+    patient_name: str | None = None
+
+
+class NurseServingDrainingServiceRef(BaseModel):
+    """The VisitService a draining execution performs."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    visit_service_id: int
+    code: str | None = None
+    name: str | None = None
+    qty: int = 1
+
+
+class NurseServingDrainingExecutionItem(BaseModel):
+    """One discoverable drain candidate: the caller's own unfinished work."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    execution: NurseServingExecutionResponse
+    station: NurseServingDrainingStationRef
+    entry: NurseServingDrainingEntryRef
+    service: NurseServingDrainingServiceRef
+
+
+class NurseServingDrainingExecutionListResponse(BaseModel):
+    """The drain-recovery discovery payload (self-scope, read-only)."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    items: list[NurseServingDrainingExecutionItem] = Field(default_factory=list)
+    total: int = 0

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { t as rawT, tInterpolate as rawTInterpolate, i18n } from '../useTranslation';
 import { SUPPORTED_LANGUAGES } from '../index';
 
@@ -9,6 +9,15 @@ import { SUPPORTED_LANGUAGES } from '../index';
 const t = rawT;
 const tInterpolate = rawTInterpolate as unknown as (key: string, params: Record<string, unknown>) => string;
 const i18nT = i18n.t as unknown as (key: string) => string;
+
+async function importIsolatedI18n() {
+  vi.resetModules();
+  vi.doMock('i18next', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('i18next')>();
+    return { ...actual, default: actual.createInstance() };
+  });
+  return import('../index');
+}
 
 /**
  * STRAT#49: Updated tests for react-i18next-backed adapter.
@@ -42,6 +51,13 @@ describe('i18n adapter (STRAT#29 + STRAT#49)', () => {
       expect(i18n.language).toBe('ru');
     });
 
+    it('bundles Russian without loading unused locale resources', () => {
+      expect(i18n.hasResourceBundle('ru', 'translation')).toBe(true);
+      for (const language of SUPPORTED_LANGUAGES.filter((code) => code !== 'ru')) {
+        expect(i18n.hasResourceBundle(language, 'translation')).toBe(false);
+      }
+    });
+
     it('exists() returns true for valid keys', () => {
       expect(i18n.exists('common.save')).toBe(true);
     });
@@ -60,7 +76,9 @@ describe('i18n adapter (STRAT#29 + STRAT#49)', () => {
 
     it.each(SUPPORTED_LANGUAGES)(
       'contains registrar wizard recovery copy for %s',
-      (language) => {
+      async (language) => {
+        await i18n.changeLanguage(language);
+        expect(i18n.hasResourceBundle(language, 'translation')).toBe(true);
         for (const key of [
           'misc.aw_doctor_cabinet',
           'misc.aw_search_failed',
@@ -74,6 +92,7 @@ describe('i18n adapter (STRAT#29 + STRAT#49)', () => {
           expect(String(value).trim(), `${language}:${key}`).not.toBe('');
           expect(value, `${language}:${key}`).not.toBe(key);
         }
+        await i18n.changeLanguage('ru');
       },
     );
   });
@@ -92,6 +111,54 @@ describe('i18n adapter (STRAT#29 + STRAT#49)', () => {
     it('i18n has resources loaded', () => {
       const resource = i18n.getResource('ru', 'translation', 'common.save');
       expect(resource).toBe('Сохранить');
+    });
+  });
+
+  describe('startup locale loading', () => {
+    it('loads a saved legacy Uzbek selection before rendering and keeps both storage keys', async () => {
+      localStorage.clear();
+      localStorage.setItem('app_language', 'uz');
+      try {
+        const { default: freshI18n, loadPersistedLanguage } = await importIsolatedI18n();
+        expect(freshI18n.language).toBe('ru');
+        expect(freshI18n.hasResourceBundle('uz-Latn', 'translation')).toBe(false);
+        expect(localStorage.getItem('app_language')).toBe('uz');
+
+        await loadPersistedLanguage();
+        expect(freshI18n.language).toBe('uz-Latn');
+        expect(freshI18n.hasResourceBundle('uz-Latn', 'translation')).toBe(true);
+        expect(localStorage.getItem('language')).toBe('uz-Latn');
+        expect(localStorage.getItem('app_language')).toBe('uz-Latn');
+      } finally {
+        vi.doUnmock('i18next');
+        vi.resetModules();
+      }
+    });
+
+    it('uses Russian before first render when the saved locale chunk fails', async () => {
+      localStorage.clear();
+      localStorage.setItem('language', 'kk');
+      vi.doMock('../locales/kk', () => { throw new Error('Locale chunk unavailable'); });
+
+      try {
+        const { default: freshI18n, loadPersistedLanguage } = await importIsolatedI18n();
+        expect(freshI18n.language).toBe('ru');
+        expect(localStorage.getItem('language')).toBe('kk');
+        await loadPersistedLanguage();
+
+        expect(freshI18n.language).toBe('ru');
+        expect(freshI18n.t('common.save')).toBe('Сохранить');
+        expect(localStorage.getItem('language')).toBe('ru');
+        expect(localStorage.getItem('app_language')).toBe('ru');
+
+        await freshI18n.changeLanguage('kk');
+        expect(freshI18n.language).toBe('ru');
+        expect(localStorage.getItem('language')).toBe('ru');
+      } finally {
+        vi.doUnmock('../locales/kk');
+        vi.doUnmock('i18next');
+        vi.resetModules();
+      }
     });
   });
 });

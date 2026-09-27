@@ -1,120 +1,128 @@
-
-/**
- * DentalPatientsTab — R-15: extracted from DentistPanelUnified.
- * Renders the "Пациенты" tab: patient cards with action buttons.
- */
-import { Card, Button } from '../ui/macos';
-import { Scissors, FileText, Eye } from 'lucide-react';
-// P0 fix: 'Tooth' is not exported by lucide-react. Use Stethoscope as alias (matches DentistPanelUnified.jsx:42).
-import { Stethoscope as Tooth } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Search } from 'lucide-react';
+import { searchPatients } from '../../api/patients';
+import type { Patient } from '../../types/domain/clinic';
 import { useTranslation } from '../../i18n/useTranslation';
+import { Button, Card, Input } from '../ui/macos';
 
-// === Domain types ===
-export interface DentalPatientsTabPatient {
+export interface DentalPatientsTabPatient extends Record<string, unknown> {
   id?: string | number;
-  name?: string;
-  patient_name?: string;
-  full_name?: string;
   patient_id?: string | number;
+  name?: string;
+  full_name?: string;
   phone?: string;
-  last_visit?: string;
-  status?: string;
-  [key: string]: unknown;
 }
 
 export interface DentalPatientsTabProps {
-  /** Patients to render as cards. */
-  patients?: DentalPatientsTabPatient[];
-  /** Open the patient details view. */
   onSelectPatient?: (patient: DentalPatientsTabPatient) => void;
-  /** Open the dental chart for a patient. */
-  onDentalChart?: (patient: DentalPatientsTabPatient) => void;
-  /** Open the treatment planner for a patient. */
-  onTreatment?: (patient: DentalPatientsTabPatient) => void;
-  /** Open the prosthetic flow for a patient. */
-  onProsthetic?: (patient: DentalPatientsTabPatient) => void;
-  [key: string]: unknown;
+  onGoToQueue?: () => void;
 }
 
-export function DentalPatientsTab({
-  patients = [],
-  onSelectPatient,
-  onDentalChart,
-  onTreatment,
-  onProsthetic,
-}: DentalPatientsTabProps) {
-  const { t: rawT } = useTranslation(); const t = rawT;
-  if (patients.length === 0) {
-    return (
-      <Card padding="large">
-        <div className="dental-text-center dental-p-48 dental-text-secondary">
-          {t('dental.dental_dpt_empty')}
-        </div>
-      </Card>
-    );
-  }
+type SearchState = 'idle' | 'loading' | 'error' | 'ready';
+
+export default function DentalPatientsTab({ onSelectPatient, onGoToQueue }: DentalPatientsTabProps) {
+  const { t } = useTranslation();
+  const [query, setQuery] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [state, setState] = useState<SearchState>('idle');
+  const requestId = useRef(0);
+
+  useEffect(() => {
+    const currentRequest = ++requestId.current;
+    const normalized = query.trim();
+    if (normalized.length < 2) {
+      setPatients([]);
+      setState('idle');
+      return;
+    }
+
+    setState('loading');
+    const timer = window.setTimeout(() => {
+      searchPatients(normalized).then((results) => {
+        if (requestId.current !== currentRequest) return;
+        setPatients(results);
+        setState('ready');
+      }).catch(() => {
+        if (requestId.current !== currentRequest) return;
+        setPatients([]);
+        setState('error');
+      });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      if (requestId.current === currentRequest) requestId.current += 1;
+    };
+  }, [query, retryKey]);
+
+  const selectPatient = (patient: Patient) => {
+    const name = patient.full_name || patient.name || [patient.last_name, patient.first_name, patient.middle_name].filter(Boolean).join(' ');
+    onSelectPatient?.({ ...patient, id: patient.id, patient_id: patient.id, name, full_name: name });
+  };
 
   return (
     <div className="dental-flex-col dental-gap-16">
-      {patients.map((patient) => (
-        <Card key={patient.id || patient.patient_id} padding="default">
-          <div className="dental-flex-between-16">
-            <div className="dental-flex dental-gap-12 dental-items-center">
-              <div>
-                <div className="dental-text-primary dental-font-medium">
-                  {patient.name || patient.patient_name || '—'}
-                </div>
-                {patient.phone && (
-                  <div className="dental-text-desc dental-text-secondary">
-                    {patient.phone}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="dental-flex dental-gap-8">
-              <Button
-                size="small"
-                variant="outline"
-                aria-label={t('dental.dental_dpt_aria_view', { name: patient.name || patient.id })}
-                onClick={() => onSelectPatient?.(patient)}
-                title={t('dental.dental_dpt_title_view')}
-                className="dental-p-8px">
-                <Eye aria-hidden="true" className="dental-icon-16" />
-              </Button>
-              <Button
-                size="small"
-                variant="outline"
-                aria-label={t('dental.dental_dpt_aria_chart', { name: patient.name || patient.id })}
-                onClick={() => onDentalChart?.(patient)}
-                title={t('dental.dental_dpt_title_chart')}
-                className="dental-p-8px">
-                <Tooth aria-hidden="true" className="dental-icon-16" />
-              </Button>
-              <Button
-                size="small"
-                variant="outline"
-                aria-label={t('dental.dental_dpt_aria_treatment', { name: patient.name || patient.id })}
-                onClick={() => onTreatment?.(patient)}
-                title={t('dental.dental_dpt_title_treatment')}
-                className="dental-p-8px">
-                <Scissors aria-hidden="true" className="dental-icon-16" />
-              </Button>
-              <Button
-                size="small"
-                variant="outline"
-                aria-label={t('dental.dental_dpt_aria_prosthetic', { name: patient.name || patient.id })}
-                onClick={() => onProsthetic?.(patient)}
-                title={t('dental.dental_dpt_title_prosthetic')}
-                className="dental-p-8px">
-                <FileText aria-hidden="true" className="dental-icon-16" />
-              </Button>
-            </div>
+      <Card padding="large">
+        <div className="dental-flex-col dental-gap-12">
+          <h2 className="dental-text-primary">{t('dental.dental_dpt_title')}</h2>
+          <label htmlFor="dental-patient-search" className="dental-text-secondary">
+            {t('dental.dental_dpt_search_label')}
+          </label>
+          <Input
+            id="dental-patient-search"
+            type="search"
+            icon={Search}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('dental.dental_dpt_search_placeholder')}
+            autoComplete="off"
+          />
+          <p className="dental-text-desc dental-text-secondary">{t('dental.dental_dpt_search_hint')}</p>
+        </div>
+      </Card>
+
+      {state === 'loading' && <p role="status" aria-live="polite" className="dental-text-secondary">{t('dental.dental_dpt_search_loading')}</p>}
+      {state === 'idle' && query.trim().length > 0 && query.trim().length < 2 && (
+        <p role="status" className="dental-text-secondary">{t('dental.dental_dpt_search_minimum')}</p>
+      )}
+      {state === 'error' && (
+        <Card padding="large" role="alert">
+          <div className="dental-flex-col dental-gap-12">
+            <p className="dental-text-primary">{t('dental.dental_dpt_search_error')}</p>
+            <Button variant="outline" onClick={() => setRetryKey((value) => value + 1)}>{t('dental.dental_dpt_retry')}</Button>
           </div>
         </Card>
-      ))}
+      )}
+      {state === 'ready' && patients.length === 0 && (
+        <Card padding="large">
+          <div className="dental-flex-col dental-gap-12">
+            <p className="dental-text-primary">{t('dental.dental_dpt_search_empty')}</p>
+            <Button variant="outline" onClick={onGoToQueue}>
+              {t('dental.dental_dpt_go_queue')}
+            </Button>
+          </div>
+        </Card>
+      )}
+      {patients.map((patient) => {
+        const name = patient.full_name || patient.name || [patient.last_name, patient.first_name, patient.middle_name].filter(Boolean).join(' ') || '—';
+        return (
+          <Card key={String(patient.id)} padding="default">
+            <div className="dental-flex-between-16">
+              <div>
+                <p className="dental-text-primary dental-font-medium">{name}</p>
+                {patient.phone && <p className="dental-text-desc dental-text-secondary">{patient.phone}</p>}
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => selectPatient(patient)}
+                aria-label={t('dental.dental_dpt_aria_select', { name })}>
+                {t('dental.dental_dpt_select')}
+              </Button>
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }
-
-
-export default DentalPatientsTab;

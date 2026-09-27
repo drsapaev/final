@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useId, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState, useId, useRef } from 'react';
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle } from '../ui/macos';
 import { useConfirm } from '../common/ConfirmDialog';
 // ADR-0015: use useLabReporting hook instead of importing api/labReporting directly.
@@ -28,6 +28,12 @@ import SignersTab from './templateEditor/SignersTab';
 import PreviewTab from './templateEditor/PreviewTab';
 import { useTranslation } from '../../i18n/useTranslation';
 import { getErrorMessage } from '../../utils/type-guards';
+// PR 3351 (review round 7, P1): split-уровни pending-защиты (см. operationPending.ts).
+import {
+  LAB_OPERATION_PENDING_ALL,
+  LAB_OPERATION_PENDING_NONE,
+  type LabOperationPendingState,
+} from './operationPending';
 import { Archive, BadgeCheck, Download, Files, Plus, RotateCcw, SlidersHorizontal, SquareStack } from 'lucide-react';
 
 export default function LabTemplateWorkbench({
@@ -36,13 +42,35 @@ export default function LabTemplateWorkbench({
   onSelectTemplate,
   onTemplatesChanged,
   registerDirtySource,
+  onDirtyStateChange,
+  guardTransition,
+  templateTransitionPending = false,
+  onOperationPendingChange = undefined,
   notify
 }: {
   templates?: unknown[];
   selectedTemplate?: Record<string, unknown> | null;
   onSelectTemplate?: (template: Record<string, unknown>) => void;
   onTemplatesChanged?: (preferredTemplateId?: string | number | null) => Promise<void>;
-  registerDirtySource?: (source: { id: string; isDirty: () => boolean; save: () => Promise<void> }) => () => void;
+  registerDirtySource?: (source: {
+    id: string;
+    isDirty: () => boolean;
+    save: () => Promise<void>;
+    discard?: () => void;
+  }) => () => void;
+  /** PR 3351: вызывается при каждом изменении dirty-состояния (sentinel route-guard). */
+  onDirtyStateChange?: () => void;
+  guardTransition?: (
+    transition: () => void | Promise<void>,
+    options?: { onCancel?: () => void | Promise<void>; sourceIds?: string[] },
+  ) => boolean;
+  templateTransitionPending?: boolean;
+  /**
+   * PR 3351 (review round 7, P1): split-уровни pending-защиты. Все операции
+   * шаблона (create/save/clone/archive) блокируют оба уровня; null (cleanup)
+   * снимает источник.
+   */
+  onOperationPendingChange?: (state: LabOperationPendingState | null) => void;
   notify?: (type: string, message: string) => void;
   [k: string]: unknown;
 }) {
@@ -74,6 +102,12 @@ export default function LabTemplateWorkbench({
   const [templateSearch, setTemplateSearch] = useState('');
   const [draftVersion, setDraftVersion] = useState(hydrateVersion(null));
   const [saving, setSaving] = useState(false);
+  const [draftSourceVersion, setDraftSourceVersion] = useState<Record<string, unknown> | null>(null);
+  const pendingCreatedDraftRef = useRef<{
+    templateId: string | number;
+    sourceVersionId: string | number | null;
+    draftVersionId: string | number;
+  } | null>(null);
   const [catalogUnits, setCatalogUnits] = useState<Array<Record<string, unknown>>>([]);
   const [catalogAnalytes, setCatalogAnalytes] = useState<Array<Record<string, unknown>>>([]);
 
@@ -118,9 +152,40 @@ export default function LabTemplateWorkbench({
       || versions[versions.length - 1]
       || null;
   }, [selectedTemplate]);
+  const draftHydrated = draftSourceVersion === activeVersion;
+  const interactionPending = saving || templateTransitionPending || !draftHydrated;
+
+  useLayoutEffect(() => {
+    // PR 3351 (review round 7, P1): все операции шаблона (create/save/clone/
+    // archive) неидемпотентны или меняют список — блокируем и контекстные
+    // переходы, и полный уход с /lab. Split-семантика (latest-wins только
+    // внутри панели) нужна исключительно report CREATE.
+    onOperationPendingChange?.(saving ? LAB_OPERATION_PENDING_ALL : LAB_OPERATION_PENDING_NONE);
+    return () => {
+      if (saving) onOperationPendingChange?.(null);
+    };
+  }, [onOperationPendingChange, saving]);
 
   useEffect(() => {
+    const pendingDraft = pendingCreatedDraftRef.current;
+    if (!pendingDraft) return;
+    const templateId = (selectedTemplate as { id?: string | number } | null)?.id;
+    const activeVersionId = (activeVersion as Record<string, unknown> | null)?.id as string | number | undefined;
+    if (
+      String(templateId ?? '') !== String(pendingDraft.templateId)
+      || (
+        String(activeVersionId ?? '') !== String(pendingDraft.sourceVersionId ?? '')
+        && String(activeVersionId ?? '') !== String(pendingDraft.draftVersionId)
+      )
+      || String(activeVersionId ?? '') === String(pendingDraft.draftVersionId)
+    ) {
+      pendingCreatedDraftRef.current = null;
+    }
+  }, [activeVersion, selectedTemplate]);
+
+  useLayoutEffect(() => {
     setDraftVersion(hydrateVersion(activeVersion));
+    setDraftSourceVersion(activeVersion);
   }, [activeVersion]);
 
   useEffect(() => {
@@ -155,31 +220,51 @@ export default function LabTemplateWorkbench({
       notify?.('error', t('errors.template_code_name_required'));
       return;
     }
-    setSaving(true);
-    try {
-      const created = await labReportingApi.createTemplate({
-        ...formData,
-        initial_version: blankVersion
-      }) as Record<string, unknown> | undefined;
-      notify?.('success', t('success.template_created'));
-      setShowNewTemplateDialog(false);
-      // PR5: используем возвращённый id — обновляем список с выбором
-      // созданного шаблона и сразу открываем его в редакторе.
-      const createdId = (created as { id?: string | number })?.id ?? null;
-      await onTemplatesChanged?.(createdId);
-      if (createdId != null && created) {
-        onSelectTemplate?.(created);
+
+    const createAndSelect = async () => {
+      setSaving(true);
+      try {
+        const created = await labReportingApi.createTemplate({
+          ...formData,
+          initial_version: blankVersion
+        }) as Record<string, unknown> | undefined;
+        notify?.('success', t('success.template_created'));
+        setShowNewTemplateDialog(false);
+        // PR5: единственный post-create переход. Родитель обновляет список и
+        // выбирает ровно id из ответа; повторный onSelectTemplate запустил бы
+        // второй dirty-guard уже после успешного POST.
+        const createdId = (created as { id?: string | number })?.id ?? null;
+        await onTemplatesChanged?.(createdId);
+      } catch (error) {
+        notify?.('error', getErrorMessage(error));
+      } finally {
+        setSaving(false);
       }
-    } catch (error) {
-      notify?.('error', getErrorMessage(error));
-    } finally {
-      setSaving(false);
+    };
+
+    // PR5: подтверждение охватывает весь переход, включая POST. При Cancel
+    // callback не выполняется, поэтому старый draft и заполненная форма
+    // создания остаются на месте.
+    if (guardTransition) {
+      guardTransition(createAndSelect, { sourceIds: ['template'] });
+      return;
     }
+    await createAndSelect();
   }
 
   async function ensureDraftVersion(): Promise<string | number> {
     if (!selectedTemplate) {
       throw new Error(t('misc.ltw_snachala_vyberite_shablon'));
+    }
+    const templateId = (selectedTemplate as { id?: string | number })?.id as string | number;
+    const sourceVersionId = ((activeVersion as Record<string, unknown>)?.id as string | number) ?? null;
+    const pendingDraft = pendingCreatedDraftRef.current;
+    if (
+      pendingDraft
+      && String(pendingDraft.templateId) === String(templateId)
+      && String(pendingDraft.sourceVersionId ?? '') === String(sourceVersionId ?? '')
+    ) {
+      return pendingDraft.draftVersionId;
     }
     if (hasTemplateVersionAction(activeVersion, 'update')) {
       return (activeVersion as Record<string, unknown>)?.id as string | number;
@@ -187,9 +272,10 @@ export default function LabTemplateWorkbench({
     if (!hasTemplateVersionAction(activeVersion, 'create_draft')) {
       throw new Error(t('misc.ltw_server_ne_razreshil_sozdat_c'));
     }
-    const version = (await labReportingApi.createTemplateVersion((selectedTemplate as { id?: string | number })?.id as string | number, ((activeVersion as Record<string, unknown>)?.id as string | number) ?? null)) as Record<string, unknown>;
-    await onTemplatesChanged?.();
-    return (version as Record<string, unknown>)?.id as string | number;
+    const version = (await labReportingApi.createTemplateVersion(templateId, sourceVersionId)) as Record<string, unknown>;
+    const draftVersionId = (version as Record<string, unknown>)?.id as string | number;
+    pendingCreatedDraftRef.current = { templateId, sourceVersionId, draftVersionId };
+    return draftVersionId;
   }
 
   // PR-57: validate reference ranges (low < high) before save/publish
@@ -270,7 +356,6 @@ export default function LabTemplateWorkbench({
   async function attemptSaveTemplate() {
     if (!selectedTemplate) {
       const message = t('errors.select_template_first');
-      notify?.('error', message);
       throw new Error(message);
     }
     const rangeErrors = validateReferenceRanges();
@@ -279,7 +364,6 @@ export default function LabTemplateWorkbench({
     if (rangeErrors.length > 0 || jsonErrors.length > 0 || keyErrors.length > 0) {
       const allErrors = [...rangeErrors, ...jsonErrors, ...keyErrors];
       const message = `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`;
-      notify?.('error', message);
       throw new Error(message);
     }
     setSaving(true);
@@ -294,12 +378,22 @@ export default function LabTemplateWorkbench({
     }
   }
 
-  async function handleSaveTemplate() {
+  // Единая оболочка для кнопки Save и dirty-guard: любая ошибка видима
+  // пользователю и пробрасывается дальше, чтобы guard не выполнил переход.
+  async function saveTemplateWithFeedback() {
     try {
       await attemptSaveTemplate();
+    } catch (error) {
+      notify?.('error', getErrorMessage(error, t('errors.save_failed')));
+      throw error;
+    }
+  }
+
+  async function handleSaveTemplate() {
+    try {
+      await saveTemplateWithFeedback();
     } catch {
-      // attemptSaveTemplate обязан сам показать ошибку пользователю
-      // (включая ранний выход при отсутствии выбранного шаблона).
+      // saveTemplateWithFeedback уже показал ошибку; кнопка остаётся на месте.
     }
   }
 
@@ -321,6 +415,7 @@ export default function LabTemplateWorkbench({
       const versionId = await ensureDraftVersion();
       await labReportingApi.updateTemplateVersion(versionId, buildVersionPayload(draftVersion));
       await labReportingApi.publishTemplateVersion(versionId);
+      pendingCreatedDraftRef.current = null;
       notify?.('success', t('success.template_published'));
       await onTemplatesChanged?.();
     } catch (error) {
@@ -338,25 +433,41 @@ export default function LabTemplateWorkbench({
       notify?.('error', t('errors.select_version_for_archive'));
       return;
     }
-    const ok = await confirm({
-      title: t('confirm.archive_title'),
-      message: t('confirm.archive_message'),
-      description: t('confirm.archive_description'),
-      confirmLabel: t('confirm.archive_confirm'),
-      cancelLabel: t('confirm.cancel'),
-      intent: 'warning',
-    });
-    if (!ok) return;
-    setSaving(true);
-    try {
-      await labReportingApi.archiveTemplateVersion((activeVersion as Record<string, unknown>)?.id as string | number);
-      notify?.('success', t('success.template_archived'));
-      await onTemplatesChanged?.();
-    } catch (error) {
-      notify?.('error', getErrorMessage(error));
-    } finally {
-      setSaving(false);
+    // Archive exactly the version the operator selected when pressing the
+    // button. Save-and-continue may create/refresh a different draft version;
+    // letting the deferred callback read activeVersion again would make the
+    // destructive target depend on response timing.
+    const archiveVersionId = (activeVersion as Record<string, unknown>)?.id as string | number;
+    const archiveAndRefresh = async () => {
+      const ok = await confirm({
+        title: t('confirm.archive_title'),
+        message: t('confirm.archive_message'),
+        description: t('confirm.archive_description'),
+        confirmLabel: t('confirm.archive_confirm'),
+        cancelLabel: t('confirm.cancel'),
+        intent: 'warning',
+      });
+      if (!ok) return;
+      setSaving(true);
+      try {
+        await labReportingApi.archiveTemplateVersion(archiveVersionId);
+        notify?.('success', t('success.template_archived'));
+        await onTemplatesChanged?.();
+      } catch (error) {
+        notify?.('error', getErrorMessage(error));
+      } finally {
+        setSaving(false);
+      }
+    };
+    if (guardTransition) {
+      // PR 3351 (review round 2, P1): archive меняет только шаблон — скоуп
+      // ['template']. Dirty report-draft не должен ни спрашиваться, ни
+      // сбрасываться: Queue/Templates/Reports смонтированы одновременно
+      // (hidden-секции), операция над шаблоном не уничтожает report-черновик.
+      guardTransition(archiveAndRefresh, { sourceIds: ['template'] });
+      return;
     }
+    await archiveAndRefresh();
   }
 
   async function handleCloneTemplate() {
@@ -364,17 +475,26 @@ export default function LabTemplateWorkbench({
       notify?.('error', t('errors.select_template_for_copy'));
       return;
     }
-    setSaving(true);
-    try {
-      const cloned = (await labReportingApi.cloneTemplate((selectedTemplate as { id?: string | number })?.id as string | number)) as Record<string, unknown>;
-      notify?.('success', t('success.template_cloned'));
-      await onTemplatesChanged?.();
-    } catch (error) {
-      const err = error as { message?: string };
-      notify?.('error', err?.message || '');
-    } finally {
-      setSaving(false);
+    const cloneAndRefresh = async () => {
+      setSaving(true);
+      try {
+        await labReportingApi.cloneTemplate((selectedTemplate as { id?: string | number })?.id as string | number);
+        notify?.('success', t('success.template_cloned'));
+        await onTemplatesChanged?.();
+      } catch (error) {
+        const err = error as { message?: string };
+        notify?.('error', err?.message || '');
+      } finally {
+        setSaving(false);
+      }
+    };
+    if (guardTransition) {
+      // PR 3351 (review round 2, P1): clone меняет только шаблон — скоуп
+      // ['template'] (см. комментарий у archive).
+      guardTransition(cloneAndRefresh, { sourceIds: ['template'] });
+      return;
     }
+    await cloneAndRefresh();
   }
 
   // ─── Field/Section mutation helpers (used by ContentTab) ───
@@ -546,22 +666,33 @@ export default function LabTemplateWorkbench({
 
   // PR5: dirty-state draft шаблона — черновик отличается от hydrate(activeVersion).
   const templateDirty = useMemo(() => {
-    if (!selectedTemplate || !activeVersion) return false;
+    if (!selectedTemplate || !draftHydrated) return false;
     return JSON.stringify(draftVersion) !== JSON.stringify(hydrateVersion(activeVersion));
-  }, [draftVersion, selectedTemplate, activeVersion]);
+  }, [draftHydrated, draftVersion, selectedTemplate, activeVersion]);
 
   const isTemplateDirtyRef = useRef(templateDirty);
+  // PR 3351 (route-level leave guard): обновляемый ref + notify на каждом
+  // рендере — route-guard перевзвешивает sentinel при флипе dirty.
+  const onDirtyStateChangeRef = useRef(onDirtyStateChange);
+  useEffect(() => {
+    onDirtyStateChangeRef.current = onDirtyStateChange;
+  });
   useEffect(() => {
     isTemplateDirtyRef.current = templateDirty;
+    onDirtyStateChangeRef.current?.();
+  });
+  const activeVersionRef = useRef(activeVersion);
+  useEffect(() => {
+    activeVersionRef.current = activeVersion;
   });
   const registerDirtySourceRef = useRef(registerDirtySource);
-  // PR5-review: attemptSaveTemplate захватывает state конкретного рендера —
+  // PR5-review: saveTemplateWithFeedback захватывает state конкретного рендера —
   // регистрация монтируется один раз, но вызывает АКТУАЛЬНУЮ функцию через
   // обновляемый ref (паттерн handleSaveDraftRef в LabReportWorkbench),
   // иначе после загрузки шаблона save продолжает видеть первый рендер.
   const attemptSaveTemplateRef = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
-    attemptSaveTemplateRef.current = attemptSaveTemplate;
+    attemptSaveTemplateRef.current = saveTemplateWithFeedback;
   });
   useEffect(() => {
     if (!registerDirtySourceRef.current) return;
@@ -569,8 +700,22 @@ export default function LabTemplateWorkbench({
       id: 'template',
       isDirty: () => isTemplateDirtyRef.current,
       save: () => attemptSaveTemplateRef.current(),
+      // PR 3351: Discard сбрасывает черновик шаблона к hydrate(activeVersion).
+      // Если переход (загрузка другого шаблона) упадёт и вернёт прежний
+      // selectedTemplate, сброшенный draft не останется dirty и не будет
+      // перезаписан поздним сохранением.
+      discard: () => {
+        setDraftVersion(hydrateVersion(activeVersionRef.current));
+      },
     });
   }, []);
+
+  // PR 3351 (review round 6, P1): beforeunload для полного документа
+  // (refresh/закрытие вкладки) больше не ставится здесь. Единственный
+  // владелец — LabDirtyGuardProvider: он видит ОБЩЕЕ состояние
+  // (dirty-источники ИЛИ незавершённые операции), поэтому pending-only
+  // мутация (clone чистого шаблона) тоже блокирует unload. Workbench-хук
+  // на одном dirty-state этот сценарий пропускал.
 
   // PR4: единый список ошибок валидации текущего draft для inline-блока;
   // хендлеры Save/Publish используют те же проверки перед любым запросом.
@@ -581,7 +726,12 @@ export default function LabTemplateWorkbench({
   ];
 
   return (
-    <div className="ltw-root">
+    <fieldset
+      disabled={interactionPending}
+      aria-busy={interactionPending}
+      className="ltw-fieldset-reset"
+    >
+      <div className="ltw-root">
       <Card variant="filled" padding="none">
         <CardHeader className="ltw-card-header">
           <CardTitle className="ltw-card-title">
@@ -589,7 +739,7 @@ export default function LabTemplateWorkbench({
               <SquareStack size={20} aria-hidden="true" />
               {t('template.title')}
             </span>
-            <Button variant="primary" size="small" onClick={() => setShowNewTemplateDialog(true)} disabled={saving}>
+            <Button variant="primary" size="small" onClick={() => setShowNewTemplateDialog(true)} disabled={interactionPending}>
               <Plus size={14} aria-hidden="true" />
               {t('template.new_template')}
             </Button>
@@ -629,7 +779,10 @@ export default function LabTemplateWorkbench({
               <button
                 key={String(template.id ?? "")}
                 type="button"
-                onClick={() => onSelectTemplate?.(template as Record<string, unknown>)}
+                onClick={() => {
+                  if (!interactionPending) onSelectTemplate?.(template as Record<string, unknown>);
+                }}
+                disabled={interactionPending}
                 className={`ltw-template-btn ${String(selectedTemplate?.id ?? "") === String(template.id ?? "") ? 'ltw-template-btn-selected' : ''}`}
               >
                 <div className="ltw-fw-600">{String(template.name ?? "")}</div>
@@ -818,7 +971,7 @@ export default function LabTemplateWorkbench({
         open={showNewTemplateDialog}
         onClose={() => setShowNewTemplateDialog(false)}
         onCreate={handleCreateTemplate}
-        saving={saving}
+        saving={interactionPending}
         existingTemplates={templates as unknown as Parameters<typeof NewTemplateDialog>[0]['existingTemplates']}
       />
 
@@ -840,7 +993,8 @@ export default function LabTemplateWorkbench({
 
       {/* L-H-1 fix: portal-mounted ConfirmDialog для destructive actions */}
       {confirmDialog}
-    </div>
+      </div>
+    </fieldset>
   );
 }
 

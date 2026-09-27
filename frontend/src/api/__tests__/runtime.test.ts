@@ -39,6 +39,7 @@ describe('api runtime resolution', () => {
   });
 
   it('prefers the browser origin when no API env is configured (same-origin deploys)', () => {
+    vi.stubEnv('VITE_API_BASE_URL', '');
     vi.stubGlobal('window', { location: { origin: 'https://clinic.example.com' } });
 
     expect(getApiOrigin()).toBe('https://clinic.example.com');
@@ -55,6 +56,7 @@ describe('api runtime resolution', () => {
   });
 
   it('derives websocket base from current browser origin', () => {
+    vi.stubEnv('VITE_API_BASE_URL', '');
     vi.stubGlobal('window', { location: { origin: 'https://clinic.example.com' } });
 
     expect(getWsBaseUrl()).toBe('wss://clinic.example.com');
@@ -70,6 +72,7 @@ describe('api runtime resolution', () => {
   });
 
   it('publishes runtime resolution onto window for smoke probes', () => {
+    vi.stubEnv('VITE_API_BASE_URL', '');
     const windowStub: RuntimeResolutionWindow = { location: { origin: 'https://clinic.example.com' } };
     vi.stubGlobal('window', windowStub);
 

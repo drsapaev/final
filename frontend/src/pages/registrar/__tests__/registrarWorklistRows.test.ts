@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import type { Appointment } from '../../../types/domain/clinic';
 import {
   computeDepartmentStats,
+  computeDoctorStats,
   computeRegistrarWorklistRows,
   describeRegistrarWorklistCounter,
   formatRegistrarWorklistCounter,
@@ -29,6 +30,49 @@ const TODAY = '2026-08-29';
 
 const appt = (overrides: Record<string, unknown>): Record<string, unknown> =>
   ({ queue_time: '2026-08-29T08:00:00+05:00', ...overrides });
+
+describe('per-doctor worklist scope', () => {
+  const rows = asAppointments([
+    appt({ id: 1, queue_tag: 'cardiology', doctor_id: 99, specialist_id: 99,
+      queue_owner_kind: 'doctor', queue_owner_id: 7, date: TODAY, status: 'waiting',
+      queue_numbers: [{ number: 1 }], patient_fio: 'A' }),
+    appt({ id: 2, queue_tag: 'cardiology', doctor_id: 7,
+      queue_owner_kind: 'doctor', queue_owner_id: 8, date: TODAY, status: 'waiting', patient_fio: 'B' }),
+    appt({ id: 3, queue_tag: 'cardiology', doctor_id: 7,
+      queue_owner_kind: 'resource', queue_owner_id: 7, date: TODAY, patient_fio: 'C' }),
+    appt({ id: 4, queue_tag: 'cardiology', doctor_id: 7,
+      date: TODAY, patient_fio: 'D' }),
+  ]);
+  const profiles: QueueProfileItem[] = [{ key: 'cardio', queue_tags: ['cardiology'] }];
+
+  it('filters by entry queue ownership rather than the shared tag or legacy doctor fields', () => {
+    const result = computeRegistrarWorklistRows({
+      appointments: rows, activeTab: null, activeDoctorId: 7,
+      statusFilter: null, searchQuery: '', queueProfiles: profiles,
+      services: {}, fallbackPatientLabel: FALLBACK,
+    });
+    expect(result.map((entry) => entry.id)).toEqual([1]);
+    // Profile aggregate remains available and still contains both doctors.
+    const profile = computeRegistrarWorklistRows({
+      appointments: rows, activeTab: 'cardio', statusFilter: null,
+      searchQuery: '', queueProfiles: profiles, services: {}, fallbackPatientLabel: FALLBACK,
+    });
+    expect(profile).toHaveLength(4);
+  });
+
+  it('computes doctor badges, empty scope and signed counters from that same owner', () => {
+    const stats = computeDoctorStats(rows, TODAY, [7, 8, 9]);
+    expect(stats['7']).toEqual({ todayCount: 1, hasActiveQueue: true, hasPendingPayments: false });
+    expect(stats['8'].todayCount).toBe(1);
+    expect(stats['9'].todayCount).toBe(0);
+    expect(resolveRegistrarWorklistEmptyScopeKind({ appointments: rows, activeTab: null, activeDoctorId: 9, queueProfiles: profiles })).toBe('queue-empty');
+    expect(resolveRegistrarWorklistEmptyScopeKind({ appointments: rows, activeTab: null, activeDoctorId: 7, queueProfiles: profiles })).toBe('filtered-empty');
+    expect(describeRegistrarWorklistCounter({ appointments: rows, activeTab: null,
+      activeDoctorId: 7, queueProfiles: profiles, rows: [], hasMore: false })).toMatchObject({
+      unit: 'records', count: 0, scopeCount: 1, narrowed: true,
+    });
+  });
+});
 
 describe('computeDepartmentStats (PR-UI-13-2)', () => {
   it('falls back to the hardcoded profile key set when no profiles loaded', () => {

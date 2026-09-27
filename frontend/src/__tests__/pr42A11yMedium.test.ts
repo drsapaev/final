@@ -3,11 +3,14 @@
  *
  * Tests for:
  * 1. Medium-E: at least one form component has <label htmlFor> association
- * 2. Medium-F: ResponsiveModal, PhotoComparison do not use hardcoded
- *    backgroundColor: 'white' (breaks dark mode)
+ * 2. Medium-F: ResponsiveModal does not use hardcoded backgroundColor: 'white'
+ *    (breaks dark mode)
  *
  * PR-UI-17-2: Medium-F ResponsiveForm + Medium-G ModernInput/ModernSelect
  * cases removed — dead components deleted (0 runtime importers).
+ * Derma audit item 8: PhotoComparison case removed — unreachable legacy
+ * component deleted together with the retired photos tab (gallery now lives
+ * in the visit screen via /files).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +18,6 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
 const RESPONSIVE_MODAL = path.join(ROOT, 'src/components/ResponsiveModal.tsx');
-const PHOTO_COMPARISON = path.join(ROOT, 'src/components/dermatology/PhotoComparison.tsx');
 
 // ---------- 1. Medium-E: label htmlFor association ----------
 
@@ -45,16 +47,6 @@ describe('Medium-E: label htmlFor association', () => {
 describe('Medium-F: dark mode backgroundColor fix', () => {
   it('ResponsiveModal does not use hardcoded backgroundColor: white', () => {
     const src = fs.readFileSync(RESPONSIVE_MODAL, 'utf-8');
-    const stripped = src
-      .replace(/\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(stripped).not.toMatch(/backgroundColor:\s*['"]white['"]/);
-    expect(stripped).not.toMatch(/backgroundColor:\s*['"]#fff['"]/);
-    expect(stripped).not.toMatch(/backgroundColor:\s*['"]#ffffff['"]/i);
-  });
-
-  it('PhotoComparison does not use hardcoded backgroundColor: white', () => {
-    const src = fs.readFileSync(PHOTO_COMPARISON, 'utf-8');
     const stripped = src
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, '');

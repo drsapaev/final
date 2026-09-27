@@ -101,20 +101,20 @@ describe('Doctor panels SSOT contract', () => {
     // Contract: all command visibility must be gated through getBackendActionAvailability.
     // The variable name (row vs rowRecord) is an implementation detail.
     expect(actionBlock).toContain('getBackendActionAvailability(');
-    expect(actionBlock).toContain("'call'");
-    expect(actionBlock).toContain("'can_start_visit'");
+    expect(actionBlock).toContain('\'call\'');
+    expect(actionBlock).toContain('\'can_start_visit\'');
     expect(actionBlock).toContain('getBackendActionAvailability(');
-    expect(actionBlock).toContain("'print'");
-    expect(actionBlock).toContain("'can_print_ticket'");
+    expect(actionBlock).toContain('\'print\'');
+    expect(actionBlock).toContain('\'can_print_ticket\'');
     expect(actionBlock).toContain('getBackendActionAvailability(');
-    expect(actionBlock).toContain("'complete'");
-    expect(actionBlock).toContain("'can_complete'");
+    expect(actionBlock).toContain('\'complete\'');
+    expect(actionBlock).toContain('\'can_complete\'');
     expect(actionBlock).toContain('getBackendActionAvailability(');
-    expect(actionBlock).toContain("'view_emr'");
-    expect(actionBlock).toContain("'can_view_emr'");
+    expect(actionBlock).toContain('\'view_emr\'');
+    expect(actionBlock).toContain('\'can_view_emr\'');
     expect(actionBlock).toContain('getBackendActionAvailability(');
-    expect(actionBlock).toContain("'schedule_next'");
-    expect(actionBlock).toContain("'can_schedule_next'");
+    expect(actionBlock).toContain('\'schedule_next\'');
+    expect(actionBlock).toContain('\'can_schedule_next\'');
     expect(actionBlock).toContain('const canPay = !isDoctorView && backendCanPay === true');
     expect(actionBlock).toContain('const canCall = isDoctorView && backendCanCall === true');
     expect(actionBlock).toContain('const canPrint = backendCanPrint === true');
@@ -194,13 +194,19 @@ describe('Doctor panels SSOT contract', () => {
     ).toBe(true);
   });
 
-  it('keeps dermatology prescription availability backend-owned', () => {
+  it('keeps dermatology prescription and completion availability backend-owned', () => {
     const dermatology = read('pages/DermatologistPanelUnified.tsx');
     const prescriptionSystem = read('components/PrescriptionSystem.tsx');
 
-    expect(dermatology).toContain('/appointments/${appointmentId}/status');
+    expect(dermatology).toContain('/appointments/${expectedAppointmentId}/status');
     expect(dermatology).toContain('setCanCreatePrescription(statusData.can_create_prescription === true)');
-    expect(dermatology).toContain('canCreatePrescription={canCreatePrescription}');
+    expect(dermatology).toContain('canCreatePrescription={Boolean(currentVisitContext.appointmentId && canCreatePrescription)}');
+    expect(dermatology).toContain('canComplete: statusData.can_complete === true');
+    expect(dermatology).toContain('currentAppointment?.can_complete === true');
+    expect(dermatology).toContain('appointmentCompletionStatus.canComplete');
+    expect(dermatology).toContain('{emr && !emr.is_draft &&');
+    expect(dermatology).toContain('canCompleteDermatologyVisit(');
+    expect(dermatology).toContain('onPersisted={() => refreshCanonicalStatus(currentVisitContext, true)}');
 
     expect(prescriptionSystem).toContain('canCreatePrescription');
     expect(prescriptionSystem).toContain('const prescriptionEligible = canCreatePrescription === true');

@@ -544,26 +544,70 @@ you push — saving 5-10 min per CI run.
 
 ### Run
 
+Run from the repository root in Bash (Git Bash on Windows). The negative tests
+use a disposable detached worktree, so even an unexpected successful commit
+cannot move `main` or include a probe file in your PR.
+
 ```bash
+set -euo pipefail
+
 # Install hooks (one-time after clone)
 bash scripts/setup-dev.sh
 
 # Verify hooks are installed
-ls -la .git/hooks/pre-commit
-# Expected: pre-commit file exists, not a sample
+test -f "$(git rev-parse --git-path hooks)/pre-commit"
 
-# Test with a fake leak
-echo "TELEGRAM_BOT_TOKEN = '1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ'" > /tmp/test_leak.py
-git add /tmp/test_leak.py 2>/dev/null || true
-git commit -m "test: should be blocked by gitleaks" 2>&1
-# Expected: gitleaks hook blocks the commit
+repo_root=$(pwd -P)
+probe_dir=$(mktemp -d "$repo_root/.check8-probe.XXXXXX")
+probe_dir=$(cd "$probe_dir" && pwd -P)
+cleanup() {
+  if [[ "$(dirname "$probe_dir")" != "$repo_root" ]]; then
+    echo "Refusing to remove a worktree outside $repo_root" >&2
+    return 1
+  fi
+  if ! git -C "$repo_root" worktree remove --force "$probe_dir" >/dev/null 2>&1; then
+    rmdir "$probe_dir" 2>/dev/null || echo "Remove disposable worktree manually: $probe_dir" >&2
+  fi
+}
+trap cleanup EXIT
+git worktree add --detach "$probe_dir" HEAD >/dev/null
+cd "$probe_dir"
 
-# Test with a stray root test file
-echo "def test_foo(): pass" > test_stray.py
+# Generate a synthetic Telegram-shaped token at runtime; never use a real one.
+python3 - <<'PY' > test_leak.py
+import secrets
+import string
+
+bot_id = str(1000000000 + secrets.randbelow(9000000000))
+alphabet = string.ascii_letters + string.digits + "_-"
+secret = "".join(secrets.choice(alphabet) for _ in range(35))
+print(f"TELEGRAM_BOT_TOKEN = '{bot_id}:{secret}'")
+PY
+git add test_leak.py
+if git -c commit.gpgsign=false -c user.name=Check8 -c user.email=check8@example.invalid \
+  commit -m "test: fake leak must be blocked" > commit.log 2>&1; then
+  echo "FAIL: fake leak was committed" >&2
+  exit 1
+fi
+grep -qiE 'gitleaks.*Failed' commit.log || {
+  echo "FAIL: commit failed without a gitleaks rejection" >&2
+  exit 1
+}
+
+git restore --staged -- test_leak.py
+rm test_leak.py
+printf 'def test_foo(): pass\n' > test_stray.py
 git add test_stray.py
-git commit -m "test: should be blocked by no-stray-root-tests" 2>&1
-# Expected: no-stray-root-tests hook blocks the commit
-rm test_stray.py
+if git -c commit.gpgsign=false -c user.name=Check8 -c user.email=check8@example.invalid \
+  commit -m "test: stray root test must be blocked" > commit.log 2>&1; then
+  echo "FAIL: stray root test was committed" >&2
+  exit 1
+fi
+grep -qiE 'Block test_.*repo root.*Failed' commit.log || {
+  echo "FAIL: commit failed without a no-stray-root-tests rejection" >&2
+  exit 1
+}
+echo "PASS: both hooks rejected the synthetic commits"
 ```
 
 ### If it fails
@@ -571,6 +615,9 @@ rm test_stray.py
 - **"pre-commit: command not found"**: `pip install pre-commit` then `pre-commit install`
 - **Hooks not running**: check `.pre-commit-config.yaml` exists at root
 - **Hook fails but commit goes through**: hooks not installed — re-run `pre-commit install`
+- **Windows blocks a hook executable**: report Check 8 as blocked and resolve
+  the application-control policy; a failed commit alone does not prove that
+  gitleaks or the stray-file guard ran.
 
 ---
 

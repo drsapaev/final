@@ -12,14 +12,22 @@ const readSource = (relPath: string) =>
   fs.readFileSync(path.join(ROOT, relPath), 'utf8').replace(/\r\n/g, '\n');
 
 describe('LabPanel Phase 1 safety contract (H-1, H-2, H-3)', () => {
-  it('H-1: LabPanel imports and calls useSessionTimeoutWarning', () => {
+  it('H-1: LabPanel wires the session timeout warning through the pending-aware wrapper', () => {
     const source = readSource('pages/LabPanel.tsx');
 
-    expect(source).toContain('from \'../hooks/useSessionTimeoutWarning\'');
-    expect(source).toContain('useSessionTimeoutWarning({');
+    // PR 3351 (review round 6, P1): прямой вызов useSessionTimeoutWarning
+    // заменён обёрткой — истечение сессии больше не делает hard navigation
+    // поверх незавершённой операции (см. usePendingAwareSessionExpiry).
+    // H-1 контракт сохранён: опрос токена + warning-диалог + redirect.
+    expect(source).toContain('from \'../hooks/usePendingAwareSessionExpiry\'');
+    expect(source).toContain('usePendingAwareSessionExpiry({');
     expect(source).toContain('onWarning:');
     expect(source).toContain('onExpired:');
     expect(source).toContain('window.location.href = \'/login\'');
+    // Обёртка сама опрашивает токен (обязана существовать и использоваться).
+    const hookSource = readSource('hooks/usePendingAwareSessionExpiry.ts');
+    expect(hookSource).toContain('useSessionTimeoutWarning({');
+    expect(hookSource).toContain('onExpired: () => {');
   });
 
   it('H-1: LabPanel renders a session timeout warning dialog', () => {

@@ -158,6 +158,61 @@
     min-width: 160px;
 }
 
+.mqm-called-visits {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--mac-border);
+}
+
+.mqm-called-visits-title {
+    margin: 0;
+    color: var(--mac-text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.mqm-called-visits-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mqm-called-visit-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-md);
+    background: var(--mac-bg-primary);
+}
+
+.mqm-called-visit-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--mac-text-primary);
+    font-size: 14px;
+}
+
+@media (max-width: 480px) {
+    .mqm-called-visit-item {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .mqm-called-visit-item .mqm-button-icon {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
 /* Queue Header */
 .mqm-queue-header {
     display: flex;

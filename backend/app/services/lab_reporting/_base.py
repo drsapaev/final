@@ -65,6 +65,11 @@ FLAG_SEVERITY_RANKS = {
     "critical": 300,
 }
 
+# PR8 (codex-lab-workflow-hardening-plan): placeholder для template preview —
+# очевидно синтетический маркер в value-колонке (никаких реальных значений
+# пациентов; numeric-колонка остаётся пустой).
+TEMPLATE_PREVIEW_PLACEHOLDER = "—"
+
 
 @dataclass
 class LabReportingDomainError(Exception):

@@ -18,6 +18,15 @@
  *  - supported=false + created=false (address exists, direction not
  *    bookable right now) shows the QR with an honest not-bookable note,
  *    never a false «готово».
+ *
+ * RQ-18 follow-up (owner round-1 review of merged #3360):
+ *  - P2-3: after a successful provision the entry-methods are RE-READ —
+ *    a freshly provisioned healthy direction drops the stale
+ *    «запись недоступна» note; a failed recheck renders the honest
+ *    unknown state, never a confident «недоступно»;
+ *  - P2-4: one QR block PER PROFILE KEY — a profile carrying several
+ *    queue_tags renders the block once; sibling tag rows show a pointer
+ *    note instead of independent duplicate QR states.
  */
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -42,6 +51,7 @@ vi.mock('../../../api/queueResources', () => queueResourcesMocks);
 
 const directionMocks = vi.hoisted(() => ({
     provisionPublicAddress: vi.fn(),
+    fetchDirectionEntryMethods: vi.fn(),
 }));
 
 vi.mock('../../../api/queueDirections', () => directionMocks);
@@ -53,6 +63,7 @@ vi.mock('qrcode.react', () => ({
 }));
 
 import AdminSetupDirections from '../AdminSetupDirections';
+import PermanentDirectionQr from '../PermanentDirectionQr';
 
 const SERVICE_ROW = {
     id: 1,
@@ -70,6 +81,28 @@ const PROFILE_ROW = {
     show_on_qr_page: true,
     queue_tags: ['lab'],
 };
+
+/** Builds an entry-methods payload with the given permanent_address flag. */
+function methodsPayload(supported: boolean) {
+    return {
+        direction_key: 'lab-key',
+        entry_methods: [
+            { method: 'session_qr', supported: true },
+            { method: 'permanent_address', supported },
+            { method: 'view_only', supported: true },
+        ],
+    };
+}
+
+/** Default post-provision recheck behavior for existing pins. */
+function mockRecheck(afterProvisionSupported: boolean | 'fail') {
+    directionMocks.fetchDirectionEntryMethods.mockImplementation(
+        (_profileKey: string) =>
+            afterProvisionSupported === 'fail'
+                ? Promise.reject(new Error('recheck failed'))
+                : Promise.resolve(methodsPayload(afterProvisionSupported)),
+    );
+}
 
 function setupApiMock(entryMethods: { data: unknown } | null) {
     apiMocks.get.mockImplementation((url: string) => {
@@ -114,6 +147,9 @@ const PROVISION_RESPONSE = {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    // default recheck: mirrors the pre-provision flag (false) — explicit
+    // pins override this per test
+    mockRecheck(false);
 });
 
 describe('RQ-18 — permanent direction QR admin surface', () => {
@@ -135,16 +171,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 2: provision response renders the QR image and the /q/<code> URL', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
         renderScreen();
         const btn = await screen.findByTestId('setup-qr-provision-lab');
@@ -155,16 +182,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 3: re-provision (reload recovery) keeps the SAME code (created=false path)', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: true },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(true) });
         directionMocks.provisionPublicAddress.mockResolvedValue({
             ...PROVISION_RESPONSE,
             created: false,
@@ -179,16 +197,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 4: QR payload is the absolute canonical frontend origin + /q/<public_code>', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
         renderScreen();
         fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
@@ -209,16 +218,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 6: the permanent surface never shows expiry/TTL phrasing and always the non-token note', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
         const { container } = renderScreen();
         fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
@@ -231,16 +231,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 6b: created=false while supported=false → QR shown WITH an honest not-bookable note', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         directionMocks.provisionPublicAddress.mockResolvedValue({
             ...PROVISION_RESPONSE,
             created: false,
@@ -248,20 +239,17 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
         renderScreen();
         fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
         expect(await screen.findByTestId('setup-qr-image-lab')).toBeTruthy();
-        expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
+        // the note shows only after the recheck PROVES false; the
+        // transient pending state is pinned separately in PIN 8 (a
+        // controlled pending recheck promise)
+        await waitFor(() => {
+            expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
+        });
+        expect(screen.queryByTestId('setup-qr-unknown-lab')).toBeNull();
     });
 
     it('PIN 6c: provision failure shows an explicit error — no silent fake success', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         directionMocks.provisionPublicAddress.mockRejectedValue(
             new Error('provision refused'),
         );
@@ -274,16 +262,7 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
     });
 
     it('PIN 7-loop: checklist load does NOT loop — GET count stays bounded (pre-existing main defect found by the QR state pin)', async () => {
-        setupApiMock({
-            data: {
-                direction_key: 'lab-key',
-                entry_methods: [
-                    { method: 'session_qr', supported: true },
-                    { method: 'permanent_address', supported: false },
-                    { method: 'view_only', supported: true },
-                ],
-            },
-        });
+        setupApiMock({ data: methodsPayload(false) });
         renderScreen();
         await screen.findByTestId('setup-qr-provision-lab');
         await new Promise((r) => setTimeout(r, 400));
@@ -292,5 +271,270 @@ describe('RQ-18 — permanent direction QR admin surface', () => {
         const calls = apiMocks.get.mock.calls.length;
         expect(calls).toBeGreaterThan(0);
         expect(calls).toBeLessThanOrEqual(8);
+    });
+
+    it('PIN 8 (round-2 P2): while the post-provision recheck is pending the state is an honest UNKNOWN — no stale not-bookable note; a proven true drops the note', async () => {
+        setupApiMock({ data: methodsPayload(false) });
+        let resolveRecheck: (value: unknown) => void = () => {};
+        const pendingRecheck = new Promise((resolve) => {
+            resolveRecheck = resolve;
+        });
+        directionMocks.fetchDirectionEntryMethods.mockReturnValue(pendingRecheck as never);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        // the recheck is still in flight: NO stale «недоступна» note, honest unknown
+        expect(screen.queryByTestId('setup-qr-not-bookable-note-lab')).toBeNull();
+        expect(screen.getByTestId('setup-qr-unknown-lab')).toBeTruthy();
+        // the parent row was told the same thing atomically (unknown, not false)
+        expect(
+          screen.getByTestId('setup-row-permanent-address').querySelector('.admin-sdx-status-unknown'),
+        ).toBeTruthy();
+        // the recheck answers: the direction became bookable
+        await React.act(async () => {
+            resolveRecheck(methodsPayload(true));
+        });
+        await waitFor(() => {
+            expect(screen.queryByTestId('setup-qr-unknown-lab')).toBeNull();
+        });
+        expect(screen.queryByTestId('setup-qr-not-bookable-note-lab')).toBeNull();
+    });
+
+    it('PIN 8b: after provision the entry-methods are re-read — the not-bookable note disappears when the direction became bookable', async () => {
+        setupApiMock({ data: methodsPayload(false) });
+        mockRecheck(true);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        // the recheck happened against the right direction
+        await waitFor(() => {
+            expect(directionMocks.fetchDirectionEntryMethods).toHaveBeenCalledWith('lab-key');
+        });
+        // freshly provisioned healthy direction: NO stale «недоступна» note
+        await waitFor(() => {
+            expect(screen.queryByTestId('setup-qr-not-bookable-note-lab')).toBeNull();
+        });
+    });
+
+    it('PIN 9: the recheck is honest in the reverse race — supported=false after provision keeps the note', async () => {
+        setupApiMock({ data: methodsPayload(false) });
+        mockRecheck(false);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        await waitFor(() => {
+            expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
+        });
+    });
+
+    it('PIN 10 (round-2 P2): a failed recheck renders the honest UNKNOWN state — in the QR block AND in the parent checklist row', async () => {
+        setupApiMock({ data: methodsPayload(false) });
+        mockRecheck('fail');
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        // honest unknown banner (read failed), QR stays shown
+        await waitFor(() => {
+            expect(screen.getByTestId('setup-qr-unknown-lab')).toBeTruthy();
+        });
+        expect(screen.queryByTestId('setup-qr-not-bookable-note-lab')).toBeNull();
+        // the PARENT row is unknown too — never the confident red «не готово»
+        expect(
+          screen.getByTestId('setup-row-permanent-address').querySelector('.admin-sdx-status-unknown'),
+        ).toBeTruthy();
+        expect(
+          screen.getByTestId('setup-row-permanent-address').querySelector('.admin-sdx-status-err'),
+        ).toBeNull();
+    });
+
+    it('PIN 11 (red on merged main): one QR block PER PROFILE KEY — a two-tag profile renders the block once, siblings get a pointer', async () => {
+        const MULTI_TAG_PROFILE = { ...PROFILE_ROW, queue_tags: ['lab', 'lab_extra'] };
+        apiMocks.get.mockImplementation((url: string) => {
+            if (url.startsWith('/services?')) {
+                return Promise.resolve({ data: [SERVICE_ROW] });
+            }
+            if (url.startsWith('/queues/profiles')) {
+                return Promise.resolve({ data: { profiles: [MULTI_TAG_PROFILE] } });
+            }
+            if (url.startsWith('/services/admin/doctors')) {
+                return Promise.resolve({ data: [] });
+            }
+            if (url.includes('/entry-methods')) {
+                return Promise.resolve({ data: methodsPayload(false) });
+            }
+            return Promise.reject(new Error(`unexpected GET ${url}`));
+        });
+        queueResourcesMocks.listQueueResources.mockResolvedValue([]);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        // both tag rows exist
+        await screen.findByTestId('setup-checklist-row-lab');
+        await screen.findByTestId('setup-checklist-row-lab_extra');
+        // but exactly ONE QR block for the single owning profile
+        await screen.findByTestId('setup-qr-block-lab');
+        const blocks = screen.getAllByTestId(/^setup-qr-block-/).filter((el) =>
+            el.getAttribute('data-testid')?.startsWith('setup-qr-block-'),
+        );
+        expect(blocks.length).toBe(1);
+        // the sibling row shows a pointer instead of a second block
+        expect(screen.getByTestId('setup-qr-dedupe-lab_extra')).toBeTruthy();
+        expect(screen.queryByTestId('setup-qr-block-lab_extra')).toBeNull();
+    });
+
+    it('PIN 31 (round-3 P2): the parent checklist row follows the recheck — unknown while pending, ready after a proven true', async () => {
+        setupApiMock({ data: methodsPayload(false) });
+        let resolveRecheck: (value: unknown) => void = () => {};
+        const pendingRecheck = new Promise((resolve) => {
+            resolveRecheck = resolve;
+        });
+        directionMocks.fetchDirectionEntryMethods.mockReturnValue(pendingRecheck as never);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        const row = () => screen.getByTestId('setup-row-permanent-address');
+        // pre-provision: definitive false → red/not-ready
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-err')).toBeTruthy();
+        });
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        // pending recheck: the row goes honest UNKNOWN (atomic round-2 contract)
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-unknown')).toBeTruthy();
+        });
+        // the recheck PROVES true → the row must become ready — never stuck
+        // at unknown (the pre-fix parent wiped the whole entry-methods
+        // object on the null notify, so a later true hit `!current` and
+        // only a full page reload resynced the row)
+        await React.act(async () => {
+            resolveRecheck(methodsPayload(true));
+        });
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-ok')).toBeTruthy();
+        });
+        expect(row().querySelector('.admin-sdx-status-unknown')).toBeNull();
+        expect(row().querySelector('.admin-sdx-status-err')).toBeNull();
+    });
+
+    it('PIN 36 (round-4 P2-2): a LATE pre-refresh recheck answer never overwrites a fresher full read', async () => {
+        // The exact review race: R1 recheck started → admin hits Refresh →
+        // the full read R2 lands (supported=false) → the STALE R1 answers
+        // true late → the checklist row must STAY false (never «ложно
+        // зелёная» again).
+        setupApiMock({ data: methodsPayload(false) });
+        let resolveRecheck: (value: unknown) => void = () => {};
+        const pendingRecheck = new Promise((resolve) => {
+            resolveRecheck = resolve;
+        });
+        directionMocks.fetchDirectionEntryMethods.mockReturnValue(pendingRecheck as never);
+        directionMocks.provisionPublicAddress.mockResolvedValue(PROVISION_RESPONSE);
+        renderScreen();
+        const row = () => screen.getByTestId('setup-row-permanent-address');
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-err')).toBeTruthy();
+        });
+        // provision at the initial generation; the recheck R1 hangs
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await screen.findByTestId('setup-qr-image-lab');
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-unknown')).toBeTruthy();
+        });
+
+        // THE REFRESH: the full read R2 (gen bump) commits supported=false
+        // and clears the overrides
+        fireEvent.click(screen.getByTestId('setup-refresh'));
+        await waitFor(() => {
+            expect(row().querySelector('.admin-sdx-status-err')).toBeTruthy();
+        });
+
+        // the STALE R1 now answers true — it belongs to the previous
+        // generation and must be DROPPED (pre-fix: it flipped the row ok)
+        await React.act(async () => {
+            resolveRecheck(methodsPayload(true));
+        });
+        await React.act(async () => {});
+        expect(row().querySelector('.admin-sdx-status-ok')).toBeNull();
+        expect(row().querySelector('.admin-sdx-status-err')).toBeTruthy();
+    });
+
+    it('PIN 37 (round-5 P2-2): a LATE provision response never paints the block-local unknown over a fresher full read', async () => {
+        // The exact round-5 review race, driven on the CHILD contract
+        // directly (a full-page refresh unmounts the block, so the
+        // parent-composition test cannot reach this window):
+        //   R1 provision starts at generation 1 → a newer full read lands
+        //   (generation 2, supported=false) → R1's provision resolves LATE
+        //   → the pre-fix child unconditionally set its local override to
+        //   null (unknown) and the stale recheck's early return never
+        //   cleaned it up — the block stayed on «статус неизвестен» until
+        //   the next Refresh. The generation-tagged override makes the
+        //   stale local state inert.
+        let resolveRecheck: (value: unknown) => void = () => {};
+        const pendingRecheck = new Promise((resolve) => {
+            resolveRecheck = resolve;
+        });
+        directionMocks.fetchDirectionEntryMethods.mockReturnValue(pendingRecheck as never);
+        let resolveProvision: (value: unknown) => void = () => {};
+        const pendingProvision = new Promise((resolve) => {
+            resolveProvision = resolve;
+        });
+        directionMocks.provisionPublicAddress.mockReturnValue(pendingProvision as never);
+
+        const view = render(
+            <ThemeProvider>
+                <MemoryRouter>
+                    <PermanentDirectionQr
+                        profileKey="lab-key"
+                        tag="lab"
+                        supported={false}
+                        supportGeneration={1}
+                    />
+                </MemoryRouter>
+            </ThemeProvider>,
+        );
+
+        // R1 provision starts (generation 1) and hangs
+        fireEvent.click(await screen.findByTestId('setup-qr-provision-lab'));
+        await waitFor(() => {
+            expect(screen.getByTestId('setup-qr-provision-lab').hasAttribute('disabled')).toBe(
+                true,
+            );
+        });
+
+        // THE NEWER FULL READ: generation 2 lands with supported=false
+        view.rerender(
+            <ThemeProvider>
+                <MemoryRouter>
+                    <PermanentDirectionQr
+                        profileKey="lab-key"
+                        tag="lab"
+                        supported={false}
+                        supportGeneration={2}
+                    />
+                </MemoryRouter>
+            </ThemeProvider>,
+        );
+        await React.act(async () => {});
+
+        // R1's provision resolves LATE — after the fresh generation landed
+        await React.act(async () => {
+            resolveProvision(PROVISION_RESPONSE);
+        });
+        await screen.findByTestId('setup-qr-image-lab');
+        // pre-fix: the block painted its own unknown banner here and kept
+        // it until the next Refresh. Round-5: the gen-1 override is inert —
+        // the fresh gen-2 answer (false) owns the block.
+        expect(screen.queryByTestId('setup-qr-unknown-lab')).toBeNull();
+        expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
+
+        // the STALE recheck also resolves — still no lingering unknown
+        await React.act(async () => {
+            resolveRecheck(methodsPayload(true));
+        });
+        await React.act(async () => {});
+        expect(screen.queryByTestId('setup-qr-unknown-lab')).toBeNull();
+        expect(screen.getByTestId('setup-qr-not-bookable-note-lab')).toBeTruthy();
     });
 });

@@ -18,6 +18,10 @@ CRITICAL_ROLES = {
     "cardio",
     "derma",
     "dentist",
+    # NURSE-V2 N2-5: the Nurse role re-opened in N2-2 now ships its
+    # frontend surface (/nurse) — the parity surface must list it or
+    # test_rbac_alignment_matches_backend_surface flags frontend_only.
+    "Nurse",
 }
 
 # Ожидаемые маршруты для ролей
@@ -31,6 +35,8 @@ ROLE_ROUTES = {
     "cardio": "/cardiologist",
     "derma": "/dermatologist",
     "dentist": "/dentist",
+    # NURSE-V2 N2-5: the canonical Nurse home (the tablet workspace).
+    "Nurse": "/nurse",
 }
 
 # Ожидаемые API endpoints для ролей

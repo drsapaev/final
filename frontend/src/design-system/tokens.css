@@ -52,6 +52,17 @@
    * 8.97:1 on #1c1c1e, 7.4:1 on #2c2c2e). Documented since CC-2 as the
    * deferred link-ink latent class. */
   --mac-link-ink: #0066d6;
+  /* PR 3351 (review round 10): canonical dual-theme DANGER text ink —
+   * error/alert TEXT on neutral surfaces (.lab-session-extend-error).
+   * No single danger value passes both themes as text: light #d92c20
+   * (--mac-danger-strong) = 4.35:1 on #eef3fa / 3.51:1 on #1c1c1e; dark
+   * #ff453a (--mac-danger) = 3.06:1 on #eef3fa / 4.99:1 on #1c1c1e — the
+   * base accent used before (#007aff via --mac-accent) failed both
+   * (3.6:1 / 4.24:1). Dual-theme pair mirroring --mac-link-ink: light
+   * #c0251c = 5.97:1 on white, 5.35:1 on #eef3fa; dark #ff6b61 = 6.10:1
+   * on #1c1c1e, 4.92:1 on #2c2c2e. Pinned by
+   * styles/__tests__/darkThemeInk.contract.test.ts. */
+  --mac-danger-ink: #c0251c;
 
   --mac-border: #b8c8da;
   --mac-border-secondary: #cad8e7;
@@ -122,8 +133,8 @@
   --mac-card-border: rgba(27, 46, 73, 0.14);
   --mac-nav-item-bg: rgba(244, 249, 255, 0.82);
   --mac-nav-item-hover: #e0ebf8;
-  --mac-nav-item-active: var(--mac-accent-blue);
-  --mac-nav-item-active-border: var(--mac-accent-blue);
+  --mac-nav-item-active: var(--mac-accent-blue-strong);
+  --mac-nav-item-active-border: var(--mac-accent-blue-strong);
   --mac-nav-item-active-text: var(--mac-text-on-accent);
   --mac-main-shell-bg: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
   --mac-main-shell-border: rgba(27, 46, 73, 0.12);
@@ -161,7 +172,7 @@
   --mac-bg-content: #f4f7fb;
   --mac-bg-sidebar: #e7eef7;
   --mac-bg-toolbar: rgba(246, 250, 255, 0.94);
-  
+
   /* macOS Gradients */
   --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(95, 149, 255, 0.08), transparent 50%), linear-gradient(180deg, #f1f6fc 0%, #dfe8f3 100%);
   --mac-gradient-sidebar: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
@@ -218,7 +229,7 @@
   --mac-duration-normal: 200ms;
   --mac-duration-slow: 250ms;
   --mac-duration-slower: 300ms;
-  
+
   /* macOS Animation Easing */
   --mac-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --mac-ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -262,6 +273,9 @@
     /* AXE-EXP-4: link ink — see the :root comment; #5ac8fa = 8.97:1 on
      * #1c1c1e / 7.4:1 on #2c2c2e. */
     --mac-link-ink: #5ac8fa;
+    /* PR 3351 (round 10): danger text ink — see the :root comment;
+     * #ff6b61 = 6.10:1 on #1c1c1e / 4.92:1 on #2c2c2e. */
+    --mac-danger-ink: #ff6b61;
 
     --mac-border: #38383a;
     --mac-border-secondary: #48484a;
@@ -273,7 +287,7 @@
     --mac-bg-content: #2c2c2e;
     --mac-bg-sidebar: #2c2c2e;
     --mac-bg-toolbar: #1c1c1e;
-    
+
     /* macOS Gradients - Dark Mode */
     --mac-gradient-window: linear-gradient(180deg, #1c1c1e 0%, #2c2c2e 100%);
     --mac-gradient-sidebar: linear-gradient(180deg, #2c2c2e 0%, #3a3a3c 100%);
@@ -301,6 +315,8 @@
   --mac-text-on-tertiary: #455568;
   /* AXE-EXP-4: mirror of the :root definition. */
   --mac-link-ink: #0066d6;
+  /* PR 3351 (round 10): mirror of the :root definition. */
+  --mac-danger-ink: #c0251c;
 
   --mac-border: #b8c8da;
   --mac-border-secondary: #cad8e7;
@@ -312,8 +328,8 @@
   --mac-card-border: rgba(27, 46, 73, 0.14);
   --mac-nav-item-bg: rgba(244, 249, 255, 0.82);
   --mac-nav-item-hover: #e0ebf8;
-  --mac-nav-item-active: var(--mac-accent-blue);
-  --mac-nav-item-active-border: var(--mac-accent-blue);
+  --mac-nav-item-active: var(--mac-accent-blue-strong);
+  --mac-nav-item-active-border: var(--mac-accent-blue-strong);
   --mac-nav-item-active-text: var(--mac-text-on-accent);
   --mac-main-shell-bg: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
   --mac-main-shell-border: rgba(27, 46, 73, 0.12);
@@ -329,7 +345,7 @@
   --mac-bg-content: #f4f7fb;
   --mac-bg-sidebar: #e7eef7;
   --mac-bg-toolbar: rgba(246, 250, 255, 0.94);
-  
+
   /* macOS Gradients - Light Mode */
   --mac-gradient-window: radial-gradient(120% 120% at 0% 0%, rgba(95, 149, 255, 0.08), transparent 50%), linear-gradient(180deg, #f1f6fc 0%, #dfe8f3 100%);
   --mac-gradient-sidebar: linear-gradient(180deg, #e8f0f8 0%, #dce6f2 100%);
@@ -359,6 +375,8 @@
   --mac-text-on-tertiary: #c7c7cc;
   /* AXE-EXP-4: mirror of the prefers-color-scheme block. */
   --mac-link-ink: #5ac8fa;
+  /* PR 3351 (round 10): mirror of the prefers-color-scheme block. */
+  --mac-danger-ink: #ff6b61;
 
   --mac-border: #38383a;
   --mac-border-secondary: #48484a;
@@ -375,8 +393,8 @@
   --mac-card-border: rgba(255, 255, 255, 0.08);
   --mac-nav-item-bg: rgba(255, 255, 255, 0.03);
   --mac-nav-item-hover: rgba(255, 255, 255, 0.08);
-  --mac-nav-item-active: var(--mac-accent-blue);
-  --mac-nav-item-active-border: var(--mac-accent-blue);
+  --mac-nav-item-active: var(--mac-accent-blue-strong);
+  --mac-nav-item-active-border: var(--mac-accent-blue-strong);
   --mac-nav-item-active-text: var(--mac-text-on-accent);
   --mac-main-shell-bg: linear-gradient(180deg, #2c2c2e 0%, #3a3a3c 100%);
   --mac-main-shell-border: rgba(255, 255, 255, 0.06);
@@ -387,7 +405,7 @@
   --mac-bg-content: #2c2c2e;
   --mac-bg-sidebar: #2c2c2e;
   --mac-bg-toolbar: #1c1c1e;
-  
+
   /* macOS Gradients - Dark Mode */
   --mac-gradient-window: linear-gradient(180deg, #1c1c1e 0%, #2c2c2e 100%);
   --mac-gradient-sidebar: linear-gradient(180deg, #2c2c2e 0%, #3a3a3c 100%);
@@ -1144,6 +1162,7 @@
     --mac-text-tertiary: #000000;
     --mac-text-on-tertiary: #000000;
     --mac-link-ink: #000000;
+    --mac-danger-ink: #000000;
   }
 }
 

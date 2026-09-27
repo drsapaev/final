@@ -1,4 +1,5 @@
 from app.services.authorization.staff import staff_authorization_service
+
 """
 API endpoints для интеграции панелей врачей с системой
 Основа: passport.md стр. 1141-2063
@@ -52,25 +53,15 @@ from app.schemas.misc_endpoints import (
 from app.services.notification_service import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
     NotificationService,  # noqa: E402, F401  # manual-review: conditional import after config — intentional
 )
+from app.services.registrar_doctor_eligibility import (
+    DOCTOR_QUEUE_SPECIALTY_VARIANTS,
+)
 from app.services.service_mapping import (  # noqa: E402, F401  # manual-review: conditional import after config — intentional
     get_service_code,  # noqa: E402, F401  # manual-review: conditional import after config — intentional
 )
 
 router = APIRouter()
 
-
-DOCTOR_QUEUE_SPECIALTY_VARIANTS: dict[str, list[str]] = {
-    "cardiology": ["cardiology", "cardio", "Cardiologist", "Cardio"],
-    "cardio": ["cardiology", "cardio", "Cardiologist", "Cardio"],
-    "derma": ["derma", "dermatology", "Dermatologist"],
-    "dermatology": ["derma", "dermatology", "Dermatologist"],
-    "dentist": ["dentist", "dental", "dentistry", "Dentist", "stomatology"],
-    "dentistry": ["dentist", "dental", "dentistry", "Dentist", "stomatology"],
-    "stomatology": ["dentist", "dental", "dentistry", "Dentist", "stomatology"],
-    "lab": ["lab", "laboratory", "Laboratory"],
-    "laboratory": ["lab", "laboratory", "Laboratory"],
-    "general": ["general", "therapy", "therapist", "general_practice"],
-}
 
 DOCTOR_QUEUE_ALLOWED_TAGS: dict[str, list[str]] = {
     "cardiology": ["cardio", "cardiology", "cardiology_common"],
@@ -132,6 +123,7 @@ def _serialize_queue_doctor(doctor: Doctor | None, current_user: User, specialty
         "specialty": normalized,
         "cabinet": None,
     }
+
 
 # ===================== МОДЕЛИ ДАННЫХ =====================
 
@@ -279,7 +271,9 @@ def _ensure_schedule_next_patient_access(
         doctor=doctor,
         current_user=current_user,
     ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
 
 
 class ScheduleNextVisitService(BaseModel):
@@ -327,5 +321,3 @@ class ScheduleNextVisitResponse(BaseModel):
 
 
 # ===================== ОЧЕРЕДЬ ВРАЧА =====================
-
-

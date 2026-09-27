@@ -80,6 +80,15 @@ const DEFAULT_FORM = {
   active: true
 };
 
+// Round-2 review P2 (PR 3455): mirror the server-side create contract
+// (DepartmentCreate.key — lowercase latin identifier, max 50) in the form,
+// so a value the UI presents as valid always survives the API boundary.
+// Applied on create/CSV-import only: the update schema has no key field
+// (server-side immutable), and legacy keys created before the contract
+// must stay editable.
+const DEPARTMENT_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
+const DEPARTMENT_KEY_MAX_LENGTH = 50;
+
 // ✅ НОВОЕ: Форма для настройки маппинга услуг
 const DEFAULT_SERVICE_MAPPING = {
   create_service: false,
@@ -246,13 +255,24 @@ const DepartmentManagement = () => {
   }, [loadDepartments]);
 
   const validateDepartment = useCallback(
-    (data: Record<string, unknown>, currentId: string | number | null = null) => {
+    (data: Record<string, unknown>, currentId: string | number | null = null, enforceKeyPattern: boolean = true) => {
       const errors: Record<string, string> = {};
       if (!data.name_ru || String(data.name_ru ?? '').trim().length < 2) {
         errors.name_ru = t('admin2.dept_err_name_required');
       }
-      if (!data.key || String(data.key ?? '').trim().length < 2) {
+      if (!data.key || !String(data.key ?? '').trim()) {
+        // Round-5 review P2: the server contract (DepartmentCreate.key)
+        // is min_length=1 — a single lowercase letter is a VALID key, so
+        // the required check must only reject an empty/whitespace value;
+        // the pattern branch below enforces the rest of the contract.
         errors.key = t('admin2.dept_err_key_required');
+      } else if (
+        enforceKeyPattern &&
+        (!DEPARTMENT_KEY_PATTERN.test(String(data.key)) || String(data.key).length > DEPARTMENT_KEY_MAX_LENGTH)
+      ) {
+        // Round-2 review P2: inline format guidance matching the 422 the
+        // server would otherwise return after the submit.
+        errors.key = t('admin2.dept_err_key_pattern');
       } else {
         const duplicate = departments.find((dept: Record<string, unknown>) => dept.key === data.key && dept.id !== currentId);
         if (duplicate) {
@@ -325,7 +345,10 @@ const DepartmentManagement = () => {
 
   const handleUpdateDepartment = async () => {
     if (!editingDepartment) return;
-    const errors = validateDepartment(formData, String(editingDepartment?.id ?? ''));
+    // Round-2 review P2: pattern is NOT enforced on update — the server
+    // update schema has no key field (immutable) and legacy keys created
+    // before the unified contract must remain savable.
+    const errors = validateDepartment(formData, String(editingDepartment?.id ?? ''), false);
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       toast.error(t('admin2.dept_err_fix_form'));

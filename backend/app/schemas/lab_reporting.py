@@ -252,6 +252,8 @@ class LabReportInstanceOut(BaseModel):
     can_finalize: bool = False
     can_revise: bool = False
     can_print: bool = False
+    # PR8: серверный PDF-preview доступен неутверждённым бланкам (Admin/Lab).
+    can_preview: bool = False
 
 
 class LabReportInstanceSummaryOut(BaseModel):
@@ -276,6 +278,8 @@ class LabReportInstanceSummaryOut(BaseModel):
     can_finalize: bool = False
     can_revise: bool = False
     can_print: bool = False
+    # PR8: серверный PDF-preview доступен неутверждённым бланкам (Admin/Lab).
+    can_preview: bool = False
 
 
 class LabReportBulkSaveResponse(BaseModel):

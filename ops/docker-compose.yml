@@ -165,6 +165,9 @@ services:
       ENV: ${ENV:-dev}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required (set it in .env)}
       TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
+      # Same public-URL contract as the backend service (the reminder
+      # worker builds deep links from settings.FRONTEND_URL too).
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       # Sentry (DSN is public send-only key — safe to commit)
       SENTRY_DSN: ${SENTRY_DSN:-https://65b5195082de2f0522c27dd6695536b7@o4511673323749376.ingest.us.sentry.io/4511673347670016}
       SENTRY_ENV: ${SENTRY_ENV:-${ENV:-dev}}

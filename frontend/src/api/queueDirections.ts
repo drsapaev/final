@@ -20,12 +20,14 @@
 
 import { api } from './client';
 import type {
+    DirectionEntryMethodsResponseDto,
     PublicAddressProvisionResponseDto,
     PublicDirectionStartResponseDto,
 } from '../types/api';
 
 export type PublicAddressProvisionResponse = PublicAddressProvisionResponseDto;
 export type PublicDirectionStartResponse = PublicDirectionStartResponseDto;
+export type DirectionEntryMethodsResponse = DirectionEntryMethodsResponseDto;
 
 /** Admin-only, idempotent provision of the permanent /q/<public_code>. */
 export async function provisionPublicAddress(
@@ -35,6 +37,22 @@ export async function provisionPublicAddress(
         `/queue/admin/directions/${encodeURIComponent(profileKey)}/public-address/provision`,
     );
     return (res as { data: PublicAddressProvisionResponse }).data;
+}
+
+/**
+ * RQ-18 follow-up (P2-3): honest per-direction entry-methods read. The
+ * `supported` flag a checklist row holds was read BEFORE any provision —
+ * after a successful provision it is stale, so the QR block re-reads this
+ * surface and reports the fresh `permanent_address.supported` to the
+ * parent checklist.
+ */
+export async function fetchDirectionEntryMethods(
+    profileKey: string,
+): Promise<DirectionEntryMethodsResponse> {
+    const res = await api.get(
+        `/queue/directions/${encodeURIComponent(profileKey)}/entry-methods`,
+    );
+    return (res as { data: DirectionEntryMethodsResponse }).data;
 }
 
 /**

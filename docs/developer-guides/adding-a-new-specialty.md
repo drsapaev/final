@@ -1,8 +1,10 @@
 # Developer Guide: Adding a New Medical Specialty
 
-**Last updated:** 2026-07-12
+**Last updated:** 2026-09-26 (RQ-28 pass: key contract limits, service_code limitation, resource queues, permanent QR address verified against the merged contracts)
 **Applies to:** MediClinic Pro backend + frontend
 **Prerequisite:** Admin access to the system
+
+> Staff-facing quick instructions (RU): [../STAFF_SETUP_INSTRUCTIONS.md](../STAFF_SETUP_INSTRUCTIONS.md)
 
 ---
 
@@ -27,7 +29,7 @@ For architectural details, see [ADR-001: Queue Ownership & Specialty Architectur
 |---|---|---|
 | Название (рус) | Неврология | Display name in Russian |
 | Название (узб) | Nevrologiya | Display name in Uzbek |
-| Ключ | `neurology` | **Must be lowercase latin, digits, underscore only.** This is the canonical specialty key. |
+| Ключ | `neurology` | **`^[a-z][a-z0-9_]*$`, 1–50 chars** (schemas pin this exact contract since the #3455 key unification; the create form validates it inline with a localized error). |
 | Порядок | 50 | Display order in tabs |
 | Иконка | `Brain` | Lucide icon name |
 | Цвет | `#8B5CF6` | Hex color for tab badge |
@@ -45,6 +47,16 @@ For architectural details, see [ADR-001: Queue Ownership & Specialty Architectur
   - `queue_tags = ["neurology"]`
   - `show_on_qr_page = true`
   - `is_active = true`
+
+⚠️ **Registered limitation (services `service_code` VARCHAR(10), backlog E-069):** the default
+auto-service code is derived as `{key}_consult` (normalized + uppercased, NOT truncated), and
+`services.service_code` is `String(10) UNIQUE`. On PostgreSQL, creating a department whose key
+is longer than ~2 characters therefore fails with a DB error unless an explicit short code is
+passed via the API integration options (`integration.service_code`, ≤10 chars, e.g. `N01`).
+The department-create form's visible service-mapping fields (name/code/price) are currently
+NOT included in the POST payload (only the empty default integration options are sent) — do not
+rely on them until the migration lands. Verify any new-specialty creation on a disposable PG
+database before demonstrating it to staff.
 
 ### Step 2: Create a Doctor User
 
@@ -102,6 +114,13 @@ For architectural details, see [ADR-001: Queue Ownership & Specialty Architectur
 | Requires Doctor | ✅ | If this service requires a doctor consultation |
 | Is Consultation | ✅ | If this is a consultation (affects repeat-discount logic) |
 
+> **Resource queues (RQ-15):** a service with **Requires Doctor = false** routes its patients to
+> the DEPARTMENT's resource queue (queue owner = the direction/profile, cabinet from the
+> directions registry), not to a doctor's DailyQueue. Resource tickets are served from the admin
+> surface; a doctor account gets 403 on them (QD-2C contract). The auto-created default
+> consultation service is also created with `requires_doctor = false` — enable the flag
+> manually when the consultation must be doctor-owned.
+
 ### Step 5: Verify End-to-End
 
 1. **Doctor logs in:**
@@ -116,9 +135,16 @@ For architectural details, see [ADR-001: Queue Ownership & Specialty Architectur
    - Patient is assigned to the specific doctor's queue
 
 3. **Patient scans QR:**
-   - Sees "Невропатолог" with correct icon and color (from QueueProfile)
-   - Selects specific doctor (e.g., "Иванов И.И. · каб. 201")
-   - Joins that doctor's queue with their own number
+   - Two entry paths exist since RQ-16.d/RQ-18: the **permanent direction address**
+     `/q/<public_code>` (provisioned once per profile by an Admin from `/admin/setup-directions`;
+     rename does not change it, archive+reactivate restores the same code) and the **temporary
+     day/specialist QR** generated from the registrar queue manager (expiry hints included).
+   - Patient sees "Невропатолог" with correct icon and color (from QueueProfile; visibility gated
+     by `show_on_qr_page` + active profile — hidden/archived directions refuse anonymously, no
+     detail leakage, S-15)
+   - Selects specific doctor (e.g., "Иванов И.И. · каб. 201") — or the direction's resource queue
+     when the service does not require a doctor
+   - Joins that queue with their own number
 
 4. **Doctor calls patient:**
    - Any neurology doctor can call patients from any neurology queue
@@ -293,6 +319,7 @@ The generic `DoctorPanel` handles:
 ## References
 
 - [ADR-001: Queue Ownership & Specialty Architecture](../adr/ADR-001-queue-ownership-and-specialty-architecture.md)
-- [Multi-Doctor & Specialty Architecture Audit](../../../download/MULTI_DOCTOR_SPECIALTY_AUDIT.md)
-- [Admin Flows Audit](../../../download/ADMIN_FLOWS_AUDIT.md)
-- [Wizard & QR UX Audit](../../../download/WIZARD_QR_UX_AUDIT.md)
+- Staff-facing quick instructions: [../STAFF_SETUP_INSTRUCTIONS.md](../STAFF_SETUP_INSTRUCTIONS.md)
+- Registrar/QR user manual: [../QR_QUEUE_USER_MANUAL.md](../QR_QUEUE_USER_MANUAL.md)
+- Direction setup surface (permanent QR addresses): `/admin/setup-directions` (`AdminSetupDirections`)
+- Queue profile CSV export/import (RQ-26): Admin → Услуги → «Вкладки регистратуры»

@@ -1,0 +1,68 @@
+.cardio-queue__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cardio-queue__title {
+  margin: 0;
+}
+
+.cardio-queue__doctor,
+.cardio-queue__phone,
+.cardio-queue__patient-icon {
+  color: var(--mac-text-secondary, currentColor);
+}
+
+.cardio-queue__doctor {
+  margin: 6px 0 0;
+}
+
+.cardio-queue__list {
+  display: grid;
+  gap: 12px;
+}
+
+.cardio-queue__entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--mac-border, currentColor);
+  border-radius: var(--mac-radius-md, 8px);
+}
+
+.cardio-queue__patient {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cardio-queue__patient-icon {
+  flex-shrink: 0;
+}
+
+.cardio-queue__patient-info {
+  min-width: 0;
+}
+
+.cardio-queue__patient-heading,
+.cardio-queue__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cardio-queue__patient-heading {
+  align-items: center;
+}
+
+.cardio-queue__phone {
+  margin-top: 4px;
+}

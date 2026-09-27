@@ -178,3 +178,87 @@ describe('tokens.css — CC-1 dark secondary-ink contrast contract', () => {
     }
   });
 });
+
+describe('tokens.css — PR 3351 round-10 dual-theme danger-ink contrast contract', () => {
+  /**
+   * PR 3351 (review round 10): error/alert TEXT on neutral surfaces
+   * (.lab-session-extend-error) — the session-extend failure message inside
+   * the warning dialog. No single danger value passes both themes as text
+   * (#d92c20 = 4.35:1 on #eef3fa / 3.51:1 on #1c1c1e; #ff453a = 3.06:1 on
+   * #eef3fa / 4.99:1 on #1c1c1e), and the previous rule painted it with the
+   * base accent #007aff — 3.6:1 / 4.24:1, below the WCAG AA 4.5:1 floor in
+   * BOTH themes (the AXE-EXP-4 latent class). The dual-theme pair mirrors
+   * --mac-link-ink; these tests pin the measured floors.
+   */
+  const luminance = (hex: string) => {
+    const n = hex.slice(1).match(/.{2}/g)!.map((b) => parseInt(b, 16) / 255);
+    const lin = n.map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+  };
+  const ratio = (fg: string, bg: string) => {
+    const l1 = luminance(fg);
+    const l2 = luminance(bg);
+    const hi = Math.max(l1, l2);
+    const lo = Math.min(l1, l2);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  it('light --mac-danger-ink meets WCAG AA (≥4.5:1) on #ffffff and --mac-bg-primary #eef3fa (round 10)', () => {
+    const css = readTokens();
+    const rootBlock = css.match(/:root\s*\{[\s\S]*?\}/)?.[0] ?? '';
+    const lightThemeBlock = css.match(/\.light-theme\s*\{[\s\S]*?\}/)?.[0] ?? '';
+    const extract = (block: string) =>
+      block.match(/--mac-danger-ink:\s*(#[0-9a-fA-F]{6});/)?.[1]?.toLowerCase() ?? null;
+
+    const lightValues = [extract(rootBlock), extract(lightThemeBlock)];
+    expect(lightValues.every(Boolean), 'both light blocks must define --mac-danger-ink').toBe(true);
+
+    for (const value of lightValues as string[]) {
+      expect(
+        ratio(value, '#ffffff'),
+        `light --mac-danger-ink ${value} must stay ≥ 4.5:1 on #ffffff (round 10)`
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        ratio(value, '#eef3fa'),
+        `light --mac-danger-ink ${value} must stay ≥ 4.5:1 on --mac-bg-primary #eef3fa (round 10)`
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('dark --mac-danger-ink meets WCAG AA (≥4.5:1) on --mac-bg-primary #1c1c1e and --mac-bg-content #2c2c2e (round 10)', () => {
+    const css = readTokens();
+    const darkThemeBlock = css.match(/\.dark-theme\s*\{[\s\S]*?\}/)?.[0] ?? '';
+    const darkMediaBlock =
+      css.match(/@media\s*\(prefers-color-scheme:\s*dark\)\s*\{[\s\S]*?\n\s*\}/)?.[0] ?? '';
+    const extract = (block: string) =>
+      block.match(/--mac-danger-ink:\s*(#[0-9a-fA-F]{6});/)?.[1]?.toLowerCase() ?? null;
+
+    const darkValues = [extract(darkThemeBlock), extract(darkMediaBlock)];
+    expect(darkValues.every(Boolean), 'both dark blocks must define --mac-danger-ink').toBe(true);
+
+    for (const value of darkValues as string[]) {
+      expect(
+        ratio(value, '#1c1c1e'),
+        `dark --mac-danger-ink ${value} must stay ≥ 4.5:1 on --mac-bg-primary #1c1c1e (round 10)`
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        ratio(value, '#2c2c2e'),
+        `dark --mac-danger-ink ${value} must stay ≥ 4.5:1 on --mac-bg-content #2c2c2e (round 10)`
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('lab session-extend error text resolves through --mac-danger-ink, not the base accent (round 10)', () => {
+    const labCss = fs
+      .readFileSync(path.resolve(__dirname, '../../pages/lab.css'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = labCss.match(/\.lab-session-extend-error\s*\{[^}]*\}/)?.[0] ?? '';
+    expect(rule, '.lab-session-extend-error rule must exist in lab.css').not.toBe('');
+    // Dual-theme danger ink с вложенным токен-fallback (ratchet
+    // cssHexOutsideTokens / varUsagesNoFallback).
+    expect(rule).toContain('var(--mac-danger-ink');
+    // Базовый акцент как текст не проходит AA ни в одной теме (AXE-EXP-4) —
+    // предыдущее правило красило сообщение об ошибке именно им.
+    expect(rule).not.toContain('--mac-accent');
+  });
+});
