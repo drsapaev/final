@@ -475,6 +475,29 @@
   max-height: 400px;
   overflow-y: auto;
 }
+/* Кнопка «Показать ещё» под списком истории — тот же рецепт на токенах
+ * дизайн-системы, что и у кнопки пагинации галереи (DermaVisitGallery). */
+.derma-history-load-more {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mac-spacing-2);
+  border: 1px solid var(--mac-border);
+  background: var(--mac-background-secondary);
+  color: var(--mac-text-primary);
+  border-radius: var(--mac-radius-md);
+  padding: var(--mac-spacing-2) var(--mac-spacing-4);
+  font-size: var(--mac-font-size-sm);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.derma-history-load-more:hover:not(:disabled) {
+  background: var(--mac-card-hover-bg);
+}
+.derma-history-load-more:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .derma-history-detail-list {
   display: flex;
   flex-direction: column;
