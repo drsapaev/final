@@ -19,6 +19,18 @@ Follow-up sibling PR: the two lock-proof fixtures that stayed on main
 carried the same P1 class — their DATABASE_URL branch admitted ANY ``?host=``
 value (no prefix check, no list parsing) and any loopback netloc with a
 non-local ``?hostaddr=``. They are wired into the same matrix below.
+
+Unification follow-up (PR #3474 guard): ``test_rq29_end_to_end_path_pg``
+carried its OWN stricter private guard (case-insensitive conninfo keys,
+repeated-key safety, ``?service=`` rejection, ``PGHOSTADDR``/``PGSERVICE``
+env re-dial rejection) while the shared validator missed exactly those
+vectors — most notably ``?HOSTADDR=`` (uppercase) bypassed the shared
+validator entirely, because libpq matches conninfo names
+case-insensitively while SQLAlchemy preserves query-key case. The two
+guards are unified onto the shared validator (RQ29-grade contract) and
+RQ29 joins this matrix; the new hardening pins below are RED-first: they
+fail against the pre-unification shared validator and pass only after it
+adopts the full contract.
 """
 
 from __future__ import annotations
@@ -68,6 +80,9 @@ SIBLING_MODULES = [
 ALL_FIXTURE_MODULES = (
     SOCKET_AWARE_MODULES + UNGUARDED_MODULES + SIBLING_MODULES + [
         "test_rq14_qr_desk_owner_consistency_pg",  # characterization, unguarded
+        # RQ-29 combined-path harness: unified off its own private guard onto
+        # the shared validator (same _candidate_admin_urls wiring interface).
+        "test_rq29_end_to_end_path_pg",
     ]
 )
 TWO_SOURCE_MODULES = [  # fallback path via _preprovisioned_local_url
@@ -81,13 +96,22 @@ REMOTE_DSN = "postgresql://probe:s3cret@db.internal:5432/postgres"
 HOSTADDR_BYPASS = "postgresql://probe:s3cret@localhost:5432/postgres?hostaddr=10.9.8.7"
 PURE_SOCKET = "postgresql:///clinicdb?host=/var/run/scratch-sockets"
 LOOPBACK_TCP = "postgresql://probe:s3cret@localhost:5432/postgres"
+# Unification hardening vector: libpq reads conninfo names case-insensitively,
+# so the uppercase spelling reaches the dialed address just like ?hostaddr=.
+CASE_HOSTADDR_BYPASS = "postgresql://probe:s3cret@localhost:5432/postgres?HOSTADDR=10.9.8.7"
+# A service file may inject any unspelled parameter (e.g. hostaddr) at connect
+# time — a local-looking DSN with ?service= must not be admitted.
+SERVICE_PARAM_DSN = "postgresql://probe:s3cret@localhost:5432/postgres?service=prod"
+SOCKET_SERVICE_PARAM_DSN = "postgresql:///clinicdb?host=/var/run/scratch-sockets&service=prod"
 
 
 def _isolate_dsn_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Remove every env var that could inject extra admin candidates."""
+    """Remove every env var that could inject or re-dial admin candidates."""
     for name in list(os.environ):
         if name == "LOCAL_PG_SUPERUSER_PASSWORD" or name.endswith("_PG_ADMIN_URL"):
             monkeypatch.delenv(name, raising=False)
+    for name in ("PGHOST", "PGHOSTADDR", "PGSERVICE"):
+        monkeypatch.delenv(name, raising=False)
 
 
 def _load(modname: str):
@@ -126,6 +150,67 @@ def test_hostaddr_bypass_is_never_accepted(monkeypatch, modname):
     urls = mod._candidate_admin_urls()
     assert urls == [], (
         f"{modname} accepted a DSN whose hostaddr points off-machine: {urls}"
+    )
+
+
+@pytest.mark.parametrize("modname", ALL_FIXTURE_MODULES)
+def test_case_variant_hostaddr_bypass_is_never_accepted(monkeypatch, modname):
+    """Unification P1: libpq matches conninfo names case-insensitively, so
+    ``?HOSTADDR=`` dials exactly like ``?hostaddr=`` — a guard that only
+    reads the lowercase key admits a remote dial through the uppercase
+    spelling. (RED against the pre-unification shared validator.)"""
+    mod = _load(modname)
+    _isolate_dsn_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_URL", CASE_HOSTADDR_BYPASS)
+    urls = mod._candidate_admin_urls()
+    assert urls == [], (
+        f"{modname} accepted a DSN whose uppercase HOSTADDR points "
+        f"off-machine: {urls}"
+    )
+
+
+@pytest.mark.parametrize("modname", ALL_FIXTURE_MODULES)
+def test_service_param_is_never_accepted(monkeypatch, modname):
+    """Unification P2: a ``?service=`` reference is resolved at connect time
+    and may inject any unspelled parameter (hostaddr included) from a file
+    this guard cannot inspect — fail closed."""
+    mod = _load(modname)
+    _isolate_dsn_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_URL", SERVICE_PARAM_DSN)
+    urls = mod._candidate_admin_urls()
+    assert urls == [], f"{modname} accepted a DSN with ?service=: {urls}"
+
+
+@pytest.mark.parametrize("modname", ALL_FIXTURE_MODULES)
+def test_socket_service_param_is_never_accepted(monkeypatch, modname):
+    """Unification P2: the service rejection also applies to an otherwise
+    fully-local socket DSN — the service file could still override the
+    dialed address."""
+    mod = _load(modname)
+    _isolate_dsn_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_URL", SOCKET_SERVICE_PARAM_DSN)
+    urls = mod._candidate_admin_urls()
+    assert urls == [], (
+        f"{modname} accepted a local socket DSN with ?service=: {urls}"
+    )
+
+
+@pytest.mark.parametrize(
+    "env_name,env_value",
+    [("PGHOSTADDR", "10.9.8.7"), ("PGSERVICE", "prod")],
+)
+@pytest.mark.parametrize("modname", ALL_FIXTURE_MODULES)
+def test_env_redial_is_never_accepted(monkeypatch, modname, env_name, env_value):
+    """Unification P2: with ``PGHOSTADDR``/``PGSERVICE`` set, libpq re-dials
+    EVERY candidate through that address/service regardless of its spelling
+    — no auto-detected candidate may be admitted while either is set."""
+    mod = _load(modname)
+    _isolate_dsn_env(monkeypatch)
+    monkeypatch.setenv(env_name, env_value)
+    monkeypatch.setenv("DATABASE_URL", LOOPBACK_TCP)
+    urls = mod._candidate_admin_urls()
+    assert urls == [], (
+        f"{modname} admitted a candidate while {env_name} can re-dial: {urls}"
     )
 
 
@@ -227,3 +312,64 @@ def test_validator_matrix() -> None:
         assert is_local(dsn), f"must ACCEPT local DSN: {dsn!r}"
     for dsn in rejected:
         assert not is_local(dsn), f"must REJECT non-local DSN: {dsn!r}"
+
+
+def test_validator_matrix_unified_contract() -> None:
+    """Unification contract (RED-first against the pre-unification shared
+    validator): case-insensitive conninfo keys, repeated-key safety,
+    ``?service=`` rejection, postgresql-only drivername, loopback hostaddr
+    admitted element-wise — the RQ29-grade rules, one shared validator."""
+    validator = pytest.importorskip("tests._pg_admin_guard")
+    is_local = validator.is_local_admin_dsn
+
+    accepted = [
+        # libpq conninfo names are case-insensitive: a LOCAL address spelled
+        # with an uppercase key must not be lost (fail-OPEN on spellings is
+        # fine only because the endpoint itself is local).
+        "postgresql:///db?HOST=/tmp/socks",
+        # Repeated keys: SQLAlchemy folds them into sequences — the validator
+        # must iterate, not crash and not read only the first.
+        "postgresql:///db?host=/s1&host=/s2",
+        "postgresql:///db?host=/s1&host=localhost",
+        # Loopback hostaddr is local by construction (element-wise rule).
+        "postgresql://u:p@localhost:5432/db?hostaddr=127.0.0.1",
+        "postgresql:///db?host=/s1&hostaddr=127.0.0.1",
+    ]
+    rejected = [
+        # THE case-variant bypass: libpq dials HOSTADDR=10.9.8.7 exactly like
+        # the lowercase spelling; the pre-unification validator only read the
+        # lowercase key and ACCEPTED this remote dial.
+        "postgresql://u:p@localhost:5432/db?HOSTADDR=10.9.8.7",
+        "postgresql://u:p@localhost:5432/db?HOSTADDR=10.9.8.7,::1",
+        # Case-variant remote host tail.
+        "postgresql://u:p@localhost:5432/db?HOST=db.internal",
+        "postgresql:///db?Host=db.internal",
+        # A service name may inject any unspelled parameter at connect time.
+        "postgresql://u:p@localhost:5432/db?service=prod",
+        "postgresql:///db?host=/tmp/socks&service=prod",
+        # Repeated-key remote tail must poison the whole DSN.
+        "postgresql:///db?host=/s1&host=db.internal",
+        "postgresql:///db?host=/s1&hostaddr=10.9.8.7",
+        # A non-postgresql URL is never a PG admin candidate — even when it
+        # carries a syntactically local ?host=.
+        "sqlite:///file.db?host=localhost",
+    ]
+    for dsn in accepted:
+        assert is_local(dsn), f"must ACCEPT local DSN: {dsn!r}"
+    for dsn in rejected:
+        assert not is_local(dsn), f"must REJECT non-local DSN: {dsn!r}"
+
+
+@pytest.mark.parametrize(
+    "env_name,env_value",
+    [("PGHOSTADDR", "10.9.8.7"), ("PGSERVICE", "prod")],
+)
+def test_validator_rejects_when_env_can_re_dial(monkeypatch, env_name, env_value):
+    """Unification P2: the environment can re-dial any candidate — with
+    PGHOSTADDR/PGSERVICE set, the validator must reject regardless of the
+    DSN spelling (libpq would dial the env-provided address)."""
+    validator = pytest.importorskip("tests._pg_admin_guard")
+    monkeypatch.setenv(env_name, env_value)
+    assert not validator.is_local_admin_dsn(
+        "postgresql://u:p@localhost:5432/db"
+    ), f"{env_name}={env_value} must force-reject a local-looking DSN"
