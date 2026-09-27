@@ -1,0 +1,37 @@
+name: Dependabot guard tests
+
+# Locks the protective logic of .github/workflows/dependabot-automerge.yml
+# (#3500 review P2): scripts/check_dependabot_automerge_workflow.py runs
+# structural assertions and behavioral tests against the REAL step scripts
+# extracted from the workflow (with a stubbed gh CLI), so a future edit
+# cannot silently reintroduce fail-open behavior.
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/dependabot-automerge.yml"
+      - ".github/workflows/dependabot-guard-tests.yml"
+      - "scripts/check_dependabot_automerge_workflow.py"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dependabot-automerge.yml"
+      - ".github/workflows/dependabot-guard-tests.yml"
+      - "scripts/check_dependabot_automerge_workflow.py"
+
+permissions:
+  contents: read
+
+jobs:
+  guard-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install PyYAML
+        run: python -m pip install --quiet pyyaml
+      - name: Run workflow guard tests
+        run: python scripts/check_dependabot_automerge_workflow.py
