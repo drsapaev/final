@@ -929,3 +929,80 @@ class TestDermaEmrHistory:
         assert len([s for s in statements if "visits.id in" in s]) == 1, (
             "combined history must load Visit data exactly once"
         )
+
+    def test_emr_history_reads_both_procedure_keys(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """Реконсиляция #3490/#3491: два писателя добавляют косметические
+        процедуры в визитную ЭМК — быстрая форма панели пишет
+        specialty_data.procedures, редактор EMR-секции —
+        specialty_data.cosmetic_procedures. История обязана показывать
+        записи обоих ключей (без потери данных)."""
+        visit_quick = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        emr_quick = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=visit_quick,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "skin_type": "combination",
+                    "procedures": [
+                        {
+                            "procedure_type": "Мезотерапия",
+                            "procedure_date": date.today().isoformat(),
+                        },
+                    ],
+                },
+            },
+        )
+        visit_section = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        emr_section = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=visit_section,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "skin_type": "dry",
+                    "cosmetic_procedures": [
+                        {
+                            "procedure_type": "Чистка",
+                            "procedure_date": date.today().isoformat(),
+                        },
+                    ],
+                },
+            },
+        )
+
+        procedures_response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&limit=10",
+            headers=auth_headers,
+        )
+        assert procedures_response.status_code == 200
+        procedure_ids = [item["id"] for item in procedures_response.json()]
+        assert f"emr-{emr_quick.id}-0" in procedure_ids
+        assert f"emr-{emr_section.id}-0" in procedure_ids
+        procedure_types = {
+            item["procedure_type"] for item in procedures_response.json()
+        }
+        assert {"Мезотерапия", "Чистка"} <= procedure_types
+
+        history_response = client.get(
+            f"/api/v1/derma/history?patient_id={test_patient.id}&limit=10",
+            headers=auth_headers,
+        )
+        assert history_response.status_code == 200
+        history_procedure_ids = [
+            item["id"] for item in history_response.json()["procedures"]
+        ]
+        assert f"emr-{emr_quick.id}-0" in history_procedure_ids
+        assert f"emr-{emr_section.id}-0" in history_procedure_ids
