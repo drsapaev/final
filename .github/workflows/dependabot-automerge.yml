@@ -1,0 +1,92 @@
+name: Dependabot auto-merge (controlled)
+
+# Managed Dependabot flow (2026-09-27):
+#   security updates  -> manual, priority review      (routed to deps-needs-triage)
+#   grouped patch/minor (npm frontend + root)          -> auto-merge, gated on required checks
+#   individual minors, majors, actions, docker, pip    -> manual (routed to deps-needs-triage)
+#
+# Queue for the manual flow: issue "Dependabot manual-review queue".
+#
+# Why pull_request_target: Dependabot PRs get a read-only GITHUB_TOKEN under
+# plain pull_request, so enabling auto-merge needs the base-context token.
+# This workflow NEVER checks out PR code and never executes it - it only
+# reads the PR title and file list through the API and calls gh pr merge.
+# Workflow code always comes from the base branch (main), not the PR.
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  classify-and-route:
+    runs-on: ubuntu-latest
+    if: >-
+      github.repository == 'drsapaev/final' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.base.ref == 'main'
+    steps:
+      - name: Classify PR against the auto-merge allowlist
+        id: classify
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Allowlist: grouped npm patch/minor PRs only. Groups are
+          # patch/minor-only BY CONFIG (dependabot.yml update-types), and key
+          # frameworks are excluded from groups, so a matching title implies
+          # the low-risk class the owner authorized for automation.
+          case "$TITLE" in
+            *"bump the frontend-npm-minor-patch group"*|*"bump the root-npm-minor-patch group"*)
+              echo "verdict=automerge" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "verdict=triage" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Guard - grouped PR must touch only manifest and lockfile
+        id: guard
+        if: steps.classify.outputs.verdict == 'automerge'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # Defense in depth for the title-based allowlist: a grouped npm PR
+          # may only change package.json / package-lock.json in frontend/ or
+          # the repo root. Anything else falls back to manual triage.
+          unexpected=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" \
+            --paginate --jq '.[].filename' \
+            | grep -vE '^(frontend/)?(package\.json|package-lock\.json)$' || true)
+          if [ -n "$unexpected" ]; then
+            echo "Unexpected files in grouped PR: ${unexpected}" >&2
+            echo "files_ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "files_ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enable auto-merge (squash, merge gated by branch protection)
+        if: steps.classify.outputs.verdict == 'automerge' && steps.guard.outputs.files_ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          # The merge itself is performed by GitHub only after every required
+          # status check passes on an up-to-date branch (branch protection on
+          # main is strict). This step never merges directly.
+          gh pr merge --auto --squash "$PR_URL"
+          gh pr comment "$PR_URL" --body "Auto-merge enabled (grouped npm patch/minor flow). Will merge when all required checks pass on an up-to-date branch."
+
+      - name: Route everything else to the manual triage queue
+        if: steps.classify.outputs.verdict == 'triage' || steps.guard.outputs.files_ok == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr edit "$PR_URL" --add-label deps-needs-triage || true
+          gh pr comment "$PR_URL" --body "Routed to the manual triage queue (\`deps-needs-triage\`): not in the auto-merge allowlist. Allowed for automation are grouped npm patch/minor PRs only; security bumps, individual minor/major bumps, actions, docker and pip requirement changes get a manual decision per the managed Dependabot flow. Tracking: 'Dependabot manual-review queue' issue."
