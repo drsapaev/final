@@ -35,15 +35,18 @@ scratch database). Disposable PostgreSQL: the module provisions its own
 scratch database (``rq29_check_<hex>``, unique per run), runs
 ``alembic upgrade head`` and drops it at the end; skips (NOT_RUN, plan
 P0) when no disposable PostgreSQL server is reachable. ``DATABASE_URL``
-is accepted for automatic provisioning only for local servers — the
-same fail-closed guard as the merged rq24b/rq26b harnesses: an
-explicit loopback host, a hostless unix-socket DSN, or a ``?host=``
-that is a socket-directory path or a loopback name; hidden address
-sources (``?hostaddr=``, a remote ``?host=`` entry — including inside
-a comma-separated fallback list — an address-overriding
-``PGHOSTADDR``/``PGSERVICE`` environment, or a ``?service=`` reference)
-are rejected, so a remote admin DSN must be passed explicitly via the
-test-owned ``RQ29_PG_ADMIN_URL``. SQLite is never a substitute here.
+is accepted for automatic provisioning only for local servers — judged
+by the SHARED fail-closed guard ``tests._pg_admin_guard.is_local_admin_dsn``
+(the rq24b/rq26b/#3468 contract, unified with this harness's former
+private guard): every endpoint of the DSN (netloc list, ``?host=`` list,
+``?hostaddr=`` under any case spelling) must be loopback or a
+unix-socket directory, and hidden address sources (a remote ``?host=``
+entry — including inside a comma-separated fallback list — an address-
+overriding ``?hostaddr=``/``?HOSTADDR=``, a ``?service=`` reference, or
+``PGHOSTADDR``/``PGSERVICE`` environment re-dial) are rejected. A bare
+hostless DSN is likewise rejected (fail-closed: the dialed default is
+environment-dependent). A remote admin DSN must be passed explicitly via
+the test-owned ``RQ29_PG_ADMIN_URL``. SQLite is never a substitute here.
 The HTTP surfaces run through the real FastAPI app (TestClient) against
 that scratch database; the display-board WebSocket is exercised through
 the real WS endpoint (JWT required, ``initial_state`` on connect).
@@ -79,7 +82,6 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -90,6 +92,8 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 SCRATCH_DB = f"rq29_check_{uuid.uuid4().hex[:12]}"
 
 sys.path.insert(0, str(BACKEND_DIR))
+
+from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
 
 pytestmark = pytest.mark.integration
 
@@ -136,21 +140,23 @@ PHONE_CANCEL = "998501002003"  # SYNTHETIC cancel-leg walk-in
 
 
 def _candidate_admin_urls() -> list[str]:
-    """Plain-psycopg admin DSNs — LOCAL servers only (rq24b/rq26b guard).
+    """Plain-psycopg admin DSNs — LOCAL servers only (shared #3468 guard).
 
     ``DATABASE_URL`` in CI is a SQLAlchemy URL (``postgresql+psycopg://``);
     psycopg.connect rejects the driver suffix, so the scheme is normalized
     for the admin connection. The scratch database must never be
     provisioned — or dropped — on a remote server reachable through a
-    plain ``DATABASE_URL``: auto-detected candidates are accepted only for
-    LOCAL servers, judged by the address libpq actually dials, not by the
-    URL spelling. ``?hostaddr=`` and ``?service=`` query parameters are
-    rejected outright (address-altering / service-resolved at connect
-    time), an address-overriding ``PGHOSTADDR``/``PGSERVICE`` environment
-    rejects every candidate shape, and ``?host=``/``PGHOST`` comma-
-    separated fallback lists are judged element-wise (a remote fallback
-    makes the candidate remote). A remote admin DSN must be passed
-    explicitly via the test-owned ``RQ29_PG_ADMIN_URL``.
+    plain ``DATABASE_URL``: the env candidate is admitted only by the
+    SHARED ``tests._pg_admin_guard.is_local_admin_dsn`` (every endpoint
+    local — netloc list, ``?host=`` list, ``?hostaddr=`` under any case
+    spelling; ``?service=`` rejected; ``PGHOSTADDR``/``PGSERVICE`` env
+    re-dial rejected; a bare hostless DSN rejected fail-closed).
+    Deliberate deltas from this harness's former private guard: a loopback
+    ``?hostaddr=`` element is now admitted element-wise (the audited
+    #3468 rule — dialling 127.0.0.1 is local by construction), and a bare
+    hostless DSN is now rejected (the module SKIPS instead of provisioning
+    through the environment-dependent default socket directory). A remote
+    admin DSN must be passed explicitly via ``RQ29_PG_ADMIN_URL``.
     """
     urls: list[str] = []
 
@@ -160,61 +166,14 @@ def _candidate_admin_urls() -> list[str]:
     def _env_can_re_dial() -> bool:
         """True when the environment can re-dial a DSN's address.
 
-        libpq fills omitted connection fields from the environment; with
-        both ``host`` and ``hostaddr`` present libpq dials ``hostaddr``,
-        and a service name may inject any unspelled parameter. Any
-        non-empty value of either rejects (fail-closed).
+        Kept for the LOCAL_PG_SUPERUSER_PASSWORD candidate below (the
+        shared guard already covers the env_url branch): libpq fills
+        omitted connection fields from the environment, so a candidate
+        must not be minted while it can be silently re-dialled.
         """
         return bool(os.getenv("PGHOSTADDR", "").strip()) or bool(
             os.getenv("PGSERVICE", "").strip()
         )
-
-    def _is_local(url: str) -> bool:
-        """True only for addresses libpq dials locally."""
-        try:
-            u = make_url(url)
-        except Exception:  # noqa: BLE001 — a malformed env DSN must
-            # degrade to "not a local PG candidate", never crash the
-            # auto-detection.
-            return False
-        if not u.drivername.startswith("postgresql"):
-            return False  # a sqlite fallback URL is never a PG candidate
-
-        def _host_elem_local(h: str) -> bool:
-            # An empty element is libpq's "default unix-socket directory".
-            return (
-                h == ""
-                or h.startswith("/")
-                or h in {"localhost", "127.0.0.1", "::1"}
-            )
-
-        # Normalize query params: libpq matches conninfo parameter names
-        # case-insensitively and SQLAlchemy parses repeated keys into
-        # sequences — the guard must not be bypassable by spelling or
-        # duplication.
-        qvals: dict[str, list[str]] = {}
-        for k, v in (u.query or {}).items():
-            vals = v if isinstance(v, (list, tuple)) else [v]
-            qvals.setdefault(str(k).lower(), []).extend(str(x) for x in vals)
-        if qvals.get("hostaddr"):
-            return False  # address-altering parameter — fail-closed
-        if qvals.get("service"):
-            return False  # service contract unresolved — fail-closed
-        if _env_can_re_dial():
-            return False
-        hosts: list[str] = []
-        for h in qvals.get("host") or []:
-            hosts.extend(h.split(","))
-        if hosts:
-            return all(_host_elem_local(h) for h in hosts)
-        if u.host is not None:
-            return all(_host_elem_local(h) for h in u.host.split(","))
-        env_host = os.getenv("PGHOST", "")
-        if env_host:
-            return all(_host_elem_local(h) for h in env_host.split(","))
-        # Hostless DSN (``postgresql:///db``) with no ``PGHOST``: libpq
-        # dials the default unix-socket directory — local by definition.
-        return True
 
     explicit = os.getenv("RQ29_PG_ADMIN_URL", "").strip()
     if explicit:
@@ -223,7 +182,7 @@ def _candidate_admin_urls() -> list[str]:
     if local_pw and not _env_can_re_dial():
         urls.append(f"postgresql://postgres:{local_pw}@localhost:5432/postgres")
     env_url = os.getenv("DATABASE_URL", "").strip()
-    if env_url and _is_local(_normalized(env_url)):
+    if env_url and is_local_admin_dsn(_normalized(env_url)):
         urls.append(_normalized(env_url))
     return urls
 
