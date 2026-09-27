@@ -27,11 +27,7 @@ not applicable - no notification, websocket, chat, or realtime behavior changed.
 
 ## Frontend Resilience
 
-- Empty data proof: Not applicable, clearing input removes text regardless of other data context.
-- Partial data proof: Not applicable, component does not handle partial data fetching.
-- Forbidden secondary path behavior: Not applicable, no routing involved.
-- Missing draft/resource behavior: Not applicable, no resource fetching.
-- Stale route/deep-link behavior: Not applicable, no deep-linking state.
+not applicable - Standard UI component fix, does not impact routing, resource fetching, or error boundaries.
 
 ## Scope Gate
 
