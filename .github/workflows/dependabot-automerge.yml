@@ -13,6 +13,15 @@ name: Dependabot auto-merge (controlled)
 #     the success path - every doubt is fail-closed.
 #   - P2 the guard re-runs on synchronize: a PR that stops matching the
 #     allowlist loses auto-merge eligibility (auto-merge switched OFF).
+# Hardening from the #3500 review:
+#   - P1 disabling auto-merge is verified, never suppressed: the state is
+#     queried before and after; only "was not enabled" is tolerated. A real
+#     disable failure fails the job (::error::) instead of commenting a
+#     false "blocked" status.
+#   - P2 the protective logic is locked by repeatable tests:
+#     scripts/check_dependabot_automerge_workflow.py runs the REAL step
+#     scripts from this file (structure + behavior with a stubbed gh CLI)
+#     via .github/workflows/dependabot-guard-tests.yml.
 #
 # Why pull_request_target: Dependabot PRs get a read-only GITHUB_TOKEN under
 # plain pull_request, so enabling auto-merge needs the base-context token.
@@ -125,12 +134,42 @@ jobs:
         if: steps.decide.outputs.action == 'disable_and_triage'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           REASON: ${{ steps.guard.outputs.reason }}
         run: |
-          # Harmless if auto-merge was never enabled; decisive when a
-          # synchronize broke the allowlist on an already-enabled PR.
-          gh pr merge --disable-auto "$PR_URL" || true
+          # P1 hardening (#3500 review): disabling auto-merge IS the
+          # fail-closed guarantee - its failure is never suppressed. The
+          # previous "|| true" could leave auto-merge active while the
+          # comment claimed it was blocked. Now:
+          #   - "auto-merge was not enabled" is the only tolerated outcome;
+          #   - a real disable failure, or any inability to CONFIRM the
+          #     disabled state afterwards, fails this job loudly (::error::)
+          #     and skips label/comment - manual intervention required.
+          am_state() {
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}" --jq '.auto_merge // empty'
+          }
+          before=$(am_state) || {
+            echo "::error::Cannot query auto-merge state of PR ${PR} - refusing to treat triage as complete. Manual intervention required." >&2
+            exit 1
+          }
+          if [ -n "$before" ]; then
+            if ! gh pr merge --disable-auto "$PR_URL"; then
+              echo "::error::auto-merge is ENABLED on PR ${PR} but 'gh pr merge --disable-auto' failed - auto-merge may stay active. Manual intervention required." >&2
+              exit 1
+            fi
+            after=$(am_state) || {
+              echo "::error::Cannot re-verify auto-merge state of PR ${PR} after disable. Manual intervention required." >&2
+              exit 1
+            }
+            if [ -n "$after" ]; then
+              echo "::error::auto-merge is still enabled on PR ${PR} after the disable attempt. Manual intervention required." >&2
+              exit 1
+            fi
+            echo "auto-merge was enabled and is now confirmed disabled."
+          else
+            echo "auto-merge was not enabled - nothing to disable."
+          fi
           gh pr edit "$PR_URL" --add-label deps-needs-triage || true
           gh pr comment "$PR_URL" --body "Auto-merge blocked by the fail-closed file guard (reason: \`${REASON}\`). Auto-merge is disabled (if it was enabled) and the PR is routed to the manual triage queue per the managed Dependabot flow. Tracking: 'Dependabot manual-review queue' issue."
 
