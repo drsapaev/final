@@ -1249,6 +1249,7 @@ const ru = {
     derma_exams_cosmetic_type_inline: 'Тип:',
     derma_exams_cosmetic_area_inline: 'Область:',
     derma_exams_cosmetic_products_inline: 'Продукты:',
+    derma_exams_cosmetic_remove: 'Удалить процедуру',
     derma_exams_cosmetic_empty: 'Нет данных процедур',
 
     // ─── derma_photo_*: PhotoUploader.jsx (Task 58b) ───────────────────────

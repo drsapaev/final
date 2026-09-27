@@ -287,8 +287,17 @@ def _emr_procedure_rows(
         specialty_data = data.get("specialty_data")
         if not isinstance(specialty_data, dict):
             continue
-        entries = specialty_data.get("procedures")
-        if not isinstance(entries, list):
+        # P2-4b reconciliation: two writers append cosmetic procedures to the
+        # visit EMR — the panel quick form uses specialty_data.procedures and
+        # the EMR specialty section editor uses
+        # specialty_data.cosmetic_procedures. History must surface both, so
+        # both keys are read (deterministic order, unique row indexes).
+        entries: list[Any] = []
+        for procedures_key in ("procedures", "cosmetic_procedures"):
+            key_entries = specialty_data.get(procedures_key)
+            if isinstance(key_entries, list):
+                entries.extend(key_entries)
+        if not entries:
             continue
         visit = visits.get(record.visit_id)
         fallback_date = _fallback_exam_date(visit, record)

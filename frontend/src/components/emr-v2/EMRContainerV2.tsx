@@ -52,6 +52,7 @@ import {
     DermatologySection,
     DentistrySection,
 } from './sections/specialty';
+import type { DermatologyCosmeticProcedureRecord } from './sections/specialty/DermatologySection';
 
 // P0 fix: LabResultsSection — shows lab panel results to all doctors.
 // Previously doctors had no way to see LabReportInstance data; cardiologist
@@ -1092,6 +1093,9 @@ export function EMRContainerV2({
                             distribution={(data?.specialty_data?.distribution as string) || ''}
                             symptoms={(data?.specialty_data?.symptoms as string) || ''}
                             treatmentPlan={(data?.specialty_data?.treatment_plan as string) || ''}
+                            cosmeticProcedures={(Array.isArray(data?.specialty_data?.cosmetic_procedures)
+                                ? data?.specialty_data?.cosmetic_procedures
+                                : []) as DermatologyCosmeticProcedureRecord[]}
                             onChange={(field, value) => handleFieldChange('specialty_data')({
                                 ...(data?.specialty_data || {}),
                                 [field]: value
