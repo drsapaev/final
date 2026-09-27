@@ -90,7 +90,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "13:00"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 5
     reviewers:
       - "drsapaev"
     assignees:
@@ -106,6 +106,20 @@ updates:
       frontend-npm-minor-patch:
         patterns:
           - "*"
+        exclude-patterns:
+          # Key frameworks: individual PRs + manual review per the managed
+          # Dependabot flow (2026-09-27 triage). A React/Vite/TS/testing
+          # update must not ride along inside a multi-package group PR -
+          # green CI proves checks pass, not clinical/frontend compatibility.
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "vite"
+          - "typescript"
+          - "vitest"
+          - "@vitest/*"
+          - "@playwright/test"
         update-types:
           - "minor"
           - "patch"
@@ -135,7 +149,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "10:00"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 3
     reviewers:
       - "drsapaev"
     assignees:
