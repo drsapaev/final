@@ -253,7 +253,9 @@ try:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     log.info("SlowAPI rate limiter registered")
 except ImportError:
-    log.warning("slowapi not installed, REST rate limiting disabled (install with: pip install slowapi)")
+    log.warning(
+        "slowapi not installed, REST rate limiting disabled (install with: pip install slowapi)"
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -274,13 +276,16 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """FRONTEND-SECURITY: Add security headers to all responses."""
+
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), microphone=(), camera=()"
+        )
         # CSP: allow inline styles (Tailwind), scripts from self, images from data: and https:
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
@@ -353,8 +358,13 @@ log.info("Idempotency middleware registered")
 CSRF_ENABLED = os.getenv("CSRF_ENABLED", "1" if IS_PROD else "0") == "1"
 if CSRF_ENABLED:
     from app.middleware.csrf_middleware import CSRFMiddleware  # noqa: E402
+
     app.add_middleware(CSRFMiddleware, enabled=True)
-    log.info("CSRF protection middleware registered (CSRF_ENABLED=%s, IS_PROD=%s)", CSRF_ENABLED, IS_PROD)
+    log.info(
+        "CSRF protection middleware registered (CSRF_ENABLED=%s, IS_PROD=%s)",
+        CSRF_ENABLED,
+        IS_PROD,
+    )
 else:
     log.info("CSRF protection disabled (CSRF_ENABLED=0)")
 
@@ -378,7 +388,9 @@ if not CORS_DISABLE:
     }
     if CORS_ALLOW_ALL:
         app.add_middleware(CORSMiddleware, allow_origins=["*"], **cfg)
-        log.info("[FIX:CORS] CORS middleware enabled for all origins in development mode")
+        log.info(
+            "[FIX:CORS] CORS middleware enabled for all origins in development mode"
+        )
     else:
         app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, **cfg)
         log.info("[FIX:CORS] CORS middleware enabled for origins: %s", CORS_ORIGINS)
@@ -411,6 +423,7 @@ log.info("Included api.v1.api router at %s", API_V1_STR)
 # GraphQL API
 app.include_router(graphql_router, prefix="/api")
 log.info("Included GraphQL router at /api/graphql")
+
 
 # -----------------------------------------------------------------------------
 # Health
@@ -457,6 +470,7 @@ def detailed_health():
         from sqlalchemy import text as sql_text
 
         from app.db.session import SessionLocal
+
         db = SessionLocal()
         try:
             db.execute(sql_text("SELECT 1"))
@@ -472,48 +486,42 @@ def detailed_health():
         import redis
 
         from app.core.config import settings
+
         redis_url = getattr(settings, "ARQ_REDIS_URL", "redis://localhost:6379/0")
         r = redis.from_url(redis_url, socket_connect_timeout=2, socket_timeout=2)
         r.ping()
         checks["redis"] = {"status": "ok"}
     except Exception:
         # Redis is optional in dev — don't fail health check
-        checks["redis"] = {"status": "skipped", "reason": "not configured or unreachable"}
+        checks["redis"] = {
+            "status": "skipped",
+            "reason": "not configured or unreachable",
+        }
 
     # 3. Sentry SDK (check if initialized, don't send event)
     try:
         import sentry_sdk
+
         client = sentry_sdk.Hub.current.client
         checks["sentry"] = {"status": "ok" if client else "disabled"}
     except Exception:
         checks["sentry"] = {"status": "disabled"}
 
-    # 4. Backup freshness (newest *.gz in backend/backups) --------------------
-    # P1 2026-09-05: two consecutive nightly backups were silently missed
-    # (host powered off at 02:00). Surface the freshest backup age so the
-    # external monitor can alert when the data-safety window (>26h) is
-    # exceeded. Stale backup is NOT an API availability failure: it must not
-    # flip overall_ok / 503 — monitors read this block and alert separately.
+    # 4. Backup freshness — manifest-based ---------------------------------
+    # The scheduled task (ops/scripts/backup_local_to_r2.py) writes
+    # last_backup_report.json ONLY after the whole chain succeeded
+    # (dump -> archive verify -> encrypt -> R2 upload + SHA-256 check).
+    # Surface its age so the external monitor can alert when the
+    # data-safety window (>26h) is exceeded. Stale backup is NOT an API
+    # availability failure: it must not flip overall_ok / 503 — monitors
+    # read this block and alert separately.
     try:
         from pathlib import Path as _Path
 
-        backup_dir = _Path(__file__).resolve().parent.parent / "backups"
-        newest_mtime = 0.0
-        newest_name = None
-        if backup_dir.is_dir():
-            for entry in list(backup_dir.glob("*.gz")) + list(backup_dir.glob("*.db")):
-                if entry.is_file() and entry.stat().st_mtime > newest_mtime:
-                    newest_mtime = entry.stat().st_mtime
-                    newest_name = entry.name
-        if newest_mtime:
-            age_hours = round((time.time() - newest_mtime) / 3600.0, 1)
-            checks["backup"] = {
-                "status": "stale" if age_hours > 26 else "ok",
-                "last_backup_file": newest_name,
-                "age_hours": age_hours,
-            }
-        else:
-            checks["backup"] = {"status": "none"}
+        from app.services.backup_manifest import read_backup_check
+
+        backup_dir = _Path(__file__).resolve().parent.parent.parent / "backups"
+        checks["backup"] = read_backup_check(backup_dir)
     except Exception as e:
         checks["backup"] = {"status": "unknown", "error": str(e)[:100]}
 
@@ -521,11 +529,13 @@ def detailed_health():
     checks["app"] = {
         "version": os.getenv("APP_VERSION", "0.9.0"),
         "env": os.getenv("ENV", "dev"),
-        "python": sys.version.split()[0] if 'sys' in dir() else "?",
+        "python": sys.version.split()[0] if "sys" in dir() else "?",
     }
 
     # 5. Uptime (approximate — process start time)
-    checks["uptime_seconds"] = int(time.time() - _app_start_time) if _app_start_time else 0
+    checks["uptime_seconds"] = (
+        int(time.time() - _app_start_time) if _app_start_time else 0
+    )
 
     response = {
         "status": "ok" if overall_ok else "degraded",
@@ -534,6 +544,7 @@ def detailed_health():
     }
 
     from fastapi import Response
+
     if not overall_ok:
         return Response(
             content=json.dumps(response),
@@ -586,7 +597,13 @@ def _warm_table_reflection() -> None:
             session = SessionLocal()
             try:
                 bind = session.get_bind()
-                for name in ("visits", "visit_services", "patients", "doctors", "users"):
+                for name in (
+                    "visits",
+                    "visit_services",
+                    "patients",
+                    "doctors",
+                    "users",
+                ):
                     Table(name, _REFLECTED_META, autoload_with=bind)
 
                 # ORM compile touch: the FIRST query per mapper also pays a
@@ -629,7 +646,6 @@ def _warm_table_reflection() -> None:
     threading.Thread(target=_warm, name="schema-reflection-warmup", daemon=True).start()
 
 
-
 async def _startup_tasks() -> None:
     """Startup tasks - validates security settings and prints routes"""
     _warm_table_reflection()
@@ -643,9 +659,13 @@ async def _startup_tasks() -> None:
         # Critical security check: fail if default SECRET_KEY in production
         if settings.SECRET_KEY == _DEFAULT_SECRET_KEY and env in ("prod", "production"):
             log.error("=" * 80)
-            log.error("CRITICAL SECURITY ERROR: Default SECRET_KEY detected in production!")
+            log.error(
+                "CRITICAL SECURITY ERROR: Default SECRET_KEY detected in production!"
+            )
             log.error("Set SECRET_KEY environment variable before starting the server.")
-            log.error("Generate secure key: python -c 'import secrets; print(secrets.token_urlsafe(32))'")
+            log.error(
+                "Generate secure key: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+            )
             log.error("=" * 80)
             raise ValueError(
                 "Cannot start in production with default SECRET_KEY. "
@@ -656,7 +676,7 @@ async def _startup_tasks() -> None:
         if len(settings.SECRET_KEY) < 32:
             log.warning(
                 "SECRET_KEY is too short (%d chars). Should be at least 32 characters.",
-                len(settings.SECRET_KEY)
+                len(settings.SECRET_KEY),
             )
 
         log.info("Security validation passed: SECRET_KEY is configured")
@@ -686,6 +706,7 @@ async def _startup_tasks() -> None:
             backup_hour = int(os.getenv("BACKUP_HOUR", "2"))
             backup_minute = int(os.getenv("BACKUP_MINUTE", "0"))
             from datetime import time
+
             backup_time = time(backup_hour, backup_minute)
 
             await backup_service.start_daily_backups(backup_time)
@@ -748,13 +769,19 @@ async def _startup_tasks() -> None:
     except Exception as e:
         log.warning(f"Failed to start lab notification scheduler: {e}")
 
+
 # Dev-only diagnostic endpoints. In production they are not registered at all -
 # less code = smaller attack surface (SEC-002, SEC-003).
 if settings.is_development:
+
     @app.get("/_routes", include_in_schema=False)
     def _routes():
         return [
-            {"path": getattr(r, "path", ""), "methods": sorted(getattr(r, "methods", []) or []), "name": getattr(r, "name", "")}
+            {
+                "path": getattr(r, "path", ""),
+                "methods": sorted(getattr(r, "methods", []) or []),
+                "name": getattr(r, "name", ""),
+            }
             for r in app.router.routes
         ]
 
