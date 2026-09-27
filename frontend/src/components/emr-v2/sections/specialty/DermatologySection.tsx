@@ -8,14 +8,40 @@
  * единственный источник фото — файловый API /files, галерея текущего визита
  * встроена в экран приёма (DermaVisitGallery). Старые значения blob: в
  * specialty_data.photos не мигрируются и не считаются сохранёнными.
+ *
+ * Косметологические процедуры (review follow-up P2-4b): записи живут в
+ * specialty_data.cosmetic_procedures и редактируются здесь, в едином
+ * осмотре ЭМК — с общим autosave/undo/conflict-механизмом контейнера.
+ * Legacy-форма (DermaExamsTab) и POST /derma/procedures удалены (410,
+ * P2-4a): двойная запись расщепляла клинические данные по двум таблицам.
+ * Поле цены отсутствует намеренно — ценообразование управляется
+ * прайс-менеджерами, а не клинической картой.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import EMRSection from '../EMRSection';
 
 import EMRSmartFieldV2 from '../EMRSmartFieldV2';
+import { Button, Input, Textarea } from '../../../ui/macos';
 import i18n from '@/i18n';
 const i18nT = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
+
+/** Одна запись косметической процедуры в specialty_data.cosmetic_procedures. */
+export interface DermatologyCosmeticProcedureRecord {
+  procedure_date: string;
+  procedure_type: string;
+  area_treated: string;
+  products_used: string;
+  results: string;
+}
+
+const EMPTY_PROCEDURE_DRAFT: DermatologyCosmeticProcedureRecord = {
+  procedure_date: '',
+  procedure_type: '',
+  area_treated: '',
+  products_used: '',
+  results: '',
+};
 
 /**
  * DermatologySection Component
@@ -26,6 +52,7 @@ const i18nT = i18n.t as unknown as (key: string, options?: Record<string, unknow
  * @param {Object} props.localization - Локализация поражений
  * @param {Function} props.onChange - Handler для изменения specialty_data
  * @param {boolean} props.disabled - Read-only mode
+ * @param {Array} props.cosmeticProcedures - specialty_data.cosmetic_procedures
  */
 interface DermatologySectionProps {
   skinType?: string;
@@ -39,6 +66,7 @@ interface DermatologySectionProps {
   disabled?: boolean;
   visitId?: string | number | null | undefined;
   patientId?: string | number | null | undefined;
+  cosmeticProcedures?: DermatologyCosmeticProcedureRecord[];
 }
 
 
@@ -51,13 +79,47 @@ export function DermatologySection({
   symptoms = '',
   treatmentPlan = '',
   onChange,
-  disabled = false
+  disabled = false,
+  cosmeticProcedures = [],
 }: DermatologySectionProps) {
 
   // Handlers
   const handleSkinTypeChange = useCallback((value: string) => {
     onChange?.('skin_type', value);
   }, [onChange]);
+
+  const [showProcedureForm, setShowProcedureForm] = useState(false);
+  const [procedureDraft, setProcedureDraft] = useState<DermatologyCosmeticProcedureRecord>(
+    EMPTY_PROCEDURE_DRAFT,
+  );
+
+  const handleProcedureAdd = useCallback(() => {
+    if (disabled) return;
+    const procedureDate = procedureDraft.procedure_date.trim();
+    const procedureType = procedureDraft.procedure_type.trim();
+    if (!procedureDate || !procedureType) return;
+
+    onChange?.('cosmetic_procedures', [
+      ...cosmeticProcedures,
+      {
+        procedure_date: procedureDate,
+        procedure_type: procedureType,
+        area_treated: procedureDraft.area_treated.trim(),
+        products_used: procedureDraft.products_used.trim(),
+        results: procedureDraft.results.trim(),
+      },
+    ]);
+    setProcedureDraft(EMPTY_PROCEDURE_DRAFT);
+    setShowProcedureForm(false);
+  }, [cosmeticProcedures, disabled, onChange, procedureDraft]);
+
+  const handleProcedureRemove = useCallback((index: number) => {
+    if (disabled) return;
+    onChange?.(
+      'cosmetic_procedures',
+      cosmeticProcedures.filter((_, position) => position !== index),
+    );
+  }, [cosmeticProcedures, disabled, onChange]);
 
   const skinExamFields = [
     {
@@ -155,6 +217,152 @@ export function DermatologySection({
                   disabled={disabled} />
               </div>
             ))}
+
+            {/* Косметологические процедуры — specialty_data.cosmetic_procedures (P2-4b). */}
+            <div className="dermatology-field-group">
+              <div className="derma-flex-between-top">
+                <label className="dermatology-label">
+                  {i18nT('derma.derma_exams_cosmetic_title')} ({cosmeticProcedures.length})
+                </label>
+                {!disabled && !showProcedureForm && (
+                  <Button type="button" onClick={() => setShowProcedureForm(true)}>
+                    {i18nT('derma.derma_exams_cosmetic_new')}
+                  </Button>
+                )}
+              </div>
+
+              {cosmeticProcedures.length > 0 ? (
+                <div className="derma-history-list-scroll derma-mt-16">
+                  {cosmeticProcedures.map((procedure, index) => (
+                    <article key={`${procedure.procedure_date}-${procedure.procedure_type}-${index}`} className="derma-card-p12-bg2-13">
+                      <div className="derma-flex-between-top">
+                        <span className="derma-p-14-secondary">{procedure.procedure_date}</span>
+                        {!disabled && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            aria-label={i18nT('derma.derma_exams_cosmetic_remove', {
+                              type: procedure.procedure_type,
+                            })}
+                            onClick={() => handleProcedureRemove(index)}>
+                            {i18nT('derma.derma_exams_cosmetic_remove')}
+                          </Button>
+                        )}
+                      </div>
+                      {(procedure.procedure_type || procedure.area_treated || procedure.products_used || procedure.results) && (
+                        <p className="derma-p-14-secondary">
+                          {[
+                            procedure.procedure_type ? `${i18nT('derma.derma_exams_cosmetic_type_inline')} ${procedure.procedure_type}` : '',
+                            procedure.area_treated ? `${i18nT('derma.derma_exams_cosmetic_area_inline')} ${procedure.area_treated}` : '',
+                            procedure.products_used ? `${i18nT('derma.derma_exams_cosmetic_products_inline')} ${procedure.products_used}` : '',
+                            procedure.results,
+                          ].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                !showProcedureForm && (
+                  <p className="derma-p-14-secondary derma-mt-16">
+                    {i18nT('derma.derma_exams_cosmetic_empty')}
+                  </p>
+                )
+              )}
+
+              {showProcedureForm && !disabled && (
+                <form
+                  className="derma-mt-16"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    handleProcedureAdd();
+                  }}>
+                  <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 'var(--mac-spacing-4)' }}>
+                    <div>
+                      <label className="derma-form-label" htmlFor="derma-procedure-date">
+                        {i18nT('derma.derma_exams_cosmetic_date')}
+                      </label>
+                      <Input
+                        id="derma-procedure-date"
+                        type="date"
+                        value={procedureDraft.procedure_date}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProcedureDraft({
+                          ...procedureDraft,
+                          procedure_date: e.target.value,
+                        })}
+                        required />
+                    </div>
+                    <div>
+                      <label className="derma-form-label" htmlFor="derma-procedure-type">
+                        {i18nT('derma.derma_exams_cosmetic_type')}
+                      </label>
+                      <Input
+                        id="derma-procedure-type"
+                        value={procedureDraft.procedure_type}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProcedureDraft({
+                          ...procedureDraft,
+                          procedure_type: e.target.value,
+                        })}
+                        placeholder={i18nT('derma.derma_exams_ph_meso')}
+                        required />
+                    </div>
+                    <div>
+                      <label className="derma-form-label" htmlFor="derma-procedure-area">
+                        {i18nT('derma.derma_exams_cosmetic_area')}
+                      </label>
+                      <Input
+                        id="derma-procedure-area"
+                        value={procedureDraft.area_treated}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProcedureDraft({
+                          ...procedureDraft,
+                          area_treated: e.target.value,
+                        })}
+                        placeholder={i18nT('derma.derma_exams_ph_face_neck')} />
+                    </div>
+                    <div>
+                      <label className="derma-form-label" htmlFor="derma-procedure-products">
+                        {i18nT('derma.derma_exams_cosmetic_products')}
+                      </label>
+                      <Input
+                        id="derma-procedure-products"
+                        value={procedureDraft.products_used}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProcedureDraft({
+                          ...procedureDraft,
+                          products_used: e.target.value,
+                        })}
+                        placeholder={i18nT('derma.derma_exams_ph_hyaluronic')} />
+                    </div>
+                  </div>
+
+                  <div className="derma-mt-16">
+                    <label className="derma-form-label" htmlFor="derma-procedure-results">
+                      {i18nT('derma.derma_exams_cosmetic_results')}
+                    </label>
+                    <Textarea
+                      id="derma-procedure-results"
+                      value={procedureDraft.results}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setProcedureDraft({
+                        ...procedureDraft,
+                        results: e.target.value,
+                      })}
+                      rows={2} />
+                  </div>
+
+                  <div className="derma-flex-gap-8 derma-mt-16" style={{ justifyContent: 'flex-end' }}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setProcedureDraft(EMPTY_PROCEDURE_DRAFT);
+                        setShowProcedureForm(false);
+                      }}>
+                      {i18nT('common.cancel')}
+                    </Button>
+                    <Button type="submit">{i18nT('derma.derma_exams_cosmetic_save')}</Button>
+                  </div>
+                </form>
+              )}
+            </div>
         </EMRSection>);
 
 }

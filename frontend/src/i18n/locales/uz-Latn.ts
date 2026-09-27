@@ -1166,6 +1166,7 @@ const uzLatn = {
     derma_exams_cosmetic_type_inline: 'Turi:',
     derma_exams_cosmetic_area_inline: 'Soha:',
     derma_exams_cosmetic_products_inline: 'Mahsulotlar:',
+    derma_exams_cosmetic_remove: "Protsedurani o'chirish",
     derma_exams_cosmetic_empty: "Protsedura ma'lumotlari yo'q",
 
     // ─── derma_photo_*: PhotoUploader.jsx (Task 58b) ───────────────────────

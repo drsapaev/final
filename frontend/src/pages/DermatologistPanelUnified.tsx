@@ -18,7 +18,6 @@ import EditPatientModal from '../components/common/EditPatientModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
-import DermaExamsTab from '../components/dermatology/DermaExamsTab';
 import DermaPatientsTab from '../components/dermatology/DermaPatientsTab';
 import DermaVisitGallery from '../components/dermatology/DermaVisitGallery';
 import { useDermatologyPatientHistory } from './useDermatologyPatientHistory';
@@ -357,20 +356,6 @@ const DermatologistPanelUnified = () => {
   const appointmentsLoadPromiseRef = useRef<Promise<DermatologyAppointment[]> | null>(null);
   const urlResolutionRef = useRef({ search: '', refreshAttempted: false, notified: false });
 
-  // Optional procedure documentation belongs to the currently open visit.
-  const [cosmeticProcedure, setCosmeticProcedure] = useState({
-    patient_id: '',
-    visit_id: '',
-    procedure_date: '',
-    procedure_type: '',
-    area_treated: '',
-    products_used: '',
-    results: '',
-    follow_up: ''
-  });
-
-  const [showCosmeticForm, setShowCosmeticForm] = useState(false);
-
 
   // Дополнительные состояния из старого файла
   const [currentAppointment, setCurrentAppointment] = useState<DermatologyPatient | null>(null);
@@ -415,17 +400,6 @@ const DermatologistPanelUnified = () => {
       setEmr(null);
       setPrescription(null);
       setAppointmentCompletionStatus(null);
-      setShowCosmeticForm(false);
-      setCosmeticProcedure({
-        patient_id: '',
-        visit_id: '',
-        procedure_date: '',
-        procedure_type: '',
-        area_treated: '',
-        products_used: '',
-        results: '',
-        follow_up: '',
-      });
     },
   });
 
@@ -791,20 +765,7 @@ const DermatologistPanelUnified = () => {
     loading: patientHistoryLoading,
     ready: patientHistoryReady,
     error: patientHistoryError,
-    reload: loadPatientData,
   } = patientHistory;
-
-  const openCosmeticProcedureForm = useCallback(() => {
-    const patientId = currentAppointment?.patient_id;
-    const visitId = currentAppointment?.visit_id;
-    if (!patientId || !visitId) return;
-    setCosmeticProcedure((prev) => ({
-      ...prev,
-      patient_id: String(patientId),
-      visit_id: String(visitId),
-    }));
-    setShowCosmeticForm(true);
-  }, [currentAppointment?.patient_id, currentAppointment?.visit_id]);
 
   // D-5 (UX audit): auto-promote selectedPatient to currentAppointment
   // so the first visit branch (with EMRContainerV2) renders correctly.
@@ -1313,47 +1274,6 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  // Обработка косметической процедуры
-  const handleCosmeticProcedureSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const patientId = currentAppointment?.patient_id;
-    const visitId = currentAppointment?.visit_id;
-    if (!patientId || !visitId) {
-      notify.error(t('derma.procedure_save_failed'));
-      return;
-    }
-    try {
-      const payload = {
-        ...cosmeticProcedure,
-        patient_id: patientId,
-        visit_id: visitId,
-      };
-      const response = (await api.post('/derma/procedures', payload)) as AxiosResponse<Record<string, unknown>>;
-
-      if (response.status < 400) {
-        setShowCosmeticForm(false);
-        setCosmeticProcedure({
-          patient_id: '',
-          visit_id: '',
-          procedure_date: '',
-          procedure_type: '',
-          area_treated: '',
-          products_used: '',
-          results: '',
-          follow_up: ''
-        });
-        loadPatientData();
-        notify.success(t('derma.procedure_saved'));
-      } else {
-        logger.error('[Dermatology] Cosmetic procedure save rejected', { statusCode: response.status });
-        notify.error(t('derma.procedure_save_failed'));
-      }
-    } catch (error: unknown) {
-      logger.error('[Dermatology] Cosmetic procedure save failed', safeErrorMetadata(error));
-      notify.error(t('derma.procedure_save_failed'));
-    }
-  };
-
   const appointmentSummaryItems = [
     {
       key: 'total',
@@ -1479,20 +1399,6 @@ const DermatologistPanelUnified = () => {
 
                 </div>
 
-                {currentAppointment.patient_id && currentAppointment.visit_id && (
-                  <div className="derma-mt-24">
-                    <DermaExamsTab
-                      cosmeticProcedure={cosmeticProcedure}
-                      setCosmeticProcedure={setCosmeticProcedure}
-                      showCosmeticForm={showCosmeticForm}
-                      onCosmeticSubmit={handleCosmeticProcedureSubmit}
-                      onOpenCosmeticForm={openCosmeticProcedureForm}
-                      onCancelCosmeticForm={() => setShowCosmeticForm(false)}
-                    />
-                  </div>
-                )}
-
-                {/* Фото визита — /files единственный источник (пункт 8 аудита) */}
                 {currentAppointment.patient_id && currentAppointment.visit_id && (
                   <div className="derma-mt-24">
                     <DermaVisitGallery
