@@ -48316,7 +48316,7 @@
           "derma"
         ],
         "summary": "Создать осмотр кожи",
-        "description": "Создать новый осмотр кожи",
+        "description": "Устаревший эндпоинт записи (review follow-up P2-4a к #3448).\n\nТаблица derma_examinations объявлена read-only (история): новые осмотры\nсохраняются в specialty_data ЭМК (emr/v2). Возврат 410 до любого\nдоступа к БД — fail-closed для всех ролей, включая Admin: двойная\nзапись (legacy + ЭМК) расщепляла клинические данные по двум таблицам.\nЧтение истории — GET /derma/examinations — не изменяется.",
         "operationId": "create_skin_examination_api_v1_derma_examinations_post",
         "security": [
           {
@@ -48434,7 +48434,7 @@
           "derma"
         ],
         "summary": "Создать косметическую процедуру",
-        "description": "Создать новую косметическую процедуру",
+        "description": "Устаревший эндпоинт записи (review follow-up P2-4a к #3448).\n\nТаблица derma_procedures объявлена read-only (история): новые\nкосметические процедуры сохраняются в specialty_data ЭМК (emr/v2).\nВозврат 410 до любого доступа к БД — fail-closed для всех ролей,\nвключая Admin: двойная запись (legacy + ЭМК) расщепляла клинические\nданные по двум таблицам. Чтение истории — GET /derma/procedures —\nне изменяется.",
         "operationId": "create_cosmetic_procedure_api_v1_derma_procedures_post",
         "security": [
           {

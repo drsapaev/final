@@ -175,10 +175,8 @@ async def create_skin_examination(
     Чтение истории — GET /derma/examinations — не изменяется.
     """
     logger.warning(
-        "[derma.examinations] rejected legacy write user_id=%s patient_id=%s visit_id=%s",
+        "[derma.examinations] rejected legacy write user_id=%s",
         getattr(user, "id", None),
-        getattr(examination_data, "patient_id", None),
-        getattr(examination_data, "visit_id", None),
     )
     raise HTTPException(
         status_code=status.HTTP_410_GONE,
@@ -266,10 +264,8 @@ async def create_cosmetic_procedure(
     не изменяется.
     """
     logger.warning(
-        "[derma.procedures] rejected legacy write user_id=%s patient_id=%s visit_id=%s",
+        "[derma.procedures] rejected legacy write user_id=%s",
         getattr(user, "id", None),
-        getattr(procedure_data, "patient_id", None),
-        getattr(procedure_data, "visit_id", None),
     )
     raise HTTPException(
         status_code=status.HTTP_410_GONE,
