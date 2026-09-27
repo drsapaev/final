@@ -7640,6 +7640,35 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/v2/analyze-skin-file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analyze Skin File
+         * @description Анализ СОХРАНЁННОГО фото визита (пункт 9 плана аудита дерматологии).
+         *
+         *     Клиент передаёт только {visit_id, file_id}; байты изображения сервер
+         *     загружает сам после проверки доступа. Ответ — только подсказка:
+         *     обязательные корневые поля requires_doctor_confirmation=True,
+         *     decision_boundary="suggestion_only", ai_notice гарантируются моделью
+         *     AIResponse. Результат никогда не записывается в ЭМК автоматически.
+         *
+         *     Requires: ANALYZE_IMAGE permission (Doctor, Dermatologist)
+         *     Feature flag: ai_complaint_analysis (503 when disabled)
+         */
+        post: operations["analyze_skin_file_api_v1_ai_v2_analyze_skin_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/v2/analyze-ecg": {
         parameters: {
             query?: never;
@@ -23857,6 +23886,25 @@ export type components = {
              * @description AI provider hint
              */
             provider?: string | null;
+        };
+        /**
+         * AnalyzeSkinFileRequest
+         * @description Request body for POST /ai/v2/analyze-skin-file (derma audit item 9).
+         *
+         *     The image is a SAVED file from the file API: the server loads its bytes
+         *     after access checks; the client never sends image content.
+         */
+        AnalyzeSkinFileRequest: {
+            /**
+             * Visit Id
+             * @description Visit the photo belongs to
+             */
+            visit_id: number;
+            /**
+             * File Id
+             * @description Saved file id from /files
+             */
+            file_id: number;
         };
         /**
          * AnalyzeSkinRequest
@@ -55091,6 +55139,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AnalyzeSkinRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AIResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_skin_file_api_v1_ai_v2_analyze_skin_file_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalyzeSkinFileRequest"];
             };
         };
         responses: {

@@ -29,7 +29,7 @@ describe('DermatologistPanel STRAT#33 — i18n migration', () => {
     expect(source).toContain("'derma.session_expired'");
     expect(source).toContain("'derma.visit_completed'");
     expect(source).toContain("'derma.prescription_saved'");
-    expect(source).toContain("'derma.skin_exam_saved'");
+    expect(source).toContain("'derma.procedure_saved'");
   });
   it('does not contain hardcoded Russian notify strings', () => {
     expect(source).not.toContain("notify.error('Сессия истекла");

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, HeartPulse, Phone, Search, Sparkles, User } from 'lucide-react';
+import { Calendar, Phone, Search, User } from 'lucide-react';
 import type { Patient } from '../../types/domain/clinic';
 import { searchPatients } from '../../api/patients';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -58,8 +58,6 @@ function birthLabel(patient: DermatologyPatientRecord): string {
 interface DermaPatientsTabProps {
   selectedPatient: DermatologyPatientRecord | null;
   onSelectPatient: (patient: DermatologyPatientRecord | null) => void;
-  onOpenExam: (patient: DermatologyPatientRecord) => void;
-  onOpenProcedure: (patient: DermatologyPatientRecord) => void;
   appointments: DermatologyAppointmentHistoryItem[];
   skinExaminations: DermatologySkinExamination[];
   cosmeticProcedures: DermatologyCosmeticProcedure[];
@@ -71,8 +69,6 @@ interface DermaPatientsTabProps {
 export function DermaPatientsTab({
   selectedPatient,
   onSelectPatient,
-  onOpenExam,
-  onOpenProcedure,
   appointments,
   skinExaminations,
   cosmeticProcedures,
@@ -227,19 +223,9 @@ export function DermaPatientsTab({
                   <span>{t('derma.derma_panel_patient_id', { id: selectedId })}</span>
                 </div>
               </div>
-              <div className="derma-flex-gap-16-wrap">
-                <Button variant="outline" onClick={() => onOpenExam(selectedPatient)}>
-                  <HeartPulse size={16} aria-hidden="true" />
-                  {t('derma.derma_panel_button_exam')}
-                </Button>
-                <Button variant="outline" onClick={() => onOpenProcedure(selectedPatient)}>
-                  <Sparkles size={16} aria-hidden="true" />
-                  {t('derma.derma_panel_button_procedure')}
-                </Button>
-                <Button variant="outline" onClick={() => onSelectPatient(null)}>
-                  {t('derma.derma_panel_patients_clear_selection')}
-                </Button>
-              </div>
+              <Button variant="outline" onClick={() => onSelectPatient(null)}>
+                {t('derma.derma_panel_patients_clear_selection')}
+              </Button>
             </div>
           </Card>
 

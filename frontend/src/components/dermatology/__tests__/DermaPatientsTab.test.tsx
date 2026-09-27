@@ -28,8 +28,6 @@ vi.mock('../../../components/ui/macos', async () => {
 const emptyProps = {
   selectedPatient: null,
   onSelectPatient: vi.fn(),
-  onOpenExam: vi.fn(),
-  onOpenProcedure: vi.fn(),
   appointments: [],
   skinExaminations: [],
   cosmeticProcedures: [],
@@ -74,6 +72,9 @@ describe('DermaPatientsTab', () => {
     expect(screen.getByText('1985')).toBeInTheDocument();
     expect(screen.queryByText('1985-01-01')).not.toBeInTheDocument();
     expect(screen.getByText('derma.derma_panel_patient_history_title')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'derma.derma_panel_patients_clear_selection' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'derma.derma_panel_button_exam' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'derma.derma_panel_button_procedure' })).not.toBeInTheDocument();
   });
 
   it('selects the patient returned by search without exposing an aggregate list', async () => {

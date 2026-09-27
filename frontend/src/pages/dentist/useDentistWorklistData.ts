@@ -76,8 +76,8 @@ export function useDentistWorklistData({
         }
 
         return null;
-      } catch (error: unknown) {
-        logger.error('[Dentist] Ошибка загрузки услуг:', error);
+      } catch (_error: unknown) {
+        logger.error('[Dentist] Ошибка загрузки услуг');
         return null;
       }
     })();
@@ -210,8 +210,8 @@ export function useDentistWorklistData({
 
         logger.error('Ошибка загрузки очередей:', response.status);
         return [];
-      } catch (error: unknown) {
-        logger.error('Ошибка загрузки записей стоматолога:', error);
+      } catch (_error: unknown) {
+        logger.error('Ошибка загрузки записей стоматолога');
         return [];
       } finally {
         setAppointmentsLoading(false);
@@ -240,9 +240,8 @@ export function useDentistWorklistData({
     }
 
     // Слушаем глобальные события обновления очереди
-    const handleQueueUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent<unknown>;
-      logger.info('[Dentist] Получено событие обновления очереди:', customEvent.detail);
+    const handleQueueUpdate = () => {
+      logger.info('[Dentist] Получено событие обновления очереди');
       if (activeTab === 'appointments') {
         loadDentistryAppointments(true);
       }
@@ -282,8 +281,8 @@ export function useDentistWorklistData({
       if (refreshedPatients.length > 0) {
         setPatients(refreshedPatients);
       }
-    } catch (e: unknown) {
-      logger.error('Ошибка загрузки пациентов:', e);
+    } catch (_error: unknown) {
+      logger.error('Ошибка загрузки пациентов');
     }
   }, [loadDentistryAppointments, tI18n]);
 
