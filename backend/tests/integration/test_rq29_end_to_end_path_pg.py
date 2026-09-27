@@ -443,6 +443,38 @@ def _ws_state(pg_client, user, board_id: str = "main_board") -> dict:
     return message["data"]
 
 
+def _assert_no_patient_phi(state) -> None:
+    """Owner review round-2 P2: the board's no-PHI claim under
+    ``show_patient_names=none`` must cover EVERY PHI string the scenario
+    planted, not only the patient last name — a regressed payload that
+    leaked, say, the phone number would slip past a name-only substring
+    check. Walks every string value of the board payload recursively and
+    pins the absence of the synthetic patients' names and phone numbers
+    (the exact strings a leaky payload would carry)."""
+    markers = [
+        "RQ29-SYNTHETIC",   # last name shared by all three synthetic patients
+        PHONE_MAIN,         # synthetic cart patient phone
+        PHONE_WALKIN,       # synthetic direction-QR walk-in phone
+        PHONE_CANCEL,       # synthetic cancel-leg walk-in phone
+    ]
+
+    def _walk(node) -> None:
+        if isinstance(node, str):
+            for marker in markers:
+                assert marker not in node, (
+                    "the board leaked patient PHI with show_patient_names=none: "
+                    f"{marker!r} found in payload"
+                )
+        elif isinstance(node, dict):
+            for value in node.values():
+                _walk(value)
+        elif isinstance(node, (list, tuple, set)):
+            for value in node:
+                _walk(value)
+
+    _walk(state)
+
+
 def _anonym_join(pg_client, token: str, name: str, phone: str) -> dict:
     """Anonymous QR session: start -> complete (RQ-18 protocol)."""
     resp = pg_client.post(JOIN_START, json={"token": token})
@@ -1038,9 +1070,7 @@ def _step5_performer_scope_consistency_and_second_session(
     state = _ws_state(pg_client, world["admin"])
     entries = state.get("queue_entries") or []
     assert entries, "the board must contain today's tickets"
-    assert "RQ29-SYNTHETIC" not in str(state), (
-        "the board leaked patient identity with show_patient_names=none"
-    )
+    _assert_no_patient_phi(state)
     by_number: dict[int, set[tuple]] = {}
     for e in entries:
         key = (e.get("specialist_name"), e.get("specialist_id"))
@@ -1190,6 +1220,14 @@ def _step7_partial_payment_then_partial_service_cancel(
     assert target2 is not None, (
         "the remaining 60000 debt must stay visible as pending"
     )
+    # Owner review round-2 P2: the pending record's presence alone does
+    # not prove the acceptance contract — the REMAINING AMOUNT must be
+    # pinned too (90000 invoice - 30000 paid = 60000 exactly).
+    assert float(target2["remaining_amount"]) == 60000.0, (
+        f"the remaining debt after the 30000 partial payment on the "
+        f"90000 invoice must be exactly 60000, got "
+        f"{target2.get('remaining_amount')}"
+    )
 
     # --- partial service cancel on a fresh multi-service walk-in -----
     resp = pg_client.post(
@@ -1297,6 +1335,14 @@ def _step7_partial_payment_then_partial_service_cancel(
     assert cancelled.get("cancelled") is True
     assert cancelled.get("cancel_reason") == "SYNTHETIC RQ-29 partial cancel"
     assert cancelled.get("cancelled_by") is not None
+    # Owner review round-2 P2: the declared audit trail is
+    # (reason/who/was_paid) — the third element must be pinned as well.
+    # The request sent was_paid=False; the endpoint persists it as
+    # was_paid_before_cancel (see cancel_service_in_entry).
+    assert cancelled.get("was_paid_before_cancel") is False, (
+        "the audit trail must persist the cancel request's was_paid flag "
+        f"as was_paid_before_cancel=False, got {cancelled.get('was_paid_before_cancel')!r}"
+    )
     assert float(cancelled_entry.total_amount) == 0.0, (
         f"the entry total must be recalculated, got {cancelled_entry.total_amount}"
     )
