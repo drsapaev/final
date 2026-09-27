@@ -45,8 +45,11 @@ describe('dermatologist visit photos contract (item 8)', () => {
       .replace(/\/\*[\s\S]*?\*\//g, '');
     expect(galleryCode).toContain('\'/files/\'');
     expect(galleryCode).toContain('api.get');
-    // normalizeSource сворачивает `patient_id: patientId` до shorthand — пиним нормализованную форму
-    expect(galleryCode).toContain('params: { patient_id, visit_id, size:');
+    // normalizeSource сворачивает `patient_id: patientId` и `size: LIST_PAGE_SIZE`
+    // до shorthand — пиним нормализованную форму. Параметр page — пагинация
+    // списка по серверному контракту FileList (follow-up P2-2): первая
+    // страница при открытии, следующие — кнопкой «Показать ещё».
+    expect(galleryCode).toContain('params: { patient_id, visit_id, size, page:');
     expect(galleryCode).toContain('(`/files/${file.id}/preview`');
     expect(galleryCode).toContain('responseType: \'blob\'');
     expect(galleryCode).toContain('api.post(\'/files/upload\'');
