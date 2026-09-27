@@ -1,11 +1,18 @@
 name: Dependabot auto-merge (controlled)
 
-# Managed Dependabot flow (2026-09-27):
+# Managed Dependabot flow (2026-09-27; hardened 2026-09-28 after the
+# retrospective review of #3495):
 #   security updates  -> manual, priority review      (routed to deps-needs-triage)
 #   grouped patch/minor (npm frontend + root)          -> auto-merge, gated on required checks
 #   individual minors, majors, actions, docker, pip    -> manual (routed to deps-needs-triage)
 #
-# Queue for the manual flow: issue "Dependabot manual-review queue".
+# Hardening from the #3495 review:
+#   - P1 fail-closed file guard: an API error, an empty file list, or ANY
+#     file outside the manifest allowlist routes the PR to the manual queue
+#     (and disables auto-merge if it was already enabled). No "|| true" on
+#     the success path - every doubt is fail-closed.
+#   - P2 the guard re-runs on synchronize: a PR that stops matching the
+#     allowlist loses auto-merge eligibility (auto-merge switched OFF).
 #
 # Why pull_request_target: Dependabot PRs get a read-only GITHUB_TOKEN under
 # plain pull_request, so enabling auto-merge needs the base-context token.
@@ -15,7 +22,7 @@ name: Dependabot auto-merge (controlled)
 
 on:
   pull_request_target:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: write
@@ -50,28 +57,55 @@ jobs:
               echo "verdict=triage" >> "$GITHUB_OUTPUT" ;;
           esac
 
-      - name: Guard - grouped PR must touch only manifest and lockfile
+      - name: Fail-closed file guard (re-checked on every synchronize)
         id: guard
         if: steps.classify.outputs.verdict == 'automerge'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          # Defense in depth for the title-based allowlist: a grouped npm PR
-          # may only change package.json / package-lock.json in frontend/ or
-          # the repo root. Anything else falls back to manual triage.
-          unexpected=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" \
-            --paginate --jq '.[].filename' \
-            | grep -vE '^(frontend/)?(package\.json|package-lock\.json)$' || true)
-          if [ -n "$unexpected" ]; then
-            echo "Unexpected files in grouped PR: ${unexpected}" >&2
+          # A grouped npm PR may only change package.json / package-lock.json
+          # in frontend/ or the repo root. Any doubt (API error, empty list,
+          # unexpected file) is fail-closed: files_ok=false -> manual queue.
+          allow_re='^(frontend/)?(package\.json|package-lock\.json)$'
+          if ! files=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --paginate --jq '.[].filename'); then
             echo "files_ok=false" >> "$GITHUB_OUTPUT"
+            echo "reason=api_error" >> "$GITHUB_OUTPUT"
+          elif [ -z "$files" ]; then
+            echo "files_ok=false" >> "$GITHUB_OUTPUT"
+            echo "reason=empty_file_list" >> "$GITHUB_OUTPUT"
+          elif unexpected=$(printf '%s\n' "$files" | grep -vE "$allow_re"); then
+            echo "files_ok=false" >> "$GITHUB_OUTPUT"
+            echo "reason=unexpected_files" >> "$GITHUB_OUTPUT"
+            echo "Unexpected files:" >&2
+            printf '%s\n' "$unexpected" >&2
           else
             echo "files_ok=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Decide action
+        id: decide
+        env:
+          VERDICT: ${{ steps.classify.outputs.verdict }}
+          FILES_OK: ${{ steps.guard.outputs.files_ok }}
+          EVENT: ${{ github.event.action }}
+        run: |
+          # enable             - first classification passed: switch auto-merge ON
+          # none               - synchronize, still eligible: keep auto-merge as is
+          # disable_and_triage - guard failed: switch auto-merge OFF (if on), manual queue
+          # triage             - outside the allowlist: manual queue (never enabled)
+          if [ "$VERDICT" = "triage" ]; then
+            echo "action=triage" >> "$GITHUB_OUTPUT"
+          elif [ "$FILES_OK" != "true" ]; then
+            echo "action=disable_and_triage" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = "synchronize" ]; then
+            echo "action=none" >> "$GITHUB_OUTPUT"
+          else
+            echo "action=enable" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Enable auto-merge (squash, merge gated by branch protection)
-        if: steps.classify.outputs.verdict == 'automerge' && steps.guard.outputs.files_ok == 'true'
+        if: steps.decide.outputs.action == 'enable'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
@@ -82,11 +116,34 @@ jobs:
           gh pr merge --auto --squash "$PR_URL"
           gh pr comment "$PR_URL" --body "Auto-merge enabled (grouped npm patch/minor flow). Will merge when all required checks pass on an up-to-date branch."
 
-      - name: Route everything else to the manual triage queue
-        if: steps.classify.outputs.verdict == 'triage' || steps.guard.outputs.files_ok == 'false'
+      - name: Keep auto-merge (synchronize, still eligible)
+        if: steps.decide.outputs.action == 'none'
+        run: |
+          echo "PR still matches the allowlist after synchronize - auto-merge stays as configured."
+
+      - name: Fail-closed - disable auto-merge and route to manual triage
+        if: steps.decide.outputs.action == 'disable_and_triage'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
+          REASON: ${{ steps.guard.outputs.reason }}
+        run: |
+          # Harmless if auto-merge was never enabled; decisive when a
+          # synchronize broke the allowlist on an already-enabled PR.
+          gh pr merge --disable-auto "$PR_URL" || true
+          gh pr edit "$PR_URL" --add-label deps-needs-triage || true
+          gh pr comment "$PR_URL" --body "Auto-merge blocked by the fail-closed file guard (reason: \`${REASON}\`). Auto-merge is disabled (if it was enabled) and the PR is routed to the manual triage queue per the managed Dependabot flow. Tracking: 'Dependabot manual-review queue' issue."
+
+      - name: Route to the manual triage queue (outside allowlist)
+        if: steps.decide.outputs.action == 'triage'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          EVENT: ${{ github.event.action }}
         run: |
           gh pr edit "$PR_URL" --add-label deps-needs-triage || true
-          gh pr comment "$PR_URL" --body "Routed to the manual triage queue (\`deps-needs-triage\`): not in the auto-merge allowlist. Allowed for automation are grouped npm patch/minor PRs only; security bumps, individual minor/major bumps, actions, docker and pip requirement changes get a manual decision per the managed Dependabot flow. Tracking: 'Dependabot manual-review queue' issue."
+          # Comment on first classification only - Dependabot rebases often,
+          # and a comment on every synchronize would be spam.
+          if [ "$EVENT" != "synchronize" ]; then
+            gh pr comment "$PR_URL" --body "Routed to the manual triage queue (\`deps-needs-triage\`): not in the auto-merge allowlist. Allowed for automation are grouped npm patch/minor PRs only; security bumps, individual minor/major bumps, actions, docker and pip requirement changes get a manual decision per the managed Dependabot flow. Tracking: 'Dependabot manual-review queue' issue."
+          fi
