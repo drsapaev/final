@@ -83,15 +83,6 @@ def db_engine():
 
 
 @pytest.fixture
-def production_session(db_engine):
-    """Production-like session: autocommit=False, NO savepoint."""
-    Session = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
-    session = Session()
-    yield session
-    session.close()
-
-
-@pytest.fixture
 def verify_session_factory(db_engine):
     """Factory for INDEPENDENT verification sessions."""
     Session = sessionmaker(bind=db_engine)
