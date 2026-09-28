@@ -1576,11 +1576,12 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar()
                 # The chain grew past the retirement (0070 lineage; now
-                # NURSE-V2 0071/0072, main's 0073 routing snapshot and the
-                # round-8 0074 payload binding); the retirement end-state
+                # NURSE-V2 0071/0072, main's 0073 routing snapshot, the
+                # round-8 0074 payload binding and the #3506 0075 derma
+                # history read model); the retirement end-state
                 # (no synthetic usernames/doctors) is a head-agnostic
                 # invariant.
-                assert version == "0074_join_payload_binding"
+                assert version == "0075_derma_history_read_model"
 
                 usernames = {
                     row[0]
