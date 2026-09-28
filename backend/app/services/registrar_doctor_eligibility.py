@@ -272,13 +272,16 @@ def assert_doctor_eligible_for_service(
     # more specific than a missing/inactive-doctor error, so it comes
     # first. The exact-doctor contract is shared with the read side
     # (registrar catalog emits doctor_id; the wizard card filter pins the
-    # service to that doctor's card only).
-    if service.doctor_id is not None and int(service.doctor_id) != int(doctor_id):
+    # service to that doctor's card only). getattr — duck-typed сервисы
+    # в тестах поверхностей без ORM-атрибутов: отсутствие поля значит
+    # «явного назначения нет», прежняя семантика.
+    service_doctor_id = getattr(service, "doctor_id", None)
+    if service_doctor_id is not None and int(service_doctor_id) != int(doctor_id):
         raise HTTPException(
             status_code=409,
             detail=(
                 f"Услуга «{service.name}» назначена другому врачу "
-                f"(ID {service.doctor_id}): запись возможна только к нему"
+                f"(ID {service_doctor_id}): запись возможна только к нему"
             ),
         )
     doctor = (

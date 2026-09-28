@@ -824,13 +824,14 @@ def test_graphql_round6_guards(gql_data, monkeypatch):
             s.merge(d["queue"])
             s.commit()
 
-    # --- 2) дубликат скоупится к ВЫБРАННОЙ tagged-очереди: пациент,
-    # waiting в базовой очереди, легитимно встаёт в tagged-очередь того же
-    # врача (раньше находили ALREADY_IN_QUEUE по всем очередям врача).
+    # --- 2) Workstream A (per-doctor single queue): tagged-join резолвится
+    # в ЕДИНУЮ очередь врача дня — пациент, waiting в этой очереди,
+    # ДУБЛИКАТ (раньше тег форкал параллельную очередь врача, и пациент
+    # держал два номера одного врача). Верное поведение — ALREADY_IN_QUEUE.
     data = _execute(
         """
         mutation($input: QueueEntryInput!) {
-          joinQueue(input: $input) { success queueEntry { number } }
+          joinQueue(input: $input) { success errors queueEntry { number } }
         }
         """,
         {
@@ -842,7 +843,8 @@ def test_graphql_round6_guards(gql_data, monkeypatch):
         },
     )
     tagged_join = data["joinQueue"]
-    assert tagged_join["success"] is True, tagged_join
+    assert tagged_join["success"] is False, tagged_join
+    assert "ALREADY_IN_QUEUE" in tagged_join["errors"], tagged_join
 
     # а в самой tagged-очереди второй join того же пациента — дубликат
     data = _execute(
@@ -1187,10 +1189,33 @@ def test_graphql_round8_guards(gql_data, monkeypatch):
             s.commit()
 
     # --- 3) новая очередь получает капу ВРАЧА, а не дефолт модели 15
+    # Workstream A (per-doctor single queue): очередь врача уже открыта
+    # ранними шагами раунда — tagged-join теперь ПЕРЕИСПОЛЬЗУЕТ её (тег
+    # не форкает параллельную очередь). Проверка «капа создания берётся у
+    # врача» требует врача БЕЗ очереди дня — первого writer'а.
+    from app.models.clinic import Doctor as Round8Doctor
+    from app.models.user import User as Round8User
+
     with S() as s:
-        d["doctor"].max_online_per_day = 7
-        s.merge(d["doctor"])
+        cap_user = Round8User(
+            username=f"synthetic-gql-r8cap-{suffix}",
+            full_name=f"R8 Cap {suffix}",
+            email=f"synthetic-gql-r8cap-{suffix}@t.local",
+            hashed_password="x",
+            role="Doctor",
+            is_active=True,
+        )
+        s.add(cap_user)
+        s.flush()
+        cap_doctor = Round8Doctor(
+            user_id=cap_user.id,
+            specialty="Cardiology",
+            active=True,
+            max_online_per_day=7,
+        )
+        s.add(cap_doctor)
         s.commit()
+        cap_doctor_id = cap_doctor.id
     try:
         data = _execute(
             """
@@ -1201,7 +1226,7 @@ def test_graphql_round8_guards(gql_data, monkeypatch):
             {
                 "input": {
                     "patientId": d["patient"].id,
-                    "doctorId": d["doctor"].id,
+                    "doctorId": cap_doctor_id,
                     "queueTag": f"r8cap-{suffix}",
                 }
             },
@@ -1212,8 +1237,8 @@ def test_graphql_round8_guards(gql_data, monkeypatch):
             q = (
                 s.query(DailyQueue)
                 .filter(
-                    DailyQueue.queue_tag == f"r8cap-{suffix}",
-                    DailyQueue.specialist_id == d["doctor"].id,
+                    DailyQueue.day == _queue_day(),
+                    DailyQueue.specialist_id == cap_doctor_id,
                 )
                 .first()
             )
@@ -1221,9 +1246,10 @@ def test_graphql_round8_guards(gql_data, monkeypatch):
             assert q.max_online_entries == 7  # doctor.max_online_per_day
     finally:
         with S() as s:
-            d["doctor"].max_online_per_day = 15
-            s.merge(d["doctor"])
-            s.commit()
+            doc = s.query(Round8Doctor).filter(Round8Doctor.id == cap_doctor_id).first()
+            if doc is not None:
+                doc.max_online_per_day = 15
+                s.commit()
 
     # --- 4) createVisit пишет CREATE критичный аудит (как канонический
     # /visits writer)
@@ -1679,29 +1705,52 @@ def test_graphql_round13(gql_data, monkeypatch):
 
     # --- 3) joinQueue: пустая очередь врача со start_number_online=3
     # начинает с билета #3 (не #1), следующая — #4
-    second_patient = None
-    original_start = d["doctor"].start_number_online
-    try:
-        with S() as s:
-            second_patient = PatientModel(
-                last_name=f"SYNTHETIC-Petrov-{suffix}",
-                first_name="SYNTHETIC",
-                middle_name="SYNTHETIC",
-                phone=f"DEV-DEMO-{suffix}-2",
-                email=f"synthetic-{suffix}-2@example.com",
-            )
-            s.add(second_patient)
-            d["doctor"].start_number_online = 3
-            s.merge(d["doctor"])
-            s.commit()
+    # Workstream A (per-doctor single queue): очередь d["doctor"] уже
+    # открыта ранними шагами раунда — tagged-join переиспользует её, и
+    # start_number_online применяется ТОЛЬКО при создании очереди дня.
+    # Проверка стартового номера требует врача БЕЗ очереди — первого
+    # writer'а дня.
+    from app.models.clinic import Doctor as Round13Doctor
+    from app.models.user import User as Round13User
 
+    second_patient = None
+    with S() as s:
+        second_patient = PatientModel(
+            last_name=f"SYNTHETIC-Petrov-{suffix}",
+            first_name="SYNTHETIC",
+            middle_name="SYNTHETIC",
+            phone=f"DEV-DEMO-{suffix}-2",
+            email=f"synthetic-{suffix}-2@example.com",
+        )
+        s.add(second_patient)
+        start_user = Round13User(
+            username=f"synthetic-gql-r13d-{suffix}",
+            full_name=f"R13 Start {suffix}",
+            email=f"synthetic-gql-r13d-{suffix}@t.local",
+            hashed_password="x",
+            role="Doctor",
+            is_active=True,
+        )
+        s.add(start_user)
+        s.flush()
+        start_doctor = Round13Doctor(
+            user_id=start_user.id,
+            specialty="Cardiology",
+            active=True,
+            start_number_online=3,
+        )
+        s.add(start_doctor)
+        s.commit()
+        start_doctor_id = start_doctor.id
+
+    try:
         data = _execute(
             """mutation($input: QueueEntryInput!) { joinQueue(input: $input) {
             success message queueEntry { id number } } }""",
             {
                 "input": {
                     "patientId": d["patient"].id,
-                    "doctorId": d["doctor"].id,
+                    "doctorId": start_doctor_id,
                     "queueTag": f"r13d-{suffix}",
                 }
             },
@@ -1716,7 +1765,7 @@ def test_graphql_round13(gql_data, monkeypatch):
             {
                 "input": {
                     "patientId": second_patient.id,
-                    "doctorId": d["doctor"].id,
+                    "doctorId": start_doctor_id,
                     "queueTag": f"r13d-{suffix}",
                 }
             },
@@ -1726,9 +1775,13 @@ def test_graphql_round13(gql_data, monkeypatch):
         assert join["queueEntry"]["number"] == 4, join
     finally:
         with S() as s:
-            doc = s.query(Doctor).filter(Doctor.id == d["doctor"].id).first()
+            doc = (
+                s.query(Round13Doctor)
+                .filter(Round13Doctor.id == start_doctor_id)
+                .first()
+            )
             if doc is not None:
-                doc.start_number_online = original_start
+                doc.start_number_online = 1
                 s.commit()
 
 
@@ -1952,12 +2005,17 @@ def test_graphql_round15(gql_data, monkeypatch, caplog):
     join = data["joinQueue"]
     assert join["success"] is False, join
     assert join["errors"] == ["DOCTOR_INACTIVE"], join
+    # Workstream A (per-doctor single queue): tagged-join резолвится в
+    # единую очередь ВРАЧА дня (тег — routing-метаданные, отдельной
+    # tagged-очереди не создаётся). В очереди врача остаётся РОВНО
+    # предсуществующий талон fixture (№1, waiting) — НОВЫЙ талон
+    # недоступному врачу не выдан.
     with S() as s:
         queue_id = (
             s.query(DailyQueue)
             .filter(
                 DailyQueue.day == _queue_day(),
-                DailyQueue.queue_tag == f"r15a-{suffix}",
+                DailyQueue.specialist_id == d["doctor"].id,
             )
             .first()
             .id
@@ -1966,8 +2024,8 @@ def test_graphql_round15(gql_data, monkeypatch, caplog):
             s.query(OnlineQueueEntry)
             .filter(OnlineQueueEntry.queue_id == queue_id)
             .count()
-            == 0
-        ), "талон недоступному врачу выдан не должен быть"
+            == 1
+        ), "талон недоступному врачу выдан не должен быть (осталась только предсуществующая запись fixture)"
 
     # --- 2) callNext: отказ пост-коммит аудита сохраняет success
     def _raiser(**kwargs):

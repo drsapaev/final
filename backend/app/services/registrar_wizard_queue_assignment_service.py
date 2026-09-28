@@ -381,15 +381,21 @@ class RegistrarWizardQueueAssignmentService:
         # attached to a doctor visit still lands in the lab resource
         # queue), and doctorless visits keep the per-tag passes unchanged.
         doctor_entry_service_tags: set[str] | None = None
-        if visit.doctor_id is not None:
+        doctor_pass_tag: str | None = None
+        # getattr: юнит-тесты гоняют seam на duck-typed визитах (_FakeVisit/
+        # SimpleNamespace) без ORM-атрибутов — отсутствие doctor_id значит
+        # «врачебная ось не определена», пер-тег проход остаётся прежним.
+        visit_doctor_id = getattr(visit, "doctor_id", None)
+        if visit_doctor_id is not None:
             doctor_axis_tags, resource_axis_tags = self._split_visit_tags_by_axis(
                 visit, unique_queue_tags, target_day
             )
             ordered_queue_tags = []
             if doctor_axis_tags:
-                ordered_queue_tags.append(
-                    self._primary_doctor_visit_tag(visit, doctor_axis_tags)
+                doctor_pass_tag = self._primary_doctor_visit_tag(
+                    visit, doctor_axis_tags
                 )
+                ordered_queue_tags.append(doctor_pass_tag)
                 doctor_entry_service_tags = set(doctor_axis_tags)
             ordered_queue_tags.extend(sorted(resource_axis_tags))
         else:
@@ -433,13 +439,31 @@ class RegistrarWizardQueueAssignmentService:
         # детерминирован для воспроизводимости материала корзины.
         for queue_tag in ordered_queue_tags:
             try:
-                prepared_assignment = assignment_service.prepare_wizard_queue_assignment(
-                    visit,
-                    queue_tag,
-                    target_day,
-                    source=source,
-                    entry_service_tags=doctor_entry_service_tags,
-                )
+                # Ключевое слово единой записи передается ТОЛЬКО в единый
+                # врачебный проход: ресурсные теги того же визита и все
+                # doctorless-проходы получают байт-идентичный прежний вызов
+                # (совместимость с подклассами/заглушками
+                # prepare_wizard_queue_assignment и корректная
+                # тег-фильтрация состава ресурсных записей).
+                if doctor_pass_tag is not None and queue_tag == doctor_pass_tag:
+                    prepared_assignment = (
+                        assignment_service.prepare_wizard_queue_assignment(
+                            visit,
+                            queue_tag,
+                            target_day,
+                            source=source,
+                            entry_service_tags=doctor_entry_service_tags,
+                        )
+                    )
+                else:
+                    prepared_assignment = (
+                        assignment_service.prepare_wizard_queue_assignment(
+                            visit,
+                            queue_tag,
+                            target_day,
+                            source=source,
+                        )
+                    )
                 if (
                     prepared_assignment is not None
                     and prepared_assignment.reused_entry_binding is not None

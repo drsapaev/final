@@ -247,7 +247,7 @@ def test_registrar_wizard_characterization_reuses_existing_same_queue_row(
 
 @pytest.mark.integration
 @pytest.mark.queue
-def test_registrar_wizard_characterization_same_specialist_different_queue_tags_create_multiple_rows(
+def test_registrar_wizard_characterization_same_specialist_different_queue_tags_share_one_doctor_queue(
     client,
     db_session,
     registrar_auth_headers,
@@ -255,6 +255,18 @@ def test_registrar_wizard_characterization_same_specialist_different_queue_tags_
     test_doctor,
     test_service,
 ):
+    """Workstream A (registrar doctor-services plan, Task 4) — обновлённый пин.
+
+    Прежний characterization («same_specialist_different_queue_tags_create_
+    multiple_rows») фиксировал раскол одного бронирования врача на записи
+    по тегам: консультация «cardiology_common» + диагностика
+    «cardiology_diagnostics» давали 2 очереди/2 записи/2 номера — пациент
+    сидел в worklist врача дважды. Канонический контракт плана меняет
+    поведение осознанно: услуги одного врача в одном бронировании делят
+    ЕДИНУЮ очередь владельца-врача — одна запись, один номер; routing-тег
+    записи = тег консультации (причина визита), собственные коды услуг
+    сохраняются в payload записи.
+    """
     diagnostics_service = _create_service(
         db_session,
         code="WIZ-DIAG-01",
@@ -296,17 +308,31 @@ def test_registrar_wizard_characterization_same_specialist_different_queue_tags_
         .filter(OnlineQueueEntry.visit_id == visit_id)
         .all()
     )
-    assert len(visit_entries) == 2
-    assert len(payload["queue_numbers"][str(visit_id)]) == 2
+    assert (
+        len(visit_entries) == 1
+    ), "услуги одного врача в одном бронировании — ОДНА запись очереди (один номер)"
+    assert len(payload["queue_numbers"][str(visit_id)]) == 1
 
-    queue_tags = {
+    entry = visit_entries[0]
+    queue = db_session.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).one()
+    assert (
+        queue.specialist_id == test_doctor.id
+    ), "очередь принадлежит врачу, тег — routing-метаданные записи"
+    assert (
+        queue.queue_tag == "cardiology_common"
+    ), "routing-тег единой записи — тег консультации (причины визита)"
+    doctor_queues = (
         db_session.query(DailyQueue)
-        .filter(DailyQueue.id == entry.queue_id)
-        .one()
-        .queue_tag
-        for entry in visit_entries
-    }
-    assert queue_tags == {"cardiology_common", "cardiology_diagnostics"}
+        .filter(
+            DailyQueue.day == date.today(),
+            DailyQueue.specialist_id == test_doctor.id,
+            DailyQueue.active.is_(True),
+        )
+        .all()
+    )
+    assert (
+        len(doctor_queues) == 1
+    ), "у врача ОДНА активная очередь дня — теги не раскалывают его ось"
 
 
 @pytest.mark.integration
@@ -457,9 +483,7 @@ def test_registrar_wizard_rejects_duplicate_same_day_resource_queue_visits_befor
                     "doctor_id": None,
                     "visit_date": date.today().isoformat(),
                     "department": "procedures",
-                    "services": [
-                        {"service_id": second_service.id, "quantity": 1}
-                    ],
+                    "services": [{"service_id": second_service.id, "quantity": 1}],
                 },
             ],
         ),
@@ -483,9 +507,7 @@ def test_registrar_wizard_rejects_duplicate_same_day_resource_queue_visits_befor
         == before["invoices"]
     )
     assert (
-        db_session.query(DailyQueue)
-        .filter(DailyQueue.queue_tag == queue_tag)
-        .count()
+        db_session.query(DailyQueue).filter(DailyQueue.queue_tag == queue_tag).count()
         == before["queues"]
     )
     assert (

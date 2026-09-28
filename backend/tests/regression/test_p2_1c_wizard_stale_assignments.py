@@ -17,6 +17,7 @@ Contract (consistent with P2-1b):
 Run:
     pytest backend/tests/regression/test_p2_1c_wizard_stale_assignments.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -41,15 +42,35 @@ os.environ.setdefault("TESTING", "1")
 
 from app.db.base_class import Base  # noqa: E402
 from app.models import (  # noqa: F401
-    audit, appointment, clinic, emr_v2, lab, online_queue,
-    payment, payment_invoice, payment_webhook, patient, user, visit,
+    audit,
+    appointment,
+    clinic,
+    emr_v2,
+    lab,
+    online_queue,
+    payment,
+    payment_invoice,
+    payment_webhook,
+    patient,
+    user,
+    visit,
 )
 from app.models import (  # noqa: F401
-    authentication, billing, department, emr, file_system,
-    role_permission, schedule, user_profile,
+    authentication,
+    billing,
+    department,
+    emr,
+    file_system,
+    role_permission,
+    schedule,
+    user_profile,
 )
 from app.models.clinic import Doctor  # noqa: E402
-from app.models.online_queue import DailyQueue, OnlineQueueEntry  # noqa: E402
+from app.models.online_queue import (
+    DailyQueue,
+    OnlineQueueEntry,
+    QueueResource,
+)  # noqa: E402
 from app.models.patient import Patient  # noqa: E402
 from app.models.service import Service  # noqa: E402
 from app.models.user import User  # noqa: E402
@@ -69,11 +90,13 @@ def db_engine():
         echo=False,
         connect_args={"check_same_thread": False},
     )
+
     @event.listens_for(engine, "connect")
     def _enable_fk(dbapi_conn, _):  # noqa: ANN001
         cur = dbapi_conn.cursor()
         cur.execute("PRAGMA foreign_keys=ON")
         cur.close()
+
     Base.metadata.create_all(engine)
     yield engine
     Base.metadata.drop_all(engine)
@@ -85,8 +108,10 @@ def db_engine():
 @pytest.fixture
 def session_factory(db_engine):
     Session = sessionmaker(bind=db_engine, autoflush=False, autocommit=False)
+
     def _create():
         return Session()
+
     return _create
 
 
@@ -94,22 +119,43 @@ def session_factory(db_engine):
 def clean_db(db_engine):
     with db_engine.connect() as conn:
         for table in [
-            "queue_entries", "visit_services", "visits",
-            "daily_queues", "services", "doctors", "patients", "users",
+            "queue_entries",
+            "visit_services",
+            "visits",
+            "daily_queues",
+            "services",
+            "doctors",
+            "patients",
+            "users",
         ]:
             conn.execute(__import__("sqlalchemy").text(f"DELETE FROM {table}"))
         conn.commit()
 
 
 def _setup_visit_with_three_tags(session):
-    """Create a visit with 3 services (A, B, C), each with a different queue_tag
-    and a corresponding DailyQueue. Returns (visit_id, [tag_a, tag_b, tag_c]).
+    """Create a mixed-axis visit (Workstream A contract): A = the doctor's
+    consultation tag (doctor axis — ONE entry for the whole doctor booking),
+    B and C = registry resource tags (per-tag entries). Returns
+    (visit_id, [tag_a, tag_b, tag_c]).
+
+    Прежний мир (три врач-тега) фиксировал пер-тег итерацию врачебного
+    визита; контракт единой очереди врача (registrar doctor-services plan)
+    слил врач-ось в ОДИН проход. Регрессионный сценарий «A succeeds →
+    B fails → C not attempted» жив для смешанного визита: врач-проход A
+    succeeds, ресурсный проход B падает, ресурсный проход C не
+    выполняется — компенсация идентична.
     """
     unique = uuid.uuid4().hex[:8]
     doctor_user = User(
-        username=f"doctor_{unique}", full_name="Dr", email=f"d_{unique}@t.local",
-        hashed_password="x", role="Doctor", is_active=True, is_superuser=False,
-        must_change_password=False, created_at=datetime.now(UTC),
+        username=f"doctor_{unique}",
+        full_name="Dr",
+        email=f"d_{unique}@t.local",
+        hashed_password="x",
+        role="Doctor",
+        is_active=True,
+        is_superuser=False,
+        must_change_password=False,
+        created_at=datetime.now(UTC),
     )
     session.add(doctor_user)
     session.flush()
@@ -117,9 +163,14 @@ def _setup_visit_with_three_tags(session):
     session.add(doctor)
     session.flush()
     patient = Patient(
-        last_name="P", first_name="Patient", birth_date=date(1990, 1, 1),
-        sex="M", phone="+998900000000", email=f"p_{unique}@t.local",
-        created_at=datetime.now(UTC), is_deleted=False,
+        last_name="P",
+        first_name="Patient",
+        birth_date=date(1990, 1, 1),
+        sex="M",
+        phone="+998900000000",
+        email=f"p_{unique}@t.local",
+        created_at=datetime.now(UTC),
+        is_deleted=False,
     )
     session.add(patient)
     session.flush()
@@ -129,32 +180,82 @@ def _setup_visit_with_three_tags(session):
     for label in ["a", "b", "c"]:
         tag = f"tag_{label}_{unique}"
         tags.append(tag)
-        svc = Service(
-            code=f"SVC_{label}_{unique}", name=f"Service {label}", price=10000,
-            duration_minutes=30, active=True, requires_doctor=True,
-            queue_tag=tag, is_consultation=True,
-            allow_doctor_price_override=False,
-        )
-        services.append(svc)
-        session.add(svc)
-        session.flush()
-        q = DailyQueue(day=date.today(), specialist_id=doctor_user.id,
-                       queue_tag=tag, active=True)
-        session.add(q)
+        if label == "a":
+            # Doctor axis: the visit's consultation (single doctor entry).
+            svc = Service(
+                code=f"SVC_{label}_{unique}",
+                name=f"Service {label}",
+                price=10000,
+                duration_minutes=30,
+                active=True,
+                requires_doctor=True,
+                queue_tag=tag,
+                is_consultation=True,
+                allow_doctor_price_override=False,
+            )
+            services.append(svc)
+            session.add(svc)
+            session.flush()
+            session.add(
+                DailyQueue(
+                    day=date.today(),
+                    specialist_id=doctor.id,
+                    queue_tag=tag,
+                    active=True,
+                )
+            )
+        else:
+            # Resource axis: registry tags keep per-tag entries.
+            svc = Service(
+                code=f"SVC_{label}_{unique}",
+                name=f"Service {label}",
+                price=10000,
+                duration_minutes=30,
+                active=True,
+                requires_doctor=False,
+                queue_tag=tag,
+                is_consultation=False,
+                allow_doctor_price_override=False,
+            )
+            services.append(svc)
+            session.add(svc)
+            session.flush()
+            session.add(
+                QueueResource(
+                    code=f"RES_{label}_{unique}",
+                    queue_tag=tag,
+                    display_name=f"Resource {label}",
+                    active=True,
+                )
+            )
     session.flush()
 
     visit = Visit(
-        patient_id=patient.id, doctor_id=doctor.id, status="confirmed",
-        visit_date=date.today(), visit_time="10:00", discount_mode="none",
-        department="cardiology", confirmation_token=f"tok-{unique}",
-        confirmation_channel="telegram", confirmed_at=datetime.now(UTC),
-        confirmation_expires_at=datetime.now(UTC), created_at=datetime.now(UTC),
+        patient_id=patient.id,
+        doctor_id=doctor.id,
+        status="confirmed",
+        visit_date=date.today(),
+        visit_time="10:00",
+        discount_mode="none",
+        department="cardiology",
+        confirmation_token=f"tok-{unique}",
+        confirmation_channel="telegram",
+        confirmed_at=datetime.now(UTC),
+        confirmation_expires_at=datetime.now(UTC),
+        created_at=datetime.now(UTC),
     )
     session.add(visit)
     session.flush()
     for svc in services:
-        vs = VisitService(visit_id=visit.id, service_id=svc.id, code=svc.code,
-                          name=svc.name, qty=1, price=svc.price, currency="UZS")
+        vs = VisitService(
+            visit_id=visit.id,
+            service_id=svc.id,
+            code=svc.code,
+            name=svc.name,
+            qty=1,
+            price=svc.price,
+            currency="UZS",
+        )
         session.add(vs)
     session.commit()
     return visit.id, tags
@@ -210,9 +311,7 @@ class TestP21cStaleDataFix:
         visit NOT activated (status stays 'confirmed')
     """
 
-    def test_failure_clears_stale_queue_assignments(
-        self, session_factory, clean_db
-    ):
+    def test_failure_clears_stale_queue_assignments(self, session_factory, clean_db):
         """REGRESSION: when tag B fails, queue_assignments must NOT contain
         stale dicts for tag A.
 
@@ -230,6 +329,7 @@ class TestP21cStaleDataFix:
 
         visit = session.query(Visit).filter(Visit.id == visit_id).first()
         from app.services.morning_assignment import MorningAssignmentService
+
         morning_service = MorningAssignmentService(session)
 
         queue_assignments = service._assign_same_day_queues_for_visit(
@@ -243,9 +343,7 @@ class TestP21cStaleDataFix:
             f"queue_assignments contains stale dicts for entries that were rolled back."
         )
 
-    def test_failure_visit_not_activated(
-        self, session_factory, clean_db
-    ):
+    def test_failure_visit_not_activated(self, session_factory, clean_db):
         """INVARIANT: when queue_assignments is empty after failure, the visit
         must NOT be activated (stays 'confirmed').
 
@@ -263,6 +361,7 @@ class TestP21cStaleDataFix:
 
         visit = session.query(Visit).filter(Visit.id == visit_id).first()
         from app.services.morning_assignment import MorningAssignmentService
+
         morning_service = MorningAssignmentService(session)
 
         # Call the top-level method that checks queue_assignments and
@@ -289,9 +388,7 @@ class TestP21cStaleDataFix:
         finally:
             verify.close()
 
-    def test_failure_no_db_entries_after_rollback(
-        self, session_factory, clean_db
-    ):
+    def test_failure_no_db_entries_after_rollback(self, session_factory, clean_db):
         """REGRESSION: after failure + rollback, DB must have 0 queue entries
         for this visit (rolled back entries are not persisted).
         """
@@ -305,6 +402,7 @@ class TestP21cStaleDataFix:
 
         visit = session.query(Visit).filter(Visit.id == visit_id).first()
         from app.services.morning_assignment import MorningAssignmentService
+
         morning_service = MorningAssignmentService(session)
 
         service._assign_same_day_queues_for_visit(
@@ -315,12 +413,14 @@ class TestP21cStaleDataFix:
 
         verify = session_factory()
         try:
-            entries = verify.query(OnlineQueueEntry).filter(
-                OnlineQueueEntry.visit_id == visit_id
-            ).all()
-            assert len(entries) == 0, (
-                f"Expected 0 DB entries (all rolled back), got {len(entries)}"
+            entries = (
+                verify.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.visit_id == visit_id)
+                .all()
             )
+            assert (
+                len(entries) == 0
+            ), f"Expected 0 DB entries (all rolled back), got {len(entries)}"
         finally:
             verify.close()
 
@@ -349,6 +449,7 @@ class TestP21cStaleDataFix:
 
         visit = session.query(Visit).filter(Visit.id == visit_id).first()
         from app.services.morning_assignment import MorningAssignmentService
+
         morning_service = MorningAssignmentService(session)
 
         # Simulate the cart transaction: a second visit staged (flushed,
@@ -383,18 +484,18 @@ class TestP21cStaleDataFix:
                 "cart visit (full-session rollback) — endpoint would return 200 "
                 "with phantom visit IDs. Savepoint must protect the cart."
             )
-            entries = verify.query(OnlineQueueEntry).filter(
-                OnlineQueueEntry.visit_id == visit_id
-            ).all()
-            assert len(entries) == 0, (
-                f"Expected 0 queue entries for the failed visit, got {len(entries)}"
+            entries = (
+                verify.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.visit_id == visit_id)
+                .all()
             )
+            assert (
+                len(entries) == 0
+            ), f"Expected 0 queue entries for the failed visit, got {len(entries)}"
         finally:
             verify.close()
 
-    def test_all_tags_succeed_normal_operation(
-        self, session_factory, clean_db
-    ):
+    def test_all_tags_succeed_normal_operation(self, session_factory, clean_db):
         """NON-REGRESSION: when all tags succeed, all entries are created."""
         setup = session_factory()
         visit_id, tags = _setup_visit_with_three_tags(setup)
@@ -405,6 +506,7 @@ class TestP21cStaleDataFix:
         visit = session.query(Visit).filter(Visit.id == visit_id).first()
 
         from app.services.morning_assignment import MorningAssignmentService
+
         morning_service = MorningAssignmentService(session)
 
         queue_assignments = service._assign_same_day_queues_for_visit(
@@ -413,24 +515,22 @@ class TestP21cStaleDataFix:
         session.commit()
         session.close()
 
-        assert len(queue_assignments) == 3, (
-            f"Expected 3 assignments (all tags succeeded), got {len(queue_assignments)}"
-        )
+        assert (
+            len(queue_assignments) == 3
+        ), f"Expected 3 assignments (all tags succeeded), got {len(queue_assignments)}"
 
         verify = session_factory()
         try:
-            entries = verify.query(OnlineQueueEntry).filter(
-                OnlineQueueEntry.visit_id == visit_id
-            ).all()
-            assert len(entries) == 3, (
-                f"Expected 3 DB entries, got {len(entries)}"
+            entries = (
+                verify.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.visit_id == visit_id)
+                .all()
             )
+            assert len(entries) == 3, f"Expected 3 DB entries, got {len(entries)}"
         finally:
             verify.close()
 
-    def test_queue_assignments_match_db_on_success(
-        self, session_factory, clean_db
-    ):
+    def test_queue_assignments_match_db_on_success(self, session_factory, clean_db):
         """INVARIANT: on success, queue_assignments count == DB entry count."""
         setup = session_factory()
         visit_id, tags = _setup_visit_with_three_tags(setup)
@@ -441,6 +541,7 @@ class TestP21cStaleDataFix:
         visit = session.query(Visit).filter(Visit.id == visit_id).first()
 
         from app.services.morning_assignment import MorningAssignmentService
+
         morning_service = MorningAssignmentService(session)
 
         queue_assignments = service._assign_same_day_queues_for_visit(
@@ -451,12 +552,14 @@ class TestP21cStaleDataFix:
 
         verify = session_factory()
         try:
-            entries = verify.query(OnlineQueueEntry).filter(
-                OnlineQueueEntry.visit_id == visit_id
-            ).all()
-            assert len(queue_assignments) == len(entries), (
-                f"queue_assignments ({len(queue_assignments)}) != DB entries ({len(entries)})"
+            entries = (
+                verify.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.visit_id == visit_id)
+                .all()
             )
+            assert len(queue_assignments) == len(
+                entries
+            ), f"queue_assignments ({len(queue_assignments)}) != DB entries ({len(entries)})"
         finally:
             verify.close()
 
@@ -494,17 +597,19 @@ class TestP21cStaleDataFix:
         verify = session_factory()
         try:
             db_visit = verify.query(Visit).filter(Visit.id == visit_id).first()
-            entries = verify.query(OnlineQueueEntry).filter(
-                OnlineQueueEntry.visit_id == visit_id
-            ).all()
+            entries = (
+                verify.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.visit_id == visit_id)
+                .all()
+            )
 
             assert db_visit.status == "confirmed", (
                 f"Visit should remain 'confirmed' after failed assignment + commit. "
                 f"Got: {db_visit.status}"
             )
-            assert len(entries) == 0, (
-                f"Expected 0 DB entries after rollback + commit, got {len(entries)}"
-            )
+            assert (
+                len(entries) == 0
+            ), f"Expected 0 DB entries after rollback + commit, got {len(entries)}"
         finally:
             verify.close()
 
@@ -564,7 +669,9 @@ class TestCodexR3CartTransactionIntegrity:
 
             def failing_flush(*args, **kwargs):
                 if state["armed"]:
-                    raise IntegrityError("simulated unique violation", None, Exception("dup"))
+                    raise IntegrityError(
+                        "simulated unique violation", None, Exception("dup")
+                    )
                 return real_flush(*args, **kwargs)
 
             def spying_rollback(*args, **kwargs):
@@ -573,12 +680,34 @@ class TestCodexR3CartTransactionIntegrity:
 
             session.flush = failing_flush  # type: ignore[method-assign]
             session.rollback = spying_rollback  # type: ignore[method-assign]
+            # Workstream A (per-doctor single queue): a doctor who already
+            # owns an active queue of the day gets it REUSED without an
+            # INSERT (tag-spelling convergence). The flush-failure arm needs
+            # a doctor with NO day-queue yet — the insert path still exists
+            # for the day's first writer.
+            fresh_user = User(
+                username=f"doctor_x_{uuid.uuid4().hex[:8]}",
+                full_name="Dr X",
+                hashed_password="x",
+                role="Doctor",
+                is_active=True,
+                is_superuser=False,
+                must_change_password=False,
+                created_at=datetime.now(UTC),
+            )
+            session.add(fresh_user)
+            session.flush()
+            fresh_doctor = Doctor(
+                user_id=fresh_user.id, specialty="Cardiology", active=True
+            )
+            session.add(fresh_doctor)
+            session.flush()
             state["armed"] = True
             with pytest.raises(IntegrityError):
                 queue_service.get_or_create_daily_queue(
                     session,
                     day=date.today(),
-                    specialist_id=committed_visit.doctor_id,
+                    specialist_id=fresh_doctor.id,
                     queue_tag=f"tag_x_{uuid.uuid4().hex[:8]}",
                 )
             state["armed"] = False
@@ -640,11 +769,22 @@ class TestCodexR3CartTransactionIntegrity:
             )
             session.add(staged_visit)
             session.flush()
-            for vs in session.query(VisitService).filter(VisitService.visit_id == visit_id).all():
-                session.add(VisitService(
-                    visit_id=staged_visit.id, service_id=vs.service_id, code=vs.code,
-                    name=vs.name, qty=vs.qty, price=vs.price, currency=vs.currency,
-                ))
+            for vs in (
+                session.query(VisitService)
+                .filter(VisitService.visit_id == visit_id)
+                .all()
+            ):
+                session.add(
+                    VisitService(
+                        visit_id=staged_visit.id,
+                        service_id=vs.service_id,
+                        code=vs.code,
+                        name=vs.name,
+                        qty=vs.qty,
+                        price=vs.price,
+                        currency=vs.currency,
+                    )
+                )
             session.flush()
             staged_visit_id = staged_visit.id
 
@@ -655,21 +795,27 @@ class TestCodexR3CartTransactionIntegrity:
                     if tags[1] in prepared_assignment.create_handoff.queue_tag:
                         # Legacy deep-helper poison: full session rollback
                         session.rollback()
-                        raise ValueError("INJECTED: deep helper performed a full rollback")
+                        raise ValueError(
+                            "INJECTED: deep helper performed a full rollback"
+                        )
                 return original(prepared_assignment)
 
             service._materialize_prepared_assignment = poisoned
 
             # Перезагружаем визит в этой сессии по id (объект после flush
             # валиден; id нужен фиксированный для belt-check запроса)
-            staged_in_session = session.query(Visit).filter(Visit.id == staged_visit_id).first()
+            staged_in_session = (
+                session.query(Visit).filter(Visit.id == staged_visit_id).first()
+            )
             with pytest.raises(Exception) as exc_info:
                 service._assign_same_day_queues_for_visit(
                     morning_service, staged_in_session, date.today(), source="desk"
                 )
             assert not isinstance(exc_info.value, AssertionError)
-            assert "INJECTED" in str(exc_info.value) or "no such savepoint" in str(exc_info.value) or isinstance(
-                exc_info.value, ValueError
+            assert (
+                "INJECTED" in str(exc_info.value)
+                or "no such savepoint" in str(exc_info.value)
+                or isinstance(exc_info.value, ValueError)
             ), f"expected the loud failure, got: {exc_info.value!r}"
         finally:
             session.close()
