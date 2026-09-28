@@ -1029,3 +1029,98 @@ class TestDermaP3CanonicalKey:
         assert payload["items"] == []
         assert payload["total"] == 0
         assert payload["pages"] == 0
+
+    def test_fingerprint_normalization_boundary_whitespace_vs_content(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """Contract boundary of the fingerprint normalization (review P3
+        follow-up): entries differing from a canonical one ONLY by
+        leading/trailing whitespace are deduplicated (the approved
+        whitespace-insensitive policy), while any change of the internal
+        text keeps the row visible. Normalization is NOT extended to
+        letter case or punctuation: those are clinically meaningful
+        differences and must surface as separate rows until a separate
+        product decision says otherwise."""
+        visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        today = date.today().isoformat()
+        canonical_entry = {
+            "procedure_date": today,
+            "procedure_type": "Мезотерапия",
+            "area_treated": "Лицо",
+            "products_used": "HA gel",
+            "results": "Гиперемия слабая",
+            "follow_up": "Контроль 14 дней",
+        }
+        emr = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "cosmetic_procedures": [
+                        canonical_entry,  # canonical[0]: entry A
+                        {  # canonical[1]: entry B (distinct, keeps A non-trivial)
+                            "procedure_date": today,
+                            "procedure_type": "Чистка",
+                            "area_treated": "Лоб",
+                        },
+                    ],
+                    "procedures": [
+                        {  # legacy[0]: edge-whitespace-only variant of A -> dedup
+                            "procedure_date": f"  {today}  ",
+                            "procedure_type": "  Мезотерапия ",
+                            "area_treated": " Лицо ",
+                            "products_used": " HA gel  ",
+                            "results": "  Гиперемия слабая   ",
+                            "follow_up": " Контроль 14 дней ",
+                        },
+                        {  # legacy[1]: INTERNAL text change -> NOT merged
+                            **canonical_entry,
+                            "results": "Гиперемия выраженная",
+                        },
+                        {  # legacy[2]: letter-case change -> NOT merged (no case folding)
+                            **canonical_entry,
+                            "procedure_type": "мезотерапия",
+                        },
+                        {  # legacy[3]: punctuation change -> NOT merged (no punctuation folding)
+                            **canonical_entry,
+                            "follow_up": "Контроль 14 дней.",
+                        },
+                    ],
+                },
+            },
+        )
+
+        response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=50",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        # A + B + legacy[1..3]; the edge-whitespace variant of A is deduplicated.
+        assert payload["total"] == 5
+        row_ids = {item["id"] for item in payload["items"]}
+        assert row_ids == {
+            f"emr-{emr.id}-0",  # canonical A
+            f"emr-{emr.id}-1",  # canonical B
+            f"emr-{emr.id}-legacy-1",  # internal text change stays visible
+            f"emr-{emr.id}-legacy-2",  # case change stays visible
+            f"emr-{emr.id}-legacy-3",  # punctuation change stays visible
+        }
+        assert f"emr-{emr.id}-legacy-0" not in row_ids
+        # Case is preserved verbatim in the projection: both spellings appear.
+        types = [item["procedure_type"] for item in payload["items"]]
+        assert types.count("Мезотерапия") == 3  # A + legacy internal-text row + legacy punctuation row
+        assert types.count("мезотерапия") == 1  # lowercase row is NOT folded away
+        # The internal text change is readable in the merged row itself.
+        by_id = {item["id"]: item for item in payload["items"]}
+        assert by_id[f"emr-{emr.id}-legacy-1"]["results"] == "Гиперемия выраженная"
+        assert by_id[f"emr-{emr.id}-legacy-3"]["follow_up"] == "Контроль 14 дней."
