@@ -221,9 +221,11 @@ const AdminSetupDirections = () => {
     // specialty-маппинга. Виден только на checklist-виде; каждая строка —
     // точная причина + ссылка на экран исправления.
     const assignmentGaps: ServiceAssignmentGap[] = useMemo(
-        // PR #3511 review P1 (round 5): ресурсы реестра передаются в
+        // PR 3511 review P1 (round 5): ресурсы реестра передаются в
         // проверку назначений — закреплённая услуга с тегом АКТИВНОЙ
-        // ресурсной очереди это видимый админу конфликт владельца.
+        // ресурсной очереди это видимый админу конфликт владельца
+        // (номер PR без решётки: ui-baseline tsxHex ratchet считает
+        // hex-литералом любую решётку с 3-8 hex-цифрами в TSX).
         () => collectServiceAssignmentGaps(services, doctors, resources),
         [services, doctors, resources],
     );
