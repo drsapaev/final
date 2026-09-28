@@ -822,7 +822,12 @@ def test_alembic_chain_single_head_0063() -> None:
         "0073_execution_routing_snapshot",
     )
     assert len("0074_join_payload_binding") <= 32
-    assert heads == ["0074_join_payload_binding"]
+    # derma history read model (issue #3506, P2 retro-review of #3494)
+    assert graph["0075_derma_history_read_model"] == (
+        "0074_join_payload_binding",
+    )
+    assert len("0075_derma_history_read_model") <= 32
+    assert heads == ["0075_derma_history_read_model"]
 
 
 # ===================== D. parity + ADR =====================

@@ -169,9 +169,10 @@ def test_single_alembic_head(fresh_head_url):
     # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved to
     # 0072; main's corrective follow-up moved it to 0073 (routing
     # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
-    # as 0074 on top of it. This file still proves 0070's own links via
-    # the graph pins below.
-    assert "0074_join_payload_binding" in head_lines[0]
+    # as 0074 on top of it; #3506 derma history read model moves it to
+    # 0075. This file still proves 0070's own links via the graph pins
+    # below.
+    assert "0075_derma_history_read_model" in head_lines[0]
 
 
 @pytest.mark.integration
