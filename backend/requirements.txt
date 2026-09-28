@@ -1,6 +1,6 @@
 fastapi>=0.121,<0.142
 uvicorn[standard]>=0.29,<0.52
-pydantic>=2.7,<2.13
+pydantic>=2.7,<2.14
 pydantic-settings>=2.14.1,<2.15
 SQLAlchemy>=2.0,<2.1
 psycopg[binary]>=3.1,<4.0
@@ -14,7 +14,7 @@ email-validator>=2.0,<3.0  # email validation for schemas/user_management.py
 starlette>=0.40,<1.4  # directly imported in middleware/* (also transitive via FastAPI)
 reportlab>=4.0,<4.6
 qrcode[pil]>=7.4,<8.3
-pydantic[email]>=2.7,<2.13  # email validator extra (pins email-validator transitively)
+pydantic[email]>=2.7,<2.14  # email validator extra (pins email-validator transitively)
 # pyotp removed — code uses custom TOTP implementation (see services/two_factor_service.py)
 requests>=2.34.2,<3.0
 httpx>=0.25,<0.29
