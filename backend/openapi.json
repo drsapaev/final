@@ -48246,7 +48246,7 @@
           "derma"
         ],
         "summary": "Осмотры кожи (история: ЭМК + legacy)",
-        "description": "История осмотров кожи (review follow-up P2-4b).\n\nОбъединяет два read-only источника: осмотры из specialty_data ЭМК\n(emr/v2, specialty=dermatology, source=\"emr\") и строки закрытой\nlegacy-таблицы derma_examinations (source=\"legacy\"). Скоупинг\nпациентов идентичен прежнему контракту. Пагинация — канонический\nконверт page/size/total/pages (контракт GET /files): total точен по\nобоим источникам, без скрытых усечений.",
+        "description": "История осмотров кожи (issue #3506: read model).\n\nСлужит из производной таблицы derma_history_entries: та же проекция\n(осмотры из specialty_data ЭМК, source=\"emr\", и строки закрытой\nlegacy-таблицы derma_examinations, source=\"legacy\"), материализуемая\nпри записи, а не пересчитываемая в памяти на каждый запрос.\nСкоупинг пациентов идентичен прежнему контракту. Пагинация —\nканонический конверт page/size/total/pages (контракт GET /files):\ntotal точен по обоим источникам, без скрытых усечений.",
         "operationId": "get_skin_examinations_api_v1_derma_examinations_get",
         "security": [
           {
@@ -48371,7 +48371,7 @@
           "derma"
         ],
         "summary": "Косметические процедуры (история: ЭМК + legacy)",
-        "description": "История косметических процедур (review follow-up P2-4b).\n\nОбъединяет два read-only источника: процедуры из\nspecialty_data.cosmetic_procedures ЭМК (emr/v2, specialty=dermatology,\nsource=\"emr\", total_cost=None — цена не хранится в ЭМК) и строки закрытой\nlegacy-таблицы derma_procedures (source=\"legacy\"). Скоупинг пациентов\nидентичен прежнему контракту. Пагинация — канонический конверт\npage/size/total/pages (контракт GET /files): total точен по обоим\nисточникам, без скрытых усечений.",
+        "description": "История косметических процедур (issue #3506: read model).\n\nСлужит из производной таблицы derma_history_entries: та же проекция\n(процедуры из specialty_data.cosmetic_procedures ЭМК, source=\"emr\",\ntotal_cost=None — цена не хранится в ЭМК, и строки закрытой\nlegacy-таблицы derma_procedures, source=\"legacy\"), материализуемая\nпри записи, а не пересчитываемая в памяти на каждый запрос.\nСкоупинг пациентов идентичен прежнему контракту. Пагинация —\nканонический конверт page/size/total/pages (контракт GET /files):\ntotal точен по обоим источникам, без скрытых усечений.",
         "operationId": "get_cosmetic_procedures_api_v1_derma_procedures_get",
         "security": [
           {
