@@ -17,6 +17,8 @@ SAFETY:
   меняется и не удаляется; downgrade = drop table;
 - без FK (производный индекс: строки обслуживаются listener'ом синхронно с
   источниками в той же транзакции, RESTRICT источников уже защищает данные);
+- RLS включён (конвенция 0051, прецеденты 0058/0072) — CI RLS guard требует
+  relrowsecurity=true для всех public-таблиц после upgrade head;
 - backfill детерминирован: те же функции проекции, что обслуживают
   listener и эндпоинты (никакой эвристики — в отличие от прецедента 0070,
   где backfill был запрещён именно из-за эвристик);
@@ -140,9 +142,14 @@ def upgrade() -> None:
         unique=False,
     )
     _backfill(op.get_bind())
+    # RLS for the new public table — 0051 convention (0058/0072 precedent);
+    # the CI RLS guard (2026-09-02 Supabase incident) requires every public
+    # table to have relrowsecurity=true right after upgrade head.
+    op.execute("ALTER TABLE public.derma_history_entries ENABLE ROW LEVEL SECURITY")
 
 
 def downgrade() -> None:
+    op.execute("ALTER TABLE public.derma_history_entries DISABLE ROW LEVEL SECURITY")
     op.drop_index("ix_derma_history_kind_date", table_name=_TABLE)
     op.drop_index("ix_derma_history_kind_patient_date", table_name=_TABLE)
     op.drop_index("ix_derma_history_entries_patient_id", table_name=_TABLE)
