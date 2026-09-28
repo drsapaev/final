@@ -12,14 +12,33 @@ interface DermaHistoryTabProps {
   appointments?: DermatologyAppointmentHistoryItem[];
   skinExaminations?: DermatologySkinExamination[];
   cosmeticProcedures?: DermatologyCosmeticProcedure[];
+  /** Exact server-side history sizes (page envelope total) — the header
+   * counters show them so a truncated listing is always visible. */
+  skinExaminationsTotal?: number;
+  cosmeticProceduresTotal?: number;
+  hasMoreExaminations?: boolean;
+  hasMoreProcedures?: boolean;
+  loadingMoreExaminations?: boolean;
+  loadingMoreProcedures?: boolean;
+  onLoadMoreExaminations?: () => void;
+  onLoadMoreProcedures?: () => void;
 }
 
 export function DermaHistoryTab({
   appointments = [],
   skinExaminations = [],
   cosmeticProcedures = [],
+  skinExaminationsTotal = skinExaminations.length,
+  cosmeticProceduresTotal = cosmeticProcedures.length,
+  hasMoreExaminations = false,
+  hasMoreProcedures = false,
+  loadingMoreExaminations = false,
+  loadingMoreProcedures = false,
+  onLoadMoreExaminations,
+  onLoadMoreProcedures,
 }: DermaHistoryTabProps) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as (key: string, options?: Record<string, unknown>) => string;
 
   return (
     <div className="derma-flex-col-24">
@@ -61,21 +80,35 @@ export function DermaHistoryTab({
 
           <section>
             <h4 className="derma-h4-16-600">
-              {t('derma.derma_panel_patient_history_examinations')} ({skinExaminations.length})
+              {t('derma.derma_panel_patient_history_examinations')} ({skinExaminationsTotal})
             </h4>
             {skinExaminations.length > 0 ? (
-              <div className="derma-history-list-scroll">
-                {skinExaminations.map((exam) => (
-                  <article key={exam.id} className="derma-card-p12-bg2-13">
-                    <div className="derma-flex-between-top">
-                      <Badge variant="info">{exam.exam_date || exam.examination_date}</Badge>
-                      <span className="derma-p-14-secondary">
-                        {[exam.skin_type, exam.skin_condition].filter(Boolean).join(' · ')}
-                      </span>
-                    </div>
-                    {exam.diagnosis && <p className="derma-p-14-secondary">{exam.diagnosis}</p>}
-                  </article>
-                ))}
+              <div className="derma-flex-col-8">
+                <div className="derma-history-list-scroll">
+                  {skinExaminations.map((exam) => (
+                    <article key={exam.id} className="derma-card-p12-bg2-13">
+                      <div className="derma-flex-between-top">
+                        <Badge variant="info">{exam.exam_date || exam.examination_date}</Badge>
+                        <span className="derma-p-14-secondary">
+                          {[exam.skin_type, exam.skin_condition].filter(Boolean).join(' · ')}
+                        </span>
+                      </div>
+                      {exam.diagnosis && <p className="derma-p-14-secondary">{exam.diagnosis}</p>}
+                    </article>
+                  ))}
+                </div>
+                {hasMoreExaminations && (
+                  <button
+                    type="button"
+                    className="derma-history-load-more"
+                    onClick={onLoadMoreExaminations}
+                    disabled={loadingMoreExaminations}
+                  >
+                    {loadingMoreExaminations
+                      ? t('derma.derma_gallery_loading')
+                      : t('derma.derma_gallery_load_more')}
+                  </button>
+                )}
               </div>
             ) : (
               <div className="derma-p-24 derma-text-center derma-p-14-secondary">
@@ -86,22 +119,36 @@ export function DermaHistoryTab({
 
           <section>
             <h4 className="derma-h4-16-600">
-              {t('derma.derma_panel_patient_history_procedures')} ({cosmeticProcedures.length})
+              {t('derma.derma_panel_patient_history_procedures')} ({cosmeticProceduresTotal})
             </h4>
             {cosmeticProcedures.length > 0 ? (
-              <div className="derma-history-list-scroll">
-                {cosmeticProcedures.map((procedure) => (
-                  <article key={procedure.id} className="derma-card-p12-bg2-13">
-                    <div className="derma-flex-between-top">
-                      <Badge variant="info">{procedure.procedure_date}</Badge>
-                    </div>
-                    {procedure.procedure_type && (
-                      <p className="derma-p-14-secondary">
-                        {[procedure.procedure_type, procedure.area_treated].filter(Boolean).join(' · ')}
-                      </p>
-                    )}
-                  </article>
-                ))}
+              <div className="derma-flex-col-8">
+                <div className="derma-history-list-scroll">
+                  {cosmeticProcedures.map((procedure) => (
+                    <article key={procedure.id} className="derma-card-p12-bg2-13">
+                      <div className="derma-flex-between-top">
+                        <Badge variant="info">{procedure.procedure_date}</Badge>
+                      </div>
+                      {procedure.procedure_type && (
+                        <p className="derma-p-14-secondary">
+                          {[procedure.procedure_type, procedure.area_treated].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+                {hasMoreProcedures && (
+                  <button
+                    type="button"
+                    className="derma-history-load-more"
+                    onClick={onLoadMoreProcedures}
+                    disabled={loadingMoreProcedures}
+                  >
+                    {loadingMoreProcedures
+                      ? t('derma.derma_gallery_loading')
+                      : t('derma.derma_gallery_load_more')}
+                  </button>
+                )}
               </div>
             ) : (
               <div className="derma-p-24 derma-text-center derma-p-14-secondary">
