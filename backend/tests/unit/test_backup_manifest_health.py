@@ -106,6 +106,25 @@ def test_stale_threshold_is_26_hours():
     assert STALE_AFTER_HOURS == 26.0
 
 
+def test_age_is_in_hours_not_seconds(tmp_path: Path):
+    """Regression: age must be HOURS. Injected `now` 25h after completion
+    must be ok and 27h must be stale — with the age accidentally computed
+    in seconds both would read as >26 'hours' and the boundary would never
+    be distinguishable."""
+    payload_ts = datetime(2026, 9, 20, 12, 0, 0, tzinfo=timezone.utc).timestamp()
+    _write_manifest(
+        tmp_path,
+        completed_at_utc=datetime.fromtimestamp(payload_ts, tz=timezone.utc).isoformat(),
+    )
+    _write_archive(tmp_path, "local_prod_schema_public_x.dump.enc")
+    ok_check = read_backup_check(tmp_path, now=payload_ts + 25 * 3600)
+    stale_check = read_backup_check(tmp_path, now=payload_ts + 27 * 3600)
+    assert ok_check["status"] == "ok", f"25h must be ok, age_hours={ok_check['age_hours']}"
+    assert ok_check["age_hours"] == 25.0
+    assert stale_check["status"] == "stale"
+    assert stale_check["age_hours"] == 27.0
+
+
 def test_real_sha256_roundtrip(tmp_path: Path):
     payload = bytes(range(256)) * 4
     _write_manifest(tmp_path, payload=payload)

@@ -60,7 +60,7 @@ def read_backup_check(
         if completed_dt.tzinfo is None:
             completed_dt = completed_dt.replace(tzinfo=UTC)
         age_hours = round(
-            (now if now is not None else time.time()) - completed_dt.timestamp(), 1
+            ((now if now is not None else time.time()) - completed_dt.timestamp()) / 3600.0, 1
         )
     except Exception:
         return {"status": "unknown", "error": "manifest has no valid completed_at_utc"}
