@@ -177,16 +177,20 @@ def test_pinned_service_rejects_other_same_specialty_doctor(
         headers=_auth_headers(admin_user),
         json=_cart_payload(
             patient_id=test_patient.id,
-            visits=[_visit(
-                doctor_id=other_cardiologist.id,
-                services=[{"service_id": service.id, "quantity": 1}],
-            )],
+            visits=[
+                _visit(
+                    doctor_id=other_cardiologist.id,
+                    services=[{"service_id": service.id, "quantity": 1}],
+                )
+            ],
         ),
     )
 
     assert response.status_code == 409, response.text
     assert "назначена другому врачу" in response.json()["detail"]
-    assert db_session.query(Visit).filter(Visit.patient_id == test_patient.id).count() == 0
+    assert (
+        db_session.query(Visit).filter(Visit.patient_id == test_patient.id).count() == 0
+    )
     assert _doctor_queue_entries(db_session, pinned_to.id)[1] == []
     assert _doctor_queue_entries(db_session, other_cardiologist.id)[1] == []
 
@@ -211,10 +215,12 @@ def test_pinned_service_books_with_assigned_doctor(
         headers=_auth_headers(admin_user),
         json=_cart_payload(
             patient_id=test_patient.id,
-            visits=[_visit(
-                doctor_id=pinned_to.id,
-                services=[{"service_id": service.id, "quantity": 1}],
-            )],
+            visits=[
+                _visit(
+                    doctor_id=pinned_to.id,
+                    services=[{"service_id": service.id, "quantity": 1}],
+                )
+            ],
         ),
     )
 
@@ -247,10 +253,12 @@ def test_pinned_service_specialty_still_enforced_for_own_doctor(
         headers=_auth_headers(admin_user),
         json=_cart_payload(
             patient_id=test_patient.id,
-            visits=[_visit(
-                doctor_id=dentist.id,
-                services=[{"service_id": service.id, "quantity": 1}],
-            )],
+            visits=[
+                _visit(
+                    doctor_id=dentist.id,
+                    services=[{"service_id": service.id, "quantity": 1}],
+                )
+            ],
         ),
     )
 
@@ -322,31 +330,36 @@ def test_same_doctor_different_tags_share_one_queue_entry(
         headers=_auth_headers(admin_user),
         json=_cart_payload(
             patient_id=test_patient.id,
-            visits=[_visit(
-                doctor_id=dermatologist.id,
-                services=[
-                    {"service_id": consult.id, "quantity": 1},
-                    {"service_id": procedure.id, "quantity": 1},
-                ],
-            )],
+            visits=[
+                _visit(
+                    doctor_id=dermatologist.id,
+                    services=[
+                        {"service_id": consult.id, "quantity": 1},
+                        {"service_id": procedure.id, "quantity": 1},
+                    ],
+                )
+            ],
         ),
     )
 
     assert response.status_code == 200, response.text
     queues, entries = _doctor_queue_entries(db_session, dermatologist.id)
-    assert len(queues) == 1, "услуги одного врача не должны раскалывать его очередь по тегам"
-    assert len(entries) == 1, "одно бронирование врача — одна запись очереди, один номер"
+    assert (
+        len(queues) == 1
+    ), "услуги одного врача не должны раскалывать его очередь по тегам"
+    assert (
+        len(entries) == 1
+    ), "одно бронирование врача — одна запись очереди, один номер"
     entry = entries[0]
     assert entry.number is not None
-    payload_codes = {
-        str(row.get("code")) for row in _entry_services_payload(entry)
-    }
-    assert payload_codes == {"ASG-D01", "ASG-D06"}, (
-        "собственные коды услуг сохраняются в payload записи врача"
-    )
-    assert queues[0].queue_tag == "dermatology", (
-        "routing-тег записи — тег консультации (причина визита)"
-    )
+    payload_codes = {str(row.get("code")) for row in _entry_services_payload(entry)}
+    assert payload_codes == {
+        "ASG-D01",
+        "ASG-D06",
+    }, "собственные коды услуг сохраняются в payload записи врача"
+    assert (
+        queues[0].queue_tag == "dermatology"
+    ), "routing-тег записи — тег консультации (причина визита)"
 
 
 def test_get_or_create_daily_queue_converges_doctor_tag_spellings(
