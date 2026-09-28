@@ -60,7 +60,10 @@ jobs:
           # frameworks are excluded from groups, so a matching title implies
           # the low-risk class the owner authorized for automation.
           case "$TITLE" in
-            *"bump the frontend-npm-minor-patch group"*|*"bump the root-npm-minor-patch group"*)
+            *"bump the frontend-npm-minor-patch group"*|\
+            *"bump the root-npm-minor-patch group"*|\
+            *"bump "*" in the frontend-npm-minor-patch group"*|\
+            *"bump "*" in the root-npm-minor-patch group"*)
               echo "verdict=automerge" >> "$GITHUB_OUTPUT" ;;
             *)
               echo "verdict=triage" >> "$GITHUB_OUTPUT" ;;
