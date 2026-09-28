@@ -16856,7 +16856,9 @@ export type paths = {
          *     specialty_data.cosmetic_procedures ЭМК (emr/v2, specialty=dermatology,
          *     source="emr", total_cost=None — цена не хранится в ЭМК; канонический
          *     ключ записи по решению P3, legacy-ключ specialty_data.procedures читается
-         *     временно как alias с дедупликацией по content-fingerprint) и строки
+         *     временно как alias, полный union без скрытия строк: записи без
+         *     стабильного ID не дедуплицируются по содержимому — возможные
+         *     дубликаты устраняются в Phase B с журналированием) и строки
          *     закрытой legacy-таблицы derma_procedures (source="legacy"). Скоупинг
          *     пациентов идентичен прежнему контракту. Пагинация — канонический конверт
          *     page/size/total/pages (контракт GET /files): total точен по обоим
