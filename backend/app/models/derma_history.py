@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, Index, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, Date, DateTime, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
@@ -62,19 +62,29 @@ class DermaHistoryEntry(Base):
             "position",
             name="uq_derma_history_entry_identity",
         ),
-        # doctor-scoped список: kind + IN(patient_id) + порядок
+        # doctor-scoped список: kind + IN(patient_id) + полный порядок.
+        # Направления колонок зеркалят ORDER BY запроса (смешанный
+        # DESC/ASC не обслуживается вс-ASC индексом — хвост уходит в
+        # temp-btree сортировку всего множества), иначе объём чтения
+        # растёт с глубиной истории.
         Index(
             "ix_derma_history_kind_patient_date",
             "kind",
             "patient_id",
-            "entry_date",
-            "created_at",
+            text("entry_date DESC"),
+            text("created_at DESC"),
+            "source",
+            text("record_id DESC"),
+            "position",
         ),
-        # общий список (Admin без patient_id): kind + порядок по датам
+        # общий список (Admin без patient_id): полный порядок запроса
         Index(
             "ix_derma_history_kind_date",
             "kind",
-            "entry_date",
-            "created_at",
+            text("entry_date DESC"),
+            text("created_at DESC"),
+            "source",
+            text("record_id DESC"),
+            "position",
         ),
     )

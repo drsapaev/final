@@ -215,8 +215,8 @@ def test_single_alembic_head(head_url):
     # Main's corrective follow-up moved the head to 0073 (routing
     # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
     # as 0074 on top of it; #3506 derma history read model moves it to
-    # 0075.
-    assert "0075_derma_history_read_model" in head_lines[0]
+    # 0075, its read-order index swap — to 0076.
+    assert "0076_derma_history_read_order" in head_lines[0]
 
 
 @pytest.mark.integration

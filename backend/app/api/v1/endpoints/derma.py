@@ -5,16 +5,13 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import desc
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.core.i18n import t  # noqa: F401
 from app.models.clinic import Doctor
-from app.models.derma_examination import DermaExamination
-from app.models.derma_procedure import DermaProcedure
-from app.models.emr_v2 import EMRRecord
+from app.models.derma_history import DermaHistoryEntry
 from app.models.user import User
 from app.models.visit import Visit
 from app.schemas.derma import (
@@ -28,11 +25,6 @@ from app.schemas.derma import (
     DermaProcedureOut,
 )
 from app.services.derma_api_service import DermaApiDomainError, DermaApiService
-from app.services.derma_history_projection import (
-    DERMATOLOGY_SPECIALTY,
-    emr_examination_rows,
-    emr_procedure_rows,
-)
 
 router = APIRouter(prefix="/derma", tags=["derma"])
 logger = logging.getLogger(__name__)
@@ -109,34 +101,37 @@ def _ensure_doctor_can_access_patient(db: Session, patient_id: int, user: User) 
         raise HTTPException(status_code=403, detail="Access denied")
 
 
-# --- Unified derma history (review follow-up P2-4b, canonical server-side union) ---
+# --- Unified derma history (issue #3506, step 2: served from the read model) ---
 #
-# The history GETs below union two read-only sources server-side: rows
-# projected out of dermatology EMR records (emr/v2, data.specialty) and the
-# closed legacy tables. The dermatology filter itself runs in SQL —
-# EMRRecord.data["specialty"].as_string() compiles portably (JSON_EXTRACT on
-# the SQLite test harness, ->> on PostgreSQL JSONB) — so the candidate set
-# is exact and uncapped: no recency scan window, no silent truncation
-# (review P1 on #3490/#3491). The merged history is paginated with the
-# canonical page/size/total/pages envelope (FileList contract), so consumers
-# get an explicit completeness signal instead of asymmetric client-side
-# source limits (review P2 on #3490).
+# Both history GETs read the derived table derma_history_entries (#3520):
+# the same SSOT projection as before (dermatology EMR specialty_data +
+# closed legacy tables), materialized at write time by the after_flush
+# listener (app.services.derma_history_projection) instead of being
+# recomputed in memory on every page request (P2 retro-review of #3494:
+# page/size limited only the response, not the read volume). A page is now
+# one COUNT + one indexed page slice; the read volume no longer grows with
+# history depth. The canonical merge order of #3494 (newest first; ties
+# keep EMR ahead of legacy; each source's build order; numeric positions)
+# is preserved by the entry columns and pinned by
+# test_read_model_order_matches_endpoint.
+_HISTORY_READ_ORDER = (
+    DermaHistoryEntry.entry_date.desc(),
+    DermaHistoryEntry.created_at.desc(),
+    DermaHistoryEntry.source.asc(),
+    DermaHistoryEntry.record_id.desc(),
+    DermaHistoryEntry.position.asc(),
+)
 
 
-def _apply_history_patient_scope(
-    db: Session,
-    query: Any,
-    patient_id: int | None,
-    user: User,
-    patient_id_column: Any,
-) -> Any:
-    """Apply the patient scoping shared by both history sources.
+def _scoped_history_entries(db: Session, user: User, patient_id: int | None) -> Any:
+    """Patient scoping identical to the former two-source contract.
 
     Doctors are limited to the patients of their own visits (403 when the
     explicitly requested patient is foreign); admins see everything,
     optionally narrowed to one patient. Returns the scoped query or None
     when a doctor has no allowed patients at all (empty history).
     """
+    query = db.query(DermaHistoryEntry)
     if not _is_admin_user(user):
         if patient_id is not None:
             _ensure_doctor_can_access_patient(db, patient_id, user)
@@ -144,78 +139,31 @@ def _apply_history_patient_scope(
             allowed_patient_ids = _doctor_allowed_patient_ids(db, user)
             if not allowed_patient_ids:
                 return None
-            query = query.filter(patient_id_column.in_(allowed_patient_ids))
+            query = query.filter(DermaHistoryEntry.patient_id.in_(allowed_patient_ids))
     if patient_id is not None:
-        query = query.filter(patient_id_column == patient_id)
+        query = query.filter(DermaHistoryEntry.patient_id == patient_id)
     return query
 
 
-def _derma_emr_records(
-    db: Session, user: User, patient_id: int | None
-) -> list[EMRRecord]:
-    """All active dermatology EMR records in scope, newest first (uncapped)."""
-    query = db.query(EMRRecord).filter(
-        EMRRecord.is_active.is_(True),
-        EMRRecord.data["specialty"].as_string() == DERMATOLOGY_SPECIALTY,
-    )
-    query = _apply_history_patient_scope(
-        db, query, patient_id, user, EMRRecord.patient_id
-    )
+def _history_page(
+    db: Session,
+    user: User,
+    kind: str,
+    patient_id: int | None,
+    page: int,
+    size: int,
+) -> tuple[list[DermaHistoryEntry], int, int]:
+    """One COUNT + one indexed page slice from the read model."""
+    query = _scoped_history_entries(db, user, patient_id)
     if query is None:
-        return []
-    return query.order_by(desc(EMRRecord.created_at), desc(EMRRecord.id)).all()
-
-
-def _history_visit_map(db: Session, records: list[EMRRecord]) -> dict[int, Visit]:
-    visit_ids = {r.visit_id for r in records if r.visit_id is not None}
-    if not visit_ids:
-        return {}
-    return {v.id: v for v in db.query(Visit).filter(Visit.id.in_(visit_ids)).all()}
-
-
-def _history_sort_key(row: Any) -> tuple[Any, ...]:
-    primary_date = (
-        row.examination_date
-        if hasattr(row, "examination_date")
-        else row.procedure_date
+        return [], 0, 0
+    query = query.filter(DermaHistoryEntry.kind == kind)
+    total = query.count()
+    rows = (
+        query.order_by(*_HISTORY_READ_ORDER).offset((page - 1) * size).limit(size).all()
     )
-    created = row.created_at or datetime.min
-    if created.tzinfo is not None:
-        created = created.replace(tzinfo=None)
-    return (primary_date, created)
-
-
-def _merge_history_rows(legacy_rows: list[Any], emr_rows: list[Any]) -> list[Any]:
-    """Union both read-only sources, newest first.
-
-    Ties keep EMR rows ahead of legacy rows and preserve each source's
-    build order (EMR entries stay in array order inside one record,
-    mirroring the stable-sort merge order of the previous client-side
-    implementation). Numeric positions are the only tie-breaker: a
-    lexicographic fallback on the synthetic string ids would misorder
-    records as soon as record ids gain a digit ("emr-9-3" vs "emr-10-0").
-    """
-    keyed: list[tuple[tuple[Any, ...], Any]] = [
-        (*_history_sort_key(row), -position, row)
-        for position, row in enumerate(emr_rows)
-    ]
-    keyed.extend(
-        (*_history_sort_key(row), -(len(emr_rows) + position), row)
-        for position, row in enumerate(legacy_rows)
-    )
-    keyed.sort(key=lambda entry: entry[:-1], reverse=True)
-    return [entry[-1] for entry in keyed]
-
-
-def _paginate_history(
-    legacy_rows: list[Any], emr_rows: list[Any], page: int, size: int
-) -> tuple[list[Any], int, int]:
-    """Union both read-only sources, newest first, exact total, page slice."""
-    merged = _merge_history_rows(legacy_rows, emr_rows)
-    total = len(merged)
     pages = (total + size - 1) // size
-    start = (page - 1) * size
-    return merged[start : start + size], total, pages
+    return rows, total, pages
 
 
 @router.get(
@@ -231,39 +179,23 @@ async def get_skin_examinations(
     patient_id: int | None = None,
 ) -> DermaExaminationHistoryPage:
     """
-    История осмотров кожи (review follow-up P2-4b).
+    История осмотров кожи (issue #3506: read model).
 
-    Объединяет два read-only источника: осмотры из specialty_data ЭМК
-    (emr/v2, specialty=dermatology, source="emr") и строки закрытой
-    legacy-таблицы derma_examinations (source="legacy"). Скоупинг
-    пациентов идентичен прежнему контракту. Пагинация — канонический
-    конверт page/size/total/pages (контракт GET /files): total точен по
-    обоим источникам, без скрытых усечений.
+    Служит из производной таблицы derma_history_entries: та же проекция
+    (осмотры из specialty_data ЭМК, source="emr", и строки закрытой
+    legacy-таблицы derma_examinations, source="legacy"), материализуемая
+    при записи, а не пересчитываемая в памяти на каждый запрос.
+    Скоупинг пациентов идентичен прежнему контракту. Пагинация —
+    канонический конверт page/size/total/pages (контракт GET /files):
+    total точен по обоим источникам, без скрытых усечений.
     """
     try:
-        query = _apply_history_patient_scope(
-            db,
-            db.query(DermaExamination),
-            patient_id,
-            user,
-            DermaExamination.patient_id,
+        rows, total, pages = _history_page(
+            db, user, "examination", patient_id, page, size
         )
-        legacy_rows: list[DermaExaminationHistoryOut] = []
-        if query is not None:
-            legacy_rows = [
-                DermaExaminationHistoryOut.model_validate(row)
-                for row in query.order_by(
-                    desc(DermaExamination.examination_date),
-                    desc(DermaExamination.created_at),
-                    desc(DermaExamination.id),
-                ).all()
-            ]
-        records = _derma_emr_records(db, user, patient_id)
-        visits = _history_visit_map(db, records)
-        emr_rows = emr_examination_rows(records, visits)
-        page_items, total, pages = _paginate_history(
-            legacy_rows, emr_rows, page, size
-        )
+        page_items = [
+            DermaExaminationHistoryOut.model_validate(row.payload) for row in rows
+        ]
         logger.info(
             "[derma.examinations] listed examinations user_id=%s patient_id=%s"
             " count=%s total=%s",
@@ -333,40 +265,24 @@ async def get_cosmetic_procedures(
     patient_id: int | None = None,
 ) -> DermaProcedureHistoryPage:
     """
-    История косметических процедур (review follow-up P2-4b).
+    История косметических процедур (issue #3506: read model).
 
-    Объединяет два read-only источника: процедуры из
-    specialty_data.cosmetic_procedures ЭМК (emr/v2, specialty=dermatology,
-    source="emr", total_cost=None — цена не хранится в ЭМК) и строки закрытой
-    legacy-таблицы derma_procedures (source="legacy"). Скоупинг пациентов
-    идентичен прежнему контракту. Пагинация — канонический конверт
-    page/size/total/pages (контракт GET /files): total точен по обоим
-    источникам, без скрытых усечений.
+    Служит из производной таблицы derma_history_entries: та же проекция
+    (процедуры из specialty_data.cosmetic_procedures ЭМК, source="emr",
+    total_cost=None — цена не хранится в ЭМК, и строки закрытой
+    legacy-таблицы derma_procedures, source="legacy"), материализуемая
+    при записи, а не пересчитываемая в памяти на каждый запрос.
+    Скоупинг пациентов идентичен прежнему контракту. Пагинация —
+    канонический конверт page/size/total/pages (контракт GET /files):
+    total точен по обоим источникам, без скрытых усечений.
     """
     try:
-        query = _apply_history_patient_scope(
-            db,
-            db.query(DermaProcedure),
-            patient_id,
-            user,
-            DermaProcedure.patient_id,
+        rows, total, pages = _history_page(
+            db, user, "procedure", patient_id, page, size
         )
-        legacy_rows: list[DermaProcedureHistoryOut] = []
-        if query is not None:
-            legacy_rows = [
-                DermaProcedureHistoryOut.model_validate(row)
-                for row in query.order_by(
-                    desc(DermaProcedure.procedure_date),
-                    desc(DermaProcedure.created_at),
-                    desc(DermaProcedure.id),
-                ).all()
-            ]
-        records = _derma_emr_records(db, user, patient_id)
-        visits = _history_visit_map(db, records)
-        emr_rows = emr_procedure_rows(records, visits)
-        page_items, total, pages = _paginate_history(
-            legacy_rows, emr_rows, page, size
-        )
+        page_items = [
+            DermaProcedureHistoryOut.model_validate(row.payload) for row in rows
+        ]
         logger.info(
             "[derma.procedures] listed procedures user_id=%s patient_id=%s"
             " count=%s total=%s",

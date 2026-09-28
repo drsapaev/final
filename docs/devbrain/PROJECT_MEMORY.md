@@ -31,6 +31,8 @@ Canonical compact memory for DevBrain routing and guardrails. Keep this file sho
 - Broad audit findings should be converted into small PR slices before implementation.
 - A closed `/ws/queue` connection once retried receive errors in a tight loop, flooding logs and consuming CPU while unrelated panels waited. Preserve exit, heartbeat cancellation, room cleanup, and the focused disconnect regression test.
 - First-screen latency means time until content appears, not FastAPI startup. Separate browser bundle/API waterfalls, backend queries, and WebSocket load before changing infrastructure; keep inactive panel tabs off the initial path.
+- An all-ASC index does NOT serve a mixed-direction ORDER BY (e.g. DESC, DESC, ASC, DESC, ASC): the planner falls back to a temp-btree sort of the whole set, silently turning O(page) reads into O(N log N). Index columns must mirror the ORDER BY directions (#3506, derma history read model).
+- Session-scoped SQLAlchemy event listeners (after_flush) must be registered from a module every entry point imports (app/db/base.py), never from an endpoint's import of the listener module — removing that import silently disables the projection (#3506).
 
 ## Strict Operating Rules
 

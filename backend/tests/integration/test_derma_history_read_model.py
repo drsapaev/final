@@ -381,3 +381,84 @@ class TestDermaHistoryReadModelProjection:
         assert exams[0].entry_date == date.today()
         assert exams[-1].entry_date == date.today() - timedelta(days=504)
         assert procs[-1].payload["procedure_type"] == "Процедура 504"
+
+    def test_endpoint_read_volume_is_constant_across_pages(
+        self, client, db_session, auth_headers, test_patient, test_doctor, admin_user
+    ):
+        """Issue #3506, шаг 2: объём чтения не растёт с глубиной истории.
+
+        Бывший in-memory путь читал ВСЕ строки обоих источников на каждый
+        запрос страницы (P2 ретро-ревью #3494). Read model обслуживает
+        страницу фиксированным числом SQL-выражений (COUNT + срез) — пин:
+        счётчик выражений на соединении одинаков для каждой страницы.
+        """
+        from sqlalchemy import event as sa_event
+
+        records_count = 45  # 3 страницы по size=20
+        visits = [
+            Visit(
+                patient_id=test_patient.id,
+                doctor_id=test_doctor.id,
+                visit_date=date.today() - timedelta(days=offset),
+                status="open",
+                source="desk",
+                department="dermatology",
+            )
+            for offset in range(records_count)
+        ]
+        db_session.add_all(visits)
+        db_session.flush()
+        db_session.add_all(
+            [
+                EMRRecord(
+                    patient_id=test_patient.id,
+                    visit_id=visit.id,
+                    version=1,
+                    status="draft",
+                    created_by=admin_user.id,
+                    data={
+                        "specialty": "dermatology",
+                        "diagnosis": {"main": "Розацеа"},
+                        "specialty_data": {"skin_type": "combination"},
+                    },
+                )
+                for visit in visits
+            ]
+        )
+        db_session.commit()
+
+        connection = db_session.get_bind()
+
+        def _counted_get(page: int) -> tuple[int, int]:
+            counter = {"n": 0}
+
+            def _count(*_args, **_kwargs) -> None:
+                counter["n"] += 1
+
+            sa_event.listen(connection, "before_cursor_execute", _count)
+            try:
+                response = client.get(
+                    f"/api/v1/derma/examinations?patient_id={test_patient.id}"
+                    f"&page={page}&size=20",
+                    headers=auth_headers,
+                )
+            finally:
+                sa_event.remove(connection, "before_cursor_execute", _count)
+            assert response.status_code == 200
+            return counter["n"], response.json()["total"]
+
+        # прогрев: разовая загрузка пользователя в сессию (не относится к
+        # глубине истории) не должна попадать в замер
+        warm = client.get(
+            f"/api/v1/derma/examinations?patient_id={test_patient.id}"
+            "&page=1&size=20",
+            headers=auth_headers,
+        )
+        assert warm.status_code == 200
+
+        counts = []
+        for page in (1, 2, 3):
+            statements, total = _counted_get(page)
+            assert total == records_count
+            counts.append(statements)
+        assert counts[0] == counts[1] == counts[2], counts

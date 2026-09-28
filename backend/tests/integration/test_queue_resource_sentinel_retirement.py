@@ -1078,11 +1078,14 @@ def test_alembic_chain_single_head_0069() -> None:
         "0072_service_executions",
     )
     # derma history read model (issue #3506, P2 retro-review of #3494)
-    # moves the head to 0075.
+    # moves the head to 0075; its read-order index swap moves it to 0076.
     assert graph["0075_derma_history_read_model"] == (
         "0074_join_payload_binding",
     )
-    assert heads == ["0075_derma_history_read_model"]
+    assert graph["0076_derma_history_read_order"] == (
+        "0075_derma_history_read_model",
+    )
+    assert heads == ["0076_derma_history_read_order"]
 
 
 # ===================== C. PostgreSQL FK introspection =====================
@@ -1577,11 +1580,11 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
                 ).scalar()
                 # The chain grew past the retirement (0070 lineage; now
                 # NURSE-V2 0071/0072, main's 0073 routing snapshot, the
-                # round-8 0074 payload binding and the #3506 0075 derma
-                # history read model); the retirement end-state
-                # (no synthetic usernames/doctors) is a head-agnostic
-                # invariant.
-                assert version == "0075_derma_history_read_model"
+                # round-8 0074 payload binding, the #3506 0075 derma
+                # history read model and its 0076 read-order index swap);
+                # the retirement end-state (no synthetic usernames/doctors)
+                # is a head-agnostic invariant.
+                assert version == "0076_derma_history_read_order"
 
                 usernames = {
                     row[0]

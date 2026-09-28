@@ -16812,14 +16812,15 @@ export type paths = {
         };
         /**
          * Осмотры кожи (история: ЭМК + legacy)
-         * @description История осмотров кожи (review follow-up P2-4b).
+         * @description История осмотров кожи (issue #3506: read model).
          *
-         *     Объединяет два read-only источника: осмотры из specialty_data ЭМК
-         *     (emr/v2, specialty=dermatology, source="emr") и строки закрытой
-         *     legacy-таблицы derma_examinations (source="legacy"). Скоупинг
-         *     пациентов идентичен прежнему контракту. Пагинация — канонический
-         *     конверт page/size/total/pages (контракт GET /files): total точен по
-         *     обоим источникам, без скрытых усечений.
+         *     Служит из производной таблицы derma_history_entries: та же проекция
+         *     (осмотры из specialty_data ЭМК, source="emr", и строки закрытой
+         *     legacy-таблицы derma_examinations, source="legacy"), материализуемая
+         *     при записи, а не пересчитываемая в памяти на каждый запрос.
+         *     Скоупинг пациентов идентичен прежнему контракту. Пагинация —
+         *     канонический конверт page/size/total/pages (контракт GET /files):
+         *     total точен по обоим источникам, без скрытых усечений.
          */
         get: operations["get_skin_examinations_api_v1_derma_examinations_get"];
         put?: never;
@@ -16850,15 +16851,16 @@ export type paths = {
         };
         /**
          * Косметические процедуры (история: ЭМК + legacy)
-         * @description История косметических процедур (review follow-up P2-4b).
+         * @description История косметических процедур (issue #3506: read model).
          *
-         *     Объединяет два read-only источника: процедуры из
-         *     specialty_data.cosmetic_procedures ЭМК (emr/v2, specialty=dermatology,
-         *     source="emr", total_cost=None — цена не хранится в ЭМК) и строки закрытой
-         *     legacy-таблицы derma_procedures (source="legacy"). Скоупинг пациентов
-         *     идентичен прежнему контракту. Пагинация — канонический конверт
-         *     page/size/total/pages (контракт GET /files): total точен по обоим
-         *     источникам, без скрытых усечений.
+         *     Служит из производной таблицы derma_history_entries: та же проекция
+         *     (процедуры из specialty_data.cosmetic_procedures ЭМК, source="emr",
+         *     total_cost=None — цена не хранится в ЭМК, и строки закрытой
+         *     legacy-таблицы derma_procedures, source="legacy"), материализуемая
+         *     при записи, а не пересчитываемая в памяти на каждый запрос.
+         *     Скоупинг пациентов идентичен прежнему контракту. Пагинация —
+         *     канонический конверт page/size/total/pages (контракт GET /files):
+         *     total точен по обоим источникам, без скрытых усечений.
          */
         get: operations["get_cosmetic_procedures_api_v1_derma_procedures_get"];
         put?: never;
