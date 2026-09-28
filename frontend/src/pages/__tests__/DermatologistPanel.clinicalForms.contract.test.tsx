@@ -45,12 +45,18 @@ describe('dermatologist clinical forms contract', () => {
     ).toThrow();
   });
 
-  it('reads patient history from the EMR first and keeps the legacy tables as a read-only fallback', () => {
-    expect(historyHook).toContain('/v2/emr/patient/');
-    expect(historyHook).toContain('specialty');
-    expect(historyHook).toContain('cosmetic_procedures');
-    expect(historyHook).toContain('api.get(\'/derma/examinations\'');
-    expect(historyHook).toContain('api.get(\'/derma/procedures\'');
+  it('reads patient history from the server-side EMR+legacy union with exact pagination (P2-4b canonical)', () => {
+    // The union is server-side: the hook pages through the derma GETs and
+    // must not fetch the EMR v2 endpoints directly (review follow-up on
+    // #3490/#3491 — no client-side EMR hydration, no per-source limits).
+    expect(historyHook).not.toContain('/v2/emr/patient/');
+    expect(historyHook).not.toContain('/v2/emr/');
+    expect(historyHook).toContain('\'/derma/examinations\'');
+    expect(historyHook).toContain('\'/derma/procedures\'');
+    expect(historyHook).toContain('api.get');
+    expect(historyHook).toContain('HISTORY_PAGE_SIZE');
+    expect(historyHook).toContain('patient_id');
+    expect(historyHook).toContain('total');
     expect(historyHook).not.toContain('api.post(\'/derma/examinations\'');
     expect(historyHook).not.toContain('api.post(\'/derma/procedures\'');
     expect(patientsTab).not.toContain('onOpenExam');

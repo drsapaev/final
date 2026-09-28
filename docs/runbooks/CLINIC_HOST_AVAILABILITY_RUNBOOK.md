@@ -75,8 +75,13 @@ NOT arm — check `AUTO_BACKUP_ENABLED` first.
 ## 4. Morning-after checklist
 
 1. `curl https://api.finalclinic.fyi/api/v1/health` → `{"ok":true,"db":"ok"}`.
-2. `backend/backups/` has today's `backup_scheduled_*.db.gz` (>0 bytes).
-3. R2 bucket `finalclinic-db-backups` lists the same key under `daily/`.
+2. `curl https://api.finalclinic.fyi/api/v1/health/detailed` →
+   `checks.backup.status == "ok"` (the manifest-based check: the scheduled
+   task writes `backups/last_backup_report.json` only after the full chain
+   — dump → archive verify → encrypt → R2 upload with SHA-256 — succeeded;
+   `archive` names today's `local_prod_schema_public_*.dump.enc`).
+3. R2 bucket `finalclinic-db-backups` lists the same key under
+   `daily/encrypted-public/`.
 4. `tools/cloudflared.log` tail shows 4× `Registered tunnel connection`
    without repeated `Serve tunnel error` bursts.
 5. If any step fails: machine awake? backend process alive (`netstat :18000`)?
