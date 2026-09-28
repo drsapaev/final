@@ -74,7 +74,7 @@ class MonitoringService:
         """Получает текущие системные метрики"""
         try:
             # CPU метрики
-            cpu_percent = psutil.cpu_percent(interval=1)
+            cpu_percent = psutil.cpu_percent(interval=0.1)
             cpu_count = psutil.cpu_count()
             cpu_freq = psutil.cpu_freq()
 

@@ -1,0 +1,574 @@
+/*
+ * NURSE-V2 N2-5 — the tablet workspace styles.
+ *
+ * Tablet-first acceptance targets (§12): 768×1024 portrait, 1024×768
+ * landscape, 1366×768 desktop control. Primary actions are touch-friendly
+ * (>=56px targets), no hover-only controls, and the current patient +
+ * the primary action stay visible without horizontal scrolling.
+ * macOS design tokens only (var(--mac-*)) — the repo token system.
+ */
+
+.nurse-tablet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-4, 16px);
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--mac-spacing-4, 16px);
+  box-sizing: border-box;
+}
+
+.nurse-tablet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mac-spacing-3, 12px);
+  flex-wrap: wrap;
+}
+
+.nurse-tablet__station {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-3, 12px);
+  min-width: 0;
+}
+
+.nurse-tablet__title {
+  margin: 0;
+  font-size: var(--mac-font-size-2xl, 22px);
+  font-weight: 600;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+  overflow-wrap: anywhere;
+}
+
+/* ——— cards ——————————————————————————————————————————————— */
+
+.nurse-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-3, 12px);
+  padding: var(--mac-spacing-4, 16px);
+  border-radius: var(--mac-radius-lg, 10px);
+  background: var(--mac-bg-secondary, rgba(227, 235, 245, 1));
+  border: 1px solid var(--mac-border, rgba(184, 200, 218, 1));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.nurse-card--current {
+  border-left: 4px solid var(--mac-accent-blue-strong, rgba(0, 102, 214, 1));
+}
+
+.nurse-card--draining {
+  border-left: 4px solid var(--mac-warning-strong, rgba(168, 98, 0, 1));
+}
+
+.nurse-card--error {
+  border-left: 4px solid var(--mac-danger-strong, rgba(217, 44, 32, 1));
+}
+
+.nurse-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mac-spacing-2, 8px);
+  flex-wrap: wrap;
+}
+
+.nurse-card__caption {
+  font-size: var(--mac-font-size-sm, 12px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+.nurse-card__cabinet {
+  font-size: var(--mac-font-size-sm, 12px);
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+/* ——— current patient ————————————————————————————————————— */
+
+.nurse-current__who {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-3, 12px);
+  flex-wrap: wrap;
+}
+
+.nurse-current__number {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--mac-accent-blue-strong, rgba(0, 102, 214, 1));
+}
+
+.nurse-current__name {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+  overflow-wrap: anywhere;
+}
+
+.nurse-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--mac-font-size-sm, 12px);
+  font-weight: 600;
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+.nurse-badge--called {
+  background: var(--mac-accent-blue-strong, rgba(0, 102, 214, 1));
+  color: var(--mac-text-on-accent, var(--mac-bg-primary, rgba(238, 243, 250, 1)));
+}
+
+.nurse-badge--in_progress {
+  background: var(--mac-success-strong, rgba(20, 122, 56, 1));
+  color: var(--mac-text-on-accent, var(--mac-bg-primary, rgba(238, 243, 250, 1)));
+}
+
+/* ——— next / idle ——————————————————————————————————————————— */
+
+.nurse-next__row {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-3, 12px);
+}
+
+.nurse-next__number {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+.nurse-next__name {
+  font-size: 17px;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+  overflow-wrap: anywhere;
+}
+
+.nurse-card__count {
+  font-size: var(--mac-font-size-sm, 12px);
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+/* ——— the read-only "another staff member" block (owner review) —— */
+
+.nurse-card--others {
+  border-left: 4px solid var(--mac-border, rgba(184, 200, 218, 1));
+}
+
+.nurse-others__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2, 8px);
+}
+
+.nurse-others__row {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-3, 12px);
+  flex-wrap: wrap;
+}
+
+.nurse-others__row .nurse-next__number {
+  font-size: 17px;
+}
+
+.nurse-others__row .nurse-next__name {
+  font-size: 15px;
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+/* ——— the D1 handover (owner review round: server-proven takeover) — */
+
+.nurse-handover__banner {
+  margin: 0 0 var(--mac-spacing-2, 8px);
+  padding: var(--mac-spacing-2, 8px) var(--mac-spacing-3, 12px);
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
+  border-left: 4px solid var(--mac-accent, rgba(0, 122, 255, 1));
+  font-size: 15px;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+.nurse-others__note {
+  font-size: 13px;
+  color: var(--mac-accent, rgba(0, 122, 255, 1));
+}
+
+.nurse-idle__text,
+.nurse-hint,
+.nurse-services__empty,
+.nurse-empty__hint,
+.nurse-draining__hint {
+  margin: 0;
+  font-size: 16px;
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+.nurse-draining__stale {
+  margin: 0 0 var(--mac-spacing-2, 8px);
+  padding: var(--mac-spacing-2, 8px) var(--mac-spacing-3, 12px);
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
+  border-left: 4px solid var(--mac-warning, rgba(255, 159, 10, 1));
+  font-size: 14px;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+.nurse-empty__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+/* ——— services ————————————————————————————————————————————— */
+
+.nurse-services {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2, 8px);
+}
+
+.nurse-service {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2, 8px);
+  padding: var(--mac-spacing-3, 12px);
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
+}
+
+.nurse-service--active {
+  background: var(--mac-bg-secondary, rgba(227, 235, 245, 1));
+  border: 1px solid var(--mac-success-strong, rgba(20, 122, 56, 1));
+}
+
+.nurse-service__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nurse-service__name {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+  overflow-wrap: anywhere;
+}
+
+.nurse-service__meta {
+  font-size: var(--mac-font-size-sm, 12px);
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+.nurse-service__actions,
+.nurse-actions,
+.nurse-draining__actions,
+.nurse-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mac-spacing-2, 8px);
+}
+
+.nurse-actions {
+  margin-top: var(--mac-spacing-2, 8px);
+}
+
+/* ——— buttons: touch-first (§12) ———————————————————————————— */
+
+.nurse-btn {
+  min-height: 56px;
+  min-width: 120px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: var(--mac-radius-md, 8px);
+  font-size: 17px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--mac-text-on-accent, var(--mac-bg-primary, rgba(238, 243, 250, 1)));
+  background: var(--mac-bg-tertiary, rgba(0, 0, 0, 0.12));
+  transition: filter 120ms ease;
+  touch-action: manipulation;
+}
+
+.nurse-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.nurse-btn:focus-visible {
+  outline: 3px solid var(--mac-accent-blue-strong, rgba(0, 102, 214, 1));
+  outline-offset: 2px;
+}
+
+.nurse-btn--primary {
+  background: var(--mac-accent-blue-strong, rgba(0, 102, 214, 1));
+}
+
+.nurse-btn--success {
+  background: var(--mac-success-strong, rgba(20, 122, 56, 1));
+}
+
+.nurse-btn--warning {
+  background: var(--mac-warning-strong, rgba(168, 98, 0, 1));
+}
+
+.nurse-btn--danger {
+  background: var(--mac-danger-strong, rgba(217, 44, 32, 1));
+}
+
+.nurse-btn--xl {
+  min-height: 64px;
+  min-width: 200px;
+  font-size: 19px;
+}
+
+.nurse-btn--small {
+  min-height: 40px;
+  min-width: auto;
+  padding: 6px 14px;
+  font-size: 14px;
+}
+
+.nurse-btn--choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-height: 72px;
+  background: var(--mac-bg-secondary, rgba(227, 235, 245, 1));
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+  border: 2px solid var(--mac-border, rgba(184, 200, 218, 1));
+}
+
+.nurse-btn--selected {
+  border-color: var(--mac-accent-blue-strong, rgba(0, 102, 214, 1));
+}
+
+.nurse-btn__label {
+  font-size: 17px;
+}
+
+.nurse-btn__meta {
+  font-size: var(--mac-font-size-sm, 12px);
+  font-weight: 400;
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+/* ——— picker / draining ——————————————————————————————————— */
+
+.nurse-picker__title,
+.nurse-draining__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+.nurse-picker__list,
+.nurse-draining__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2, 8px);
+}
+
+.nurse-draining__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-2, 8px);
+  padding: var(--mac-spacing-3, 12px);
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
+}
+
+.nurse-draining__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nurse-draining__station {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+.nurse-draining__who,
+.nurse-draining__service {
+  font-size: var(--mac-font-size-sm, 12px);
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+/* ——— notice / error ————————————————————————————————————— */
+
+.nurse-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--mac-spacing-3, 12px);
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: var(--mac-radius-md, 8px);
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+  font-size: 15px;
+}
+
+/* Owner review: the board-read error stays visible WHILE the last
+ * rendered board is kept (§9) — danger-tinted, never dismissible data
+ * staleness going unnoticed. */
+.nurse-notice--error {
+  border-left: 4px solid var(--mac-danger-strong, rgba(217, 44, 32, 1));
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
+}
+
+.nurse-notice__close {
+  margin-left: auto;
+  border: none;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+  cursor: pointer;
+  padding: 6px 10px;
+  min-height: 40px;
+}
+
+.nurse-error__text {
+  margin: 0;
+  font-size: 16px;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+/* ——— dialog (the overlay itself is the Modal kit) ——— */
+
+.nurse-dialog__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+.nurse-dialog__label {
+  font-size: 15px;
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+.nurse-dialog__input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 96px;
+  padding: 12px;
+  border-radius: var(--mac-radius-md, 8px);
+  border: 1px solid var(--mac-border, rgba(184, 200, 218, 1));
+  font-size: 16px;
+  font-family: inherit;
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+  background: var(--mac-bg-primary, rgba(238, 243, 250, 1));
+  resize: vertical;
+}
+
+.nurse-dialog__input:focus-visible {
+  outline: 3px solid var(--mac-accent-blue-strong, rgba(0, 102, 214, 1));
+  outline-offset: 1px;
+}
+
+.nurse-dialog__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--mac-spacing-2, 8px);
+  font-size: var(--mac-font-size-sm, 12px);
+}
+
+.nurse-dialog__counter {
+  color: var(--mac-text-secondary, rgba(69, 85, 104, 1));
+}
+
+.nurse-dialog__counter--over {
+  color: var(--mac-danger-strong, rgba(217, 44, 32, 1));
+  font-weight: 700;
+}
+
+.nurse-dialog__error {
+  color: var(--mac-danger-strong, rgba(217, 44, 32, 1));
+}
+
+.nurse-dialog__actions {
+  justify-content: flex-end;
+}
+
+/* ——— dark theme mirrors (token-driven) ————————————————— */
+
+[data-theme='dark'] .nurse-card {
+  background: var(--mac-bg-secondary, rgba(227, 235, 245, 1));
+  border-color: var(--mac-border, rgba(184, 200, 218, 1));
+}
+
+[data-theme='dark'] .nurse-service,
+[data-theme='dark'] .nurse-draining__item,
+[data-theme='dark'] .nurse-notice,
+[data-theme='dark'] .nurse-others__row,
+[data-theme='dark'] .nurse-btn--choice {
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+[data-theme='dark'] .nurse-handover__banner,
+[data-theme='dark'] .nurse-draining__stale {
+  background: var(--mac-bg-tertiary, rgba(215, 225, 238, 1));
+  color: var(--mac-text-primary, rgba(0, 0, 0, 0.92));
+}
+
+/* ——— responsive: tablet targets (§12) ————————————————— */
+
+@media (max-width: 768px) {
+  .nurse-tablet {
+    padding: var(--mac-spacing-3, 12px);
+    gap: var(--mac-spacing-3, 12px);
+  }
+
+  .nurse-actions {
+    flex-direction: column;
+  }
+
+  .nurse-btn {
+    width: 100%;
+  }
+
+  .nurse-btn--small {
+    width: auto;
+  }
+
+  .nurse-current__number {
+    font-size: 24px;
+  }
+
+  .nurse-current__name {
+    font-size: 19px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .nurse-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}

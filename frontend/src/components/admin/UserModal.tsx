@@ -194,12 +194,17 @@ const UserModal = ({
   // REC-1 (Receptionist deprecation): 'Receptionist' removed from the
   // create/edit role options — Registrar is the canonical front-desk role
   // (0 production Receptionist rows, SQL evidence 2026-09-02).
+  // NURSE-V2 N2-2 (codex round-3 P2, PR 3333): 'Nurse' added — it is a
+  // creatable role since this slice and the backend /roles/options now
+  // guarantees it; this fallback covers the API-failure window so the
+  // option never disappears from the creation workflow.
   const baseRoleOptions = apiRoleOptions.length > 0 ? apiRoleOptions : [
     { value: 'Admin', label: t('admin2.umdl_role_admin') },
     { value: 'Doctor', label: t('admin2.umdl_role_doctor_general') },
     { value: 'Registrar', label: t('admin2.umdl_role_registrar') },
     { value: 'Cashier', label: t('admin2.umdl_role_cashier') },
     { value: 'Lab', label: t('admin2.umdl_role_lab') },
+    { value: 'Nurse', label: t('admin2.umdl_role_nurse') },
     { value: 'Patient', label: t('admin2.umdl_role_patient') }
   ];
 

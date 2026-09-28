@@ -17,6 +17,7 @@ import {
   Input } from '../ui/macos';
 import { getLocalDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
+import type { QueueActionResponse } from '../../types/domain/queue';
 // UX Audit Stage 3 (Queue issue 7.1):
 // WebSocket подписка для мгновенных обновлений очереди вместо 30s polling.
 import { useQueueWebSocket } from '../../hooks/useQueueWebSocket';
@@ -46,12 +47,16 @@ export interface ModernQueueManagerDoctor {
 }
 
 export interface ModernQueueManagerProps {
+  /** The caller's workflow controls which queue-management actions are visible. */
+  mode: 'doctor' | 'registrar';
   /** Currently selected date (YYYY-MM-DD). */
   selectedDate?: string;
   /** Currently selected doctor id. */
   selectedDoctor?: string | number;
   /** Called when the queue snapshot needs to be reloaded. */
   onQueueUpdate?: () => void | Promise<void>;
+  /** Called after a doctor explicitly starts a patient returned by call-next. */
+  onStartVisit?: (patient: NonNullable<QueueActionResponse['patient']>) => boolean | void | Promise<boolean | void>;
   /** Active UI language. */
   language?: string;
   /** Doctor lookup array (passed from parent). */
@@ -68,14 +73,17 @@ export interface ModernQueueManagerProps {
 }
 
 const ModernQueueManager = ({
+  mode,
   selectedDate = getLocalDateString(),
   selectedDoctor = '',
   onQueueUpdate,
+  onStartVisit,
   language = 'ru',
   doctors = [],
   onDoctorChange,
   onDateChange
 }: ModernQueueManagerProps) => {
+  const isRegistrarMode = mode === 'registrar';
   const {
     loading,
     queueData,
@@ -97,6 +105,8 @@ const ModernQueueManager = ({
   const effectiveDate = selectedDate !== undefined && selectedDate !== '' ? selectedDate : internalDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [calledPatients, setCalledPatients] = useState<NonNullable<QueueActionResponse['patient']>[]>([]);
+  const [startingQueueEntryId, setStartingQueueEntryId] = useState<string | number | null>(null);
 
   // RQ-11 (F-10): классификация срока из серверного expires_at (valid/expired/
   // unspecified). Пересчитывается при открытии диалога, чтобы истекший код
@@ -344,6 +354,13 @@ const ModernQueueManager = ({
       });
 
       if (result?.success && result?.patient) {
+        if (onStartVisit && result.patient.id !== null && result.patient.id !== undefined) {
+          setCalledPatients((current) => current.some((patient) => String(patient.id) === String(result.patient?.id))
+            ? current
+            : [...current, result.patient!]);
+        } else if (onStartVisit) {
+          toast.error(t('dental.dental_panel_start_visit_failed'));
+        }
         toast.success(
           t('misc.mqm_patient_called', { name: result.patient.name, number: result.patient.number })
         );
@@ -354,6 +371,22 @@ const ModernQueueManager = ({
       await loadQueue();
     } catch (error) {
       toast.error(getErrorMessage(error) || t('misc.mqm_call_patient_error'));
+    }
+  };
+
+  const startCalledPatientVisit = async (patient: NonNullable<QueueActionResponse['patient']>) => {
+    if (!onStartVisit || patient.id === null || patient.id === undefined) return;
+
+    setStartingQueueEntryId(patient.id);
+    try {
+      const started = await onStartVisit(patient);
+      if (started !== false) {
+        setCalledPatients((current) => current.filter((candidate) => String(candidate.id) !== String(patient.id)));
+      }
+    } catch {
+      toast.error(t('dental.dental_panel_start_visit_failed'));
+    } finally {
+      setStartingQueueEntryId(null);
     }
   };
 
@@ -507,7 +540,7 @@ const ModernQueueManager = ({
       <div className="mqm-card mqm-controls-card">
         <div className="mqm-controls-header">
           <h3 className="mqm-title">
-            {t('misc.mqm_title')}
+            {mode === 'doctor' ? t('nav.queue') : t('misc.mqm_title')}
           </h3>
 
           <div className="mqm-controls-grid">
@@ -536,6 +569,7 @@ const ModernQueueManager = ({
 
             </div>
 
+            {isRegistrarMode && (
             <div className="mqm-input-group">
               <label className="mqm-label" htmlFor="modern-queue-doctor">
                 {t('misc.mqm_label_doctor')}
@@ -563,8 +597,9 @@ const ModernQueueManager = ({
                 ]}
                 className="mqm-select mqm-select-full"></Select>
             </div>
+            )}
 
-            <div className="mqm-actions">
+            {isRegistrarMode && <div className="mqm-actions">
               <Button
                 variant="primary"
                 size="default"
@@ -588,9 +623,9 @@ const ModernQueueManager = ({
                 <Building2 size={16} className="mqm-icon-primary" aria-hidden="true" />
                 {t('misc.mqm_clinic_qr')}
               </Button>
-            </div>
+            </div>}
 
-            {(() => {
+            {isRegistrarMode && (() => {
               const isDisabled = !effectiveDoctor || loading || queueData?.is_open;
               return (
                 <Button
@@ -616,7 +651,7 @@ const ModernQueueManager = ({
             {/* UX Audit Registrar #7: «Закрыть приём» кнопка.
                 Раньше не было в UI — только «Открыть».
                 Показывается когда приём открыт (queueData.is_open === true). */}
-            {queueData?.is_open && (
+            {isRegistrarMode && queueData?.is_open && (
               <Button
                 variant="outline"
                 size="default"
@@ -718,6 +753,32 @@ const ModernQueueManager = ({
             </div>
           </div>
         </div>
+        {!isRegistrarMode && onStartVisit && calledPatients.length > 0 && (
+          <section className="mqm-called-visits" aria-label={t('dental.dental_panel_called_waiting')}>
+            <h4 className="mqm-called-visits-title">{t('dental.dental_panel_called_waiting')}</h4>
+            <ul className="mqm-called-visits-list">
+              {calledPatients.map((patient) => {
+                const patientName = patient.name || t('dental.dental_panel_patient_default');
+                const ticketNumber = patient.number === null || patient.number === undefined ? '—' : String(patient.number);
+                return (
+                  <li key={String(patient.id)} className="mqm-called-visit-item">
+                    <span className="mqm-called-visit-name">{patientName} · №{ticketNumber}</span>
+                    <Button
+                      variant="primary"
+                      size="default"
+                      className="mqm-button-icon"
+                      aria-label={t('dental.dental_panel_start_visit_for', { name: patientName, number: ticketNumber })}
+                      disabled={startingQueueEntryId !== null}
+                      onClick={() => { void startCalledPatientVisit(patient); }}
+                    >
+                      {t('dental.dental_panel_start_visit')}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
       </div>
 
       {/* Текущая очередь */}
@@ -737,7 +798,7 @@ const ModernQueueManager = ({
           <QueueTable
             queueData={queueData as unknown as QueueTableData | null}
             effectiveDoctor={String(effectiveDoctor ?? '')}
-            onGenerateQR={generateQR}
+            onGenerateQR={isRegistrarMode ? generateQR : undefined}
             loading={loading}
             t={queueTableT} />
 
@@ -745,7 +806,7 @@ const ModernQueueManager = ({
       </div>
 
       {/* Диалог QR кода */}
-      <ModernDialog
+      {isRegistrarMode && <ModernDialog
         isOpen={showQrDialog}
         onClose={() => setShowQrDialog(false)}
         title={qrData?.is_clinic_wide ? t('misc.mqm_dialog_title_clinic_qr') : t('misc.mqm_dialog_title_doctor_qr')}
@@ -862,7 +923,7 @@ const ModernQueueManager = ({
             </Button>
           </div>
         </div>
-      </ModernDialog>
+      </ModernDialog>}
 
       {/* UX Audit Registrar #2: ConfirmDialog (useConfirm hook). */}
       {confirmDialog}

@@ -9,18 +9,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import DentistVisitsView from '../views/DentistVisitsView';
-import DentistPhotosView from '../views/DentistPhotosView';
-import DentistAIAssistantView from '../views/DentistAIAssistantView';
-import { dentalCardKeyDown } from '../dentistCardA11y';
 import { useDentistUrlPatient } from '../useDentistUrlPatient';
 import type { SelectedPatient } from '../dentistContracts';
 
 const t = (key: string, params?: Record<string, unknown>) =>
   params ? `${key}:${JSON.stringify(params)}` : key;
 
-vi.mock('../../../components/ai/AIAssistant', () => ({
-  default: () => <div data-testid="ai-assistant" />,
-}));
 vi.mock('../../../components/dental/DentalVisitScreen', () => ({
   default: ({ patient }: { patient: Record<string, unknown> }) => (
     <div data-testid="visit-screen">{String(patient.patient_name)}</div>
@@ -28,26 +22,22 @@ vi.mock('../../../components/dental/DentalVisitScreen', () => ({
 }));
 
 describe('dentist views (PR-UI-15-6)', () => {
-  const patients: SelectedPatient[] = [
-    { id: 1, name: 'SYNTHETIC-Patient-One' },
-    { id: 2, name: 'SYNTHETIC-Patient-Two' },
-  ];
-
-  it('DentistVisitsView renders the pick grid without a selected patient', () => {
+  it('DentistVisitsView directs an empty visit tab to the single patient search', () => {
+    const onGoToPatients = vi.fn();
+    const onBackToQueue = vi.fn();
     renderWithProviders(
       <DentistVisitsView
         selectedPatient={null}
-        patients={patients}
         loading={false}
         onCompleteVisit={vi.fn()}
-        onVisitProtocol={vi.fn()}
-        onBackToQueue={vi.fn()}
+        onGoToPatients={onGoToPatients}
+        onBackToQueue={onBackToQueue}
         tI18n={t}
       />,
     );
     expect(screen.getByText('dental.dental_panel_visits_title')).toBeInTheDocument();
-    expect(screen.getByText('SYNTHETIC-Patient-One')).toBeInTheDocument();
-    expect(screen.getByText('SYNTHETIC-Patient-Two')).toBeInTheDocument();
+    screen.getByRole('button', { name: 'dental.dental_dpt_title' }).click();
+    expect(onGoToPatients).toHaveBeenCalledOnce();
     expect(screen.queryByTestId('visit-screen')).not.toBeInTheDocument();
   });
 
@@ -55,47 +45,16 @@ describe('dentist views (PR-UI-15-6)', () => {
     renderWithProviders(
       <DentistVisitsView
         selectedPatient={{ patient_name: 'SYNTHETIC-Selected' } as SelectedPatient}
-        patients={patients}
         loading={false}
         onCompleteVisit={vi.fn()}
-        onVisitProtocol={vi.fn()}
         onBackToQueue={vi.fn()}
+        onGoToPatients={vi.fn()}
         tI18n={t}
       />,
     );
     expect(screen.getByTestId('visit-screen')).toHaveTextContent('SYNTHETIC-Selected');
   });
 
-  it('DentistPhotosView renders the photo archive grid', () => {
-    renderWithProviders(
-      <DentistPhotosView patients={patients} onPhotoArchive={vi.fn()} tI18n={t} />,
-    );
-    expect(screen.getByText('dental.dental_panel_photos_title')).toBeInTheDocument();
-    expect(screen.getAllByText('dental.dental_panel_photos_action')).toHaveLength(2);
-  });
-
-  it('DentistAIAssistantView renders the dentistry AI assistant surface', () => {
-    renderWithProviders(<DentistAIAssistantView tI18n={t} />);
-    expect(screen.getByTestId('ai-assistant')).toBeInTheDocument();
-    expect(screen.getByText('dental.dental_panel_ai_title')).toBeInTheDocument();
-  });
-
-  it('dentalCardKeyDown activates on Enter/Space and swallows the event', () => {
-    const action = vi.fn();
-    const enter = { key: 'Enter', preventDefault: vi.fn() } as unknown as React.KeyboardEvent<HTMLElement>;
-    dentalCardKeyDown(enter, action);
-    expect(action).toHaveBeenCalledTimes(1);
-    expect(enter.preventDefault).toHaveBeenCalled();
-
-    const space = { key: ' ', preventDefault: vi.fn() } as unknown as React.KeyboardEvent<HTMLElement>;
-    dentalCardKeyDown(space, action);
-    expect(action).toHaveBeenCalledTimes(2);
-
-    const other = { key: 'a', preventDefault: vi.fn() } as unknown as React.KeyboardEvent<HTMLElement>;
-    dentalCardKeyDown(other, action);
-    expect(action).toHaveBeenCalledTimes(2);
-    expect(other.preventDefault).not.toHaveBeenCalled();
-  });
 });
 
 describe('useDentistUrlPatient (PR-UI-15-6)', () => {

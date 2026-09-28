@@ -55,7 +55,8 @@ During `/aif-implement`, keep progress resume-friendly:
 Before any runtime/code task, print the `AGENTS.md` execution pre-work block.
 
 - Use `direct_execute` only for narrow single-file fixes with known ownership and a clear validation target.
-- Use `gate` for queue, EMR, RBAC, payment, Telegram, routing, frontend/backend contract, or multi-file UX work.
+- For GPT-6, use `advisory_gate` for UI/API work, including queue/EMR presentation and additive contract fields, when it does not change DB schema/migrations, authentication/RBAC/security, production configuration/deployment, queue ownership/fairness, or clinical lifecycle/signature rules. The gate is optional context; source, tests, user scope, and explicit boundaries control.
+- Keep `gate` mandatory for DB schema/migrations, authentication/RBAC/security, production configuration/deployment, and changes to queue ownership/fairness or clinical lifecycle/signature rules. Other agent models follow the existing gate process.
 - Use `gate_known_root_cause` only when the root-cause file is already confirmed.
 - Gate command for risky tasks:
   `cd C:\final\ai\langgraph && .\scripts\run_agent_gate.ps1 "<task>"`
@@ -63,8 +64,8 @@ Before any runtime/code task, print the `AGENTS.md` execution pre-work block.
   `cd C:\final\ai\langgraph && .\scripts\run_agent_gate.ps1 "<task>" --known-root-cause "<relative/path>"`
 - Use the launcher instead of bare `python` or `py`; it validates Python 3.11+ and skips broken local launcher state.
 - For other local Python commands in this Windows checkout, prefer `C:\final\scripts\run_python.ps1`.
-- If the gate emits a handoff, read and obey the generated `Ready-to-send execution prompt` before editing.
-- If the gate fails, stop and report instead of editing.
+- For a mandatory gate, read and obey the generated `Ready-to-send execution prompt` before editing when handoff is required.
+- If a mandatory gate fails, stop and report instead of editing. In GPT-6 advisory mode, a gate failure or misroute alone does not block a well-grounded task.
 
 ## Recovery Principles
 
@@ -72,7 +73,7 @@ Before any runtime/code task, print the `AGENTS.md` execution pre-work block.
 - Do not trust "100% complete" reports unless executable source, tests, migrations, CI, or browser evidence proves them.
 - Preserve the dirty worktree and do not revert unrelated user or agent changes.
 - Use `AGENTS.md` execution mode rules before every implementation slice.
-- Use `agent_gate.py` for risky, multi-file, canonical/legacy ambiguous, queue, EMR, RBAC, payment, Telegram, routing, or frontend/backend contract work.
+- Use the mandatory gate for DB/schema migrations, authentication/RBAC/security, production configuration/deployment, and changes to queue ownership/fairness or clinical lifecycle/signature rules. For eligible GPT-6 UI/API work, gate use is optional and advisory as described in `AGENTS.md`.
 - Do not expose secrets, credentials, tokens, production URLs, or patient data.
 - AI features must remain draft/suggestion/support only; final clinical decisions require doctor/admin approval.
 

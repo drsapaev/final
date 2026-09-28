@@ -6,7 +6,7 @@ SSOT для типов задач и форматов ответов
 from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -53,6 +53,13 @@ class AIResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list, description="Предупреждения")
 
     # Medical compliance
+    requires_doctor_confirmation: Literal[True] = Field(
+        ..., description="Врач должен подтвердить предложение AI перед внесением в ЭМК"
+    )
+    decision_boundary: Literal["suggestion_only"] = Field(
+        ..., description="Ответ AI является только предложением"
+    )
+    ai_notice: str = Field(..., min_length=1, description="Предупреждение о роли AI")
     disclaimer: str = Field(
         default="AI suggestions are advisory only. Final decisions must be made by licensed medical professionals.",
         description="Медицинский дисклеймер"

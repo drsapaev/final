@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import and_, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
@@ -77,6 +77,7 @@ class RegistrarNotificationService:
         """Получает список активных регистраторов"""
         return (
             self.db.query(User)
+            .options(joinedload(User.profile))
             .filter(
                 and_(
                     func.lower(User.role) == "registrar",  # E-4: receptionist alias removed
@@ -88,10 +89,14 @@ class RegistrarNotificationService:
 
     def get_registrars_by_department(self, department: str = None) -> list[User]:
         """Получает регистраторов по отделению"""
-        query = self.db.query(User).filter(
-            and_(
-                func.lower(User.role) == "registrar",  # E-4: receptionist alias removed
-                User.is_active == True,
+        query = (
+            self.db.query(User)
+            .options(joinedload(User.profile))
+            .filter(
+                and_(
+                    func.lower(User.role) == "registrar",  # E-4: receptionist alias removed
+                    User.is_active == True,
+                )
             )
         )
 

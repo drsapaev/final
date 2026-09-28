@@ -81,6 +81,23 @@ describe('PR-UI-19 (C-6): Sidebar labelKey i18n resolution', () => {
     expect(screen.getByRole('button', { name: 'Обычный пункт' })).toBeInTheDocument();
   });
 
+  it('keeps active labels readable against the active background, including hover', () => {
+    render(<Sidebar items={[{ id: 'queue', labelKey: 'nav.queue', icon: Users }]} activeItem="queue" />);
+
+    const activeButton = screen.getByRole('button', { name: 'Очередь' });
+    expect(activeButton).toHaveClass('mac-sidebar-item--active');
+    expect(activeButton.querySelector('span')).toHaveStyle({
+      color: 'var(--mac-nav-item-active-text)',
+    });
+
+    const sidebarStyles = Array.from(document.querySelectorAll('style'))
+      .map((style) => style.textContent || '')
+      .join('\n');
+    expect(sidebarStyles).toContain(
+      '.mac-sidebar-item--active:hover {\n          background: var(--mac-nav-item-active) !important;'
+    );
+  });
+
   it('localizes the AI disclaimer badge and screen-reader name (Codex round 1)', async () => {
     await act(async () => {
       await i18n.changeLanguage('ru');
@@ -93,18 +110,29 @@ describe('PR-UI-19 (C-6): Sidebar labelKey i18n resolution', () => {
       tooltipKey: 'nav.ai_disclaimer_aria',
       ariaLabelKey: 'nav.ai_disclaimer_aria',
     };
-    const { unmount } = render(<Sidebar items={[aiItem]} />);
+    const { unmount } = render(<Sidebar items={[aiItem]} activeItem="ai" />);
     const ruButton = screen.getByRole('button', { name: /черновик, не диагноз/i });
     expect(ruButton).toBeInTheDocument();
-    expect(screen.getByText(/Черновик · не медицинское заключение/i)).toBeInTheDocument();
+    const ruBadge = screen.getByText(/Черновик · не диагноз/i);
+    expect(ruBadge).toBeInTheDocument();
+    expect(ruBadge).toHaveAttribute('style', expect.stringContaining('background-color: transparent'));
+    expect(ruBadge).toHaveAttribute('style', expect.stringContaining('color: var(--mac-nav-item-active-text)'));
     unmount();
 
     await act(async () => {
       await i18n.changeLanguage('en');
     });
-    render(<Sidebar items={[aiItem]} />);
+    const { unmount: unmountEn } = render(<Sidebar items={[aiItem]} activeItem="ai" />);
     expect(screen.getByRole('button', { name: /draft, not a diagnosis/i })).toBeInTheDocument();
-    expect(screen.getByText(/Draft · not a medical conclusion/i)).toBeInTheDocument();
+    expect(screen.getByText(/Draft · not a diagnosis/i)).toBeInTheDocument();
+    unmountEn();
+
+    await act(async () => {
+      await i18n.changeLanguage('uz-Latn');
+    });
+    render(<Sidebar items={[aiItem]} />);
+    expect(screen.getByRole('button', { name: /qoralama, tashxis emas/i })).toBeInTheDocument();
+    expect(screen.getByText(/Qoralama · tashxis emas/i)).toBeInTheDocument();
   });
 
   it('localizes section headings through titleKey (Codex round 1)', async () => {

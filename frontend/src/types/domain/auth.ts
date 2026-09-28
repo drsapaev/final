@@ -47,6 +47,14 @@ export interface UserProfile {
 export interface AuthState {
   token: string | null;
   profile: UserProfile | null;
+  /**
+   * Phase 0 follow-up (Codex P2, round 8): carried in the notified snapshot
+   * when the session was just CLEARED — the kind of principal whose session
+   * died (patient vs staff). RouteAccessBoundary reads it from the snapshot
+   * so the expired-patient redirect target cannot be lost to effect-timing
+   * races; stores/auth re-arms it on the next setToken().
+   */
+  expiredPrincipalWasPatient?: boolean;
 }
 
 // === Richer auth context state (FUTURE) =====================================

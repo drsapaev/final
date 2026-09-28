@@ -160,3 +160,20 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     expect(source).toContain("t18('queue.history_critical')");
   });
 });
+
+// ─── PR7: honest search/filter scope under server pagination ───
+describe('LabQueueWorkbench PR7 — honest search scope hint', () => {
+  it('declares the loaded-pages-only search scope when more server pages exist', () => {
+    const workbenchSource = fs.readFileSync(
+      path.join(ROOT, 'components/laboratory/LabQueueWorkbench.tsx'),
+      'utf8'
+    );
+    // Условие: есть ещё серверные страницы и активен поиск/фильтр.
+    expect(workbenchSource).toContain(
+      'hasMore && appointments.length < queueTotal && (searchQuery.trim() !== \'\' || statusFilter !== \'all\')'
+    );
+    // Честная формулировка scope: по загруженным записям, X из Y.
+    expect(workbenchSource).toContain('по загруженным записям');
+    expect(workbenchSource).toContain('{appointments.length} из {queueTotal}');
+  });
+});

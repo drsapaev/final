@@ -1,27 +1,26 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import type { CSSProperties } from "react";
+import type { CSSProperties } from 'react';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
+import { DERMATOLOGY_PANEL_TABS, getDermatologyTabAliases } from './dermatologyTabAliases';
 // S-M-2 (история, ОТМЕНЕНО Track 3-2): macos-Icon обёртка → lucide refs (§3.3)
-import { Button, Card, Badge, Input, AppEmpty } from '../components/ui/macos';
+import { Button, Card, Badge, AppEmpty } from '../components/ui/macos';
 
 import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './dermatology.css';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import AIAssistant from '../components/ai/AIAssistant';
-import ServiceChecklist from '../components/ServiceChecklist';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import SessionWarningModal from '../components/common/SessionWarningModal';
 import EditPatientModal from '../components/common/EditPatientModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import QueueIntegration from '../components/QueueIntegration';
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
-import ProcedureTemplates from '../components/dermatology/ProcedureTemplates';
-import DermaExamsTab from '../components/dermatology/DermaExamsTab';
-import DermaHistoryTab from '../components/dermatology/DermaHistoryTab';
-import DermaPhotosTab from '../components/dermatology/DermaPhotosTab';
+import DermaPatientsTab from '../components/dermatology/DermaPatientsTab';
+import DermaVisitGallery from '../components/dermatology/DermaVisitGallery';
+import { useDermatologyPatientHistory } from './useDermatologyPatientHistory';
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
 import { printPanelTicket } from '../services/panelPrint';
@@ -49,8 +48,15 @@ import {
   SPECIALTY_KEYS,
 } from '../utils/doctorPanelShared';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
-import { getErrorMessage } from '../utils/type-guards';
-import { Calendar, CheckCircle2, CircleDollarSign, FileText, HeartPulse, Phone, RotateCw, Scissors, Sparkles, Stethoscope, User } from 'lucide-react';
+import {
+  canCompleteDermatologyVisit,
+  isSameDermatologyVisit,
+  postDermatologyPrescription,
+  toPrescriptionSystemRecord,
+  toPrescriptionCreatePayload,
+  type DermatologyVisitContext,
+} from './dermatologyVisitActions';
+import { Calendar, CheckCircle2, FileText, RotateCw, Stethoscope } from 'lucide-react';
 
 const API_V1_BASE = getApiBaseUrl();
 const DERMATOLOGY_REQUEST_COOLDOWN_MS = 5000;
@@ -78,13 +84,9 @@ const dermatologyAppointmentsTitleStyle: CSSProperties = {
 const dermatologyRequestCache: {
   appointments: { promise: Promise<unknown> | null; data: unknown[] | null; lastAttemptAt: number };
   services: { promise: Promise<unknown> | null; data: Record<string, unknown> | null; lastAttemptAt: number };
-  skinExaminations: { promise: Promise<unknown> | null; data: unknown[] | null; lastAttemptAt: number };
-  cosmeticProcedures: { promise: Promise<unknown> | null; data: unknown[] | null; lastAttemptAt: number };
 } = {
   appointments: { promise: null, data: null, lastAttemptAt: 0 },
   services: { promise: null, data: null, lastAttemptAt: 0 },
-  skinExaminations: { promise: null, data: null, lastAttemptAt: 0 },
-  cosmeticProcedures: { promise: null, data: null, lastAttemptAt: 0 }
 };
 
 interface DermatologyPatient {
@@ -157,14 +159,6 @@ interface DermatologyAppointment {
   [key: string]: unknown;
 }
 
-interface SelectedServiceItem {
-  id: number;
-  name?: string;
-  price?: number;
-  duration?: number;
-  [key: string]: unknown;
-}
-
 // Queue entry shape returned by /registrar/queues/today, used by
 // loadDermatologyAppointments to build DermatologyAppointment rows.
 interface DermatologyQueueEntryItem {
@@ -201,32 +195,6 @@ interface DermatologyQueueEntryItem {
   [key: string]: unknown;
 }
 
-interface SkinExaminationRecord {
-  patient_id?: string | number;
-  visit_id?: string | number;
-  examination_date?: string;
-  skin_type?: string;
-  skin_condition?: string;
-  lesions?: string;
-  distribution?: string;
-  symptoms?: string;
-  diagnosis?: string;
-  treatment_plan?: string;
-  [key: string]: unknown;
-}
-
-interface CosmeticProcedureData {
-  patient_id?: string | number;
-  visit_id?: string | number;
-  procedure_date?: string;
-  procedure_type?: string;
-  area_treated?: string;
-  products_used?: string;
-  results?: string;
-  follow_up?: string;
-  [key: string]: unknown;
-}
-
 // countAppointmentsByStatuses is imported from utils/doctorPanelShared
 // (unified implementation shared with Cardiology and Dentistry panels).
 
@@ -237,6 +205,17 @@ function resolveDoctorQueueEntryId(row: Record<string, unknown>): number | strin
   }
 
   return null;
+}
+
+function safeErrorMetadata(error: unknown): { errorType: string; statusCode?: number } {
+  const value = error !== null && typeof error === 'object'
+    ? error as { response?: { status?: unknown } }
+    : null;
+  const status = value?.response?.status;
+  return {
+    errorType: error instanceof Error ? error.name : typeof error,
+    ...(typeof status === 'number' ? { statusCode: status } : {}),
+  };
 }
 
 function getRecentDermatologyCache<T>(cacheEntry: { lastAttemptAt: number; data: T | null }, fallbackValue: T): T | null {
@@ -258,7 +237,7 @@ function splitFullName(fullName: unknown) {
   };
 }
 
-function buildDermatologyPatientFromAppointment(appointment: Record<string, unknown> | null | undefined, t: unknown): DermatologyPatient | null {
+function buildDermatologyPatientFromAppointment(appointment: Record<string, unknown> | null | undefined): DermatologyPatient | null {
   if (!appointment) {
     return null;
   }
@@ -284,28 +263,12 @@ function buildDermatologyPatientFromAppointment(appointment: Record<string, unkn
     first_name: (appointment.first_name as string) || nameParts.first_name,
     middle_name: (appointment.middle_name as string) || nameParts.middle_name,
     phone: (appointment.patient_phone as string) || (appointment.phone as string) || '',
-    birth_date: appointment.patient_birth_year
-      ? `${appointment.patient_birth_year}-01-01`
-      : (appointment.birth_date as string) || '',
+    birth_date: (appointment.birth_date as string) || '',
+    patient_birth_year: appointment.patient_birth_year as string | number | undefined,
     address: (appointment.address as string) || '',
     specialty: (appointment.specialty as string) || 'dermatology',
     source: (appointment.source as string) || 'appointments'
   };
-}
-
-function buildPatientsFromAppointments(appointments: DermatologyAppointment[], t: unknown): DermatologyPatient[] {
-  const patientsById = new Map<number | string, DermatologyPatient>();
-
-  appointments.forEach((appointment: DermatologyAppointment) => {
-    const patient = buildDermatologyPatientFromAppointment(appointment, i18n.t.bind(null));
-    if (!patient || !patient.patient_id || patientsById.has(patient.patient_id)) {
-      return;
-    }
-
-    patientsById.set(patient.patient_id, patient);
-  });
-
-  return Array.from(patientsById.values());
 }
 
 /**
@@ -346,6 +309,10 @@ const DermatologistPanelUnified = () => {
   });
   const location = useLocation();
   // P-009: navigate removed — useDoctorPanelState handles tab URL sync
+  const dermatologyTabAliases = useMemo(
+    () => getDermatologyTabAliases(location.search),
+    [location.search]
+  );
 
   // P-009 fix: use shared useDoctorPanelState hook for tab/URL/patient state.
   const {
@@ -357,10 +324,12 @@ const DermatologistPanelUnified = () => {
     selectedPatient,
     setSelectedPatient,
   } = useDoctorPanelState({
-    // Phase 4+: sidebar reduced to 4 tabs — queue / visit / patients / ai.
+    // Phase 4+: the sidebar has three destinations — queue / visit / patients.
     defaultTab: 'queue',
     visitDeepLinkTab: 'visit',
     patientDeepLinkTab: 'patients',
+    validTabs: [...DERMATOLOGY_PANEL_TABS],
+    tabAliases: dermatologyTabAliases,
   }) as {
     activeTab: string;
     setActiveTab: (tab: string) => void;
@@ -370,7 +339,6 @@ const DermatologistPanelUnified = () => {
     selectedPatient: DermatologyPatient | null;
     setSelectedPatient: (patient: DermatologyPatient | null) => void;
   };
-  const [selectedServices, setSelectedServices] = useState<SelectedServiceItem[]>([]);
   const [visitData, setVisitData] = useState({
     complaint: '',
     diagnosis: '',
@@ -388,45 +356,18 @@ const DermatologistPanelUnified = () => {
   const appointmentsLoadPromiseRef = useRef<Promise<DermatologyAppointment[]> | null>(null);
   const urlResolutionRef = useRef({ search: '', refreshAttempted: false, notified: false });
 
-  // Специализированные данные дерматолога
-  const [skinExamination, setSkinExamination] = useState({
-    patient_id: '',
-    visit_id: '',
-    examination_date: '',
-    skin_type: '',
-    skin_condition: '',
-    lesions: '',
-    distribution: '',
-    symptoms: '',
-    diagnosis: '',
-    treatment_plan: ''
-  });
-
-  const [cosmeticProcedure, setCosmeticProcedure] = useState({
-    patient_id: '',
-    visit_id: '',
-    procedure_date: '',
-    procedure_type: '',
-    area_treated: '',
-    products_used: '',
-    results: '',
-    follow_up: ''
-  });
-
-  const [showSkinForm, setShowSkinForm] = useState(false);
-  const [showCosmeticForm, setShowCosmeticForm] = useState(false);
-  const [skinExaminations, setSkinExaminations] = useState<SkinExaminationRecord[]>([]);
-  const [cosmeticProcedures, setCosmeticProcedures] = useState<CosmeticProcedureData[]>([]);
-  // D-001 fix: photoData now receives state from PhotoUploader via onDataUpdate callback
-  const [photoData, setPhotoData] = useState<{ before: unknown[]; after: unknown[] }>({ before: [], after: [] });
 
   // Дополнительные состояния из старого файла
-  const [patients, setPatients] = useState<DermatologyPatient[]>([]);
   const [currentAppointment, setCurrentAppointment] = useState<DermatologyPatient | null>(null);
   const [emr, setEmr] = useState<Record<string, unknown> | null>(null);
   const [prescription, setPrescription] = useState<Record<string, unknown> | null>(null);
   const [canCreatePrescription, setCanCreatePrescription] = useState(false);
-  const [doctorPrice, setDoctorPrice] = useState('');
+  const [appointmentCompletionStatus, setAppointmentCompletionStatus] = useState<{
+    appointmentId: string;
+    visitId: string | null;
+    canComplete: boolean;
+  } | null>(null);
+  const statusRequestIdRef = useRef(0);
 
   // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
   // is invalidated when the doctor switches between visits or patients.
@@ -458,31 +399,9 @@ const DermatologistPanelUnified = () => {
       // currentAppointment changes.
       setEmr(null);
       setPrescription(null);
+      setAppointmentCompletionStatus(null);
     },
   });
-
-  // PR-47: removed unused showPriceOverride / selectedServiceForPriceOverride state
-  // (PriceOverrideManager import also removed — component was not rendered)
-
-  // Локальный справочник цен для дерма/косметологии
-  const dermaPriceMap = useMemo((): Record<string, number> => ({
-    derma_consultation: 50000,
-    derma_biopsy: 150000,
-    cosm_cleaning: 80000,
-    cosm_botox: 300000,
-    cosm_laser: 250000
-  }), []);
-
-  const servicesSubtotal = useMemo(() => {
-    return selectedServices.reduce((sum: number, item: SelectedServiceItem) => sum + (((item as { id?: string | number })?.id as unknown as string) ? (dermaPriceMap[(item as { id?: string | number }).id as unknown as string] || 0) : 0), 0);
-  }, [selectedServices, dermaPriceMap]);
-
-  const doctorPriceNum = useMemo(() => {
-    const n = Number(String(doctorPrice).replace(/[^0-9.-]/g, ''));
-    return Number.isFinite(n) ? Math.max(0, n) : 0;
-  }, [doctorPrice]);
-
-  const totalCost = useMemo(() => servicesSubtotal + doctorPriceNum, [servicesSubtotal, doctorPriceNum]);
 
   // Загрузка услуг для правильного отображения в tooltips
   const loadServices = useCallback(async (force = false) => {
@@ -514,7 +433,7 @@ const DermatologistPanelUnified = () => {
         }
         return (dermatologyRequestCache.services.data as Record<string, unknown>) || {};
       } catch (error: unknown) {
-        logger.error('[Dermatology] Ошибка загрузки услуг:', error);
+        logger.error('[Dermatology] Service list request failed', safeErrorMetadata(error));
         return (dermatologyRequestCache.services.data as Record<string, unknown>) || {};
       }
     })();
@@ -549,7 +468,6 @@ const DermatologistPanelUnified = () => {
       if (cachedAppointments) {
         const cached = cachedAppointments as DermatologyAppointment[];
         setAppointments(cached);
-        setPatients(buildPatientsFromAppointments(cached, tI18n));
         return cached;
       }
     }
@@ -560,7 +478,6 @@ const DermatologistPanelUnified = () => {
       try {
         const token = tokenManager.getAccessToken();
         if (!token) {
-          logger.info('[Dermatology] Нет токена аутентификации');
           return [];
         }
 
@@ -640,12 +557,11 @@ const DermatologistPanelUnified = () => {
         });
 
         setAppointments(enrichedAppointmentsData);
-        setPatients(buildPatientsFromAppointments(enrichedAppointmentsData, tI18n));
         dermatologyRequestCache.appointments.data = enrichedAppointmentsData;
         logger.info('[Dermatology] Загружено записей:', enrichedAppointmentsData.length);
         return enrichedAppointmentsData;
       } catch (error: unknown) {
-        logger.error('[Dermatology] Ошибка загрузки записей:', error);
+        logger.error('[Dermatology] Appointment list request failed', safeErrorMetadata(error));
         return [];
       } finally {
         setAppointmentsLoading(false);
@@ -669,13 +585,13 @@ const DermatologistPanelUnified = () => {
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
-    if (activeTab === 'appointments' || activeTab === 'patients') {
+    if (activeTab === 'appointments') {
       loadDermatologyAppointments();
+      loadServices();
     }
 
     // Слушаем глобальные события обновления очереди
-    const handleQueueUpdate = (event: Event) => {
-      logger.info('[Dermatology] Получено событие обновления очереди:', (event as CustomEvent).detail);
+    const handleQueueUpdate = () => {
       if (activeTab === 'appointments') {
         loadDermatologyAppointments();
       }
@@ -685,7 +601,7 @@ const DermatologistPanelUnified = () => {
     return () => {
       window.removeEventListener('queueUpdated', handleQueueUpdate);
     };
-  }, [activeTab, loadDermatologyAppointments]);
+  }, [activeTab, loadDermatologyAppointments, loadServices]);
 
   const ensureCanonicalVisitId = useCallback(
     (row: Record<string, unknown>) => makeEnsureCanonicalVisitId(setAppointments as unknown as React.Dispatch<React.SetStateAction<any[]>>, resolveCanonicalVisitId)(row),
@@ -701,41 +617,33 @@ const DermatologistPanelUnified = () => {
       middleName: nameParts[2] || '',
       phone: row.patient_phone || '',
       address: row.address || '',
-      birthDate: row.patient_birth_year ? `${row.patient_birth_year}-01-01` : ''
+      birthDate: (row as DermatologyAppointment & { birth_date?: string }).birth_date || ''
     };
   }, []);
 
   // Обработчик редактирования пациента
   const handleEditPatient = useCallback(async (row: DermatologyAppointment) => {
-    const patientFromCache = patients.find((patient: DermatologyPatient) =>
-      patient.patient_id === row.patient_id || patient.id === row.patient_id
-    ) || null;
-
     // Если нет patient_id (QR-пациент), используем частичные данные из row
     if (!row.patient_id) {
-      logger.info('[Dermatology] QR-пациент без patient_id, используем частичные данные из row');
       const partialPatient = createPartialPatientFromRow(row);
       setEditPatientModal({ open: true, patient: partialPatient, loading: false });
       return;
     }
 
     const patientForEdit =
-      patientFromCache ||
-      buildDermatologyPatientFromAppointment(row, tI18n) ||
+      buildDermatologyPatientFromAppointment(row) ||
       createPartialPatientFromRow(row);
 
-    logger.info('[Dermatology] Открытие модального окна редактирования из локальных данных для:', row.patient_fio);
     setEditPatientModal({ open: true, patient: patientForEdit, loading: false });
-  }, [patients, createPartialPatientFromRow]);
+  }, [createPartialPatientFromRow]);
 
   // Обработчики для таблицы записей
   const handleAppointmentRowClick = async (row: DermatologyAppointment) => {
-    logger.info('Клик по записи:', row);
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
       const visitId = await ensureCanonicalVisitId(row);
       if (!visitId) {
-        logger.error('[Dermatology] Не удалось определить канонический visit_id', row);
+        logger.warn('[Dermatology] Could not resolve the canonical visit for the selected row');
         return;
       }
 
@@ -760,7 +668,6 @@ const DermatologistPanelUnified = () => {
   };
 
   const handleAppointmentActionClick = async (action: string, row: DermatologyAppointment, event?: unknown) => {
-    logger.info('[Dermatology] handleAppointmentActionClick:', action, row);
     if (event) {
       (event as React.MouseEvent).stopPropagation();
     }
@@ -774,7 +681,7 @@ const DermatologistPanelUnified = () => {
         try {
           const queueEntryId = resolveDoctorQueueEntryId(row);
           if (queueEntryId === null) {
-            logger.warn('[Dermatology] Cannot start visit without OnlineQueueEntry id', row);
+            logger.warn('[Dermatology] Cannot start visit without a queue entry ID');
             notify.error(t('derma.no_queue_id_for_visit'));
             break;
           }
@@ -782,27 +689,24 @@ const DermatologistPanelUnified = () => {
           const response = (await api.post(`/doctor/queue/${queueEntryId}/start-visit`)) as AxiosResponse<Record<string, unknown>>;
 
           if (response.status < 400) {
-            logger.info('[Dermatology] Пациент вызван:', row.patient_fio);
             await loadDermatologyAppointments();
           }
         } catch (error: unknown) {
-          logger.error('[Dermatology] Ошибка вызова пациента:', error);
+          logger.error('[Dermatology] Could not start the selected visit', safeErrorMetadata(error));
         }
         break;
       case 'payment':
-        logger.info('[Dermatology] Открытие окна оплаты для:', row.patient_fio);
-        logger.info('[Dermatology] payment action invoked (disabled for doctor view)', row);
+        logger.info('[Dermatology] Payment action is unavailable in doctor view');
         break;
       case 'print':
-        logger.info('[Dermatology] Печать талона для:', row.patient_fio);
         try {
           const printResult = await printPanelTicket(row, {
             specialtyName: t('derma.derma_panel_specialty_name')
           });
           notify.success(printResult?.message || t('derma.derma_panel_ticket_printed', { name: row.patient_fio }));
         } catch (error: unknown) {
-          logger.error('[Dermatology] Ошибка печати талона:', error);
-          notify.error(getErrorMessage(error) || t('derma.derma_panel_ticket_print_failed'));
+          logger.error('[Dermatology] Queue ticket print failed', safeErrorMetadata(error));
+          notify.error(t('derma.derma_panel_ticket_print_failed'));
         }
         break;
       case 'complete':
@@ -810,7 +714,7 @@ const DermatologistPanelUnified = () => {
         try {
           const visitId = await ensureCanonicalVisitId(row);
           if (!visitId) {
-            logger.error('[Dermatology] Нельзя завершить прием без канонического visit_id', row);
+            logger.warn('[Dermatology] Cannot open completion flow without a canonical visit');
             break;
           }
 
@@ -827,17 +731,15 @@ const DermatologistPanelUnified = () => {
             status: 'in_cabinet',
             specialty: row.specialty || 'dermatology'
           };
-          logger.info('[Dermatology] Завершение приёма для:', patient.patient_name);
           setSelectedPatient(patient);
           setCurrentAppointment(patient);
           handleTabChange('visit');
         } catch (error: unknown) {
-          logger.error('[Dermatology] Ошибка при завершении приёма:', error);
+          logger.error('[Dermatology] Could not open visit completion flow', safeErrorMetadata(error));
         }
         break;
       case 'edit':
         // Загружаем полные данные пациента перед открытием модального окна
-        logger.info('[Dermatology] Открытие модального окна редактирования для:', row.patient_fio);
         await handleEditPatient(row);
         break;
       case 'cancel':
@@ -848,10 +750,6 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  const authHeader = useCallback(() => ({
-    Authorization: `Bearer ${tokenManager.getAccessToken()}`
-  }), []);
-
   const getSelectedPatientId = useCallback(() => (
     selectedPatient?.patient?.id ||
     selectedPatient?.patient_id ||
@@ -859,161 +757,23 @@ const DermatologistPanelUnified = () => {
     null
   ), [currentAppointment?.patient_id, selectedPatient]);
 
-  const getSelectedVisitId = useCallback(() => (
-    currentAppointment?.visit_id ||
-    selectedPatient?.visit_id ||
-    null
-  ), [currentAppointment?.visit_id, selectedPatient]);
-
-  const loadPatients = useCallback(async () => {
-    try {
-      setLoading(true);
-      await loadDermatologyAppointments();
-    } catch (error: unknown) {
-      logger.error('Ошибка загрузки пациентов:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [loadDermatologyAppointments]);
-
-  const loadSkinExaminations = useCallback(async (force = false) => {
-    if (!force) {
-      if (dermatologyRequestCache.skinExaminations.promise) {
-        return dermatologyRequestCache.skinExaminations.promise;
-      }
-
-      const cachedSkinExaminations = getRecentDermatologyCache(dermatologyRequestCache.skinExaminations, [] as SkinExaminationRecord[]);
-      if (cachedSkinExaminations !== null) {
-        const cached = cachedSkinExaminations as SkinExaminationRecord[];
-        setSkinExaminations(cached);
-        return cached;
-      }
-    }
-
-    const loadPromise = (async () => {
-      dermatologyRequestCache.skinExaminations.lastAttemptAt = Date.now();
-      try {
-        const response = (await api.get('/derma/examinations?limit=100')) as AxiosResponse<Record<string, unknown>>;
-        if (response.status < 400) {
-          const data = response.data;
-          const nextSkinExaminations = Array.isArray(data) ? (data as unknown as SkinExaminationRecord[]) : [];
-          setSkinExaminations(nextSkinExaminations);
-          dermatologyRequestCache.skinExaminations.data = nextSkinExaminations as unknown[];
-          return nextSkinExaminations;
-        }
-        return (dermatologyRequestCache.skinExaminations.data as SkinExaminationRecord[] | null) || [];
-      } catch {
-
-        // эндпоинт может отсутствовать
-        return dermatologyRequestCache.skinExaminations.data || [];
-      }
-    })();
-
-    dermatologyRequestCache.skinExaminations.promise = loadPromise;
-    try {
-      return await loadPromise;
-    } finally {
-      if (dermatologyRequestCache.skinExaminations.promise === loadPromise) {
-        dermatologyRequestCache.skinExaminations.promise = null;
-      }
-    }
-  }, [authHeader]);
-
-  const loadCosmeticProcedures = useCallback(async (force = false) => {
-    if (!force) {
-      if (dermatologyRequestCache.cosmeticProcedures.promise) {
-        return dermatologyRequestCache.cosmeticProcedures.promise;
-      }
-
-      const cachedCosmeticProcedures = getRecentDermatologyCache(dermatologyRequestCache.cosmeticProcedures, [] as CosmeticProcedureData[]);
-      if (cachedCosmeticProcedures !== null) {
-        const cached = cachedCosmeticProcedures as CosmeticProcedureData[];
-        setCosmeticProcedures(cached);
-        return cached;
-      }
-    }
-
-    const loadPromise = (async () => {
-      dermatologyRequestCache.cosmeticProcedures.lastAttemptAt = Date.now();
-      try {
-        const response = (await api.get('/derma/procedures?limit=100')) as AxiosResponse<Record<string, unknown>>;
-        if (response.status < 400) {
-          const data = response.data;
-          const nextCosmeticProcedures = Array.isArray(data) ? (data as unknown as CosmeticProcedureData[]) : [];
-          setCosmeticProcedures(nextCosmeticProcedures);
-          dermatologyRequestCache.cosmeticProcedures.data = nextCosmeticProcedures as unknown[];
-          return nextCosmeticProcedures;
-        }
-        return (dermatologyRequestCache.cosmeticProcedures.data as CosmeticProcedureData[] | null) || [];
-      } catch {
-
-        // эндпоинт может отсутствовать
-        return dermatologyRequestCache.cosmeticProcedures.data || [];
-      }
-    })();
-
-    dermatologyRequestCache.cosmeticProcedures.promise = loadPromise;
-    try {
-      return await loadPromise;
-    } finally {
-      if (dermatologyRequestCache.cosmeticProcedures.promise === loadPromise) {
-        dermatologyRequestCache.cosmeticProcedures.promise = null;
-      }
-    }
-  }, [authHeader]);
-
-  const loadPatientData = useCallback(async () => {
-    const patientId = getSelectedPatientId();
-    if (!patientId) return;
-
-    try {
-      const token = tokenManager.getAccessToken();
-      if (!token) return;
-
-      const skinResponse = (await api.get(`/derma/examinations?patient_id=${patientId}&limit=10`)) as AxiosResponse<Record<string, unknown>>;
-      if (skinResponse.status < 400) {
-        const skinData = skinResponse.data;
-        setSkinExaminations(Array.isArray(skinData) ? (skinData as unknown as SkinExaminationRecord[]) : []);
-      }
-
-      const cosmeticResponse = (await api.get(`/derma/procedures?patient_id=${patientId}&limit=10`)) as AxiosResponse<Record<string, unknown>>;
-      if (cosmeticResponse.status < 400) {
-        const cosmeticData = cosmeticResponse.data;
-        setCosmeticProcedures(Array.isArray(cosmeticData) ? (cosmeticData as unknown as CosmeticProcedureData[]) : []);
-      }
-    } catch (error: unknown) {
-      logger.error('[Dermatology] Ошибка загрузки данных пациента:', error);
-    }
-  }, [getSelectedPatientId]);
-
-  const openSkinExaminationForm = useCallback(() => {
-    const patientId = getSelectedPatientId();
-    const visitId = getSelectedVisitId();
-    setSkinExamination((prev) => ({
-      ...prev,
-      patient_id: String(patientId || ''),
-      visit_id: String(visitId || '')
-    }));
-    setShowSkinForm(true);
-  }, [getSelectedPatientId, getSelectedVisitId]);
-
-  const openCosmeticProcedureForm = useCallback(() => {
-    const patientId = getSelectedPatientId();
-    const visitId = getSelectedVisitId();
-    setCosmeticProcedure((prev) => ({
-      ...prev,
-      patient_id: String(patientId || ''),
-      visit_id: String(visitId || '')
-    }));
-    setShowCosmeticForm(true);
-  }, [getSelectedPatientId, getSelectedVisitId]);
-
-  useEffect(() => {
-    loadPatients();
-    loadSkinExaminations();
-    loadCosmeticProcedures();
-    loadServices();
-  }, [loadPatients, loadSkinExaminations, loadCosmeticProcedures, loadServices]);
+  const patientHistory = useDermatologyPatientHistory(getSelectedPatientId());
+  const {
+    appointments: patientAppointmentsHistory,
+    skinExaminations,
+    cosmeticProcedures,
+    skinExaminationsTotal,
+    cosmeticProceduresTotal,
+    hasMoreExaminations,
+    hasMoreProcedures,
+    loadingMoreExaminations,
+    loadingMoreProcedures,
+    loadMoreExaminations,
+    loadMoreProcedures,
+    loading: patientHistoryLoading,
+    ready: patientHistoryReady,
+    error: patientHistoryError,
+  } = patientHistory;
 
   // D-5 (UX audit): auto-promote selectedPatient to currentAppointment
   // so the first visit branch (with EMRContainerV2) renders correctly.
@@ -1022,12 +782,6 @@ const DermatologistPanelUnified = () => {
       setCurrentAppointment(selectedPatient);
     }
   }, [selectedPatient, currentAppointment, activeTab]);
-
-  useEffect(() => {
-    if (selectedPatient) {
-      loadPatientData();
-    }
-  }, [selectedPatient, loadPatientData]);
 
   // ✅ Автоматическая загрузка пациента из URL параметра patientId / visitId
   useEffect(() => {
@@ -1081,7 +835,7 @@ const DermatologistPanelUnified = () => {
         });
 
         const applyAppointmentSelection = (appointment: DermatologyAppointment) => {
-          const patientObj = buildDermatologyPatientFromAppointment(appointment as Record<string, unknown>, i18n.t.bind(null));
+          const patientObj = buildDermatologyPatientFromAppointment(appointment as Record<string, unknown>);
           if (!patientObj) {
             return false;
           }
@@ -1092,7 +846,7 @@ const DermatologistPanelUnified = () => {
           };
           setSelectedPatient(nextPatient);
           setCurrentAppointment(nextPatient);
-          setActiveTab(visitIdFromUrl ? 'visit' : 'appointments');
+          setActiveTab(visitIdFromUrl ? 'visit' : 'queue');
           urlResolutionRef.current.notified = false;
           notify.info(t('derma.derma_panel_patient_loaded', { name: patientObj.patient_name }));
           return true;
@@ -1137,12 +891,8 @@ const DermatologistPanelUnified = () => {
 
           setSelectedPatient(fallbackPatient);
           setCurrentAppointment(fallbackPatient);
-          setActiveTab(visitIdFromUrl ? 'visit' : 'appointments');
+          setActiveTab(visitIdFromUrl ? 'visit' : 'queue');
           urlResolutionRef.current.notified = false;
-          logger.info('[Dermatology] Пациент из URL не найден в очереди, использую безопасный URL-fallback', {
-            visitId: visitIdFromUrl,
-            patientId: fallbackPatientId,
-          });
           return;
         }
 
@@ -1158,7 +908,7 @@ const DermatologistPanelUnified = () => {
           );
         }
       } catch (error: unknown) {
-        logger.error('[Dermatology] Не удалось загрузить пациента из URL:', error);
+        logger.error('[Dermatology] URL patient selection failed', safeErrorMetadata(error));
         notify.error(t('derma.patient_load_failed'));
       }
     };
@@ -1166,79 +916,229 @@ const DermatologistPanelUnified = () => {
     loadPatientFromUrl();
   }, [location.search, patientIdFromUrl, visitIdFromUrl, selectedPatient?.patient_id, selectedPatient?.visit_id, currentAppointment?.visit_id, appointments, loadDermatologyAppointments, setActiveTab, setSelectedPatient]);
 
-  useEffect(() => {
-    const appointmentId = currentAppointment?.appointment_id || null;
-    if (!appointmentId) {
-      setEmr(null);
+  const currentVisitContext = useMemo<DermatologyVisitContext>(() => ({
+    appointmentId: currentAppointment?.appointment_id ?? selectedPatient?.appointment_id ?? null,
+    patientId: currentAppointment?.patient_id ?? selectedPatient?.patient_id ?? null,
+    visitId: currentAppointment?.visit_id ?? selectedPatient?.visit_id ?? null,
+    queueEntryId: currentAppointment?.doctor_queue_entry_id ?? currentAppointment?.queue_entry_id ??
+      selectedPatient?.doctor_queue_entry_id ?? selectedPatient?.queue_entry_id ?? null,
+  }), [
+    currentAppointment?.appointment_id,
+    currentAppointment?.patient_id,
+    currentAppointment?.visit_id,
+    currentAppointment?.doctor_queue_entry_id,
+    currentAppointment?.queue_entry_id,
+    selectedPatient?.appointment_id,
+    selectedPatient?.patient_id,
+    selectedPatient?.visit_id,
+    selectedPatient?.doctor_queue_entry_id,
+    selectedPatient?.queue_entry_id,
+  ]);
+  const currentVisitContextRef = useRef(currentVisitContext);
+  currentVisitContextRef.current = currentVisitContext;
+  const selectedPatientRef = useRef(selectedPatient);
+  selectedPatientRef.current = selectedPatient;
+
+  const updateSelectedPatient = useCallback((update: (patient: DermatologyPatient | null) => DermatologyPatient | null) => {
+    const previous = selectedPatientRef.current;
+    const next = update(previous);
+    if (next !== previous) {
+      selectedPatientRef.current = next;
+      setSelectedPatient(next);
+    }
+  }, [setSelectedPatient]);
+
+  const refreshCanonicalStatus = useCallback(async (
+    expectedContext: DermatologyVisitContext,
+    refreshQueue: boolean,
+  ) => {
+    if (!isSameDermatologyVisit(expectedContext, currentVisitContextRef.current)) return;
+
+    const requestId = ++statusRequestIdRef.current;
+    const expectedAppointmentId = expectedContext.appointmentId === null || expectedContext.appointmentId === undefined
+      ? null
+      : String(expectedContext.appointmentId);
+    const expectedQueueEntryId = expectedContext.queueEntryId === null || expectedContext.queueEntryId === undefined
+      ? null
+      : String(expectedContext.queueEntryId);
+
+    if (expectedAppointmentId) {
+      setAppointmentCompletionStatus({
+        appointmentId: expectedAppointmentId,
+        visitId: expectedContext.visitId === null || expectedContext.visitId === undefined
+          ? null
+          : String(expectedContext.visitId),
+        canComplete: false,
+      });
+    } else {
+      setAppointmentCompletionStatus(null);
       setPrescription(null);
       setCanCreatePrescription(false);
-      return;
     }
 
-    let isMounted = true;
-    setCanCreatePrescription(false);
+    if (refreshQueue && expectedQueueEntryId) {
+      setCurrentAppointment((previous) => previous ? { ...previous, can_complete: false } : previous);
+      updateSelectedPatient((previous) => previous ? { ...previous, can_complete: false } : previous);
+    }
 
-    const loadCanonicalStatus = async () => {
-      try {
-        const response = (await api.get(`/appointments/${appointmentId}/status`)) as AxiosResponse<Record<string, unknown>>;
+    const statusRequest = expectedAppointmentId
+      ? api.get(`/appointments/${expectedAppointmentId}/status`)
+      : expectedContext.visitId !== null && expectedContext.visitId !== undefined
+        ? api.get(`/v2/emr/${expectedContext.visitId}`)
+        : Promise.resolve(null);
+    const queueRequest = refreshQueue && expectedQueueEntryId
+      ? api.get('/doctor/dermatology/queue/today')
+      : Promise.resolve(null);
 
-        if (response.status >= 400) {
-          return;
-        }
+    const [statusResult, queueResult] = await Promise.allSettled([statusRequest, queueRequest]);
+    if (
+      statusRequestIdRef.current !== requestId ||
+      !isSameDermatologyVisit(expectedContext, currentVisitContextRef.current)
+    ) return;
 
-        const statusData = response.data as Record<string, unknown>;
-        if (!isMounted) {
+    if (statusResult.status === 'fulfilled' && statusResult.value && statusResult.value.status < 400) {
+      const statusData = statusResult.value.data as Record<string, unknown>;
+      if (expectedAppointmentId) {
+        const statusVisitId = normalizeNumericId(statusData.visit_id as string | number | null | undefined);
+        if (expectedContext.visitId !== null && expectedContext.visitId !== undefined &&
+          String(statusVisitId) !== String(expectedContext.visitId)) {
           return;
         }
 
         setEmr((statusData.emr as Record<string, unknown>) || null);
-        setPrescription((statusData.prescription as Record<string, unknown>) || null);
+        setPrescription(toPrescriptionSystemRecord(statusData.prescription));
         setCanCreatePrescription(statusData.can_create_prescription === true);
-
-        const normalizedStatusVisitId = normalizeNumericId(statusData.visit_id as string | number | null | undefined);
-        const normalizedCurrentVisitId = normalizeNumericId(currentAppointment?.visit_id);
-        if (normalizedStatusVisitId && normalizedStatusVisitId !== normalizedCurrentVisitId) {
-          setCurrentAppointment((prev) => prev ? { ...prev, visit_id: normalizedStatusVisitId } : prev);
-        }
+        setAppointmentCompletionStatus({
+          appointmentId: expectedAppointmentId,
+          visitId: statusVisitId === null ? null : String(statusVisitId),
+          canComplete: statusData.can_complete === true,
+        });
 
         const appointmentData = statusData.appointment as { status?: string } | undefined;
-        const normalizedAppointmentStatus = appointmentData?.status || null;
-        if (normalizedAppointmentStatus) {
-          setCurrentAppointment((prev) => prev ? { ...prev, status: normalizedAppointmentStatus } : prev);
+        setCurrentAppointment((previous) => previous &&
+          String(previous.appointment_id) === expectedAppointmentId
+          ? {
+              ...previous,
+              ...(statusVisitId !== null ? { visit_id: statusVisitId } : {}),
+              ...(appointmentData?.status ? { status: appointmentData.status } : {}),
+            }
+          : previous);
+        updateSelectedPatient((previous) => previous &&
+          String(previous.appointment_id) === expectedAppointmentId
+          ? {
+              ...previous,
+              ...(statusVisitId !== null ? { visit_id: statusVisitId } : {}),
+              ...(appointmentData?.status ? { status: appointmentData.status } : {}),
+            }
+          : previous);
+      } else {
+        const returnedVisitId = normalizeNumericId(
+          (statusData.visit_id ?? statusData.visitId) as string | number | null | undefined,
+        );
+        if (expectedContext.visitId !== null && expectedContext.visitId !== undefined &&
+          returnedVisitId !== null && String(returnedVisitId) !== String(expectedContext.visitId)) {
+          return;
         }
-      } catch (error: unknown) {
-        logger.warn('[Dermatology] Не удалось загрузить canonical status:', error);
+        const isDraft = statusData.is_draft ?? statusData.isDraft ?? statusData.status === 'draft';
+        setEmr({ ...statusData, is_draft: isDraft === true });
+        setPrescription(null);
+        setCanCreatePrescription(false);
+        setAppointmentCompletionStatus(null);
       }
-    };
+    } else if (statusResult.status === 'rejected') {
+      logger.warn('[Dermatology] Canonical visit status refresh failed', safeErrorMetadata(statusResult.reason));
+    }
 
-    loadCanonicalStatus();
+    if (refreshQueue && expectedQueueEntryId) {
+      let queueCanComplete = false;
+      if (queueResult.status === 'fulfilled' && queueResult.value && queueResult.value.status < 400) {
+        const queueData = queueResult.value.data as { entries?: unknown };
+        const entries = Array.isArray(queueData.entries)
+          ? queueData.entries as Array<Record<string, unknown>>
+          : [];
+        const matchingEntry = entries.find((entry) => String(entry.id) === expectedQueueEntryId);
+        const sameVisit = matchingEntry && (
+          expectedContext.visitId === null || expectedContext.visitId === undefined ||
+          String(matchingEntry.visit_id) === String(expectedContext.visitId)
+        );
+        const samePatient = matchingEntry && (
+          expectedContext.patientId === null || expectedContext.patientId === undefined ||
+          String(matchingEntry.patient_id) === String(expectedContext.patientId)
+        );
+        queueCanComplete = Boolean(sameVisit && samePatient && matchingEntry?.can_complete === true);
+      } else if (queueResult.status === 'rejected') {
+        logger.warn('[Dermatology] Doctor queue status refresh failed', safeErrorMetadata(queueResult.reason));
+      }
 
+      const updateQueueEntry = (previous: DermatologyPatient | null): DermatologyPatient | null => {
+        if (!previous || String(resolveDoctorQueueEntryId(previous as unknown as Record<string, unknown>)) !== expectedQueueEntryId) {
+          return previous;
+        }
+        if (expectedContext.visitId !== null && expectedContext.visitId !== undefined &&
+          String(previous.visit_id) !== String(expectedContext.visitId)) return previous;
+        if (expectedContext.patientId !== null && expectedContext.patientId !== undefined &&
+          String(previous.patient_id) !== String(expectedContext.patientId)) return previous;
+        return { ...previous, can_complete: queueCanComplete };
+      };
+      setCurrentAppointment(updateQueueEntry);
+      updateSelectedPatient(updateQueueEntry);
+    }
+  }, [updateSelectedPatient]);
+
+  useEffect(() => {
+    setEmr(null);
+    setPrescription(null);
+    setCanCreatePrescription(false);
+    if (currentVisitContext.appointmentId !== null && currentVisitContext.appointmentId !== undefined) {
+      setAppointmentCompletionStatus({
+        appointmentId: String(currentVisitContext.appointmentId),
+        visitId: currentVisitContext.visitId === null || currentVisitContext.visitId === undefined
+          ? null
+          : String(currentVisitContext.visitId),
+        canComplete: false,
+      });
+    } else {
+      setAppointmentCompletionStatus(null);
+    }
+
+    if (
+      (currentVisitContext.appointmentId === null || currentVisitContext.appointmentId === undefined) &&
+      (currentVisitContext.visitId === null || currentVisitContext.visitId === undefined)
+    ) return;
+
+    void refreshCanonicalStatus(currentVisitContext, false);
     return () => {
-      isMounted = false;
+      statusRequestIdRef.current += 1;
     };
-  }, [currentAppointment?.appointment_id, currentAppointment?.id, currentAppointment?.visit_id]);
+  }, [currentVisitContext, refreshCanonicalStatus]);
 
 
   const savePrescription = async (prescriptionData: unknown) => {
+    let prescriptionPayload: ReturnType<typeof toPrescriptionCreatePayload>;
     try {
-      const appointmentId = currentAppointment?.appointment_id || null;
-      if (!appointmentId) {
-        notify.error(t('derma.no_entry_for_prescription'));
-        return;
-      }
-      const response = (await api.post(`/appointments/${appointmentId}/prescription`, prescriptionData)) as AxiosResponse<Record<string, unknown>>;
+      prescriptionPayload = toPrescriptionCreatePayload(prescriptionData, {
+        appointmentId: currentVisitContext.appointmentId,
+        visitId: currentVisitContext.visitId,
+        emrId: emr?.id,
+      });
+    } catch {
+      notify.error(t('derma.no_entry_for_prescription'));
+      throw new Error('Prescription requires an appointment');
+    }
 
-      if (response.status < 400) {
-        const savedPrescription = response.data;
-        setPrescription(savedPrescription);
-        notify.success(t('derma.prescription_saved'));
-      } else {
-        const error = response.data as { detail?: string };
-        notify.error(error.detail || t('derma.derma_panel_prescription_save_failed_short'));
-      }
+    try {
+      const savedPrescription = await postDermatologyPrescription(
+        prescriptionPayload,
+        (appointmentId, payload) => api.post(`/appointments/${appointmentId}/prescription`, payload) as Promise<AxiosResponse<unknown>>,
+      );
+      setPrescription(savedPrescription);
+      notify.success(t('derma.prescription_saved'));
     } catch (error: unknown) {
-      logger.error('DermatologistPanel: Save prescription error:', error);
-      notify.error(t('derma.prescription_save_failed'));
+      const statusCode = safeErrorMetadata(error).statusCode;
+      notify.error(statusCode === 422
+        ? t('derma.derma_panel_prescription_save_failed_short')
+        : t('derma.prescription_save_failed'));
+      throw new Error('Prescription save failed');
     }
   };
 
@@ -1274,15 +1174,9 @@ const DermatologistPanelUnified = () => {
       }
 
       notify.success(result.data?.message || t('derma.derma_panel_prescription_printed'));
-      logger.info('[Dermatology] Prescription print success', {
-        patientId: payload.patient.id,
-        visitId: currentAppointment?.visit_id || null,
-        printer: result.data?.printer || null,
-        jobId: result.data?.job_id || null
-      });
     } catch (error: unknown) {
-      logger.error('[Dermatology] Prescription print error:', error);
-      notify.error(getErrorMessage(error) || t('derma.derma_panel_prescription_print_failed'));
+      logger.error('[Dermatology] Prescription print failed', safeErrorMetadata(error));
+      notify.error(t('derma.derma_panel_prescription_print_failed'));
       throw error;
     }
   };
@@ -1300,8 +1194,39 @@ const DermatologistPanelUnified = () => {
     }
   };
 
+  const currentVisitAppointmentId = currentVisitContext.appointmentId === null || currentVisitContext.appointmentId === undefined
+    ? null
+    : String(currentVisitContext.appointmentId);
+  const currentVisitStatusId = currentVisitContext.visitId === null || currentVisitContext.visitId === undefined
+    ? null
+    : String(currentVisitContext.visitId);
+  const appointmentStatusMatches = Boolean(
+    appointmentCompletionStatus &&
+    appointmentCompletionStatus.appointmentId === currentVisitAppointmentId &&
+    appointmentCompletionStatus.visitId === currentVisitStatusId &&
+    appointmentCompletionStatus.canComplete,
+  );
+  const canCompleteCurrentVisit = canCompleteDermatologyVisit(
+    currentAppointment?.can_complete === true &&
+      currentVisitContext.queueEntryId !== null && currentVisitContext.queueEntryId !== undefined,
+    currentVisitContext.appointmentId,
+    appointmentStatusMatches,
+  );
+  const canCompleteCurrentVisitRef = useRef(canCompleteCurrentVisit);
+  canCompleteCurrentVisitRef.current = canCompleteCurrentVisit;
+
   // Унифицированная обработка сохранения визита
   const handleSaveVisit = async () => {
+    if (!canCompleteCurrentVisitRef.current) return;
+    const completionContext = currentVisitContext;
+    const entryId =
+      resolveDoctorQueueEntryId(currentAppointment as unknown as Record<string, unknown>) ??
+      resolveDoctorQueueEntryId(selectedPatient as unknown as Record<string, unknown>);
+    if (!entryId || String(entryId) !== String(completionContext.queueEntryId)) {
+      notify.error(t('derma.no_patient_for_complete'));
+      return;
+    }
+
     // QW-5 (UX audit): confirm before completing the visit
     const ok = await confirm({
       title: t('derma.complete_visit_title'),
@@ -1314,56 +1239,14 @@ const DermatologistPanelUnified = () => {
     if (!ok) {
       return;
     }
-
-    // Определяем ID записи: приоритет selectedPatient, потом currentAppointment
-    const entryId = resolveDoctorQueueEntryId(selectedPatient as Record<string, unknown>) ?? resolveDoctorQueueEntryId(currentAppointment as Record<string, unknown>);
-    if (!entryId) {
-      logger.error('[Dermатology] handleSaveVisit: нет entryId');
-      notify.error(t('derma.no_patient_for_complete'));
-      return;
-    }
+    if (
+      !isSameDermatologyVisit(completionContext, currentVisitContextRef.current) ||
+      !canCompleteCurrentVisitRef.current
+    ) return;
 
     try {
       setLoading(true);
-      logger.info('[Dermatology] handleSaveVisit: start', { entryId, selectedPatient, currentAppointment });
-
-      // Определяем patient_id из доступных источников
-      const patientId = selectedPatient?.patient?.id ||
-      selectedPatient?.patient_id ||
-      currentAppointment?.patient_id ||
-      selectedPatient?.id ||
-      entryId;
-
-      // X-2 (UX audit): fetch latest EMR data for the payload
-      let emrPayload = { complaint: '', diagnosis: '', icd10: '', notes: '' };
-      try {
-        const emrRes = (await api.get(`/v2/emr/${selectedPatient?.visit_id || currentAppointment?.visit_id}`)) as AxiosResponse<Record<string, unknown>>;
-        if (emrRes.status < 400) {
-          const emrData = emrRes.data as Record<string, unknown>;
-          emrPayload = {
-            complaint: (emrData?.complaints as string) || '',
-            diagnosis: (emrData?.diagnosis as string) || '',
-            icd10: (emrData?.icd10_code as string) || (emrData?.icd10 as string) || '',
-            notes: (emrData?.notes as string) || '',
-          };
-        }
-      } catch (emrErr) {
-        logger.warn('[Dermatology] Failed to fetch EMR for payload, using local visitData', emrErr);
-        emrPayload = { complaint: visitData.complaint, diagnosis: visitData.diagnosis, icd10: visitData.icd10, notes: visitData.notes };
-      }
-
-      const visitPayload = {
-        patient_id: patientId,
-        complaint: emrPayload.complaint,
-        diagnosis: emrPayload.diagnosis,
-        icd10: emrPayload.icd10,
-        services: selectedServices,
-        notes: emrPayload.notes
-      };
-
-      logger.info('[Dermatology] handleSaveVisit: payload', visitPayload);
-      await queueService.completeVisit(entryId, visitPayload);
-      logger.info('[Dermatology] handleSaveVisit: completeVisit OK');
+      await queueService.completeVisit(entryId, {});
 
       notify.success(t('derma.visit_completed'));
 
@@ -1375,7 +1258,6 @@ const DermatologistPanelUnified = () => {
       // Очищаем форму и состояние
       setSelectedPatient(null);
       setCurrentAppointment(null);
-      setSelectedServices([]);
       setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
       setEmr(null);
       setPrescription(null);
@@ -1383,100 +1265,20 @@ const DermatologistPanelUnified = () => {
 
       // Автоматически вызвать следующего пациента по дерматологии
       try {
-        logger.info('[Dermatology] callNextWaiting(dermatology): start');
         const next = await queueService.callNextWaiting(SPECIALTY_KEYS.DERMATOLOGY);
-        logger.info('[Dermatology] callNextWaiting(dermatology): result', next);
+        logger.info('[Dermatology] Next dermatology queue entry requested', { succeeded: next?.success === true });
         if (next?.success) {
             notify.success(t('derma.derma_panel_next_patient_called', { number: (next as { entry?: { number?: string | number } }).entry?.number ?? '' }));
         }
-      } catch (err) {
-        logger.warn('[Dermatology] callNextWaiting(dermatology): failed', err);
+      } catch (error: unknown) {
+        logger.warn('[Dermatology] Next dermatology queue entry request failed', safeErrorMetadata(error));
       }
 
     } catch (error: unknown) {
-      logger.error('[Dermatology] handleSaveVisit: error', error);
-      notify.error(getErrorMessage(error) || t('derma.derma_panel_complete_failed'));
+      logger.error('[Dermatology] Visit completion failed', safeErrorMetadata(error));
+      notify.error(t('derma.derma_panel_complete_failed'));
     } finally {
-      logger.info('[Dermatology] handleSaveVisit: finish');
       setLoading(false);
-    }
-  };
-
-  // Обработка осмотра кожи
-  const handleSkinExaminationSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        ...skinExamination,
-        patient_id: skinExamination.patient_id || getSelectedPatientId(),
-        visit_id: skinExamination.visit_id || getSelectedVisitId() || null
-      };
-      logger.info('[Dermatology] Сохранение осмотра кожи', payload);
-
-      const response = (await api.post('/derma/examinations', payload)) as AxiosResponse<Record<string, unknown>>;
-
-      if (response.status < 400) {
-        setShowSkinForm(false);
-        setSkinExamination({
-          patient_id: '',
-          visit_id: '',
-          examination_date: '',
-          skin_type: '',
-          skin_condition: '',
-          lesions: '',
-          distribution: '',
-          symptoms: '',
-          diagnosis: '',
-          treatment_plan: ''
-        });
-        loadPatientData();
-        notify.success(t('derma.skin_exam_saved'));
-      } else {
-        const detail = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-        logger.error('[Dermatology] Ошибка ответа при сохранении осмотра', { status: response.status, detail });
-        notify.error(t('derma.skin_exam_save_failed'));
-      }
-    } catch (error: unknown) {
-      logger.error('Ошибка сохранения осмотра:', error);
-      notify.error(t('derma.skin_exam_save_failed'));
-    }
-  };
-
-  // Обработка косметической процедуры
-  const handleCosmeticProcedureSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        ...cosmeticProcedure,
-        patient_id: cosmeticProcedure.patient_id || getSelectedPatientId(),
-        visit_id: cosmeticProcedure.visit_id || getSelectedVisitId() || null
-      };
-      logger.info('[Dermatology] Сохранение косметической процедуры', payload);
-
-      const response = (await api.post('/derma/procedures', payload)) as AxiosResponse<Record<string, unknown>>;
-
-      if (response.status < 400) {
-        setShowCosmeticForm(false);
-        setCosmeticProcedure({
-          patient_id: '',
-          visit_id: '',
-          procedure_date: '',
-          procedure_type: '',
-          area_treated: '',
-          products_used: '',
-          results: '',
-          follow_up: ''
-        });
-        loadPatientData();
-        notify.success(t('derma.procedure_saved'));
-      } else {
-        const detail = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-        logger.error('[Dermatology] Ошибка ответа при сохранении процедуры', { status: response.status, detail });
-        notify.error(t('derma.procedure_save_failed'));
-      }
-    } catch (error: unknown) {
-      logger.error('Ошибка сохранения процедуры:', error);
-      notify.error(t('derma.procedure_save_failed'));
     }
   };
 
@@ -1515,9 +1317,8 @@ const DermatologistPanelUnified = () => {
 
         {/* Контент вкладок */}
         <div>
-          {/* Записи дерматолога.
-              Phase 4+: 'patients' tab combines appointments + history. */}
-          {(activeTab === 'appointments' || activeTab === 'patients') &&
+          {/* Записи дерматолога */}
+          {activeTab === 'appointments' &&
           <div className="derma-flex-col-24 derma-w-full derma-max-w-none">
               <Card className="derma-card-w-full">
                 <div style={dermatologyAppointmentsHeaderStyle}>
@@ -1551,100 +1352,29 @@ const DermatologistPanelUnified = () => {
             </div>
           }
 
-          {/* Список пациентов */}
-          {activeTab === 'patients' &&
-          <div className="derma-flex-col-24">
-              <Card className="derma-p-8">
-                <div className="derma-flex-center">
-                  <h3 className="derma-flex-center">
-                    <User size={20} className="derma-icon-mr-green" aria-hidden="true" />
-                    {t('derma.derma_panel_patients_title')}
-                  </h3>
-                  <Badge variant="info">{t('derma.derma_panel_patients_count', { count: patients.length })}</Badge>
-                </div>
-
-                {loading ?
-              <div className="derma-loading-state">
-                    <RotateCw size={32} className="derma-loading-icon" aria-hidden="true" />
-                    <p className="derma-p-14-secondary">{t('derma.derma_panel_patients_loading')}</p>
-                  </div> :
-
-              <div className="derma-flex-col-24">
-                    {patients.map((patient) =>
-                <div key={patient.id} className="derma-patient-card">
-                        <div className="derma-flex-between-top">
-                          <div className="derma-flex-1">
-                            <div className="derma-flex-center">
-                              <h4 className="derma-h4-16-600">
-                                {patient.last_name} {patient.first_name} {patient.middle_name}
-                              </h4>
-                              <Badge variant="success" className="derma-ml-12">{t('derma.derma_panel_badge_dermatology')}</Badge>
-                            </div>
-                            <div className="derma-patient-info-list">
-                              <div className="derma-flex-center">
-                                <Phone size={18} className="derma-icon-mr derma-text-accent" aria-hidden="true" />
-                                {patient.phone}
-                              </div>
-                              <div className="derma-flex-center">
-                                <Calendar size={14} className="derma-icon-mr" aria-hidden="true" />
-                                {patient.birth_date}
-                              </div>
-                              <div className="derma-flex-center">
-                                <User size={14} className="derma-icon-mr" aria-hidden="true" />
-                                ID: {patient.id}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="derma-flex-gap-16">
-                            <Button
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedPatient(patient);
-                          setSkinExamination((prev) => ({
-                            ...prev,
-                            patient_id: String(patient.id ?? ''),
-                            visit_id: String(patient.visit_id || '')
-                          }));
-                          setShowSkinForm(true);
-                        }}
-                        className="derma-flex-center">
-
-                              <HeartPulse size={16} aria-hidden="true" />
-                              {t('derma.derma_panel_button_exam')}
-                            </Button>
-                            <Button
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedPatient(patient);
-                          setCosmeticProcedure((prev) => ({
-                            ...prev,
-                            patient_id: String(patient.id ?? ''),
-                            visit_id: String(patient.visit_id || '')
-                          }));
-                          setShowCosmeticForm(true);
-                        }}
-                        className="derma-flex-center">
-
-                              <Sparkles size={16} aria-hidden="true" />
-                              {t('derma.derma_panel_button_procedure')}
-                            </Button>
-                            <Button
-                        variant="outline"
-                        onClick={() => setSelectedPatient(patient)}
-                        className="derma-flex-center">
-
-                              <User size={16} aria-hidden="true" />
-                              {t('derma.derma_panel_button_view')}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                )}
-                  </div>
-              }
-              </Card>
-            </div>
-          }
+          {(activeTab === 'patients' || activeTab === 'history') && (
+            <DermaPatientsTab
+              selectedPatient={selectedPatient}
+              onSelectPatient={(patient) => {
+                setSelectedPatient(patient as DermatologyPatient | null);
+                setCurrentAppointment(null);
+              }}
+              appointments={patientAppointmentsHistory}
+              skinExaminations={skinExaminations}
+              cosmeticProcedures={cosmeticProcedures}
+              skinExaminationsTotal={skinExaminationsTotal}
+              cosmeticProceduresTotal={cosmeticProceduresTotal}
+              hasMoreExaminations={hasMoreExaminations}
+              hasMoreProcedures={hasMoreProcedures}
+              loadingMoreExaminations={loadingMoreExaminations}
+              loadingMoreProcedures={loadingMoreProcedures}
+              onLoadMoreExaminations={loadMoreExaminations}
+              onLoadMoreProcedures={loadMoreProcedures}
+              historyLoading={patientHistoryLoading}
+              historyReady={patientHistoryReady}
+              historyError={patientHistoryError}
+            />
+          )}
 
           {/* Прием пациента - EMR система */}
           {activeTab === 'queue' &&
@@ -1680,9 +1410,18 @@ const DermatologistPanelUnified = () => {
                   <EMRContainerV2
                   visitId={(currentAppointment?.visit_id ?? undefined) as string | number}
                   patientId={(currentAppointment?.patient_id ?? undefined) as string | number | null | undefined}
-                  specialty="dermatology" />
+                  specialty="dermatology"
+                  onPersisted={() => refreshCanonicalStatus(currentVisitContext, true)} />
 
                 </div>
+
+                {currentAppointment.patient_id && currentAppointment.visit_id && (
+                  <div className="derma-mt-24">
+                    <DermaVisitGallery
+                      patientId={currentAppointment.patient_id}
+                      visitId={currentAppointment.visit_id} />
+                  </div>
+                )}
 
                 {/* Система рецептов */}
                 {emr && !emr.is_draft &&
@@ -1695,7 +1434,7 @@ const DermatologistPanelUnified = () => {
                   appointment={currentAppointment as unknown as never}
                   emr={emr}
                   prescription={prescription}
-                  canCreatePrescription={canCreatePrescription}
+                  canCreatePrescription={Boolean(currentVisitContext.appointmentId && canCreatePrescription)}
                   onSave={savePrescription}
                   onPrint={printPrescription} />
 
@@ -1707,7 +1446,7 @@ const DermatologistPanelUnified = () => {
               <div className="derma-mt-24 derma-text-center">
                     <Button
                   onClick={handleSaveVisit}
-                  disabled={loading}
+                  disabled={loading || !canCompleteCurrentVisit}
                   className="derma-flex-center">
 
                       {loading ?
@@ -1742,165 +1481,11 @@ const DermatologistPanelUnified = () => {
             </Card>
           }
 
-          {/* Фото — R-15: extracted to DermaPhotosTab */}
-          {activeTab === 'photos' &&
-            <DermaPhotosTab
-              hasPatient={!!(currentAppointment || selectedPatient)}
-              currentAppointment={currentAppointment as unknown as never}
-              selectedPatient={selectedPatient as unknown as never}
-              photoData={photoData as unknown as never}
-              onPhotoUpdate={(updatedPhotos) => {
-                if (updatedPhotos) setPhotoData(updatedPhotos as { before: unknown[]; after: unknown[] });
-                loadPatientData();
-              }}
-              onGoToAppointments={() => handleTabChange('patients')}
-            />
-          }
-          {(activeTab === 'skin' || activeTab === 'cosmetic') &&
-            <DermaExamsTab
-              activeTab={activeTab}
-              skinExamination={skinExamination}
-              setSkinExamination={setSkinExamination}
-              showSkinForm={showSkinForm}
-              skinExaminations={skinExaminations as unknown as never[]}
-              onSkinSubmit={handleSkinExaminationSubmit}
-              onOpenSkinForm={openSkinExaminationForm}
-              onCancelSkinForm={() => setShowSkinForm(false)}
-              cosmeticProcedure={cosmeticProcedure}
-              setCosmeticProcedure={setCosmeticProcedure}
-              showCosmeticForm={showCosmeticForm}
-              cosmeticProcedures={cosmeticProcedures as unknown as never[]}
-              onCosmeticSubmit={handleCosmeticProcedureSubmit}
-              onOpenCosmeticForm={openCosmeticProcedureForm}
-              onCancelCosmeticForm={() => setShowCosmeticForm(false)}
-              getColor={getColor}
-              getFontSize={getFontSize}
-              getSpacing={getSpacing}
-            />
-          }
           {activeTab === 'ai' &&
           <AIAssistant
             specialty="dermatology"
             onSuggestionSelect={handleAISuggestion} />
 
-          }
-
-          {/* Управление услугами */}
-          {activeTab === 'services' &&
-          <div className="derma-flex-col-24">
-              <Card className="derma-p-8">
-                <h3 className="derma-flex-center">
-                  <Scissors size={20} className="derma-icon-mr-orange" aria-hidden="true" />
-                  {t('derma.derma_panel_services_title')}
-                </h3>
-
-                <div className="derma-flex-col-16">
-                  <div>
-                    <label className="derma-label-13-mb8">
-                      {t('derma.derma_panel_services_select')}
-                    </label>
-
-                    {/* Шаблоны процедур */}
-                    <ProcedureTemplates
-                    visitId={(selectedPatient?.visit_id ?? undefined) as string | number | undefined}
-                    onSelectProcedure={(procedure) => {
-                      logger.info('Выбрана процедура:', procedure);
-                      // Добавляем процедуру в список услуг
-                      setSelectedServices((prev) => [...prev, {
-                        id: Date.now(),
-                        name: (procedure as { name?: string }).name,
-                        price: (procedure as { price?: number }).price,
-                        duration: (procedure as { duration?: number }).duration
-                      }]);
-                    }} />
-
-
-                    <div className="derma-p-4 derma-mt-16">
-                      <ServiceChecklist
-                      value={selectedServices as unknown as string[]}
-                      onChange={(v: unknown) => setSelectedServices(v as unknown as SelectedServiceItem[])}
-                      department="derma" />
-
-                    </div>
-                  </div>
-
-                  <div className="derma-grid-auto-300">
-                    <div>
-                      <label className="derma-label-13-mb8">
-                        {t('derma.derma_panel_doctor_price_label')}
-                      </label>
-                      <div className="derma-flex-gap-8">
-                        <div className="derma-pos-rel-flex-1">
-                          <CircleDollarSign size={16} className="derma-dollar-icon-abs" aria-hidden="true" />
-                          <Input
-                          type="text"
-                          value={doctorPrice}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDoctorPrice(e.target.value)}
-                          placeholder={t('derma.derma_panel_ph_doctor_price')}
-                          inputMode="numeric"
-                          className="derma-input-pl-40" />
-
-                        </div>
-                        <Button
-                        onClick={() => {
-                          // PR-47: PriceOverrideManager was dead code (imported but never rendered).
-                          // Button now shows a toast instead of calling removed state setters.
-                          notify.info(t('derma.price_change_unavailable'));
-                        }}
-                        variant="primary"
-                        aria-label={t('derma.derma_panel_change_price_aria')}
-                        title={t('derma.derma_panel_change_price_aria')}>
-
-                          <CircleDollarSign size={16} aria-hidden="true" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="derma-label-13-mb8">
-                        {t('derma.derma_panel_total_label')}
-                      </label>
-                      <div className="derma-flex-center">
-                        <span className="derma-text-18-600-primary">
-                          {totalCost.toLocaleString()} UZS
-                        </span>
-                        <span className="derma-ml-8-text-13-secondary">
-                          {t('derma.derma_panel_total_breakdown', {
-                            services: servicesSubtotal.toLocaleString(),
-                            doctor: doctorPriceNum ? t('derma.derma_panel_doctor_inline', { amount: doctorPriceNum.toLocaleString() }) : ''
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="derma-price-info-box">
-                    <h4 className="derma-price-h4">
-                      {t('derma.derma_panel_price_directory')}
-                    </h4>
-                    <div className="derma-grid-auto-200-13">
-                      <div>{t('derma.derma_panel_price_consultation')}</div>
-                      <div>{t('derma.derma_panel_price_biopsy')}</div>
-                      <div>{t('derma.derma_panel_price_cleaning')}</div>
-                      <div>{t('derma.derma_panel_price_botox')}</div>
-                      <div>{t('derma.derma_panel_price_laser')}</div>
-                      <div>{t('derma.derma_panel_price_doctor_extra')}</div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          }
-
-          {/* История */}
-          {/* История — R-15: extracted to DermaHistoryTab.
-              Phase 4+: also renders under 'patients' tab. */}
-          {(activeTab === 'history' || activeTab === 'patients') &&
-            <DermaHistoryTab
-              skinExaminations={skinExaminations as unknown as never[]}
-              cosmeticProcedures={cosmeticProcedures as unknown as never[]}
-              getSpacing={getSpacing}
-            />
           }
 
         </div>{/* End of tab content wrapper */}

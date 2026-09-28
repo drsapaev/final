@@ -41,6 +41,42 @@ class ServicesApiRepository:
     def get_service(self, service_id: int):
         return self.db.query(Service).filter(Service.id == service_id).first()
 
+    def get_service_for_update(self, service_id: int):
+        """RQ-17 round-2 (P1-2): row-level serialization writer-а.
+
+        Конкурентный writer той же строки (canonical update/delete/
+        batch) сериализуется на row-lock; READ COMMITTED возвращает
+        последнюю закоммиченную версию строки на момент взятия лока,
+        поэтому stale-pre-lock чтение тега невозможно.
+        ``populate_existing`` перезатирает возможный stale identity-map
+        той же сессии. SQLite: FOR UPDATE игнорируется диалектом
+        (последовательные семантики тестов).
+        """
+        return (
+            self.db.query(Service)
+            .filter(Service.id == service_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+
+    def get_services_for_update(self, service_ids: list[int]):
+        """RQ-17 round-2 (P1-1): batch row-level serialization.
+
+        Детерминированный порядок строк (sorted by id) + SELECT ...
+        FOR UPDATE: конкурентные writer-ы тех же строк сериализуются
+        на row-lock; READ COMMITTED отдаёт пост-состояние закоммиченных
+        ретегов. SQLite: FOR UPDATE игнорируется диалектом.
+        """
+        return (
+            self.db.query(Service)
+            .filter(Service.id.in_(service_ids))
+            .order_by(Service.id)
+            .with_for_update()
+            .populate_existing()
+            .all()
+        )
+
     def get_service_by_code(self, code: str):
         return (
             self.db.query(Service)
@@ -134,6 +170,7 @@ class ServicesApiRepository:
         new_service: Service,
         user_id: int | None = None,
         comment: str | None = None,
+        commit: bool = True,
     ) -> None:
         try:
             ServiceAuditService(self.db).log_service_update(
@@ -142,8 +179,15 @@ class ServicesApiRepository:
                 new_service=new_service,
                 user_id=user_id,
                 comment=comment,
+                commit=commit,
             )
         except Exception as exc:
+            if not commit:
+                # RQ-17 round-3 P2: в batch-режиме audit-строка — часть
+                # атомарной транзакции batch'а; молча проглоченный сбой
+                # здесь оставил бы batch без audit-следа при успешном
+                # коммите. Владелец транзакции обязан увидеть сбой.
+                raise
             logger.warning(
                 "Service audit update failed after service commit: service_id=%s error=%s",
                 service_id,

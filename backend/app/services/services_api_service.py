@@ -8,6 +8,15 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.crud.clinic import clinic_today
+from app.crud.queue_owner_invariant import (
+    OwnerInvariantViolation,
+    affected_service_tags,
+    lock_owner_config_scope,
+    lock_owner_config_scopes,
+    validate_service_gate_for_requires_doctor,
+    validate_tag_owner_invariant,
+)
 from app.models.clinic import ServiceCategory
 from app.models.service import Service
 from app.repositories.services_api_repository import ServicesApiRepository
@@ -26,6 +35,7 @@ class ServicesApiService:
         db: Session,
         repository: ServicesApiRepository | None = None,
     ):
+        self.db = db
         self.repository = repository or ServicesApiRepository(db)
 
     @staticmethod
@@ -160,16 +170,20 @@ class ServicesApiService:
         new_service: Service,
         user_id: int | None = None,
         comment: str | None = None,
+        commit: bool = True,
     ) -> None:
         # Codex round-15 P2: user_id -- attribution of the service audit to
         # the authenticated actor (GraphQL updateServicePrice); None keeps
         # the legacy behaviour for callers without an actor.
+        # RQ-17 round-3 P2: commit=False -- transaction ownership remains
+        # with the batch writer (one commit for changes + audit rows).
         self.repository.log_service_update(
             service_id=service_id,
             old_service=old_service,
             new_service=new_service,
             user_id=user_id,
             comment=comment,
+            commit=commit,
         )
 
     def list_service_categories(self, *, active: bool | None):
@@ -342,6 +356,19 @@ class ServicesApiService:
 
         service = Service(**payload)
         self.repository.add(service)
+        # RQ-17 §3.1: gate мутации service-set тега (пин 3: create
+        # requires_doctor=true на resource-backed теге -> reject;
+        # пост-валидация — defense-in-depth для любого create с тегом).
+        db = self.db
+        create_tag = payload.get("queue_tag")
+        if create_tag:
+            if payload.get("requires_doctor"):
+                validate_service_gate_for_requires_doctor(
+                    db, create_tag, clinic_today(db)
+                )
+            lock_owner_config_scope(db, create_tag)
+            db.flush()
+            validate_tag_owner_invariant(db, create_tag, clinic_today(db))
         self.repository.commit()
         self.repository.refresh(service)
         self._log_service_creation(service, user_id=user_id)
@@ -350,7 +377,12 @@ class ServicesApiService:
     def update_service(
         self, *, service_id: int, service_data, user_id: int | None = None
     ):
-        service = self.repository.get_service(service_id)
+        # RQ-17 round-2 (P1-2): row-level serialization ДО вычисления
+        # effective old_tag -- конкурентный writer той же Service
+        # сериализуется на row-lock; old_tag читается из перечитанной
+        # locked-строки (READ COMMITTED), а не из stale pre-lock
+        # снапшота (пин 13).
+        service = self.repository.get_service_for_update(service_id)
         if not service:
             raise LookupError("Service not found")
         old_service = self._service_snapshot(service)
@@ -418,8 +450,33 @@ class ServicesApiService:
             if not category:
                 raise ValueError("Selected category not found")
 
+        # RQ-17 §3.1(б)/(в): serialization-scope мутации Service. Ретег
+        # Service.queue_tag (поле writable: ServiceUpdate.queue_tag,
+        # PUT /services/{service_id}) меняет ДВА service-set разом —
+        # локи ВСЕХ affected-тегов в каноническом sorted-порядке;
+        # мутации одного тега — вырожденный одно-теговый случай.
+        old_tag = service.queue_tag
+        new_tag = update_data["queue_tag"] if "queue_tag" in update_data else old_tag
+        affected_tags = affected_service_tags(old_tag, new_tag)
+        db = self.db
+        today = clinic_today(db)
+        lock_owner_config_scopes(db, affected_tags)
+
         for field, value in update_data.items():
             setattr(service, field, value)
+
+        if affected_tags:
+            if update_data.get("requires_doctor"):
+                # пины 3-4: перевод в requires_doctor=true при живой
+                # RESOURCE_SURFACE целевого тега — быстрый отказ до flush
+                for tag in affected_tags:
+                    validate_service_gate_for_requires_doctor(db, tag, today)
+            db.flush()
+            # валидация ПОСТ-состояния КАЖДОГО affected-тега до commit:
+            # requires_doctor-флип, деактивация последней doctorless и
+            # ретег A->B / A->NULL / NULL->B (пины 4, 10-11)
+            for tag in affected_tags:
+                validate_tag_owner_invariant(db, tag, today)
 
         self.repository.commit()
         self.repository.refresh(service)
@@ -432,7 +489,10 @@ class ServicesApiService:
         return service
 
     def delete_service(self, *, service_id: int) -> dict[str, Any]:
-        service = self.repository.get_service(service_id)
+        # RQ-17 round-2 (P1-2): row-level serialization и для soft-delete --
+        # ретег <-> delete остаётся в той же stale-object категории
+        # (пин 14): валидация по фактическому post-lock тегу.
+        service = self.repository.get_service_for_update(service_id)
         if not service:
             raise LookupError("Service not found")
 
@@ -440,8 +500,19 @@ class ServicesApiService:
         visit_services_count = self.repository.count_visit_services_for_service(
             service_id,
         )
+        db = self.db
+        today = clinic_today(db)
+        if service.queue_tag:
+            # RQ-17 §3.1(б): soft-delete — равноправный writer той же
+            # критической секции (round-4 brief)
+            lock_owner_config_scope(db, service.queue_tag)
         service.active = False
         self.repository.add(service)
+        if service.queue_tag:
+            db.flush()
+            # пост-delete service-set тега: RESOURCE_SURFACE != ∅ при
+            # 0 активных doctorless -> reject (пины 8-9)
+            validate_tag_owner_invariant(db, service.queue_tag, today)
         self.repository.commit()
         self.repository.refresh(service)
         self._log_service_update(
@@ -461,6 +532,121 @@ class ServicesApiService:
             "visit_usage_count": visit_services_count,
             "visit_service_links": visit_services_count,
         }
+
+    def batch_update_services(
+        self,
+        *,
+        service_ids: list[int],
+        updates: dict[str, Any],
+        comment: str | None = None,
+        user_id: int | None = None,
+    ) -> tuple[list[int], list[dict[str, Any]]]:
+        """RQ-17 round-2 (P1-1): batch -- равноправный writer того же
+        serialization-scope, а не прямой setattr-обход инварианта §3.1.
+
+        Протокол (атомарно, один commit):
+          1. load + lock Service-строк детерминированно (sorted by id,
+             SELECT ... FOR UPDATE -- та же row-level serialization,
+             что и у canonical update/delete);
+          2. affected-теги ВСЕГО batch (ретег old->new; флипы
+             active/requires_doctor меняют membership/owner-семантику
+             активного service-set текущего тега);
+          3. owner-config-локи ВСЕХ affected-тегов (sorted, §3.1(в));
+          4. применение пост-состояния всего batch;
+          5. flush + валидация инварианта КАЖДОГО affected-тега
+             (пины 3-4: быстрый отказ для requires_doctor=true);
+          6. single commit.
+
+        Нарушение инварианта -> rollback ВСЕГО batch +
+        OwnerInvariantViolation (endpoint маппит в 409): ничего
+        не применяется частично. Не найденные id попадают в
+        failed_services и не прерывают batch (прецедент прежнего
+        поведения endpoint'а).
+        """
+        from sqlalchemy.exc import SQLAlchemyError
+
+        # repository-boundary: ORM-запрос batch-локов живёт в
+        # ServicesApiRepository (гейт прямых ORM-вызовов сервис-слоя)
+        rows = self.repository.get_services_for_update(service_ids)
+        by_id = {row.id: row for row in rows}
+        failed_services = [
+            {"service_id": service_id, "error": "Услуга не найдена"}
+            for service_id in service_ids
+            if service_id not in by_id
+        ]
+        services = [
+            by_id[service_id]
+            for service_id in service_ids
+            if service_id in by_id
+        ]
+        if not services:
+            return [], failed_services
+
+        retag_requested = "queue_tag" in updates
+        owner_sensitive_flip = ("active" in updates) or (
+            "requires_doctor" in updates
+        )
+        affected: set[str] = set()
+        for service in services:
+            old_tag = service.queue_tag
+            new_tag = updates["queue_tag"] if retag_requested else old_tag
+            affected.update(affected_service_tags(old_tag, new_tag))
+            if owner_sensitive_flip and old_tag:
+                affected.add(old_tag)
+        affected_tags = sorted(affected)
+
+        db = self.db
+        today = clinic_today(db)
+        lock_owner_config_scopes(db, affected_tags)
+
+        old_snapshots = {
+            service.id: self._service_snapshot(service) for service in services
+        }
+        try:
+            for service in services:
+                for field, value in updates.items():
+                    if hasattr(service, field):
+                        setattr(service, field, value)
+
+            if affected_tags:
+                if updates.get("requires_doctor"):
+                    # пины 3-4: быстрый отказ до flush -- та же семантика,
+                    # что и у canonical update_service
+                    for tag in affected_tags:
+                        validate_service_gate_for_requires_doctor(db, tag, today)
+                db.flush()
+                for tag in affected_tags:
+                    validate_tag_owner_invariant(db, tag, today)
+
+            # RQ-17 round-3 (P2): audit-строки суть ЧАСТЬ batch-транзакции:
+            # add/flush без внутреннего commit, ОДИН commit ниже применяет
+            # изменения и audit атомарно. Прежний порядок (audit-хелпер с
+            # внутренним commit ДО repository.commit()) коммитил весь batch
+            # первым же audit-вызовом: заявленная single-commit граница
+            # нарушалась, row/advisory-локи освобождались до конца
+            # критической секции, конкурентный writer мог изменить строку
+            # до формирования следующего audit snapshot.
+            for service in services:
+                self._log_service_update(
+                    service_id=service.id,
+                    old_service=old_snapshots[service.id],
+                    new_service=service,
+                    user_id=user_id,
+                    comment=f"Batch update: {comment}" if comment else "Batch update",
+                    commit=False,
+                )
+        except OwnerInvariantViolation:
+            db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            db.rollback()
+            raise ValueError(f"Batch update failed: {exc}") from exc
+
+        # single commit: изменения Service и весь audit одной транзакцией
+        self.repository.commit()
+        for service in services:
+            self.repository.refresh(service)
+        return [service.id for service in services], failed_services
 
     def list_doctors_temp(self):
         return self.repository.list_active_doctors()

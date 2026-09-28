@@ -462,6 +462,7 @@ test.describe('Visual regression — registrar EAT', () => {
   // Locks horizontal-scroll as the canonical mobile behavior (per ruling P7).
   // If a follow-up sub-PR (09b–09e) accidentally switches to cards-layout,
   // this snapshot will differ — Rule 13 causality investigation triggers.
+  // The named doctor queue tab is an intentional registrar workflow change.
   test('Surface 4: registrar EAT — mobile 375×720 (scroll lock)', async ({ page }) => {
     // Override the project's default desktop viewport for this test only.
     await page.setViewportSize({ width: 375, height: 720 });
@@ -887,8 +888,8 @@ test.describe('Visual regression — PR-UI-12-4 five clinical screens', () => {
       // 200 would need the full section schema; the draft path is production
       // behavior for a first visit).
       if (pathname === '/api/v1/v2/emr/501') { await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ detail: 'not found' }) }); return; }
-      if (pathname === '/api/v1/derma/examinations') { await route.fulfill(jsonResponse({ items: [], data: [] })); return; }
-      if (pathname === '/api/v1/derma/procedures') { await route.fulfill(jsonResponse({ items: [], data: [] })); return; }
+      if (pathname === '/api/v1/derma/examinations') { await route.fulfill(jsonResponse({ items: [], total: 0, page: 1, size: 20, pages: 0 })); return; }
+      if (pathname === '/api/v1/derma/procedures') { await route.fulfill(jsonResponse({ items: [], total: 0, page: 1, size: 20, pages: 0 })); return; }
       if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
       await route.fulfill(jsonResponse({ success: true }));
     });

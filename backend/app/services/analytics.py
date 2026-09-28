@@ -3,16 +3,51 @@ import statistics
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
 from app.core.specialties import specialty_variants
+from app.models.department import Department
 from app.models.patient import Patient
 from app.models.payment_webhook import PaymentWebhook
 from app.models.service import Service
 from app.models.visit import Visit
 from app.services.queue_service import queue_service
+
+
+def department_ids_for_filter(db: Session, department: str | None) -> list[int] | None:
+    """Round-10 (owner P2, PR #3340): resolve a `?department=` filter value
+    into Appointment FK ids — the SSOT for EVERY appointment analytics
+    surface.
+
+    `Appointment.department` is the ORM RELATIONSHIP (a Department row);
+    the historical filters compared it to the request STRING
+    (`Appointment.department == department`), which raised ArgumentError
+    (500) or silently matched nothing. And the `_stringify_dimension`
+    grouping hit Department's numeric `id` attribute first (the model has
+    no `name`/`title`/`label`/`code`), so department breakdowns were
+    grouped by the surrogate key instead of the canonical `key` contract
+    every other surface publishes.
+
+    Contract (exact-key semantics, the same one round-9 gave the schedule
+    readers):
+
+    * ``None``/blank parameter → ``None`` — NO filter (unchanged "all
+      departments" behavior);
+    * known canonical key → ``[departments.id]`` — filter on the FK;
+    * unknown key → ``[]`` — an EMPTY result (never "all NULL-department
+      rows", which a plain ``department_id == None`` filter would answer).
+
+    Response/grouping labels use the `Appointment.department_key` /
+    `department_name` accessors — the string canonical contract.
+    """
+    if department is None or not str(department).strip():
+        return None
+    row = db.execute(
+        select(Department.id).where(Department.key == str(department).strip())
+    ).first()
+    return [int(row[0])] if row is not None else []
 
 
 class AnalyticsService:
@@ -690,8 +725,16 @@ class AnalyticsService:
             )
         )
 
-        if department:
-            query = query.filter(Appointment.department == department)
+        # Round-10 (owner P2, PR #3340): the filter is the canonical KEY
+        # string — resolve it to the FK ids ONCE (see
+        # department_ids_for_filter); the old
+        # `Appointment.department == department` compared the ORM
+        # RELATIONSHIP to the request string (ArgumentError → 500 on the
+        # first keyed query). An unknown key answers an EMPTY analytics
+        # payload (exact-key semantics), never the unfiltered result.
+        department_ids = department_ids_for_filter(db, department)
+        if department_ids is not None:
+            query = query.filter(Appointment.department_id.in_(department_ids))
 
         appointments = query.all()
 
@@ -706,11 +749,14 @@ class AnalyticsService:
             status_stats[status] += 1
 
         # Статистика по отделениям
+        # Round-10 (owner P2): group under the canonical KEY string —
+        # `_stringify_dimension(appointment.department, ...)` walked the
+        # Department row's attrs (no name/title/label/code) into the
+        # numeric `id` fallback, so the breakdown was keyed by the
+        # surrogate PK instead of the `cardio`-style contract.
         department_stats = {}
         for appointment in appointments:
-            dept = AnalyticsService._stringify_dimension(
-                getattr(appointment, "department", None), "Не указано"
-            )
+            dept = getattr(appointment, "department_key", None) or "Не указано"
             if dept not in department_stats:
                 department_stats[dept] = {"total": 0, "paid": 0, "completed": 0}
             department_stats[dept]["total"] += 1

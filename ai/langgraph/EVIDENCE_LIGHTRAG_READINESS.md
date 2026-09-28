@@ -3404,3 +3404,24 @@ for migration, RBAC, billing, EMR, queue, Telegram, CI/CD, deploy, and productio
 - Make migration routing intent-aware and give confirmed dev-brain self-tooling ownership precedence.
 - Emit compact structured output by default and omit the execution prompt for narrow same-agent work.
 - Retain mandatory handoff and migration ownership for concrete risky-domain changes.
+
+## Task 96 - GPT-6 cardiology UI/API gate advisory policy
+
+### User task
+Implement the cardiologist panel audit plan, beginning with additive doctor-owned
+queue response identifiers and their API contract checks.
+
+### Gate results
+- first run mode/result: execute / gate_ok
+- first run first-touch files: `backend/app/services/queue_service.py`, `backend/app/models/online_queue.py`, `backend/tests/unit/test_queue_time_window.py`
+- first run `gate_misroute`: no (the output flag missed the actual API/DTO scope)
+- known-root-cause retry: `narrow_override`
+- retry `gate_misroute`: yes
+- retry `override_used`: yes
+- retry `known_root_cause_file`: `backend/app/api/v1/endpoints/doctor_integration/_queue_ops.py`
+- retry first-touch files: endpoint only; route contract tests were not included
+
+### Observed gap and follow-up
+- Keyword routing prioritized queue-time/ownership files and returned a one-file patch boundary that excluded the tests required by the additive API contract.
+- The code owner and affected contract were confirmed from executable route source, but the gate output would have blocked the user-approved scope.
+- Follow-up: make gate use optional and advisory for GPT-6 UI/API work that does not alter migrations, authentication/RBAC/security, production settings, queue ownership/fairness, or clinical lifecycle/signature rules; retain mandatory gate use for those high-risk categories.

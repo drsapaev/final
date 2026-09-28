@@ -73,6 +73,11 @@ export function useRoles({ includeAll = false }: UseRolesOptions = {}): UseRoles
         { value: 'Registrar', label: 'Регистратор' },
         { value: 'Cashier', label: 'Кассир' },
         { value: 'Lab', label: 'Лаборант' },
+        // NURSE-V2 N2-2 (codex round-3 P2, PR 3333): Nurse is a creatable
+        // role since this slice — the API-failure fallback must offer it,
+        // otherwise the /roles/options merge (backend) would be undone by
+        // an incidental request failure.
+        { value: 'Nurse', label: 'Медсестра' },
         { value: 'cardio', label: 'Кардиолог' },
         { value: 'derma', label: 'Дерматолог' },
         { value: 'dentist', label: 'Стоматолог' },

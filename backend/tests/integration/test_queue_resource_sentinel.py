@@ -620,8 +620,36 @@ def test_alembic_chain_single_head_0062() -> None:
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(rev for rev in graph if rev not in referenced)
     # single head: RQ-15.d retires the synthetic pairs after the
-    # public-address registry (RQ-16.c chained after the 0067 snapshot)
-    assert heads == ["0070_lab_results_lineage"]
+    # public-address registry (RQ-16.c chained after the 0067 snapshot),
+    # the lab-results lineage (A+ stage 1) claims 0070, and NURSE-V2 N2-2
+    # (owner design-GO 2026-09-19) extends the chain with the workplace
+    # assignments (0071) and service executions (0072).
+    assert graph["0071_nurse_workplace_assignments"] == (
+        "0070_lab_results_lineage",
+    )
+    assert graph["0072_service_executions"] == (
+        "0071_nurse_workplace_assignments",
+    )
+    # RQ-18 follow-up round-8 (PR #3362 review): the join-session payload
+    # binding + response snapshot is re-parented as 0074 on top of main's
+    # 0073 (execution routing snapshot).
+    assert graph["0074_join_payload_binding"] == (
+        "0073_execution_routing_snapshot",
+    )
+    assert len("0071_nurse_workplace_assignments") <= 32
+    assert len("0072_service_executions") <= 32
+    # Main's corrective follow-up moved the head to 0073 (routing
+    # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
+    # as 0074 on top of it.
+    assert graph["0073_execution_routing_snapshot"] == (
+        "0072_service_executions",
+    )
+    assert len("0073_execution_routing_snapshot") <= 32
+    assert graph["0074_join_payload_binding"] == (
+        "0073_execution_routing_snapshot",
+    )
+    assert len("0074_join_payload_binding") <= 32
+    assert heads == ["0074_join_payload_binding"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============

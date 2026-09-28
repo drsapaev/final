@@ -65,7 +65,19 @@ class DepartmentIntegrationOptions(BaseModel):
 class DepartmentCreate(BaseModel):
     """Схема для создания отделения"""
 
-    key: str
+    # RQ-26.b follow-up (review P2): unify the key contract with
+    # schemas/department.py DepartmentBase (PR-20) and QueueProfileCreate
+    # (^[a-z][a-z0-9_]*$). _ensure_department_integrations() turns
+    # department.key into a QueueProfile.key, and the admin CSV round-trip
+    # validates the imported payload against QueueProfileCreate — a
+    # department key accepted without the pattern could create a profile
+    # that no longer re-imports (export → import 422).
+    key: str = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        pattern=r"^[a-z][a-z0-9_]*$",
+    )
     name_ru: str
     name_uz: str | None = None
     icon: str | None = "folder"

@@ -12,7 +12,7 @@
  * callbacks via props.
  */
 
-import { Calendar, Eye, Download, FileText } from 'lucide-react';
+import { Calendar, ClipboardList, Eye, Download, FileText } from 'lucide-react';
 import { Button, Badge, Card, AppEmpty } from '../ui/macos';
 import { formatRegistrarDate } from '../../utils/dateUtils';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -39,7 +39,7 @@ export interface HistoryFilterOption {
 }
 
 /** Discriminated history entry kinds rendered by the timeline. */
-export type HistoryEntryKind = 'ecg' | 'labs' | 'attachments';
+export type HistoryEntryKind = 'visits' | 'ecg' | 'labs' | 'attachments';
 
 /** A single timeline entry rendered by the history tab. */
 export interface HistoryEntry {
@@ -196,6 +196,7 @@ export function HistoryTab({
               >
                 {/* Icon by kind */}
                 <div style={{ flexShrink: 0, marginTop: '2px' }}>
+                  {entry.kind === 'visits' && <ClipboardList size={18} style={{ color: getColor('secondary', 600) }} />}
                   {entry.kind === 'ecg' && <Calendar size={18} style={{ color: getColor('secondary', 600) }} />}
                   {entry.kind === 'labs' && <FileText size={18} style={{ color: getColor('secondary', 600) }} />}
                   {entry.kind === 'attachments' && <FileText size={18} style={{ color: getColor('textSecondary') }} />}
@@ -208,7 +209,13 @@ export function HistoryTab({
                       {entry.title}
                     </div>
                     <Badge variant={entry.badgeVariant || 'info'}>
-                      {entry.kind === 'ecg' ? t('cardio.cardio_hist_badge_ecg') : entry.kind === 'labs' ? t('cardio.cardio_hist_badge_labs') : t('cardio.cardio_hist_badge_attachments')}
+                      {entry.kind === 'visits'
+                        ? t('cardio.cardio_hist_badge_visits')
+                        : entry.kind === 'ecg'
+                          ? t('cardio.cardio_hist_badge_ecg')
+                          : entry.kind === 'labs'
+                            ? t('cardio.cardio_hist_badge_labs')
+                            : t('cardio.cardio_hist_badge_attachments')}
                     </Badge>
                   </div>
                   <div style={{ fontSize: getFontSize('sm'), color: getColor('textSecondary'), marginTop: '2px' }}>

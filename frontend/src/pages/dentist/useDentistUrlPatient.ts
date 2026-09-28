@@ -101,7 +101,7 @@ export function useDentistUrlPatient({
 
           setSelectedPatient(patientObj);
           handleTabChange(patientObj.visit_id ? 'visit' : 'patients');
-          logger.info('[Dentist] Загружен пациент из URL:', patientObj.patient_name);
+          logger.info('[Dentist] Загружен пациент из URL');
           return;
         }
 
@@ -127,11 +127,11 @@ export function useDentistUrlPatient({
           const fallbackLogKey = `${patientIdFromUrl || ''}:${visitIdFromUrl || ''}`;
           if (!dentistCache.fallbackLoggedKeys.has(fallbackLogKey)) {
             dentistCache.fallbackLoggedKeys.add(fallbackLogKey);
-            logger.info('[Dentist] Пациент из URL не найден в очереди, использую безопасный URL-fallback:', patientObj.patient_name);
+            logger.info('[Dentist] Пациент из URL не найден в очереди, использую безопасный URL-fallback');
           }
         }
-      } catch (error: unknown) {
-        logger.error('[Dentist] Не удалось загрузить пациента из URL:', error);
+      } catch (_error: unknown) {
+        logger.error('[Dentist] Не удалось загрузить пациента из URL');
       }
     };
 

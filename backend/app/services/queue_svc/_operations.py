@@ -12,7 +12,10 @@ from sqlalchemy.exc import IntegrityError
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
 from app.core.specialties import expand_queue_tags
 from app.crud import queue_resource_routing
-from app.crud.queue_resource_routing import effective_day_start_number
+from app.crud.queue_resource_routing import (
+    effective_day_start_number,
+    lock_queue_tag_claim_scope,  # Round-6 (P1-2): canonical batch pre-lock
+)
 from app.models.online_queue import QueueResource
 
 # RQ-16.d (E-055 §11): the provision retry loop generates FRESH opaque
@@ -1177,6 +1180,151 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
             "Не удалось сгенерировать уникальный публичный код направления"
         ) from last_error
 
+    # ------------------------------------------------------------------
+    # Round-6 (PR #3362 review, P1-2): canonical multi-tag lock order for
+    # multi-specialist join batches. The batch pre-resolves every
+    # selection's tag-claim scope READ-ONLY and pre-acquires the scopes
+    # in sorted (day, queue_tag) order BEFORE the first write — the same
+    # restore-of-order the registrar cart performs with
+    # ``prelock_cart_tag_claim_scopes`` (QD-2E P1). Transaction-scoped
+    # advisory locks are idempotent while held, so the re-acquisition
+    # inside the allocations below stays free.
+    # ------------------------------------------------------------------
+
+    def resolve_join_batch_tag_targets(
+        self,
+        db: Session,
+        *,
+        token_str: str,
+        specialist_ids: list[int],
+        specialist_entity_types: list[str] | None = None,
+    ) -> dict[int, str]:
+        """Map each selection index to its tag-claim scope tag, read-only.
+
+        Mirrors EXACTLY the tag resolution ``join_queue_with_token``
+        performs per selection (profile → expanded tags → first registry
+        resource surface, else the profile key; untyped → the doctor's
+        QR-visible profile key; non-clinic-wide token → its own queue's
+        tag) so the pre-locks below cover every scope the batch will
+        claim. Selections whose target cannot be resolved (invisible
+        profile, ghost doctor, ...) are OMITTED — the allocation loop
+        reports their real error; pre-locking them is pointless.
+        """
+        token_obj, token_meta = self.validate_queue_token(db, token_str)
+        day = token_meta.get("day") or token_obj.day
+        if day is None:
+            return {}
+
+        targets: dict[int, str] = {}
+
+        def _profile_target_tag(profile) -> str | None:
+            profile_key = getattr(profile, "key", None)
+            if not profile_key:
+                return None
+            queue_tags = expand_queue_tags(
+                list(getattr(profile, "queue_tags", None) or [profile_key])
+            )
+            resource_tag = next(
+                (
+                    tag
+                    for tag in queue_tags
+                    if queue_resource_routing.tag_routes_to_resource(db, tag, day)
+                    is not None
+                    or queue_resource_routing.resolve_tag_resource(db, tag)
+                    is not None
+                ),
+                None,
+            )
+            return resource_tag or profile_key
+
+        for index, specialist_id in enumerate(specialist_ids):
+            specialist_type = (
+                str(specialist_entity_types[index]).strip().lower()
+                if specialist_entity_types is not None
+                and index < len(specialist_entity_types)
+                else None
+            )
+            try:
+                if not token_obj.is_clinic_wide:
+                    daily_queue = token_meta.get("daily_queue")
+                    queue_tag = (
+                        daily_queue.queue_tag
+                        if daily_queue is not None
+                        else None
+                    )
+                    if queue_tag:
+                        targets[index] = queue_tag
+                    continue
+                if specialist_type == "profile":
+                    from app.models.queue_profile import QueueProfile
+
+                    queue_profile = (
+                        db.query(QueueProfile)
+                        .filter(QueueProfile.id == specialist_id)
+                        .first()
+                    )
+                    if queue_profile is None or not self._is_qr_visible_profile(
+                        queue_profile
+                    ):
+                        continue
+                    tag = _profile_target_tag(queue_profile)
+                    if tag:
+                        targets[index] = tag
+                    continue
+                if specialist_type in (None, "doctor"):
+                    doctor = (
+                        db.query(Doctor)
+                        .join(User, Doctor.user_id == User.id)
+                        .filter(
+                            Doctor.active.is_(True),
+                            Doctor.id == specialist_id,
+                            User.is_active.is_(True),
+                            func.lower(User.role).in_(sorted(DOCTOR_ROLE_SPELLINGS)),
+                        )
+                        .first()
+                    )
+                    if not doctor or is_doctor_profile_incomplete(doctor.specialty):
+                        continue
+                    qr_profile = self._get_qr_visible_profile_for_doctor(db, doctor)
+                    if qr_profile is None:
+                        continue
+                    targets[index] = qr_profile.key
+            except Exception:  # noqa: BLE001 — one bad selection never
+                # blocks the pre-lock of the resolvable ones; the
+                # allocation loop surfaces the true error for it.
+                continue
+        return targets
+
+    def prelock_join_batch_tag_scopes(
+        self,
+        db: Session,
+        *,
+        lock_targets: dict[int, str],
+        day: date | None = None,
+        token_str: str | None = None,
+    ) -> None:
+        """Acquire every distinct (day, tag) claim scope, sorted.
+
+        The canonical order from ``lock_queue_tag_claim_scope`` (QD-2E
+        P1): the lock is transaction-scoped and idempotent while held, so
+        taking a scope here and re-taking it through the claim
+        coordinator inside the same transaction is free, while an
+        inverted order across concurrent transactions can deadlock
+        PostgreSQL.
+        """
+        if not lock_targets:
+            return
+        resolved_day = day
+        if resolved_day is None:
+            if not token_str:
+                return
+            token_obj, token_meta = self.validate_queue_token(db, token_str)
+            resolved_day = token_meta.get("day") or token_obj.day
+        if resolved_day is None:
+            return
+        for queue_tag in sorted(set(lock_targets.values())):
+            lock_queue_tag_claim_scope(db, queue_tag, resolved_day)
+
     def join_queue_with_token(
         self,
         db: Session,
@@ -1189,9 +1337,16 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         specialist_type: str | None = None,
         patient_id: int | None = None,
         source: str = "online",
+        commit: bool = True,
     ) -> dict[str, Any]:
         """
         Единая точка входа для присоединения к очереди через QR-токен.
+
+        Round-5 (PR #3362 review, P1-2): ``commit=False`` lets the
+        join-session complete flow run the allocation INSIDE its own
+        single transaction boundary (claim → patient → entry → outcome →
+        joined status → one commit). Default stays True — every other
+        caller keeps the historical commit-on-return semantics.
 
         Returns:
             dict с полями entry, duplicate, specialist_name и т.д.
@@ -1692,8 +1847,14 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         )
 
         self._increment_token_usage(token_obj)
-        db.commit()
-        db.refresh(entry)
+        if commit:
+            db.commit()
+            db.refresh(entry)
+        else:
+            # Round-5 (P1-2): the caller owns the transaction boundary —
+            # the entry stays uncommitted until the single outer commit.
+            db.flush()
+            db.refresh(entry)
 
         return {
             "entry": entry,

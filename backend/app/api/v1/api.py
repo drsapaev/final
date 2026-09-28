@@ -77,11 +77,14 @@ from app.api.v1.endpoints import (
     mobile_api_extended,
     notification_websocket,
     notifications,
+    nurse_serving,
+    nurse_workplace,
     observability,
     online_queue_new,
     password_reset,
     patient_access,
     patient_activation_admin,
+    patient_portal,
     patients,
     payment_reconciliation,
     payment_settings,
@@ -173,6 +176,13 @@ api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 # Legacy simple/minimal auth routers were deleted in PR #1942; the
 # ENABLE_FALLBACK_AUTH flag now only gates the legacy /auth/login and
 # /auth/json-login endpoints inside auth.py itself.
+# Phase 1 PR-C1: JWT patient portal self-service (cabinet summary, booking,
+# read-only forms). Reuses the Mini App service layer; identity = JWT patient.
+# Included BEFORE patients.router: static paths (/patients/forms,
+# /patients/booking) must win over GET /patients/{patient_id}.
+api_router.include_router(
+    patient_portal.router, prefix="/patients", tags=["patients"]
+)
 api_router.include_router(patients.router, prefix="/patients", tags=["patients"])
 api_router.include_router(visits.router, prefix="/visits", tags=["visits"])
 api_router.include_router(services.router, prefix="/services")
@@ -210,6 +220,13 @@ api_router.include_router(security_management_router, tags=["security-management
 api_router.include_router(migration_management_router, tags=["migration-management"])
 # Эндпоинты управления фича-флагами
 api_router.include_router(feature_flags.router, tags=["feature-flags"])
+# NURSE-V2 N2-2 (owner design-GO 2026-09-19): nurse workplace
+# assignment admin contract (create/read/deactivate).
+api_router.include_router(nurse_workplace.router, tags=["nurse-workplace-assignments"])
+# NURSE-V2 N2-3 (owner GO 2026-09-20): the assignment-scoped nurse
+# serving plane (workplaces / station board / call-next / start /
+# service executions / no-show / incomplete).
+api_router.include_router(nurse_serving.router, tags=["nurse-serving"])
 # Эндпоинты QR очередей (основной роутер для queue)
 api_router.include_router(qr_queue.router, prefix="/queue", tags=["qr-queue"])
 # Эндпоинты лимитов очередей

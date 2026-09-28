@@ -119,7 +119,7 @@ async def create_user(
 
 
 @router.get("/users", response_model=UserListResponse)
-async def get_users(
+def get_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     role: str | None = Query(

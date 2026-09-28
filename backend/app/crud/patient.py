@@ -137,7 +137,11 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
                 "id": apt.id,
                 "appointment_date": apt.appointment_date,
                 "appointment_time": apt.appointment_time,
-                "department": apt.department,
+                # Round-6 (owner P1, PR #3340): map the ORM RELATIONSHIP to
+                # its canonical key — the raw attribute is a Department
+                # object once the portal booking persisted department_id,
+                # which rendered as garbage in the Telegram bot listing.
+                "department": apt.department_key,
                 "doctor_id": apt.doctor_id,
                 "status": apt.status,
                 "reason": apt.reason,

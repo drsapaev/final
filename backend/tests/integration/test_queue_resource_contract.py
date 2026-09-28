@@ -810,7 +810,19 @@ def test_alembic_chain_single_head_0063() -> None:
     heads = sorted(revision for revision in graph if revision not in referenced)
     # single head: RQ-15.d retires the synthetic pairs after the
     # public-address registry
-    assert heads == ["0070_lab_results_lineage"]
+    # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved
+    # to 0072 (nurse workplace assignments 0071 + service executions 0072);
+    # main's corrective follow-up moved it to 0073 (routing snapshot);
+    # RQ-18 follow-up round-8 re-parents the payload binding as 0074.
+    assert graph["0073_execution_routing_snapshot"] == (
+        "0072_service_executions",
+    )
+    assert len("0073_execution_routing_snapshot") <= 32
+    assert graph["0074_join_payload_binding"] == (
+        "0073_execution_routing_snapshot",
+    )
+    assert len("0074_join_payload_binding") <= 32
+    assert heads == ["0074_join_payload_binding"]
 
 
 # ===================== D. parity + ADR =====================

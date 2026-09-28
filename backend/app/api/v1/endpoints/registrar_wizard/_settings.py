@@ -288,6 +288,18 @@ class VisitResponse(BaseModel):
     doctor_name: str | None = None
     doctor_specialty: str | None = None
     department: str | None = None
+    # Round-6 (owner P1, PR #3340): unified department contract shared by
+    # BOTH sources of this response (legacy Appointment rows and Visit
+    # rows). `department` keeps its historical `str | null` shape — for
+    # appointments it is mapped from the ORM RELATIONSHIP to the canonical
+    # `Department.key` (passing the relationship object itself turned every
+    # portal-created row into a response-validation error that the broad
+    # except swallowed, silently dropping the WHOLE appointments block from
+    # the registrar read-model). The typed fields carry the full contract:
+    # the persisted routing FK, the canonical key and the display label.
+    department_id: int | None = None
+    department_key: str | None = None
+    department_name: str | None = None
     visit_date: date | None = None
     visit_time: str | None = None
     status: str

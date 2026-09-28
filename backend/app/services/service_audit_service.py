@@ -29,6 +29,7 @@ class ServiceAuditService:
         comment: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
+        commit: bool = True,
     ) -> ServiceAuditLog:
         """
         Log a service change.
@@ -43,6 +44,13 @@ class ServiceAuditService:
             comment: Optional comment/reason for change
             ip_address: IP address of the user
             user_agent: User agent string
+            commit: Transaction ownership (RQ-17 round-3 P2): True (legacy) —
+                helper коммитит сам (post-commit audit single-writer путей);
+                False — только add + flush: транзакцию ведёт вызывающий
+                writer (batch_update_services), чей контракт — ОДИН commit
+                на весь batch, включая audit-строки. Внутренний commit audit
+                внутри batch-транзакции коммитил весь batch и отпускал
+                row/advisory-локи до завершения критической секции.
 
         Returns:
             Created audit log entry
@@ -61,6 +69,12 @@ class ServiceAuditService:
         )
 
         self.db.add(audit_log)
+        if not commit:
+            # flush присваивает PK и делает строку видимой в текущей
+            # транзакции; commit/refresh остаются у владельца транзакции
+            self.db.flush()
+            return audit_log
+
         self.db.commit()
         self.db.refresh(audit_log)
 
@@ -96,6 +110,7 @@ class ServiceAuditService:
         comment: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
+        commit: bool = True,
     ) -> ServiceAuditLog:
         """Log service update with field-level changes."""
         old_values = self._service_to_dict(old_service)
@@ -122,6 +137,7 @@ class ServiceAuditService:
             comment=comment,
             ip_address=ip_address,
             user_agent=user_agent,
+            commit=commit,
         )
 
     def log_service_deletion(

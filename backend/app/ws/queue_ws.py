@@ -83,7 +83,7 @@ class WSManager:
                         log.info("WSManager: removed dead websocket from room %s", r)
 
     def broadcast(self, room: str, data) -> None:
-        log.info("WSManager: broadcasting to room %s, data: %s", room, data)
+        log.info("WSManager: broadcasting to room %s", room)
         log.info(
             "WSManager: room %s has %d connections",
             room,
@@ -331,10 +331,9 @@ async def ws_queue(
 ):
     origin = websocket.headers.get("origin")
     log.info(
-        "WS connect origin=%s path=%s query=%s",
+        "WS connect origin=%s path=%s",
         origin,
         websocket.url.path,
-        websocket.url.query,
     )
 
     # PR-4: also extract token from subprotocol/Authorization header
@@ -419,6 +418,9 @@ async def ws_queue(
                 except (json.JSONDecodeError, KeyError):
                     pass  # Not a JSON message or missing type
 
+            except WebSocketDisconnect:
+                log.info("WebSocket disconnected: %s", room)
+                break
             except TimeoutError:
                 # Check if connection is still alive
                 # ✅ BUGFIX: Access list element to get current value
@@ -431,9 +433,9 @@ async def ws_queue(
                     await websocket.send_json({"type": "ping", "timestamp": asyncio.get_event_loop().time()})
                 except Exception:
                     break  # Connection is dead
-            except Exception as e:
-                log.error(f"Error receiving message: {e}")
-                await asyncio.sleep(0.05)
+            except Exception:
+                log.warning("Queue WebSocket receive failed; closing")
+                break
     except WebSocketDisconnect:
         log.info(f"WebSocket disconnected: {room}")
     finally:

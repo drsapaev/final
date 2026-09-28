@@ -50,6 +50,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 import psycopg
@@ -58,13 +59,23 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-SCRATCH_DB = "rq16c_check"
+SCRATCH_DB_PREFIX = "rq16c_check"
+SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 # The head pin advances with the chain (established pattern: #3306
 # advanced the 0067-era pins; the RQ-15.d repair chains 0069 above the
 # 0068 registry revision — owner directive trace 1a0aef280204950d).
-EXPECTED_HEAD = "0070_lab_results_lineage"
+# NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved
+# to 0072 (nurse workplace assignments 0071 + service executions 0072).
+# Corrective follow-up: chain head moved to 0073 (routing snapshot).
+# RQ-18 follow-up (#3362, 2026-09-25): the chain head moved to 0074
+# (join attempt payload binding) — the pin advances with the chain
+# (same established pattern; the advance was missed in that cycle and
+# is carried by the RQ-26.b verification slice).
+EXPECTED_HEAD = "0074_join_payload_binding"
 
 sys.path.insert(0, str(BACKEND_DIR))
+
+from tests._pg_admin_guard import is_local_admin_dsn  # noqa: E402
 
 pytestmark = pytest.mark.integration
 
@@ -80,7 +91,12 @@ def _candidate_admin_urls() -> list[str]:
         urls.append(f"postgresql://postgres:{local_pw}@localhost:5432/postgres")
     env_url = os.getenv("DATABASE_URL", "").strip()
     if env_url:
-        urls.append(env_url)
+        # PR #3468 audit P1: DATABASE_URL is usable for scratch
+        # provisioning only when EVERY endpoint it can reach (netloc host,
+        # ?host= / ?hostaddr= failover lists) is local — a remote DSN must
+        # never receive CREATE/DROP DATABASE.
+        if is_local_admin_dsn(env_url):
+            urls.append(env_url)
     return urls
 
 
@@ -148,16 +164,29 @@ def pg_env():
 
     psycopg_dsn, sa_url = _scratch_urls(admin_url)
     with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        # No pre-drop: the run-unique name cannot pre-exist (a collision would
+        # take 2**48 parallel runs), and dropping a fixed name unconditionally
+        # is exactly the cross-run hazard this fixture used to carry.
         c.execute(f'CREATE DATABASE "{SCRATCH_DB}"')
 
-    r = _run_alembic(sa_url, "upgrade", "head")
-    assert r.returncode == 0, r.stderr[-1500:]
+    # PR #3468 audit P2: a scratch database now EXISTS on the admin server;
+    # teardown must run on every exit path — a pre-yield alembic failure
+    # included — because the run-unique name can no longer be swept by the
+    # next run (the old fixed-name pre-drop used to).
+    try:
+        r = _run_alembic(sa_url, "upgrade", "head")
+        assert r.returncode == 0, r.stderr[-1500:]
 
-    yield sa_url, psycopg_dsn
-
-    with psycopg.connect(admin_url, autocommit=True) as c:
-        c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
+        yield sa_url, psycopg_dsn
+    finally:
+        with psycopg.connect(admin_url, autocommit=True) as c:
+            # Cleanup touches ONLY the run-unique database this process created;
+            # WITH (FORCE) clears lingering connections (PG 13+), falling back
+            # to the plain form on older servers.
+            try:
+                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}" WITH (FORCE)')
+            except psycopg.errors.SyntaxError:
+                c.execute(f'DROP DATABASE IF EXISTS "{SCRATCH_DB}"')
 
 
 @pytest.fixture(scope="module")
@@ -445,13 +474,18 @@ def test_non_lowercase_code_rejected(pg_session):
 def test_downgrade_reupgrade_leaves_no_partial_registry(pg_env):
     sa_url, psycopg_dsn = pg_env
 
-    r_down = _run_alembic(sa_url, "downgrade", "-1")
+    # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the head moved to 0072
+    # (nurse workplace assignments 0071 + service executions 0072), so the
+    # first step is an ABSOLUTE downgrade to the retirement 0069 — this
+    # exercises the 0072/0071/0070 downgrades on the way and keeps the
+    # original assertion shape: the retirement state must retain the
+    # registry with NO partial rows.
+    r_down = _run_alembic(sa_url, "downgrade", "0069_sentinel_pair_retirement")
     assert r_down.returncode == 0, r_down.stderr[-1500:]
     with psycopg.connect(psycopg_dsn) as conn:
         version = conn.execute("select version_num from alembic_version").fetchone()[0]
-        # -1 from the head (0070 lineage) lands on the retirement 0069:
-        # the lineage downgrade drops only its own columns/indexes and
-        # must leave NO partial registry rows either.
+        # landing on the retirement 0069: the lineage downgrade drops only
+        # its own columns/indexes and must leave NO partial registry rows.
         assert version == "0069_sentinel_pair_retirement"
         present = conn.execute(
             "select to_regclass('public.queue_direction_public_addresses')"

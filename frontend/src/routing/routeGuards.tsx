@@ -1,6 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import auth from '../stores/auth';
+import auth, { resetExpiredPrincipalHint } from '../stores/auth';
 import type { AuthState } from '../types/domain/auth';
 import logger from '../utils/logger';
 import {
@@ -97,6 +97,60 @@ export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProp
   const [isChecking, setIsChecking] = useState<boolean>(() => Boolean(auth.getToken()) && route?.auth !== 'public');
   const location = useLocation();
 
+  const missingTokenRedirect = route !== null && route.auth !== 'public' && !state.token;
+
+  // Codex P2 (rounds 8+9): the expired-principal kind arrives INSIDE the
+  // notified snapshot (atomic with the token-clear — immune to stale
+  // passive-effect ordering) and is consumed EXACTLY ONCE per clear
+  // episode, wherever this boundary instance happens to be mounted:
+  //   - protected route + missing token → the frozen redirect target
+  //     becomes the patient login (the expiry case this PR fixes);
+  //   - public route (explicit logout navigation) → retired without a
+  //     redirect.
+  // Consuming once per episode keeps the retained boundary snapshot
+  // (App.tsx renders sibling routes through one RouteRenderer instance, so
+  // boundary state survives navigation) from misdirecting a LATER anonymous
+  // visit to the patient login.
+  // The redirect target is FROZEN once selected for the episode — duplicate
+  // clears trigger extra re-renders and must never flip an already-chosen
+  // redirect back to the staff login. Re-armed when a session is
+  // (re-)established (effect below).
+  const redirectTargetRef = useRef<string | null>(null);
+  const consumeEpisodeRef = useRef(false);
+  if (state.expiredPrincipalWasPatient === true && !consumeEpisodeRef.current) {
+    consumeEpisodeRef.current = true;
+    if (missingTokenRedirect) {
+      redirectTargetRef.current = '/patient/login';
+    }
+  }
+
+  // Any anonymous protected render without a consumed patient episode keeps
+  // the staff login; a frozen patient target from an earlier episode stays.
+  if (missingTokenRedirect && redirectTargetRef.current === null) {
+    redirectTargetRef.current = '/login';
+  }
+
+  useEffect(() => {
+    // Codex P2 (round 10): the episode ends when a session is
+    // (re-)established AND when the redirect reaches its anonymous
+    // destination — the public login route can render through the SAME
+    // preserved boundary instance (React Router preserves RouteRenderer),
+    // so a public render must also re-arm the refs and strip the consumed
+    // snapshot flag; otherwise a later anonymous visit to a protected
+    // staff route is sent back to /patient/login.
+    if (state.token || route?.auth === 'public') {
+      redirectTargetRef.current = null;
+      consumeEpisodeRef.current = false;
+      if (state.expiredPrincipalWasPatient) {
+        setState((prev) => ({ ...prev, expiredPrincipalWasPatient: false }));
+      }
+    }
+    // Codex P2 (rounds 5+7): the global hint lives only BETWEEN the session
+    // clear and the next boundary evaluation — every auth-state transition
+    // drops it, so fresh mounts can never inherit a stale marker.
+    resetExpiredPrincipalHint();
+  }, [state.token, missingTokenRedirect, route, state.expiredPrincipalWasPatient]);
+
   useEffect(() => {
     let isMounted = true;
     const unsubscribe = auth.subscribe((nextState: AuthState) => {
@@ -160,8 +214,21 @@ export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProp
     );
   }
 
-  if (route.auth !== 'public' && !state.token) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+  if (missingTokenRedirect) {
+    // Phase 0 follow-up (Codex P1/P2, rounds 2-9): the redirect target
+    // follows the EXPIRED PRINCIPAL, not the route — patient-home is shared
+    // with support staff (Admin/Registrar/Doctor), so route metadata cannot
+    // identify whose session died. The kind arrives in the notified auth
+    // snapshot and is consumed exactly once per clear episode (refs above);
+    // an expired PATIENT lands on the phone/OTP entry point (/patient/login),
+    // expired staff and anonymous visitors keep /login.
+    return (
+      <Navigate
+        to={redirectTargetRef.current ?? '/login'}
+        replace
+        state={{ from: location }}
+      />
+    );
   }
 
   if (!canAccessRoute(route, state.profile as RouteProfile | null)) {

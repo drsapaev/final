@@ -574,7 +574,11 @@ async def get_pending_payments(
                     'patient_last_name': patient_last_name,
                     'patient_first_name': patient_first_name,
                     'doctor_id': apt.doctor_id,
-                    'department': apt.department,
+                    # Round-6 (owner P1, PR #3340): `apt.department` is the
+                    # ORM RELATIONSHIP — the first portal-created row put a
+                    # Department OBJECT into this dict and response encoding
+                    # broke. Map the canonical key instead.
+                    'department': apt.department_key,
                     'appointment_date': (
                         apt.appointment_date.isoformat()
                         if apt.appointment_date

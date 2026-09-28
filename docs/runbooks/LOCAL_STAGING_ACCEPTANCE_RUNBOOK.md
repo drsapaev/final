@@ -2,19 +2,21 @@
 
 ## Purpose
 
-Use the local host-based staging contour as the primary operating environment until the product passes a role-by-role acceptance sweep and the remaining legacy data decisions are closed.
+Use the isolated Linux staging environment in WSL2 Ubuntu 24.04 Docker on this Windows host for role-by-role acceptance. It is separate from Windows production and may be stopped between test runs. See `docs/runbooks/AGENT_SESSION_WORKTREES.md` for isolation and startup preflight.
 
-Current contour:
-- backend: `http://127.0.0.1:18000`
+Current local staging contour (verify the active Compose project and port overrides before use):
+- backend: `http://127.0.0.1:18001`
 - frontend: `http://127.0.0.1:18080`
-- LAN frontend/backend: current machine IP on ports `18080` / `18000`
-- staging Postgres: `localhost:55432`
+- staging Postgres: `127.0.0.1:55432`
+- Windows production backend: `:18000` — never bind staging to this port
+- LAN access: configure and verify it explicitly if testing a tablet; do not assume the old host IP is current
 
 ## Pre-Flight
 
 - Confirm staging backend is healthy: `GET /api/v1/health`
+- Confirm the Compose project points to the intended source worktree and `STAGING_BACKEND_PORT` differs from production `18000`
 - Confirm frontend root loads without blocking console/network errors
-- Confirm staging Postgres is running and the current app points to the staging DSN
+- Confirm staging Postgres is running and the staging app points to its own DSN and synthetic fixtures, not production data
 - Confirm latest EMR cutover verification is green before manual checks:
   - `passed == true`
   - `failed == 0`

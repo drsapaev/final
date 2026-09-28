@@ -1,7 +1,7 @@
 
 import { Button } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-import { Download, GitBranch, Lock, Printer, Send } from 'lucide-react';
+import { Download, Eye, GitBranch, Lock, Printer, Send } from 'lucide-react';
 
 interface LabReportActionsBarProps {
   saving?: boolean;
@@ -11,11 +11,14 @@ interface LabReportActionsBarProps {
   canRevise?: boolean;
   canPrint?: boolean;
   canNotify?: boolean;
+  /** PR8: серверный PDF-preview до утверждения (Admin/Lab, без side-effects). */
+  canPreview?: boolean;
   onSaveDraft: () => void;
   onFinalize: () => void;
   onRevise: () => void;
   onPrint: () => void;
   onNotify?: () => void;
+  onPreview?: () => void;
 }
 
 /**
@@ -31,6 +34,12 @@ interface LabReportActionsBarProps {
  * Терминология (Вариант B): «Финализировать» → «Утвердить»,
  * «Создать ревизию» → «Создать исправленную версию».
  *
+ * PR8 (codex-lab-workflow-hardening-plan): кнопка «Предпросмотр» —
+ * серверный A4-рендер того же движка, что пойдёт на печать, ДО
+ * утверждения. Разрешение приходит из backend available_actions
+ * ('preview', только неутверждённые бланки); preview не вызывает
+ * mark-printed и не меняет статус.
+ *
  * STRAT#5: все русские строки мигрированы на t() из labTranslations.
  * i18n-unification: t() теперь берётся из useTranslation() (react-i18next),
  * что обеспечивает реактивность при смене языка.
@@ -43,15 +52,17 @@ export default function LabReportActionsBar({
   canRevise = false,
   canPrint = false,
   canNotify = false,
+  canPreview = false,
   onSaveDraft,
   onFinalize,
   onRevise,
   onPrint,
   onNotify,
+  onPreview,
 }: LabReportActionsBarProps) {
   const { t: rawT } = useTranslation(); const t = rawT;
   const showPrimaryGroup = canSaveDraft || canFinalize;
-  const showSecondaryGroup = canRevise || canPrint || canNotify;
+  const showSecondaryGroup = canRevise || canPrint || canNotify || canPreview;
 
   if (!showPrimaryGroup && !showSecondaryGroup) {
     return null;
@@ -65,6 +76,19 @@ export default function LabReportActionsBar({
             <Download size={16} aria-hidden="true" />
             {busyAction === 'save' ? t('actions.saving') : t('actions.save_draft')}
           </Button>
+          {/* PR8: предпросмотр сохранённых значений до утверждения —
+              серверный A4-рендер, watermark «Черновик», без side-effects. */}
+          {canPreview && (
+            <Button
+              variant="outline"
+              onClick={onPreview}
+              disabled={saving || busyAction === 'preview'}
+              title={t('actions.preview_title')}
+            >
+              <Eye size={16} aria-hidden="true" />
+              {busyAction === 'preview' ? t('actions.previewing') : t('actions.preview')}
+            </Button>
+          )}
           <Button variant="primary" onClick={onFinalize} disabled={saving || !canFinalize}>
             <Lock size={16} aria-hidden="true" />
             {busyAction === 'finalize' ? t('actions.finalizing') : t('actions.finalize')}

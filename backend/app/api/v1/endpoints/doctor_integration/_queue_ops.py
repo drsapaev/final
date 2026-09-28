@@ -2,6 +2,7 @@
 
 Split from doctor_integration.py (1900 LOC god file → modular).
 """
+
 from __future__ import annotations
 
 from app.api.v1.endpoints.doctor_integration._helpers import *  # noqa: F401, F403
@@ -24,9 +25,28 @@ from app.api.v1.endpoints.doctor_integration._helpers import (  # noqa: F401
     _visit_filter_doctor_id,
     router,
 )
+from app.crud.visit_appointment_pairing import (
+    AmbiguousAppointmentPairingError,
+    move_paired_appointment_to_day,
+)
+from app.schemas.doctor_queue import (
+    DoctorQueueStartVisitResponse,
+    DoctorQueueTodayResponse,
+)
+from app.services.emr_completion_policy import (
+    EMR_REQUIRED_DETAIL,
+    requires_saved_emr,
+)
+from app.services.emr_completion_policy import (
+    saved_emr_pairs as get_saved_emr_pairs,
+)
 
 
-@router.get("/doctor/{specialty}/queue/today", response_model=dict[str, Any])
+@router.get(
+    "/doctor/{specialty}/queue/today",
+    response_model=DoctorQueueTodayResponse,
+    response_model_exclude_unset=True,
+)
 def get_doctor_queue_today(
     specialty: str,
     db: Session = Depends(get_db),
@@ -159,12 +179,32 @@ def get_doctor_queue_today(
             .all()
         )
 
+        requires_emr = requires_saved_emr(normalized_specialty)
+        saved_emr_pairs: set[tuple[int, int]] = set()
+        if requires_emr:
+            saved_emr_pairs = get_saved_emr_pairs(
+                db,
+                {
+                    (entry.visit_id, entry.patient_id)
+                    for entry in entries
+                    if entry.visit_id is not None and entry.patient_id is not None
+                },
+            )
+
         # Формируем данные для врача
         queue_entries = []
         next_call_entry_id = None
         for entry in entries:
             available_actions = _doctor_queue_available_actions(entry)
             action_flags = _doctor_queue_action_flags(entry)
+            if (
+                requires_emr
+                and (entry.visit_id, entry.patient_id) not in saved_emr_pairs
+            ):
+                available_actions = [
+                    action for action in available_actions if action != "complete"
+                ]
+                action_flags["can_complete"] = False
             if next_call_entry_id is None and action_flags["can_call"]:
                 next_call_entry_id = entry.id
 
@@ -186,6 +226,8 @@ def get_doctor_queue_today(
             queue_entries.append(
                 {
                     "id": entry.id,
+                    "patient_id": entry.patient_id,
+                    "visit_id": entry.visit_id,
                     "number": entry.number,
                     "patient_name": entry.patient_name
                     or (
@@ -196,11 +238,21 @@ def get_doctor_queue_today(
                     "phone": entry.phone,
                     "source": entry.source,
                     "status": entry.status,
-                    "created_at": entry.created_at.isoformat() if entry.created_at else None,
-                    "queue_time": entry.queue_time.isoformat() if entry.queue_time else None,
-                    "updated_at": entry.updated_at.isoformat() if entry.updated_at else None,
-                    "last_changed_at": entry.updated_at.isoformat() if entry.updated_at else None,
-                    "display_time_kind": "queue_time" if entry.queue_time else "created_at",
+                    "created_at": (
+                        entry.created_at.isoformat() if entry.created_at else None
+                    ),
+                    "queue_time": (
+                        entry.queue_time.isoformat() if entry.queue_time else None
+                    ),
+                    "updated_at": (
+                        entry.updated_at.isoformat() if entry.updated_at else None
+                    ),
+                    "last_changed_at": (
+                        entry.updated_at.isoformat() if entry.updated_at else None
+                    ),
+                    "display_time_kind": (
+                        "queue_time" if entry.queue_time else "created_at"
+                    ),
                     "timezone": "Asia/Tashkent",
                     "called_at": (
                         entry.called_at.isoformat() if entry.called_at else None
@@ -230,7 +282,9 @@ def get_doctor_queue_today(
                 if daily_queues[0].opened_at
                 else None
             ),
-            "doctor": _serialize_queue_doctor(doctor, current_user, normalized_specialty),
+            "doctor": _serialize_queue_doctor(
+                doctor, current_user, normalized_specialty
+            ),
             "date": today.isoformat(),
             "entries": queue_entries,
             "stats": stats,
@@ -324,25 +378,24 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 # старом дне (и канонический резолв может родить под
                 # него второй визит). Паринг — тот же, что у
                 # CanonicalVisitRepository (время — оба написания).
-                appointment_filters = [
-                    Appointment.patient_id == visit.patient_id,
-                    Appointment.appointment_date == visit.visit_date,
-                    Appointment.status.not_in(["cancelled", "completed", "no_show"]),
-                ]
-                if visit.doctor_id is None:
-                    appointment_filters.append(Appointment.doctor_id.is_(None))
-                else:
-                    appointment_filters.append(Appointment.doctor_id == visit.doctor_id)
-                if visit.visit_time:
-                    _hhmm = visit.visit_time[:5]
-                    appointment_filters.append(
-                        Appointment.appointment_time.in_((_hhmm, f"{_hhmm}:00"))
-                    )
-                else:
-                    appointment_filters.append(Appointment.appointment_time.is_(None))
-                db.query(Appointment).filter(*appointment_filters).update(
-                    {"appointment_date": queue_day}, synchronize_session=False
-                )
+                # Corrective follow-up (вердикт владельца по смерженному
+                # рантайму, P1): паринг сужается департаментом визита,
+                # берётся под lock, переносится РОВНО ОДНА строка, при
+                # неоднозначности — fail closed (409): старый bulk
+                # UPDATE сдвигал ОБА doctorless-аппойнтмента пациента
+                # того же дня (лабораторию вместе с процедурным
+                # переносом).
+                try:
+                    move_paired_appointment_to_day(db, visit=visit, new_day=queue_day)
+                except AmbiguousAppointmentPairingError as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=(
+                            "Перенос визита отклонён: неоднозначное "
+                            f"сопоставление с appointment (visit_id={visit.id}) "
+                            f"— {exc}"
+                        ),
+                    ) from exc
                 visit.visit_date = queue_day
                 return visit
             # shared by live same-day tickets: fall through to the
@@ -368,6 +421,21 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             .first()
         )
         if visit is None:
+            # Owner round-3 P2 (PR #3367): commit=False — the visit
+            # INSERT joins the CALLER's transaction. Both callers of
+            # this helper (start/complete) stage queue mutations BEFORE
+            # the resolution (in_progress / served + attribution) and
+            # commit AFTER it; with the CRUD default (commit=True) the
+            # internal db.commit() prematurely persisted the staged
+            # served flip + attribution + the new open visit mid-flow,
+            # and a failure of the trailing boundary commit left a
+            # durable served entry (retry rejected: complete is
+            # unavailable for served) with an orphaned open visit and
+            # a lost visit link. create_visit only needs flush() for
+            # the ID (the Fix C contract); the nurse surface
+            # (nurse_serving_api_service._resolve_entry_visit) already
+            # passes commit=False — the N2-2 single-transaction
+            # discipline this aligns the doctor surface with.
             visit = crud_visit.create_visit(
                 db=db,
                 patient_id=queue_entry.patient_id,
@@ -376,6 +444,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 # Codex round-37 P2: время визита — клиник-локальные часы
                 visit_time=_clinic_now(db).strftime("%H:%M"),
                 department=department,
+                commit=False,
             )
     else:
         # Codex round-42 P2: врачебная поверхность резолвит свежий визит
@@ -407,6 +476,11 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
             .first()
         )
         if visit is None:
+            # Owner round-3 P2 (PR #3367): commit=False here too — the
+            # doctor-branch creation is the same mid-composition INSERT
+            # as the resource branch above (see the comment there): the
+            # staged served flip + attribution must not become durable
+            # before the caller's single boundary commit.
             visit = crud_visit.create_visit(
                 db=db,
                 patient_id=queue_entry.patient_id,
@@ -415,6 +489,7 @@ def _resolve_entry_visit(db: Session, queue_entry, doctor, department: str):
                 # Codex round-37 P2: время визита — клиник-локальные часы
                 visit_time=_clinic_now(db).strftime("%H:%M"),
                 department=department,
+                commit=False,
             )
 
     if queue_entry.visit_id != visit.id:
@@ -491,10 +566,14 @@ def call_patient(
         # Now: Admin can always call; any doctor can call from queues
         # where the queue's doctor has the same specialty as the caller.
         if current_user.role != "Admin":
-            caller_doctor = db.query(Doctor).filter(
-                Doctor.user_id == current_user.id,
-                Doctor.active == True,
-            ).first()
+            caller_doctor = (
+                db.query(Doctor)
+                .filter(
+                    Doctor.user_id == current_user.id,
+                    Doctor.active == True,
+                )
+                .first()
+            )
 
             if not caller_doctor:
                 raise HTTPException(
@@ -506,7 +585,11 @@ def call_patient(
             if doctor.user_id != current_user.id:
                 caller_specialty = (caller_doctor.specialty or "").lower().strip()
                 queue_specialty = (doctor.specialty or "").lower().strip()
-                if not caller_specialty or not queue_specialty or caller_specialty != queue_specialty:
+                if (
+                    not caller_specialty
+                    or not queue_specialty
+                    or caller_specialty != queue_specialty
+                ):
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
                         detail="Нет прав для работы с этой очередью — вы не владелец и специальность не совпадает",
@@ -576,7 +659,11 @@ def call_patient(
                 "number": queue_entry.number,
                 "status": queue_entry.status,
                 "called_at": queue_entry.called_at.isoformat(),
-                "updated_at": queue_entry.updated_at.isoformat() if queue_entry.updated_at else None,
+                "updated_at": (
+                    queue_entry.updated_at.isoformat()
+                    if queue_entry.updated_at
+                    else None
+                ),
             },
         }
 
@@ -589,7 +676,10 @@ def call_patient(
         )
 
 
-@router.post("/doctor/queue/{entry_id}/start-visit", response_model=dict[str, Any])
+@router.post(
+    "/doctor/queue/{entry_id}/start-visit",
+    response_model=DoctorQueueStartVisitResponse,
+)
 def start_patient_visit(
     entry_id: int,
     db: Session = Depends(get_db),
@@ -644,18 +734,35 @@ def start_patient_visit(
                 )
 
         # PR-26: same-specialty doctors can also work with this queue
-        if current_user.role != "Admin" and doctor.user_id and doctor.user_id != current_user.id:
-            caller_doctor = db.query(Doctor).filter(
-                Doctor.user_id == current_user.id, Doctor.active == True,
-            ).first()
+        if (
+            current_user.role != "Admin"
+            and doctor.user_id
+            and doctor.user_id != current_user.id
+        ):
+            caller_doctor = (
+                db.query(Doctor)
+                .filter(
+                    Doctor.user_id == current_user.id,
+                    Doctor.active == True,
+                )
+                .first()
+            )
             if not caller_doctor:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Только врач может работать с этой очередью")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Только врач может работать с этой очередью",
+                )
             caller_specialty = (caller_doctor.specialty or "").lower().strip()
             queue_specialty = (doctor.specialty or "").lower().strip()
-            if not caller_specialty or not queue_specialty or caller_specialty != queue_specialty:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Нет прав для работы с этой очередью")
+            if (
+                not caller_specialty
+                or not queue_specialty
+                or caller_specialty != queue_specialty
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Нет прав для работы с этой очередью",
+                )
 
         # Обновляем статус
         if "start_visit" not in _doctor_queue_available_actions(queue_entry):
@@ -687,11 +794,26 @@ def start_patient_visit(
         # the visit. Without this, visit stays in "open" and complete_visit()
         # fails because open→completed is not allowed by the state machine
         # (only open→in_progress is). This was found by Codex review.
+        # Start-atomicity follow-up (PR after #3367): commit=False —
+        # the lifecycle commit joins the CALLER's transaction, exactly
+        # like the completion unit after d5ac9441e. start_patient_visit
+        # stages the queue mutations BEFORE the resolution
+        # (queue_entry.status="in_progress" + updated_at) and writes the
+        # visit annotations (visit_time/notes) AFTER the lifecycle call;
+        # with the service default (commit=True) the internal
+        # db.commit() prematurely persisted the staged flip + the
+        # in_progress transition (+ the created visit and its link on
+        # the resolution path), and a failure of the trailing boundary
+        # commit left a durable partial start: entry in_progress with
+        # visit_time/notes lost. The explicit db.commit() below stays
+        # the SINGLE transaction boundary of the start unit.
         from app.services.visit_lifecycle_service import VisitLifecycleService
+
         if visit.status == "open":
             visit = VisitLifecycleService(db).start_visit(
                 visit_id=visit.id,
                 current_user=current_user,
+                commit=False,
             )
 
         # Обновляем время начала приема
@@ -711,6 +833,8 @@ def start_patient_visit(
             "success": True,
             "message": "Прием пациента начат",
             "entry_id": entry_id,
+            "patient_id": queue_entry.patient_id,
+            "visit_id": visit.id,
             "status": "in_progress",
         }
 
@@ -853,6 +977,40 @@ def complete_patient_visit(
                 record_doctor_id=appointment.doctor_id,
                 current_user=current_user,
             )
+            if requires_saved_emr(
+                appointment.doctor.specialty if appointment.doctor else None
+            ):
+                from app.services.canonical_visit_service import (
+                    CanonicalVisitResolutionError,
+                    CanonicalVisitService,
+                )
+
+                try:
+                    appointment_visit_id = CanonicalVisitService(
+                        db
+                    ).resolve_canonical_visit(appointment.id, create_if_missing=False)
+                except CanonicalVisitResolutionError as exc:
+                    db.rollback()
+                    if exc.status_code == 404:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail=EMR_REQUIRED_DETAIL,
+                        ) from exc
+                    raise HTTPException(
+                        status_code=exc.status_code, detail=exc.detail
+                    ) from exc
+
+                if (
+                    appointment_visit_id,
+                    appointment.patient_id,
+                ) not in get_saved_emr_pairs(
+                    db, {(appointment_visit_id, appointment.patient_id)}
+                ):
+                    db.rollback()
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=EMR_REQUIRED_DETAIL,
+                    )
             # Обновляем статус appointment
             appointment.status = "completed"
 
@@ -895,55 +1053,103 @@ def complete_patient_visit(
                 )
 
             changed_at = datetime.now(UTC)
+
+            # Codex round-1 P1 (corrective follow-up): resolve + pair the
+            # visit BEFORE the served-commit. The pairing may FAIL CLOSED
+            # (409 on an ambiguous appointment set), and the broad
+            # ``except Exception`` below the commit deliberately swallows
+            # visit-update errors — an ambiguous pairing swallowed THERE
+            # left the entry committed served while the visit and its
+            # appointment stayed on the old day, exactly the inconsistency
+            # the fail-closed contract forbids. Everything up to this point
+            # is read-only; the resolution's own mutations (visit link /
+            # re-date / appointment move) flush with the served-commit
+            # below, and a 409 propagates through the outer
+            # ``except HTTPException`` with NOTHING committed.
+            resource_department = None
+            if daily_queue is not None and (
+                getattr(daily_queue, "queue_resource_id", None) is not None
+            ):
+                resource = daily_queue.queue_resource
+                resource_department = daily_queue.queue_tag or (
+                    resource.code if resource is not None else None
+                )
+            # QD-2C (Codex round-35 P1): департамент визита записи —
+            # visit_id-first и департаментный поиск у ресурсной
+            # поверхности (см. хелпер): завершение мутирует тот же визит,
+            # что старт.
+            # Codex round-43 P2: департамент завершения врач-очереди —
+            # тот же канонический маппинг, что у старта (тег или
+            # «general»), а не легаси-«cardiology»: с департаментным
+            # lookup резолва (round-43) рассинхрон департаментов
+            # заставлял завершение создавать второй визит и
+            # оставлять исходный открытым.
+            department_hint = resource_department or (
+                getattr(daily_queue, "queue_tag", None) or "general"
+            )
+            resolved_visit = _resolve_entry_visit(
+                db, queue_entry, doctor, department_hint
+            )
+
+            completion_specialty = (
+                doctor.specialty if doctor else getattr(daily_queue, "queue_tag", None)
+            )
+            if (
+                requires_saved_emr(completion_specialty)
+                and resolved_visit.patient_id != queue_entry.patient_id
+            ):
+                # Reject a mismatched queue/visit link before the lifecycle
+                # policy checks the saved EMR for the Visit's own patient.
+                db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Визит не связан с пациентом записи очереди",
+                )
+
+            # Codex round-2 P2 + round-3 P2: the lifecycle completion ALSO
+            # runs BEFORE the served-commit — resolution + lifecycle + the
+            # served flip are one atomic unit. A lifecycle failure
+            # (terminal-state conflict, lease conflict) propagates with
+            # NOTHING committed: the entry stays in_progress and the retry
+            # re-enters cleanly (the resolution is same-day-idempotent).
+            # ``commit=False`` keeps the explicit ``db.commit()`` below as
+            # the SINGLE transaction boundary — the service's own default
+            # would commit the visit/appointment move and the served flip
+            # mid-flow, and a failure of the trailing commit would 500 on
+            # an already-durable completion whose retry then hits a
+            # terminal queue entry. The genuinely tolerable tail (payment
+            # markers, appointment status, medical data) stays below the
+            # swallow by the pre-existing design: «не блокируем основной
+            # флоу очереди».
+            from app.services.visit_lifecycle_service import VisitLifecycleService
+
+            resolved_visit = VisitLifecycleService(db).complete_visit(
+                visit_id=resolved_visit.id,
+                current_user=current_user,
+                commit=False,
+                completion_specialty=completion_specialty,
+            )
+            resolved_visit.updated_at = changed_at
+
+            # Stage the queue transition only after the EMR check
+            # and visit lifecycle validation have both succeeded.
             queue_entry.status = "served"
             queue_entry.updated_at = changed_at
-            # QF-1 (operator attribution): persist WHO completed the entry —
-            # the live human operator, deliberately separate from the routing
-            # owner (specialist_id / resource doctor). Nullable FK: deleting
-            # the user keeps the history row with NULL attribution.
+            # QF-1: persist WHO completed the entry, separately from its owner.
             queue_entry.served_by_user_id = current_user.id
             queue_entry.served_at = changed_at
+
             db.commit()
             db.refresh(queue_entry)
 
             # Создаем или обновляем визит на сегодня и помечаем как завершенный,
             # чтобы это отразилось в registrar/queues/today, который читает Visit/Appointment
             try:
-                # QD-2C (Codex round-34 P2): департамент визита — из оси
-                # ресурсной очереди (тег/реестр): у DailyQueue нет
-                # department-атрибута, и легаси-fallback писал «cardiology»
-                # — лабораторный/ЭКГ визит (specialist NULL) попадал в чужое
-                # отделение. Врач-очереди без ресурса сохраняют прежний
-                # fallback байт-идентично.
-                resource_department = None
-                if daily_queue is not None and (
-                    getattr(daily_queue, "queue_resource_id", None) is not None
-                ):
-                    resource = daily_queue.queue_resource
-                    resource_department = daily_queue.queue_tag or (
-                        resource.code if resource is not None else None
-                    )
-                # QD-2C (Codex round-35 P1): визит записи — visit_id-first
-                # и департаментный поиск у ресурсной поверхности (см.
-                # хелпер): завершение мутирует тот же визит, что старт
-                # Codex round-43 P2: департамент завершения врач-очереди —
-                # тот же канонический маппинг, что у старта (тег или
-                # «general»), а не легаси-«cardiology»: с департаментным
-                # lookup резолва (round-43) рассинхрон департаментов
-                # заставлял завершение создавать второй визит и
-                # оставлять исходный открытым
-                department_hint = resource_department or (
-                    getattr(daily_queue, "queue_tag", None) or "general"
-                )
-                visit = _resolve_entry_visit(db, queue_entry, doctor, department_hint)
-                # ✅ Issue #06 Phase 3: delegate to VisitLifecycleService
-                # for state machine validation + row lock.
-                from app.services.visit_lifecycle_service import VisitLifecycleService
-
-                visit = VisitLifecycleService(db).complete_visit(
-                    visit_id=visit.id,
-                    current_user=current_user,
-                )
+                # QD-2C (Codex round-34 P2) + Codex round-43 P2: департамент,
+                # сам визит и lifecycle РАЗРЕШЕНЫ ДО served-коммита выше (см.
+                # комментарий у resolved_visit): здесь остаётся только
+                # платёжная/медицинская запись и статус appointment.
+                visit = resolved_visit
                 visit.updated_at = changed_at
 
                 # ✅ ИСПРАВЛЕНО: Проверяем и сохраняем информацию об оплате, создаем платеж через SSOT
@@ -967,11 +1173,11 @@ def complete_patient_visit(
                     # Paid payment may update explicit payment markers only;
                     # registration discount_mode must be preserved.
                     if (
-                        hasattr(visit, 'payment_processed_at')
+                        hasattr(visit, "payment_processed_at")
                         and not visit.payment_processed_at
                     ):
-                        visit.payment_processed_at = (
-                            payment.paid_at or datetime.now(UTC)
+                        visit.payment_processed_at = payment.paid_at or datetime.now(
+                            UTC
                         )
                 # ✅ Также обновляем соответствующий Appointment, если он существует
                 from app.models.appointment import Appointment
@@ -995,10 +1201,7 @@ def complete_patient_visit(
                 if appointment:
                     appointment.status = "completed"
                     # Appointment has no discount_mode; use its explicit payment marker.
-                    if (
-                        payment_is_paid
-                        and not appointment.payment_processed_at
-                    ):
+                    if payment_is_paid and not appointment.payment_processed_at:
                         appointment.payment_processed_at = (
                             payment.paid_at or datetime.now(UTC)
                         )
@@ -1043,5 +1246,3 @@ def complete_patient_visit(
 
 
 # ===================== УСЛУГИ ДЛЯ ВРАЧА =====================
-
-

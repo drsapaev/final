@@ -338,5 +338,74 @@ describe('AIAssistant Component', () => {
       });
     });
   });
+
+  // Cardioplan slice 4: the cardiology AI tab no longer passes
+  // onSuggestionSelect, so the per-item "Использовать" action (which only
+  // mutated detached panel-local state) must not render there. Applying
+  // suggestions stays inside the EMR editor.
+  describe('apply action visibility', () => {
+    const icdResponse = {
+      status: 'success',
+      data: {
+        clinical_recommendations: 'Рекомендации',
+        suggestions: [
+          { code: 'I21.0', name: 'Острый инфаркт миокарда', relevance: 'high' },
+        ],
+      },
+    };
+
+    it('renders no apply button when onSuggestionSelect is not provided', async () => {
+      mcpAPIMocks.suggestICD10.mockResolvedValue(icdResponse);
+
+      render(
+        <MockWrapper>
+          <AIAssistant
+            analysisType="icd10"
+            data={{ symptoms: ['боль в груди'] }}
+            useMCP={true}
+          />
+        </MockWrapper>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /обновить/i }));
+
+      await waitFor(() => {
+        expect(mcpAPIMocks.suggestICD10).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/I21\.0/)).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      expect(screen.queryByText('Использовать')).not.toBeInTheDocument();
+    });
+
+    it('keeps the apply button for panels that pass onSuggestionSelect', async () => {
+      mcpAPIMocks.suggestICD10.mockResolvedValue(icdResponse);
+
+      render(
+        <MockWrapper>
+          <AIAssistant
+            analysisType="icd10"
+            data={{ symptoms: ['боль в груди'] }}
+            useMCP={true}
+            onSuggestionSelect={vi.fn()}
+          />
+        </MockWrapper>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /обновить/i }));
+
+      await waitFor(() => {
+        expect(mcpAPIMocks.suggestICD10).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/I21\.0/)).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      expect(screen.getByText('Использовать')).toBeInTheDocument();
+    });
+  });
 });
 

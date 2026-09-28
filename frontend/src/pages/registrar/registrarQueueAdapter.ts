@@ -10,8 +10,8 @@
  *   no aggregation — SSOT: backend owns queue facts).
  * - Entries without an ID are skipped (null).
  * - Patient display fields pass through backend contract first
- *   (fullEntry.* ?? entry.* fallbacks), gender triple-normalized via
- *   normalizePatientGender.
+ *   (fullEntry.* ?? entry.* fallbacks). Explicit nullable patient_gender is
+ *   authoritative; older gender aliases fall back via normalizePatientGender.
  *
  * @param entry   one queue entry (may wrap payload in entry.data)
  * @param queue   the owning queue object (queue_tag/specialty/specialist_name)
@@ -39,6 +39,16 @@ export const adaptQueueEntry = (
   const timeFields = adaptTimeFields(entry, data);
   const queueTime = timeFields.queue_time ?? null;
   const canonicalStatus = fullEntry.canonical_status ?? fullEntry.queue_status ?? fullEntry.status ?? null;
+  // A present nullable field is the backend's complete answer. The marker
+  // distinguishes it from the null we synthesize for older queue responses.
+  const hasPatientGenderInFullEntry = Object.prototype.hasOwnProperty.call(fullEntry, 'patient_gender') && fullEntry.patient_gender !== undefined;
+  const hasPatientGenderInEntry = Object.prototype.hasOwnProperty.call(entry, 'patient_gender') && entry.patient_gender !== undefined;
+  const hasPatientGenderContract = hasPatientGenderInFullEntry || hasPatientGenderInEntry;
+  const patientGender = hasPatientGenderInFullEntry
+    ? fullEntry.patient_gender
+    : hasPatientGenderInEntry
+      ? entry.patient_gender
+      : normalizePatientGender(fullEntry) ?? normalizePatientGender(entry);
 
   return {
     // SSOT passthrough
@@ -55,13 +65,19 @@ export const adaptQueueEntry = (
     visit_id: fullEntry.visit_id || entry.visit_id || null,
     appointment_id: fullEntry.appointment_id || entry.appointment_id || null,
     queue_entry_id: fullEntry.queue_entry_id || entry.queue_entry_id || null,
+    // Per-entry queue ownership from the read model. The surrounding
+    // specialty bucket can contain several doctors and is not an owner.
+    queue_owner_kind: fullEntry.queue_owner_kind ?? entry.queue_owner_kind ?? null,
+    queue_owner_id: fullEntry.queue_owner_id ?? entry.queue_owner_id ?? null,
+    daily_queue_id: fullEntry.daily_queue_id ?? entry.daily_queue_id ?? null,
     patient_id: fullEntry.patient_id || entry.patient_id,
     patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name ?? entry.patient_fio ?? entry.patient_name ?? fallbackPatientLabel,
     patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year ?? entry.patient_birth_year ?? entry.birth_year ?? null,
     patient_phone: fullEntry.patient_phone ?? fullEntry.phone ?? entry.patient_phone ?? entry.phone ?? '',
-    patient_gender: normalizePatientGender(fullEntry as Record<string, unknown>) ?? normalizePatientGender(entry as Record<string, unknown>),
-    gender: normalizePatientGender(fullEntry as Record<string, unknown>) ?? normalizePatientGender(entry as Record<string, unknown>),
-    sex: normalizePatientGender(fullEntry as Record<string, unknown>) ?? normalizePatientGender(entry as Record<string, unknown>),
+    patient_gender: patientGender,
+    gender: patientGender,
+    sex: patientGender,
+    __patient_gender_contract_present: hasPatientGenderContract,
     address: fullEntry.address ?? entry.address ?? '',
     services: Array.isArray(fullEntry.services) ? fullEntry.services : [],
     service_codes: Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [],

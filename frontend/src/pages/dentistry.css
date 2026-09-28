@@ -283,6 +283,13 @@
 .dental-text-success   { color: var(--mac-success); }
 .dental-text-warning   { color: var(--mac-warning); }
 .dental-text-danger    { color: var(--mac-danger); }
+.dental-photo-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  margin-inline: auto;
+  object-fit: contain;
+}
 .dental-text-blue      { color: var(--mac-accent-blue); }
 .dental-text-purple    { color: var(--mac-accent-purple); }
 .dental-text-orange    { color: var(--mac-accent-orange); }

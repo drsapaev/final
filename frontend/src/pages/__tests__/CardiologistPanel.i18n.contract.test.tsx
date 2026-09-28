@@ -42,7 +42,9 @@ describe('CardiologistPanel STRAT#32 — i18n migration', () => {
     expect(source).toContain("tI18n('cardio.visit_completed')");
     expect(source).toContain("tI18n('cardio.blood_test_saved')");
     expect(source).toContain("tI18n('cardio.ecg_added')");
-    expect(source).toContain("tI18n('cardio.settings_saved')");
+    // Cardioplan slice 5: the floating settings menu (and its "settings
+    // saved" toast) was removed with the unused ECG/Echo toggle; the key
+    // stays in the locales for parity but the panel no longer uses it.
   });
 
   it('does not contain hardcoded Russian strings in notify() calls', () => {
@@ -59,7 +61,7 @@ describe('CardiologistPanel STRAT#32 — i18n migration', () => {
       'cancel_appointment_title', 'cancel_appointment_message',
       'cancel_appointment_confirm', 'cancel_appointment_cancel',
       'session_expired', 'select_patient_first', 'visit_completed',
-      'blood_test_saved', 'ecg_added', 'settings_saved',
+      'blood_test_saved', 'ecg_added',
     ];
     for (const key of keys) {
       expect(translationsSource).toContain(`${key}:`);

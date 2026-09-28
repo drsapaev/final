@@ -49,7 +49,7 @@ describe('DentistPanel safety guards contract (C-1, C-2, C-3)', () => {
     const source = readSource();
     const completeBlock = extractBlock(
       source,
-      'const handleCompleteVisit = async () => {',
+      'const handleCompleteVisit = async (latestDraft?: Record<string, unknown>) => {',
       'try {',
     );
 
@@ -95,8 +95,8 @@ describe('DentistPanel safety guards contract (C-1, C-2, C-3)', () => {
 
     // i18n-unification: CRITICAL_ICD10_CODES is now an array of code strings,
     // labels are in i18n locale files (dental.dental_panel_critical_K04/K10)
-    expect(block).toContain("'K04'");
-    expect(block).toContain("'K10'");
+    expect(block).toContain('\'K04\'');
+    expect(block).toContain('\'K10\'');
     expect(block).toContain('dental_panel_critical_');
   });
 
@@ -119,20 +119,20 @@ describe('DentistPanel safety guards contract (C-1, C-2, C-3)', () => {
     const source = readSource();
     const completeBlock = extractBlock(
       source,
-      'const handleCompleteVisit = async () => {',
+      'const handleCompleteVisit = async (latestDraft?: Record<string, unknown>) => {',
       'try {',
     );
 
-    // Must compute criticalWarning from visitProtocol icd10 field.
+    // Must compute criticalWarning from the same latest draft saved by the screen.
     expect(completeBlock).toContain('getCriticalDiagnosisWarning(');
-    expect(completeBlock).toContain('visitProtocol?.icd10');
+    expect(completeBlock).toContain('latestDraft.icd10_code');
 
     // Must branch into danger-intent confirm when criticalWarning is truthy.
     expect(completeBlock).toContain('if (criticalWarning) {');
     expect(completeBlock).toContain('intent: \'danger\'');
     // i18n-unification: confirm labels now use tI18n()
-    expect(completeBlock).toContain("tI18n('dental.dental_panel_critical_confirm')");
-    expect(completeBlock).toContain("tI18n('dental.dental_panel_critical_cancel')");
+    expect(completeBlock).toContain('tI18n(\'dental.dental_panel_critical_confirm\')');
+    expect(completeBlock).toContain('tI18n(\'dental.dental_panel_critical_cancel\')');
 
     // Must fall back to primary-intent confirm for non-critical diagnoses.
     expect(completeBlock).toContain('intent: \'primary\'');

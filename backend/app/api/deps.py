@@ -11,8 +11,10 @@ This module provides:
 It is intentionally defensive: it supports get_db() returning either
 an AsyncSession or a regular (sync) Session / sessionmaker instance.
 """
+
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 import uuid
@@ -21,6 +23,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
+from anyio import CancelScope, CapacityLimiter, to_thread
+from anyio.lowlevel import RunVar
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt import PyJWTError as JWTError
@@ -55,6 +59,42 @@ except Exception:
     TokenBlacklist = None  # type: ignore
 
 logger = logging.getLogger(__name__)
+
+_AUTH_DB_THREAD_LIMITER: RunVar[CapacityLimiter] = RunVar("auth_db_thread_limiter")
+
+
+def _auth_db_thread_limiter() -> CapacityLimiter:
+    """Limit sync auth queries per event loop without occupying the shared worker quota."""
+    limiter = _AUTH_DB_THREAD_LIMITER.get(None)
+    if limiter is None:
+        # Match the default SQLAlchemy pool size while leaving shared workers free.
+        limiter = CapacityLimiter(8)
+        _AUTH_DB_THREAD_LIMITER.set(limiter)
+    return limiter
+
+
+async def _run_sync_auth_query(db: Session, stmt: Any) -> Any:
+    """Keep the session alive until its worker completes, even on request cancellation."""
+    lookup = asyncio.create_task(
+        to_thread.run_sync(
+            lambda: db.execute(stmt).first(), limiter=_auth_db_thread_limiter()
+        )
+    )
+    try:
+        return await asyncio.shield(lookup)
+    except asyncio.CancelledError:
+        # A direct Task.cancel() bypasses AnyIO's cancellation shield. Wait for
+        # the SQL worker before FastAPI can close the request-scoped Session.
+        with CancelScope(shield=True):
+            while not lookup.done():
+                try:
+                    await asyncio.shield(lookup)
+                except asyncio.CancelledError:
+                    continue
+        if not lookup.cancelled():
+            lookup.exception()  # Mark a concurrent DB error as observed.
+        raise
+
 
 # Document the 2FA-aware canonical login endpoint in OpenAPI.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/authentication/login")
@@ -237,7 +277,7 @@ async def _get_user_with_blacklist(
     if inspect.iscoroutinefunction(execute_callable):
         row = (await db.execute(stmt)).first()
     else:
-        row = db.execute(stmt).first()
+        row = await _run_sync_auth_query(db, stmt)
 
     if row is None:
         return None, False
@@ -334,7 +374,9 @@ async def get_current_user(
         ) from e
 
     if not user:
-        logger.warning("[deps.get_current_user] user not found (username from token may not exist in DB)")
+        logger.warning(
+            "[deps.get_current_user] user not found (username from token may not exist in DB)"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
@@ -405,9 +447,24 @@ def require_roles(*roles: str) -> Callable[..., Any]:
     return _require_roles(*roles)
 
 
+def require_active_roles(*roles: str) -> Callable[..., Any]:
+    """
+    Dependency factory: роли + User.is_active (перенаправляет на SSOT).
+
+    Алиас для app.core.security.require_active_roles(). NURSE-V2 N2-2 review
+    P1 (PR #3333): require_roles() не проверяет is_active — деактивированная
+    привилегированная учётная запись с непросроченным JWT продолжает проходить
+    роль-гейт. Контрольные поверхности авторизационных примитивов (nurse
+    workplace assignments) должны закрываться по деактивации: 403.
+    """
+    from app.core.security import require_active_roles as _require_active_roles
+
+    return _require_active_roles(*roles)
+
+
 def get_current_user_from_request(request: Request) -> User | None:
     """Получить текущего пользователя из состояния запроса (для middleware)"""
-    user_id = getattr(request.state, 'user_id', None)
+    user_id = getattr(request.state, "user_id", None)
     if not user_id:
         return None
 
@@ -422,12 +479,12 @@ def get_current_user_from_request(request: Request) -> User | None:
 
 def get_current_user_id(request: Request) -> int | None:
     """Получить ID текущего пользователя из состояния запроса"""
-    return getattr(request.state, 'user_id', None)
+    return getattr(request.state, "user_id", None)
 
 
 def get_current_user_role(request: Request) -> str | None:
     """Получить роль текущего пользователя из состояния запроса"""
-    return getattr(request.state, 'role', None)
+    return getattr(request.state, "role", None)
 
 
 def require_authentication(request: Request) -> User:

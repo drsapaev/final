@@ -293,3 +293,51 @@ describe('QueueProfilesManager CSV import (RQ-26.a)', () => {
     expect(api.put).toHaveBeenCalledTimes(1);
   });
 });
+
+// RQ-26.b — CSV import × the new lifecycle contracts: archiving goes through
+// the update endpoint only (never destructive), and hand-edited registry
+// columns (public_code, E-055) are warned about and never forwarded.
+describe('QueueProfilesManager CSV import lifecycle (RQ-26.b)', () => {
+  const archiveLifecycleCsv = [
+    'key,title,title_ru,queue_tags,department_key,icon,color,display_order,is_active,show_on_qr_page',
+    '"synthetic-cardio","Синтетическая кардио, взрослая","Синтетическая кардиология","cardio;ekg","cardiology","Heart","#E53E3E","3","false","true"',
+  ].join('\n');
+
+  const publicCodeColumnCsv = [
+    'key,title,public_code,is_active',
+    '"synthetic-cardio","Синтетическая кардио","aaaaaaaaaaaa","false"',
+  ].join('\n');
+
+  it('archives an existing profile through PUT and never calls DELETE', async () => {
+    await renderManager();
+    await uploadCsv(archiveLifecycleCsv);
+
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalledWith(
+        '/queues/profiles/synthetic-cardio',
+        expect.objectContaining({ is_active: false })
+      );
+    });
+
+    // D-02: import is create-or-update only — archiving must not be
+    // implemented as (or escalate into) a destructive delete.
+    expect(api.delete).not.toHaveBeenCalled();
+  });
+
+  it('imports rows from a file with a hand-edited public_code column without forwarding it', async () => {
+    await renderManager();
+    await uploadCsv(publicCodeColumnCsv);
+
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalledWith(
+        '/queues/profiles/synthetic-cardio',
+        expect.objectContaining({ is_active: false })
+      );
+    });
+
+    const payload = (api.put as ReturnType<typeof vi.fn>).mock.calls[0][1] as Record<string, unknown>;
+    // E-055: the public address is server-SSOT — the CSV column is a
+    // non-blocking unknown_column warning, never a payload field.
+    expect(payload).not.toHaveProperty('public_code');
+  });
+});

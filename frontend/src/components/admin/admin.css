@@ -11089,7 +11089,7 @@
   margin-bottom: 6px;
   font-size: var(--mac-font-size-sm, 13px);
   font-weight: 500;
-  color: var(--mac-text-primary, #1d1d1f);
+  color: var(--mac-text-primary, rgba(29, 29, 31, 1));
 }
 
 /* Form label block + mb-8 + sm + 500 + primary */
@@ -11098,7 +11098,7 @@
   margin-bottom: 8px;
   font-size: var(--mac-font-size-sm, 13px);
   font-weight: 500;
-  color: var(--mac-text-primary, #1d1d1f);
+  color: var(--mac-text-primary, rgba(29, 29, 31, 1));
 }
 
 /* Required asterisk */
@@ -12726,4 +12726,356 @@ button[class*="admin-btn"]:active:not(:disabled) {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
   margin-bottom: 24px;
+}
+
+/* ─── RQ-17 (E-065): setup-directions entry screen + QueueResource manager ─── */
+
+.admin-sdx-wrap {
+  padding: 16px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.admin-sdx-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.admin-sdx-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-sdx-subtitle {
+  font-size: 12px;
+  color: var(--mac-text-secondary, rgba(107, 114, 128, 1));
+  margin: 0 0 14px 0;
+}
+
+.admin-sdx-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: var(--mac-error-bg, rgba(255, 59, 48, 0.08));
+  color: var(--mac-error, rgba(255, 59, 48, 1));
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.admin-sdx-note {
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--mac-text-secondary, rgba(107, 114, 128, 1));
+}
+
+.admin-sdx-teaser {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-sdx-teaser-title {
+  font-size: 13px;
+}
+
+.admin-sdx-teaser-desc {
+  color: var(--mac-text-secondary, rgba(107, 114, 128, 1));
+  font-size: 12px;
+}
+
+.admin-sdx-steps {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.admin-sdx-axis-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.admin-sdx-axis-card {
+  border: 1px solid var(--mac-border, rgba(0, 0, 0, 0.1));
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.admin-sdx-axis-title {
+  font-size: 13px;
+}
+
+.admin-sdx-axis-desc {
+  font-size: 12px;
+  color: var(--mac-text-secondary, rgba(107, 114, 128, 1));
+  margin: 6px 0;
+}
+
+.admin-sdx-axis-select {
+  margin-bottom: 8px;
+}
+
+.admin-sdx-step-hint {
+  font-size: 12px;
+  margin: 0 0 8px 0;
+}
+
+.admin-sdx-step-nav {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-sdx-link {
+  font-size: 12px;
+}
+
+.admin-sdx-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-sdx-card {
+  border: 1px solid var(--mac-border, rgba(0, 0, 0, 0.1));
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.admin-sdx-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.admin-sdx-code {
+  font-size: 12px;
+}
+
+.admin-sdx-row-sub {
+  font-size: 12px;
+  color: var(--mac-text-secondary, rgba(107, 114, 128, 1));
+}
+
+.admin-sdx-table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+}
+
+.admin-sdx-cell {
+  padding: 3px 6px;
+}
+
+.admin-sdx-cell-icon {
+  padding: 3px 6px;
+  width: 20px;
+}
+
+.admin-sdx-cell-right {
+  padding: 3px 6px;
+  text-align: right;
+}
+
+.admin-sdx-muted {
+  color: var(--mac-text-secondary, rgba(107, 114, 128, 1));
+}
+
+.admin-sdx-status-ok {
+  color: var(--mac-success, rgba(48, 209, 88, 1));
+  display: inline-flex;
+}
+
+.admin-sdx-status-err {
+  color: var(--mac-error, rgba(255, 59, 48, 1));
+  display: inline-flex;
+}
+
+.admin-sdx-status-unknown {
+  color: var(--mac-text-secondary, rgba(107, 114, 128, 1));
+  display: inline-flex;
+}
+
+.admin-qrm-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-qrm-form {
+  border: 1px solid var(--mac-border, rgba(0, 0, 0, 0.1));
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.admin-qrm-form-span {
+  grid-column: 1 / -1;
+}
+
+.admin-qrm-immutable {
+  font-size: 12px;
+  grid-column: 1 / -1;
+  color: var(--mac-text-secondary, rgba(107, 114, 128, 1));
+}
+
+.admin-qrm-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-qrm-table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+}
+
+.admin-qrm-th {
+  padding: 6px 8px;
+  text-align: left;
+  color: var(--mac-text-secondary, rgba(107, 114, 128, 1));
+}
+
+.admin-qrm-td {
+  padding: 6px 8px;
+}
+
+.admin-qrm-td-right {
+  padding: 6px 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.admin-qrm-tr {
+  border-top: 1px solid var(--mac-border, rgba(0, 0, 0, 0.08));
+}
+
+.admin-sdx-icon-l {
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.admin-sdx-icon-r {
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.admin-sdx-icon-m {
+  vertical-align: middle;
+}
+
+.admin-sdx-card-gap {
+  margin-bottom: 14px;
+}
+
+/* ─── RQ-18 (E-067): permanent direction QR block (S-15 admin half) ─── */
+
+.admin-sdx-qr-block {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--mac-border, rgba(210, 210, 215, 1)) 80%, transparent);
+  border-radius: var(--mac-radius-lg, 12px);
+  background: var(--mac-bg-secondary, rgba(0, 0, 0, 0.02));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-sdx-qr-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-sdx-qr-icon {
+  color: var(--mac-text-secondary, rgba(110, 110, 115, 1));
+}
+
+.admin-sdx-qr-title {
+  font-size: var(--mac-font-size-sm, 13px);
+  font-weight: var(--mac-font-weight-semibold, 600);
+  color: var(--mac-text-primary, rgba(29, 29, 31, 1));
+}
+
+.admin-sdx-qr-unknown {
+  font-size: var(--mac-font-size-sm, 13px);
+  color: var(--mac-text-secondary, rgba(110, 110, 115, 1));
+}
+
+.admin-sdx-qr-error {
+  font-size: var(--mac-font-size-sm, 13px);
+  color: var(--mac-error, rgba(255, 59, 48, 1));
+  margin-bottom: 8px;
+}
+
+.admin-sdx-qr-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.admin-sdx-qr-canvas {
+  padding: 10px;
+  border-radius: var(--mac-radius-md, 10px);
+  background: rgba(255, 255, 255, 1);
+  border: 1px solid color-mix(in srgb, var(--mac-border, rgba(210, 210, 215, 1)) 80%, transparent);
+  align-self: center;
+}
+
+.admin-sdx-qr-url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  font-size: var(--mac-font-size-sm, 13px);
+  color: var(--mac-text-primary, rgba(29, 29, 31, 1));
+  word-break: break-all;
+}
+
+.admin-sdx-qr-note-warn {
+  font-size: var(--mac-font-size-xs, 12px);
+  color: var(--mac-text-primary, rgba(29, 29, 31, 1));
+  background: color-mix(in srgb, var(--mac-warning, rgba(255, 159, 10, 1)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mac-warning, rgba(255, 159, 10, 1)) 40%, transparent);
+  border-radius: var(--mac-radius-md, 10px);
+  padding: 8px 10px;
+}
+
+.admin-sdx-qr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-sdx-qr-permanent-note {
+  font-size: var(--mac-font-size-xs, 12px);
+  color: var(--mac-text-secondary, rgba(110, 110, 115, 1));
+  margin: 0;
+}
+
+/* RQ-18 follow-up (P2-4): sibling tag rows of the SAME owning profile
+   show a pointer to the row that carries the QR block — one block per
+   profile key, no independent duplicate states. */
+.admin-sdx-qr-dedupe-note {
+  font-size: var(--mac-font-size-xs, 12px);
+  color: var(--mac-text-secondary, rgba(110, 110, 115, 1));
+  background: color-mix(in srgb, var(--mac-bg-secondary, rgba(246, 246, 248, 1)) 60%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--mac-text-tertiary, rgba(160, 160, 165, 1)) 45%, transparent);
+  border-radius: var(--mac-radius-md, 10px);
+  padding: 8px 10px;
+  margin: 0;
 }

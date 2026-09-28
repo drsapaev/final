@@ -61,6 +61,9 @@ export interface Appointment {
   doctor_id?: DoctorId;
   doctor_name?: string;
   specialist_id?: DoctorId;
+  queue_owner_kind?: 'doctor' | 'resource' | null;
+  queue_owner_id?: number | null;
+  daily_queue_id?: number | null;
   status?: AppointmentStatus | (string & {});
   type?: AppointmentType;
   date?: string;

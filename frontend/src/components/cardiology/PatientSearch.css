@@ -1,0 +1,46 @@
+/* PatientSearch — cardioplan slice 4 */
+
+.cardio-patient-search__list {
+  list-style: none;
+  margin: var(--mac-spacing-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mac-spacing-1);
+}
+
+.cardio-patient-search__row {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mac-spacing-2);
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  background: var(--mac-bg-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.cardio-patient-search__row:hover {
+  background: var(--mac-accent-blue-bg);
+}
+
+.cardio-patient-search__row[aria-pressed='true'] {
+  border-color: var(--mac-accent-blue);
+  background: var(--mac-accent-blue-bg);
+}
+
+.cardio-patient-search__name {
+  font-weight: var(--mac-font-weight-medium, 500);
+  color: var(--mac-text-primary);
+}
+
+.cardio-patient-search__meta {
+  font-size: var(--mac-font-size-sm);
+  color: var(--mac-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

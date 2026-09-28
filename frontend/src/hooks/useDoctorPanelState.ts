@@ -21,12 +21,22 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 const DEFAULT_DEFAULT_TAB = 'appointments';
 const DEFAULT_VISIT_DEEP_LINK_TAB = 'visit';
+const EMPTY_TAB_ALIASES: Record<string, string> = {};
 
 export function useDoctorPanelState({
   defaultTab = DEFAULT_DEFAULT_TAB,
   visitDeepLinkTab = DEFAULT_VISIT_DEEP_LINK_TAB,
   patientDeepLinkTab = 'appointments',
   initialTab = null,
+  validTabs = null,
+  tabAliases = EMPTY_TAB_ALIASES,
+}: {
+  defaultTab?: string;
+  visitDeepLinkTab?: string;
+  patientDeepLinkTab?: string;
+  initialTab?: string | null;
+  validTabs?: string[] | null;
+  tabAliases?: Record<string, string>;
 } = {}) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -49,11 +59,14 @@ export function useDoctorPanelState({
 
   const resolveTabFromUrl = useCallback(() => {
     const explicitTab = searchParams.get('tab');
-    if (explicitTab) return explicitTab;
+    if (explicitTab) {
+      const resolvedTab = tabAliases[explicitTab] || explicitTab;
+      return !validTabs || validTabs.includes(resolvedTab) ? resolvedTab : defaultTab;
+    }
     if (visitIdFromUrl) return visitDeepLinkTab;
     if (patientIdFromUrl) return patientDeepLinkTab;
     return defaultTab;
-  }, [searchParams, visitIdFromUrl, patientIdFromUrl, visitDeepLinkTab, patientDeepLinkTab, defaultTab]);
+  }, [searchParams, visitIdFromUrl, patientIdFromUrl, visitDeepLinkTab, patientDeepLinkTab, defaultTab, tabAliases, validTabs]);
 
   const [activeTab, setActiveTab] = useState(() => {
     if (initialTab) return initialTab;
@@ -62,21 +75,29 @@ export function useDoctorPanelState({
 
   useEffect(() => {
     const urlTab = resolveTabFromUrl();
+    const explicitTab = searchParams.get('tab');
+    if (explicitTab && explicitTab !== urlTab) {
+      const params = new URLSearchParams(location.search);
+      params.set('tab', urlTab);
+      navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+    }
     if (urlTab !== activeTab) {
       setActiveTab(urlTab);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolveTabFromUrl]);
+  }, [resolveTabFromUrl, searchParams, location.pathname, location.search, navigate]);
 
   const handleTabChange = useCallback((tabId: string) => {
-    setActiveTab(tabId);
+    const aliasedTab = tabAliases[tabId] || tabId;
+    const resolvedTab = !validTabs || validTabs.includes(aliasedTab) ? aliasedTab : defaultTab;
+    setActiveTab(resolvedTab);
     const params = new URLSearchParams(location.search);
-    params.set('tab', tabId);
+    params.set('tab', resolvedTab);
     // P-029 (UX audit): use push instead of replace so the browser Back
     // button navigates between tabs intuitively. Previously used replace:
     // true, which meant Back always exited the panel entirely.
     navigate({ pathname: location.pathname, search: params.toString() }, { replace: false });
-  }, [location.pathname, location.search, navigate]);
+  }, [defaultTab, location.pathname, location.search, navigate, tabAliases, validTabs]);
 
   const [selectedPatient, setSelectedPatient] = useState(null);
 

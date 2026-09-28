@@ -70,7 +70,28 @@ class FCMService:
         self._load_credentials()
 
     def _load_credentials(self):
-        """Загрузка учетных данных сервисного аккаунта"""
+        """Загрузка учетных данных сервисного аккаунта.
+
+        Log severity must match intent: an intentionally disabled channel
+        (FCM_ENABLED=false, the default) is always INFO — missing,
+        unloadable, or stale credentials included (a broken credential file
+        cannot make a switched-off channel misconfigured, so the old blanket
+        ``logger.error`` on load failure leaked ERROR noise into valid dev
+        startups). Only an ENABLED channel is allowed to WARN: missing or
+        unloadable credentials there are a real misconfiguration — sends
+        short-circuit with "FCM service not configured" and pushes silently
+        never fire.
+
+        No early return (review round 3): the diagnostics below always see
+        the whole configuration — credentials AND project id. Otherwise an
+        enabled channel with valid credentials but a missing
+        ``FCM_PROJECT_ID`` logged a clean "loaded successfully" and stopped,
+        while ``active`` stayed False and pushes silently never fired.
+        """
+        enabled = bool(getattr(settings, "FCM_ENABLED", False))
+        # None = no credential file to attempt; a string = the load failed.
+        load_failure: str | None = None
+        loaded = False
         try:
             # Пытаемся найти путь к JSON файлу в env или settings
             cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -80,12 +101,53 @@ class FCMService:
                 self.credentials = service_account.Credentials.from_service_account_file(
                     cred_path, scopes=scopes
                 )
-                logger.info("FCM credentials loaded successfully")
-            else:
-                logger.warning("GOOGLE_APPLICATION_CREDENTIALS not found or invalid. FCM disabled.")
-
+                loaded = True
         except Exception as e:
-            logger.error(f"Failed to load FCM credentials: {e}")
+            load_failure = str(e) or type(e).__name__
+
+        if loaded:
+            logger.info("FCM credentials loaded successfully")
+            if enabled and not self.project_id:
+                logger.warning(
+                    "FCM_ENABLED=true and service-account credentials "
+                    "loaded, but FCM_PROJECT_ID is missing — push "
+                    "notifications stay disabled and sends short-circuit "
+                    "with 'FCM service not configured'. Set FCM_PROJECT_ID "
+                    "to your Firebase project id and restart the process"
+                )
+        elif enabled:
+            if load_failure is None:
+                logger.warning(
+                    "FCM_ENABLED=true but GOOGLE_APPLICATION_CREDENTIALS is "
+                    "not set or the file does not exist — push notifications "
+                    "stay disabled. Generate a Firebase service-account JSON "
+                    "(Firebase Console > Project Settings > Service accounts "
+                    "> Generate new private key), point the env var at it, "
+                    "set FCM_PROJECT_ID, and restart the process"
+                )
+            else:
+                logger.warning(
+                    "FCM_ENABLED=true but the service-account file at "
+                    "GOOGLE_APPLICATION_CREDENTIALS could not be loaded "
+                    "(%s) — push notifications stay disabled. Regenerate "
+                    "the JSON (Firebase Console > Project Settings > "
+                    "Service accounts > Generate new private key), point "
+                    "the env var at it, verify FCM_PROJECT_ID, and restart "
+                    "the process",
+                    load_failure,
+                )
+        elif load_failure is None:
+            logger.info(
+                "FCM disabled by configuration (FCM_ENABLED=false); "
+                "push notifications are off"
+            )
+        else:
+            logger.info(
+                "FCM disabled by configuration (FCM_ENABLED=false); push "
+                "notifications are off (an existing credential file is "
+                "invalid and was ignored: %s)",
+                load_failure,
+            )
 
     def _get_access_token(self) -> str | None:
         """Получение валидного OAuth2 токена (синхронно, так как редко)"""

@@ -462,6 +462,9 @@ def test_qf1_did_not_touch_rbac_vocabulary():
     from app.core.roles import Roles
 
     # Enum-level pin: the canonical role set on main before/after QF-1.
+    # NURSE-V2 N2-2 (owner design-GO 2026-09-19): 'Nurse' re-opened as a
+    # NEW product capability — the only vocabulary change since QF-1;
+    # QF-1's own surfaces (queue ops guards) are untouched by it.
     assert {role.value for role in Roles} == {
         "Admin",
         "Registrar",
@@ -471,6 +474,7 @@ def test_qf1_did_not_touch_rbac_vocabulary():
         "cardio",
         "derma",
         "dentist",
+        "Nurse",
         "Patient",
         "SuperAdmin",
     }

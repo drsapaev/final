@@ -44,6 +44,17 @@ const tokenBoxStyle = {
   userSelect: 'all' as const,
 };
 
+// Backend: app/services/patient_activation_service.py ERR_ISSUANCE_PHONE_BOUND
+// (pinned by backend/tests/unit/test_patient_activation_service.py). Kept as
+// a literal mirror because the frontend cannot import backend constants; any
+// backend drift breaks its own unit test first. Phase 0 follow-up (owner P2):
+// the backend deliberately returns two DIFFERENT safe 409 details on this
+// endpoint — collapsing both into a generic already-linked message hid the
+// real reason (and the correct operator action) from staff.
+const BACKEND_ERR_ISSUANCE_PHONE_BOUND =
+  'Портал-доступ с этим номером телефона уже активирован для другой карты. ' +
+  'Активация второго аккаунта на тот же номер недоступна.';
+
 const PatientActivationTokenDialog = ({ isOpen, onClose, patient }: PatientActivationTokenDialogProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -55,9 +66,16 @@ const PatientActivationTokenDialog = ({ isOpen, onClose, patient }: PatientActiv
   const [error, setError] = useState('');
 
   const patientId = patient?.id as string | number | undefined;
-  const patientName = String(
-    patient?.full_name || [patient?.last_name, patient?.first_name, patient?.middle_name].filter(Boolean).join(' ') || ''
-  );
+  // Phase 0 follow-up (owner P2): the real caller (AdminPatients) passes
+  // usePatients-transformed rows — camelCase firstName/lastName/middleName.
+  // Reading the raw API shape (full_name/last_name/...) here always produced
+  // an empty name, so the irreversible-reissue confirmation degraded to a
+  // bare #id — exactly the stage where staff must see the real patient.
+  const patientName = [patient?.lastName, patient?.firstName, patient?.middleName]
+    .filter(Boolean)
+    .map(String)
+    .join(' ')
+    .trim();
 
   const handleIssue = async () => {
     if (!patientId) {
@@ -74,7 +92,20 @@ const PatientActivationTokenDialog = ({ isOpen, onClose, patient }: PatientActiv
       logger.warn('[PatientActivationTokenDialog] issue failed:', err);
       const apiError = err as HttpApiError;
       if (apiError?.response?.status === 409) {
-        setError(t('patientPortal.pi_error_already_linked'));
+        // Phase 0 follow-up (owner P2): two different 409s on this endpoint.
+        //   ERR_PATIENT_ALREADY_LINKED — this very card is already linked;
+        //   ERR_ISSUANCE_PHONE_BOUND — the card is NOT linked, but the phone
+        //     is already bound to another portal card (family/shared phone).
+        // The second case needs a different corrective action (different
+        // card / phone update), so the cases are reported separately.
+        const detail = String(
+          (apiError?.response?.data as Record<string, unknown> | undefined)?.detail ?? ''
+        );
+        if (detail === BACKEND_ERR_ISSUANCE_PHONE_BOUND) {
+          setError(t('patientPortal.pi_error_phone_bound'));
+        } else {
+          setError(t('patientPortal.pi_error_already_linked'));
+        }
       } else if (apiError?.response?.status === 404) {
         setError(t('patientPortal.pi_error_not_found'));
       } else if (apiError?.response?.status === 429) {

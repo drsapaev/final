@@ -1063,7 +1063,21 @@ def test_alembic_chain_single_head_0069() -> None:
     assert len(module.revision) <= 32
     referenced = {parent for parents in graph.values() for parent in parents}
     heads = sorted(revision for revision in graph if revision not in referenced)
-    assert heads == ["0070_lab_results_lineage"]
+    # NURSE-V2 N2-2 (owner design-GO 2026-09-19): the chain head moved to
+    # 0072 (workplace assignments 0071 + service executions 0072).
+    assert graph["0071_nurse_workplace_assignments"] == (
+        "0070_lab_results_lineage",
+    )
+    assert graph["0072_service_executions"] == (
+        "0071_nurse_workplace_assignments",
+    )
+    # Main's corrective follow-up moved the head to 0073 (routing
+    # snapshot); RQ-18 follow-up round-8 re-parents the payload binding
+    # as 0074 on top of it.
+    assert graph["0073_execution_routing_snapshot"] == (
+        "0072_service_executions",
+    )
+    assert heads == ["0074_join_payload_binding"]
 
 
 # ===================== C. PostgreSQL FK introspection =====================
@@ -1556,10 +1570,12 @@ def test_full_chain_retires_the_sentinel_pairs_on_a_fresh_database() -> None:
                 version = conn.execute(
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar()
-                # The chain grew past the retirement (0070 lineage); the
-                # retirement end-state (no synthetic usernames/doctors)
-                # is a head-agnostic invariant.
-                assert version == "0070_lab_results_lineage"
+                # The chain grew past the retirement (0070 lineage; now
+                # NURSE-V2 0071/0072, main's 0073 routing snapshot and the
+                # round-8 0074 payload binding); the retirement end-state
+                # (no synthetic usernames/doctors) is a head-agnostic
+                # invariant.
+                assert version == "0074_join_payload_binding"
 
                 usernames = {
                     row[0]

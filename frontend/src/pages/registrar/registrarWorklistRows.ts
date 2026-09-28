@@ -45,6 +45,27 @@ export interface RegistrarDepartmentStats {
   };
 }
 
+const belongsToDoctor = (entry: Appointment, doctorId: number): boolean => {
+  return entry.queue_owner_kind === 'doctor' && entry.queue_owner_id === doctorId;
+};
+
+/** Doctor tabs use the entry's own queue owner, never a specialty bucket. */
+export const computeDoctorStats = (
+  appointments: Appointment[],
+  date: string,
+  doctorIds: number[],
+): RegistrarDepartmentStats => Object.fromEntries(doctorIds.map((id) => {
+  const rows = appointments.filter((entry) => belongsToDoctor(entry, id));
+  return [String(id), {
+    todayCount: rows.filter((entry) => (entry.date || entry.appointment_date) === date).length,
+    hasActiveQueue: rows.some((entry) =>
+      entry.queue_numbers && entry.queue_numbers.length > 0 &&
+      ['waiting', 'called', 'in_service'].includes(String(entry.status || ''))),
+    hasPendingPayments: rows.some((entry) =>
+      entry.status === 'paid_pending' || entry.payment_status === 'pending'),
+  }];
+})) as RegistrarDepartmentStats;
+
 // Мемоизированные счетчики и индикаторы по отделам
 export const computeDepartmentStats = (
   appointments: Appointment[],
@@ -134,6 +155,7 @@ const appointmentQueueTagValue = (entry: Appointment): string => (
 export const computeRegistrarWorklistRows = ({
   appointments,
   activeTab,
+  activeDoctorId = null,
   statusFilter,
   searchQuery,
   queueProfiles,
@@ -142,6 +164,7 @@ export const computeRegistrarWorklistRows = ({
 }: {
   appointments: Appointment[];
   activeTab: string | null;
+  activeDoctorId?: number | null;
   statusFilter: string | null;
   searchQuery: string;
   queueProfiles: QueueProfileItem[];
@@ -149,9 +172,9 @@ export const computeRegistrarWorklistRows = ({
   fallbackPatientLabel: string;
 }): Record<string, unknown>[] => {
   // Если выбрана конкретная вкладка (не "Все отделения"), используем appointments с фильтрацией по queue_tag
-  if (activeTab) {
+  if (activeTab || activeDoctorId != null) {
     // ⭐ SSOT: queue_tags from API profiles, not hardcoded
-    const possibleTags = getQueueTagsForTabKey(activeTab, queueProfiles);
+    const possibleTags = activeDoctorId == null ? getQueueTagsForTabKey(activeTab as string, queueProfiles) : [];
 
     // Фильтруем appointments по queue_tag вкладки
     const entriesForTab = (appointments).filter((entry) => {
@@ -159,7 +182,9 @@ export const computeRegistrarWorklistRows = ({
       const entryQueueTag = appointmentQueueTagValue(entry);
 
       // Проверяем соответствие вкладке
-      const matchesTab = possibleTags.some((tag: string) => tag.toLowerCase() === entryQueueTag);
+      const matchesTab = activeDoctorId != null
+        ? belongsToDoctor(entry, activeDoctorId)
+        : possibleTags.some((tag: string) => tag.toLowerCase() === entryQueueTag);
       if (!matchesTab) return false;
 
       // Фильтр по статусу
@@ -297,22 +322,25 @@ export type RegistrarWorklistEmptyScopeKind = 'queue-empty' | 'filtered-empty';
 export const resolveRegistrarWorklistEmptyScopeKind = ({
   appointments,
   activeTab,
+  activeDoctorId = null,
   queueProfiles,
 }: {
   appointments: Appointment[];
   activeTab: string | null;
+  activeDoctorId?: number | null;
   queueProfiles: QueueProfileItem[];
 }): RegistrarWorklistEmptyScopeKind => {
   // "All departments": every loaded appointment is in scope; aggregation
   // never loses patients, so any entry means zero rows can only be narrowing.
-  if (!activeTab) {
+  if (!activeTab && activeDoctorId == null) {
     return appointments.length === 0 ? 'queue-empty' : 'filtered-empty';
   }
 
   // Specific tab: same SSOT tag resolution and entry normalization as rows.
-  const possibleTags = getQueueTagsForTabKey(activeTab, queueProfiles);
-  const scopeHasEntries = appointments.some((entry) =>
-    possibleTags.some((tag: string) => tag.toLowerCase() === appointmentQueueTagValue(entry)));
+  const possibleTags = activeDoctorId == null ? getQueueTagsForTabKey(activeTab as string, queueProfiles) : [];
+  const scopeHasEntries = appointments.some((entry) => activeDoctorId != null
+    ? belongsToDoctor(entry, activeDoctorId)
+    : possibleTags.some((tag: string) => tag.toLowerCase() === appointmentQueueTagValue(entry)));
 
   return scopeHasEntries ? 'filtered-empty' : 'queue-empty';
 };
@@ -353,17 +381,19 @@ export interface RegistrarWorklistCounterDescriptor {
 export const describeRegistrarWorklistCounter = ({
   appointments,
   activeTab,
+  activeDoctorId = null,
   queueProfiles,
   rows,
   hasMore,
 }: {
   appointments: Appointment[];
   activeTab: string | null;
+  activeDoctorId?: number | null;
   queueProfiles: QueueProfileItem[];
   rows: Record<string, unknown>[];
   hasMore: boolean;
 }): RegistrarWorklistCounterDescriptor => {
-  if (!activeTab) {
+  if (!activeTab && activeDoctorId == null) {
     // All-departments: the scope is the AGGREGATED PATIENT count of the
     // loaded day (aggregation cannot lose patients — RQ-21.a note), taken
     // BEFORE the status/search narrowing the rows already embody.
@@ -381,9 +411,10 @@ export const describeRegistrarWorklistCounter = ({
 
   // Specific tab: same SSOT tag resolution as rows/emptyScopeKind — the
   // scope is every entry matching the tab's queue_tags, before narrowing.
-  const possibleTags = getQueueTagsForTabKey(activeTab, queueProfiles);
-  const scopeCount = appointments.filter((entry) =>
-    possibleTags.some((tag: string) => tag.toLowerCase() === appointmentQueueTagValue(entry)),
+  const possibleTags = activeDoctorId == null ? getQueueTagsForTabKey(activeTab as string, queueProfiles) : [];
+  const scopeCount = appointments.filter((entry) => activeDoctorId != null
+    ? belongsToDoctor(entry, activeDoctorId)
+    : possibleTags.some((tag: string) => tag.toLowerCase() === appointmentQueueTagValue(entry)),
   ).length;
   return {
     unit: 'records',
@@ -423,12 +454,14 @@ export const formatRegistrarWorklistCounter = (
 export const resolveRegistrarWorklistPresentationFacts = ({
   appointments,
   activeTab,
+  activeDoctorId = null,
   queueProfiles,
   rows,
   hasMore,
 }: {
   appointments: Appointment[];
   activeTab: string | null;
+  activeDoctorId?: number | null;
   queueProfiles: QueueProfileItem[];
   rows: Record<string, unknown>[];
   hasMore: boolean;
@@ -436,8 +469,8 @@ export const resolveRegistrarWorklistPresentationFacts = ({
   emptyScopeKind: RegistrarWorklistEmptyScopeKind;
   counter: RegistrarWorklistCounterDescriptor;
 } => ({
-  emptyScopeKind: resolveRegistrarWorklistEmptyScopeKind({ appointments, activeTab, queueProfiles }),
-  counter: describeRegistrarWorklistCounter({ appointments, activeTab, queueProfiles, rows, hasMore }),
+  emptyScopeKind: resolveRegistrarWorklistEmptyScopeKind({ appointments, activeTab, activeDoctorId, queueProfiles }),
+  counter: describeRegistrarWorklistCounter({ appointments, activeTab, activeDoctorId, queueProfiles, rows, hasMore }),
 });
 
 export default computeRegistrarWorklistRows;

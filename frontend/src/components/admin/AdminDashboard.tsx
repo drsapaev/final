@@ -362,20 +362,16 @@ const AdminDashboard = () => {
     initialData: [],
   });
 
-  // PR-UI-11-1: clinic-wide queue summary. Delegated to the canonical
-  // `useQueueSummary` hook (ADR-0015 hook-layer boundary) — it fetches
-  // the list of active departments via `/doctor/departments?active_only=true`
-  // then fans out per-department `/queues/stats?department=<name>&d=<today>`
-  // calls via Promise.all. Per-department failures are tolerated (skipped);
-  // the summary reflects only the departments that returned data.
+  // Clinic-wide queue summary uses its queue endpoint and the stats response
+  // already loaded above for the approximate serving/done counters.
+  const statsData = statsDataRaw as AdminStats | null | undefined;
   const {
     summary: queueSummary,
     loading: queueLoading,
     error: queueError,
     refresh: refreshQueue,
-  } = useQueueSummary({ enabled: true, date: todayIso });
+  } = useQueueSummary({ enabled: true, date: todayIso, statsData });
 
-  const statsData = statsDataRaw as AdminStats | null | undefined;
   const activityChartData = activityChartDataRaw as AdminActivityChartData | null | undefined;
   const stats: AdminStats = statsData || defaultStats;
   const scheduleItems = Array.isArray(scheduleDataRaw) ? (scheduleDataRaw as AdminScheduleItem[]) : [];

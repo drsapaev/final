@@ -25,6 +25,13 @@ import { getPatient } from '../../api/patients';
 import logger from '../../utils/logger';
 import type { HttpApiError } from '../../types/errors';
 
+const doctorIdFromParams = (params: URLSearchParams): number | null => {
+  const raw = params.get('doctor_id');
+  if (!raw || !/^[1-9]\d*$/.test(raw)) return null;
+  const id = Number(raw);
+  return Number.isSafeInteger(id) ? id : null;
+};
+
 export const useRegistrarNavigation = ({
   showWizard,
   setShowWizard,
@@ -42,17 +49,32 @@ export const useRegistrarNavigation = ({
 
   // R-02 fix: activeTab синхронизирован с URL (?dept=...).
   // Раньше был useState(null) — F5 сбрасывал выбранное отделение.
-  const [activeTab, setActiveTabRaw] = useState(() => searchParams.get('dept') || null);
+  const [activeTab, setActiveTabRaw] = useState(() => doctorIdFromParams(searchParams) ? null : searchParams.get('dept') || null);
+  const [activeDoctorId, setActiveDoctorIdRaw] = useState(() => doctorIdFromParams(searchParams));
   // RQ-20 (срез RQ-20.a): браузерные back/forward (и любой внешний переход,
   // меняющий ?dept=, пока панель смонтирована) обязаны возвращать UI к вкладке
   // из URL. useState-инициализатор выполняется только при маунте, поэтому без
   // этой синхронизации Back менял ?dept= в адресной строке, а панель
   // продолжала показывать новую вкладку.
   useEffect(() => {
-    setActiveTabRaw(searchParams.get('dept') || null);
+    const doctorId = doctorIdFromParams(searchParams);
+    setActiveDoctorIdRaw(doctorId);
+    setActiveTabRaw(doctorId ? null : searchParams.get('dept') || null);
   }, [searchParams]);
+  // A shared link can carry both historical ?dept= and the new doctor_id.
+  // Doctor selection wins; discard malformed ids without adding history.
+  useEffect(() => {
+    if (location.pathname !== '/registrar') return;
+    if (!searchParams.has('doctor_id')) return;
+    const doctorId = doctorIdFromParams(searchParams);
+    if (doctorId && !searchParams.has('dept')) return;
+    const params = new URLSearchParams(searchParams);
+    params.delete(doctorId ? 'dept' : 'doctor_id');
+    setSearchParams(params, { replace: true });
+  }, [location.pathname, searchParams, setSearchParams]);
   const setActiveTab = useCallback((tab: string | null) => {
     setActiveTabRaw(tab);
+    setActiveDoctorIdRaw(null);
     // R-02: пишем в URL для shareable links + back button.
     // RQ-20 (срез RQ-20.a): (1) источник параметров — router searchParams,
     // а не window.location.search: под MemoryRouter/basename location.search
@@ -60,11 +82,21 @@ export const useRegistrarNavigation = ({
     // ?q=/?status=; (2) push вместо replace — история браузера обходит
     // выбранные вкладки (back/forward соответствуют выбранной вкладке).
     const params = new URLSearchParams(searchParams);
+    params.delete('doctor_id');
     if (tab) {
       params.set('dept', tab);
     } else {
       params.delete('dept');
     }
+    setSearchParams(params);
+  }, [searchParams, setSearchParams]);
+  const setActiveDoctorId = useCallback((doctorId: number | null) => {
+    setActiveDoctorIdRaw(doctorId);
+    setActiveTabRaw(null);
+    const params = new URLSearchParams(searchParams);
+    params.delete('dept');
+    if (doctorId != null) params.set('doctor_id', String(doctorId));
+    else params.delete('doctor_id');
     setSearchParams(params);
   }, [searchParams, setSearchParams]);
 
@@ -210,6 +242,8 @@ export const useRegistrarNavigation = ({
     navigate,
     activeTab,
     setActiveTab,
+    activeDoctorId,
+    setActiveDoctorId,
     clearStatusFilter,
     currentView,
     searchQuery,

@@ -1,855 +1,461 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button, Card, Input, Select } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState, useEffect } from 'react';
-import logger from '../../utils/logger';
 import {
-  Camera,
-  Upload,
-  Download,
-  Trash2,
-  Eye,
-  Edit,
-  Search,
+  deleteDentalMedia,
+  listDentalMedia,
+  loadDentalMediaContent,
+  updateDentalMedia,
+  uploadDentalMedia,
+  type DentalMediaCategory,
+  type DentalMediaItem,
+  type DentalMediaMetadata,
+} from '../../api/dentalMedia';
 
-  Calendar,
-  MapPin,
-  Tag,
-
-  X,
-  Save,
-  FileImage,
-  FileText,
-  Video,
-  Image as ImageIcon } from
-
-
-
-
-
-
-'lucide-react';
-import notify from '../../services/notify';
-
-/**
- * Архив фото и рентгенов для стоматологической ЭМК
- * Включает привязку к зубам, датам, категориям и поиск
- */
-
-interface MediaFile {
-  id: number;
-  name: string;
-  type: string;
-  size: number;
-  url: string;
-  category: string;
-  tooth: string;
-  date: string;
+type MetadataDraft = {
+  title: string;
   description: string;
-  tags: string[];
-  uploadedAt: string;
-  isRadiograph: boolean;
-}
-
-interface PhotoArchiveFilters {
-  category: string;
+  category: DentalMediaCategory;
   tooth: string;
-  dateFrom: string;
-  dateTo: string;
-  tags: string[];
-}
-
-interface PhotoArchiveFormData {
-  patientId: string | number;
-  patientName: string;
-  mediaFiles: MediaFile[];
-  filters: PhotoArchiveFilters;
-  searchQuery: string;
-  createdAt: string;
-  updatedAt: string;
-}
+  capture_date: string;
+};
 
 interface PhotoArchiveProps {
-  patientId: string | number;
-  patientName: string;
-  initialData?: Partial<PhotoArchiveFormData> | null;
-  onSave?: (data: PhotoArchiveFormData) => Promise<void> | void;
+  patientId?: string | number | null;
+  visitId?: string | number | null;
+  patientName?: string;
+  presentation?: 'page' | 'dialog';
   onClose?: () => void;
+  onGoToPatients?: () => void;
+  onGoToQueue?: () => void;
 }
+
+const toId = (value?: string | number | null) => {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const errorStatus = (error: unknown): number | undefined => {
+  if (!error || typeof error !== 'object') return undefined;
+  const response = (error as { response?: { status?: unknown } }).response;
+  return typeof response?.status === 'number' ? response.status : undefined;
+};
+
+const newMetadataDraft = (item: DentalMediaItem): MetadataDraft => ({
+  title: item.title || '',
+  description: item.description || '',
+  category: item.category,
+  tooth: item.tooth || '',
+  capture_date: item.capture_date || '',
+});
 
 const PhotoArchive = ({
   patientId,
-  patientName,
-  initialData = null,
-  onSave,
-  onClose
+  visitId,
+  patientName = '',
+  presentation = 'page',
+  onClose,
+  onGoToPatients,
+  onGoToQueue,
 }: PhotoArchiveProps) => {
-  const { t: rawT } = useTranslation();
-  const t = rawT;
-  const [formData, setFormData] = useState<PhotoArchiveFormData>({
-    // Основные данные
-    patientId,
-    patientName,
-
-    // Медиа файлы
-    mediaFiles: [],
-
-    // Фильтры
-    filters: {
-      category: 'all',
-      tooth: 'all',
-      dateFrom: '',
-      dateTo: '',
-      tags: []
-    },
-
-    // Поиск
-    searchQuery: '',
-
-    // Метаданные
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  });
-
-  const [isEditing, setIsEditing] = useState(false);
+  const { t } = useTranslation();
+  const numericPatientId = toId(patientId);
+  const numericVisitId = toId(visitId);
+  const [items, setItems] = useState<DentalMediaItem[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<MediaFile | null>(null);
-  const [showImageViewer, setShowImageViewer] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'timeline'>('grid'); // grid, list, timeline
-  const [sortBy, setSortBy] = useState<'date' | 'tooth' | 'category' | 'name'>('date'); // date, tooth, category, name
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [category, setCategory] = useState<DentalMediaCategory>('photo');
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadDescription, setUploadDescription] = useState('');
+  const [uploadTooth, setUploadTooth] = useState('');
+  const [uploadDate, setUploadDate] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [savingId, setSavingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<MetadataDraft | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ item: DentalMediaItem; url: string } | null>(null);
+  const [previewingId, setPreviewingId] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewCloseRef = useRef<HTMLButtonElement>(null);
+  const requestId = useRef(0);
 
-  // Инициализация данных
-  useEffect(() => {
-    if (initialData) {
-      setFormData((prev) => ({
-        ...prev,
-        ...(initialData as Partial<PhotoArchiveFormData>)
-      }));
-    }
-  }, [initialData]);
-
-  // Обработчики
-  const handleInputChange = (field: string, value: unknown) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setFormData((prev) => {
-        const parentValue = prev[parent as keyof PhotoArchiveFormData] as unknown as Record<string, unknown> | undefined;
-        return {
-          ...prev,
-          [parent]: {
-            ...(parentValue ?? {}),
-            [child]: value
-          }
-        } as PhotoArchiveFormData;
-      });
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [field]: value
-      } as PhotoArchiveFormData));
-    }
-  };
-
-  const handleFileUpload = (files: FileList | null) => {
-    if (!files) return;
-    Array.from(files as ArrayLike<File>).forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onload = (e: ProgressEvent<FileReader>) => {
-        const mediaFile: MediaFile = {
-          id: Date.now() + Math.random(),
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          url: (e.target as EventTarget & { result: string }).result,
-          category: 'photo',
-          tooth: '',
-          date: new Date().toISOString().split('T')[0],
-          description: '',
-          tags: [],
-          uploadedAt: new Date().toISOString(),
-          isRadiograph: file.type.includes('image') && (
-          file.name.toLowerCase().includes('xray') ||
-          file.name.toLowerCase().includes('panoramic') ||
-          file.name.toLowerCase().includes('cbct') ||
-          file.name.toLowerCase().includes('periapical'))
-
-        };
-
-        setFormData((prev) => ({
-          ...prev,
-          mediaFiles: [...prev.mediaFiles, mediaFile]
-        }));
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-  const openFileViewer = (file: MediaFile) => {
-    setSelectedFile(file);
-    setShowImageViewer(true);
-  };
-  const handleActivationKeyDown = (event: React.KeyboardEvent, action: () => void) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      action();
-    }
-  };
-
-  const handleFileUpdate = (fileId: number, updates: Partial<MediaFile>) => {
-    setFormData((prev) => ({
-      ...prev,
-      mediaFiles: prev.mediaFiles.map((file) =>
-      file.id === fileId ? { ...file, ...updates } : file
-      )
-    }));
-  };
-
-  const handleFileDelete = (fileId: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      mediaFiles: prev.mediaFiles.filter((file) => file.id !== fileId)
-    }));
-  };
-
-  const handleSave = async () => {
+  const reload = useCallback(async () => {
+    if (!numericPatientId || !numericVisitId) return;
+    const currentRequest = ++requestId.current;
     setLoading(true);
+    setLoadingMore(false);
+    setLoadError(false);
     try {
-      const updatedData: PhotoArchiveFormData = {
-        ...formData,
-        updatedAt: new Date().toISOString()
-      };
-
-      if (onSave) {
-        await onSave(updatedData);
-      }
-
-      setIsEditing(false);
-    } catch (error: unknown) {
-      logger.error('Ошибка сохранения:', error);
-      notify.error(t('dental2.photo_load_failed'));
+      const result = await listDentalMedia(numericPatientId, numericVisitId);
+      if (requestId.current !== currentRequest) return;
+      setItems(result.items);
+      setTotalItems(result.total);
+      setCurrentPage(result.page);
+    } catch {
+      if (requestId.current !== currentRequest) return;
+      setItems([]);
+      setLoadError(true);
     } finally {
-      setLoading(false);
+      if (requestId.current === currentRequest) setLoading(false);
+    }
+  }, [numericPatientId, numericVisitId]);
+
+  useEffect(() => {
+    void reload();
+    return () => { requestId.current += 1; };
+  }, [reload, retryKey]);
+
+  useEffect(() => () => {
+    if (preview?.url) URL.revokeObjectURL(preview.url);
+  }, [preview?.url]);
+
+  useEffect(() => {
+    if (!preview) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    previewCloseRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreview(null);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [preview]);
+
+  const showActionError = (error: unknown) => {
+    setSuccessMessage(null);
+    if (errorStatus(error) === 403) {
+      setActionError(t('dental.dental_pa_permission_denied'));
+      return;
+    }
+    setActionError(t('dental.dental_pa_action_failed'));
+  };
+
+  const loadMore = async () => {
+    if (!numericPatientId || !numericVisitId || loadingMore) return;
+    const nextPage = currentPage + 1;
+    const currentRequest = ++requestId.current;
+    setLoadingMore(true);
+    setActionError(null);
+    try {
+      const result = await listDentalMedia(numericPatientId, numericVisitId, nextPage);
+      if (requestId.current !== currentRequest) return;
+      setItems((current) => {
+        const existingIds = new Set(current.map((item) => item.id));
+        return [...current, ...result.items.filter((item) => !existingIds.has(item.id))];
+      });
+      setTotalItems(result.total);
+      setCurrentPage(result.page);
+    } catch (error: unknown) {
+      if (requestId.current === currentRequest) showActionError(error);
+    } finally {
+      if (requestId.current === currentRequest) setLoadingMore(false);
     }
   };
 
-  // Фильтрация файлов
-  const filteredFiles = formData.mediaFiles.filter((file) => {
-    const matchesSearch = !formData.searchQuery ||
-    file.name.toLowerCase().includes(formData.searchQuery.toLowerCase()) ||
-    file.description.toLowerCase().includes(formData.searchQuery.toLowerCase());
-
-    const matchesCategory = formData.filters.category === 'all' ||
-    file.category === formData.filters.category;
-
-    const matchesTooth = formData.filters.tooth === 'all' ||
-    file.tooth === formData.filters.tooth;
-
-    const matchesDate = (!formData.filters.dateFrom || file.date >= formData.filters.dateFrom) && (
-    !formData.filters.dateTo || file.date <= formData.filters.dateTo);
-
-    return matchesSearch && matchesCategory && matchesTooth && matchesDate;
-  });
-
-  // Сортировка файлов
-  const sortedFiles = [...filteredFiles].sort((a, b) => {
-    switch (sortBy) {
-      case 'date':
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      case 'tooth':
-        return a.tooth.localeCompare(b.tooth);
-      case 'category':
-        return a.category.localeCompare(b.category);
-      case 'name':
-        return a.name.localeCompare(b.name);
-      default:
-        return 0;
+  const handleFileChange = (file?: File) => {
+    setActionError(null);
+    setSuccessMessage(null);
+    if (!file) {
+      setSelectedFile(null);
+      return;
     }
-  });
-
-  // Категории медиа файлов
-  const categories = [
-  { id: 'all', label: t('dental.dental_pa_cat_all'), icon: FileImage },
-  { id: 'photo', label: t('dental.dental_pa_cat_photo'), icon: Camera },
-  { id: 'radiograph', label: t('dental.dental_pa_cat_radiograph'), icon: FileText },
-  { id: 'video', label: t('dental.dental_pa_cat_video'), icon: Video },
-  { id: 'document', label: t('dental.dental_pa_cat_document'), icon: FileText }];
-
-
-  // Зубы для фильтрации
-  const teeth = [
-  'all', '11', '12', '13', '14', '15', '16', '17', '18',
-  '21', '22', '23', '24', '25', '26', '27', '28',
-  '31', '32', '33', '34', '35', '36', '37', '38',
-  '41', '42', '43', '44', '45', '46', '47', '48'];
-
-
-  // Рендер сетки файлов
-  const renderGridView = () =>
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {sortedFiles.map((file) =>
-    <div key={file.id} className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-          {/* Превью файла */}
-          <div
-        className="aspect-square bg-gray-100 flex items-center justify-center cursor-pointer relative group"
-        role="button"
-        tabIndex={0}
-        onClick={() => openFileViewer(file)}
-        onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
-        
-            {file.type.startsWith('image/') ?
-        <img
-          src={file.url}
-          alt={file.name}
-          className="w-full h-full object-cover" /> :
-
-
-        <div className="text-center">
-                <FileImage className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                <span className="text-sm text-gray-600">{file.name}</span>
-              </div>
-        }
-            
-            {/* Overlay с информацией */}
-            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-center">
-                <Eye className="h-6 w-6 mx-auto mb-1" />
-                <span className="text-sm">{t('dental.dental_pa_view_label')}</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Информация о файле */}
-          <div className="p-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium truncate">{file.name}</span>
-              <div className="flex items-center gap-1">
-                {file.category === 'photo' && <Camera className="h-3 w-3 text-blue-500" />}
-                {file.category === 'radiograph' && <FileText className="h-3 w-3 text-red-500" />}
-                {file.category === 'video' && <Video className="h-3 w-3 text-purple-500" />}
-                {file.category === 'document' && <FileText className="h-3 w-3 text-gray-500" />}
-              </div>
-            </div>
-            
-            <div className="text-xs text-gray-600 space-y-1">
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {new Date(file.date).toLocaleDateString('ru-RU')}
-              </div>
-              {file.tooth &&
-          <div className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  {t('dental.dental_pa_tooth_label', { tooth: file.tooth })}
-                </div>
-          }
-              {file.tags.length > 0 &&
-          <div className="flex items-center gap-1">
-                  <Tag className="h-3 w-3" />
-                  {file.tags.join(', ')}
-                </div>
-          }
-            </div>
-            
-            {isEditing &&
-        <div className="mt-2 flex gap-1">
-                <button
-            onClick={() => handleFileUpdate(file.id, {})}
-            aria-label={t('dental.dental_pa_aria_edit_file', { name: file.name })}
-            className="flex-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
-            
-                  <Edit className="h-3 w-3 mx-auto" />
-                </button>
-                <button
-            onClick={() => handleFileDelete(file.id)}
-            aria-label={t('dental.dental_pa_aria_delete_file', { name: file.name })}
-            className="flex-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200">
-            
-                  <Trash2 className="h-3 w-3 mx-auto" />
-                </button>
-              </div>
-        }
-          </div>
-        </div>
-    )}
-    </div>;
-
-
-  // Рендер списка файлов
-  const renderListView = () =>
-  <div className="space-y-2">
-      {sortedFiles.map((file) =>
-    <div key={file.id} className="border rounded-lg p-4 hover:bg-gray-50">
-          <div className="flex items-center gap-4">
-            {/* Превью */}
-            <div
-          className="w-16 h-16 bg-gray-100 rounded flex items-center justify-center cursor-pointer"
-          role="button"
-          aria-label={t('dental.dental_pa_aria_open_file', { name: file.name })}
-          tabIndex={0}
-          onClick={() => openFileViewer(file)}
-          onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
-          
-              {file.type.startsWith('image/') ?
-          <img
-            src={file.url}
-            alt={file.name}
-            className="w-full h-full object-cover rounded" /> :
-
-
-          <FileImage className="h-6 w-6 text-gray-400" />
-          }
-            </div>
-            
-            {/* Информация */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-medium truncate">{file.name}</span>
-                <div className="flex items-center gap-1">
-                  {file.category === 'photo' && <Camera className="h-4 w-4 text-blue-500" />}
-                  {file.category === 'radiograph' && <FileText className="h-4 w-4 text-red-500" />}
-                  {file.category === 'video' && <Video className="h-4 w-4 text-purple-500" />}
-                  {file.category === 'document' && <FileText className="h-4 w-4 text-gray-500" />}
-                </div>
-              </div>
-              
-              <div className="text-sm text-gray-600 space-y-1">
-                <div className="flex items-center gap-4">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {new Date(file.date).toLocaleDateString('ru-RU')}
-                  </span>
-                  {file.tooth &&
-              <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {t('dental.dental_pa_tooth_label', { tooth: file.tooth })}
-                    </span>
-              }
-                  <span className="text-xs text-gray-500">
-                    {((file.size) / 1024 / 1024).toFixed(2)} MB
-                  </span>
-                </div>
-                
-                {file.description &&
-            <p className="text-sm text-gray-700 truncate">{file.description}</p>
-            }
-                
-                {file.tags.length > 0 &&
-            <div className="flex items-center gap-1 flex-wrap">
-                    <Tag className="h-3 w-3" />
-                    {file.tags.map((tag) =>
-              <span key={tag} className="text-xs bg-gray-100 px-2 py-1 rounded">
-                        {tag}
-                      </span>
-              )}
-                  </div>
-            }
-              </div>
-            </div>
-            
-            {/* Действия */}
-            <div className="flex items-center gap-2">
-              <button
-            onClick={() => {
-              setSelectedFile(file);
-              setShowImageViewer(true);
-            }}
-            className="p-2 text-gray-500 hover:text-blue-600"
-            aria-label={t('dental.dental_pa_aria_view_file', { name: file.name })}
-            title={t('dental.dental_pa_title_view')}>
-            
-                <Eye className="h-4 w-4" />
-              </button>
-              
-              <button
-            onClick={() => {
-              const link = document.createElement('a');
-              link.href = file.url;
-              link.download = file.name;
-              link.click();
-            }}
-            className="p-2 text-gray-500 hover:text-green-600"
-            aria-label={t('dental.dental_pa_aria_download_file', { name: file.name })}
-            title={t('dental.dental_pa_title_download')}>
-            
-                <Download className="h-4 w-4" />
-              </button>
-              
-              {isEditing &&
-          <button
-            onClick={() => handleFileDelete(file.id)}
-            className="p-2 text-gray-500 hover:text-red-600"
-            aria-label={t('dental.dental_pa_aria_delete_file', { name: file.name })}
-            title={t('dental.dental_pa_title_delete')}>
-            
-                  <Trash2 className="h-4 w-4" />
-                </button>
-          }
-            </div>
-          </div>
-        </div>
-    )}
-    </div>;
-
-
-  // Рендер временной шкалы
-  const renderTimelineView = () => {
-    const groupedFiles = sortedFiles.reduce<Record<string, MediaFile[]>>((groups, file) => {
-      const date = file.date;
-      if (!groups[date]) {
-        groups[date] = [];
-      }
-      groups[date].push(file);
-      return groups;
-    }, {});
-
-    return (
-      <div className="space-y-6">
-        {Object.entries(groupedFiles).map(([date, files]) =>
-        <div key={date}>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-              <h3 className="text-lg font-semibold">
-                {new Date(date).toLocaleDateString('ru-RU', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
-              </h3>
-            </div>
-            
-            <div className="ml-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {files.map((file) =>
-            <div key={file.id} className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-                  <div
-                className="aspect-video bg-gray-100 flex items-center justify-center cursor-pointer"
-                role="button"
-                aria-label={t('dental.dental_pa_aria_open_file', { name: file.name })}
-                tabIndex={0}
-                onClick={() => openFileViewer(file)}
-                onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
-                
-                    {file.type.startsWith('image/') ?
-                <img
-                  src={file.url}
-                  alt={file.name}
-                  className="w-full h-full object-cover" /> :
-
-
-                <div className="text-center">
-                        <FileImage className="h-8 w-8 text-gray-400 mx-auto mb-1" />
-                        <span className="text-xs text-gray-600">{file.name}</span>
-                      </div>
-                }
-                  </div>
-                  
-                  <div className="p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium truncate">{file.name}</span>
-                      <div className="flex items-center gap-1">
-                        {file.category === 'photo' && <Camera className="h-3 w-3 text-blue-500" />}
-                        {file.category === 'radiograph' && <FileText className="h-3 w-3 text-red-500" />}
-                        {file.category === 'video' && <Video className="h-3 w-3 text-purple-500" />}
-                        {file.category === 'document' && <FileText className="h-3 w-3 text-gray-500" />}
-                      </div>
-                    </div>
-                    
-                    {file.tooth &&
-                <div className="text-xs text-gray-600 mb-1">
-                        {t('dental.dental_pa_tooth_label', { tooth: file.tooth })}
-                      </div>
-                }
-                    
-                    {file.description &&
-                <p className="text-xs text-gray-700 truncate">{file.description}</p>
-                }
-                  </div>
-                </div>
-            )}
-            </div>
-          </div>
-        )}
-      </div>);
-
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const supported = ['jpg', 'jpeg', 'png', 'pdf'].includes(extension || '') &&
+      ['image/jpeg', 'image/png', 'application/pdf', 'application/octet-stream'].includes(file.type || 'application/octet-stream');
+    if (!supported) {
+      setSelectedFile(null);
+      setActionError(t('dental.dental_pa_unsupported_file'));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    setSelectedFile(file);
+    setCategory(extension === 'pdf' ? 'xray' : 'photo');
   };
 
-  // Рендер просмотрщика изображений
-  const renderImageViewer = (): React.ReactNode => {
-    if (!selectedFile || !showImageViewer) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
-        <div className="relative max-w-7xl max-h-full p-4">
-          {/* Кнопка закрытия */}
-          <button
-            onClick={() => setShowImageViewer(false)}
-            aria-label={t('dental.dental_pa_aria_close_viewer')}
-            className="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75">
-            
-            <X className="h-6 w-6" />
-          </button>
-          
-          {/* Изображение */}
-          <div className="relative">
-            {selectedFile.type.startsWith('image/') ?
-            <img
-              src={selectedFile.url}
-              alt={selectedFile.name}
-              className="max-w-full max-h-full object-contain" /> :
-
-
-            <div className="w-96 h-96 bg-gray-100 flex items-center justify-center rounded">
-                <div className="text-center text-white">
-                  <FileImage className="h-16 w-16 mx-auto mb-4" />
-                  <p className="text-lg">{selectedFile.name}</p>
-                  <p className="text-sm text-gray-300">{t('dental.dental_pa_preview_unavailable')}</p>
-                </div>
-              </div>
-            }
-          </div>
-          
-          {/* Информация о файле */}
-          <div className="absolute bottom-4 left-4 right-4 bg-black bg-opacity-50 text-white p-4 rounded">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold">{selectedFile.name}</h3>
-                <div className="text-sm text-gray-300 space-y-1">
-                  <div>{t('dental.dental_pa_meta_date', { date: new Date(selectedFile.date).toLocaleDateString('ru-RU') })}</div>
-                  {selectedFile.tooth && <div>{t('dental.dental_pa_meta_tooth', { tooth: selectedFile.tooth })}</div>}
-                  {selectedFile.description && <div>{t('dental.dental_pa_meta_description', { description: selectedFile.description })}</div>}
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = selectedFile.url;
-                    link.download = selectedFile.name;
-                    link.click();
-                  }}
-                  aria-label={t('dental.dental_pa_aria_download_file', { name: selectedFile.name })}
-                  className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                  
-                  <Download className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>);
-
+  const submitUpload = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!numericPatientId || !numericVisitId || !selectedFile) return;
+    const extension = selectedFile.name.split('.').pop()?.toLowerCase();
+    if (extension === 'pdf' && category !== 'xray') {
+      setActionError(t('dental.dental_pa_pdf_xray_only'));
+      return;
+    }
+    setUploading(true);
+    setActionError(null);
+    setSuccessMessage(null);
+    try {
+      await uploadDentalMedia(numericPatientId, numericVisitId, category, selectedFile, {
+        title: uploadTitle.trim() || null,
+        description: uploadDescription.trim() || null,
+        tooth: uploadTooth.trim() || null,
+        capture_date: uploadDate || null,
+      });
+      setSelectedFile(null);
+      setUploadTitle('');
+      setUploadDescription('');
+      setUploadTooth('');
+      setUploadDate('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setSuccessMessage(t('dental.dental_pa_upload_success'));
+      await reload();
+    } catch (error: unknown) {
+      showActionError(error);
+    } finally {
+      setUploading(false);
+    }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-7xl h-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Заголовок */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div>
-            <h2 className="text-xl font-semibold">
-              {t('dental.dental_pa_title', { name: patientName })}
-            </h2>
-            <p className="text-gray-600 text-sm">
-              {t('dental.dental_pa_file_count', { count: formData.mediaFiles.length })} | {isEditing ? t('dental.dental_pa_mode_edit') : t('dental.dental_pa_mode_view')}
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {!isEditing ?
-            <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-              
-                <Edit className="h-4 w-4" />
-                {t('dental.dental_pa_btn_edit')}
-              </button> :
+  const saveMetadata = async (item: DentalMediaItem) => {
+    if (!editDraft) return;
+    if (item.mime_type === 'application/pdf' && editDraft.category !== 'xray') {
+      setActionError(t('dental.dental_pa_pdf_xray_only'));
+      return;
+    }
+    setSavingId(item.id);
+    setActionError(null);
+    setSuccessMessage(null);
+    const metadata: DentalMediaMetadata = {
+      title: editDraft.title.trim() || null,
+      description: editDraft.description.trim() || null,
+      category: editDraft.category,
+      tooth: editDraft.tooth.trim() || null,
+      capture_date: editDraft.capture_date || null,
+    };
+    try {
+      await updateDentalMedia(item.id, metadata);
+      setEditingId(null);
+      setEditDraft(null);
+      setSuccessMessage(t('dental.dental_pa_metadata_success'));
+      await reload();
+    } catch (error: unknown) {
+      showActionError(error);
+    } finally {
+      setSavingId(null);
+    }
+  };
 
-            <>
-                <button
-                onClick={() => setIsEditing(false)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
-                
-                  <X className="h-4 w-4" />
-                  {t('dental.dental_pa_btn_cancel')}
-                </button>
-                <button
-                onClick={handleSave}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50">
-                
-                  <Save className="h-4 w-4" />
-                  {loading ? t('dental.dental_pa_btn_saving') : t('dental.dental_pa_btn_save')}
-                </button>
-              </>
-            }
-            <button
-              onClick={onClose}
-              aria-label={t('dental.dental_pa_aria_close')}
-              className="p-2 text-gray-500 hover:text-gray-700">
-              
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
+  const deleteItem = async (item: DentalMediaItem) => {
+    setDeletingId(item.id);
+    setActionError(null);
+    setSuccessMessage(null);
+    try {
+      await deleteDentalMedia(item.id);
+      setConfirmDeleteId(null);
+      setSuccessMessage(t('dental.dental_pa_delete_success'));
+      await reload();
+    } catch (error: unknown) {
+      showActionError(error);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
-        {/* Панель инструментов */}
-        <div className="p-4 border-b bg-gray-50">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Поиск */}
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  aria-label={t('dental.dental_pa_aria_search')}
-                  placeholder={t('dental.dental_pa_ph_search')}
-                  value={formData.searchQuery}
-                  onChange={(e) => handleInputChange('searchQuery', e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                
-              </div>
-            </div>
-            
-            {/* Фильтры */}
-            <div className="flex gap-2">
-              <select
-                value={formData.filters.category}
-                onChange={(e) => handleInputChange('filters.category', e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                
-                {categories.map((category) =>
-                <option key={category.id} value={category.id}>
-                    {category.label}
-                  </option>
-                )}
-              </select>
-              
-              <select
-                value={formData.filters.tooth}
-                onChange={(e) => handleInputChange('filters.tooth', e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                
-                <option value="all">{t('dental.dental_pa_all_teeth')}</option>
-                {teeth.slice(1).map((tooth) =>
-                <option key={tooth} value={tooth}>{t('dental.dental_pa_tooth_label', { tooth })}</option>
-                )}
-              </select>
-              
-              <input
-                type="date"
-                aria-label={t('dental.dental_pa_aria_date_from')}
-                value={formData.filters.dateFrom}
-                onChange={(e) => handleInputChange('filters.dateFrom', e.target.value)}
-                placeholder={t('dental.dental_pa_ph_date_from')}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-              
-              
-              <input
-                type="date"
-                aria-label={t('dental.dental_pa_aria_date_to')}
-                value={formData.filters.dateTo}
-                onChange={(e) => handleInputChange('filters.dateTo', e.target.value)}
-                placeholder={t('dental.dental_pa_ph_date_to')}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-              
-            </div>
-            
-            {/* Сортировка и вид */}
-            <div className="flex gap-2">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'date' | 'tooth' | 'category' | 'name')}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                
-                <option value="date">{t('dental.dental_pa_sort_date')}</option>
-                <option value="tooth">{t('dental.dental_pa_sort_tooth')}</option>
-                <option value="category">{t('dental.dental_pa_sort_category')}</option>
-                <option value="name">{t('dental.dental_pa_sort_name')}</option>
-              </select>
-              
-              <div className="flex border border-gray-300 rounded-md">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  aria-label={t('dental.dental_pa_aria_view_grid')}
-                  className={`px-3 py-2 ${viewMode === 'grid' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
-                  
-                  <ImageIcon className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  aria-label={t('dental.dental_pa_aria_view_list')}
-                  className={`px-3 py-2 ${viewMode === 'list' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
-                  
-                  <FileText className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('timeline')}
-                  aria-label={t('dental.dental_pa_aria_view_timeline')}
-                  className={`px-3 py-2 ${viewMode === 'timeline' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
-                  
-                  <Calendar className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+  const openPreview = async (item: DentalMediaItem) => {
+    if (!numericVisitId) return;
+    setPreviewingId(item.id);
+    setActionError(null);
+    try {
+      const blob = await loadDentalMediaContent(item.id, numericVisitId);
+      const url = URL.createObjectURL(blob);
+      setPreview({ item, url });
+    } catch (error: unknown) {
+      showActionError(error);
+    } finally {
+      setPreviewingId(null);
+    }
+  };
 
-        {/* Загрузка файлов */}
-        {isEditing &&
-        <div className="p-4 border-b bg-blue-50">
-            <label className="flex items-center gap-2 p-4 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:border-blue-500">
-              <Upload className="h-5 w-5 text-blue-500" />
-              <span className="text-blue-700">{t('dental.dental_pa_btn_upload')}</span>
-              <input
-              type="file"
-              aria-label={t('dental.dental_pa_aria_upload')}
-              multiple
-              accept="image/*,video/*,.pdf,.doc,.docx"
-              onChange={(e) => handleFileUpload(e.target.files)}
-              className="hidden" />
-            
-            </label>
-          </div>
-        }
+  const title = t('dental.dental_pa_title', { name: patientName || t('dental.dental_panel_patient_default') });
+  const dialog = presentation === 'dialog';
 
-        {/* Контент */}
-        <div className="flex-1 overflow-auto p-6">
-          {sortedFiles.length === 0 ?
-          <div className="text-center py-12">
-              <Camera className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">{t('dental.dental_pa_empty_title')}</h3>
-              <p className="text-gray-600 mb-4">
-                {isEditing ? t('dental.dental_pa_empty_edit_hint') : t('dental.dental_pa_empty_view_hint')}
-              </p>
-              {isEditing &&
-            <label className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer">
-                  <Upload className="h-4 w-4" />
-                  {t('dental.dental_pa_btn_upload')}
-                  <input
-                type="file"
-                aria-label={t('dental.dental_pa_aria_upload_empty')}
-                multiple
-                accept="image/*,video/*,.pdf,.doc,.docx"
-                onChange={(e) => handleFileUpload(e.target.files)}
-                className="hidden" />
-              
-                </label>
-            }
-            </div> :
-
-          <>
-              {viewMode === 'grid' && renderGridView()}
-              {viewMode === 'list' && renderListView()}
-              {viewMode === 'timeline' && renderTimelineView()}
-            </>
-          }
-        </div>
+  const content = (
+    <div className="dental-flex-col dental-gap-16">
+      <div className="dental-flex-between-16">
+        <h2 id={dialog ? 'dental-photo-archive-title' : undefined} className="dental-text-primary">{title}</h2>
+        {dialog && onClose && <Button variant="outline" onClick={onClose}>{t('dental.dental_pa_aria_close')}</Button>}
       </div>
 
-      {/* Просмотрщик изображений */}
-      {renderImageViewer()}
-    </div>);
+      {(!numericPatientId || !numericVisitId) && (
+        <Card padding="large">
+          <div className="dental-flex-col dental-gap-12">
+            <p className="dental-text-primary">{numericPatientId ? t('dental.dental_pa_need_visit') : t('dental.dental_pa_no_patient')}</p>
+            <div className="dental-flex dental-gap-8">
+              {!numericPatientId && onGoToPatients && <Button variant="outline" onClick={onGoToPatients}>{t('dental.dental_dpt_title')}</Button>}
+              {numericPatientId && onGoToQueue && <Button variant="outline" onClick={onGoToQueue}>{t('dental.dental_dpt_go_queue')}</Button>}
+            </div>
+          </div>
+        </Card>
+      )}
 
+      {numericPatientId && numericVisitId && (
+        <>
+          <Card padding="large">
+            <form className="dental-flex-col dental-gap-12" onSubmit={submitUpload}>
+              <h3 className="dental-text-primary">{t('dental.dental_pa_upload_heading')}</h3>
+              <label className="dental-flex-col dental-gap-8">
+                <span className="dental-text-secondary">{t('dental.dental_pa_file_label')}</span>
+                <Input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                  aria-label={t('dental.dental_pa_file_label')}
+                  onChange={(event) => handleFileChange(event.target.files?.[0])}
+                />
+              </label>
+              <div className="dental-flex-col dental-gap-12">
+                <label className="dental-flex-col dental-gap-8">
+                  <span className="dental-text-secondary">{t('dental.dental_pa_category_label')}</span>
+                  <Select
+                    aria-label={t('dental.dental_pa_category_label')}
+                    value={category}
+                    onValueChange={(value) => setCategory(value as DentalMediaCategory)}
+                    options={[
+                      { value: 'photo', label: t('dental.dental_pa_cat_photo') },
+                      { value: 'xray', label: t('dental.dental_pa_cat_radiograph') },
+                    ]}
+                  />
+                </label>
+                <Input aria-label={t('dental.dental_pa_title_label')} placeholder={t('dental.dental_pa_title_label')} value={uploadTitle} onChange={(event) => setUploadTitle(event.target.value)} maxLength={255} />
+                <Input aria-label={t('dental.dental_pa_description_label')} placeholder={t('dental.dental_pa_description_label')} value={uploadDescription} onChange={(event) => setUploadDescription(event.target.value)} maxLength={2000} />
+                <div className="dental-flex dental-gap-12">
+                  <Input aria-label={t('dental.dental_pa_tooth_input_label')} placeholder={t('dental.dental_pa_tooth_input_label')} value={uploadTooth} onChange={(event) => setUploadTooth(event.target.value)} maxLength={16} />
+                  <Input type="date" aria-label={t('dental.dental_pa_capture_date_label')} value={uploadDate} onChange={(event) => setUploadDate(event.target.value)} />
+                </div>
+              </div>
+              <p className="dental-text-desc dental-text-secondary">{t('dental.dental_pa_supported_formats')}</p>
+              <Button type="submit" variant="primary" disabled={!selectedFile || uploading} loading={uploading}>
+                {uploading ? t('dental.dental_pa_uploading') : t('dental.dental_pa_btn_upload')}
+              </Button>
+            </form>
+          </Card>
+
+          {actionError && <p role="alert" className="dental-text-danger">{actionError}</p>}
+          {successMessage && <p role="status" aria-live="polite" className="dental-text-success">{successMessage}</p>}
+
+          <section aria-labelledby="dental-photo-list-title" className="dental-flex-col dental-gap-12">
+            <h3 id="dental-photo-list-title" className="dental-text-primary">{t('dental.dental_pa_saved_heading')}</h3>
+            {loading && <p role="status" aria-live="polite" className="dental-text-secondary">{t('dental.dental_pa_loading')}</p>}
+            {loadError && (
+              <Card padding="large" role="alert">
+                <div className="dental-flex-col dental-gap-12">
+                  <p className="dental-text-primary">{t('dental.dental_pa_load_failed')}</p>
+                  <Button variant="outline" onClick={() => setRetryKey((value) => value + 1)}>{t('dental.dental_dpt_retry')}</Button>
+                </div>
+              </Card>
+            )}
+            {!loading && !loadError && items.length === 0 && (
+              <Card padding="large"><p className="dental-text-secondary">{t('dental.dental_pa_empty_view_hint')}</p></Card>
+            )}
+            {!loading && items.map((item) => {
+              const isEditing = editingId === item.id && editDraft;
+              return (
+                <Card key={item.id} padding="default">
+                  <div className="dental-flex-col dental-gap-12">
+                    {isEditing ? (
+                      <div className="dental-flex-col dental-gap-12">
+                        <label className="dental-flex-col dental-gap-8">
+                          <span className="dental-text-secondary">{t('dental.dental_pa_category_label')}</span>
+                          <Select
+                            aria-label={t('dental.dental_pa_category_label')}
+                            value={editDraft.category}
+                            onValueChange={(value) => setEditDraft({ ...editDraft, category: value as DentalMediaCategory })}
+                            options={item.mime_type === 'application/pdf'
+                              ? [{ value: 'xray', label: t('dental.dental_pa_cat_radiograph') }]
+                              : [
+                                { value: 'photo', label: t('dental.dental_pa_cat_photo') },
+                                { value: 'xray', label: t('dental.dental_pa_cat_radiograph') },
+                              ]}
+                          />
+                        </label>
+                        <Input aria-label={t('dental.dental_pa_title_label')} value={editDraft.title} onChange={(event) => setEditDraft({ ...editDraft, title: event.target.value })} maxLength={255} />
+                        <Input aria-label={t('dental.dental_pa_description_label')} value={editDraft.description} onChange={(event) => setEditDraft({ ...editDraft, description: event.target.value })} maxLength={2000} />
+                        <div className="dental-flex dental-gap-12">
+                          <Input aria-label={t('dental.dental_pa_tooth_input_label')} value={editDraft.tooth} onChange={(event) => setEditDraft({ ...editDraft, tooth: event.target.value })} maxLength={16} />
+                          <Input type="date" aria-label={t('dental.dental_pa_capture_date_label')} value={editDraft.capture_date} onChange={(event) => setEditDraft({ ...editDraft, capture_date: event.target.value })} />
+                        </div>
+                        <div className="dental-flex dental-gap-8">
+                          <Button variant="primary" onClick={() => void saveMetadata(item)} disabled={savingId === item.id} loading={savingId === item.id}>{t('dental.dental_pa_btn_save')}</Button>
+                          <Button variant="outline" onClick={() => { setEditingId(null); setEditDraft(null); }}>{t('dental.dental_pa_btn_cancel')}</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="dental-flex-between-16">
+                          <div>
+                            <p className="dental-text-primary dental-font-medium">{item.title || t(item.category === 'xray' ? 'dental.dental_pa_cat_radiograph' : 'dental.dental_pa_cat_photo')}</p>
+                            <p className="dental-text-desc dental-text-secondary">
+                              {t(item.category === 'xray' ? 'dental.dental_pa_cat_radiograph' : 'dental.dental_pa_cat_photo')} · {item.mime_type.toUpperCase()}
+                              {item.capture_date ? ` · ${item.capture_date}` : ''}
+                              {item.tooth ? ` · ${t('dental.dental_pa_tooth_input_label')}: ${item.tooth}` : ''}
+                            </p>
+                            {item.description && <p className="dental-text-secondary">{item.description}</p>}
+                          </div>
+                          <Button variant="outline" onClick={() => void openPreview(item)} disabled={previewingId === item.id} loading={previewingId === item.id}>
+                            {t('dental.dental_pa_title_view')}
+                          </Button>
+                        </div>
+                        <div className="dental-flex dental-gap-8">
+                          <Button variant="outline" onClick={() => { setEditingId(item.id); setEditDraft(newMetadataDraft(item)); setActionError(null); }}>{t('dental.dental_pa_btn_edit')}</Button>
+                          {confirmDeleteId === item.id ? (
+                            <>
+                              <span className="dental-text-secondary">{t('dental.dental_pa_confirm_delete')}</span>
+                              <Button variant="danger" onClick={() => void deleteItem(item)} disabled={deletingId === item.id} loading={deletingId === item.id}>{t('dental.dental_pa_title_delete')}</Button>
+                              <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>{t('dental.dental_pa_btn_cancel')}</Button>
+                            </>
+                          ) : (
+                            <Button variant="outline" onClick={() => { setConfirmDeleteId(item.id); setActionError(null); }}>{t('dental.dental_pa_title_delete')}</Button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+            {!loading && !loadError && items.length < totalItems && (
+              <Button variant="outline" onClick={() => void loadMore()} disabled={loadingMore} loading={loadingMore}>
+                {t('dental.dental_pa_load_more')}
+              </Button>
+            )}
+          </section>
+        </>
+      )}
+
+      {preview && (
+        <div className="dental-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="dental-photo-preview-title">
+          <section className="dental-modal-card-xl dental-flex-col dental-gap-12">
+            <div className="dental-flex-between-16">
+              <h3 id="dental-photo-preview-title" className="dental-text-primary">{preview.item.title || t('dental.dental_pa_title_view')}</h3>
+              <Button ref={previewCloseRef} variant="outline" onClick={() => setPreview(null)}>{t('dental.dental_pa_aria_close_viewer')}</Button>
+            </div>
+            {preview.item.mime_type === 'application/pdf' ? (
+              <a href={preview.url} target="_blank" rel="noreferrer">{t('dental.dental_pa_open_pdf')}</a>
+            ) : (
+              <img src={preview.url} alt={preview.item.title || t('dental.dental_pa_title_view')} className="dental-photo-preview" />
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+
+  if (!dialog) return content;
+  return (
+    <div className="dental-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="dental-photo-archive-title">
+      <section className="dental-modal-card-xl" aria-label={title}>{content}</section>
+    </div>
+  );
 };
-
-
-// audit/strict: removed self-referencing propTypes spread
 
 export default PhotoArchive;

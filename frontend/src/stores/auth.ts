@@ -17,7 +17,7 @@
 //
 // Keep changes minimal and additive — don't remove existing exported names.
 
-import { me, setToken as setClientToken } from '../api/client';
+import { me, setToken as setClientToken, setSessionInvalidationListener } from '../api/client';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 import type { AuthState, UserProfile } from '../types/domain/auth';
@@ -40,6 +40,47 @@ let profileLoadPromise: Promise<UserProfile | null> | null = null;
 let sessionValidationPromise: Promise<AuthState> | null = null;
 let lastValidatedAt = 0;
 let lastValidatedToken: string | null = null;
+
+// Phase 0 follow-up (Codex P1, round 3): the patient panel route is SHARED
+// with support staff (Admin/Registrar/Doctor retain access for support /
+// debug purposes), so the ROUTE alone cannot identify the principal whose
+// session was just cleared. When a session dies we remember the dying
+// principal's kind: RouteAccessBoundary sends an expired PATIENT to
+// /patient/login (the phone/OTP entry point) while expired staff and
+// anonymous visitors keep /login. In-memory only, reset by the next
+// setToken() — never persisted anywhere.
+let expiredPrincipalWasPatient = false;
+
+function rememberExpiredPrincipalKind(): void {
+  const profile = getProfileFromStorage() as Record<string, unknown> | null;
+  const isPatient = String(profile?.role ?? '').toLowerCase() === 'patient';
+  // Codex P1 (round 4): duplicate clears happen on the same 401 (the
+  // response interceptor clears first, then getProfile() catches the same
+  // failure and clears again — the second call sees NO profile anymore).
+  // Only positive patient evidence may set the hint; a later profile-less
+  // clear must never overwrite it with false.
+  if (isPatient) {
+    expiredPrincipalWasPatient = true;
+  }
+}
+
+/**
+ * True when the most recently CLEARED session in this tab belonged to a
+ * Patient principal. Reset by any subsequent setToken() with a real token,
+ * and consumed by RouteAccessBoundary once the redirect target is selected.
+ */
+export function getExpiredPrincipalWasPatient(): boolean {
+  return expiredPrincipalWasPatient;
+}
+
+/**
+ * Consume the hint (Codex P2, round 4): after the boundary has selected the
+ * redirect target, the hint must not keep sending LATER anonymous visits in
+ * this tab to the patient login.
+ */
+export function resetExpiredPrincipalHint(): void {
+  expiredPrincipalWasPatient = false;
+}
 
 function notify(): void {
   const state = getState();
@@ -96,9 +137,15 @@ export function getProfileFromStorage(): UserProfile | null {
 }
 
 export function getState(): AuthState {
+  // Codex P2 (round 8): the expired-principal kind travels INSIDE the
+  // notified snapshot — a boundary that re-renders from a subscription
+  // reads the flag atomically with the token-clear, immune to stale
+  // passive-effect ordering (an already-scheduled effect could otherwise
+  // wipe the global hint before the observing render ran).
   return {
     token: getToken(),
     profile: getProfileFromStorage(),
+    expiredPrincipalWasPatient: expiredPrincipalWasPatient,
   };
 }
 
@@ -116,6 +163,12 @@ function clearProfileStorageOnly(): void {
  */
 export function setToken(token: string | null): void {
   const previousToken = getToken();
+
+  // A freshly installed session invalidates the expired-principal marker
+  // (Phase 0 follow-up: see rememberExpiredPrincipalKind).
+  if (token) {
+    expiredPrincipalWasPatient = false;
+  }
 
   try {
     if (token === null || token === undefined) {
@@ -152,6 +205,11 @@ export function setToken(token: string | null): void {
  * Clear token & profile.
  */
 export function clearToken(): void {
+  // Phase 0 follow-up (Codex P1): identify WHOSE session is dying BEFORE the
+  // profile is wiped, so the route boundary can pick the correct login
+  // surface (patient vs staff).
+  rememberExpiredPrincipalKind();
+
   profileLoadPromise = null;
   sessionValidationPromise = null;
   lastValidatedAt = 0;
@@ -413,6 +471,20 @@ export const getAuthToken = getToken;
 export const clearAuthToken = clearToken;
 export const setAuthProfile = setProfile;
 export const subscribeAuth = subscribe;
+
+// Phase 0 follow-up (owner P2, access-only session lifecycle): the api client
+// 401-recovery path terminates dead access-only sessions (the Patient portal
+// installs sessions with no refresh token, so a dead 30-minute JWT used to
+// leave the UI showing a logged-in patient until the next navigation). The
+// clear must run through THIS store — clearing auth_token/auth_profile plus
+// tokenManager and PHI caches and notifying subscribers — so
+// RouteAccessBoundary reacts immediately. The store registers itself here
+// (instead of client.ts importing this store) to keep the import direction
+// acyclic; the client falls back to its own credential cleanup when no
+// listener is registered.
+setSessionInvalidationListener(() => {
+  clearToken();
+});
 
 // Default export for consumers using default import
 const auth = {

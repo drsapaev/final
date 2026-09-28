@@ -2,7 +2,8 @@
  * useLocalStorage — R-16 / P-016 (UX audit).
  *
  * A tiny localStorage-backed useState replacement. Used by the cardiologist
- * panel's floating settings popover (ldlThreshold, showEcgEchoTogether)
+ * cardiology panel's persisted settings (ldlThreshold; the unused ECG/Echo
+ * toggle and its floating settings menu were removed in cardioplan slice 5)
  * so that the doctor's preferences persist across page reloads and browser
  * restarts.
  *

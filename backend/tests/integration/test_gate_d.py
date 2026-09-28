@@ -163,26 +163,6 @@ def test_user(db_session):
     return user
 
 
-@pytest.fixture
-def test_patient(db_session):
-    """Create a test patient."""
-    patient = Patient(
-        user_id=None,
-        last_name="Test",
-        first_name="Patient",
-        middle_name="GateD",
-        birth_date=date(1990, 1, 1),
-        sex="M",
-        phone="+998900000121",
-        email="patient@test.local",
-        created_at=datetime.now(UTC),
-        is_deleted=False,
-    )
-    db_session.add(patient)
-    db_session.flush()
-    return patient
-
-
 def create_test_visit(session, status="open", patient=None, **kwargs):
     """Helper: create a Visit with specified status."""
     if patient is None:

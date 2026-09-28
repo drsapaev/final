@@ -22,7 +22,9 @@ class LabReportPDFService(
     """Composed of focused mixin modules."""
 
     def __init__(self) -> None:
-        self.backend_root = Path(__file__).resolve().parents[2]
+        # PR8 hotfix: parents[2] после сплита в пакет указывал на backend/app,
+        # а шаблоны лежат в backend/app/templates/print — нужен parents[3].
+        self.backend_root = Path(__file__).resolve().parents[3]
         self.templates_dir = self.backend_root / "app" / "templates" / "print"
         self.jinja_env = Environment(autoescape=True,
             loader=FileSystemLoader(self.templates_dir),

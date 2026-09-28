@@ -12,7 +12,9 @@
  *
  * PII scrubbing: Sentry React SDK auto-scrubs `password`, `secret`, `token`
  * keys from payloads. Additional scrubbing for medical fields is done in
- * `beforeSend`.
+ * `beforeSend`; credential query params embedded in URL-valued fields and
+ * transactions are redacted in `beforeSend`/`beforeSendTransaction`
+ * (owner round-12 P1 — see redactCredentialQueryParams).
  */
 
 import * as Sentry from '@sentry/react';
@@ -47,21 +49,68 @@ const MEDICAL_PII_KEYS = [
   'token', 'access_token', 'refresh_token', 'secret', 'api_key', 'password',
 ];
 
-function scrubPIIFromObject(obj: unknown): unknown {
+// Credential keys redacted INSIDE URL-shaped strings (owner round-12 P1):
+// request.url, breadcrumb from/to, Referer headers and pageload/http-span
+// descriptions carry the URL as a plain string, so the key-based scrubber
+// above never sees the "token" key. Deliberately narrower than
+// MEDICAL_PII_KEYS — non-credential params (sort, q, lang, name…) must
+// stay readable for debugging.
+const CREDENTIAL_QUERY_KEYS = [
+  'token', // also matches *_token via the suffix rule (access_token, refresh_token, activation_token, …)
+  'apikey', 'api_key', 'secret', 'password', 'sig', 'signature', 'authorization',
+];
+
+/**
+ * Redact credential query/fragment params inside a URL-ish string while
+ * preserving everything else. Matches `?key=`, `&key=`, `#key=` and a bare
+ * leading `key=` (separately-transmitted query_string fields); keys are
+ * percent-decoded first, mirroring URLSearchParams so an obfuscated
+ * %74oken= is caught too. Generic over the string-ish input so callers
+ * keep their precise type (string | undefined for event.transaction, etc.).
+ */
+export function redactCredentialQueryParams<T extends string | undefined | null>(value: T): T {
+  if (typeof value !== 'string' || !value) {
+    return value;
+  }
+  const scrubbed = value.replace(
+    /(^|[?&#])([A-Za-z0-9_%.-]+)=([^&#]*)/g,
+    (match, sep: string, key: string) => {
+      let lowerKey = key.toLowerCase();
+      try {
+        lowerKey = decodeURIComponent(lowerKey);
+      } catch {
+        // Malformed percent-encoding — match on the raw key.
+      }
+      const isCredential = CREDENTIAL_QUERY_KEYS.some(
+        (k) => lowerKey === k || lowerKey.endsWith(`_${k}`)
+      );
+      return isCredential ? `${sep}${key}=[REDACTED]` : match;
+    }
+  );
+  return scrubbed as T;
+}
+
+/**
+ * Key-based PII scrubbing PLUS credential-query redaction inside string
+ * values (owner round-12 P1): URL-valued telemetry fields (request.url,
+ * breadcrumb from/to, Referer) hold the URL as a plain string — the
+ * key-based loop below cannot catch a `?token=` embedded in it. Exported
+ * for unit tests (scrubbing contract is security-relevant).
+ */
+export function scrubPIIFromObject(obj: unknown): unknown {
+  if (typeof obj === 'string') {
+    return redactCredentialQueryParams(obj);
+  }
   if (!obj || typeof obj !== 'object') return obj;
-  const o = obj as Record<string, unknown>;
-  if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return (Array.isArray(o) ? o.map(scrubPIIFromObject) : o);
+  if (Array.isArray(obj)) return obj.map(scrubPIIFromObject);
 
   const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     const lowerKey = key.toLowerCase();
     if (MEDICAL_PII_KEYS.some((pii) => lowerKey.includes(pii))) {
       (cleaned as Record<string, unknown>)[key] = '[REDACTED]';
-    } else if (typeof value === 'object') {
-      (cleaned as Record<string, unknown>)[key] = scrubPIIFromObject(value);
     } else {
-      (cleaned as Record<string, unknown>)[key] = value;
+      (cleaned as Record<string, unknown>)[key] = scrubPIIFromObject(value);
     }
   }
   return cleaned;
@@ -117,6 +166,30 @@ export function initSentry() {
       }
       if (event.contexts) {
         event.contexts = scrubPIIFromObject(event.contexts) as typeof event.contexts;
+      }
+      return event;
+    },
+    // Owner round-12 P1: pageload/navigation traces are NOT routed through
+    // beforeSend — request.url carries the full URL (legacy ?token= handout
+    // form) and http spans repeat it in span.description. Scrub the same
+    // way regardless of trace sampling (errors are always sent, traces are
+    // sampled — both must be credential-free).
+    beforeSendTransaction(event) {
+      if (event.request) {
+        event.request = scrubPIIFromObject(event.request) as typeof event.request;
+      }
+      event.transaction = redactCredentialQueryParams(event.transaction);
+      if (event.spans?.length) {
+        event.spans = event.spans.map((span) => ({
+          ...span,
+          description:
+            typeof span.description === 'string'
+              ? redactCredentialQueryParams(span.description)
+              : span.description,
+          data: span.data
+            ? (scrubPIIFromObject(span.data) as typeof span.data)
+            : span.data,
+        }));
       }
       return event;
     },

@@ -28,7 +28,8 @@ vi.mock('../../../i18n/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-import Tabs, { tabButtonIdFor } from '../Tabs';
+import Tabs, { doctorTabButtonIdFor, tabButtonIdFor } from '../Tabs';
+import { toDoctorId } from '../../../types/domain/branded';
 
 afterEach(() => cleanup());
 
@@ -352,6 +353,38 @@ describe('RQ-19 — ARIA tabs pattern (tablist/tab, id, aria-selected, aria-cont
     // Enter/Space (native click) because switching tabs triggers the
     // worklist data fetch.
     expect(onTabChange).not.toHaveBeenCalled();
+  });
+
+  it('renders every eligible doctor by identity and arrows across the profile-to-doctor boundary', async () => {
+    const onDoctorChange = vi.fn();
+    render(<Tabs
+      activeDoctorId={7}
+      doctors={[
+        { id: toDoctorId(7), user: { full_name: 'Иванов Иван' } },
+        { id: toDoctorId(8), user: { full_name: 'Иванов Иван' } },
+      ]}
+      doctorStats={{ '7': { todayCount: 1, hasActiveQueue: true } }}
+      onDoctorChange={onDoctorChange}
+    />);
+    await waitFor(() => expect(document.querySelectorAll('.tab-button.department').length).toBe(8));
+    const doctorTabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-doctor-id]'));
+    expect(doctorTabs).toHaveLength(2);
+    expect(doctorTabs.map((tab) => tab.id)).toEqual([doctorTabButtonIdFor(7), doctorTabButtonIdFor(8)]);
+    expect(doctorTabs[0]).toHaveAttribute('aria-label', 'Иванов Иван · #7');
+    expect(doctorTabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(doctorTabs[1]).toHaveAttribute('aria-selected', 'false');
+    expect(doctorTabs[0]).toHaveTextContent('Иванов Иван · #7');
+    expect(doctorTabs[1]).toHaveAttribute('aria-label', 'Иванов Иван · #8');
+    expect(doctorTabs[1]).toHaveTextContent('Иванов Иван · #8');
+    const profiles = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-tab]'));
+    profiles.at(-1)!.focus();
+    fireEvent.keyDown(profiles.at(-1)!, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(doctorTabs[0]);
+    fireEvent.keyDown(doctorTabs[0]!, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(doctorTabs[1]);
+    expect(onDoctorChange).not.toHaveBeenCalled();
+    fireEvent.click(doctorTabs[1]!);
+    expect(onDoctorChange).toHaveBeenCalledWith(8);
   });
 
   it('S-16 scale: 1/10/20 whitespace-keyed tabs keep the contract and long labels in the name', async () => {

@@ -8,7 +8,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.crud.queue_owner_policy import QueueOwnerConfigurationError
-from app.crud.queue_resource_routing import lock_queue_tag_claim_scope
+from app.crud.queue_resource_routing import (
+    lock_queue_tag_claim_scope,
+    resolve_tag_resource,
+)
 from app.models.service import Service
 from app.models.visit import Visit
 from app.services.morning_assignment import (
@@ -21,6 +24,16 @@ from app.services.queue_domain_service import QueueDomainService
 from app.services.visit_lifecycle_service import VisitLifecycleService
 
 logger = logging.getLogger(__name__)
+
+
+class DuplicateCartResourceQueueVisitsError(ValueError):
+    """One patient-day resource queue was split across cart visits."""
+
+    def __init__(self, *, resource_name: str) -> None:
+        super().__init__(
+            f"Услуги очереди «{resource_name}» распределены по нескольким "
+            "визитам. Объедините их в один визит и повторите сохранение."
+        )
 
 
 class RegistrarWizardQueueAssignmentService:
@@ -162,6 +175,74 @@ class RegistrarWizardQueueAssignmentService:
                 continue
 
         return queue_numbers
+
+    @staticmethod
+    def assert_unique_same_day_resource_queue_visits(
+        db: Session,
+        cart_visits: Sequence[Any],
+        *,
+        target_day: date,
+    ) -> None:
+        """Reject a cart that splits one resource queue across visits.
+
+        A patient can hold only one active claim in a daily resource queue.
+        If two request-level visits carry services routed to the same active
+        ``QueueResource``, assigning the first visit binds that claim and the
+        second visit can never bind it safely. Detect that request conflict
+        before the endpoint creates visits, an invoice, or a queue entry.
+
+        Resource ownership follows the canonical exact-tag registry resolver;
+        department labels, service codes, and names do not participate.
+        Multiple services with the same resource tag inside one visit remain
+        valid and produce one queue claim for that visit.
+        """
+        service_ids = {
+            int(service_item.service_id)
+            for visit_request in cart_visits
+            if visit_request.visit_date == target_day
+            for service_item in visit_request.services
+        }
+        if not service_ids:
+            return
+
+        service_tags = {
+            int(service_id): queue_tag
+            for service_id, queue_tag in (
+                db.query(Service.id, Service.queue_tag)
+                .filter(
+                    Service.id.in_(service_ids),
+                    Service.queue_tag.isnot(None),
+                )
+                .all()
+            )
+            if queue_tag
+        }
+        resource_by_tag = {
+            queue_tag: resource
+            for queue_tag in sorted(set(service_tags.values()))
+            if (resource := resolve_tag_resource(db, queue_tag)) is not None
+        }
+
+        first_visit_by_tag: dict[str, int] = {}
+        for visit_index, visit_request in enumerate(cart_visits):
+            if visit_request.visit_date != target_day:
+                continue
+            visit_tags = {
+                service_tags.get(int(service_item.service_id))
+                for service_item in visit_request.services
+            }
+            for queue_tag in sorted(
+                tag for tag in visit_tags if tag in resource_by_tag
+            ):
+                previous_visit_index = first_visit_by_tag.setdefault(
+                    queue_tag,
+                    visit_index,
+                )
+                if previous_visit_index != visit_index:
+                    resource = resource_by_tag[queue_tag]
+                    raise DuplicateCartResourceQueueVisitsError(
+                        resource_name=resource.display_name or queue_tag,
+                    )
 
     @staticmethod
     def prelock_cart_tag_claim_scopes(

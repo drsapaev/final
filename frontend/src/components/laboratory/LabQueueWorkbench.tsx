@@ -243,6 +243,13 @@ export default function LabQueueWorkbench({
             </Button>
           </div>
           {/* QW-8 fix: панель поиска и фильтра статусов. L-H-4: CSS-классы. */}
+          {/* PR7: честный scope поиска/фильтра — при серверной пагинации
+              поиск действует только по уже загруженным записям. */}
+          {hasMore && appointments.length < queueTotal && (searchQuery.trim() !== '' || statusFilter !== 'all') && (
+            <div className="lqw-search-scope-hint" role="note">
+              Поиск и фильтр действуют по загруженным записям: {appointments.length} из {queueTotal}. Загрузите остальные, чтобы искать по всему дню.
+            </div>
+          )}
           <div className="lqw-search-filter-row">
             <div className="lqw-search-wrapper">
               <Search size={14} className="lqw-search-icon" aria-hidden="true" />

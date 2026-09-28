@@ -17,7 +17,6 @@ const readSource = (fileName: string) =>
 const FILES_WITH_USER_FACING_ERRORS = [
   'DiagnosisForm.tsx',
   'PatientCard.tsx',
-  'PhotoArchive.tsx',
   'ToothModal.tsx',
   'TreatmentPlanner.tsx',
   'VisitProtocol.tsx',

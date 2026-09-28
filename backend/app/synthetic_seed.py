@@ -189,7 +189,7 @@ def _generate_visit(patient_id: int, specialty: str) -> dict[str, Any]:
     icd10 = random.choice(ICD10_BY_SPECIALTY.get(specialty, ["R69"]))
     # Naive UTC for the same reason as ``_generate_patient.created_at`` above.
     visit_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(
-        days=random.randint(0, 90)
+        days=random.randint(1, 90)
     )
 
     return {

@@ -79,6 +79,11 @@ def normalize_role(role: str | None) -> str:
 # Each canonical role has a set of permissions.
 # Permissions are action-scoped: 'appointment:read', 'patient:edit', etc.
 
+# NURSE-V2 (owner design-GO 2026-09-19): the canonical role 'Nurse' is
+# deliberately ABSENT from this map — normalize_role maps it to
+# 'unknown' and the .get() default yields the empty frozenset, i.e.
+# deny-by-default. Serving permissions arrive in N2-3 and are
+# assignment-scoped (active NurseWorkplaceAssignment), not role-wide.
 _STAFF_PERMISSIONS: dict[str, frozenset[str]] = {
     "admin": frozenset({
         "appointment:read", "appointment:write", "appointment:delete",

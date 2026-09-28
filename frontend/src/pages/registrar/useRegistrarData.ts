@@ -181,6 +181,13 @@ export const useRegistrarData = () => {
   // tab/window, revalidate the reference data silently. A 5s throttle
   // collapses the focus+visibilitychange burst browsers fire together into
   // one refresh (extra-requests budget per ACCEPTANCE S-28).
+  // RQ-27.b (S-28 reconnect row): a network drop/restoration cycle fires the
+  // browser `online` event even when the session never lost focus/visibility
+  // (kiosk-like registrar workstation) — revalidate once on reconnect, same
+  // throttled silent path. The manual session refresh (panel button)
+  // dispatches `registrar:session-refresh`, which runs the SAME silent
+  // revalidation — a user-understandable refresh without knowing about any
+  // internal window event.
   const lastFocusRefreshAtRef = useRef(0);
   useEffect(() => {
     const FOCUS_REFRESH_MIN_INTERVAL_MS = 5000;
@@ -198,9 +205,13 @@ export const useRegistrarData = () => {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', refreshIfDue);
+    window.addEventListener('online', refreshIfDue);
+    window.addEventListener('registrar:session-refresh', refreshIfDue);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', refreshIfDue);
+      window.removeEventListener('online', refreshIfDue);
+      window.removeEventListener('registrar:session-refresh', refreshIfDue);
     };
   }, [loadIntegratedData]);
 

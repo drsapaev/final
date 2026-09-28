@@ -384,8 +384,8 @@ test.describe('PR-UI-16-2 — Landing product screenshots (deterministic capture
       if (pathname === '/api/v1/registrar/services') { await route.fulfill(jsonResponse({ services_by_group: {} })); return; }
       // EMR GET → 404: canonical "new visit" draft (deterministic).
       if (pathname === '/api/v1/v2/emr/501') { await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ detail: 'not found' }) }); return; }
-      if (pathname === '/api/v1/derma/examinations') { await route.fulfill(jsonResponse({ items: [], data: [] })); return; }
-      if (pathname === '/api/v1/derma/procedures') { await route.fulfill(jsonResponse({ items: [], data: [] })); return; }
+      if (pathname === '/api/v1/derma/examinations') { await route.fulfill(jsonResponse({ items: [], total: 0, page: 1, size: 20, pages: 0 })); return; }
+      if (pathname === '/api/v1/derma/procedures') { await route.fulfill(jsonResponse({ items: [], total: 0, page: 1, size: 20, pages: 0 })); return; }
       if (pathname === '/api/v1/notifications/history/stats') { await route.fulfill(jsonResponse({ recent_activity: [] })); return; }
       await route.fulfill(jsonResponse({ success: true }));
     });

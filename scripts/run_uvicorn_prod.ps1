@@ -31,5 +31,11 @@ $Log    = Join-Path $Repo 'tools\uvicorn_backend.log'
 
 Set-Location (Join-Path $Repo 'backend')
 
+# The detached process inherits the Windows console code page even though its
+# streams are redirected to a file. Force UTF-8 so structured logs containing
+# Cyrillic text or symbols do not fail inside logging.StreamHandler.
+$env:PYTHONUTF8 = '1'
+$env:PYTHONIOENCODING = 'utf-8'
+
 & "$env:ComSpec" /c "`"$Python`" -m uvicorn app.main:app --host 127.0.0.1 --port 18000 --log-level warning >> `"$Log`" 2>&1"
 exit $LASTEXITCODE

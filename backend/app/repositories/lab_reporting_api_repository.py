@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.lab import (
     LabCatalogAnalyte,
@@ -323,6 +323,35 @@ class LabReportingApiRepository:
             )
         )
         return self.db.execute(stmt).scalars().unique().first()
+
+    def get_instance_for_update(
+        self, instance_id: int
+    ) -> LabReportInstance | None:
+        """Lock and refresh the report aggregate's parent row.
+
+        ``populate_existing`` is required after a lock wait: the Session may
+        already contain an older identity-map copy loaded earlier in the
+        request. The version/status checks must inspect the row committed by
+        the writer that just released the lock.
+
+        ``selectinload`` refreshes the aggregate only after the parent lock
+        query. Joining the values/template trees into ``FOR UPDATE`` would
+        widen the lock set; every writer serializes on this parent row first.
+        """
+        stmt = (
+            select(LabReportInstance)
+            .where(LabReportInstance.id == instance_id)
+            .options(
+                selectinload(LabReportInstance.template),
+                selectinload(LabReportInstance.template_version)
+                .selectinload(LabReportTemplateVersion.sections)
+                .selectinload(LabReportSection.fields),
+                selectinload(LabReportInstance.values),
+            )
+            .with_for_update(of=LabReportInstance)
+            .execution_options(populate_existing=True)
+        )
+        return self.db.execute(stmt).scalars().one_or_none()
 
     def add_instance(self, instance: LabReportInstance) -> LabReportInstance:
         self.db.add(instance)

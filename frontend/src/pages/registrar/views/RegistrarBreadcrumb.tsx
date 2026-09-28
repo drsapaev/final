@@ -21,6 +21,7 @@ import { resolveRegistrarTabLabel } from '../registrarHelpers';
 
 interface RegistrarBreadcrumbProps {
   activeTab: string | null;
+  activeDoctorLabel?: string | null;
   // RQ-20 (срез RQ-20.a): TabItem objects carry a localized `label`; the
   // raw backend shape carries `title` — both accepted by the shared helper.
   queueProfiles: { key?: string; label?: string; title?: string }[];
@@ -40,6 +41,7 @@ interface RegistrarBreadcrumbProps {
 
 const RegistrarBreadcrumb = ({
   activeTab,
+  activeDoctorLabel,
   queueProfiles,
   searchQuery,
   wizardEditMode,
@@ -58,14 +60,14 @@ const RegistrarBreadcrumb = ({
     >
       {tI18n('registrarPanel.rp_breadcrumb_root')}
     </button>
-    {activeTab && (
+    {(activeTab || activeDoctorLabel) && (
       <>
         <ChevronRight size={16} className="registrar-breadcrumb-separator" aria-hidden="true" />
         {/* RQ-20 (срез RQ-20.a): resolve through the shared helper — the
             previous `?.title || activeTab` lookup never matched the TabItem
             objects (they carry `label`), so every backend-driven tab showed
             its raw key in the wayfinding crumb. */}
-        <span>{resolveRegistrarTabLabel(activeTab, queueProfiles, (key) => tI18n('registrarPanel.' + key))}</span>
+        <span>{activeDoctorLabel || resolveRegistrarTabLabel(activeTab, queueProfiles, (key) => tI18n('registrarPanel.' + key))}</span>
       </>
     )}
     {searchQuery && (

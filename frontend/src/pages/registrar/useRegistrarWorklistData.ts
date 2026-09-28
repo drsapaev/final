@@ -469,16 +469,6 @@ export const useRegistrarWorklistData = ({
     }
   }, [historyDate, showCalendar, loadAppointments]);
 
-  // Отслеживаем изменения в appointments для отладки
-  useEffect(() => {
-    logger.info('🔔 appointments state изменился:', {
-      count: appointments.length,
-      showCalendar,
-      historyDate,
-      first3: appointments.slice(0, 3).map((a) => ({ id: a.id, fio: a.patient_fio, date: a.appointment_date }))
-    });
-  }, [appointments, showCalendar, historyDate]);
-
   // Автообновление очереди с возможностью паузы (в тихом режиме)
   const autoRefresh = true; // Новые состояния для интеграции с админ панелью
   useEffect(() => {

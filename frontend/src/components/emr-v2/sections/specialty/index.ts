@@ -4,5 +4,4 @@
 
 export { CardiologySection } from './CardiologySection';
 export { DermatologySection } from './DermatologySection';
-export type { DermatologyPhoto } from './DermatologySection';
 export { DentistrySection } from './DentistrySection';

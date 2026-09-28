@@ -21,6 +21,9 @@ vi.mock('@/api/client', () => ({
     put: vi.fn(),
     delete: vi.fn(),
   },
+  // stores/auth registers its session-termination listener in the client at
+  // module scope — stub it so registration is a no-op.
+  setSessionInvalidationListener: vi.fn(),
 }));
 
 const mockedGet = vi.mocked(api.get);

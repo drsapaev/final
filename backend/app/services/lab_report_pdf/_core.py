@@ -5,14 +5,27 @@ Split from lab_report_pdf_service.py.
 from __future__ import annotations
 
 from app.services.lab_report_pdf._base import *  # noqa: F401, F403
-from app.services.lab_report_pdf._base import LabReportPDFServiceMixinBase
+from app.services.lab_report_pdf._base import (  # noqa: F401
+    LabReportPDFServiceMixinBase,
+    _load_weasyprint_components,
+)
+
+# PR8 hotfix (codex-lab-workflow-hardening-plan): underscore-имена НЕ
+# экспортируются `from ... import *` (в _base нет __all__), поэтому без
+# явного импорта вызов render_report поднимал NameError, который не
+# перехватывался `except (ImportError, OSError)` — ReportLab-fallback был
+# недостижим и печать PDF падала 500 для всех ролей.
 
 
 class CoreMixin(LabReportPDFServiceMixinBase):
     """Core methods."""
 
     def __init__(self) -> None:
-        self.backend_root = Path(__file__).resolve().parents[2]
+        # PR8 hotfix: сплит service-файла в пакет добавил уровень вложенности —
+        # parents[2] указывал на backend/app (маскировалось NameError выше по
+        # коду), и jinja не находил app/templates/print. Нужен backend/:
+        # parents[3].
+        self.backend_root = Path(__file__).resolve().parents[3]
         self.templates_dir = self.backend_root / "app" / "templates" / "print"
         self.jinja_env = Environment(autoescape=True,
             loader=FileSystemLoader(self.templates_dir),
@@ -49,7 +62,11 @@ class CoreMixin(LabReportPDFServiceMixinBase):
 
         template = self.jinja_env.get_template("lab_report_fixed.j2")
         html_content = template.render(**context)
-        css_content = self._build_css(layout_preset=layout_preset, page_settings=page_settings)
+        css_content = self._build_css(
+            layout_preset=layout_preset,
+            page_settings=page_settings,
+            watermark_text=str(context.get("watermark_text") or "") or None,
+        )
         html_doc = weasy_html(string=html_content, base_url=str(self.backend_root))
         css_doc = weasy_css(string=css_content)
         return html_doc.write_pdf(stylesheets=[css_doc])
