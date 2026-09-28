@@ -278,12 +278,32 @@ export type DoctorAssignmentGapReason =
   | 'doctor_missing'
   | 'specialty_mismatch';
 
+/** Статус запроса списка врачей (проводится из AppointmentWizardV2 в CartStepV2). */
+export type DoctorsRequestStatus = 'idle' | 'loading' | 'loaded' | 'error';
+
 export interface DoctorAssignmentGap {
   serviceId: string | number;
   serviceName: string;
   serviceCode: string | null;
   pinnedDoctorId: string | number;
   reason: DoctorAssignmentGapReason;
+}
+
+export interface DoctorAssignmentGapOptions {
+  /**
+   * Раунд-3 ревью PR #3511 (P2): пустой roster имеет ДВЕ разные причины,
+   * которые нельзя смешивать.
+   *
+   * - `true` / флаг опущен — переданный массив это ДОСТОВЕРНЫЙ список
+   *   активных врачей (запрос успешно завершён). Даже пустой: каждая
+   *   закреплённая услуга не может быть предложена ни одной карточке →
+   *   `doctor_missing` с инструкцией администратору.
+   * - `false` — список ещё НЕ получен (запрос в полёте или упал).
+   *   Отсутствие врача в неполученном списке — НЕ конфиг-ошибка:
+   *   блок instructions не показываем, иначе ложная ошибка конфигурации
+   *   при временном сбое загрузки.
+   */
+  rosterLoaded?: boolean;
 }
 
 /**
@@ -296,15 +316,31 @@ export interface DoctorAssignmentGap {
  *
  * Чистая функция: те же входные данные (каталог + врачи), тот же
  * predicate eligibility (filterDoctorsForService), без догадок.
+ *
+ * Пустой roster (раунд-3 ревью PR #3511, P2): ПУСТОЙ, но достоверно
+ * загруженный список активных врачей — валидное состояние, при котором
+ * закреплённые услуги дают `doctor_missing` (ранний выход `[]` убран —
+ * он прятал причину недоступности услуги). Незавершённый/упавший запрос
+ * различается опцией `rosterLoaded: false` — с ней конфиг-ошибок не
+ * показываем; `doctors` null/undefined (список не передан) — нечем
+ * сверять, тоже без gaps.
  */
 export const collectDoctorAssignmentGaps = (
   services: AssignmentGapServiceLike[],
   doctors: Array<WizardDoctorRecord | null | undefined> | null | undefined,
+  options: DoctorAssignmentGapOptions = {},
 ): DoctorAssignmentGap[] => {
   if (!Array.isArray(services) || services.length === 0) return [];
-  const roster: WizardDoctorRecord[] = (Array.isArray(doctors) ? doctors : [])
+  // Список врачей ещё не получен (loading/error): «отсутствие» назначенного
+  // врача в неподтверждённом списке — не конфиг-ошибка.
+  if (options.rosterLoaded === false) return [];
+  // Список не передан вовсе (null/undefined/не-массив) — нечем сверять.
+  if (!Array.isArray(doctors)) return [];
+  const roster: WizardDoctorRecord[] = doctors
     .filter((d): d is WizardDoctorRecord => Boolean(d));
-  if (roster.length === 0) return [];
+  // РАННИЙ ВЫХОД ПРИ ПУСТОМ ROSTER УБРАН (P2 #3511): успешно загруженный
+  // пустой список активных врачей судится тем же predicate — закреплённая
+  // услуга не появляется ни на одной карточке и обязана объяснить причину.
 
   const gaps: DoctorAssignmentGap[] = [];
   for (const service of services) {

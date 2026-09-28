@@ -123,6 +123,47 @@ describe('collectDoctorAssignmentGaps: admin instruction state', () => {
   });
 });
 
+describe('collectDoctorAssignmentGaps: пустой roster (PR #3511 round-3, P2)', () => {
+  const pinnedEcho = {
+    id: 20,
+    name: 'ЭхоКГ (закреплена)',
+    service_code: 'K11',
+    doctor_id: 7,
+    department_key: 'cardiology',
+    accepted_specialties: ['cardiology'],
+  };
+
+  it('reporting doctor_missing when the roster is delivered and EMPTY (loaded-empty ≠ no-roster)', () => {
+    const gaps = collectDoctorAssignmentGaps([pinnedEcho], []);
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].reason).toBe('doctor_missing');
+    expect(gaps[0].pinnedDoctorId).toBe(7);
+    expect(gaps[0].serviceName).toBe('ЭхоКГ (закреплена)');
+  });
+
+  it('does not create gaps for unpinned services on an empty roster', () => {
+    expect(
+      collectDoctorAssignmentGaps(
+        [{ id: 21, name: 'Обычная консультация', service_code: 'K01', doctor_id: null }],
+        [],
+      ),
+    ).toEqual([]);
+  });
+
+  it('suppresses gaps while the roster request is unsettled (loading/error) — no false config error', () => {
+    // Пустой roster при незавершённом запросе — не конфиг-ошибка:
+    expect(collectDoctorAssignmentGaps([pinnedEcho], [], { rosterLoaded: false })).toEqual([]);
+    // Непустой, но неподтверждённый список тоже не судит об отсутствии врача:
+    const pinnedMissing = { ...pinnedEcho, id: 22, doctor_id: 999 };
+    expect(collectDoctorAssignmentGaps([pinnedMissing], roster, { rosterLoaded: false })).toEqual([]);
+  });
+
+  it('treats a missing roster (null/undefined) as unverifiable, not as a config error', () => {
+    expect(collectDoctorAssignmentGaps([pinnedEcho], null)).toEqual([]);
+    expect(collectDoctorAssignmentGaps([pinnedEcho], undefined)).toEqual([]);
+  });
+});
+
 describe('groupCartItemsByVisit: one visit per doctor booking', () => {
   const departments = new Map<number, string>([
     [1, 'dermatology'],

@@ -15,7 +15,7 @@ import { AlertCircle, X } from 'lucide-react';
 import { Button, Tooltip,
   Checkbox } from '../ui/macos';
 import { normalizeCategoryCode, parseServiceCode } from '../../utils/serviceCodeUtils';
-import { MIXED_REPEAT_WARNING, collectDoctorAssignmentGaps, filterDoctorsForService, getWizardDoctorDisplayName } from './wizardUtils';
+import { MIXED_REPEAT_WARNING, collectDoctorAssignmentGaps, filterDoctorsForService, getWizardDoctorDisplayName, type DoctorsRequestStatus } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './CartStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -132,6 +132,14 @@ export interface CartStepV2Props {
   cartQuoteTotal?: number | null;
   /** Fix D: server quote failure detail (e.g. «для услуги не указана цена»). */
   cartQuoteMessage?: string;
+  /**
+   * Round-3 PR #3511 (P2): статус запроса списка врачей. Только 'loaded'
+   * подтверждает достоверность roster — в том числе ПУСТОГО (тогда
+   * закреплённые услуги дают doctor_missing с инструкцией). 'loading'/
+   * 'error' не создают ложных конфиг-ошибок. Не передан (legacy-вызовы) —
+   * переданный массив считается достоверным (прежний pure-default).
+   */
+  doctorsRequestStatus?: DoctorsRequestStatus;
   [key: string]: unknown;
 }
 
@@ -154,7 +162,8 @@ const CartStepV2 = ({
   repeatSuggestionSummary,
   cartQuoteStatus,
   cartQuoteTotal,
-  cartQuoteMessage
+  cartQuoteMessage,
+  doctorsRequestStatus
 }: CartStepV2Props) => {
   const { t: rawT } = useTranslation(); const t = rawT;
   const doctorRowLabel = (name: string) =>
@@ -325,9 +334,15 @@ const CartStepV2 = ({
   // которые не может предложить НИ одна карточка — назначенный врач
   // неактивен/отсутствует или не проходит специальность услуги. Не
   // переезжают к коллегам: показываем точную причину и путь администратора.
+  // Round-3 PR #3511 (P2): пустой roster судится только когда запрос врачей
+  // УСПЕШНО завершён ('loaded') — иначе (loading/error) блок не показываем,
+  // чтобы сбой загрузки не выглядел конфиг-ошибкой каталога. Проп не передан
+  // (legacy) — массив по-прежнему считается достоверным.
   const doctorAssignmentGaps = useMemo(
-    () => collectDoctorAssignmentGaps(servicesData, normalizedDoctorsData),
-    [servicesData, normalizedDoctorsData],
+    () => collectDoctorAssignmentGaps(servicesData, normalizedDoctorsData, {
+      rosterLoaded: doctorsRequestStatus === undefined ? undefined : doctorsRequestStatus === 'loaded',
+    }),
+    [servicesData, normalizedDoctorsData, doctorsRequestStatus],
   );
 
   const consultationRows = useMemo(() =>
