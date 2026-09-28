@@ -1077,7 +1077,12 @@ def test_alembic_chain_single_head_0069() -> None:
     assert graph["0073_execution_routing_snapshot"] == (
         "0072_service_executions",
     )
-    assert heads == ["0074_join_payload_binding"]
+    # derma history read model (issue #3506, P2 retro-review of #3494)
+    # moves the head to 0075.
+    assert graph["0075_derma_history_read_model"] == (
+        "0074_join_payload_binding",
+    )
+    assert heads == ["0075_derma_history_read_model"]
 
 
 # ===================== C. PostgreSQL FK introspection =====================

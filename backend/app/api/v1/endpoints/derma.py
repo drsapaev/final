@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -28,7 +28,11 @@ from app.schemas.derma import (
     DermaProcedureOut,
 )
 from app.services.derma_api_service import DermaApiDomainError, DermaApiService
-from app.services.emr_contract import extract_diagnosis_main
+from app.services.derma_history_projection import (
+    DERMATOLOGY_SPECIALTY,
+    emr_examination_rows,
+    emr_procedure_rows,
+)
 
 router = APIRouter(prefix="/derma", tags=["derma"])
 logger = logging.getLogger(__name__)
@@ -117,14 +121,6 @@ def _ensure_doctor_can_access_patient(db: Session, patient_id: int, user: User) 
 # canonical page/size/total/pages envelope (FileList contract), so consumers
 # get an explicit completeness signal instead of asymmetric client-side
 # source limits (review P2 on #3490).
-_EXAM_TEXT_FIELDS = (
-    "skin_type",
-    "skin_condition",
-    "lesions",
-    "distribution",
-    "symptoms",
-    "treatment_plan",
-)
 
 
 def _apply_history_patient_scope(
@@ -160,7 +156,7 @@ def _derma_emr_records(
     """All active dermatology EMR records in scope, newest first (uncapped)."""
     query = db.query(EMRRecord).filter(
         EMRRecord.is_active.is_(True),
-        EMRRecord.data["specialty"].as_string() == "dermatology",
+        EMRRecord.data["specialty"].as_string() == DERMATOLOGY_SPECIALTY,
     )
     query = _apply_history_patient_scope(
         db, query, patient_id, user, EMRRecord.patient_id
@@ -175,124 +171,6 @@ def _history_visit_map(db: Session, records: list[EMRRecord]) -> dict[int, Visit
     if not visit_ids:
         return {}
     return {v.id: v for v in db.query(Visit).filter(Visit.id.in_(visit_ids)).all()}
-
-
-def _str_or_none(value: Any) -> str | None:
-    return value if isinstance(value, str) else None
-
-
-def _parse_iso_date(value: Any) -> date | None:
-    if isinstance(value, str) and value.strip():
-        try:
-            return date.fromisoformat(value[:10])
-        except ValueError:
-            return None
-    return None
-
-
-def _history_exam_date(visit: Visit | None, record: EMRRecord) -> date:
-    visit_date = getattr(visit, "visit_date", None)
-    if visit_date:
-        return visit_date
-    if record.created_at:
-        return record.created_at.date()
-    return date.today()
-
-
-def _derma_exam_has_content(
-    specialty_data: dict[str, Any], diagnosis_main: str | None
-) -> bool:
-    """An empty derma EMR (fresh skeleton draft) must not pollute history."""
-    if diagnosis_main:
-        return True
-    for field in _EXAM_TEXT_FIELDS:
-        value = specialty_data.get(field)
-        if isinstance(value, str) and value.strip():
-            return True
-    localization = specialty_data.get("localization")
-    if isinstance(localization, dict):
-        if any(isinstance(v, str) and v.strip() for v in localization.values()):
-            return True
-    return False
-
-
-def _emr_examination_rows(
-    records: list[EMRRecord], visits: dict[int, Visit]
-) -> list[DermaExaminationHistoryOut]:
-    rows: list[DermaExaminationHistoryOut] = []
-    for record in records:
-        data = record.data if isinstance(record.data, dict) else {}
-        specialty_data = data.get("specialty_data")
-        if not isinstance(specialty_data, dict):
-            specialty_data = {}
-        diagnosis_main = extract_diagnosis_main(data)
-        if not _derma_exam_has_content(specialty_data, diagnosis_main):
-            continue
-        visit = visits.get(record.visit_id)
-        rows.append(
-            DermaExaminationHistoryOut(
-                id=f"emr-{record.id}",
-                source="emr",
-                patient_id=record.patient_id,
-                visit_id=record.visit_id,
-                doctor_id=getattr(visit, "doctor_id", None),
-                examination_date=_history_exam_date(visit, record),
-                skin_type=str(specialty_data.get("skin_type") or ""),
-                skin_condition=_str_or_none(specialty_data.get("skin_condition")),
-                lesions=_str_or_none(specialty_data.get("lesions")),
-                distribution=_str_or_none(specialty_data.get("distribution")),
-                symptoms=_str_or_none(specialty_data.get("symptoms")),
-                diagnosis=diagnosis_main,
-                treatment_plan=_str_or_none(specialty_data.get("treatment_plan")),
-                created_at=record.created_at,
-                updated_at=record.updated_at,
-            )
-        )
-    return rows
-
-
-def _emr_procedure_rows(
-    records: list[EMRRecord], visits: dict[int, Visit]
-) -> list[DermaProcedureHistoryOut]:
-    """Project specialty_data.cosmetic_procedures entries into history rows."""
-    rows: list[DermaProcedureHistoryOut] = []
-    for record in records:
-        data = record.data if isinstance(record.data, dict) else {}
-        specialty_data = data.get("specialty_data")
-        if not isinstance(specialty_data, dict):
-            continue
-        entries = specialty_data.get("cosmetic_procedures")
-        if not isinstance(entries, list):
-            continue
-        visit = visits.get(record.visit_id)
-        fallback_date = _history_exam_date(visit, record)
-        for index, entry in enumerate(entries):
-            if not isinstance(entry, dict):
-                continue
-            procedure_type = entry.get("procedure_type")
-            if not isinstance(procedure_type, str) or not procedure_type.strip():
-                continue
-            rows.append(
-                DermaProcedureHistoryOut(
-                    id=f"emr-{record.id}-{index}",
-                    source="emr",
-                    patient_id=record.patient_id,
-                    visit_id=record.visit_id,
-                    doctor_id=getattr(visit, "doctor_id", None),
-                    procedure_date=(
-                        _parse_iso_date(entry.get("procedure_date")) or fallback_date
-                    ),
-                    procedure_type=procedure_type,
-                    area_treated=_str_or_none(entry.get("area_treated")),
-                    products_used=_str_or_none(entry.get("products_used")),
-                    results=_str_or_none(entry.get("results")),
-                    follow_up=_str_or_none(entry.get("follow_up")),
-                    total_cost=None,
-                    created_at=record.created_at,
-                    updated_at=None,
-                )
-            )
-    return rows
 
 
 def _history_sort_key(row: Any) -> tuple[Any, ...]:
@@ -382,7 +260,7 @@ async def get_skin_examinations(
             ]
         records = _derma_emr_records(db, user, patient_id)
         visits = _history_visit_map(db, records)
-        emr_rows = _emr_examination_rows(records, visits)
+        emr_rows = emr_examination_rows(records, visits)
         page_items, total, pages = _paginate_history(
             legacy_rows, emr_rows, page, size
         )
@@ -485,7 +363,7 @@ async def get_cosmetic_procedures(
             ]
         records = _derma_emr_records(db, user, patient_id)
         visits = _history_visit_map(db, records)
-        emr_rows = _emr_procedure_rows(records, visits)
+        emr_rows = emr_procedure_rows(records, visits)
         page_items, total, pages = _paginate_history(
             legacy_rows, emr_rows, page, size
         )
