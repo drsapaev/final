@@ -15,7 +15,7 @@ import { AlertCircle, X } from 'lucide-react';
 import { Button, Tooltip,
   Checkbox } from '../ui/macos';
 import { normalizeCategoryCode, parseServiceCode } from '../../utils/serviceCodeUtils';
-import { MIXED_REPEAT_WARNING, filterDoctorsForService, getWizardDoctorDisplayName } from './wizardUtils';
+import { MIXED_REPEAT_WARNING, collectDoctorAssignmentGaps, filterDoctorsForService, getWizardDoctorDisplayName } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './CartStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -321,6 +321,15 @@ const CartStepV2 = ({
     })
     .filter((group) => !doctorQuery || group.matchesDoctor || group.services.length > 0);
 
+  // Workstream A (Task 3): услуги с явным назначением (Service.doctor_id),
+  // которые не может предложить НИ одна карточка — назначенный врач
+  // неактивен/отсутствует или не проходит специальность услуги. Не
+  // переезжают к коллегам: показываем точную причину и путь администратора.
+  const doctorAssignmentGaps = useMemo(
+    () => collectDoctorAssignmentGaps(servicesData, normalizedDoctorsData),
+    [servicesData, normalizedDoctorsData],
+  );
+
   const consultationRows = useMemo(() =>
   (cart?.items || []).
   map((item) => {
@@ -352,6 +361,29 @@ const CartStepV2 = ({
         <div className="cart-step-v2__search-info">
             Результаты поиска: {regularServices.length + doctorGroups.reduce((count, group) => count + group.services.length, 0)}
           </div>
+        }
+
+        {showDoctorCards && doctorAssignmentGaps.length > 0 &&
+        <div className="cart-step-v2__assignment-gaps" role="alert">
+          <strong>{t('misc.aw_doctor_assignment_gap_title')}</strong>
+          <ul>
+            {doctorAssignmentGaps.map((gap) => (
+              <li key={`${String(gap.serviceId)}:${String(gap.pinnedDoctorId)}`}>
+                {gap.reason === 'doctor_missing'
+                  ? t('misc.aw_doctor_assignment_gap_missing', {
+                      service: gap.serviceName,
+                      id: String(gap.pinnedDoctorId),
+                    })
+                  : t('misc.aw_doctor_assignment_gap_specialty', {
+                      service: gap.serviceName,
+                    })}
+              </li>
+            ))}
+          </ul>
+          <span className="cart-step-v2__discount-hint">
+            {t('misc.aw_doctor_assignment_gap_path')}
+          </span>
+        </div>
         }
 
         {doctorGroups.length > 0 &&
