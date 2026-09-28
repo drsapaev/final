@@ -672,6 +672,54 @@ class RegistrarEditDeltaService:
         # транзакции (SELECT ... FOR UPDATE) — отмена/смена статуса между
         # ревалидацией квоты и применением команды не может сменить
         # наблюдаемое состояние (READ COMMITTED).
+        #
+        # Единая врачебная запись (registrar doctor-services plan): запись
+        # врача несёт услуги с РАЗНЫМИ queue_tag, поэтому routing-тег
+        # отдельной услуги больше не обязан совпадать с тегом самой
+        # очереди. ЯВНО названная идентичность (strict_entry_id из
+        # read-модели) сильнее теговой эвристики: именованная запись
+        # ищется по (пациент, день, активность) без фильтра по тегу
+        # очереди, иначе живая запись врачебного визита отвергалась бы с
+        # ложным «больше не активна», а добавление тихо форкало вторую
+        # запись. Неназванная идентичность сохраняет теговый скоуп —
+        # resource-ось и врач-ось без явного ID остаются разведёнными.
+        if strict_entry_id is not None:
+            named_query = self.db.query(OnlineQueueEntry).join(
+                DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
+            )
+            if lock:
+                named_query = named_query.with_for_update()
+            named_entry = (
+                named_query.filter(
+                    OnlineQueueEntry.id == strict_entry_id,
+                    OnlineQueueEntry.patient_id == patient_id,
+                    OnlineQueueEntry.status.in_(ACTIVE_APPEND_STATUSES),
+                    DailyQueue.day == target_date,
+                    DailyQueue.active.is_(True),
+                )
+                .order_by(OnlineQueueEntry.queue_time.asc(), OnlineQueueEntry.id.asc())
+                .first()
+            )
+            if named_entry is None:
+                # Codex R11 #3115 (P1): явный queue_entry_id — СТРОГИЙ селектор.
+                # Устаревшая идентичность — громкий отказ, а не тихая
+                # ре-регистрация.
+                raise ValueError(
+                    f"Указанная запись очереди ({strict_entry_id}) больше не "
+                    "активна в этот день — обновите данные записи и повторите "
+                    "попытку"
+                )
+            if specialist_id is not None:
+                named_specialist = (
+                    named_entry.queue.specialist_id
+                    if named_entry.queue is not None
+                    else None
+                )
+                if named_specialist is None or int(named_specialist) != int(
+                    specialist_id
+                ):
+                    return None
+            return named_entry
         query = self.db.query(OnlineQueueEntry).join(
             DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id
         )
@@ -688,17 +736,6 @@ class RegistrarEditDeltaService:
             preferred = [entry for entry in entries if entry.id in preferred_entry_ids]
             if preferred:
                 entries = preferred
-            elif strict_entry_id is not None:
-                # Codex R11 #3115 (P1): явный queue_entry_id — СТРОГИЙ селектор.
-                # Прежний код при пустом preferred оставлял полный список
-                # кандидатов (entries[0] — мутировала и биллила ЧУЖУЮ строку
-                # очереди) или проваливался в создание новой записи (тихая
-                # ре-регистрация). Устаревшая идентичность — громкий отказ.
-                raise ValueError(
-                    f"Указанная запись очереди ({strict_entry_id}) больше не "
-                    "активна в этот день — обновите данные записи и повторите "
-                    "попытку"
-                )
         if specialist_id is not None:
             # W2-PR1 (ADR-001): очередь принадлежит врачу. Явно запрошенный
             # специалист не может дослать позицию в чужую очередь того же

@@ -224,7 +224,19 @@ def assert_doctor_eligible_for_service(
     doctor_map: dict[int, Doctor] | None = None,
     target_date: date | None = None,
 ) -> None:
-    """Validate a doctor-required service before any registrar write."""
+    """Validate a doctor-required service before any registrar write.
+
+    Explicit assignment rule (registrar doctor-services plan): when an
+    administrator pins a service to a concrete doctor
+    (``Service.doctor_id``), the booking MUST use exactly that doctor.
+    The rule is enforced on every write surface that calls this guard
+    (registrar cart save, edit-delta quote/apply, QR full-update) so
+    the read-side card filter and the write-side decision cannot drift.
+    Specialty eligibility stays in force for the pinned doctor too —
+    a pin is an additional restriction, never a cross-specialty
+    exception (fail-closed instead of silently booking a cardiologist
+    service to a dentist).
+    """
     if not service_requires_doctor_selection(service):
         return
     # PR #3438 review P1-1: queue ownership decides the doctor surface.
@@ -253,6 +265,20 @@ def assert_doctor_eligible_for_service(
             detail=(
                 f"Услуга «{service.name}» требует выбора врача: "
                 "сохранение визита без врача недоступно"
+            ),
+        )
+    # Explicit assignment: a pinned service is bookable only with its own
+    # doctor. The mismatch is detectable without a DB round-trip and is
+    # more specific than a missing/inactive-doctor error, so it comes
+    # first. The exact-doctor contract is shared with the read side
+    # (registrar catalog emits doctor_id; the wizard card filter pins the
+    # service to that doctor's card only).
+    if service.doctor_id is not None and int(service.doctor_id) != int(doctor_id):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Услуга «{service.name}» назначена другому врачу "
+                f"(ID {service.doctor_id}): запись возможна только к нему"
             ),
         )
     doctor = (

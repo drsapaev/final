@@ -625,6 +625,35 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         if daily_queue:
             return daily_queue
 
+        # Per-doctor single-queue contract (PR-26 text made effective): a
+        # doctor owns ONE active queue per day. The exact-tag lookup above
+        # misses when another writer (wizard cart, online join, batch)
+        # already opened this doctor's queue under a different tag
+        # spelling ("cardio" vs "cardiology", "dermatology" vs
+        # "procedures"). Reusing the doctor's existing active queue of
+        # the day keeps the owner axis singular instead of forking
+        # parallel tag queues for one doctor — two queues meant two
+        # numbering sequences and the same patient holding two numbers
+        # in one doctor's worklist. The existing row's queue_tag stays
+        # the routing/display metadata of the first writer and does NOT
+        # override per-doctor ownership. Pre-existing parallel queues
+        # keep their committed entries; only NEW resolutions converge.
+        # The advisory lock above serializes (day, specialist) creators,
+        # so this read cannot race a concurrent doctor-queue insert.
+        if queue_tag:
+            doctor_day_queue = (
+                db.query(DailyQueue)
+                .filter(
+                    DailyQueue.day == day,
+                    DailyQueue.specialist_id == actual_specialist_id,
+                    DailyQueue.active == True,
+                )
+                .order_by(DailyQueue.id.asc())
+                .first()
+            )
+            if doctor_day_queue is not None:
+                return doctor_day_queue
+
         # Fallback: if no queue exists for this specific doctor on this day,
         # check if there's an active queue for the same queue_tag+day that
         # belongs to a DIFFERENT doctor (legacy shared-queue scenario).

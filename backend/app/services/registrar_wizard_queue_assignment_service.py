@@ -11,9 +11,10 @@ from app.crud.queue_owner_policy import QueueOwnerConfigurationError
 from app.crud.queue_resource_routing import (
     lock_queue_tag_claim_scope,
     resolve_tag_resource,
+    tag_routes_to_resource,
 )
 from app.models.service import Service
-from app.models.visit import Visit
+from app.models.visit import Visit, VisitService
 from app.services.morning_assignment import (
     MorningAssignmentCreateBranchHandoff,
     MorningAssignmentPreparedQueueAssignment,
@@ -368,6 +369,32 @@ class RegistrarWizardQueueAssignmentService:
             logger.warning("Визит %d: нет queue_tag в услугах", visit.id)
             return []
 
+        # Per-doctor single-queue contract (registrar doctor-services
+        # plan, Workstream A): a doctor-owned visit books ALL its
+        # doctor-axis services into the doctor's ONE queue of the day —
+        # one entry, one number — even when the services carry different
+        # queue_tags/categories (D01 «dermatology» + D_PROC «procedures»
+        # for the same dermatologist). Each service's own code/name/price
+        # stays in the entry payload for reporting; queue_tag is routing
+        # metadata and never owns the doctor's visit. Resource-axis tags
+        # of the same visit keep their own per-tag entries (a lab panel
+        # attached to a doctor visit still lands in the lab resource
+        # queue), and doctorless visits keep the per-tag passes unchanged.
+        doctor_entry_service_tags: set[str] | None = None
+        if visit.doctor_id is not None:
+            doctor_axis_tags, resource_axis_tags = self._split_visit_tags_by_axis(
+                visit, unique_queue_tags, target_day
+            )
+            ordered_queue_tags = []
+            if doctor_axis_tags:
+                ordered_queue_tags.append(
+                    self._primary_doctor_visit_tag(visit, doctor_axis_tags)
+                )
+                doctor_entry_service_tags = set(doctor_axis_tags)
+            ordered_queue_tags.extend(sorted(resource_axis_tags))
+        else:
+            ordered_queue_tags = sorted(unique_queue_tags)
+
         queue_assignments: list[dict[str, Any]] = []
         # QD-2E review P1 (2c5ea05ce, external report): provenance ledger
         # of the PRE-EXISTING entries the reuse branch bound to THIS
@@ -404,7 +431,6 @@ class RegistrarWizardQueueAssignmentService:
         # QD-2E P1: перебор только sorted-порядком — cart-scope-ы уже
         # взяты _lock_cart_tag_claim_scopes в начале корзины; здесь порядок
         # детерминирован для воспроизводимости материала корзины.
-        ordered_queue_tags = sorted(unique_queue_tags)
         for queue_tag in ordered_queue_tags:
             try:
                 prepared_assignment = assignment_service.prepare_wizard_queue_assignment(
@@ -412,6 +438,7 @@ class RegistrarWizardQueueAssignmentService:
                     queue_tag,
                     target_day,
                     source=source,
+                    entry_service_tags=doctor_entry_service_tags,
                 )
                 if (
                     prepared_assignment is not None
@@ -482,6 +509,55 @@ class RegistrarWizardQueueAssignmentService:
                 break
 
         return queue_assignments
+
+    def _split_visit_tags_by_axis(
+        self,
+        visit: Visit,
+        unique_queue_tags: set,
+        target_day: date,
+    ) -> tuple[set, set]:
+        """Classify the visit's tags into doctor-axis and resource-axis.
+
+        The resource predicate mirrors ``prepare_wizard_queue_assignment``:
+        an ACTIVE registry row for the exact tag OR the day's existing
+        resource-owned surface (deactivation-proof). Resource tags of a
+        doctor-owned visit keep their own per-tag entries; only the
+        doctor-axis tags merge into the doctor's single entry.
+        """
+        resource_axis: set = set()
+        for tag in unique_queue_tags:
+            if (
+                resolve_tag_resource(self.db, tag) is not None
+                or tag_routes_to_resource(self.db, tag, target_day) is not None
+            ):
+                resource_axis.add(tag)
+        doctor_axis = set(unique_queue_tags) - resource_axis
+        return doctor_axis, resource_axis
+
+    def _primary_doctor_visit_tag(self, visit: Visit, doctor_axis_tags: set) -> str:
+        """Deterministic routing tag of the doctor visit's single entry.
+
+        The consultation service's tag when the visit has one (the visit's
+        reason — K01 «cardio» for a cardiologist consult), else the first
+        sorted doctor-axis tag. Determinism matters for the (day, tag)
+        claim coordinator: the same cart composition always resolves the
+        same primary tag, so retries cannot flip the claim surface.
+        """
+        sorted_tags = sorted(doctor_axis_tags)
+        consultation_tag = (
+            self.db.query(Service.queue_tag)
+            .join(VisitService, VisitService.service_id == Service.id)
+            .filter(
+                VisitService.visit_id == visit.id,
+                Service.is_consultation.is_(True),
+                Service.queue_tag.in_(sorted_tags),
+            )
+            .order_by(VisitService.id.asc())
+            .first()
+        )
+        if consultation_tag and consultation_tag[0]:
+            return str(consultation_tag[0])
+        return sorted_tags[0]
 
     def _cleanup_visit_queue_entries(
         self,

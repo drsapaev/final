@@ -80,3 +80,26 @@ def test_long_service_codes_stay_null(db):
         service = db.query(Service).filter(Service.code == code).one()
         assert service.service_code is None
         assert service.code == code
+
+
+def test_doctor_performed_services_carry_specialty_department_key(db):
+    """Workstream A (registrar doctor-services plan, Task 2).
+
+    Врач-исполняемые услуги каталога несут department_key: без него
+    accepted_specialties = None и услуга предлагается КАЖДОЙ карточке
+    врача («нет specialty mapping» = конфиг-ошибка, не «все врачи»).
+    Пин покрывает консультации K01/D01/S01, кардио-диагностику K11 и
+    стоматологическую рентгенографию S10.
+    """
+    seed_services_catalog(db)
+    expected = {
+        "K01": "cardiology",
+        "K11": "cardiology",
+        "D01": "dermatology",
+        "S01": "stomatology",
+        "S10": "stomatology",
+    }
+    for code, key in expected.items():
+        service = db.query(Service).filter(Service.code == code).one()
+        assert service.requires_doctor is True, code
+        assert service.department_key == key, code
