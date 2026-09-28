@@ -251,39 +251,6 @@ def _emr_examination_rows(
     return rows
 
 
-def _procedure_entry_fingerprint(entry: dict) -> tuple[Any, ...]:
-    """Stable, content-based identity of one procedure entry.
-
-    The P3 decision (#3490/#3491 reconciliation) requires union dedup by a
-    provable identifier; entries carry no explicit id, so identity is the
-    exact tuple of ALL clinically meaningful fields (whitespace-stripped,
-    date normalized when parseable). Array index is never part of identity
-    and never a dedup key: two entries merge only when every field matches,
-    otherwise both stay visible (no data loss on ambiguous records).
-    """
-    raw_date = entry.get("procedure_date")
-    parsed = _parse_iso_date(raw_date) if isinstance(raw_date, str) else None
-    if parsed is not None:
-        date_key: Any = parsed.isoformat()
-    elif isinstance(raw_date, str):
-        date_key = raw_date.strip()
-    else:
-        date_key = ""
-
-    def _norm(value: Any) -> str:
-        return value.strip() if isinstance(value, str) else ""
-
-    procedure_type = entry.get("procedure_type")
-    return (
-        _norm(procedure_type) if isinstance(procedure_type, str) else "",
-        date_key,
-        _norm(entry.get("area_treated")),
-        _norm(entry.get("products_used")),
-        _norm(entry.get("results")),
-        _norm(entry.get("follow_up")),
-    )
-
-
 def _procedure_history_row(
     record: EMRRecord,
     visit: Visit | None,
@@ -321,11 +288,14 @@ def _emr_procedure_rows(
     (canonical key of the merged #3490 editor, P3 decision on the
     #3490/#3491 reconciliation). ``specialty_data.procedures`` is a
     transitional legacy READ alias (Phase A of the P3 migration): legacy
-    entries are projected identically and deduplicated against the
-    canonical array by the content fingerprint — never by array index.
-    Intra-array order and duplicates are preserved verbatim: data
-    normalization belongs to Phase B (migration with fingerprint/manual
-    review), alias removal to Phase C (after the stored-data audit).
+    entries are projected identically and in full — the union NEVER hides
+    a row. Entries carry no stable identifier, so content equality is not
+    proof that two entries are the same clinical event (review P2 on this
+    PR): two identically described procedures must both stay visible, and
+    resolving genuinely double-written duplicates belongs to Phase B
+    (data migration with manual review and audit trail), not to the read
+    projection. Array index is never an identity key; alias removal is
+    Phase C (only after the stored-data audit).
     """
     rows: list[DermaProcedureHistoryOut] = []
     for record in records:
@@ -343,14 +313,12 @@ def _emr_procedure_rows(
             continue
         visit = visits.get(record.visit_id)
         fallback_date = _history_exam_date(visit, record)
-        canonical_fingerprints: set[tuple[Any, ...]] = set()
         for index, entry in enumerate(canonical_entries):
             if not isinstance(entry, dict):
                 continue
             procedure_type = entry.get("procedure_type")
             if not isinstance(procedure_type, str) or not procedure_type.strip():
                 continue
-            canonical_fingerprints.add(_procedure_entry_fingerprint(entry))
             rows.append(
                 _procedure_history_row(record, visit, fallback_date, entry, str(index))
             )
@@ -360,8 +328,9 @@ def _emr_procedure_rows(
             procedure_type = entry.get("procedure_type")
             if not isinstance(procedure_type, str) or not procedure_type.strip():
                 continue
-            if _procedure_entry_fingerprint(entry) in canonical_fingerprints:
-                continue  # union dedup: the canonical array already carries it
+            # No content-based exclusion: identical-looking entries in the
+            # two arrays may be two separate clinical events; hiding one is
+            # a data-loss risk the read path must not take (review P2).
             rows.append(
                 _procedure_history_row(
                     record, visit, fallback_date, entry, f"legacy-{index}"
@@ -536,7 +505,9 @@ async def get_cosmetic_procedures(
     specialty_data.cosmetic_procedures ЭМК (emr/v2, specialty=dermatology,
     source="emr", total_cost=None — цена не хранится в ЭМК; канонический
     ключ записи по решению P3, legacy-ключ specialty_data.procedures читается
-    временно как alias с дедупликацией по content-fingerprint) и строки
+    временно как alias, полный union без скрытия строк: записи без
+    стабильного ID не дедуплицируются по содержимому — возможные
+    дубликаты устраняются в Phase B с журналированием) и строки
     закрытой legacy-таблицы derma_procedures (source="legacy"). Скоупинг
     пациентов идентичен прежнему контракту. Пагинация — канонический конверт
     page/size/total/pages (контракт GET /files): total точен по обоим

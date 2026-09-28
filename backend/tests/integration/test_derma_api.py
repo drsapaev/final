@@ -818,12 +818,15 @@ class TestDermaEmrHistory:
 class TestDermaP3CanonicalKey:
     """P3 decision on the #3490/#3491 reconciliation: one canonical write key
     (specialty_data.cosmetic_procedures); specialty_data.procedures is a
-    transitional legacy READ alias, union-deduplicated against the canonical
-    array by a content fingerprint — never by array index. Phase C (alias
-    removal) happens only after the stored-data audit; until then legacy-keyed
-    records must stay visible without duplication."""
+    transitional legacy READ alias projected IN FULL — the union never hides
+    a row. Entries carry no stable identifier, so content equality is not
+    proof of identity: two identically described entries may be two separate
+    clinical events, and hiding one is a data-loss risk the read path must
+    not take (review P2). Resolving genuinely double-written duplicates
+    belongs to Phase B (data migration with manual review and audit trail);
+    alias removal is Phase C (only after the stored-data audit)."""
 
-    def test_union_of_both_keys_with_fingerprint_dedup(
+    def test_union_of_both_keys_all_valid_entries_visible(
         self,
         client,
         db_session,
@@ -832,9 +835,10 @@ class TestDermaP3CanonicalKey:
         test_doctor,
         admin_user,
     ):
-        """Both keys in ONE record: canonical entries pass verbatim, a legacy
-        entry identical to a canonical one is deduplicated by fingerprint,
-        a legacy entry sharing only the type but differing in date survives,
+        """Both keys in ONE record: every VALID entry of both arrays is
+        projected — a legacy entry identical to a canonical one stays
+        visible (content equality is not identity, review P2), a legacy
+        entry sharing only the type but differing in date stays visible,
         and invalid legacy entries are skipped without hiding the rest."""
         visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
         today = date.today().isoformat()
@@ -888,24 +892,93 @@ class TestDermaP3CanonicalKey:
         )
         assert response.status_code == 200
         payload = response.json()
-        # A + B + legacy[1] + legacy[2]; duplicate A and invalid entries gone.
-        assert payload["total"] == 4
+        # A + B + legacy[0] (identical copy of A) + legacy[1] + legacy[2];
+        # only invalid entries (blank type, non-dict) are skipped.
+        assert payload["total"] == 5
         row_ids = {item["id"] for item in payload["items"]}
         assert row_ids == {
             f"emr-{emr.id}-0",  # canonical A
             f"emr-{emr.id}-1",  # canonical B
+            f"emr-{emr.id}-legacy-0",  # identical copy of A — NOT hidden
             f"emr-{emr.id}-legacy-1",  # legacy Ботокс
             f"emr-{emr.id}-legacy-2",  # legacy Мезотерапия (other date)
         }
-        # Fingerprint is content-based: same type with a different date is
-        # NOT merged, so "Мезотерапия" legitimately appears twice.
+        # Content equality is not identity: the identically described copy
+        # stays visible, so "Мезотерапия" legitimately appears three times.
         types = [item["procedure_type"] for item in payload["items"]]
-        assert types.count("Мезотерапия") == 2
+        assert types.count("Мезотерапия") == 3
         assert types.count("Чистка") == 1
         assert types.count("Ботокс") == 1
         # Every row stays bound to its record and visit.
         assert all(item["visit_id"] == visit.id for item in payload["items"])
         assert all(item["total_cost"] is None for item in payload["items"])
+
+    def test_identical_entries_across_keys_stay_visible(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """Review-mandated ambiguous case: ONE canonical entry and TWO
+        fully identical entries in the legacy key. Without a stable
+        identifier the read path cannot prove these are the same clinical
+        event, so ALL THREE rows stay visible with an honest total — the
+        possible double-write is resolved in Phase B (manual review with
+        audit trail), never by silently hiding rows at projection time."""
+        visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        identical_entry = {
+            "procedure_date": date.today().isoformat(),
+            "procedure_type": "Мезотерапия",
+            "area_treated": "Лицо",
+            "products_used": "HA gel",
+            "results": "Гиперемия слабая",
+            "follow_up": "Контроль 14 дней",
+        }
+        emr = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "cosmetic_procedures": [dict(identical_entry)],
+                    "procedures": [
+                        dict(identical_entry),
+                        dict(identical_entry),
+                    ],
+                },
+            },
+        )
+
+        response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=2",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        # 1 canonical + 2 identical legacy copies — nothing is hidden.
+        assert payload["total"] == 3
+        assert payload["pages"] == 2  # honest pagination over the full union
+
+        full_response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=50",
+            headers=auth_headers,
+        )
+        assert full_response.status_code == 200
+        full_payload = full_response.json()
+        assert full_payload["total"] == 3
+        row_ids = {item["id"] for item in full_payload["items"]}
+        assert row_ids == {
+            f"emr-{emr.id}-0",
+            f"emr-{emr.id}-legacy-0",
+            f"emr-{emr.id}-legacy-1",
+        }
+        types = [item["procedure_type"] for item in full_payload["items"]]
+        assert types == ["Мезотерапия", "Мезотерапия", "Мезотерапия"]
 
     def test_legacy_only_record_stays_visible_in_history(
         self,
@@ -1030,7 +1103,7 @@ class TestDermaP3CanonicalKey:
         assert payload["total"] == 0
         assert payload["pages"] == 0
 
-    def test_fingerprint_normalization_boundary_whitespace_vs_content(
+    def test_similar_entries_across_keys_are_not_collapsed(
         self,
         client,
         db_session,
@@ -1039,14 +1112,12 @@ class TestDermaP3CanonicalKey:
         test_doctor,
         admin_user,
     ):
-        """Contract boundary of the fingerprint normalization (review P3
-        follow-up): entries differing from a canonical one ONLY by
-        leading/trailing whitespace are deduplicated (the approved
-        whitespace-insensitive policy), while any change of the internal
-        text keeps the row visible. Normalization is NOT extended to
-        letter case or punctuation: those are clinically meaningful
-        differences and must surface as separate rows until a separate
-        product decision says otherwise."""
+        """No content-based hiding at all (review P2): entries that differ
+        from a canonical one by leading/trailing whitespace only, by
+        internal text, by letter case or by punctuation are ALL projected —
+        the read path runs no normalization and no similarity judgment, so
+        no variant of an entry can be silently folded away. Case and
+        punctuation are additionally pinned verbatim in the projection."""
         visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
         today = date.today().isoformat()
         canonical_entry = {
@@ -1074,7 +1145,7 @@ class TestDermaP3CanonicalKey:
                         },
                     ],
                     "procedures": [
-                        {  # legacy[0]: edge-whitespace-only variant of A -> dedup
+                        {  # legacy[0]: edge-whitespace-only variant of A -> visible
                             "procedure_date": f"  {today}  ",
                             "procedure_type": "  Мезотерапия ",
                             "area_treated": " Лицо ",
@@ -1082,15 +1153,15 @@ class TestDermaP3CanonicalKey:
                             "results": "  Гиперемия слабая   ",
                             "follow_up": " Контроль 14 дней ",
                         },
-                        {  # legacy[1]: INTERNAL text change -> NOT merged
+                        {  # legacy[1]: INTERNAL text change -> visible
                             **canonical_entry,
                             "results": "Гиперемия выраженная",
                         },
-                        {  # legacy[2]: letter-case change -> NOT merged (no case folding)
+                        {  # legacy[2]: letter-case change -> visible (no case folding)
                             **canonical_entry,
                             "procedure_type": "мезотерапия",
                         },
-                        {  # legacy[3]: punctuation change -> NOT merged (no punctuation folding)
+                        {  # legacy[3]: punctuation change -> visible (no punctuation folding)
                             **canonical_entry,
                             "follow_up": "Контроль 14 дней.",
                         },
@@ -1105,22 +1176,23 @@ class TestDermaP3CanonicalKey:
         )
         assert response.status_code == 200
         payload = response.json()
-        # A + B + legacy[1..3]; the edge-whitespace variant of A is deduplicated.
-        assert payload["total"] == 5
+        # A + B + ALL FOUR legacy variants — nothing is collapsed.
+        assert payload["total"] == 6
         row_ids = {item["id"] for item in payload["items"]}
         assert row_ids == {
             f"emr-{emr.id}-0",  # canonical A
             f"emr-{emr.id}-1",  # canonical B
+            f"emr-{emr.id}-legacy-0",  # whitespace variant stays visible
             f"emr-{emr.id}-legacy-1",  # internal text change stays visible
             f"emr-{emr.id}-legacy-2",  # case change stays visible
             f"emr-{emr.id}-legacy-3",  # punctuation change stays visible
         }
-        assert f"emr-{emr.id}-legacy-0" not in row_ids
         # Case is preserved verbatim in the projection: both spellings appear.
         types = [item["procedure_type"] for item in payload["items"]]
-        assert types.count("Мезотерапия") == 3  # A + legacy internal-text row + legacy punctuation row
+        assert types.count("Мезотерапия") == 3  # A + legacy[1] + legacy[3]
+        assert types.count("  Мезотерапия ") == 1  # whitespace variant, verbatim
         assert types.count("мезотерапия") == 1  # lowercase row is NOT folded away
-        # The internal text change is readable in the merged row itself.
+        # The internal text change is readable in its own row.
         by_id = {item["id"]: item for item in payload["items"]}
         assert by_id[f"emr-{emr.id}-legacy-1"]["results"] == "Гиперемия выраженная"
         assert by_id[f"emr-{emr.id}-legacy-3"]["follow_up"] == "Контроль 14 дней."
