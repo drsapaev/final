@@ -61,6 +61,14 @@ interface DermaPatientsTabProps {
   appointments: DermatologyAppointmentHistoryItem[];
   skinExaminations: DermatologySkinExamination[];
   cosmeticProcedures: DermatologyCosmeticProcedure[];
+  skinExaminationsTotal: number;
+  cosmeticProceduresTotal: number;
+  hasMoreExaminations: boolean;
+  hasMoreProcedures: boolean;
+  loadingMoreExaminations: boolean;
+  loadingMoreProcedures: boolean;
+  onLoadMoreExaminations: () => void;
+  onLoadMoreProcedures: () => void;
   historyLoading: boolean;
   historyReady: boolean;
   historyError: boolean;
@@ -72,6 +80,14 @@ export function DermaPatientsTab({
   appointments,
   skinExaminations,
   cosmeticProcedures,
+  skinExaminationsTotal,
+  cosmeticProceduresTotal,
+  hasMoreExaminations,
+  hasMoreProcedures,
+  loadingMoreExaminations,
+  loadingMoreProcedures,
+  onLoadMoreExaminations,
+  onLoadMoreProcedures,
   historyLoading,
   historyReady,
   historyError,
@@ -244,6 +260,14 @@ export function DermaPatientsTab({
               appointments={appointments}
               skinExaminations={skinExaminations}
               cosmeticProcedures={cosmeticProcedures}
+              skinExaminationsTotal={skinExaminationsTotal}
+              cosmeticProceduresTotal={cosmeticProceduresTotal}
+              hasMoreExaminations={hasMoreExaminations}
+              hasMoreProcedures={hasMoreProcedures}
+              loadingMoreExaminations={loadingMoreExaminations}
+              loadingMoreProcedures={loadingMoreProcedures}
+              onLoadMoreExaminations={onLoadMoreExaminations}
+              onLoadMoreProcedures={onLoadMoreProcedures}
             />
           )}
         </>
