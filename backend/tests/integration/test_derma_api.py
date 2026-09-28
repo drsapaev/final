@@ -868,7 +868,7 @@ class TestDermaP3CanonicalKey:
                         },
                     ],
                     "procedures": [
-                        dict(canonical_entry),  # legacy[0]: duplicate of A -> dedup
+                        dict(canonical_entry),  # legacy[0]: identical copy of A -> KEEP; content equality is not identity
                         {  # legacy[1]: distinct entry -> kept (id legacy-1)
                             "procedure_date": other_day,
                             "procedure_type": "Ботокс",
