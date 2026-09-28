@@ -28,7 +28,7 @@ RQ-05.a: zero visits/invoices/queue entries).
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
@@ -499,3 +499,435 @@ def test_edit_delta_quote_rejects_pinned_service_for_other_doctor(
 
     assert response.status_code == 409, response.text
     assert "назначена другому врачу" in response.json()["detail"]
+
+
+# ── PR #3511 review P1 (round 5): pin WITHOUT catalog flags ────────────────
+#
+# The admin catalog saves ``Service.doctor_id`` and ``requires_doctor``/
+# ``is_consultation`` INDEPENDENTLY, so a service can arrive pinned with
+# BOTH flags unset. Every historical gate keyed its early exit on the raw
+# flags and the pin was silently bypassed: the cart pre-filter dropped the
+# service before the guard, the guard returned before the exact-doctor
+# check, the QR resolver/validation loop skipped the row, and the catalog
+# answered ``doctor_selection_required=false`` — so the master wizard
+# offered the service to every doctor (or doctorless) and the server
+# accepted it. The pins below restore the exact-doctor contract for
+# ``doctor_id задан, requires_doctor=false``:
+#
+# - doctor-queue tag: the service is offered ONLY on the assigned
+#   doctor's card (catalog decision) and booking to another doctor is
+#   rejected with the same 409 on every write surface;
+# - resource-routed tag: queue ownership wins — the surface stays
+#   resource/doctorless (no read/write drift) and the pin is surfaced to
+#   the ADMIN readiness as a configuration error instead of being
+#   enforced against the resource axis.
+
+
+def _make_pinned_unflagged_service(
+    db_session: Session,
+    *,
+    code: str,
+    name: str,
+    pinned_to_id: int,
+    queue_tag: str = "cardio",
+    department_key: str = "cardiology",
+) -> Service:
+    return _make_service(
+        db_session,
+        code=code,
+        name=name,
+        queue_tag=queue_tag,
+        department_key=department_key,
+        requires_doctor=False,
+        is_consultation=False,
+        doctor_id=pinned_to_id,
+    )
+
+
+def test_unflagged_pinned_service_rejects_other_doctor_on_cart_save(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    """P1 (мастер, серверная запись): услуга с Service.doctor_id=X и
+    requires_doctor=false при визите к врачу Y → 409 «назначена другому
+    врачу», частичного состояния нет."""
+    pinned_to = _make_doctor(db_session, specialty="cardiology")
+    other_cardiologist = _make_doctor(db_session, specialty="cardiology")
+    service = _make_pinned_unflagged_service(
+        db_session,
+        code="ASG-P1F-K",
+        name="ЭхоКГ закреплённая без флага",
+        pinned_to_id=pinned_to.id,
+    )
+
+    response = client.post(
+        "/api/v1/registrar/cart",
+        headers=_auth_headers(admin_user),
+        json=_cart_payload(
+            patient_id=test_patient.id,
+            visits=[
+                _visit(
+                    doctor_id=other_cardiologist.id,
+                    services=[{"service_id": service.id, "quantity": 1}],
+                )
+            ],
+        ),
+    )
+
+    assert response.status_code == 409, response.text
+    assert "назначена другому врачу" in response.json()["detail"]
+    assert (
+        db_session.query(Visit).filter(Visit.patient_id == test_patient.id).count() == 0
+    )
+    assert _doctor_queue_entries(db_session, pinned_to.id)[1] == []
+    assert _doctor_queue_entries(db_session, other_cardiologist.id)[1] == []
+
+
+def test_unflagged_pinned_service_rejects_doctorless_visit(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    """Закреплённая услуга без визита врача → 400 «требует выбора врача»
+    (пин обязан выполняться, запись «без кого попало» недоступна)."""
+    pinned_to = _make_doctor(db_session, specialty="cardiology")
+    service = _make_pinned_unflagged_service(
+        db_session,
+        code="ASG-P1F-ND",
+        name="ЭхоКГ закреплённая без врача",
+        pinned_to_id=pinned_to.id,
+    )
+
+    response = client.post(
+        "/api/v1/registrar/cart",
+        headers=_auth_headers(admin_user),
+        json=_cart_payload(
+            patient_id=test_patient.id,
+            visits=[
+                _visit(
+                    doctor_id=None,
+                    services=[{"service_id": service.id, "quantity": 1}],
+                )
+            ],
+        ),
+    )
+
+    assert response.status_code == 400, response.text
+    assert "требует выбора врача" in response.json()["detail"]
+    assert (
+        db_session.query(Visit).filter(Visit.patient_id == test_patient.id).count() == 0
+    )
+
+
+def test_unflagged_pinned_service_books_with_assigned_doctor(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    """Контроль: закреплённая безфлажковая услуга + её врач → 200, единая
+    запись в ОЧЕРЕДИ назначенного врача (пин не ломает happy path)."""
+    pinned_to = _make_doctor(db_session, specialty="cardiology")
+    service = _make_pinned_unflagged_service(
+        db_session,
+        code="ASG-P1F-OK",
+        name="ЭхоКГ закреплённая без флага ок",
+        pinned_to_id=pinned_to.id,
+    )
+
+    response = client.post(
+        "/api/v1/registrar/cart",
+        headers=_auth_headers(admin_user),
+        json=_cart_payload(
+            patient_id=test_patient.id,
+            visits=[
+                _visit(
+                    doctor_id=pinned_to.id,
+                    services=[{"service_id": service.id, "quantity": 1}],
+                )
+            ],
+        ),
+    )
+
+    assert response.status_code == 200, response.text
+    visit = db_session.query(Visit).get(response.json()["visit_ids"][0])
+    assert visit.doctor_id == pinned_to.id
+    queues, entries = _doctor_queue_entries(db_session, pinned_to.id)
+    assert len(queues) == 1
+    assert len(entries) == 1
+    assert queues[0].queue_resource_id is None
+
+
+def test_registrar_catalog_requires_doctor_selection_for_unflagged_pin(
+    client: TestClient, db_session: Session, admin_user
+):
+    """Мастер-карточки (серверное решение каталога): закреплённая услуга
+    без флагов на врачебном теге → doctor_selection_required=true и
+    doctor_booking_available=true — карточки врачей показываются, фильтр
+    wizardUtils.pin оставляет только назначенного врача."""
+    pinned_to = _make_doctor(db_session, specialty="cardiology")
+    service = _make_pinned_unflagged_service(
+        db_session,
+        code="ASG-P1F-CAT",
+        name="Каталожная закреплённая без флага",
+        pinned_to_id=pinned_to.id,
+    )
+
+    response = client.get(
+        "/api/v1/registrar/services", headers=_auth_headers(admin_user)
+    )
+
+    assert response.status_code == 200, response.text
+    rows = [
+        row
+        for group in response.json()["services_by_group"].values()
+        for row in group
+        if row["id"] == service.id
+    ]
+    assert len(rows) == 1
+    assert rows[0]["doctor_id"] == pinned_to.id
+    assert rows[0]["doctor_selection_required"] is True
+    assert rows[0]["doctor_booking_available"] is True
+
+
+def test_registrar_catalog_keeps_resource_surface_for_pin_on_resource_tag(
+    client: TestClient, db_session: Session, admin_user
+):
+    """Пин на теге АКТИВНОЙ ресурсной очереди: владелец очереди важнее —
+    каталог держит ресурсную поверхность (doctor_selection_required=false,
+    doctor_booking_available=false), закрепление видит админ-readiness,
+    read/write дрейфа нет (сервер не предлагает то, что отвергнет)."""
+    from app.models.online_queue import QueueResource
+
+    pinned_to = _make_doctor(db_session, specialty="cardiology")
+    suffix = uuid4().hex[:8]
+    resource_tag = f"p1f_res_{suffix}"
+    db_session.add(
+        QueueResource(
+            code=f"p1f_{suffix}",
+            queue_tag=resource_tag,
+            display_name="Тестовый ресурс P1F",
+            active=True,
+        )
+    )
+    db_session.commit()
+    service = _make_pinned_unflagged_service(
+        db_session,
+        code=f"ASG-P1F-R_{suffix}".upper(),
+        name=f"Закреплённая на ресурсном теге {suffix}",
+        pinned_to_id=pinned_to.id,
+        queue_tag=resource_tag,
+    )
+
+    response = client.get(
+        "/api/v1/registrar/services", headers=_auth_headers(admin_user)
+    )
+
+    assert response.status_code == 200, response.text
+    rows = [
+        row
+        for group in response.json()["services_by_group"].values()
+        for row in group
+        if row["id"] == service.id
+    ]
+    assert len(rows) == 1
+    assert rows[0]["doctor_selection_required"] is False
+    assert rows[0]["doctor_booking_available"] is False
+    assert rows[0]["doctor_id"] == pinned_to.id
+
+
+def test_unflagged_pinned_service_edit_delta_quote_rejects_other_doctor(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    """Edit-delta поверхность использует ту же проверку: квота добавления
+    закреплённой безфлажковой услуги к другому врачу → 409 того же
+    контракта; к назначенному врачу → 200 (контроль)."""
+    pinned_to = _make_doctor(db_session, specialty="cardiology")
+    other_cardiologist = _make_doctor(db_session, specialty="cardiology")
+    service = _make_pinned_unflagged_service(
+        db_session,
+        code="ASG-P1F-EQ",
+        name="ЭхоКГ закреплённая без флага квота",
+        pinned_to_id=pinned_to.id,
+    )
+
+    rejected = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=_auth_headers(admin_user),
+        json={
+            "items": [
+                {
+                    "service_id": service.id,
+                    "quantity": 1,
+                    "specialist_id": other_cardiologist.id,
+                }
+            ],
+            "discount_mode": "none",
+            "pricing_mode": "edit_delta",
+            "patient_id": test_patient.id,
+            "target_date": date.today().isoformat(),
+        },
+    )
+    assert rejected.status_code == 409, rejected.text
+    assert "назначена другому врачу" in rejected.json()["detail"]
+
+    accepted = client.post(
+        "/api/v1/registrar/cart/quote",
+        headers=_auth_headers(admin_user),
+        json={
+            "items": [
+                {
+                    "service_id": service.id,
+                    "quantity": 1,
+                    "specialist_id": pinned_to.id,
+                }
+            ],
+            "discount_mode": "none",
+            "pricing_mode": "edit_delta",
+            "patient_id": test_patient.id,
+            "target_date": date.today().isoformat(),
+        },
+    )
+    assert accepted.status_code == 200, accepted.text
+
+
+def _qr_resource_entry(db_session: Session, *, patient, day) -> OnlineQueueEntry:
+    from app.models.online_queue import QueueResource
+
+    suffix = uuid4().hex[:8]
+    resource = QueueResource(
+        code=f"p1f_qr_{suffix}",
+        queue_tag=f"p1f_lab_{suffix}",
+        display_name="Тестовый ресурс QR",
+        active=True,
+    )
+    db_session.add(resource)
+    db_session.flush()
+    resource_queue = DailyQueue(
+        day=day,
+        queue_resource_id=resource.id,
+        queue_tag=resource.queue_tag,
+        active=True,
+    )
+    db_session.add(resource_queue)
+    db_session.commit()
+    return OnlineQueueEntry(
+        queue_id=resource_queue.id,
+        number=1,
+        queue_time=datetime.now(UTC),
+        patient_id=patient.id,
+        patient_name=patient.short_name(),
+        phone=patient.phone,
+        source="online",
+        status="waiting",
+        services="[]",
+    )
+
+
+def _persist_qr_entry(db_session: Session, entry: OnlineQueueEntry) -> OnlineQueueEntry:
+    db_session.add(entry)
+    db_session.commit()
+    return entry
+
+
+def _qr_full_update(client, headers, entry: OnlineQueueEntry, services: list[dict]):
+    return client.put(
+        f"/api/v1/queue/online-entry/{entry.id}/full-update",
+        headers=headers,
+        json={
+            "patient_data": {"patient_name": "Changed Test Patient"},
+            "visit_type": "paid",
+            "discount_mode": "none",
+            "services": services,
+            "all_free": False,
+        },
+    )
+
+
+def test_qr_full_update_unflagged_pin_lands_on_pinned_doctor_queue(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    """QR full-update из РЕСУРСНОЙ записи: добавление закреплённой
+    безфлажковой услуги создаёт независимую запись в очереди НАЗНАЧЕННОГО
+    врача (раньше услуга ехала по resource-ветке резолвера — пин
+    обходился, тег мог привести в чужую очередь)."""
+    from app.crud.clinic import clinic_today
+
+    pinned_to = _make_doctor(db_session, specialty="cardiology")
+    service = _make_pinned_unflagged_service(
+        db_session,
+        code="ASG-P1F-QR",
+        name="ЭхоКГ закреплённая без флага QR",
+        pinned_to_id=pinned_to.id,
+    )
+    day = clinic_today(db_session)
+    entry = _persist_qr_entry(
+        db_session, _qr_resource_entry(db_session, patient=test_patient, day=day)
+    )
+
+    response = _qr_full_update(
+        client,
+        _auth_headers(admin_user),
+        entry,
+        [{"service_id": service.id, "quantity": 1}],
+    )
+
+    assert response.status_code == 200, response.text
+    added = (
+        db_session.query(OnlineQueueEntry)
+        .filter(
+            OnlineQueueEntry.patient_id == test_patient.id,
+            OnlineQueueEntry.id != entry.id,
+        )
+        .all()
+    )
+    assert len(added) == 1
+    assert added[0].queue.specialist_id == pinned_to.id
+    assert added[0].queue.queue_resource_id is None
+
+
+def test_qr_full_update_unflagged_pin_rejects_other_doctors_entry(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    """QR full-update из записи ДРУГОГО врача: закреплённая безфлажковая
+    услуга → 409 «назначена другому врачу» ДО мутаций (валидационный
+    прогон больше не пропускает строку мимо гварда)."""
+    from app.crud.clinic import clinic_today
+
+    pinned_to = _make_doctor(db_session, specialty="cardiology")
+    other_cardiologist = _make_doctor(db_session, specialty="cardiology")
+    service = _make_pinned_unflagged_service(
+        db_session,
+        code="ASG-P1F-QR2",
+        name="ЭхоКГ закреплённая без флага QR2",
+        pinned_to_id=pinned_to.id,
+    )
+    day = clinic_today(db_session)
+    other_queue = DailyQueue(
+        day=day, specialist_id=other_cardiologist.id, queue_tag="cardio", active=True
+    )
+    db_session.add(other_queue)
+    db_session.commit()
+    entry = _persist_qr_entry(
+        db_session,
+        OnlineQueueEntry(
+            queue_id=other_queue.id,
+            number=1,
+            queue_time=datetime.now(UTC),
+            patient_id=test_patient.id,
+            patient_name=test_patient.short_name(),
+            phone=test_patient.phone,
+            source="online",
+            status="waiting",
+            services="[]",
+        ),
+    )
+    original_name = entry.patient_name
+
+    response = _qr_full_update(
+        client,
+        _auth_headers(admin_user),
+        entry,
+        [{"service_id": service.id, "quantity": 1}],
+    )
+
+    assert response.status_code == 409, response.text
+    assert "назначена другому врачу" in response.json()["detail"]
+    db_session.refresh(entry)
+    assert entry.patient_name == original_name
+    assert entry.services == "[]"
+    assert _doctor_queue_entries(db_session, pinned_to.id)[1] == []

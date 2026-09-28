@@ -22,6 +22,7 @@ from app.models.visit import Visit, VisitService
 from app.services.queue_service import queue_service
 from app.services.registrar_doctor_eligibility import (
     assert_doctor_eligible_for_service,
+    service_has_explicit_doctor_assignment,
     service_requires_doctor_selection,
     service_routes_to_resource_queue,
 )
@@ -759,8 +760,17 @@ class RegistrarEditDeltaService:
         entry: OnlineQueueEntry | None,
         target_date: date,
     ) -> None:
-        """Keep added clinician work on an eligible doctor's queue."""
-        if not service_requires_doctor_selection(service):
+        """Keep added clinician work on an eligible doctor's queue.
+
+        PR #3511 review P1 (round 5): the entry condition mirrors the
+        canonical guard — an explicitly pinned service
+        (``Service.doctor_id``, catalog flags unset) reaches the same
+        checks instead of silently returning here (the pin used to be
+        bypassable on the edit-delta surface exactly like on cart save).
+        """
+        if not service_requires_doctor_selection(service) and not (
+            service_has_explicit_doctor_assignment(service)
+        ):
             return
 
         # PR #3438 owner-verdict P1 (round 3): the SAME ownership rule as

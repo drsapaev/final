@@ -341,7 +341,8 @@ export function candidateTags(
 export type ServiceAssignmentGapReason =
   | 'doctor_missing'
   | 'specialty_mismatch'
-  | 'missing_specialty_mapping';
+  | 'missing_specialty_mapping'
+  | 'resource_queue_conflict';
 
 export interface ServiceAssignmentGap {
   serviceId: number;
@@ -366,7 +367,12 @@ export interface ServiceAssignmentGap {
  * - ``missing_specialty_mapping`` — врач-исполняемая услуга без
  *   department_key: серверная семантика «нет ограничения» — услуга
  *   предлагается КАЖДОЙ карточке; по контракту плана это ошибка
- *   настройки, а не «все врачи».
+ *   настройки, а не «все врачи»;
+ * - ``resource_queue_conflict`` (PR #3511 review P1, round 5) —
+ *   закреплённая услуга с тегом АКТИВНОЙ ресурсной очереди: владелец
+ *   очереди — ресурс, закрепление не действует (услуга записывается в
+ *   общую очередь без врача), сервер честно отказывает запись к врачу
+ *   409-м. Убрать назначение врача или сменить тег услуги.
  *
  * Специальность сверяется теми же alias-семействами, что и
  * eligibleDoctorsForTag (зеркало backend DOCTOR_QUEUE_SPECIALTY_VARIANTS
@@ -375,14 +381,26 @@ export interface ServiceAssignmentGap {
 export function collectServiceAssignmentGaps(
   services: ChecklistServiceDto[],
   doctors: ChecklistDoctorDto[],
+  resources: ChecklistResourceDto[] = [],
 ): ServiceAssignmentGap[] {
   if (!Array.isArray(services) || !Array.isArray(doctors)) return [];
   const gaps: ServiceAssignmentGap[] = [];
   const activeRoster = doctors.filter((doctor) => doctor.active !== false);
+  const activeResourceTags = new Set(
+    resources
+      .filter((resource) => resource.active === true && resource.queue_tag)
+      .map((resource) => specialtyTagKey(resource.queue_tag)),
+  );
 
   for (const service of services) {
     if (service.active === false) continue;
-    if (service.requires_doctor !== true) continue;
+    // PR #3511 review P1 (round 5): явное назначение участвует в контракте
+    // и без флага requires_doctor — раньше закреплённая услуга с
+    // requires_doctor=false полностью выпадала из проверки готовности,
+    // хотя сервер с этого же PR гоняет её через точный гвард врача.
+    if (service.requires_doctor !== true && service.doctor_id == null) {
+      continue;
+    }
 
     const serviceCode =
       typeof service.service_code === 'string'
@@ -396,6 +414,27 @@ export function collectServiceAssignmentGaps(
 
     const pinnedDoctorId =
       service.doctor_id != null ? Number(service.doctor_id) : null;
+
+    // PR #3511 review P1 (round 5): закрепление + тег АКТИВНОЙ ресурсной
+    // очереди — конфликт владельца: очередь принадлежит ресурсу, пин
+    // декоративен, запись идёт без врача (сервер 409 при явном враче).
+    // Проверка первая: конфликт владельца первичнее судьбы самого врача.
+    if (
+      pinnedDoctorId != null &&
+      Number.isFinite(pinnedDoctorId) &&
+      queueTag &&
+      activeResourceTags.has(specialtyTagKey(queueTag))
+    ) {
+      gaps.push({
+        serviceId: service.id,
+        serviceName,
+        serviceCode,
+        queueTag,
+        pinnedDoctorId,
+        reason: 'resource_queue_conflict',
+      });
+      continue;
+    }
 
     if (pinnedDoctorId == null || !Number.isFinite(pinnedDoctorId)) {
       const departmentKey = specialtyTagKey(

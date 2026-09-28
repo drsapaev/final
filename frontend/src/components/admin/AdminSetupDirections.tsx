@@ -221,8 +221,11 @@ const AdminSetupDirections = () => {
     // specialty-маппинга. Виден только на checklist-виде; каждая строка —
     // точная причина + ссылка на экран исправления.
     const assignmentGaps: ServiceAssignmentGap[] = useMemo(
-        () => collectServiceAssignmentGaps(services, doctors),
-        [services, doctors],
+        // PR #3511 review P1 (round 5): ресурсы реестра передаются в
+        // проверку назначений — закреплённая услуга с тегом АКТИВНОЙ
+        // ресурсной очереди это видимый админу конфликт владельца.
+        () => collectServiceAssignmentGaps(services, doctors, resources),
+        [services, doctors, resources],
     );
 
     // RQ-18 follow-up (P2-4): the permanent address is provisioned PER
@@ -614,6 +617,11 @@ const AdminSetupDirections = () => {
                                                             {gap.reason === 'missing_specialty_mapping' &&
                                                                 t('admin2.sdx_assignment_missing_mapping', {
                                                                     service: gap.serviceName,
+                                                                })}
+                                                            {gap.reason === 'resource_queue_conflict' &&
+                                                                t('admin2.sdx_assignment_resource_queue', {
+                                                                    service: gap.serviceName,
+                                                                    tag: gap.queueTag ?? '',
                                                                 })}
                                                         </td>
                                                         <td className="admin-sdx-cell-right">

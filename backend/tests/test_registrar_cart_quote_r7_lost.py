@@ -323,7 +323,13 @@ def test_edit_delta_quote_duplicate_rows_different_specialists_cover_by_service(
     service = _r7_service(db_session, code="R15-DUP-SPEC", price=Decimal("25000"))
     # Дефолтный врач услуги: строка со specialist_id=None проходит R11-гейт
     # («specialist_id is required») через service.doctor_id, как и в команде.
+    # PR #3511 review P1 (round 5): закрепление без флагов теперь доходит
+    # до канонического гварда, а specialty-eligibility действует и для
+    # назначенного врача («пин — дополнительное ограничение, а не
+    # исключение из специальности») — отделение услуги выровнено с
+    # кардиологом-владельцем пина, иначе гвард честно ответил бы 400.
     service.doctor_id = test_doctor.id
+    service.department_key = "cardiology"
     db_session.commit()
 
     quoted = client.post(

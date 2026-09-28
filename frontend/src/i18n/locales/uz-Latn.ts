@@ -2582,6 +2582,7 @@ const uzLatn = {
     sdx_assignment_doctor_missing: "«{service}» xizmati faol shifokorlar orasida yo‘q shifokorga (ID {id}) bog‘langan. Shifokorni va uning hisobini faollashtiring yoki xizmatni qayta belgilang.",
     sdx_assignment_specialty_mismatch: "«{service}» xizmati mutaxassisligi mos kelmaydigan shifokorga bog'langan. Belgilashni yoki mutaxassislikni tuzating.",
     sdx_assignment_missing_mapping: "Shifokor «{service}» xizmatining mutaxassislik mosligi yo‘q: u har bir shifokorga taklif qilinadi. Xizmatning bo‘limini/mutaxassisligini ko‘rsating.",
+    sdx_assignment_resource_queue: "«{service}» xizmati shifokorga bog'langan, ammo uning «{tag}» navbat tigi resurs navbatiga yo'naltiriladi: bog'lash amal qilmaydi, xizmat shifokorsiz umumiy navbatga yoziladi. Shifokor belgilashni olib tashlang yoki xizmat tegini o'zgartiring.",
     sdx_assignment_fix_doctors: 'Shifokorlar',
     sdx_assignment_fix_catalog: 'Xizmatlar → Katalog',
     sdx_checklist_title: 'Yo\'nalishlar tayyorgarligi',

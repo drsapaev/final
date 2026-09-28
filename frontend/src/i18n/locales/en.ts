@@ -2582,6 +2582,7 @@ const en = {
     sdx_assignment_doctor_missing: 'Service "{service}" is pinned to a doctor (ID {id}) who is not among the active doctors. Activate the doctor and their account, or reassign the service.',
     sdx_assignment_specialty_mismatch: 'Service "{service}" is pinned to a doctor whose specialty does not fit the service. Fix the assignment or the specialty.',
     sdx_assignment_missing_mapping: 'Doctor-performed service "{service}" has no specialty mapping: it is offered to every doctor. Set the service department/specialty.',
+    sdx_assignment_resource_queue: 'Service "{service}" is pinned to a doctor, but its queue tag "{tag}" routes to a resource queue: the pin has no effect and the service books into the shared queue without a doctor. Remove the doctor assignment or change the service tag.',
     sdx_assignment_fix_doctors: 'Doctors',
     sdx_assignment_fix_catalog: 'Services → Catalog',
     sdx_checklist_title: 'Direction readiness',

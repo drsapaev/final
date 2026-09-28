@@ -47,6 +47,7 @@ from app.services.registrar_doctor_eligibility import (  # noqa: F401
 )
 from app.services.registrar_doctor_eligibility import (
     assert_doctor_eligible_for_service,
+    service_has_explicit_doctor_assignment,
     service_requires_doctor_selection,
 )
 from app.services.registrar_edit_delta_service import (  # noqa: F401
@@ -418,11 +419,18 @@ def _assert_cart_doctor_eligibility(
         resolved_map = {doctor.id: doctor for doctor in doctors}
 
     for visit in visits:
+        # PR #3511 review P1 (round 5): the pre-filter feeds the canonical
+        # guard, so it must mirror the guard's own entry condition — a
+        # service explicitly pinned via ``Service.doctor_id`` (flags unset)
+        # used to be dropped HERE and never reached the exact-doctor check.
         required = [
             service
             for item in visit.services
             if (service := service_map.get(item.service_id)) is not None
-            and service_requires_doctor_selection(service)
+            and (
+                service_requires_doctor_selection(service)
+                or service_has_explicit_doctor_assignment(service)
+            )
         ]
         if not required:
             continue
