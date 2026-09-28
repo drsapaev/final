@@ -827,7 +827,12 @@ def test_alembic_chain_single_head_0063() -> None:
         "0074_join_payload_binding",
     )
     assert len("0075_derma_history_read_model") <= 32
-    assert heads == ["0075_derma_history_read_model"]
+    # read-order index swap moves the head to 0076 (#3506 step 2)
+    assert graph["0076_derma_history_read_order"] == (
+        "0075_derma_history_read_model",
+    )
+    assert len("0076_derma_history_read_order") <= 32
+    assert heads == ["0076_derma_history_read_order"]
 
 
 # ===================== D. parity + ADR =====================

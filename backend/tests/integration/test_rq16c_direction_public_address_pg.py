@@ -71,8 +71,9 @@ SCRATCH_DB = f"{SCRATCH_DB_PREFIX}_{uuid.uuid4().hex[:12]}"
 # (join attempt payload binding) — the pin advances with the chain
 # (same established pattern; the advance was missed in that cycle and
 # is carried by the RQ-26.b verification slice).
-# #3506 (P2 retro-review of #3494): derma history read model — 0075.
-EXPECTED_HEAD = "0075_derma_history_read_model"
+# #3506 (P2 retro-review of #3494): derma history read model — 0075,
+# read-order index swap — 0076.
+EXPECTED_HEAD = "0076_derma_history_read_order"
 
 sys.path.insert(0, str(BACKEND_DIR))
 

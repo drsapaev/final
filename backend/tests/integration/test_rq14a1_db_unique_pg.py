@@ -156,8 +156,9 @@ def _assert_pg_head(engine) -> None:
     # to 0072 (nurse workplace assignments 0071 + service executions 0072);
     # main's corrective follow-up moved it to 0073 (routing snapshot);
     # RQ-18 follow-up round-8 re-parents the payload binding as 0074;
-    # #3506 derma history read model moves the head to 0075.
-    assert version == "0075_derma_history_read_model", version
+    # #3506 derma history read model moves the head to 0075; its
+    # read-order index swap moves it to 0076.
+    assert version == "0076_derma_history_read_order", version
 
 
 def _both_unique_objects(engine) -> dict[str, bool]:
