@@ -1,7 +1,7 @@
 # Monitoring and Observability Dependencies
 
 # Error Tracking
-sentry-sdk[fastapi]>=2.61.1
+sentry-sdk[fastapi]>=2.70.0
 
 # Metrics
 prometheus-client>=0.26.0
