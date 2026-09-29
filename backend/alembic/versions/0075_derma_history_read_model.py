@@ -22,6 +22,17 @@ REVISED (review follow-up, owner fact-check a6cbef): backfill переписан
 применённые ревизии; проекция детерминирована (тот же результат);
 production cutover ещё не выполнялся — именно его и защищает правка.
 
+REVISED-2 (review follow-up, owner fact-check 5625c8f1b, P2-2): rebuild
+читает источники ЯВНЫМИ списками колонок (_EMR_SOURCE_COLUMNS /
+_VISIT_SOURCE_COLUMNS / _LEGACY_* в SSOT-модуле), а не sa.select всей
+таблицы живой модели — иначе первый же `alembic upgrade head` с нуля
+после добавления колонки в visits/emr_records/derma_* (будущая ревизия +
+модель) падал бы НА ЭТОМ шаге: SELECT колонки, которой в БД на момент
+0075 ещё нет. In-place безопасна по тем же причинам. Блокировки полного
+режима (P2-3) к миграционному прогону не применимы: backfill выполняется
+в транзакции alembic ДО деплоя пишущего кода — слушателей и читателей
+на живой БД в этот момент нет (порядок rollout: migrate → deploy).
+
 SAFETY:
 - additive-only DDL: новая таблица, ни одна существующая строка/таблица не
   меняется и не удаляется; downgrade = drop table;
