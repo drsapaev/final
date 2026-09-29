@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Аудит путей записи источников read model (a6cbef → 5625c8f1b).
+"""Аудит путей записи источников read model (a6cbef → 5625c8f1b → 9e6c0f6c1).
 
 Owner fact-check потребовал перечислить реальные способы изменения
 источников (EMRRecord, DermaExamination, DermaProcedure, Visit) и
@@ -11,6 +11,16 @@ SQL и raw SQL его обходят. Раунд 2 закрыл СЛЕПУЮ З�
 reschedule-пути писали visit_date, ПРОЕКЦИОННУЮ колонку, и read model
 молча расходился с ответами GET /derma/* (P1, репро владельца на SQLite).
 
+Раунд 3 (owner review 9e6c0f6c1) закрыл вторую слепую зону того же
+класса: bulk-UPDATE через ORM-Query API —
+query(Visit).filter(...).update(..., synchronize_session=False) — не
+ловился НИ ОДНИМ из трёх семейств (модельного update(Visit) в цепочке
+нет: аргумент update — словарь). Именно так Telegram staff_move_visit
+писал visit_date (P1, репро владельца: visits.visit_date=2026-11-05,
+derma_history_entries остаётся на 2026-10-20). Четвёртое семейство
+query_dml вскрыло ещё ДВА ранее невидимых сайта (visit_confirmation_service
+— оба аудированы: не-проекционные колонки).
+
 Полная карта записи (перечислена вручную, зафиксирована пинами):
 
 - ORM-пути (сервисы ЭМК, cutover через save_canonical_emr, dev_seed,
@@ -20,6 +30,14 @@ reschedule-пути писали visit_date, ПРОЕКЦИОННУЮ колон
 - Core-UPDATE visit_date в reschedule-путях (сервис + 2 роута) —
   проекционная колонка: каждый сайт сопровождается
   resync_derma_history_for_visits в ТОЙ ЖЕ транзакции (P1 fix);
+- bulk query(Visit).update() в Telegram staff_move_visit —
+  проекционная колонка visit_date: сопровождается
+  resync_derma_history_for_visits в ТОЙ ЖЕ транзакции (P1 fix,
+  owner review 9e6c0f6c1);
+- bulk query(Visit).update() в visit_confirmation_service (сброс
+  confirmation-токена; статус pending_confirmation→processing) —
+  только не-проекционные колонки (вскрыты семейством query_dml
+  в раунде 3, аудированы задним числом);
 - visit_payment_integration_repository — Core-UPDATE только
   payment_*/lifecycle-колонок, не-проекционных;
 - synthetic_seed — raw INSERT INTO/DELETE FROM visits без ЭМК-записей;
@@ -86,6 +104,26 @@ AUDITED_SITES: dict[str, dict[str, tuple[int, str]]] = {
             "не-проекционных (owner fact-check 5625c8f1b)",
         ),
     },
+    "backend/app/services/telegram_staff_action_adapter_service.py": {
+        "query_dml": (
+            1,
+            "staff_move_visit: bulk query(Visit).update пишет visit_date "
+            "(ПРОЕКЦИОННАЯ колонка) + reminder-поля; сопровождается "
+            "resync_derma_history_for_visits(self.db, [visit_id]) в той же "
+            "транзакции после refresh(visit), до _commit_or_flush "
+            "(P1 fix, owner review 9e6c0f6c1)",
+        ),
+    },
+    "backend/app/services/visit_confirmation_service.py": {
+        "query_dml": (
+            2,
+            "bulk query(Visit).update: сброс confirmation_token/"
+            "confirmation_expires_at (claim токена) и status "
+            "pending_confirmation→processing — только не-проекционные "
+            "колонки; вскрыты семейством query_dml в раунде 3 "
+            "(owner review 9e6c0f6c1), аудированы задним числом",
+        ),
+    },
     "backend/app/services/visits_api_service.py": {
         "reflected_table": (
             1,
@@ -128,10 +166,12 @@ SCAN_ROOTS = (
     REPO_ROOT / "scripts",
 )
 
-# Три ВХОДА в запись источников мимо after_flush listener'а. Первых двух
-# не хватало раундом раньше: update(Visit) и raw «UPDATE visits» не ловят
+# Четыре ВХОДА в запись источников мимо after_flush listener'а. Первых
+# двух не хватало в раунд 1 (update(Visit) и raw «UPDATE visits» не ловят
 # Core-DML по рефлектированной Table("visits", ...) — слепая зона стоила
-# P1 (reschedule-пути, owner fact-check 5625c8f1b).
+# P1 reschedule-путей, owner fact-check 5625c8f1b); четвёртого не
+# хватало в раунд 2 (query(<Source>)…update( — слепая зона стоила P1
+# Telegram-пути, owner review 9e6c0f6c1).
 _MODEL_DML = re.compile(
     r"\b(?:insert|update|delete)\(\s*(?:sa\.|sqlalchemy\.)?\b("
     + "|".join(SOURCE_MODELS)
@@ -143,13 +183,34 @@ _TABLE_DML = re.compile(
     + r")\b",
     re.IGNORECASE,
 )
-# Рефлектированная таблица источника — единственный оставшийся вход в
-# невидимый Core DML (переменные t/table/update() сами по себе не
-# отслеживаются статически — ловится точка входа, конструкция таблицы).
+# Рефлектированная таблица источника — ТРЕТИЙ вход в невидимый Core DML
+# (переменные t/table/update() сами по себе не отслеживаются статически —
+# ловится точка входа, конструкция таблицы).
 # Многострочные конструкции ловятся по полному тексту файла; хит
 # атрибутируется строке с именем таблицы.
 _REFLECTED_TABLE = re.compile(
     r"\bTable\(\s*[\"'](" + "|".join(SOURCE_TABLES) + r")[\"']"
+)
+
+# Четвёртый вход (owner review 9e6c0f6c1): bulk-DML через ORM-Query API —
+# query(<Source>).filter(...).update({...}, synchronize_session=False) —
+# Core-UPDATE/DELETE, который after_flush listener НЕ видит (Query.update
+# не проходит через unit-of-work flush). Ни одно из трёх семейств такую
+# цепочку не брало: модельного «update(Visit)» в ней нет — аргумент update
+# словарь/колонки. Терминатор update( ИЛИ delete( (legacy Query.delete —
+# тот же класс обхода). Цепочка должна быть НЕПРЕРЫВНОЙ: окно 600 символов
+# и «запретные якоря» в зазоре (другая .query(, материализаторы чтения
+# .first/.first_or_404/.all/.count/.scalar/.scalars/.one/.one_or_none/.get/
+# .subquery, .statement, «;») — прочитанная и материализованная цепочка
+# не может продолжиться DML. Многострочные цепочки ловятся по полному
+# тексту; хит атрибутируется строке .query(<Source>). Статические границы
+# семейства (окно, якоря) зафиксированы тестом мощности обнаружения ниже.
+_QUERY_DML = re.compile(
+    r"\.query\(\s*(?:sa\.|sqlalchemy\.)?\b(?:" + "|".join(SOURCE_MODELS) + r")\b\s*\)"
+    r"(?:(?!\.query\(|\.first\(|\.first_or_404\(|\.all\(|\.count\(|"
+    r"\.scalar\(|\.scalars\(|\.one\(|\.one_or_none\(|\.get\(|"
+    r"\.statement\b|\.subquery\(|;)[\s\S]){0,600}?"
+    r"\.(?:update|delete)\s*\("
 )
 
 
@@ -165,6 +226,8 @@ def _scan_text(text: str) -> dict[str, list[int]]:
         hits.setdefault("reflected_table", []).append(
             text[: match.end()].count("\n") + 1
         )
+    for match in _QUERY_DML.finditer(text):
+        hits.setdefault("query_dml", []).append(text[: match.start()].count("\n") + 1)
     return hits
 
 
@@ -239,12 +302,19 @@ class TestDermaHistoryWritePathAudit:
             "AUDITED_SITES с обоснованием аудита и перепином счётчика."
         )
 
-    def test_scanner_detects_all_three_dml_gateways(self) -> None:
+    def test_scanner_detects_all_four_dml_gateways(self) -> None:
         """P1 (owner fact-check 5625c8f1b): прежний сканер видел только
         update(Visit) и raw «UPDATE visits» — Core-UPDATE по рефлектированной
         таблице (как писали reschedule-пути) проходил мимо. Пин мощности
-        обнаружения всех трёх входов, включая МНОГОСТРОЧНУЮ конструкцию
-        Table(...) из visits_api_service (однострочный grep её не брал)."""
+        обнаружения первых трёх входов, включая МНОГОСТРОЧНУЮ конструкцию
+        Table(...) из visits_api_service (однострочный grep её не брал).
+
+        P1 (owner review 9e6c0f6c1): четвёртый вход — bulk-DML через
+        ORM-Query API. Пин мощности его обнаружения, включая
+        МНОГОСТРОЧНУЮ цепочку staff_move_visit (query и update на разных
+        строках) и негативы: прочитанная цепочка (материализатор) не
+        продолжается DML; update словаря без query-цепочки; query
+        не-источника (Payment) не считается."""
         sample = "\n".join(
             [
                 't = Table("visits", meta, autoload_with=bind)',
@@ -253,6 +323,18 @@ class TestDermaHistoryWritePathAudit:
                 ")",
                 'db.execute(text("UPDATE derma_procedures SET x = 1"))',
                 'db.execute(update(Visit).values(status="open"))',
+                "claimed = (",
+                "    self.db.query(Visit)",
+                "    .filter(",
+                "        Visit.id == visit_id,",
+                "        Visit.reminder_generation == generation,",
+                "    )",
+                "    .update(",
+                "        {\"visit_date\": new_visit_date},",
+                "        synchronize_session=False,",
+                "    )",
+                " stale = db.query(EMRRecord).filter(EMRRecord.id == rid).delete()",
+                "queue = db.query(Visit).filter(Visit.id == vid).all()",
             ]
         )
         hits = _scan_text(sample)
@@ -260,6 +342,10 @@ class TestDermaHistoryWritePathAudit:
         assert hits["reflected_table"] == [1, 3]
         assert hits["raw_dml"] == [5]
         assert hits["model_dml"] == [6]
+        # многострочная query-цепочка: хит атрибутируется строке .query(Visit)
+        # (строка 8); однострочный query-delete — строке 17; строка 18 —
+        # материализатор .all(), НЕ DML
+        assert hits["query_dml"] == [8, 17]
 
         # негатив: чтения, dict.update и select не триггерят
         clean = "\n".join(
@@ -267,6 +353,9 @@ class TestDermaHistoryWritePathAudit:
                 "sa.select(Visit.__table__)",
                 "values = {}; values.update(other)",
                 "rows = session.execute(sa.select(emr_tbl.c.id))",
+                "visit = db.query(Visit).filter(Visit.id == vid).first()",
+                "payment = db.query(Payment).filter(Payment.id == pid)",
+                "payment = db.query(Payment).filter(Payment.id == pid).update({})",
             ]
         )
         assert _scan_text(clean) == {}
@@ -355,6 +444,106 @@ class TestDermaHistoryWritePathAudit:
         assert exams[0].payload["examination_date"] == new_date.isoformat()
         assert len(procs) == 1
         assert procs[0].entry_date == date.today()
+
+    def test_telegram_staff_move_visit_updates_derma_read_model(
+        self, db_session, test_patient, test_doctor, admin_user
+    ) -> None:
+        """P1 (owner review 9e6c0f6c1, репро на SQLite): Telegram
+        /move_visit пишет visit_date bulk query(Visit).update(...,
+        synchronize_session=False) — Core-UPDATE мимо after_flush
+        listener'а (та же слепая зона, что reschedule-пути 5625c8f1b,
+        но через ORM-Query API: аргумент update — словарь, модельного
+        update(Visit) в цепочке нет). Прежний код: visits.visit_date
+        уходит на новую дату, derma_history_entries молча остаётся на
+        старой (репро владельца: 2026-11-05 против 2026-10-20) —
+        расходились entry_date, payload.examination_date и порядок
+        GET /derma/*. Фикс: resync_derma_history_for_visits в той же
+        транзакции (после refresh(visit), до _commit_or_flush)."""
+        from app.models.online_queue import DailyQueue, OnlineQueueEntry
+        from app.services.telegram_staff_action_adapter_service import (
+            TelegramStaffActionAdapterService,
+        )
+        from tests.integration.test_derma_history_read_model import (
+            _add_emr,
+            _add_visit,
+            _derma_emr_data,
+            _entries,
+        )
+
+        # второй визит с более СТАРОЙ датой: после переноса первого в
+        # будущее порядок истории обязан перевернуться (newest-first)
+        visit_a = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+            visit_date=date.today() - timedelta(days=30),
+        )
+        emr_a = _add_emr(
+            db_session,
+            visit=visit_a,
+            data=_derma_emr_data(procedures=0, with_exam=True),
+            created_by=admin_user.id,
+        )
+        visit_b = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+            visit_date=date.today() - timedelta(days=5),
+        )
+        emr_b = _add_emr(
+            db_session,
+            visit=visit_b,
+            data=_derma_emr_data(procedures=0, with_exam=True),
+            created_by=admin_user.id,
+        )
+        assert len(_entries(db_session, kind="examination", source="emr")) == 2
+
+        # staff_move_visit требует активной queue-связи визита (иначе
+        # QueueNotFoundError → rollback) — как в unit-тестах адаптера
+        queue = DailyQueue(
+            day=date.today(),
+            specialist_id=test_doctor.id,
+            queue_tag="derma_history_audit",
+            active=True,
+        )
+        db_session.add(queue)
+        db_session.flush()
+        db_session.add(
+            OnlineQueueEntry(
+                queue_id=queue.id,
+                visit_id=visit_b.id,
+                number=7,
+                patient_id=test_patient.id,
+                patient_name="Derma History Audit",
+                phone="+998900000199",
+                source="desk",
+                status="waiting",
+            )
+        )
+        db_session.flush()
+
+        new_date = date.today() + timedelta(days=20)
+        result = TelegramStaffActionAdapterService(db_session).staff_move_visit(
+            visit_id=visit_b.id,
+            new_visit_date=new_date,
+            actor_user_id=admin_user.id,
+            telegram_chat_id=7704,
+            commit=False,
+        )
+        assert result["success"] is True
+
+        # Core DELETE+INSERT не обновляет identity map сессии — перечитываем
+        db_session.expire_all()
+        entries = _entries(db_session, kind="examination", source="emr")
+        assert len(entries) == 2  # ровно две строки — без дублей
+        moved = [e for e in entries if e.record_id == emr_b.id][0]
+        assert moved.entry_date == new_date
+        assert moved.payload["examination_date"] == new_date.isoformat()
+        # порядок истории: перенесённый визит первым (newest-first)
+        assert entries[0].record_id == emr_b.id
+        # незатронутый визит не тронут scoped-пересчётом
+        other = [e for e in entries if e.record_id == emr_a.id][0]
+        assert other.entry_date == date.today() - timedelta(days=30)
 
     def test_core_visit_date_change_desync_detected_and_repaired(
         self, db_session, test_patient, test_doctor, admin_user

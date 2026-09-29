@@ -14,11 +14,13 @@
   транзакция, откат источника откатывает и проекцию; внутри события
   только Core SQL (DML и чтение) — ORM-загрузки в after_flush обходят
   предупреждение SQLAlchemy о не приведённом состоянии identity map;
-- resync_derma_history_for_visits — досинхронизация для ЕДИНСТВЕННОГО
-  известного класса производственной записи мимо ORM: reschedule-пути
-  пишут visit_date Core-UPDATE'ом по рефлектированной таблице «visits»
-  (owner fact-check 5625c8f1b, P1). Вызов в той же транзакции, что и
-  UPDATE, — строки read model визита пересчитываются атомарно;
+- resync_derma_history_for_visits — досинхронизация для ИЗВЕСТНЫХ классов
+  производственной записи мимо ORM: (а) reschedule-пути пишут visit_date
+  Core-UPDATE'ом по рефлектированной таблице «visits» (owner fact-check
+  5625c8f1b, P1); (б) Telegram /move_visit — bulk query(Visit).update()
+  через ORM-Query API (owner review 9e6c0f6c1, P1). Оба обходят
+  after_flush listener; вызов в той же транзакции, что и UPDATE, —
+  строки read model визита пересчитываются атомарно;
 - миграция 0075 выполняет одноразовый backfill тех же строк (батчами
   keyset, без полной материализации в памяти); rebuild_derma_history_entries
   — тот же пересчёт как runbook-команда для любой внешней правки источников.
@@ -413,10 +415,16 @@ def resync_derma_history_for_visits(
     Core-UPDATE'ом по рефлектированной таблице «visits» — after_flush
     listener видит только ORM-изменения, и derma_history_entries молча
     оставалась на старой дате (расходились entry_date,
-    payload.examination_date и порядок ответов GET /derma/*). Вызывается
-    в ТОЙ ЖЕ транзакции, что и Core-UPDATE: удаление+вставка строк визита
-    атомарны с изменением источника — откат reschedule откатывает и
-    проекцию. Пустой для визитов без ЭМК (дёшево, можно звать всегда).
+    payload.examination_date и порядок ответов GET /derma/*).
+
+    P1 (owner review 9e6c0f6c1): тот же класс обхода через ORM-Query API —
+    bulk query(Visit).update(..., synchronize_session=False) в
+    Telegram staff_move_visit; фиксирован вызовом здесь (после
+    refresh(visit), до _commit_or_flush) в той же транзакции.
+
+    Вызывается в ТОЙ ЖЕ транзакции, что и UPDATE источника: удаление+вставка
+    строк визита атомарны с изменением источника — откат мутации откатывает
+    и проекцию. Пустой для визитов без ЭМК (дёшево, можно звать всегда).
 
     Только Core SQL — пригоден и как runbook-инструмент: scoped-режим
     CLI resync_derma_history.py работает через эту функцию и не делает
