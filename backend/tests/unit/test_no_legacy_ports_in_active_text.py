@@ -78,6 +78,8 @@ def _is_excluded(path: Path) -> bool:
     path_text = path.as_posix()
     if path.name in EXCLUDED_FILES:
         return True
+    if "mutants_sim" in path.parts:
+        return True
     return any(part in path_text for part in EXCLUDED_PARTS)
 
 
@@ -115,6 +117,27 @@ def _collect_active_text_files(root: Path) -> list[Path]:
     return files
 
 
+def test_active_text_collection_excludes_mutation_sandbox(tmp_path):
+    backend_root = tmp_path / "backend"
+    active_file = backend_root / "app" / "services" / "active.py"
+    mutant_file = (
+        backend_root
+        / "mutants_sim"
+        / "app"
+        / "scripts"
+        / "migrate_users_to_postgres.py"
+    )
+    active_file.parent.mkdir(parents=True)
+    mutant_file.parent.mkdir(parents=True)
+    active_file.write_text("# active source\n", encoding="utf-8")
+    mutant_file.write_text("# mutation sandbox copy\n", encoding="utf-8")
+
+    collected = _collect_active_text_files(backend_root)
+
+    assert active_file in collected
+    assert mutant_file not in collected
+
+
 def test_no_legacy_port_refs_in_active_text():
     repo_root = Path(__file__).resolve().parents[3]
     matches: list[str] = []
@@ -146,7 +169,9 @@ def test_no_legacy_port_refs_in_active_text():
                     if line_end == -1:
                         line_end = len(content)
                     line = content[line_start:line_end].strip()
-                    matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
+                    matches.append(
+                        f"{path.relative_to(repo_root)}:{line_number}:{line}"
+                    )
 
     for path in repo_root.glob("*.md"):
         if _is_excluded(path):
@@ -166,7 +191,9 @@ def test_no_legacy_port_refs_in_active_text():
                 line = content[line_start:line_end].strip()
                 matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
 
-    assert not matches, "Legacy port references still exist:\n" + "\n".join(matches[:50])
+    assert not matches, "Legacy port references still exist:\n" + "\n".join(
+        matches[:50]
+    )
 
 
 def test_no_sqlite_first_claims_in_active_docs():
@@ -199,9 +226,13 @@ def test_no_sqlite_first_claims_in_active_docs():
                     if line_end == -1:
                         line_end = len(content)
                     line = content[line_start:line_end].strip()
-                    matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
+                    matches.append(
+                        f"{path.relative_to(repo_root)}:{line_number}:{line}"
+                    )
 
-    assert not matches, "SQLite-first doc claims still exist:\n" + "\n".join(matches[:50])
+    assert not matches, "SQLite-first doc claims still exist:\n" + "\n".join(
+        matches[:50]
+    )
 
 
 def test_no_default_database_passwords_in_active_docs():
@@ -234,7 +265,9 @@ def test_no_default_database_passwords_in_active_docs():
                     if line_end == -1:
                         line_end = len(content)
                     line = content[line_start:line_end].strip()
-                    matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
+                    matches.append(
+                        f"{path.relative_to(repo_root)}:{line_number}:{line}"
+                    )
 
     for path in repo_root.glob("*.md"):
         if _is_excluded(path):
@@ -254,9 +287,10 @@ def test_no_default_database_passwords_in_active_docs():
                 line = content[line_start:line_end].strip()
                 matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
 
-    assert not matches, (
-        "Default database passwords still exist in active docs:\n"
-        + "\n".join(matches[:50])
+    assert (
+        not matches
+    ), "Default database passwords still exist in active docs:\n" + "\n".join(
+        matches[:50]
     )
 
 
@@ -284,9 +318,10 @@ def test_no_default_database_passwords_in_active_workflows():
                 line = content[line_start:line_end].strip()
                 matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
 
-    assert not matches, (
-        "Default database passwords still exist in active workflows:\n"
-        + "\n".join(matches[:50])
+    assert (
+        not matches
+    ), "Default database passwords still exist in active workflows:\n" + "\n".join(
+        matches[:50]
     )
 
 
@@ -320,11 +355,14 @@ def test_no_retired_backend_helper_commands_in_active_docs():
                     if line_end == -1:
                         line_end = len(content)
                     line = content[line_start:line_end].strip()
-                    matches.append(f"{path.relative_to(repo_root)}:{line_number}:{line}")
+                    matches.append(
+                        f"{path.relative_to(repo_root)}:{line_number}:{line}"
+                    )
 
-    assert not matches, (
-        "Retired backend helper commands still exist in active docs:\n"
-        + "\n".join(matches[:50])
+    assert (
+        not matches
+    ), "Retired backend helper commands still exist in active docs:\n" + "\n".join(
+        matches[:50]
     )
 
 
@@ -424,12 +462,17 @@ def test_legacy_sqlite_reset_scripts_are_deprecated_fail_fast():
     assert "exit 2" in auto_reset
 
     assert "DEPRECATED DATABASE RESET SCRIPT" in interactive_reset
-    assert "This legacy helper no longer deletes local SQLite files" in interactive_reset
+    assert (
+        "This legacy helper no longer deletes local SQLite files" in interactive_reset
+    )
     assert "PostgreSQL + Alembic are the database source of truth" in interactive_reset
     assert "Remove-Item" not in interactive_reset
     assert "exit 2" in interactive_reset
 
-    assert "PostgreSQL runtime databases should apply schema changes with Alembic" in fk_summary
+    assert (
+        "PostgreSQL runtime databases should apply schema changes with Alembic"
+        in fk_summary
+    )
     assert "legacy SQLite-only recovery helper" in fk_summary
 
 
@@ -461,14 +504,14 @@ def test_allowlisted_sqlite_recovery_helpers_remain_explicit_opt_in():
         if not file_path.exists():
             # File has been moved to scripts/legacy_scripts/ — skip active-backend check.
             continue
-        content = file_path.read_text(
-            encoding="utf-8", errors="ignore"
-        )
+        content = file_path.read_text(encoding="utf-8", errors="ignore")
         for marker in markers:
             if marker not in content:
                 missing.append(f"{relative_path}: missing {marker}")
 
-    assert not missing, "SQLite recovery helper opt-in markers missing:\n" + "\n".join(missing)
+    assert not missing, "SQLite recovery helper opt-in markers missing:\n" + "\n".join(
+        missing
+    )
 
 
 def test_diagnose_ci_uses_only_isolated_temporary_sqlite():
@@ -478,9 +521,7 @@ def test_diagnose_ci_uses_only_isolated_temporary_sqlite():
         # backend/diagnose_ci.py was retired and moved to scripts/legacy_scripts/.
         # No active file to enforce isolation rules on.
         return
-    content = diagnose_ci_path.read_text(
-        encoding="utf-8", errors="ignore"
-    )
+    content = diagnose_ci_path.read_text(encoding="utf-8", errors="ignore")
 
     assert "tempfile.TemporaryDirectory" in content
     assert "diagnose_ci.db" in content
@@ -496,9 +537,7 @@ def test_orphan_cleanup_requires_postgres_without_sqlite_fallback():
         # backend/cleanup_orphaned_records.py was retired and moved to
         # scripts/legacy_scripts/. No active file to enforce Postgres-only rules on.
         return
-    content = orphan_cleanup_path.read_text(
-        encoding="utf-8", errors="ignore"
-    )
+    content = orphan_cleanup_path.read_text(encoding="utf-8", errors="ignore")
 
     assert "DATABASE_URL must be configured before orphan cleanup." in content
     assert "SQLite DATABASE_URL is disabled for orphan cleanup." in content
