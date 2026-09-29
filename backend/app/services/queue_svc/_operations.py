@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import NoReturn
 
-from sqlalchemy import select, text  # RQ-14.a: row-lock + advisory lock
+from sqlalchemy import select  # RQ-14.a: row-lock
 from sqlalchemy.exc import IntegrityError
 
 from app.core.roles import DOCTOR_ROLE_SPELLINGS
@@ -14,6 +14,7 @@ from app.core.specialties import expand_queue_tags
 from app.crud import queue_resource_routing
 from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.crud.queue_resource_routing import (
+    lock_daily_queue_creation,  # Lock-parity follow-up to the #3511 review
     lock_queue_tag_claim_scope,  # Round-6 (P1-2): canonical batch pre-lock
 )
 from app.models.online_queue import QueueResource
@@ -603,11 +604,12 @@ class OperationsMixin(QueueBusinessServiceMixinBase):
         # fix). The resource branch above is already serialized by
         # lock_registry_tag_creation. PostgreSQL-only: the SQLite
         # conftest tests skip this branch harmlessly.
-        if db.get_bind().dialect.name == "postgresql":
-            db.execute(
-                text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
-                {"lock_key": f"daily_queue:{day}:{actual_specialist_id}"},
-            )
+        #
+        # Lock-parity follow-up to the #3511 review: the key spelling
+        # moved to queue_resource_routing (one SSOT shared with the four
+        # legacy creation paths) — byte-identical identity, see
+        # daily_queue_creation_lock_key.
+        lock_daily_queue_creation(db, day, actual_specialist_id)
 
         # PR-26: ARCHITECTURE FIX — queue is owned by DOCTOR, not by queue_tag.
         #

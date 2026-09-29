@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.crud import clinic as crud_clinic
 from app.crud.daily_queue_creation_policy import daily_queue_creation_snapshot
 from app.crud.queue_resource_routing import (
+    lock_daily_queue_creation,
     lock_registry_tag_creation,
     resolve_tag_resource,
     resolve_tag_resource_locked,
@@ -152,6 +153,19 @@ class VisitConfirmationRepository:
             )
 
         actual_specialist_id = doctor.id
+
+        # Lock-parity follow-up to the #3511 review: serialize the
+        # check-then-insert window below on the canonical (day, doctor)
+        # advisory key — the same scope
+        # queue_service.get_or_create_daily_queue holds. A concurrent
+        # canonical writer (registrar cart, morning assignment) racing
+        # this path for the same (day, doctor, tag) could both observe
+        # no queue and insert — the partial unique then fails the loser
+        # with an unhandled IntegrityError instead of the clean
+        # block → re-read → reuse this lock provides. flush-only
+        # creation: the lock lives until the caller's single commit.
+        # Advisory-first: nothing row-locked earlier in this flow.
+        lock_daily_queue_creation(self.db, day, actual_specialist_id)
 
         # QD-2E (Codex round-4 P1): поверхность для записи с решённым
         # врачом — очередь ЭТОГО врача (PR-26 per-doctor), не tag-only

@@ -187,6 +187,54 @@ def lock_registry_tag_creation(db: Session, queue_tag: str, day: date) -> None:
     lock_queue_tag_claim_scope(db, queue_tag, day)
 
 
+def daily_queue_creation_lock_key(day: date, specialist_id: int) -> str:
+    """The ONE canonical advisory key for a doctor's day-queue creation.
+
+    Lock-parity follow-up to the #3511 review (owner verdict round): the
+    canonical ``queue_service.get_or_create_daily_queue`` holds
+    ``pg_advisory_xact_lock('daily_queue:{day}:{specialist}')`` across its
+    lookup and insert. The key spelling lives HERE now — as a pure function
+    — so the legacy creation paths (GraphQL untagged join,
+    ``crud/online_queue.get_or_create_daily_queue`` via queue_batch, the
+    visit-confirmation repository, the queue-limits repository) take the
+    byte-identical scope and serialize against the canonical writer
+    instead of only against themselves.
+
+    ``day.isoformat()`` equals the historical ``f"{day}"`` interpolation,
+    so the canonical service's existing lock identity is unchanged.
+    """
+    return f"daily_queue:{day.isoformat()}:{specialist_id}"
+
+
+def lock_daily_queue_creation(db: Session, day: date, specialist_id: int) -> None:
+    """Serialize the check-then-insert window for one doctor's day queue.
+
+    Two concurrent creators that both observe "no queue for this doctor
+    today" and both insert produce either a duplicate same-tag row (the
+    ``uq_daily_queues_active_doctor_day_tag`` partial unique then fails
+    one writer with an unhandled IntegrityError) or — via paths whose
+    lookups are tag-filtered — a cross-tag fork. The transaction-scoped
+    PostgreSQL advisory lock taken BEFORE the lookup closes the window:
+    the loser blocks until the winner commits, re-reads, and reuses the
+    committed row. Byte-identical key with the canonical service (see
+    :func:`daily_queue_creation_lock_key`) — one serialization scope for
+    every creation path.
+
+    Callers MUST acquire the scope BEFORE any row lock they take later
+    (the QD-2E advisory-first invariant against the cart's
+    ``User FOR SHARE → Doctor FOR SHARE`` order); the helper only
+    executes the lock statement and never ends the transaction.
+    PostgreSQL-only; SQLite sessions (tests) have no advisory locks and
+    skip — sequential no-duplicate pins cover that path, the same
+    parity as ``lock_queue_tag_claim_scope``.
+    """
+    if _bound_dialect_name(db) == "postgresql":
+        db.execute(
+            sa.text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
+            {"k": daily_queue_creation_lock_key(day, specialist_id)},
+        )
+
+
 def resource_start_number(db: Session, daily_queue: DailyQueue) -> int | None:
     """The registry row's start_number_online for a resource queue.
 
