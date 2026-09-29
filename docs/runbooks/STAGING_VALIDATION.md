@@ -193,82 +193,109 @@ preconditions not met (no backup, no psql, etc.).
 
 ## Check 3 — AI feature flags kill-switch
 
-**Purpose**: prove that toggling a feature flag actually blocks the endpoint.
+**Purpose**: prove that the `ai_smart_template` flag intercepts its endpoint
+before the route handler runs.
 
-**Why it matters**: if a misbehaving AI endpoint starts hallucinating
-prescriptions, admin needs to kill it instantly without a code deploy. If
-the kill-switch is broken, you can't stop the AI.
+**Safety contract**: `generate-smart-template` is intentionally unavailable
+and must remain so. With the flag enabled (or absent), it returns HTTP 503
+with `detail.error=ai_feature_unavailable`; this check does not enable model
+generation or produce clinical content. With the flag disabled, the gate must
+run first and return HTTP 503 with `detail.error=feature_disabled` and
+`detail.flag=ai_smart_template`.
 
-### Setup (one-time)
+### Preconditions
 
-```bash
-cd backend
-python -m app.scripts.seed_ai_feature_flags
-```
+- Run this only against synthetic staging, never production.
+- Obtain an admin bearer token through the normal authentication flow and
+  complete the configured 2FA challenge. Do not disable or bypass 2FA. Use a
+  doctor or admin bearer token obtained through the normal login flow for the
+  endpoint probe. Keep tokens in shell variables or an approved secret store;
+  do not paste them into logs or commit them.
+- Confirm `GET /api/v1/admin/feature-flags/ai_smart_template` returns HTTP 200.
+  If it returns 404, first confirm staging is pointed at the intended database,
+  then run `python -m app.scripts.seed_ai_feature_flags` from `backend/` against
+  that staging database and start this check again. The seeder creates missing
+  flags with defaults; do not use `--reset` for this check.
 
 ### Run
 
+Set `BASE_URL`, `ADMIN_TOKEN`, and `DOCTOR_TOKEN` from the authenticated staging
+sessions described above, then run this Bash script. It records the current
+flag value and restores that exact value on normal exit, failure, or interrupt.
+
 ```bash
-# Get admin token
-ADMIN_TOKEN=$(curl -sS -X POST http://localhost:18000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin@clinic.com","password":"<admin password>"}' \
-  | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+set -euo pipefail
+BASE_URL="${BASE_URL:-http://localhost:18001}"
+: "${ADMIN_TOKEN:?Set an authenticated staging admin token (complete 2FA first)}"
+: "${DOCTOR_TOKEN:?Set an authenticated staging doctor or admin token}"
+FLAG_URL="$BASE_URL/api/v1/admin/feature-flags/ai_smart_template"
+TOGGLE_URL="$FLAG_URL/toggle"
+PROBE_URL="$BASE_URL/api/v1/emr/ai-enhanced/generate-smart-template?specialty=cardiology"
+TMP_DIR=$(mktemp -d)
+restore_flag() {
+  if [[ -n "${ORIGINAL_ENABLED:-}" ]]; then
+    curl -fsS -X POST "$TOGGLE_URL" -H "Authorization: Bearer $ADMIN_TOKEN" \
+      -H 'Content-Type: application/json' \
+      -d "{\"enabled\":$ORIGINAL_ENABLED,\"reason\":\"staging validation restore\"}" >/dev/null \
+      || echo "ERROR: restore ai_smart_template=$ORIGINAL_ENABLED manually" >&2
+  fi
+  rm -rf "$TMP_DIR"
+}
+trap restore_flag EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-# Get doctor token
-DOCTOR_TOKEN=$(curl -sS -X POST http://localhost:18000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"doctor@clinic.com","password":"<doctor password>"}' \
-  | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+HTTP=$(curl -sS -o "$TMP_DIR/flag.json" -w '%{http_code}' \
+  -H "Authorization: Bearer $ADMIN_TOKEN" "$FLAG_URL")
+[[ "$HTTP" == "200" ]] || { echo "Cannot read flag state (HTTP $HTTP); stop."; exit 1; }
+ORIGINAL_ENABLED=$(python -c 'import json,sys; print(str(json.load(open(sys.argv[1]))["enabled"]).lower())' "$TMP_DIR/flag.json")
+[[ "$ORIGINAL_ENABLED" == "true" || "$ORIGINAL_ENABLED" == "false" ]] || { echo "Unexpected flag response; stop."; exit 1; }
 
-# Step 1: verify endpoint works with flag enabled
-echo "=== Step 1: flag enabled, endpoint should return 200/422 ==="
-curl -sS -o /dev/null -w "HTTP %{http_code}\n" \
-  -X POST http://localhost:18000/api/v1/emr-ai-enhanced/generate-smart-template \
-  -H "Authorization: Bearer $DOCTOR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"specialty":"cardiology","patient_id":1,"visit_id":1}'
-# Expected: HTTP 200 or HTTP 422 (validation error) — NOT 503
+probe() {
+  local expected_error="$1" expected_http="$2" expected_flag="${3:-}" http body error flag
+  http=$(curl -sS -o "$TMP_DIR/probe.json" -w '%{http_code}' -X POST "$PROBE_URL" \
+    -H "Authorization: Bearer $DOCTOR_TOKEN" -H 'Content-Type: application/json' -d '{}')
+  body=$(cat "$TMP_DIR/probe.json")
+  error=$(python -c 'import json,sys; d=json.loads(sys.argv[1]).get("detail",{}); print(d.get("error", "") if isinstance(d,dict) else "")' "$body")
+  flag=$(python -c 'import json,sys; d=json.loads(sys.argv[1]).get("detail",{}); print(d.get("flag", "") if isinstance(d,dict) else "")' "$body")
+  printf 'HTTP %s, detail.error=%s, detail.flag=%s\n' "$http" "$error" "$flag"
+  [[ "$http" == "$expected_http" && "$error" == "$expected_error" && ( -z "$expected_flag" || "$flag" == "$expected_flag" ) ]]
+}
 
-# Step 2: disable the flag
-echo "=== Step 2: disabling ai_smart_template flag ==="
-curl -sS -X POST http://localhost:18000/api/v1/admin/feature-flags/ai_smart_template/toggle \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"enabled":false,"reason":"validation test"}'
-# Expected: 200 OK with {"key":"ai_smart_template","enabled":false,...}
+# Prove the enabled route remains intentionally unavailable; this makes no AI call.
+curl -fsS -X POST "$TOGGLE_URL" -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"enabled":true,"reason":"staging kill-switch validation"}' >/dev/null
+echo 'Enabled flag: expect ai_feature_unavailable (endpoint stays disabled).'
+probe ai_feature_unavailable 503
 
-# Step 3: verify endpoint now returns 503
-echo "=== Step 3: flag disabled, endpoint should return 503 ==="
-curl -sS -o /dev/null -w "HTTP %{http_code}\n" \
-  -X POST http://localhost:18000/api/v1/emr-ai-enhanced/generate-smart-template \
-  -H "Authorization: Bearer $DOCTOR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"specialty":"cardiology","patient_id":1,"visit_id":1}'
-# Expected: HTTP 503
-
-# Step 4: re-enable the flag
-echo "=== Step 4: re-enabling flag ==="
-curl -sS -X POST http://localhost:18000/api/v1/admin/feature-flags/ai_smart_template/toggle \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"enabled":true,"reason":"validation test cleanup"}'
+curl -fsS -X POST "$TOGGLE_URL" -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"enabled":false,"reason":"staging kill-switch validation"}' >/dev/null
+echo 'Disabled flag: expect feature_disabled (kill-switch intercepted first).'
+probe feature_disabled 503 ai_smart_template
 ```
+
+The `EXIT` trap restores the original flag state. Check the script output and
+confirm restoration with `GET /api/v1/admin/feature-flags/ai_smart_template`.
+If the shell is forcibly terminated before the trap runs, restore the captured
+value manually through the admin feature-flags UI or toggle endpoint.
 
 ### Expected
 
-- Step 1: HTTP 200 or 422 (NOT 503)
-- Step 2: HTTP 200
-- Step 3: **HTTP 503** (this is the kill-switch working)
-- Step 4: HTTP 200
+- Enabled: HTTP 503, `detail.error=ai_feature_unavailable`.
+- Disabled: HTTP 503, `detail.error=feature_disabled`,
+  `detail.flag=ai_smart_template`.
+- After the check: the flag's original enabled value is restored.
 
 ### If it fails
 
-- **Step 3 returns 200 not 503**: feature flag wiring broken — check
-  `backend/app/services/ai_feature_gating.py` + endpoint decorator
-- **Step 2 returns 403**: admin token invalid or admin role misconfigured
-- **Step 1 returns 503**: flag was already disabled, or `seed_ai_feature_flags`
-  wasn't run
+- **Enabled returns `feature_disabled`**: the flag was not enabled or the
+  environment/database is not the intended staging target.
+- **Disabled returns `ai_feature_unavailable`**: the gate did not intercept;
+  inspect `backend/app/services/ai_feature_gating.py` and the route dependency.
+- **Either response is not HTTP 503**: inspect the exact route and response;
+  do not enable or deploy AI generation as a workaround.
+- **Toggle returns 403**: complete admin authentication, including 2FA, and
+  verify the account has the Admin role.
 
 ---
 

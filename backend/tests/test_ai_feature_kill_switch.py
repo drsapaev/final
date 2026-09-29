@@ -1,28 +1,23 @@
 """Behavioral proof for the AI feature-flag kill-switch (runbook Check 3).
 
-The staging smoke check proves wiring only (flag row + dependency class).
-This module proves the actual toggle contract from
-docs/runbooks/STAGING_VALIDATION.md Check 3 against a real endpoint:
-
-- flag disabled  -> gated endpoint returns 503 with error=feature_disabled
-- flag enabled   -> the endpoint is released (usage-stats is DB-only, so 200)
-- flag missing   -> fail-open: the endpoint proceeds normally
-
-`GET /api/v1/ai/usage-stats` is used because its router carries
-`Depends(RequireAiFeature("ai_integration"))` and the endpoint body never
-calls an external AI provider, so both toggle states are observable without
-provider credentials.
+The selected EMR route is intentionally unavailable and must stay fail-closed:
+with the feature enabled (or missing), it returns ``ai_feature_unavailable``;
+with the flag disabled, ``RequireAiFeature`` must run first and return
+``feature_disabled``. The distinct responses prove the kill-switch intercepts
+the route without invoking an AI provider or generating clinical content.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 from sqlalchemy.orm import Session
 
 from app.models.feature_flags import FeatureFlag
 
-GATED_ENDPOINT = "/api/v1/ai/usage-stats"
-FLAG_KEY = "ai_integration"
+GATED_ENDPOINT = "/api/v1/emr/ai-enhanced/generate-smart-template?specialty=cardiology"
+FLAG_KEY = "ai_smart_template"
 
 
 def _set_flag(db: Session, *, enabled: bool | None) -> None:
@@ -39,13 +34,8 @@ def clean_flag(db_session):
     _set_flag(db_session, enabled=None)
 
 
-def _gate_error(response) -> str | None:
-    """Extract the gate's structured error, if the response came from the gate.
-
-    The endpoint body is outside the gate's responsibility: with the flag
-    enabled, usage-stats currently fails with a generic 500 (its own bug,
-    reported separately), so 'released' is asserted as 'not the gate's 503'.
-    """
+def _response_error(response) -> str | None:
+    """Extract the structured error returned by the gate or route."""
     detail = response.json().get("detail")
     return detail.get("error") if isinstance(detail, dict) else None
 
@@ -53,7 +43,7 @@ def _gate_error(response) -> str | None:
 def test_disabled_flag_returns_503(client, auth_headers, db_session):
     _set_flag(db_session, enabled=False)
 
-    response = client.get(GATED_ENDPOINT, headers=auth_headers)
+    response = client.post(GATED_ENDPOINT, json={}, headers=auth_headers)
 
     assert response.status_code == 503
     detail = response.json()["detail"]
@@ -62,21 +52,35 @@ def test_disabled_flag_returns_503(client, auth_headers, db_session):
     assert "disabled by the administrator" in detail["message"]
 
 
-def test_reenabled_flag_releases_endpoint(client, auth_headers, db_session):
-    _set_flag(db_session, enabled=False)
-    assert client.get(GATED_ENDPOINT, headers=auth_headers).status_code == 503
-
+def test_enabled_flag_reaches_intentionally_unavailable_route(
+    client, auth_headers, db_session
+):
     _set_flag(db_session, enabled=True)
-    response = client.get(GATED_ENDPOINT, headers=auth_headers)
+    response = client.post(GATED_ENDPOINT, json={}, headers=auth_headers)
 
-    assert response.status_code != 503
-    assert _gate_error(response) != "feature_disabled"
+    assert response.status_code == 503
+    assert _response_error(response) == "ai_feature_unavailable"
 
 
 def test_missing_flag_fails_open(client, auth_headers, db_session):
     _set_flag(db_session, enabled=None)
 
-    response = client.get(GATED_ENDPOINT, headers=auth_headers)
+    response = client.post(GATED_ENDPOINT, json={}, headers=auth_headers)
 
-    assert response.status_code != 503
-    assert _gate_error(response) != "feature_disabled"
+    assert response.status_code == 503
+    assert _response_error(response) == "ai_feature_unavailable"
+
+
+def test_runbook_check_uses_the_same_endpoint_and_distinguishes_503_reasons():
+    repo_root = Path(__file__).resolve().parents[2]
+    runbook = (repo_root / "docs/runbooks/STAGING_VALIDATION.md").read_text(
+        encoding="utf-8"
+    )
+    check3 = runbook.split("## Check 3 — AI feature flags kill-switch", 1)[1].split(
+        "## Check 4 — AI safety contract", 1
+    )[0]
+
+    assert GATED_ENDPOINT in check3
+    assert "ai_feature_unavailable" in check3
+    assert "feature_disabled" in check3
+    assert FLAG_KEY in check3
