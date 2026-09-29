@@ -3,7 +3,11 @@
 Каноническая серверная агрегация #3494 объединяет два read-only источника:
 дерма-ЭМК (emr/v2, specialty_data) и закрытые legacy-таблицы. Этот модуль —
 единственное место, где определена проекция обоих источников в строки
-истории (HistoryOut). До появления read model эндпоинты derma.py считали
+истории (HistoryOut). Процедуры ЭМК читаются union'ом двух ключей
+specialty_data: канонический cosmetic_procedures + временный legacy
+READ-alias procedures (решение P3 по реконсиляции #3490/#3491, Phase A;
+полный union без скрытия строк, без дедупликации по содержимому).
+До появления read model эндпоинты derma.py считали
 эту проекцию на каждый запрос в памяти (P2 ретро-ревью #3494); теперь те же
 функции питают производную таблицу derma_history_entries:
 
@@ -218,22 +222,81 @@ def _emr_examination_items(
     return items
 
 
+def _procedure_history_row(
+    record: Any,
+    visit: Any,
+    fallback_date: date,
+    entry: dict,
+    id_suffix: str,
+) -> DermaProcedureHistoryOut:
+    """Одна строка истории из сохранённой записи процедуры (canonical или legacy)."""
+    return DermaProcedureHistoryOut(
+        id=f"emr-{record.id}-{id_suffix}",
+        source="emr",
+        patient_id=record.patient_id,
+        visit_id=record.visit_id,
+        doctor_id=getattr(visit, "doctor_id", None),
+        procedure_date=(parse_iso_date(entry.get("procedure_date")) or fallback_date),
+        procedure_type=entry.get("procedure_type"),
+        area_treated=str_or_none(entry.get("area_treated")),
+        products_used=str_or_none(entry.get("products_used")),
+        results=str_or_none(entry.get("results")),
+        follow_up=str_or_none(entry.get("follow_up")),
+        total_cost=None,
+        created_at=record.created_at,
+        updated_at=None,
+    )
+
+
 def _emr_procedure_items(
     records: list[Any], visits: dict[int, Any]
 ) -> list[tuple[DermaProcedureHistoryOut, int, int]]:
-    """Проекция процедур: (row, record_id, index) из specialty_data.cosmetic_procedures."""
+    """Проекция процедур: (row, record_id, position) — union двух ключей.
+
+    Канонический ключ записи — specialty_data.cosmetic_procedures (решение
+    P3 по реконсиляции #3490/#3491: так пишет merged-редактор #3490/#3494);
+    legacy-ключ specialty_data.procedures (эпоха #3491) читается временно
+    как transitional READ alias (Phase A миграции P3): legacy-записи
+    проецируются так же и ПОЛНОСТЬЮ — union никогда не прячет строку.
+    Записи не несут стабильного идентификатора, поэтому равенство
+    содержимого не доказывает тождественность клинических событий
+    (review P2): две одинаково описанные процедуры обе остаются видимыми;
+    разбор реально задублированных записей — Phase B (миграция данных с
+    ручным ревью и журналированием), удаление алиаса — Phase C (только
+    после аудита хранимых данных). Идентификаторы строк:
+    emr-<rid>-<index> (canonical) и emr-<rid>-legacy-<index> (alias).
+    Контракт position (review P2, round-3): position — стабильная
+    позиция записи в её ИСХОДНОМ массиве (canonical: индекс в
+    cosmetic_procedures; alias: len(canonical_entries) + индекс в
+    procedures), а не плотный индекс отображаемых строк. Invalid-записи
+    (не-словарь / без procedure_type) пропускаются БЕЗ пересчёта
+    позиций соседей: разрывы допустимы ([valid, invalid, valid] +
+    [alias] → 0, 2, 3), плотность НЕ гарантируется и не требуется —
+    порядок чтения keyset (entry_date, created_at, source, record_id,
+    position) от разрывов не зависит, а id-суффикс и position живут в
+    одном индексном пространстве источника. Гарантируются:
+    уникальность (kind, source, record_id, position) — canonical-индексы
+    строго меньше len(canonical), alias-позиции не меньше — и
+    canonical-раньше-legacy при тай-брейках порядка чтения (тот же
+    порядок, что in-memory union прежней endpoint-реализации #3508).
+    """
     items: list[tuple[DermaProcedureHistoryOut, int, int]] = []
     for record in records:
         data = record.data if isinstance(record.data, dict) else {}
         specialty_data = data.get("specialty_data")
         if not isinstance(specialty_data, dict):
             continue
-        entries = specialty_data.get("cosmetic_procedures")
-        if not isinstance(entries, list):
+        canonical_entries = specialty_data.get("cosmetic_procedures")
+        canonical_entries = (
+            canonical_entries if isinstance(canonical_entries, list) else []
+        )
+        legacy_entries = specialty_data.get("procedures")
+        legacy_entries = legacy_entries if isinstance(legacy_entries, list) else []
+        if not canonical_entries and not legacy_entries:
             continue
         visit = visits.get(record.visit_id)
         fallback_date = history_exam_date(visit, record)
-        for index, entry in enumerate(entries):
+        for index, entry in enumerate(canonical_entries):
             if not isinstance(entry, dict):
                 continue
             procedure_type = entry.get("procedure_type")
@@ -241,26 +304,31 @@ def _emr_procedure_items(
                 continue
             items.append(
                 (
-                    DermaProcedureHistoryOut(
-                        id=f"emr-{record.id}-{index}",
-                        source="emr",
-                        patient_id=record.patient_id,
-                        visit_id=record.visit_id,
-                        doctor_id=getattr(visit, "doctor_id", None),
-                        procedure_date=(
-                            parse_iso_date(entry.get("procedure_date")) or fallback_date
-                        ),
-                        procedure_type=procedure_type,
-                        area_treated=str_or_none(entry.get("area_treated")),
-                        products_used=str_or_none(entry.get("products_used")),
-                        results=str_or_none(entry.get("results")),
-                        follow_up=str_or_none(entry.get("follow_up")),
-                        total_cost=None,
-                        created_at=record.created_at,
-                        updated_at=None,
+                    _procedure_history_row(
+                        record, visit, fallback_date, entry, str(index)
                     ),
                     record.id,
                     index,
+                )
+            )
+        # Без исключения по содержимому: одинаково описанные записи в двух
+        # массивах могут быть двумя отдельными клиническими событиями;
+        # скрытие одной — риск потери данных, который read-путь не имеет
+        # права брать на себя (review P2).
+        legacy_offset = len(canonical_entries)
+        for index, entry in enumerate(legacy_entries):
+            if not isinstance(entry, dict):
+                continue
+            procedure_type = entry.get("procedure_type")
+            if not isinstance(procedure_type, str) or not procedure_type.strip():
+                continue
+            items.append(
+                (
+                    _procedure_history_row(
+                        record, visit, fallback_date, entry, f"legacy-{index}"
+                    ),
+                    record.id,
+                    legacy_offset + index,
                 )
             )
     return items

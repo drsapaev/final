@@ -812,3 +812,397 @@ class TestDermaEmrHistory:
             assert [item["id"] for item in payload["items"]] == [
                 seeded_exams[offset].id for offset in expected_ids
             ]
+
+
+@pytest.mark.integration
+class TestDermaP3CanonicalKey:
+    """P3 decision on the #3490/#3491 reconciliation: one canonical write key
+    (specialty_data.cosmetic_procedures); specialty_data.procedures is a
+    transitional legacy READ alias projected IN FULL — the union never hides
+    a row. Entries carry no stable identifier, so content equality is not
+    proof of identity: two identically described entries may be two separate
+    clinical events, and hiding one is a data-loss risk the read path must
+    not take (review P2). Resolving genuinely double-written duplicates
+    belongs to Phase B (data migration with manual review and audit trail);
+    alias removal is Phase C (only after the stored-data audit)."""
+
+    def test_union_of_both_keys_all_valid_entries_visible(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """Both keys in ONE record: every VALID entry of both arrays is
+        projected — a legacy entry identical to a canonical one stays
+        visible (content equality is not identity, review P2), a legacy
+        entry sharing only the type but differing in date stays visible,
+        and invalid legacy entries are skipped without hiding the rest."""
+        visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        today = date.today().isoformat()
+        other_day = (date.today() + timedelta(days=2)).isoformat()
+        canonical_entry = {
+            "procedure_date": today,
+            "procedure_type": "Мезотерапия",
+            "area_treated": "Лицо",
+            "products_used": "HA gel",
+            "results": "Гиперемия слабая",
+            "follow_up": "Контроль 14 дней",
+        }
+        emr = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "cosmetic_procedures": [
+                        canonical_entry,  # canonical[0]: entry A
+                        {  # canonical[1]: entry B
+                            "procedure_date": today,
+                            "procedure_type": "Чистка",
+                            "area_treated": "Лоб",
+                        },
+                    ],
+                    "procedures": [
+                        dict(
+                            canonical_entry
+                        ),  # legacy[0]: identical copy of A -> KEEP; content equality is not identity
+                        {  # legacy[1]: distinct entry -> kept (id legacy-1)
+                            "procedure_date": other_day,
+                            "procedure_type": "Ботокс",
+                            "area_treated": "Лоб",
+                        },
+                        {  # legacy[2]: same TYPE as A, different date -> kept
+                            "procedure_date": other_day,
+                            "procedure_type": "Мезотерапия",
+                            "area_treated": "Лицо",
+                        },
+                        {"procedure_type": "   "},  # legacy[3]: blank type -> skip
+                        "garbage-string",  # legacy[4]: not a dict -> skip
+                    ],
+                },
+            },
+        )
+
+        response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=50",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        # A + B + legacy[0] (identical copy of A) + legacy[1] + legacy[2];
+        # only invalid entries (blank type, non-dict) are skipped.
+        assert payload["total"] == 5
+        row_ids = {item["id"] for item in payload["items"]}
+        assert row_ids == {
+            f"emr-{emr.id}-0",  # canonical A
+            f"emr-{emr.id}-1",  # canonical B
+            f"emr-{emr.id}-legacy-0",  # identical copy of A — NOT hidden
+            f"emr-{emr.id}-legacy-1",  # legacy Ботокс
+            f"emr-{emr.id}-legacy-2",  # legacy Мезотерапия (other date)
+        }
+        # Content equality is not identity: the identically described copy
+        # stays visible, so "Мезотерапия" legitimately appears three times.
+        types = [item["procedure_type"] for item in payload["items"]]
+        assert types.count("Мезотерапия") == 3
+        assert types.count("Чистка") == 1
+        assert types.count("Ботокс") == 1
+        # Every row stays bound to its record and visit.
+        assert all(item["visit_id"] == visit.id for item in payload["items"])
+        assert all(item["total_cost"] is None for item in payload["items"])
+
+    def test_identical_entries_across_keys_stay_visible(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """Review-mandated ambiguous case: ONE canonical entry and TWO
+        fully identical entries in the legacy key. Without a stable
+        identifier the read path cannot prove these are the same clinical
+        event, so ALL THREE rows stay visible with an honest total — the
+        possible double-write is resolved in Phase B (manual review with
+        audit trail), never by silently hiding rows at projection time."""
+        visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        identical_entry = {
+            "procedure_date": date.today().isoformat(),
+            "procedure_type": "Мезотерапия",
+            "area_treated": "Лицо",
+            "products_used": "HA gel",
+            "results": "Гиперемия слабая",
+            "follow_up": "Контроль 14 дней",
+        }
+        emr = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "cosmetic_procedures": [dict(identical_entry)],
+                    "procedures": [
+                        dict(identical_entry),
+                        dict(identical_entry),
+                    ],
+                },
+            },
+        )
+
+        response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=2",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        # 1 canonical + 2 identical legacy copies — nothing is hidden.
+        assert payload["total"] == 3
+        assert payload["pages"] == 2  # honest pagination over the full union
+
+        full_response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=50",
+            headers=auth_headers,
+        )
+        assert full_response.status_code == 200
+        full_payload = full_response.json()
+        assert full_payload["total"] == 3
+        row_ids = {item["id"] for item in full_payload["items"]}
+        assert row_ids == {
+            f"emr-{emr.id}-0",
+            f"emr-{emr.id}-legacy-0",
+            f"emr-{emr.id}-legacy-1",
+        }
+        types = [item["procedure_type"] for item in full_payload["items"]]
+        assert types == ["Мезотерапия", "Мезотерапия", "Мезотерапия"]
+
+    def test_legacy_only_record_stays_visible_in_history(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """Transition safety: an EMR written by a pre-P3 writer that stored
+        entries ONLY under the legacy key must still surface in
+        /derma/procedures and in the combined /derma/history, with every
+        field, the visit binding and honest totals intact."""
+        legacy_visit = _create_visit(
+            db_session, patient=test_patient, doctor=test_doctor
+        )
+        legacy_emr = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=legacy_visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "procedures": [
+                        {
+                            "procedure_date": date.today().isoformat(),
+                            "procedure_type": "Дарсонваль",
+                            "area_treated": "Спина",
+                            "products_used": "—",
+                            "results": "Без осложнений",
+                            "follow_up": "Курс 5 сеансов",
+                        },
+                    ],
+                },
+            },
+        )
+        canonical_visit = _create_visit(
+            db_session, patient=test_patient, doctor=test_doctor
+        )
+        _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=canonical_visit,
+            user=admin_user,
+            data=_derma_emr_data(),  # canonical key only (editor shape)
+        )
+
+        procedures_response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=50",
+            headers=auth_headers,
+        )
+        assert procedures_response.status_code == 200
+        procedures_payload = procedures_response.json()
+        # 1 legacy-keyed entry + 2 canonical entries of _derma_emr_data().
+        assert procedures_payload["total"] == 3
+        by_id = {item["id"]: item for item in procedures_payload["items"]}
+        legacy_row = by_id[f"emr-{legacy_emr.id}-legacy-0"]
+        assert legacy_row["procedure_type"] == "Дарсонваль"
+        assert legacy_row["area_treated"] == "Спина"
+        assert legacy_row["products_used"] == "—"
+        assert legacy_row["results"] == "Без осложнений"
+        assert legacy_row["follow_up"] == "Курс 5 сеансов"
+        assert legacy_row["source"] == "emr"
+        assert legacy_row["visit_id"] == legacy_visit.id
+        assert legacy_row["total_cost"] is None
+
+        # Idempotent re-read: no duplicates appear, the union is stable.
+        reread_response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=50",
+            headers=auth_headers,
+        )
+        assert reread_response.status_code == 200
+        reread_payload = reread_response.json()
+        assert reread_payload["total"] == procedures_payload["total"]
+        assert {item["id"] for item in reread_payload["items"]} == set(by_id)
+
+    def test_garbage_key_shapes_yield_no_rows_and_honest_total(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """Non-list arrays, empty arrays and entries without a usable type
+        produce zero rows; total/pages stay honest."""
+        # NB: emr_records.visit_id is UNIQUE — one EMR per visit.
+        first_visit = _create_visit(
+            db_session, patient=test_patient, doctor=test_doctor
+        )
+        _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=first_visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "cosmetic_procedures": [],
+                    "procedures": "not-a-list",
+                },
+            },
+        )
+        second_visit = _create_visit(
+            db_session, patient=test_patient, doctor=test_doctor
+        )
+        _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=second_visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "procedures": [{"area_treated": "no type here"}, 42],
+                },
+            },
+        )
+
+        response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=10",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["items"] == []
+        assert payload["total"] == 0
+        assert payload["pages"] == 0
+
+    def test_similar_entries_across_keys_are_not_collapsed(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """No content-based hiding at all (review P2): entries that differ
+        from a canonical one by leading/trailing whitespace only, by
+        internal text, by letter case or by punctuation are ALL projected —
+        the read path runs no normalization and no similarity judgment, so
+        no variant of an entry can be silently folded away. Case and
+        punctuation are additionally pinned verbatim in the projection."""
+        visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        today = date.today().isoformat()
+        canonical_entry = {
+            "procedure_date": today,
+            "procedure_type": "Мезотерапия",
+            "area_treated": "Лицо",
+            "products_used": "HA gel",
+            "results": "Гиперемия слабая",
+            "follow_up": "Контроль 14 дней",
+        }
+        emr = _create_emr(
+            db_session,
+            patient=test_patient,
+            visit=visit,
+            user=admin_user,
+            data={
+                "specialty": "dermatology",
+                "specialty_data": {
+                    "cosmetic_procedures": [
+                        canonical_entry,  # canonical[0]: entry A
+                        {  # canonical[1]: entry B (distinct, keeps A non-trivial)
+                            "procedure_date": today,
+                            "procedure_type": "Чистка",
+                            "area_treated": "Лоб",
+                        },
+                    ],
+                    "procedures": [
+                        {  # legacy[0]: edge-whitespace-only variant of A -> visible
+                            "procedure_date": f"  {today}  ",
+                            "procedure_type": "  Мезотерапия ",
+                            "area_treated": " Лицо ",
+                            "products_used": " HA gel  ",
+                            "results": "  Гиперемия слабая   ",
+                            "follow_up": " Контроль 14 дней ",
+                        },
+                        {  # legacy[1]: INTERNAL text change -> visible
+                            **canonical_entry,
+                            "results": "Гиперемия выраженная",
+                        },
+                        {  # legacy[2]: letter-case change -> visible (no case folding)
+                            **canonical_entry,
+                            "procedure_type": "мезотерапия",
+                        },
+                        {  # legacy[3]: punctuation change -> visible (no punctuation folding)
+                            **canonical_entry,
+                            "follow_up": "Контроль 14 дней.",
+                        },
+                    ],
+                },
+            },
+        )
+
+        response = client.get(
+            f"/api/v1/derma/procedures?patient_id={test_patient.id}&size=50",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        # A + B + ALL FOUR legacy variants — nothing is collapsed.
+        assert payload["total"] == 6
+        row_ids = {item["id"] for item in payload["items"]}
+        assert row_ids == {
+            f"emr-{emr.id}-0",  # canonical A
+            f"emr-{emr.id}-1",  # canonical B
+            f"emr-{emr.id}-legacy-0",  # whitespace variant stays visible
+            f"emr-{emr.id}-legacy-1",  # internal text change stays visible
+            f"emr-{emr.id}-legacy-2",  # case change stays visible
+            f"emr-{emr.id}-legacy-3",  # punctuation change stays visible
+        }
+        # Case is preserved verbatim in the projection: both spellings appear.
+        types = [item["procedure_type"] for item in payload["items"]]
+        assert types.count("Мезотерапия") == 3  # A + legacy[1] + legacy[3]
+        assert types.count("  Мезотерапия ") == 1  # whitespace variant, verbatim
+        assert types.count("мезотерапия") == 1  # lowercase row is NOT folded away
+        # The internal text change is readable in its own row.
+        by_id = {item["id"]: item for item in payload["items"]}
+        assert by_id[f"emr-{emr.id}-legacy-1"]["results"] == "Гиперемия выраженная"
+        assert by_id[f"emr-{emr.id}-legacy-3"]["follow_up"] == "Контроль 14 дней."
