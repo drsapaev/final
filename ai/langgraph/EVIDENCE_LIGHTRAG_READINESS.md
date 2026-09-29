@@ -3447,3 +3447,28 @@ route and prove the feature flag blocks it without enabling model generation.
 - The user explicitly authorized continuing after the misroute was reported.
 - Follow-up: improve gate routing for AI safety, staging runbook, and contract-test
   tasks so it includes the executable route owner and validation docs.
+
+## Task 98 - Staging Telegram configuration gate misroute
+
+### User task
+Pass a dedicated staging Telegram bot token to the staging backend and arq
+worker, then make Check 6 safe and actionable without using production
+credentials or messaging real patients.
+
+### Gate result
+- mode: `gate_known_root_cause`
+- result: `narrow_override`
+- `gate_misroute`: yes
+- `override_used`: yes
+- `known_root_cause_file`: `ops/compose.staging.yml`
+- first-touch files pointed to Telegram API/UI handlers and omitted the staging
+  Compose file, env sample, and staging validation runbook.
+
+### Manual reconstruction and follow-up
+- Confirmed Compose omitted `TELEGRAM_BOT_TOKEN` for both backend and worker.
+- Confirmed the existing notification token resolver gives a DB-configured
+  token precedence over the environment fallback.
+- Kept the patch to staging Compose, its env sample, Check 6, and this evidence
+  entry. The user explicitly authorized continuing deployment preparation.
+- Follow-up: improve gate routing for staging-only runtime configuration and
+  validation-runbook work so it includes Compose/env owners and documentation.

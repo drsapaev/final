@@ -473,25 +473,97 @@ notification channel. If bot is broken, patients miss appointments.
 
 ### Prerequisites
 
-- `TELEGRAM_BOT_TOKEN` env var set (from @BotFather)
-- At least one patient has linked their Telegram account via mini-app
+- A dedicated staging bot created for this environment; never reuse the
+  production bot token
+- The staging bot token is set as `TELEGRAM_BOT_TOKEN` in the untracked
+  `ops/staging.env`, then the isolated staging backend and worker are recreated
+  from that same env file
+- No production bot token is saved in the staging database: a DB-configured
+  token takes precedence over `TELEGRAM_BOT_TOKEN`
+- A synthetic staging patient has linked the staging bot via mini-app and
+  started a conversation with it
 - Worker is running (Check 5)
+
+Keep the token out of chat, commits, screenshots, shell history, and logs. Do
+not enable shell tracing (`set -x`). Never run Compose from the production
+checkout against staging until its project name and env file are confirmed.
 
 ### Run
 
 ```bash
-# 1. Verify bot is reachable
-curl -sS "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getMe" | python -m json.tool
-# Expected: {"ok":true,"result":{"id":...,"is_bot":true,"first_name":"...","username":"..."}}
+# Run from a trusted staging host. Prompt for the token so it is not stored in
+# shell history. Run from the repository root of the isolated staging checkout.
+# Use the existing project name shown by `docker compose ls`; do not guess it.
+(
+set -e
+trap 'unset STAGING_TELEGRAM_TOKEN' EXIT
+read -rp "Existing staging Compose project name: " STAGING_COMPOSE_PROJECT
+docker compose --project-name "$STAGING_COMPOSE_PROJECT" \
+  --env-file ops/staging.env \
+  -f ops/compose.staging.yml \
+  up -d --build --no-deps backend worker
+unset STAGING_COMPOSE_PROJECT
 
-# 2. Send a test message to yourself (replace CHAT_ID with your Telegram chat ID)
-curl -sS -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-  -H "Content-Type: application/json" \
-  -d '{"chat_id": <CHAT_ID>, "text": "staging validation test - telegram delivery"}'
-# Expected: {"ok":true,"result":{"message_id":...,...}}
+# Enter only the dedicated staging bot token.
+read -rsp "Staging bot token: " STAGING_TELEGRAM_TOKEN; echo
+export STAGING_TELEGRAM_TOKEN
 
-# 3. Trigger a visit reminder via arq (Check 5 step 2) — patient should receive it in Telegram
+# 1. Check bot identity without printing the token or full response.
+python - <<'PY'
+import getpass
+import json
+import os
+import urllib.request
+
+token = os.environ.get("STAGING_TELEGRAM_TOKEN") or getpass.getpass("Staging bot token: ")
+request = urllib.request.Request(f"https://api.telegram.org/bot{token}/getMe")
+try:
+    with urllib.request.urlopen(request, timeout=15) as response:
+        result = json.load(response)
+except Exception:
+    raise SystemExit("Telegram getMe request failed; inspect staging bot configuration without sharing the token") from None
+if not result.get("ok"):
+    raise SystemExit("Telegram getMe failed; inspect staging bot configuration without sharing the token")
+bot = result["result"]
+print(f"OK: is_bot={bot.get('is_bot')} username=@{bot.get('username', '')}")
+PY
+
+# 2. Send one test message only to the explicitly designated synthetic staging
+# test chat. The prompt hides the chat ID; do not use a patient's real chat.
+python - <<'PY'
+import getpass
+import json
+import os
+import urllib.parse
+import urllib.request
+
+token = os.environ.get("STAGING_TELEGRAM_TOKEN") or getpass.getpass("Staging bot token: ")
+chat_id = getpass.getpass("Synthetic staging test chat ID: ")
+body = urllib.parse.urlencode({"chat_id": chat_id, "text": "Staging Telegram delivery check"}).encode()
+request = urllib.request.Request(
+    f"https://api.telegram.org/bot{token}/sendMessage",
+    data=body,
+    headers={"Content-Type": "application/x-www-form-urlencoded"},
+)
+try:
+    with urllib.request.urlopen(request, timeout=15) as response:
+        result = json.load(response)
+except Exception:
+    raise SystemExit("Telegram test send failed; inspect staging configuration without sharing token or chat ID") from None
+if not result.get("ok"):
+    raise SystemExit("Telegram test send failed; inspect staging configuration without sharing token or chat ID")
+print("OK: Telegram accepted the staging test message")
+PY
+
+# 3. Trigger a reminder for the synthetic, staging-linked patient via arq
+# (Check 5 step 2); verify it arrives in that same synthetic test chat.
+)
 ```
+
+The staging DB must contain either no bot-token setting or the same dedicated
+staging bot token. If a token was configured through Admin → Telegram settings,
+verify it is the staging bot before testing; never copy a production token into
+staging.
 
 ### If it fails
 
