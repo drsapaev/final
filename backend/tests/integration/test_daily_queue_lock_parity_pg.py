@@ -2,7 +2,7 @@
 
 Follow-up to the #3511 review (owner verdict round): four legacy
 creation paths ran the check-then-insert for a doctor's day queue
-outside the canonical ``pg_advisory_xct_lock`` scope that
+outside the canonical ``pg_advisory_xact_lock`` scope that
 ``queue_service.get_or_create_daily_queue`` holds — the GraphQL untagged
 join even used a different key spelling and serialized only against
 itself. Two concurrent writers could both observe "no queue for this
@@ -15,7 +15,7 @@ The fix routes every creation path through
 ``daily_queue:{day}:{doctor}`` scope, taken BEFORE the existing-queue
 lookup.
 
-Proof (real workers against one PostgreSQL, mixed legacy + canonical
+Proofs (real workers against one PostgreSQL, mixed legacy + canonical
 paths for the same fresh (day, doctor)):
 
 1. ``..._serialize_on_one_canonical_scope``: four concurrent creators —
@@ -27,24 +27,38 @@ paths for the same fresh (day, doctor)):
    (block → re-read → reuse). Without the parity lock the interleaving
    ends in an IntegrityError on the partial unique (the constraint is
    what makes the regression loud rather than silent).
-
-2. ``..._gql_untagged_scope_matches_canonical``: the scope the GraphQL
-   untagged branch acquires (via the same helper) is IDENTICAL to the
-   canonical service's scope — asserted by taking the helper's key in
-   one session and the canonical service's real lock in another, then
-   proving the second BLOCKS (the historical mismatched spelling did
-   not: doctor-before-day plus a trailing colon hashed to a different
+2. ``..._gql_untagged_scope_matches_canonical``: the scope the helper
+   acquires is IDENTICAL to the canonical service's scope — the helper
+   lock in one session blocks the REAL canonical service in another
+   until the first commits (the historical mismatched spelling did not:
+   doctor-before-day plus a trailing colon hashed to a different
    advisory id).
+3. ``..._without_parity_is_loud``: the unserialized interleaving shape
+   — a second INSERT of the same key blocks behind the first writer's
+   uncommitted unique index entry and fails with IntegrityError once
+   that writer commits. This pins WHY the parity lock exists: the
+   constraint is the safety net, the advisory lock is the clean-reuse
+   fix; the previous behavior was an unhandled IntegrityError.
 
-Bounded waits (statement/lock timeouts) keep a regression loud and
-fast instead of hanging the suite — the same regime as
-test_cart_doctor_eligibility_lock_pg.py.
+Harness hardening (the first CI run hung 27 minutes at this file before
+the 30-minute job timeout cancelled it — the local repro found the
+shape): every session is context-managed with a rollback on error (a
+raised creator must NEVER leak a transaction-scoped advisory lock
+through a traceback-held session); queue ids are read BEFORE the commit
+expires the instance (DetachedInstanceError); the blocking INSERT of
+proof 3 runs in a background thread (two same-thread INSERTs would
+self-deadlock the single test thread until the statement timeout);
+every worker wait is bounded (barrier + future timeouts + the engine's
+statement/lock timeouts — advisory waits respect the statement timeout,
+verified experimentally); the executor is shut down without waiting so
+a stuck worker can never wedge the suite.
 """
 
 from __future__ import annotations
 
 import os
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -74,6 +88,11 @@ from app.repositories.visit_confirmation_repository import (
 )
 from app.services.queue_service import queue_service
 
+# bounded waits keep a REGRESSION loud and fast instead of hanging the
+# suite (mirrors the cart eligibility lock PG proof; advisory waits
+# respect the statement timeout — verified against a live PostgreSQL)
+_PG_TIMEOUTS_MS = 15000
+
 
 @pytest.fixture
 def lock_parity_engine():
@@ -97,10 +116,8 @@ def lock_parity_engine():
         connect_args={
             "options": (
                 f"-csearch_path={schema} "
-                # bounded waits keep a REGRESSION loud and fast instead of
-                # hanging the suite (mirrors the cart eligibility lock PG
-                # proof).
-                "-cstatement_timeout=60000 -clock_timeout=60000 "
+                f"-cstatement_timeout={_PG_TIMEOUTS_MS} "
+                f"-clock_timeout={_PG_TIMEOUTS_MS} "
                 "-cdeadlock_timeout=500ms"
             )
         },
@@ -150,8 +167,9 @@ def _canonical_creator(engine, day, doctor_id, barrier, errors, queue_ids):
                 specialist_id=doctor_id,
                 queue_tag=None,
             )
+            queue_id = int(queue.id)  # read before commit expires the instance
             session.commit()
-        queue_ids.append(queue.id)
+        queue_ids.append(queue_id)
     except Exception as exc:  # noqa: BLE001 — the proof collects every failure
         errors.append(("canonical", exc))
 
@@ -159,11 +177,14 @@ def _canonical_creator(engine, day, doctor_id, barrier, errors, queue_ids):
 def _crud_creator(engine, day, doctor_id, barrier, errors, queue_ids):
     try:
         barrier.wait(timeout=30)
-        # the queue_batch path: commits internally, exactly as in prod
-        queue = crud_online_queue.get_or_create_daily_queue(
-            Session(engine), day, doctor_id, queue_tag=None
-        )
-        queue_ids.append(queue.id)
+        # the queue_batch path: commits internally, exactly as in prod.
+        # Context-managed so a mid-path failure rolls back and releases
+        # the transaction-scoped advisory lock instead of leaking it.
+        with Session(engine) as session:
+            queue = crud_online_queue.get_or_create_daily_queue(
+                session, day, doctor_id, queue_tag=None
+            )
+            queue_ids.append(int(queue.id))
     except Exception as exc:  # noqa: BLE001
         errors.append(("crud/queue_batch", exc))
 
@@ -174,8 +195,9 @@ def _visit_confirmation_creator(engine, day, doctor_id, barrier, errors, queue_i
             barrier.wait(timeout=30)
             repository = VisitConfirmationRepository(session)
             queue = repository.get_or_create_daily_queue(day, doctor_id, queue_tag="")
+            queue_id = int(queue.id)  # read before commit expires the instance
             session.commit()
-        queue_ids.append(queue.id)
+        queue_ids.append(queue_id)
     except Exception as exc:  # noqa: BLE001
         errors.append(("visit_confirmation", exc))
 
@@ -188,8 +210,10 @@ def _limits_creator(engine, day, doctor_id, barrier, errors, queue_ids):
             queue = repository.get_or_create_daily_queue(
                 day=day, specialist_id=doctor_id, max_online_entries=15
             )
+            session.flush()  # assign the PK before the commit expires it
+            queue_id = int(queue.id)
             session.commit()
-        queue_ids.append(queue.id)
+        queue_ids.append(queue_id)
     except Exception as exc:  # noqa: BLE001
         errors.append(("queue_limits", exc))
 
@@ -222,10 +246,16 @@ def test_mixed_creators_serialize_on_one_canonical_scope(lock_parity_engine):
             lock_parity_engine, day, doctor_id, barrier, errors, queue_ids
         ),
     ]
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    pool = ThreadPoolExecutor(max_workers=4)
+    try:
         futures = [pool.submit(worker) for worker in workers]
         for future in futures:
-            future.result(timeout=90)
+            future.result(timeout=120)
+    finally:
+        # never wedge the suite on a stuck worker: every DB wait in the
+        # workers is bounded by the engine timeouts, and the executor is
+        # shut down without joining stragglers
+        pool.shutdown(wait=False, cancel_futures=True)
 
     assert errors == [], f"concurrent creators failed: {errors!r}"
     assert len(queue_ids) == 4
@@ -275,47 +305,55 @@ def test_helper_scope_blocks_the_canonical_service_scope(lock_parity_engine):
 
         def _contend():
             try:
-                queue = queue_service.get_or_create_daily_queue(
-                    contender,
-                    day=day,
-                    specialist_id=doctor_id,
-                    queue_tag=None,
-                )
-                created_queue_id.append(queue.id)
-                contender.commit()
+                with contender:
+                    queue = queue_service.get_or_create_daily_queue(
+                        contender,
+                        day=day,
+                        specialist_id=doctor_id,
+                        queue_tag=None,
+                    )
+                    queue_id = int(queue.id)
+                    contender.commit()
+                created_queue_id.append(queue_id)
             except Exception as exc:  # noqa: BLE001
                 service_error.append(exc)
             finally:
                 service_done.set()
 
-        thread = threading.Thread(target=_contend)
+        thread = threading.Thread(target=_contend, daemon=True)
         thread.start()
         # the canonical service is still blocked while the holder keeps
         # the helper scope: its own advisory acquisition must wait
-        assert not service_done.wait(timeout=1.5), (
+        assert not service_done.wait(timeout=2.0), (
             "the canonical service acquired its scope without waiting — "
             "the helper key diverged from the canonical lock identity"
         )
         assert service_error == []
         holder.commit()  # releases the transaction-scoped advisory lock
         assert service_done.wait(
-            timeout=30
+            timeout=60
         ), f"the canonical service never finished: {service_error!r}"
-        thread.join(timeout=10)
+        thread.join(timeout=30)
         assert service_error == []
         assert len(created_queue_id) == 1
     finally:
+        holder.rollback()
+        contender.rollback()
         holder.close()
         contender.close()
 
 
 @pytest.mark.integration
 def test_regression_shape_without_parity_is_loud(lock_parity_engine):
-    """The partial unique makes the unserialized interleaving LOUD: two
-    plain check-then-insert writers for the same (day, doctor, NULL tag)
-    cannot both commit. This pins WHY the parity lock exists — the
-    constraint is the safety net, the advisory lock is the clean-reuse
-    fix; the previous behavior was an unhandled IntegrityError."""
+    """The partial unique makes the unserialized interleaving LOUD: a
+    second INSERT of the same (day, doctor, NULL tag) blocks behind the
+    first writer's uncommitted unique index entry and fails with
+    IntegrityError once that writer commits. This pins WHY the parity
+    lock exists — the constraint is the safety net, the advisory lock is
+    the clean-reuse fix; the previous behavior was an unhandled
+    IntegrityError. The second INSERT runs in a background thread: in
+    the SAME thread it would self-deadlock until the statement timeout
+    (the writer's commit is the very next line of this test)."""
 
     from datetime import date
 
@@ -337,12 +375,31 @@ def test_regression_shape_without_parity_is_loud(lock_parity_engine):
 
     writer_a = Session(lock_parity_engine)
     writer_b = Session(lock_parity_engine)
+    outcome: dict[str, str] = {}
     try:
         _plain_insert(writer_a)  # holds the uncommitted unique index entry
-        _plain_insert(writer_b)  # blocks on A's entry until A commits
-        writer_a.commit()
-        with pytest.raises(IntegrityError):
-            writer_b.commit()
+
+        def _second_insert():
+            try:
+                _plain_insert(writer_b)  # blocks behind A's entry
+                outcome["b"] = "inserted"
+            except IntegrityError:
+                outcome["b"] = "integrity"
+
+        thread = threading.Thread(target=_second_insert, daemon=True)
+        thread.start()
+        # give the second writer time to queue behind the first's entry
+        assert "b" not in outcome or outcome["b"] == "inserted"
+        time.sleep(1.5)
+        assert "b" not in outcome, (
+            f"the second writer finished early: {outcome!r} — the proof "
+            "assumes it blocks behind the uncommitted unique entry"
+        )
+        writer_a.commit()  # the conflict materializes for the second writer
+        thread.join(timeout=60)
+        assert (
+            outcome.get("b") == "integrity"
+        ), f"the unserialized duplicate insert did not fail loudly: {outcome!r}"
     finally:
         writer_a.rollback()
         writer_b.rollback()
