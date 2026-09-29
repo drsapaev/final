@@ -8,9 +8,30 @@ app.services.derma_history_projection), поддерживаемая after_flush
 listener'ом при любой ORM-записи источников, с точным порядком канонического
 мержа #3494 в колонках сортировки.
 
-Этот PR — шаг 1 из 2 (аддитивный): таблица + backfill + listener.
-Эндпоинты GET /derma/examinations и GET /derma/procedures НЕ меняются —
-переключение на read model в отдельном PR после выдержки паритет-теста.
+Шаг 1 из 2 (аддитивный): таблица + backfill + listener. На момент коммита
+этого шага эндпоинты GET /derma/examinations и GET /derma/procedures не
+менялись; переключены на read model следующим шагом — #3521 (0076),
+обе части уже в main: эндпоинты сейчас обслуживаются из этой таблицы,
+а рассинхронизация источников искажает фактические ответы API.
+
+REVISED (review follow-up, owner fact-check a6cbef): backfill переписан
+с полной материализации трёх источников в памяти (.all() + накопление
+перед одним insert) на пакетированный keyset-пересчёт
+(rebuild_derma_history_entries, память O(batch)). Ревизия in-place
+безопасна: alembic не хеширует тела миграций и не перезапускает
+применённые ревизии; проекция детерминирована (тот же результат);
+production cutover ещё не выполнялся — именно его и защищает правка.
+
+REVISED-2 (review follow-up, owner fact-check 5625c8f1b, P2-2): rebuild
+читает источники ЯВНЫМИ списками колонок (_EMR_SOURCE_COLUMNS /
+_VISIT_SOURCE_COLUMNS / _LEGACY_* в SSOT-модуле), а не sa.select всей
+таблицы живой модели — иначе первый же `alembic upgrade head` с нуля
+после добавления колонки в visits/emr_records/derma_* (будущая ревизия +
+модель) падал бы НА ЭТОМ шаге: SELECT колонки, которой в БД на момент
+0075 ещё нет. In-place безопасна по тем же причинам. Блокировки полного
+режима (P2-3) к миграционному прогону не применимы: backfill выполняется
+в транзакции alembic ДО деплоя пишущего кода — слушателей и читателей
+на живой БД в этот момент нет (порядок rollout: migrate → deploy).
 
 SAFETY:
 - additive-only DDL: новая таблица, ни одна существующая строка/таблица не
@@ -21,7 +42,8 @@ SAFETY:
   relrowsecurity=true для всех public-таблиц после upgrade head;
 - backfill детерминирован: те же функции проекции, что обслуживают
   listener и эндпоинты (никакой эвристики — в отличие от прецедента 0070,
-  где backfill был запрещён именно из-за эвристик);
+  где backfill был запрещён именно из-за эвристик); пакетирование меняет
+  только ресурсный профиль (RSS/время), не результат;
 - применение на staging/production НЕ входит в этот PR (прецедент 0070):
   merge не авторизует прогон миграции на живой БД.
 
@@ -31,8 +53,6 @@ Create Date: 2026-09-28
 """
 
 from __future__ import annotations
-
-from typing import Any
 
 import sqlalchemy as sa
 
@@ -49,58 +69,21 @@ _TABLE = "derma_history_entries"
 def _backfill(bind: sa.Connection) -> int:
     """Одноразовая проекция существующих источников в read model.
 
-    Использует SSOT-функции app.services.derma_history_projection — те же,
-    что работают в after_flush listener'е. Row-объекты core-select
-    удовлетворяют проекции (attribute access по именам колонок).
+    Делегирует пакетированному rebuild_derma_history_entries (SSOT-функции
+    app.services.derma_history_projection — те же, что работают в
+    after_flush listener'е и эндпоинтах). Память O(batch_size), не
+    O(история): keyset по id каждого источника, вставка пачками.
     """
-    from app.models.derma_examination import DermaExamination
-    from app.models.derma_history import DermaHistoryEntry
-    from app.models.derma_procedure import DermaProcedure
-    from app.models.emr_v2 import EMRRecord
-    from app.models.visit import Visit
     from app.services.derma_history_projection import (
-        DERMATOLOGY_SPECIALTY,
-        emr_entry_dicts,
-        legacy_examination_entry_dicts,
-        legacy_procedure_entry_dicts,
+        rebuild_derma_history_entries,
     )
 
-    entries_tbl = DermaHistoryEntry.__table__
-    emr_tbl = EMRRecord.__table__
-    visit_tbl = Visit.__table__
-
-    # Активные дерма-ЭМК: SQL-фильтр по specialty (портативный: JSON_EXTRACT /
-    # ->>, подтверждено в #3494), без cap'ов
-    records = (
-        bind.execute(
-            sa.select(emr_tbl).where(
-                emr_tbl.c.is_active.is_(True),
-                emr_tbl.c.data["specialty"].as_string() == DERMATOLOGY_SPECIALTY,
-            )
-        )
-        .mappings()
-        .all()
+    counts = rebuild_derma_history_entries(bind)
+    return (
+        counts["emr_entries"]
+        + counts["legacy_examination"]
+        + counts["legacy_procedure"]
     )
-
-    visit_ids = {row["visit_id"] for row in records if row["visit_id"] is not None}
-    visits: dict[int, Any] = {}
-    if visit_ids:
-        for row in bind.execute(
-            sa.select(visit_tbl).where(visit_tbl.c.id.in_(visit_ids))
-        ).all():
-            visits[row.id] = row
-
-    entries: list[dict[str, Any]] = emr_entry_dicts(records, visits)
-
-    # Legacy-таблицы заморожены (POST → 410, #3489): проектируем как есть
-    legacy_exams = bind.execute(sa.select(DermaExamination.__table__)).all()
-    entries.extend(legacy_examination_entry_dicts(legacy_exams))
-    legacy_procs = bind.execute(sa.select(DermaProcedure.__table__)).all()
-    entries.extend(legacy_procedure_entry_dicts(legacy_procs))
-
-    if entries:
-        bind.execute(entries_tbl.insert(), entries)
-    return len(entries)
 
 
 def upgrade() -> None:

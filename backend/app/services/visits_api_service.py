@@ -27,9 +27,7 @@ from app.tasks.lease import REMINDER_IN_PROGRESS_DETAIL as _REMINDER_IN_PROGRESS
 # Round 14, P1: the conditional UPDATE can lose the race to a concurrent
 # schedule change (generation moved on) — a distinct condition from an
 # in-flight delivery.
-_SCHEDULE_MOVED_DETAIL = (
-    "Visit schedule was modified concurrently; refresh and retry"
-)
+_SCHEDULE_MOVED_DETAIL = "Visit schedule was modified concurrently; refresh and retry"
 
 
 class VisitsApiService:
@@ -410,9 +408,7 @@ class VisitsApiService:
         # reschedule can never be silently restored over.
         if new_date == visit_row.get("visit_date"):
             fresh = (
-                self.repository.execute(
-                    select(table).where(table.c.id == visit_id)
-                )
+                self.repository.execute(select(table).where(table.c.id == visit_id))
                 .mappings()
                 .first()
             )
@@ -424,9 +420,7 @@ class VisitsApiService:
         if hasattr(table.c, "reminder_sent_at"):
             reschedule_values["reminder_sent_at"] = None
         if hasattr(table.c, "reminder_generation"):
-            reschedule_values["reminder_generation"] = (
-                table.c.reminder_generation + 1
-            )
+            reschedule_values["reminder_generation"] = table.c.reminder_generation + 1
             # Round 14, P1: bind the mutation to the generation READ above
             # — two overlapping reschedules can no longer double-bump the
             # generation (stranding the fresh job's schedule version).
@@ -455,9 +449,7 @@ class VisitsApiService:
                 table.c.reminder_claimed_at.is_(None),
                 table.c.reminder_claimed_at < datetime.now(UTC) - LEASE_TTL,
             )
-        upd = table.update().where(
-            table.c.id == visit_id, *race_guards
-        )
+        upd = table.update().where(table.c.id == visit_id, *race_guards)
         if lease_free is not None:
             upd = upd.where(lease_free)
         row = (
@@ -467,18 +459,17 @@ class VisitsApiService:
         )
         if not row:
             current = (
-                self.repository.execute(
-                    select(table).where(table.c.id == visit_id)
-                )
+                self.repository.execute(select(table).where(table.c.id == visit_id))
                 .mappings()
                 .first()
             )
             if current:
                 # Same loser-cause distinction as the reschedule route:
                 # in-flight claim vs concurrent schedule change.
-                live_lease = lease_free is not None and current.get(
-                    "reminder_claimed_at"
-                ) is not None
+                live_lease = (
+                    lease_free is not None
+                    and current.get("reminder_claimed_at") is not None
+                )
                 if live_lease:
                     from app.tasks.lease import LEASE_TTL
 
@@ -487,12 +478,8 @@ class VisitsApiService:
                         claimed = claimed.replace(tzinfo=UTC)
                     live_lease = datetime.now(UTC) - claimed < LEASE_TTL
                 if live_lease:
-                    raise HTTPException(
-                        status_code=409, detail=_REMINDER_IN_PROGRESS
-                    )
-                raise HTTPException(
-                    status_code=409, detail=_SCHEDULE_MOVED_DETAIL
-                )
+                    raise HTTPException(status_code=409, detail=_REMINDER_IN_PROGRESS)
+                raise HTTPException(status_code=409, detail=_SCHEDULE_MOVED_DETAIL)
             raise HTTPException(404, "Visit not found")
 
         try:
@@ -503,6 +490,13 @@ class VisitsApiService:
             )
         except Exception:
             pass
+
+        # P1 (owner fact-check 5625c8f1b): visit_date пишется Core-UPDATE'ом
+        # по рефлектированной таблице — after_flush listener read model его
+        # не видит. Досинхронизация строк визита в ТОЙ ЖЕ транзакции: откат
+        # reschedule откатывает и проекцию (иначе derma_history_entries
+        # молча остаётся на старой дате, расходясь с GET /derma/*).
+        self.repository.resync_derma_history_for_visit(visit_id)
 
         self.repository.commit()
         return dict(row)

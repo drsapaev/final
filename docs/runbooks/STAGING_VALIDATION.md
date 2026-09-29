@@ -193,82 +193,109 @@ preconditions not met (no backup, no psql, etc.).
 
 ## Check 3 — AI feature flags kill-switch
 
-**Purpose**: prove that toggling a feature flag actually blocks the endpoint.
+**Purpose**: prove that the `ai_smart_template` flag intercepts its endpoint
+before the route handler runs.
 
-**Why it matters**: if a misbehaving AI endpoint starts hallucinating
-prescriptions, admin needs to kill it instantly without a code deploy. If
-the kill-switch is broken, you can't stop the AI.
+**Safety contract**: `generate-smart-template` is intentionally unavailable
+and must remain so. With the flag enabled (or absent), it returns HTTP 503
+with `detail.error=ai_feature_unavailable`; this check does not enable model
+generation or produce clinical content. With the flag disabled, the gate must
+run first and return HTTP 503 with `detail.error=feature_disabled` and
+`detail.flag=ai_smart_template`.
 
-### Setup (one-time)
+### Preconditions
 
-```bash
-cd backend
-python -m app.scripts.seed_ai_feature_flags
-```
+- Run this only against synthetic staging, never production.
+- Obtain an admin bearer token through the normal authentication flow and
+  complete the configured 2FA challenge. Do not disable or bypass 2FA. Use a
+  doctor or admin bearer token obtained through the normal login flow for the
+  endpoint probe. Keep tokens in shell variables or an approved secret store;
+  do not paste them into logs or commit them.
+- Confirm `GET /api/v1/admin/feature-flags/ai_smart_template` returns HTTP 200.
+  If it returns 404, first confirm staging is pointed at the intended database,
+  then run `python -m app.scripts.seed_ai_feature_flags` from `backend/` against
+  that staging database and start this check again. The seeder creates missing
+  flags with defaults; do not use `--reset` for this check.
 
 ### Run
 
+Set `BASE_URL`, `ADMIN_TOKEN`, and `DOCTOR_TOKEN` from the authenticated staging
+sessions described above, then run this Bash script. It records the current
+flag value and restores that exact value on normal exit, failure, or interrupt.
+
 ```bash
-# Get admin token
-ADMIN_TOKEN=$(curl -sS -X POST http://localhost:18000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin@clinic.com","password":"<admin password>"}' \
-  | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+set -euo pipefail
+BASE_URL="${BASE_URL:-http://localhost:18001}"
+: "${ADMIN_TOKEN:?Set an authenticated staging admin token (complete 2FA first)}"
+: "${DOCTOR_TOKEN:?Set an authenticated staging doctor or admin token}"
+FLAG_URL="$BASE_URL/api/v1/admin/feature-flags/ai_smart_template"
+TOGGLE_URL="$FLAG_URL/toggle"
+PROBE_URL="$BASE_URL/api/v1/emr/ai-enhanced/generate-smart-template?specialty=cardiology"
+TMP_DIR=$(mktemp -d)
+restore_flag() {
+  if [[ -n "${ORIGINAL_ENABLED:-}" ]]; then
+    curl -fsS -X POST "$TOGGLE_URL" -H "Authorization: Bearer $ADMIN_TOKEN" \
+      -H 'Content-Type: application/json' \
+      -d "{\"enabled\":$ORIGINAL_ENABLED,\"reason\":\"staging validation restore\"}" >/dev/null \
+      || echo "ERROR: restore ai_smart_template=$ORIGINAL_ENABLED manually" >&2
+  fi
+  rm -rf "$TMP_DIR"
+}
+trap restore_flag EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-# Get doctor token
-DOCTOR_TOKEN=$(curl -sS -X POST http://localhost:18000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"doctor@clinic.com","password":"<doctor password>"}' \
-  | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+HTTP=$(curl -sS -o "$TMP_DIR/flag.json" -w '%{http_code}' \
+  -H "Authorization: Bearer $ADMIN_TOKEN" "$FLAG_URL")
+[[ "$HTTP" == "200" ]] || { echo "Cannot read flag state (HTTP $HTTP); stop."; exit 1; }
+ORIGINAL_ENABLED=$(python -c 'import json,sys; print(str(json.load(open(sys.argv[1]))["enabled"]).lower())' "$TMP_DIR/flag.json")
+[[ "$ORIGINAL_ENABLED" == "true" || "$ORIGINAL_ENABLED" == "false" ]] || { echo "Unexpected flag response; stop."; exit 1; }
 
-# Step 1: verify endpoint works with flag enabled
-echo "=== Step 1: flag enabled, endpoint should return 200/422 ==="
-curl -sS -o /dev/null -w "HTTP %{http_code}\n" \
-  -X POST http://localhost:18000/api/v1/emr-ai-enhanced/generate-smart-template \
-  -H "Authorization: Bearer $DOCTOR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"specialty":"cardiology","patient_id":1,"visit_id":1}'
-# Expected: HTTP 200 or HTTP 422 (validation error) — NOT 503
+probe() {
+  local expected_error="$1" expected_http="$2" expected_flag="${3:-}" http body error flag
+  http=$(curl -sS -o "$TMP_DIR/probe.json" -w '%{http_code}' -X POST "$PROBE_URL" \
+    -H "Authorization: Bearer $DOCTOR_TOKEN" -H 'Content-Type: application/json' -d '{}')
+  body=$(cat "$TMP_DIR/probe.json")
+  error=$(python -c 'import json,sys; d=json.loads(sys.argv[1]).get("detail",{}); print(d.get("error", "") if isinstance(d,dict) else "")' "$body")
+  flag=$(python -c 'import json,sys; d=json.loads(sys.argv[1]).get("detail",{}); print(d.get("flag", "") if isinstance(d,dict) else "")' "$body")
+  printf 'HTTP %s, detail.error=%s, detail.flag=%s\n' "$http" "$error" "$flag"
+  [[ "$http" == "$expected_http" && "$error" == "$expected_error" && ( -z "$expected_flag" || "$flag" == "$expected_flag" ) ]]
+}
 
-# Step 2: disable the flag
-echo "=== Step 2: disabling ai_smart_template flag ==="
-curl -sS -X POST http://localhost:18000/api/v1/admin/feature-flags/ai_smart_template/toggle \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"enabled":false,"reason":"validation test"}'
-# Expected: 200 OK with {"key":"ai_smart_template","enabled":false,...}
+# Prove the enabled route remains intentionally unavailable; this makes no AI call.
+curl -fsS -X POST "$TOGGLE_URL" -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"enabled":true,"reason":"staging kill-switch validation"}' >/dev/null
+echo 'Enabled flag: expect ai_feature_unavailable (endpoint stays disabled).'
+probe ai_feature_unavailable 503
 
-# Step 3: verify endpoint now returns 503
-echo "=== Step 3: flag disabled, endpoint should return 503 ==="
-curl -sS -o /dev/null -w "HTTP %{http_code}\n" \
-  -X POST http://localhost:18000/api/v1/emr-ai-enhanced/generate-smart-template \
-  -H "Authorization: Bearer $DOCTOR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"specialty":"cardiology","patient_id":1,"visit_id":1}'
-# Expected: HTTP 503
-
-# Step 4: re-enable the flag
-echo "=== Step 4: re-enabling flag ==="
-curl -sS -X POST http://localhost:18000/api/v1/admin/feature-flags/ai_smart_template/toggle \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"enabled":true,"reason":"validation test cleanup"}'
+curl -fsS -X POST "$TOGGLE_URL" -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"enabled":false,"reason":"staging kill-switch validation"}' >/dev/null
+echo 'Disabled flag: expect feature_disabled (kill-switch intercepted first).'
+probe feature_disabled 503 ai_smart_template
 ```
+
+The `EXIT` trap restores the original flag state. Check the script output and
+confirm restoration with `GET /api/v1/admin/feature-flags/ai_smart_template`.
+If the shell is forcibly terminated before the trap runs, restore the captured
+value manually through the admin feature-flags UI or toggle endpoint.
 
 ### Expected
 
-- Step 1: HTTP 200 or 422 (NOT 503)
-- Step 2: HTTP 200
-- Step 3: **HTTP 503** (this is the kill-switch working)
-- Step 4: HTTP 200
+- Enabled: HTTP 503, `detail.error=ai_feature_unavailable`.
+- Disabled: HTTP 503, `detail.error=feature_disabled`,
+  `detail.flag=ai_smart_template`.
+- After the check: the flag's original enabled value is restored.
 
 ### If it fails
 
-- **Step 3 returns 200 not 503**: feature flag wiring broken — check
-  `backend/app/services/ai_feature_gating.py` + endpoint decorator
-- **Step 2 returns 403**: admin token invalid or admin role misconfigured
-- **Step 1 returns 503**: flag was already disabled, or `seed_ai_feature_flags`
-  wasn't run
+- **Enabled returns `feature_disabled`**: the flag was not enabled or the
+  environment/database is not the intended staging target.
+- **Disabled returns `ai_feature_unavailable`**: the gate did not intercept;
+  inspect `backend/app/services/ai_feature_gating.py` and the route dependency.
+- **Either response is not HTTP 503**: inspect the exact route and response;
+  do not enable or deploy AI generation as a workaround.
+- **Toggle returns 403**: complete admin authentication, including 2FA, and
+  verify the account has the Admin role.
 
 ---
 
@@ -446,25 +473,97 @@ notification channel. If bot is broken, patients miss appointments.
 
 ### Prerequisites
 
-- `TELEGRAM_BOT_TOKEN` env var set (from @BotFather)
-- At least one patient has linked their Telegram account via mini-app
+- A dedicated staging bot created for this environment; never reuse the
+  production bot token
+- The staging bot token is set as `TELEGRAM_BOT_TOKEN` in the untracked
+  `ops/staging.env`, then the isolated staging backend and worker are recreated
+  from that same env file
+- No production bot token is saved in the staging database: a DB-configured
+  token takes precedence over `TELEGRAM_BOT_TOKEN`
+- A synthetic staging patient has linked the staging bot via mini-app and
+  started a conversation with it
 - Worker is running (Check 5)
+
+Keep the token out of chat, commits, screenshots, shell history, and logs. Do
+not enable shell tracing (`set -x`). Never run Compose from the production
+checkout against staging until its project name and env file are confirmed.
 
 ### Run
 
 ```bash
-# 1. Verify bot is reachable
-curl -sS "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getMe" | python -m json.tool
-# Expected: {"ok":true,"result":{"id":...,"is_bot":true,"first_name":"...","username":"..."}}
+# Run from a trusted staging host. Prompt for the token so it is not stored in
+# shell history. Run from the repository root of the isolated staging checkout.
+# Use the existing project name shown by `docker compose ls`; do not guess it.
+(
+set -e
+trap 'unset STAGING_TELEGRAM_TOKEN' EXIT
+read -rp "Existing staging Compose project name: " STAGING_COMPOSE_PROJECT
+docker compose --project-name "$STAGING_COMPOSE_PROJECT" \
+  --env-file ops/staging.env \
+  -f ops/compose.staging.yml \
+  up -d --build --no-deps backend worker
+unset STAGING_COMPOSE_PROJECT
 
-# 2. Send a test message to yourself (replace CHAT_ID with your Telegram chat ID)
-curl -sS -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-  -H "Content-Type: application/json" \
-  -d '{"chat_id": <CHAT_ID>, "text": "staging validation test - telegram delivery"}'
-# Expected: {"ok":true,"result":{"message_id":...,...}}
+# Enter only the dedicated staging bot token.
+read -rsp "Staging bot token: " STAGING_TELEGRAM_TOKEN; echo
+export STAGING_TELEGRAM_TOKEN
 
-# 3. Trigger a visit reminder via arq (Check 5 step 2) — patient should receive it in Telegram
+# 1. Check bot identity without printing the token or full response.
+python - <<'PY'
+import getpass
+import json
+import os
+import urllib.request
+
+token = os.environ.get("STAGING_TELEGRAM_TOKEN") or getpass.getpass("Staging bot token: ")
+request = urllib.request.Request(f"https://api.telegram.org/bot{token}/getMe")
+try:
+    with urllib.request.urlopen(request, timeout=15) as response:
+        result = json.load(response)
+except Exception:
+    raise SystemExit("Telegram getMe request failed; inspect staging bot configuration without sharing the token") from None
+if not result.get("ok"):
+    raise SystemExit("Telegram getMe failed; inspect staging bot configuration without sharing the token")
+bot = result["result"]
+print(f"OK: is_bot={bot.get('is_bot')} username=@{bot.get('username', '')}")
+PY
+
+# 2. Send one test message only to the explicitly designated synthetic staging
+# test chat. The prompt hides the chat ID; do not use a patient's real chat.
+python - <<'PY'
+import getpass
+import json
+import os
+import urllib.parse
+import urllib.request
+
+token = os.environ.get("STAGING_TELEGRAM_TOKEN") or getpass.getpass("Staging bot token: ")
+chat_id = getpass.getpass("Synthetic staging test chat ID: ")
+body = urllib.parse.urlencode({"chat_id": chat_id, "text": "Staging Telegram delivery check"}).encode()
+request = urllib.request.Request(
+    f"https://api.telegram.org/bot{token}/sendMessage",
+    data=body,
+    headers={"Content-Type": "application/x-www-form-urlencoded"},
+)
+try:
+    with urllib.request.urlopen(request, timeout=15) as response:
+        result = json.load(response)
+except Exception:
+    raise SystemExit("Telegram test send failed; inspect staging configuration without sharing token or chat ID") from None
+if not result.get("ok"):
+    raise SystemExit("Telegram test send failed; inspect staging configuration without sharing token or chat ID")
+print("OK: Telegram accepted the staging test message")
+PY
+
+# 3. Trigger a reminder for the synthetic, staging-linked patient via arq
+# (Check 5 step 2); verify it arrives in that same synthetic test chat.
+)
 ```
+
+The staging DB must contain either no bot-token setting or the same dedicated
+staging bot token. If a token was configured through Admin → Telegram settings,
+verify it is the staging bot before testing; never copy a production token into
+staging.
 
 ### If it fails
 
