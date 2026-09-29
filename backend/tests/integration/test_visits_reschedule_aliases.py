@@ -201,3 +201,140 @@ class TestVisitsRescheduleAliases:
 
         assert response.status_code == 422, response.text
         assert "HH:MM" in response.json()["detail"]
+
+    def _make_derm_history(
+        self,
+        db_session,
+        test_patient,
+        test_doctor,
+        admin_user,
+        *,
+        visit_date,
+    ):
+        """Визит + дерма-ЭМК с осмотром: строки read model спроектированы."""
+        from tests.integration.test_derma_history_read_model import (
+            _add_emr,
+            _add_visit,
+            _derma_emr_data,
+            _entries,
+        )
+
+        visit = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+            visit_date=visit_date,
+        )
+        emr = _add_emr(
+            db_session,
+            visit=visit,
+            data=_derma_emr_data(procedures=0, with_exam=True),
+            created_by=admin_user.id,
+        )
+        entries = _entries(
+            db_session, kind="examination", source="emr", record_id=emr.id
+        )
+        assert len(entries) == 1
+        assert entries[0].entry_date == visit_date
+        return visit, emr
+
+    def test_reschedule_updates_derma_read_model(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """P1 (owner fact-check 5625c8f1b, репро на SQLite): reschedule-роут
+        пишет visit_date Core-UPDATE'ом по рефлектированной таблице —
+        after_flush listener read model его не видит. Фикс: пересчёт строк
+        визита в той же транзакции. дерма-ЭМК с осмотром на X, перенос на
+        Y — entry_date/payload.examination_date и порядок GET /derma/*
+        обязаны дать Y (прежде — старая дата и неверный порядок)."""
+        from tests.integration.test_derma_history_read_model import (
+            _entries,
+        )
+
+        # второй визит с более СТАРОЙ датой: после переноса первого в
+        # будущее порядок GET /derma/* обязан перевернуться
+        self._make_derm_history(
+            db_session,
+            test_patient,
+            test_doctor,
+            admin_user,
+            visit_date=date.today() - timedelta(days=30),
+        )
+        visit, emr = self._make_derm_history(
+            db_session,
+            test_patient,
+            test_doctor,
+            admin_user,
+            visit_date=date.today() - timedelta(days=5),
+        )
+
+        new_date = date.today() + timedelta(days=20)
+        response = client.post(
+            f"/api/v1/visits/visits/{visit.id}/reschedule",
+            headers=auth_headers,
+            params={"new_date": new_date.isoformat()},
+        )
+        assert response.status_code == 200, response.text
+
+        # Core DELETE+INSERT не обновляет identity map сессии — перечитываем
+        db_session.expire_all()
+        entries = _entries(db_session, kind="examination", source="emr")
+        assert len(entries) == 2
+        moved = [e for e in entries if e.record_id == emr.id][0]
+        assert moved.entry_date == new_date
+        assert moved.payload["examination_date"] == new_date.isoformat()
+
+        # живой эндпоинт: новая дата первой строкой (newest-first)
+        derma = client.get(
+            f"/api/v1/derma/examinations?patient_id={test_patient.id}"
+            "&page=1&size=50",
+            headers=auth_headers,
+        )
+        assert derma.status_code == 200, derma.text
+        items = derma.json()["items"]
+        assert items[0]["id"] == f"emr-{emr.id}"
+        assert items[0]["examination_date"] == new_date.isoformat()
+
+    def test_reschedule_tomorrow_updates_derma_read_model(
+        self,
+        client,
+        db_session,
+        auth_headers,
+        test_patient,
+        test_doctor,
+        admin_user,
+    ):
+        """P1 (owner fact-check 5625c8f1b), второй независимый сайт записи:
+        /reschedule/tomorrow — собственный Core-UPDATE в эндпоинте, не
+        делегирует сервису. Досинхронизация обязательна и здесь."""
+        from tests.integration.test_derma_history_read_model import (
+            _entries,
+        )
+
+        visit, emr = self._make_derm_history(
+            db_session,
+            test_patient,
+            test_doctor,
+            admin_user,
+            visit_date=date.today() - timedelta(days=5),
+        )
+
+        response = client.post(
+            f"/api/v1/visits/visits/{visit.id}/reschedule/tomorrow",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, response.text
+
+        tomorrow = date.today() + timedelta(days=1)
+        db_session.expire_all()
+        entries = _entries(db_session, kind="examination", source="emr")
+        assert len(entries) == 1
+        assert entries[0].record_id == emr.id
+        assert entries[0].entry_date == tomorrow
+        assert entries[0].payload["examination_date"] == tomorrow.isoformat()

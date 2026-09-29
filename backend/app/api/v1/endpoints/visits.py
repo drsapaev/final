@@ -14,6 +14,7 @@ from app.api.deps import get_db, require_roles
 from app.core.roles import DOCTOR_FAMILY_GATE_ROLES, is_doctor_role_spelling
 from app.models.clinic import Doctor
 from app.models.visit import Visit
+from app.services.derma_history_projection import resync_derma_history_for_visits
 from app.services.patient_access_audit import (
     log_patient_access,
     log_patient_access_many,
@@ -116,9 +117,7 @@ from app.tasks.lease import REMINDER_IN_PROGRESS_DETAIL as _REMINDER_IN_PROGRESS
 # the SCHEDULE (generation) moved on between the row read and the UPDATE
 # — a concurrent reschedule committed. That is a different condition from
 # an in-flight delivery and gets its own refusal detail.
-_SCHEDULE_MOVED_DETAIL = (
-    "Visit schedule was modified concurrently; refresh and retry"
-)
+_SCHEDULE_MOVED_DETAIL = "Visit schedule was modified concurrently; refresh and retry"
 
 
 def _visits(db: Session) -> Table:
@@ -242,7 +241,9 @@ def _ensure_doctor_can_create_visit_for_payload(
         raise HTTPException(status_code=403, detail="Access denied")
 
 
-@router.get("", response_model=list[VisitOut], summary="Список визитов (мобильный алиас)")
+@router.get(
+    "", response_model=list[VisitOut], summary="Список визитов (мобильный алиас)"
+)
 @router.get("/visits", response_model=list[VisitOut], summary="Список визитов")
 def list_visits(
     request: Request,
@@ -740,9 +741,7 @@ def reschedule_visit(
         # and echoes the CURRENT committed state, so it can never restore
         # an old schedule value over a newer commit (lost update), never
         # clear a stamp and never touch a live lease.
-        fresh = (
-            db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
-        )
+        fresh = db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
         if not fresh:
             raise HTTPException(404, "Visit not found")
         return VisitOut(**fresh)  # type: ignore[arg-type]
@@ -817,9 +816,10 @@ def reschedule_visit(
             # wait loop's last poll (in-progress delivery) vs a concurrent
             # schedule change (the generation no longer matches the one
             # read above). Different detail, same 409 status.
-            live_lease = lease_free is not None and current.get(
-                "reminder_claimed_at"
-            ) is not None
+            live_lease = (
+                lease_free is not None
+                and current.get("reminder_claimed_at") is not None
+            )
             if live_lease:
                 from datetime import datetime
 
@@ -850,6 +850,13 @@ def reschedule_visit(
         )
     except Exception:
         pass
+
+    # P1 (owner fact-check 5625c8f1b): visit_date пишется Core-UPDATE'ом по
+    # рефлектированной таблице — after_flush listener read model его не
+    # видит. Пересчёт строк визита в ТОЙ ЖЕ транзакции: откат reschedule
+    # откатывает и проекцию (иначе derma_history_entries молча остаётся
+    # на старой дате, расходясь с ответами GET /derma/*).
+    resync_derma_history_for_visits(db, [visit_id])
 
     db.commit()
     return VisitOut(**row)  # type: ignore[arg-type]
@@ -896,9 +903,7 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
     # write; the no-op echoes the freshly re-read row instead of restoring
     # an old value over it.
     if tomorrow == vrow.get("visit_date"):
-        fresh = (
-            db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
-        )
+        fresh = db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
         if not fresh:
             raise HTTPException(404, "Visit not found")
         return VisitOut(**fresh)  # type: ignore[arg-type]
@@ -937,9 +942,10 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
         current = db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
         if current:
             # Same loser-cause distinction as the /reschedule route.
-            live_lease = lease_free is not None and current.get(
-                "reminder_claimed_at"
-            ) is not None
+            live_lease = (
+                lease_free is not None
+                and current.get("reminder_claimed_at") is not None
+            )
             if live_lease:
                 from datetime import datetime
 
@@ -970,6 +976,13 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
         )
     except Exception:
         pass
+
+    # P1 (owner fact-check 5625c8f1b): visit_date пишется Core-UPDATE'ом по
+    # рефлектированной таблице — after_flush listener read model его не
+    # видит. Пересчёт строк визита в ТОЙ ЖЕ транзакции: откат reschedule
+    # откатывает и проекцию (иначе derma_history_entries молча остаётся
+    # на старой дате, расходясь с ответами GET /derma/*).
+    resync_derma_history_for_visits(db, [visit_id])
 
     db.commit()
     return VisitOut(**row)  # type: ignore[arg-type]

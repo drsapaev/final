@@ -44,6 +44,23 @@ class VisitsApiRepository:
 
         return wait_for_reminder_lease_clear(self.db, visit_id)
 
+    def resync_derma_history_for_visit(self, visit_id: int) -> dict[str, int]:
+        """Пересчитать строки derma read model визита (P1, owner fact-check
+        5625c8f1b).
+
+        reschedule_visit пишет visit_date Core-UPDATE'ом по рефлектированной
+        таблице «visits» — after_flush listener видит только ORM-изменения.
+        Тот же boundary-контракт, что у wait_for_reminder_lease_clear:
+        сервис не трогает сессию напрямую, досинхронизация live здесь.
+        Вызывать в ТОЙ ЖЕ транзакции, что и UPDATE (до commit) — см.
+        app.services.derma_history_projection.resync_derma_history_for_visits.
+        """
+        from app.services.derma_history_projection import (
+            resync_derma_history_for_visits,
+        )
+
+        return resync_derma_history_for_visits(self.db, [visit_id])
+
     def create_visit_via_crud(
         self,
         *,

@@ -11,8 +11,19 @@
   — ровно та же проекция, что и в эндпоинтах, плюс связь с записью-источником;
 - after_flush listener поддерживает таблицу автоматически при ЛЮБОЙ записи
   источников через ORM (сервисы ЭМК, cutover, тесты, утилиты) — та же
-  транзакция, откат источника откатывает и проекцию;
-- миграция 0075 выполняет одноразовый backfill тех же строк.
+  транзакция, откат источника откатывает и проекцию; внутри события
+  только Core SQL (DML и чтение) — ORM-загрузки в after_flush обходят
+  предупреждение SQLAlchemy о не приведённом состоянии identity map;
+- resync_derma_history_for_visits — досинхронизация для ИЗВЕСТНЫХ классов
+  производственной записи мимо ORM: (а) reschedule-пути пишут visit_date
+  Core-UPDATE'ом по рефлектированной таблице «visits» (owner fact-check
+  5625c8f1b, P1); (б) Telegram /move_visit — bulk query(Visit).update()
+  через ORM-Query API (owner review 9e6c0f6c1, P1). Оба обходят
+  after_flush listener; вызов в той же транзакции, что и UPDATE, —
+  строки read model визита пересчитываются атомарно;
+- миграция 0075 выполняет одноразовый backfill тех же строк (батчами
+  keyset, без полной материализации в памяти); rebuild_derma_history_entries
+  — тот же пересчёт как runbook-команда для любой внешней правки источников.
 
 Контракт порядка (закреплён паритет-тестом): выборка из read model
 ORDER BY entry_date DESC, created_at DESC, source ASC, record_id DESC,
@@ -24,9 +35,11 @@ newest-first, при равенстве дат EMR раньше legacy, внут
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterable
 from datetime import date, datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
@@ -42,6 +55,64 @@ from app.schemas.derma import (
 from app.services.emr_contract import extract_diagnosis_main
 
 _ENTRY_TABLE = DermaHistoryEntry.__table__
+
+# Колонки источников, которые реально читает проекция — ЯВНЫЕ списки, а не
+# sa.select всей таблицы живой модели (owner fact-check 5625c8f1b, P2-2):
+# backfill миграции 0075 делегирует rebuild'у, и SELECT колонки, которой
+# в БД на шаге 0075 ещё нет, сломал бы `alembic upgrade head` с нуля, как
+# только будущая миграция добавит колонку в visits/emr_records/legacy.
+# Состав заморожен пином в test_derma_history_write_path_audit.
+_EMR_SOURCE_COLUMNS = (
+    EMRRecord.__table__.c.id,
+    EMRRecord.__table__.c.visit_id,
+    EMRRecord.__table__.c.patient_id,
+    EMRRecord.__table__.c.data,
+    EMRRecord.__table__.c.created_at,
+    EMRRecord.__table__.c.updated_at,
+    EMRRecord.__table__.c.is_active,
+)
+_VISIT_SOURCE_COLUMNS = (
+    Visit.__table__.c.id,
+    Visit.__table__.c.visit_date,
+    Visit.__table__.c.doctor_id,
+)
+_LEGACY_EXAMINATION_COLUMNS = tuple(
+    DermaExamination.__table__.c[name]
+    for name in (
+        "id",
+        "patient_id",
+        "visit_id",
+        "doctor_id",
+        "examination_date",
+        "skin_type",
+        "skin_condition",
+        "lesions",
+        "distribution",
+        "symptoms",
+        "diagnosis",
+        "treatment_plan",
+        "created_at",
+        "updated_at",
+    )
+)
+_LEGACY_PROCEDURE_COLUMNS = tuple(
+    DermaProcedure.__table__.c[name]
+    for name in (
+        "id",
+        "patient_id",
+        "visit_id",
+        "doctor_id",
+        "procedure_date",
+        "procedure_type",
+        "area_treated",
+        "products_used",
+        "results",
+        "follow_up",
+        "total_cost",
+        "created_at",
+        "updated_at",
+    )
+)
 
 # Специальность ЭМК, проекция которой попадает в историю дермы (SSOT;
 # SQL-фильтр эндпоинта и Python-фильтр listener'а обязаны совпадать)
@@ -108,7 +179,7 @@ def derma_exam_has_content(
 
 
 def _emr_examination_items(
-    records: list[Any], visits: dict[int, Visit]
+    records: list[Any], visits: dict[int, Any]
 ) -> list[tuple[DermaExaminationHistoryOut, int, int]]:
     """Проекция осмотров: (row, record_id, position=0), по ≤1 строке на запись."""
     items: list[tuple[DermaExaminationHistoryOut, int, int]] = []
@@ -148,7 +219,7 @@ def _emr_examination_items(
 
 
 def _emr_procedure_items(
-    records: list[Any], visits: dict[int, Visit]
+    records: list[Any], visits: dict[int, Any]
 ) -> list[tuple[DermaProcedureHistoryOut, int, int]]:
     """Проекция процедур: (row, record_id, index) из specialty_data.cosmetic_procedures."""
     items: list[tuple[DermaProcedureHistoryOut, int, int]] = []
@@ -196,14 +267,14 @@ def _emr_procedure_items(
 
 
 def emr_examination_rows(
-    records: list[Any], visits: dict[int, Visit]
+    records: list[Any], visits: dict[int, Any]
 ) -> list[DermaExaminationHistoryOut]:
     """Строки осмотров из ЭМК (контракт эндпоинта, без связи с записью)."""
     return [row for row, _, _ in _emr_examination_items(records, visits)]
 
 
 def emr_procedure_rows(
-    records: list[Any], visits: dict[int, Visit]
+    records: list[Any], visits: dict[int, Any]
 ) -> list[DermaProcedureHistoryOut]:
     """Строки процедур из ЭМК (контракт эндпоинта, без связи с записью)."""
     return [row for row, _, _ in _emr_procedure_items(records, visits)]
@@ -263,9 +334,7 @@ def _entry_dicts(kind: str, items: list[tuple[Any, int, int]]) -> list[dict[str,
     ]
 
 
-def emr_entry_dicts(
-    records: list[Any], visits: dict[int, Visit]
-) -> list[dict[str, Any]]:
+def emr_entry_dicts(records: list[Any], visits: dict[int, Any]) -> list[dict[str, Any]]:
     """Все строки read model для списка ЭМК-записей (оба kind)."""
     return [
         *_entry_dicts("examination", _emr_examination_items(records, visits)),
@@ -282,27 +351,29 @@ def legacy_procedure_entry_dicts(rows: list[Any]) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# Обслуживание таблицы (core DML, без ORM-состояния — безопасно внутри flush)
+# Обслуживание таблицы (только Core SQL: DML и чтение — без ORM-загрузок)
 # ---------------------------------------------------------------------------
 
 
-def _visit_map_for_records(session: Session, records: list[Any]) -> dict[int, Visit]:
-    """Визиты затронутых записей: сначала identity map сессии, затем один IN-запрос."""
-    visit_map: dict[int, Visit] = {}
-    missing: set[int] = set()
-    for record in records:
-        visit_id = record.visit_id
-        if visit_id is None or visit_id in visit_map:
-            continue
-        visit = session.get(Visit, visit_id)
-        if visit is not None:
-            visit_map[visit_id] = visit
-        else:
-            missing.add(visit_id)
-    if missing:
-        for visit in session.query(Visit).filter(Visit.id.in_(missing)).all():
-            visit_map[visit.id] = visit
-    return visit_map
+def _visit_map_for_records(session: Session, records: list[Any]) -> dict[int, Any]:
+    """Визиты затронутых записей: ОДИН batched Core-SELECT трёх колонок.
+
+    Специально НЕ ORM-загрузка (session.get/query): after_flush
+    выполняется до приведения внутреннего состояния сессии, и SQLAlchemy
+    предупреждает, что ORM-запросы внутри события могут путать identity
+    map. Core-SELECT видит строки этого же flush'а (та же транзакция:
+    INSERT/UPDATE уже выполнены) и не трогает identity map вовсе.
+    Row даёт attribute access visit_date/doctor_id — то, что нужно
+    проекции (history_exam_date / doctor_id).
+    """
+    visit_ids = {record.visit_id for record in records if record.visit_id is not None}
+    if not visit_ids:
+        return {}
+    visit_tbl = Visit.__table__
+    rows = session.execute(
+        sa.select(*_VISIT_SOURCE_COLUMNS).where(visit_tbl.c.id.in_(visit_ids))
+    ).all()
+    return {row.id: row for row in rows}
 
 
 def replace_emr_entries(session: Session, records: list[Any]) -> None:
@@ -311,13 +382,17 @@ def replace_emr_entries(session: Session, records: list[Any]) -> None:
     insert_emr_entries(session, records)
 
 
-def insert_emr_entries(session: Session, records: list[Any]) -> None:
-    """Вставить проекцию записей (без удаления — для уже очищенных id)."""
+def insert_emr_entries(session: Session, records: list[Any]) -> int:
+    """Вставить проекцию записей (без удаления — для уже очищенных id).
+
+    Возвращает число вставленных строк (счётчик resync-вызовов и CLI).
+    """
     if not records:
-        return
+        return 0
     entries = emr_entry_dicts(records, _visit_map_for_records(session, records))
     if entries:
         session.execute(_ENTRY_TABLE.insert(), entries)
+    return len(entries)
 
 
 def remove_emr_entries(session: Session, record_ids: set[int]) -> None:
@@ -329,6 +404,49 @@ def remove_emr_entries(session: Session, record_ids: set[int]) -> None:
             _ENTRY_TABLE.c.record_id.in_(record_ids),
         )
     )
+
+
+def resync_derma_history_for_visits(
+    session: Session, visit_ids: Iterable[int]
+) -> dict[str, int]:
+    """Пересчитать строки read model для ЭМК-записей данных визитов.
+
+    P1 (owner fact-check 5625c8f1b): reschedule-пути пишут visit_date
+    Core-UPDATE'ом по рефлектированной таблице «visits» — after_flush
+    listener видит только ORM-изменения, и derma_history_entries молча
+    оставалась на старой дате (расходились entry_date,
+    payload.examination_date и порядок ответов GET /derma/*).
+
+    P1 (owner review 9e6c0f6c1): тот же класс обхода через ORM-Query API —
+    bulk query(Visit).update(..., synchronize_session=False) в
+    Telegram staff_move_visit; фиксирован вызовом здесь (после
+    refresh(visit), до _commit_or_flush) в той же транзакции.
+
+    Вызывается в ТОЙ ЖЕ транзакции, что и UPDATE источника: удаление+вставка
+    строк визита атомарны с изменением источника — откат мутации откатывает
+    и проекцию. Пустой для визитов без ЭМК (дёшево, можно звать всегда).
+
+    Только Core SQL — пригоден и как runbook-инструмент: scoped-режим
+    CLI resync_derma_history.py работает через эту функцию и не делает
+    глобального DELETE (живой трафик не блокируется надолго).
+    """
+    ids = {int(visit_id) for visit_id in visit_ids if visit_id is not None}
+    if not ids:
+        return {"visits": 0, "emr_records": 0, "entries": 0}
+    emr_tbl = EMRRecord.__table__
+    records = session.execute(
+        sa.select(*_EMR_SOURCE_COLUMNS).where(emr_tbl.c.visit_id.in_(ids))
+    ).all()
+    remove_emr_entries(session, {record.id for record in records})
+    entries = insert_emr_entries(
+        session,
+        [
+            record
+            for record in records
+            if record.is_active and is_dermatology_emr(record)
+        ],
+    )
+    return {"visits": len(ids), "emr_records": len(records), "entries": entries}
 
 
 def _replace_legacy_entries(
@@ -352,6 +470,125 @@ def _replace_legacy_entries(
     )
     if entries:
         session.execute(_ENTRY_TABLE.insert(), entries)
+
+
+# ---------------------------------------------------------------------------
+# Полный пересчёт (backfill/ребилд): keyset-батчи, память O(batch)
+# ---------------------------------------------------------------------------
+
+DEFAULT_REBUILD_BATCH_SIZE = 2000
+
+
+def rebuild_derma_history_entries(
+    bind: sa.Connection, *, batch_size: int = DEFAULT_REBUILD_BATCH_SIZE
+) -> dict[str, int]:
+    """Пакетированный полный пересчёт read model из источников.
+
+    Review follow-up (owner fact-check a6cbef, backfill 0075): прежний
+    backfill читал ВСЕ три источника через .all() и копил строки в памяти
+    перед одним insert — неограниченный RSS на живой истории. Здесь:
+    keyset-пагинация по id каждого источника (WHERE id > курсор ORDER BY
+    id LIMIT batch), визиты — batched IN-запрос на батч, вставка пачками;
+    память O(batch_size), не O(история).
+
+    Review follow-up (owner fact-check 5625c8f1b, P2-2): источники читаются
+    ЯВНЫМИ списками колонок (_EMR_SOURCE_COLUMNS / _VISIT_SOURCE_COLUMNS /
+    _LEGACY_*), а не sa.select всей таблицы живой модели — `alembic upgrade
+    head` с нуля не сломается на 0075, когда будущая миграция добавит
+    колонку в модель источника (в БД на шаге 0075 её ещё нет).
+
+    Детерминированный полный рефреш: DELETE всех строк + повторная
+    проекция теми же SSOT-функциями, что обслуживают listener и
+    эндпоинты. Выполняется в транзакции вызывающего (миграция 0075 —
+    транзакция alembic; CLI — собственная транзакция): атомарно, откат
+    возвращает прежнее состояние таблицы.
+
+    ОПЕРАЦИОННОЕ ОГРАНИЧЕНИЕ (owner fact-check 5625c8f1b, P2-3): полный
+    режим держит блокировки строк derma_history_entries до конца ЕДИНОЙ
+    транзакции. Под живым трафиком параллельный after_flush listener
+    (сохранение ЭМК врача) упирается в блокировку и ждёт, а его INSERT
+    после коммита пересчёта может нарушить uq_derma_history_entry_identity
+    и уронить сохранение ЭМК. Полный пересчёт — только в окне обслуживания
+    с остановленной записью; под трафиком — scoped-режим
+    (resync_derma_history_for_visits / CLI --visit-ids): без глобального
+    DELETE, блокируется только диапазон затронутых визитов.
+
+    Также runbook-команда для ЛЮБОЙ внешней правки источников мимо ORM
+    (Core DML, data-миграции, raw SQL) — единственный класс записей,
+    который after_flush listener не видит.
+    """
+    entries_tbl = DermaHistoryEntry.__table__
+    emr_tbl = EMRRecord.__table__
+    visit_tbl = Visit.__table__
+
+    deleted = bind.execute(entries_tbl.delete()).rowcount or 0
+    counts = {
+        "deleted": int(deleted),
+        "emr_batches": 0,
+        "emr_entries": 0,
+        "legacy_examination": 0,
+        "legacy_procedure": 0,
+    }
+
+    # Активные дерма-ЭМК: SQL-фильтр по specialty (портативный:
+    # JSON_EXTRACT / ->>, подтверждено в #3494), keyset по id
+    cursor: int = 0
+    while True:
+        records = bind.execute(
+            sa.select(*_EMR_SOURCE_COLUMNS)
+            .where(
+                emr_tbl.c.id > cursor,
+                emr_tbl.c.is_active.is_(True),
+                emr_tbl.c.data["specialty"].as_string() == DERMATOLOGY_SPECIALTY,
+            )
+            .order_by(emr_tbl.c.id)
+            .limit(batch_size)
+        ).all()
+        if not records:
+            break
+        cursor = records[-1].id
+        visit_ids = {
+            record.visit_id for record in records if record.visit_id is not None
+        }
+        visits: dict[int, Any] = {}
+        if visit_ids:
+            for row in bind.execute(
+                sa.select(*_VISIT_SOURCE_COLUMNS).where(visit_tbl.c.id.in_(visit_ids))
+            ).all():
+                visits[row.id] = row
+        entries = emr_entry_dicts(records, visits)
+        if entries:
+            bind.execute(entries_tbl.insert(), entries)
+        counts["emr_batches"] += 1
+        counts["emr_entries"] += len(entries)
+
+    # Legacy-таблицы заморожены (POST → 410, #3489): проектируем как есть
+    for columns, kind, count_key in (
+        (_LEGACY_EXAMINATION_COLUMNS, "examination", "legacy_examination"),
+        (_LEGACY_PROCEDURE_COLUMNS, "procedure", "legacy_procedure"),
+    ):
+        id_column = columns[0]
+        cursor = 0
+        while True:
+            rows = bind.execute(
+                sa.select(*columns)
+                .where(id_column > cursor)
+                .order_by(id_column)
+                .limit(batch_size)
+            ).all()
+            if not rows:
+                break
+            cursor = rows[-1].id
+            entries = (
+                legacy_examination_entry_dicts(rows)
+                if kind == "examination"
+                else legacy_procedure_entry_dicts(rows)
+            )
+            if entries:
+                bind.execute(entries_tbl.insert(), entries)
+            counts[count_key] += len(entries)
+
+    return counts
 
 
 # ---------------------------------------------------------------------------
@@ -405,16 +642,17 @@ def _sync_derma_history(session: Session) -> None:
         elif isinstance(obj, Visit):
             affected_visit_ids.add(obj.id)
 
-    # Изменение визита (дата/врач) меняет проекцию его дерма-ЭМК
+    # Изменение визита (дата/врач) меняет проекцию его дерма-ЭМК.
+    # Тоже Core-SELECT (не session.query): строки, вставленные этим же
+    # flush'ом, видны в транзакции, а identity map не затрагивается.
     if affected_visit_ids:
-        for record in (
-            session.query(EMRRecord)
-            .filter(
-                EMRRecord.visit_id.in_(affected_visit_ids),
-                EMRRecord.is_active.is_(True),
+        emr_tbl = EMRRecord.__table__
+        for record in session.execute(
+            sa.select(*_EMR_SOURCE_COLUMNS).where(
+                emr_tbl.c.visit_id.in_(affected_visit_ids),
+                emr_tbl.c.is_active.is_(True),
             )
-            .all()
-        ):
+        ).all():
             affected_emr[record.id] = record
 
     if not (
