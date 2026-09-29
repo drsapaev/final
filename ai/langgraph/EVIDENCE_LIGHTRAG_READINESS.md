@@ -3425,3 +3425,50 @@ queue response identifiers and their API contract checks.
 - Keyword routing prioritized queue-time/ownership files and returned a one-file patch boundary that excluded the tests required by the additive API contract.
 - The code owner and affected contract were confirmed from executable route source, but the gate output would have blocked the user-approved scope.
 - Follow-up: make gate use optional and advisory for GPT-6 UI/API work that does not alter migrations, authentication/RBAC/security, production settings, queue ownership/fairness, or clinical lifecycle/signature rules; retain mandatory gate use for those high-risk categories.
+
+## Task 97 - AI kill-switch staging runbook gate misroute
+
+### User task
+Align staging validation Check 3 with the intentionally unavailable EMR AI
+route and prove the feature flag blocks it without enabling model generation.
+
+### Gate result
+- mode: `gate_known_root_cause`
+- result: `narrow_override`
+- `gate_misroute`: yes
+- `override_used`: yes
+- `known_root_cause_file`: `docs/runbooks/STAGING_VALIDATION.md`
+- first-touch files incorrectly pointed to frontend routing and omitted the
+  backend AI contract, runbook, and regression test.
+
+### Manual reconstruction and follow-up
+- Read the endpoint, router mount, feature-gating dependency, authentication/2FA
+  flow, existing test, and staging runbook to establish the narrow boundary.
+- The user explicitly authorized continuing after the misroute was reported.
+- Follow-up: improve gate routing for AI safety, staging runbook, and contract-test
+  tasks so it includes the executable route owner and validation docs.
+
+## Task 98 - Staging Telegram configuration gate misroute
+
+### User task
+Pass a dedicated staging Telegram bot token to the staging backend and arq
+worker, then make Check 6 safe and actionable without using production
+credentials or messaging real patients.
+
+### Gate result
+- mode: `gate_known_root_cause`
+- result: `narrow_override`
+- `gate_misroute`: yes
+- `override_used`: yes
+- `known_root_cause_file`: `ops/compose.staging.yml`
+- first-touch files pointed to Telegram API/UI handlers and omitted the staging
+  Compose file, env sample, and staging validation runbook.
+
+### Manual reconstruction and follow-up
+- Confirmed Compose omitted `TELEGRAM_BOT_TOKEN` for both backend and worker.
+- Confirmed the existing notification token resolver gives a DB-configured
+  token precedence over the environment fallback.
+- Kept the patch to staging Compose, its env sample, Check 6, and this evidence
+  entry. The user explicitly authorized continuing deployment preparation.
+- Follow-up: improve gate routing for staging-only runtime configuration and
+  validation-runbook work so it includes Compose/env owners and documentation.

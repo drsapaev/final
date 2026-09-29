@@ -48,6 +48,7 @@ from .department import (
     DepartmentService,
 )
 from .derma_examination import DermaExamination
+from .derma_history import DermaHistoryEntry
 from .derma_procedure import DermaProcedure
 
 # Временно отключены из-за проблем с relationships

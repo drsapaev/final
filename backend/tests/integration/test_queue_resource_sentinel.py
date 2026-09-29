@@ -649,7 +649,17 @@ def test_alembic_chain_single_head_0062() -> None:
         "0073_execution_routing_snapshot",
     )
     assert len("0074_join_payload_binding") <= 32
-    assert heads == ["0074_join_payload_binding"]
+    # derma history read model (issue #3506, P2 retro-review of #3494)
+    assert graph["0075_derma_history_read_model"] == (
+        "0074_join_payload_binding",
+    )
+    assert len("0075_derma_history_read_model") <= 32
+    # read-order index swap moves the head to 0076 (#3506 step 2)
+    assert graph["0076_derma_history_read_order"] == (
+        "0075_derma_history_read_model",
+    )
+    assert len("0076_derma_history_read_order") <= 32
+    assert heads == ["0076_derma_history_read_order"]
 
 
 # ============ Codex round-1: remaining credential surfaces ============
