@@ -870,3 +870,137 @@ class TestDermaP3LegacyAliasProjection:
         procs = _entries(db_session, kind="procedure", source="emr")
         assert len(procs) == 1
         assert procs[0].payload["procedure_type"] == "Только legacy ключ"
+
+    def test_p3_position_is_source_array_position_not_dense_display_index(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        """Owner P2 (round-3, head 6eef00e9d): position — стабильная
+        позиция записи в ИСХОДНОМ массиве источника, а не плотный индекс
+        отображаемых строк. Кейс вердикта: canonical [valid, invalid,
+        valid] + legacy [valid] → positions {0, 2, 3}, а не {0, 1, 2}:
+        invalid-запись (пустой procedure_type) пропускается БЕЗ
+        пересчёта позиций соседей. Гарантии при разрывах:
+        уникальность (kind, source, record_id, position),
+        canonical-раньше-legacy, id-суффикс и position в одном
+        source-индексном пространстве."""
+        visit = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+        )
+        emr = _add_emr(
+            db_session,
+            visit=visit,
+            data={
+                "specialty": "dermatology",
+                "diagnosis": {"main": "Розацеа", "secondary": []},
+                "specialty_data": {
+                    "cosmetic_procedures": [
+                        {
+                            "procedure_date": date.today().isoformat(),
+                            "procedure_type": "Каноническая первая",
+                            "area_treated": "Щёки",
+                        },
+                        {
+                            "procedure_date": date.today().isoformat(),
+                            # invalid: пустой procedure_type → строка не
+                            # проецируется, позиция 1 НЕ переиспользуется
+                            "procedure_type": "   ",
+                            "area_treated": "Лоб",
+                        },
+                        {
+                            "procedure_date": date.today().isoformat(),
+                            "procedure_type": "Каноническая третья",
+                            "area_treated": "Нос",
+                        },
+                    ],
+                    "procedures": [
+                        {
+                            "procedure_date": date.today().isoformat(),
+                            "procedure_type": "Legacy процедура",
+                            "area_treated": "Шея",
+                        }
+                    ],
+                },
+            },
+            created_by=admin_user.id,
+        )
+
+        procs = _entries(db_session, kind="procedure", source="emr")
+        assert len(procs) == 3  # 2 canonical valid + 1 legacy valid
+
+        by_id = {e.payload["id"]: e for e in procs}
+        assert sorted(by_id) == sorted(
+            [f"emr-{emr.id}-0", f"emr-{emr.id}-2", f"emr-{emr.id}-legacy-0"]
+        )
+        # Контракт вердикта: positions {0, 2, 3} — разрыв на пропущенной
+        # invalid-записи сохранён, плотность НЕ гарантируется
+        assert sorted(e.position for e in procs) == [0, 2, 3]
+        # id-суффикс и position живут в одном индексном пространстве
+        # источника: canonical position == source index
+        assert by_id[f"emr-{emr.id}-0"].position == 0
+        assert by_id[f"emr-{emr.id}-2"].position == 2
+        # legacy: len(canonical_entries)=3 + source index 0
+        assert by_id[f"emr-{emr.id}-legacy-0"].position == 3
+        # уникальность (kind, source, record_id, position) при разрывах
+        assert len({e.position for e in procs}) == 3
+        assert all(e.record_id == emr.id for e in procs)
+        # тай-брейк порядка: canonical-раньше-legacy даже с разрывами
+        assert max(
+            e.position for e in procs if "-legacy-" not in e.payload["id"]
+        ) < min(e.position for e in procs if "-legacy-" in e.payload["id"])
+
+    def test_p3_position_gap_in_legacy_array_keeps_source_indices(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        """Обратная сторона того же контракта: invalid-записи в LEGACY
+        массиве тоже не перенумеровывают соседей — canonical [valid] +
+        legacy [не-словарь, valid] → positions {0, 2}: canonical 0,
+        legacy len(canonical)=1 + source index 1 = 2; id остаётся
+        emr-<rid>-legacy-1 (source-индекс), а не legacy-0."""
+        visit = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+        )
+        emr = _add_emr(
+            db_session,
+            visit=visit,
+            data={
+                "specialty": "dermatology",
+                "diagnosis": {"main": "Розацеа", "secondary": []},
+                "specialty_data": {
+                    "cosmetic_procedures": [
+                        {
+                            "procedure_date": date.today().isoformat(),
+                            "procedure_type": "Единственная каноническая",
+                            "area_treated": "Щёки",
+                        }
+                    ],
+                    "procedures": [
+                        # invalid: не словарь → пропускается
+                        "повреждённая запись (не словарь)",
+                        {
+                            "procedure_date": date.today().isoformat(),
+                            "procedure_type": "Legacy вторая",
+                            "area_treated": "Шея",
+                        },
+                    ],
+                },
+            },
+            created_by=admin_user.id,
+        )
+
+        procs = _entries(db_session, kind="procedure", source="emr")
+        assert len(procs) == 2
+        by_id = {e.payload["id"]: e for e in procs}
+        assert sorted(by_id) == sorted([f"emr-{emr.id}-0", f"emr-{emr.id}-legacy-1"])
+        # canonical 0; legacy: len(canonical)=1 + source index 1 → 2
+        assert by_id[f"emr-{emr.id}-0"].position == 0
+        assert by_id[f"emr-{emr.id}-legacy-1"].position == 2
+        assert sorted(e.position for e in procs) == [0, 2]
+        # keyset-порядок чтения от разрывов не зависит: legacy всё ещё
+        # после canonical при тай-брейках
+        assert (
+            by_id[f"emr-{emr.id}-0"].position < by_id[f"emr-{emr.id}-legacy-1"].position
+        )

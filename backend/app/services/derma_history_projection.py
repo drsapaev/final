@@ -264,9 +264,19 @@ def _emr_procedure_items(
     разбор реально задублированных записей — Phase B (миграция данных с
     ручным ревью и журналированием), удаление алиаса — Phase C (только
     после аудита хранимых данных). Идентификаторы строк:
-    emr-<rid>-<index> (canonical) и emr-<rid>-legacy-<index> (alias);
-    position alias-записей смещена на длину canonical-массива —
-    уникальность (kind, source, record_id, position) и
+    emr-<rid>-<index> (canonical) и emr-<rid>-legacy-<index> (alias).
+    Контракт position (review P2, round-3): position — стабильная
+    позиция записи в её ИСХОДНОМ массиве (canonical: индекс в
+    cosmetic_procedures; alias: len(canonical_entries) + индекс в
+    procedures), а не плотный индекс отображаемых строк. Invalid-записи
+    (не-словарь / без procedure_type) пропускаются БЕЗ пересчёта
+    позиций соседей: разрывы допустимы ([valid, invalid, valid] +
+    [alias] → 0, 2, 3), плотность НЕ гарантируется и не требуется —
+    порядок чтения keyset (entry_date, created_at, source, record_id,
+    position) от разрывов не зависит, а id-суффикс и position живут в
+    одном индексном пространстве источника. Гарантируются:
+    уникальность (kind, source, record_id, position) — canonical-индексы
+    строго меньше len(canonical), alias-позиции не меньше — и
     canonical-раньше-legacy при тай-брейках порядка чтения (тот же
     порядок, что in-memory union прежней endpoint-реализации #3508).
     """
