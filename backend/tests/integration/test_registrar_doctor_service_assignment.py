@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
 from app.models.service import Service
 from app.models.user import User
 from app.models.visit import Visit
@@ -728,6 +729,126 @@ def test_registrar_catalog_keeps_resource_surface_for_pin_on_resource_tag(
     assert rows[0]["doctor_selection_required"] is False
     assert rows[0]["doctor_booking_available"] is False
     assert rows[0]["doctor_id"] == pinned_to.id
+
+
+def test_unflagged_pin_on_resource_tag_cart_save_books_resource_queue(
+    client: TestClient, db_session: Session, admin_user, test_patient
+):
+    """PR #3511 merge-gate e2e (owner verdict P1#1): write-нога cart-save
+    для НОВОГО входа «unflagged pin на ресурсном теге».
+
+    Read-нога запинена соседним
+    ``test_registrar_catalog_keeps_resource_surface_for_pin_on_resource_tag``
+    (doctor_selection_required=false, doctor_booking_available=false);
+    флагованный вариант — ``test_k10_resource_service_books_without_doctor_
+    into_resource_queue`` / ``..._with_doctor_fails_closed`` в
+    test_registrar_resource_service_classification.py. Здесь — недостающее
+    звено: пин (``Service.doctor_id``) без ``requires_doctor``/
+    ``is_consultation`` на теге АКТИВНОГО ресурса проходит cart-save
+    тем же контрактом ownership-wins:
+
+    - без врача → 200, запись в ресурсной очереди (пин декоративен:
+      specialist нет, вилки докторской очереди нет);
+    - с врачом — даже с САМИМ закреплённым врачом — 409 «ресурсная»
+      (fail-closed), частичного состояния нет. Второй пациент изолирует
+      RED-подпись от дубль-клейм-гварда: до round-5 ранний выход гварда
+      по сырым флагам обходил пин целиком и корзина принималась с любым
+      врачом — воспроизводится именно как «success с декоративным
+      врачом», а не как отказ по чужой причине.
+    """
+    from app.models.online_queue import QueueResource
+
+    pinned_to = _make_doctor(db_session, specialty="cardiology")
+    suffix = uuid4().hex[:8]
+    resource_tag = f"asg_pin_res_{suffix}"
+    resource = QueueResource(
+        code=f"asg_pin_{suffix}",
+        queue_tag=resource_tag,
+        display_name="Тестовый ресурс пина",
+        active=True,
+    )
+    db_session.add(resource)
+    db_session.commit()
+    service = _make_pinned_unflagged_service(
+        db_session,
+        code=f"ASG-P1F-CRT_{suffix}".upper(),
+        name=f"Закреплённая на ресурсном теге запись {suffix}",
+        pinned_to_id=pinned_to.id,
+        queue_tag=resource_tag,
+    )
+
+    booked = client.post(
+        "/api/v1/registrar/cart",
+        headers=_auth_headers(admin_user),
+        json=_cart_payload(
+            patient_id=test_patient.id,
+            visits=[
+                _visit(
+                    doctor_id=None,
+                    services=[{"service_id": service.id, "quantity": 1}],
+                )
+            ],
+        ),
+    )
+    assert booked.status_code == 200, booked.text
+
+    visit = db_session.query(Visit).get(booked.json()["visit_ids"][0])
+    assert visit.doctor_id is None
+    resource_queue = (
+        db_session.query(DailyQueue)
+        .filter(
+            DailyQueue.day == date.today(),
+            DailyQueue.queue_tag == resource_tag,
+        )
+        .one()
+    )
+    assert resource_queue.queue_resource_id == resource.id
+    assert resource_queue.specialist_id is None
+    entry = (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.visit_id == visit.id)
+        .one()
+    )
+    assert entry.queue_id == resource_queue.id
+    assert _doctor_queue_entries(db_session, pinned_to.id) == ([], [])
+
+    fresh_patient = Patient(
+        first_name="Пётр",
+        last_name="Петров",
+        middle_name="Петрович",
+        phone=f"+9989{uuid4().hex[:9]}",
+        birth_date=date(1990, 1, 1),
+        address="Тестовый адрес",
+    )
+    db_session.add(fresh_patient)
+    db_session.commit()
+    db_session.refresh(fresh_patient)
+
+    rejected = client.post(
+        "/api/v1/registrar/cart",
+        headers=_auth_headers(admin_user),
+        json=_cart_payload(
+            patient_id=fresh_patient.id,
+            visits=[
+                _visit(
+                    doctor_id=pinned_to.id,
+                    services=[{"service_id": service.id, "quantity": 1}],
+                )
+            ],
+        ),
+    )
+    assert rejected.status_code == 409, rejected.text
+    assert "ресурсная" in rejected.json()["detail"]
+    assert (
+        db_session.query(Visit).filter(Visit.patient_id == fresh_patient.id).count()
+        == 0
+    )
+    assert (
+        db_session.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.patient_id == fresh_patient.id)
+        .count()
+        == 0
+    )
 
 
 def test_unflagged_pinned_service_edit_delta_quote_rejects_other_doctor(
