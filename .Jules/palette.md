@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-09-29 - Translating native input clear button attributes
+**Learning:** The native clear button in the Input component had hardcoded English text ('Clear input') for `aria-label` and `title`, violating i18n standards.
+**Action:** Use `useTranslation` and `t()` with a `defaultValue` to localize internal components, avoiding hardcoded strings and ensuring robust fallback.
