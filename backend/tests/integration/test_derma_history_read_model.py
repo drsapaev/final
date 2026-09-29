@@ -382,15 +382,24 @@ class TestDermaHistoryReadModelProjection:
         assert exams[-1].entry_date == date.today() - timedelta(days=504)
         assert procs[-1].payload["procedure_type"] == "Процедура 504"
 
-    def test_endpoint_read_volume_is_constant_across_pages(
+    def test_endpoint_statement_count_is_constant_across_pages(
         self, client, db_session, auth_headers, test_patient, test_doctor, admin_user
     ):
-        """Issue #3506, шаг 2: объём чтения не растёт с глубиной истории.
+        """Issue #3506, шаг 2: пин постоянства ЧИСЛА SQL-выражений на страницу.
 
         Бывший in-memory путь читал ВСЕ строки обоих источников на каждый
         запрос страницы (P2 ретро-ревью #3494). Read model обслуживает
-        страницу фиксированным числом SQL-выражений (COUNT + срез) — пин:
+        страницу фиксированным числом SQL-выражений (COUNT + срез) —
         счётчик выражений на соединении одинаков для каждой страницы.
+
+        ВАЖНО (review follow-up, owner fact-check a6cbef): этот пин — про
+        ЧИСЛО ВЫРАЖЕНИЙ, не про объём чтения индексных записей/страниц.
+        COUNT сканирует индексный диапазон скоупинга, OFFSET проходит
+        (page-1)*size+size записей — фактический объём чтения растёт с
+        глубиной страницы линейно. Инструмент замера —
+        scripts/bench_derma_history_read_model.py (свитч глубины + PG
+        EXPLAIN (ANALYZE, BUFFERS) протокол); строгий инвариант без роста
+        требует keyset-пагинации — задокументированный follow-up.
         """
         from sqlalchemy import event as sa_event
 
@@ -462,3 +471,231 @@ class TestDermaHistoryReadModelProjection:
             assert total == records_count
             counts.append(statements)
         assert counts[0] == counts[1] == counts[2], counts
+
+
+class TestAfterFlushJointState:
+    """Review follow-up (owner fact-check раунда a6cbef): совместный flush.
+
+    SQLAlchemy допускает Core DML в after_flush, но предупреждает об
+    ORM-загрузках внутри события: внутреннее состояние сессии ещё не
+    приведено (identity map в flux). Эти пины покрывают совместные
+    flush'ы Visit + EMRRecord — пути, где листенер обязан видеть
+    согласованное состояние обоих источников.
+    """
+
+    def test_joint_create_visit_and_emr_single_flush(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        """Новый Visit и новая дерма-ЭМК в одной транзакции (flush визита,
+        затем flush ЭМК, один commit): проекция берёт visit_date/doctor_id
+        этой же транзакции, visit из identity map сессии."""
+        visit = Visit(
+            patient_id=test_patient.id,
+            doctor_id=test_doctor.id,
+            visit_date=date.today() - timedelta(days=7),
+            status="open",
+            source="desk",
+            department="dermatology",
+        )
+        db_session.add(visit)
+        db_session.flush()
+        emr = EMRRecord(
+            patient_id=test_patient.id,
+            visit_id=visit.id,
+            version=1,
+            status="draft",
+            created_by=admin_user.id,
+            data=_derma_emr_data(procedures=1, with_exam=True),
+        )
+        db_session.add(emr)
+        db_session.commit()
+
+        exams = _entries(db_session, kind="examination", source="emr")
+        assert len(exams) == 1
+        assert exams[0].record_id == emr.id
+        assert exams[0].entry_date == date.today() - timedelta(days=7)
+        assert exams[0].doctor_id == test_doctor.id
+
+    def test_visit_update_with_emr_create_single_flush(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        """Visit A (дата меняется, ЭМК уже спроектирована) + ПЕРВАЯ ЭМК
+        визита B в одном flush: оба пути листенера (session.new и выборка
+        по затронутому визиту) отрабатывают согласованно — без дублей,
+        каждая запись со своей датой визита."""
+        visit_a = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+            visit_date=date.today(),
+        )
+        first = _add_emr(
+            db_session,
+            visit=visit_a,
+            data=_derma_emr_data(procedures=0, with_exam=True),
+            created_by=admin_user.id,
+        )
+        visit_b = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+            visit_date=date.today() - timedelta(days=40),
+        )
+        assert len(_entries(db_session, kind="examination", source="emr")) == 1
+
+        new_date = date.today() + timedelta(days=30)
+        visit_a.visit_date = new_date
+        second = EMRRecord(
+            patient_id=test_patient.id,
+            visit_id=visit_b.id,
+            version=1,
+            status="draft",
+            created_by=admin_user.id,
+            data=_derma_emr_data(procedures=1, with_exam=True),
+        )
+        db_session.add(second)
+        db_session.commit()
+
+        exams = _entries(db_session, kind="examination", source="emr")
+        assert sorted(e.record_id for e in exams) == sorted([first.id, second.id])
+        by_record = {e.record_id: e for e in exams}
+        assert by_record[first.id].entry_date == new_date
+        assert by_record[second.id].entry_date == date.today() - timedelta(days=40)
+        assert {e.doctor_id for e in exams} == {test_doctor.id}
+        procs = _entries(db_session, kind="procedure", source="emr")
+        assert [e.record_id for e in procs] == [second.id]
+
+    def test_first_emr_for_updated_visit_single_flush(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        """Острейший identity-map сценарий: визит БЕЗ ЭМК меняет дату и в ТОМ
+        ЖЕ flush получает свою первую ЭМК. ORM-выборка листенера по
+        затронутому визиту возвращает только что вставленную строку при
+        объекте ещё в session.new — проекция обязана видеть новую дату."""
+        visit = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+            visit_date=date.today(),
+        )
+        new_date = date.today() - timedelta(days=55)
+        visit.visit_date = new_date
+        emr = EMRRecord(
+            patient_id=test_patient.id,
+            visit_id=visit.id,
+            version=1,
+            status="draft",
+            created_by=admin_user.id,
+            data=_derma_emr_data(procedures=1, with_exam=True),
+        )
+        db_session.add(emr)
+        db_session.commit()
+
+        exams = _entries(db_session, kind="examination", source="emr")
+        procs = _entries(db_session, kind="procedure", source="emr")
+        assert [e.record_id for e in exams] == [emr.id]
+        # осмотр — новая дата визита из этого же flush'а; процедура —
+        # собственный procedure_date (контракт проекции)
+        assert exams[0].entry_date == new_date
+        assert [p.entry_date for p in procs] == [date.today()]
+
+    def test_visit_update_with_emr_update_single_flush(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        """Visit.visit_date + EMR.data меняются в одном flush: полная
+        замена строк без дублей (уникальная идентичность держится)."""
+        visit = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+            visit_date=date.today(),
+        )
+        emr = _add_emr(
+            db_session,
+            visit=visit,
+            data=_derma_emr_data(procedures=1, with_exam=True),
+            created_by=admin_user.id,
+        )
+
+        new_date = date.today() - timedelta(days=99)
+        visit.visit_date = new_date
+        emr.data = _derma_emr_data(procedures=3, with_exam=True)
+        db_session.commit()
+
+        exams = _entries(db_session, kind="examination", source="emr")
+        procs = _entries(db_session, kind="procedure", source="emr")
+        assert len(exams) == 1 and exams[0].record_id == emr.id
+        assert len(procs) == 3
+        # осмотр берёт дату визита (новую), процедуры — собственный
+        # procedure_date из specialty_data (контракт проекции)
+        assert exams[0].entry_date == new_date
+        assert {p.entry_date for p in procs} == {
+            date.fromisoformat(entry["procedure_date"][:10])
+            for entry in emr.data["specialty_data"]["cosmetic_procedures"]
+        }
+        identities = {
+            (e.kind, e.source, e.record_id, e.position) for e in exams + procs
+        }
+        assert len(identities) == 4
+
+    def test_visit_doctor_change_reprojects_doctor_id(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        """Смена врача визита A (ЭМК спроектирована) в одном flush с созданием
+        первой ЭМК визита B: doctor_id репроектируется для записей A."""
+        from app.models.clinic import Doctor
+        from app.models.user import User
+
+        other_user = User(
+            username=f"derma_joint_{_suffix()}",
+            email=f"derma_joint_{_suffix()}@test.com",
+            full_name="Joint Flush Doctor",
+            role="Doctor",
+            is_active=True,
+            hashed_password="x-not-a-real-hash",
+        )
+        db_session.add(other_user)
+        db_session.flush()
+        other_doctor = Doctor(
+            user_id=other_user.id, specialty="Дерматология", active=True
+        )
+        db_session.add(other_doctor)
+        db_session.commit()
+
+        visit_a = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+            visit_date=date.today(),
+        )
+        first = _add_emr(
+            db_session,
+            visit=visit_a,
+            data=_derma_emr_data(procedures=0, with_exam=True),
+            created_by=admin_user.id,
+        )
+        visit_b = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+            visit_date=date.today(),
+        )
+        assert _entries(db_session, kind="examination")[0].doctor_id == (test_doctor.id)
+
+        visit_a.doctor_id = other_doctor.id
+        second = EMRRecord(
+            patient_id=test_patient.id,
+            visit_id=visit_b.id,
+            version=1,
+            status="draft",
+            created_by=admin_user.id,
+            data=_derma_emr_data(procedures=0, with_exam=True),
+        )
+        db_session.add(second)
+        db_session.commit()
+
+        exams = _entries(db_session, kind="examination", source="emr")
+        assert sorted(e.record_id for e in exams) == sorted([first.id, second.id])
+        by_record = {e.record_id: e for e in exams}
+        assert by_record[first.id].doctor_id == other_doctor.id
+        assert by_record[second.id].doctor_id == test_doctor.id
