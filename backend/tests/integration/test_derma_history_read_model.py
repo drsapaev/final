@@ -699,3 +699,174 @@ class TestAfterFlushJointState:
         by_record = {e.record_id: e for e in exams}
         assert by_record[first.id].doctor_id == other_doctor.id
         assert by_record[second.id].doctor_id == test_doctor.id
+
+
+class TestDermaP3LegacyAliasProjection:
+    """Решение P3 по реконсиляции #3490/#3491 (rework #3508 на read model):
+    канонический ключ записи — specialty_data.cosmetic_procedures;
+    specialty_data.procedures — временный legacy READ alias (Phase A).
+    Проекция читает ОБА ключа полным union'ом без скрытия строк и без
+    дедупликации по содержимому (равенство содержимого не доказывает
+    тождественность клинических событий — review P2). Идентификаторы:
+    emr-<rid>-<index> (canonical) и emr-<rid>-legacy-<index> (alias);
+    position alias-записей смещена на длину canonical-массива —
+    уникальность (kind, source, record_id, position) и
+    canonical-раньше-legacy при тай-брейках порядка."""
+
+    @staticmethod
+    def _union_data() -> dict:
+        return {
+            "specialty": "dermatology",
+            "diagnosis": {"main": "Розацеа", "secondary": []},
+            "specialty_data": {
+                "skin_type": "combination",
+                "cosmetic_procedures": [
+                    {
+                        "procedure_date": date.today().isoformat(),
+                        "procedure_type": "Каноническая процедура",
+                        "area_treated": "Щёки",
+                    },
+                    {
+                        "procedure_date": date.today().isoformat(),
+                        "procedure_type": "Вторая каноническая",
+                        "area_treated": "Лоб",
+                    },
+                ],
+                "procedures": [
+                    {
+                        "procedure_date": date.today().isoformat(),
+                        "procedure_type": "Legacy процедура",
+                        "area_treated": "Подбородок",
+                    },
+                    {
+                        "procedure_date": date.today().isoformat(),
+                        "procedure_type": "Вторая legacy",
+                        "area_treated": "Шея",
+                    },
+                ],
+            },
+        }
+
+    def test_p3_union_projects_both_keys_with_distinct_ids_and_positions(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        visit = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+        )
+        emr = _add_emr(
+            db_session,
+            visit=visit,
+            data=self._union_data(),
+            created_by=admin_user.id,
+        )
+
+        procs = _entries(db_session, kind="procedure", source="emr")
+        assert len(procs) == 4
+        assert sorted(e.payload["id"] for e in procs) == sorted(
+            [
+                f"emr-{emr.id}-0",
+                f"emr-{emr.id}-1",
+                f"emr-{emr.id}-legacy-0",
+                f"emr-{emr.id}-legacy-1",
+            ]
+        )
+        # position: canonical 0..1, legacy смещена на len(canonical)=2 → 2..3;
+        # уникальность (kind, source, record_id, position) — uq-констрейнт
+        # держится, обе записи одного ркорда сосуществуют
+        assert sorted(e.position for e in procs) == [0, 1, 2, 3]
+        assert all(e.record_id == emr.id for e in procs)
+        legacy_rows = [
+            e for e in procs if e.payload["id"].endswith(("-legacy-0", "-legacy-1"))
+        ]
+        assert sorted(e.payload["procedure_type"] for e in legacy_rows) == [
+            "Legacy процедура",
+            "Вторая legacy",
+        ]
+
+    def test_p3_identical_entries_across_keys_both_rows_persist(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        """Review P2: одинаковые словари в двух ключах — ДВЕ строки (не
+        дедуп по содержимому); uq-констрейнт не нарушен — позиции разные."""
+        identical = {
+            "procedure_date": date.today().isoformat(),
+            "procedure_type": "Идентичная процедура",
+            "area_treated": "Щёки",
+        }
+        visit = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+        )
+        _add_emr(
+            db_session,
+            visit=visit,
+            data={
+                "specialty": "dermatology",
+                "diagnosis": {"main": "Розацеа", "secondary": []},
+                "specialty_data": {
+                    "cosmetic_procedures": [dict(identical)],
+                    "procedures": [dict(identical)],
+                },
+            },
+            created_by=admin_user.id,
+        )
+
+        procs = _entries(db_session, kind="procedure", source="emr")
+        assert len(procs) == 2
+        # обе строки одного содержания, разные id/position
+        assert len({e.payload["id"] for e in procs}) == 2
+        assert len({e.position for e in procs}) == 2
+
+    def test_p3_legacy_only_record_visible_via_flush_and_rebuild(
+        self, db_session, test_patient, test_doctor, admin_user
+    ):
+        """Legacy-only запись видна через flush (listener) И через
+        rebuild_derma_history_entries — runbook-путь для УЖЕ хранимых
+        строк: после deploy фикса существующие ЭМК с legacy-ключом
+        попадают в историю пересчётом, без пересохранения ЭМК."""
+        from app.services.derma_history_projection import (
+            rebuild_derma_history_entries,
+        )
+
+        visit = _add_visit(
+            db_session,
+            patient=test_patient,
+            doctor=test_doctor,
+        )
+        _add_emr(
+            db_session,
+            visit=visit,
+            data={
+                "specialty": "dermatology",
+                "diagnosis": {"main": "Розацеа", "secondary": []},
+                "specialty_data": {
+                    "procedures": [
+                        {
+                            "procedure_date": date.today().isoformat(),
+                            "procedure_type": "Только legacy ключ",
+                            "area_treated": "Щёки",
+                        }
+                    ]
+                },
+            },
+            created_by=admin_user.id,
+        )
+
+        procs = _entries(db_session, kind="procedure", source="emr")
+        assert len(procs) == 1
+        assert procs[0].payload["procedure_type"] == "Только legacy ключ"
+        assert procs[0].payload["id"].endswith("-legacy-0")
+
+        # имитация «строки, спроецированные ДО фикса»: сносим и пересчитываем
+        db_session.query(DermaHistoryEntry).delete()
+        db_session.commit()
+        assert _entries(db_session, kind="procedure") == []
+
+        counts = rebuild_derma_history_entries(db_session.connection())
+        assert counts["emr_entries"] >= 1
+        procs = _entries(db_session, kind="procedure", source="emr")
+        assert len(procs) == 1
+        assert procs[0].payload["procedure_type"] == "Только legacy ключ"

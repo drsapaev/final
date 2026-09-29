@@ -868,7 +868,9 @@ class TestDermaP3CanonicalKey:
                         },
                     ],
                     "procedures": [
-                        dict(canonical_entry),  # legacy[0]: identical copy of A -> KEEP; content equality is not identity
+                        dict(
+                            canonical_entry
+                        ),  # legacy[0]: identical copy of A -> KEEP; content equality is not identity
                         {  # legacy[1]: distinct entry -> kept (id legacy-1)
                             "procedure_date": other_day,
                             "procedure_type": "Ботокс",
@@ -993,7 +995,9 @@ class TestDermaP3CanonicalKey:
         entries ONLY under the legacy key must still surface in
         /derma/procedures and in the combined /derma/history, with every
         field, the visit binding and honest totals intact."""
-        legacy_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        legacy_visit = _create_visit(
+            db_session, patient=test_patient, doctor=test_doctor
+        )
         legacy_emr = _create_emr(
             db_session,
             patient=test_patient,
@@ -1015,7 +1019,9 @@ class TestDermaP3CanonicalKey:
                 },
             },
         )
-        canonical_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        canonical_visit = _create_visit(
+            db_session, patient=test_patient, doctor=test_doctor
+        )
         _create_emr(
             db_session,
             patient=test_patient,
@@ -1065,7 +1071,9 @@ class TestDermaP3CanonicalKey:
         """Non-list arrays, empty arrays and entries without a usable type
         produce zero rows; total/pages stay honest."""
         # NB: emr_records.visit_id is UNIQUE — one EMR per visit.
-        first_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        first_visit = _create_visit(
+            db_session, patient=test_patient, doctor=test_doctor
+        )
         _create_emr(
             db_session,
             patient=test_patient,
@@ -1079,7 +1087,9 @@ class TestDermaP3CanonicalKey:
                 },
             },
         )
-        second_visit = _create_visit(db_session, patient=test_patient, doctor=test_doctor)
+        second_visit = _create_visit(
+            db_session, patient=test_patient, doctor=test_doctor
+        )
         _create_emr(
             db_session,
             patient=test_patient,
