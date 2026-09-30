@@ -12104,29 +12104,6 @@
   word-break: break-all;
 }
 
-/* ─── Dev Mode (dynamic bg/border via custom props) ─── */
-.admin-dev-mode-card {
-  background: var(--admin-card-bg, var(--mac-bg-secondary));
-  border: 1px solid var(--admin-card-border, var(--mac-border));
-  border-radius: var(--mac-radius-lg);
-  padding: var(--mac-spacing-4);
-}
-
-.admin-dev-mode-btn {
-  background: var(--admin-btn-bg, var(--mac-bg-tertiary));
-  color: var(--admin-btn-color, var(--mac-text-primary));
-  border: 1px solid var(--mac-border);
-  border-radius: var(--mac-radius-md);
-  padding: var(--mac-spacing-2) var(--mac-spacing-3);
-  font-size: var(--mac-font-size-sm);
-  font-weight: var(--mac-font-weight-medium);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--mac-spacing-2);
-  cursor: pointer;
-  transition: background var(--mac-duration-normal) var(--mac-ease);
-}
-
 /* ─── Text blocks (sm/xs + color + flex col + gap) ─── */
 .admin-div-sm-info-flex-col-8 {
   font-size: var(--mac-font-size-sm);
