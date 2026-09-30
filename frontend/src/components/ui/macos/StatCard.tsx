@@ -207,8 +207,8 @@ const MacOSStatCard = ({
   };
 
   const renderLoading = () => (
-    <div style={cardStyle} aria-busy="true">
-      <div style={headerStyle}>
+    <div style={cardStyle} role="status" aria-live="polite" aria-busy="true">
+      <div style={headerStyle} aria-hidden="true">
         <div style={{ 
           width: '60%', 
           height: '16px', 
@@ -228,13 +228,13 @@ const MacOSStatCard = ({
         background: 'var(--mac-bg-tertiary)', 
         borderRadius: 'var(--mac-radius-sm)',
         marginBottom: '8px'
-      }} />
+      }} aria-hidden="true" />
       <div style={{ 
         width: '40%', 
         height: '12px', 
         background: 'var(--mac-bg-tertiary)', 
         borderRadius: 'var(--mac-radius-sm)' 
-      }} />
+      }} aria-hidden="true" />
     </div>
   );
 

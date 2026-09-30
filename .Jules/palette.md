@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-09-30 - Added role=status and aria-live to StatCard Loading State
+**Learning:** [Accessibility] While StatCard had `aria-busy="true"` during its loading state, it lacked `role="status"` and `aria-live="polite"`. Furthermore, its inner visual skeleton placeholders were exposed to screen readers, creating unnecessary noise. Complex loading containers must broadcast their status and hide their decorative children.
+**Action:** Always add `role="status"` and `aria-live="polite"` alongside `aria-busy="true"` on loading containers. Simultaneously, add `aria-hidden="true"` to the direct children that serve as purely visual placeholders (like skeleton bars or circles) to prevent screen readers from reading meaningless structural elements.
