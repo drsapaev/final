@@ -263,6 +263,14 @@ export function clearToken(): void {
     logger.warn('clearToken localStorage PHI/financial sweep failed:', e);
   }
 
+  for (const draftKey of ['admin.queue.settings.draft.v1', 'admin.queue.settings.draft.v2']) {
+    try {
+      sessionStorage.removeItem(draftKey);
+    } catch {
+      logger.warn('clearToken queue settings draft cleanup failed');
+    }
+  }
+
   try {
     sessionStorage.removeItem('patient_jwt_token');
     sessionStorage.removeItem('patient_refresh_token');

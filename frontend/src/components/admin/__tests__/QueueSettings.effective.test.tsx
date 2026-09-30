@@ -35,6 +35,9 @@ vi.mock('@/api/client', () => ({
     patch: vi.fn(),
     delete: vi.fn(),
   },
+  me: vi.fn(),
+  setToken: vi.fn(),
+  setSessionInvalidationListener: vi.fn(),
 }));
 
 const mockedGet = vi.mocked(api.get);
@@ -711,9 +714,12 @@ describe('QueueSettings panel fixes for PR 3291 review findings (owner audit, cu
 });
 
 describe('QueueSettings draft safeguards (T02)', () => {
+  const draftKey = 'admin.queue.settings.draft.v2';
+
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
+    window.sessionStorage.setItem('auth_profile', JSON.stringify({ id: 1, clinic_id: 1, role: 'admin' }));
     mockedGet.mockImplementation(async (url: string) => {
       if (url.startsWith('/admin/queue/settings/effective')) {
         return { data: url.includes('department_id=2') ? scopedReport : baseReport };
@@ -750,6 +756,61 @@ describe('QueueSettings draft safeguards (T02)', () => {
     renderPanel();
 
     expect(await screen.findByDisplayValue('10:30')).toBeInTheDocument();
+  });
+
+  it('does not silently restore a stale draft over newer server settings and rebases only the draft changes on request', async () => {
+    const currentSettings = { ...settingsFixture, max_per_day: { cardiology: 30 } };
+    window.sessionStorage.setItem(draftKey, JSON.stringify({
+      version: 2,
+      ownerId: '1:1',
+      baseSettings: settingsFixture,
+      settings: { ...settingsFixture, auto_close_time: '10:30' },
+    }));
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url === '/admin/queue/settings') return { data: currentSettings };
+      if (url.startsWith('/admin/queue/settings/effective')) return { data: baseReport };
+      return { data: {} };
+    });
+    mockedPut.mockResolvedValue({
+      data: {
+        message: 'Настройки сохранены',
+        settings: { ...currentSettings, auto_close_time: '10:30' },
+      },
+    } as never);
+
+    const user = userEvent.setup();
+    renderPanel();
+
+    expect(await screen.findByDisplayValue('09:00')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('09:00')).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Настройки на сервере изменились после создания черновика.');
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Применить мои изменения' }));
+    expect(await screen.findByDisplayValue('10:30')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(mockedPut).toHaveBeenCalledTimes(1));
+    expect(mockedPut.mock.calls[0]?.[1]).toMatchObject({
+      auto_close_time: '10:30',
+      max_per_day: { cardiology: 30 },
+    });
+  });
+
+  it('discards a draft owned by a different signed-in principal', async () => {
+    window.sessionStorage.setItem('auth_profile', JSON.stringify({ id: 2, clinic_id: 1, role: 'admin' }));
+    window.sessionStorage.setItem(draftKey, JSON.stringify({
+      version: 2,
+      ownerId: '1:1',
+      baseSettings: settingsFixture,
+      settings: { ...settingsFixture, auto_close_time: '10:30' },
+    }));
+
+    renderPanel();
+
+    expect(await screen.findByDisplayValue('09:00')).toBeInTheDocument();
+    expect(await screen.findByText('Черновик не привязан к текущей учётной записи и удалён. Загружены актуальные настройки сервера.')).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull();
   });
 
   it('requires explicit confirmation before refresh discards an unsaved draft', async () => {
@@ -802,6 +863,33 @@ describe('QueueSettings draft safeguards (T02)', () => {
     expect(settingsGets).toBe(3);
   });
 
+  it('continues refreshing after sessionStorage rejects draft removal', async () => {
+    window.sessionStorage.setItem(draftKey, JSON.stringify({
+      version: 2,
+      ownerId: '1:1',
+      baseSettings: settingsFixture,
+      settings: { ...settingsFixture, auto_close_time: '10:30' },
+    }));
+
+    const user = userEvent.setup();
+    renderPanel();
+    expect(await screen.findByDisplayValue('10:30')).toBeInTheDocument();
+    const settingsGetsBefore = mockedGet.mock.calls.filter(([url]) => url === '/admin/queue/settings').length;
+    const originalRemoveItem = window.sessionStorage.removeItem.bind(window.sessionStorage);
+    const removeSpy = vi.spyOn(window.sessionStorage, 'removeItem').mockImplementationOnce((key: string) => {
+      if (key === draftKey) throw new DOMException('Storage access denied', 'SecurityError');
+      originalRemoveItem(key);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Обновить' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Обновить' }));
+
+    expect(await screen.findByDisplayValue('09:00')).toBeInTheDocument();
+    expect(mockedGet.mock.calls.filter(([url]) => url === '/admin/queue/settings')).toHaveLength(settingsGetsBefore + 1);
+    removeSpy.mockRestore();
+  });
+
   it('keeps newer edits when an older save response arrives late', async () => {
     let releasePut!: (value: { data: unknown }) => void;
     const putGate = new Promise<{ data: unknown }>((resolve) => {
@@ -824,8 +912,9 @@ describe('QueueSettings draft safeguards (T02)', () => {
       },
     });
 
-    expect(await screen.findByText('Настройки сохранены')).toBeInTheDocument();
+    expect(await screen.findByText('Предыдущие изменения сохранены. Остались новые несохранённые изменения.')).toBeInTheDocument();
     expect(screen.getByDisplayValue('11:00')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeEnabled();
   });
 
   it('shows no fake QR test and does not fabricate a quota or number range', async () => {

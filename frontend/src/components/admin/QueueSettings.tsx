@@ -47,6 +47,7 @@ import type {
   ResourceRow,
   ActiveDayRow,
 } from '../../utils/queueSettingsEffective';
+import { getProfileFromStorage } from '../../stores/auth';
 
 type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
@@ -167,7 +168,14 @@ const getDoctorDisplayName = (doctor: DoctorRecord | null | undefined, t: Transl
   doctor?.user?.full_name || doctor?.user?.username || t('admin2.qs_doctor_fallback', { id: doctor?.id ?? '—' })
 );
 
-const QUEUE_SETTINGS_DRAFT_KEY = 'admin.queue.settings.draft.v1';
+const QUEUE_SETTINGS_DRAFT_KEY = 'admin.queue.settings.draft.v2';
+
+interface QueueSettingsDraft {
+  version: 2;
+  ownerId: string;
+  baseSettings: QueueSettingsState;
+  settings: QueueSettingsState;
+}
 
 const parseNumberMap = (value: unknown): Record<string, number> | null => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
@@ -206,29 +214,121 @@ const parseQueueSettings = (value: unknown): QueueSettingsState | null => {
 const areQueueSettingsEqual = (left: QueueSettingsState, right: QueueSettingsState): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
-const readQueueSettingsDraft = (): QueueSettingsState | null => {
+const getQueueSettingsDraftOwnerId = (): string | null => {
+  const profile = getProfileFromStorage();
+  if (typeof profile?.id !== 'number' || !Number.isSafeInteger(profile.id) || profile.id <= 0) return null;
+  const clinicId = profile.clinic_id;
+  const clinicKey = typeof clinicId === 'string' || typeof clinicId === 'number' ? String(clinicId) : 'global';
+  return `${clinicKey}:${profile.id}`;
+};
+
+const clearQueueSettingsDraft = (): void => {
+  try {
+    window.sessionStorage.removeItem(QUEUE_SETTINGS_DRAFT_KEY);
+    // Remove drafts written by the initial T02 implementation as well.
+    window.sessionStorage.removeItem('admin.queue.settings.draft.v1');
+  } catch {
+    logger.warn('Unable to clear queue settings draft in this tab');
+  }
+};
+
+const readQueueSettingsDraft = (): QueueSettingsDraft | null => {
   try {
     const serialized = window.sessionStorage.getItem(QUEUE_SETTINGS_DRAFT_KEY);
     if (!serialized) return null;
-    const draft = JSON.parse(serialized) as { version?: unknown; settings?: unknown };
-    return draft.version === 1 ? parseQueueSettings(draft.settings) : null;
+    const draft = JSON.parse(serialized) as Record<string, unknown>;
+    const baseSettings = parseQueueSettings(draft.baseSettings);
+    const settings = parseQueueSettings(draft.settings);
+    if (
+      draft.version !== 2 ||
+      typeof draft.ownerId !== 'string' || !draft.ownerId.trim() ||
+      !baseSettings || !settings
+    ) {
+      clearQueueSettingsDraft();
+      return null;
+    }
+    return { version: 2, ownerId: draft.ownerId, baseSettings, settings };
   } catch {
     return null;
   }
 };
 
+const writeQueueSettingsDraft = (draft: QueueSettingsDraft): void => {
+  try {
+    window.sessionStorage.setItem(QUEUE_SETTINGS_DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    logger.warn('Unable to persist queue settings draft in this tab');
+  }
+};
+
+const applyNumberMapChanges = (
+  base: Record<string, number>,
+  draft: Record<string, number>,
+  current: Record<string, number>,
+): Record<string, number> => {
+  const rebased = { ...current };
+  const keys = new Set([...Object.keys(base), ...Object.keys(draft)]);
+  for (const key of keys) {
+    const baseHasKey = Object.prototype.hasOwnProperty.call(base, key);
+    const draftHasKey = Object.prototype.hasOwnProperty.call(draft, key);
+    if (baseHasKey === draftHasKey && base[key] === draft[key]) continue;
+    if (draftHasKey) rebased[key] = draft[key];
+    else delete rebased[key];
+  }
+  return rebased;
+};
+
+const rebaseQueueSettingsDraft = (
+  draft: QueueSettingsDraft,
+  current: QueueSettingsState,
+): QueueSettingsState => ({
+  timezone: draft.settings.timezone === draft.baseSettings.timezone ? current.timezone : draft.settings.timezone,
+  queue_start_hour: draft.settings.queue_start_hour === draft.baseSettings.queue_start_hour
+    ? current.queue_start_hour
+    : draft.settings.queue_start_hour,
+  auto_close_time: draft.settings.auto_close_time === draft.baseSettings.auto_close_time
+    ? current.auto_close_time
+    : draft.settings.auto_close_time,
+  start_numbers: applyNumberMapChanges(draft.baseSettings.start_numbers, draft.settings.start_numbers, current.start_numbers),
+  max_per_day: applyNumberMapChanges(draft.baseSettings.max_per_day, draft.settings.max_per_day, current.max_per_day),
+});
+
+const updateQueueSetting = (
+  previous: QueueSettingsState,
+  path: string,
+  value: unknown,
+): QueueSettingsState => {
+  const nextSettings = { ...previous };
+  const keys = path.split('.');
+  const topKey = keys[0] as keyof QueueSettingsState;
+  if (keys.length === 1) {
+    (nextSettings as unknown as Record<string, unknown>)[topKey] = value;
+  } else if (keys.length === 2) {
+    const nested = nextSettings[topKey];
+    const nestedRecord = (typeof nested === 'object' && nested !== null ? nested : {}) as Record<string, unknown>;
+    (nextSettings as unknown as Record<string, unknown>)[topKey] = { ...nestedRecord, [keys[1]]: value };
+  }
+  return nextSettings;
+};
+
 const QueueSettings = () => {
   const { t: rawT, language } = useTranslation();
   const t = rawT;
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const [confirmRaw, confirmDialog] = useConfirm();
   const [loadState, setLoadState] = useState<'loading' | 'error' | 'loaded'>('loading');
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<QueueSettingsState | null>(null);
   const [savedSettings, setSavedSettings] = useState<QueueSettingsState | null>(null);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<QueueSettingsDraft | null>(null);
   const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
   const settingsRequestSeq = useRef(0);
   const draftRevision = useRef(0);
+  const currentSettingsRef = useRef<QueueSettingsState | null>(null);
   const isDirty = Boolean(settings && savedSettings && !areQueueSettingsEqual(settings, savedSettings));
 
   // RQ-23.ui (S-20): effective settings report — read-only SSOT view over
@@ -327,17 +427,7 @@ const QueueSettings = () => {
     }
   }, []);
 
-  useEffect(() => {
-    loadProfiles();
-    loadSettings();
-    loadDepartments();
-  }, [loadProfiles, loadDepartments]);
-
-  useEffect(() => {
-    loadEffectiveReport(reportScope);
-  }, [reportScope, loadEffectiveReport]);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async (options: { ignoreStoredDraft?: boolean } = {}) => {
     const requestSeq = settingsRequestSeq.current + 1;
     settingsRequestSeq.current = requestSeq;
     const revisionAtStart = draftRevision.current;
@@ -351,11 +441,37 @@ const QueueSettings = () => {
 
       setSavedSettings(serverSettings);
       if (revisionAtStart === draftRevision.current) {
-        const storedDraft = readQueueSettingsDraft();
-        const shouldRestoreDraft = storedDraft !== null && !areQueueSettingsEqual(storedDraft, serverSettings);
-        setSettings(shouldRestoreDraft ? storedDraft : serverSettings);
-        setDraftRestored(shouldRestoreDraft);
-        if (shouldRestoreDraft) draftRevision.current += 1;
+        setPendingDraft(null);
+        if (options.ignoreStoredDraft) {
+          currentSettingsRef.current = serverSettings;
+          setSettings(serverSettings);
+          setDraftRestored(false);
+        } else {
+          const storedDraft = readQueueSettingsDraft();
+          const currentOwnerId = getQueueSettingsDraftOwnerId();
+          if (storedDraft && (!currentOwnerId || storedDraft.ownerId !== currentOwnerId)) {
+            clearQueueSettingsDraft();
+            currentSettingsRef.current = serverSettings;
+            setSettings(serverSettings);
+            setDraftRestored(false);
+            setMessage({ type: 'warning', text: tRef.current('admin2.qs_draft_owner_mismatch') });
+          } else if (storedDraft && !areQueueSettingsEqual(storedDraft.baseSettings, serverSettings)) {
+            currentSettingsRef.current = serverSettings;
+            setSettings(serverSettings);
+            setDraftRestored(false);
+            setPendingDraft(storedDraft);
+          } else if (storedDraft) {
+            const shouldRestoreDraft = !areQueueSettingsEqual(storedDraft.settings, serverSettings);
+            currentSettingsRef.current = shouldRestoreDraft ? storedDraft.settings : serverSettings;
+            setSettings(currentSettingsRef.current);
+            setDraftRestored(shouldRestoreDraft);
+            if (shouldRestoreDraft) draftRevision.current += 1;
+          } else {
+            currentSettingsRef.current = serverSettings;
+            setSettings(serverSettings);
+            setDraftRestored(false);
+          }
+        }
       }
       setLoadState('loaded');
     } catch (error) {
@@ -363,7 +479,17 @@ const QueueSettings = () => {
       if (requestSeq !== settingsRequestSeq.current) return;
       setLoadState('error');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadProfiles();
+    void loadSettings();
+    loadDepartments();
+  }, [loadProfiles, loadSettings, loadDepartments]);
+
+  useEffect(() => {
+    loadEffectiveReport(reportScope);
+  }, [reportScope, loadEffectiveReport]);
 
   // Активные профили — карточки настроек (редактирование
   // остаётся active-only, PR 3291 P2-3).
@@ -399,21 +525,13 @@ const QueueSettings = () => {
   const handleSettingChange = (path: string, value: unknown) => {
     draftRevision.current += 1;
     setDraftRestored(false);
+    setPendingDraft(null);
     setMessage({ type: '', text: '' });
-    setSettings((previous) => {
-      if (!previous) return previous;
-      const nextSettings = { ...previous };
-      const keys = path.split('.');
-      const topKey = keys[0] as keyof QueueSettingsState;
-      if (keys.length === 1) {
-        (nextSettings as unknown as Record<string, unknown>)[topKey] = value;
-      } else if (keys.length === 2) {
-        const nested = nextSettings[topKey];
-        const nestedRecord = (typeof nested === 'object' && nested !== null ? nested : {}) as Record<string, unknown>;
-        (nextSettings as unknown as Record<string, unknown>)[topKey] = { ...nestedRecord, [keys[1]]: value };
-      }
-      return nextSettings;
-    });
+    const current = currentSettingsRef.current;
+    if (!current) return;
+    const next = updateQueueSetting(current, path, value);
+    currentSettingsRef.current = next;
+    setSettings(next);
   };
 
   const refreshSettings = async () => {
@@ -428,12 +546,13 @@ const QueueSettings = () => {
       if (!confirmed) return;
     }
     if (isDirty) {
-      window.sessionStorage.removeItem(QUEUE_SETTINGS_DRAFT_KEY);
+      clearQueueSettingsDraft();
       draftRevision.current += 1;
       setDraftRestored(false);
+      currentSettingsRef.current = savedSettings;
       setSettings(savedSettings);
     }
-    void loadSettings();
+    void loadSettings({ ignoreStoredDraft: isDirty });
   };
 
   const saveSettings = async () => {
@@ -447,10 +566,19 @@ const QueueSettings = () => {
       const response = await api.put('/admin/queue/settings', settingsAtSubmit);
       const data = response.data as { message?: string; settings?: unknown };
       const confirmedSettings = parseQueueSettings(data.settings) ?? settingsAtSubmit;
+      const hasNewerUnsavedChanges =
+        draftRevision.current !== revisionAtSubmit &&
+        currentSettingsRef.current !== null &&
+        !areQueueSettingsEqual(currentSettingsRef.current, confirmedSettings);
       setSavedSettings(confirmedSettings);
-      if (draftRevision.current === revisionAtSubmit) setSettings(confirmedSettings);
+      if (!hasNewerUnsavedChanges) {
+        currentSettingsRef.current = confirmedSettings;
+        setSettings(confirmedSettings);
+      }
       setDraftRestored(false);
-      setMessage({ type: 'success', text: data.message ?? '' });
+      setMessage(hasNewerUnsavedChanges
+        ? { type: 'warning', text: t('admin2.qs_save_pending_changes') }
+        : { type: 'success', text: data.message ?? '' });
       loadEffectiveReport(reportScopeRef.current);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
@@ -460,18 +588,41 @@ const QueueSettings = () => {
     }
   };
 
+  const applyPendingDraft = () => {
+    if (!pendingDraft || !savedSettings) return;
+    const currentOwnerId = getQueueSettingsDraftOwnerId();
+    if (!currentOwnerId || currentOwnerId !== pendingDraft.ownerId) {
+      clearQueueSettingsDraft();
+      setPendingDraft(null);
+      setMessage({ type: 'warning', text: t('admin2.qs_draft_owner_mismatch') });
+      return;
+    }
+    const rebasedSettings = rebaseQueueSettingsDraft(pendingDraft, savedSettings);
+    currentSettingsRef.current = rebasedSettings;
+    draftRevision.current += 1;
+    setSettings(rebasedSettings);
+    setPendingDraft(null);
+    setDraftRestored(false);
+    setMessage({ type: 'warning', text: t('admin2.qs_draft_rebased') });
+  };
+
+  const discardPendingDraft = () => {
+    clearQueueSettingsDraft();
+    setPendingDraft(null);
+    setDraftRestored(false);
+    setMessage({ type: '', text: '' });
+  };
+
   useEffect(() => {
     if (loadState !== 'loaded' || !settings || !savedSettings) return;
-    try {
-      if (isDirty) {
-        window.sessionStorage.setItem(QUEUE_SETTINGS_DRAFT_KEY, JSON.stringify({ version: 1, settings }));
-      } else {
-        window.sessionStorage.removeItem(QUEUE_SETTINGS_DRAFT_KEY);
-      }
-    } catch {
-      logger.warn('Unable to persist queue settings draft in this tab');
+    if (pendingDraft) return;
+    const ownerId = getQueueSettingsDraftOwnerId();
+    if (!ownerId || !isDirty) {
+      clearQueueSettingsDraft();
+      return;
     }
-  }, [isDirty, loadState, savedSettings, settings]);
+    writeQueueSettingsDraft({ version: 2, ownerId, baseSettings: savedSettings, settings });
+  }, [isDirty, loadState, pendingDraft, savedSettings, settings]);
 
   if (loadState === 'loading') {
     return (
@@ -526,7 +677,7 @@ const QueueSettings = () => {
             </Button>
             <Button
               onClick={saveSettings}
-              disabled={!isDirty || saving}
+              disabled={!isDirty || saving || Boolean(pendingDraft)}
               className="admin-action-btn-primary">
 
               {saving ?
@@ -546,23 +697,56 @@ const QueueSettings = () => {
           </p>
         )}
 
+        {pendingDraft && (
+          <Card
+            className="admin-dynamic-banner-p-16 mb-6"
+            style={{
+              '--admin-banner-bg': 'var(--mac-warning-bg)',
+              '--admin-banner-border': 'var(--mac-warning-border)',
+            } as CSSProperties}
+          >
+            <div role="alert" aria-live="assertive">
+              <p className="admin-text-sm-secondary mb-3">{t('admin2.qs_draft_stale')}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={applyPendingDraft} className="admin-action-btn-primary">
+                  {t('admin2.qs_apply_draft')}
+                </Button>
+                <Button variant="outline" onClick={discardPendingDraft} className="admin-action-btn">
+                  {t('admin2.qs_discard_draft')}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {message.text &&
         <Card
           className="admin-dynamic-banner-p-16 mb-6"
           style={{
-            '--admin-banner-bg': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
-            '--admin-banner-border': message.type === 'success' ? 'var(--mac-success-border)' : 'var(--mac-error-border)'
+            '--admin-banner-bg': message.type === 'success'
+              ? 'var(--mac-success-bg)'
+              : message.type === 'warning' ? 'var(--mac-warning-bg)' : 'var(--mac-error-bg)',
+            '--admin-banner-border': message.type === 'success'
+              ? 'var(--mac-success-border)'
+              : message.type === 'warning' ? 'var(--mac-warning-border)' : 'var(--mac-error-border)',
           } as CSSProperties}
         >
             <div className="flex items-center justify-center gap-2">
               {message.type === 'success' ?
             <CheckCircle className="admin-icon-20-success" /> :
 
-            <AlertCircle className="admin-icon-20-error" />
+            <AlertCircle
+              className="w-5 h-5"
+              style={{ color: message.type === 'warning' ? 'var(--mac-warning)' : 'var(--mac-error)' }}
+            />
             }
               <span
                 className="admin-span-sm-med-dynamic-color"
-                style={{ '--admin-span-color': message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)'  } as CSSProperties}
+                style={{
+                  '--admin-span-color': message.type === 'success'
+                    ? 'var(--mac-success)'
+                    : message.type === 'warning' ? 'var(--mac-warning)' : 'var(--mac-error)',
+                } as CSSProperties}
               >
                 {message.text}
               </span>
@@ -587,6 +771,7 @@ const QueueSettings = () => {
                 </label>
                 <Select
                   value={Number(settings.queue_start_hour)}
+                  disabled={Boolean(pendingDraft)}
                   onChange={(event: SelectChangeEvent) => handleSettingChange('queue_start_hour', parseInt(event.target.value, 10))}
                   options={Array.from({ length: 24 }, (_, i) => ({
                     value: i,
@@ -606,6 +791,7 @@ const QueueSettings = () => {
                 <Input
                   type="time"
                   value={settings.auto_close_time}
+                  disabled={Boolean(pendingDraft)}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange('auto_close_time', e.target.value)}
                   className="w-full" />
 
@@ -620,6 +806,7 @@ const QueueSettings = () => {
                 </label>
                 <Select
                   value={settings.timezone}
+                  disabled={Boolean(pendingDraft)}
                   onChange={(event: SelectChangeEvent) => handleSettingChange('timezone', event.target.value)}
                   options={TIMEZONE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
                   className="w-full"></Select>
@@ -649,6 +836,7 @@ const QueueSettings = () => {
                   min="1"
                   max="100"
                   value={getNumberSetting(settings.start_numbers, specialty.settingsKey, 1)}
+                  disabled={Boolean(pendingDraft)}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     if (e.target.value !== '') handleSettingChange(`start_numbers.${specialty.settingsKey}`, parseInt(e.target.value, 10));
                   }}
@@ -669,6 +857,7 @@ const QueueSettings = () => {
                   min="0"
                   max="100"
                   value={settings.max_per_day[specialty.settingsKey] ?? ''}
+                  disabled={Boolean(pendingDraft)}
                   onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     if (e.target.value !== '') handleSettingChange(`max_per_day.${specialty.settingsKey}`, parseInt(e.target.value, 10));
                   }}
