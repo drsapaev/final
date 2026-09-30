@@ -27,7 +27,7 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 
 ## T01 — 2026-09-30
 
-- Commit under test: initial implementation `9ca4573a5` based on `bae927f5c88010808d9091e7f47d09bbfdfa1005`; current PR head includes the ratchet correction.
+- Commits under test: initial implementation `9ca4573a5`; CI ratchet correction `6b8f2b7e9`; both based on `bae927f5c88010808d9091e7f47d09bbfdfa1005`.
 - Environment: Windows worktree `C:\final\_wt_aqs_t01`; branch `codex/aqs-T01-profile-modal`.
 - Execution mode: `advisory_gate`; narrow UI-only task, no backend/API/schema/lifecycle edits.
 - Allowed paths: `frontend/src/components/admin/QueueProfilesManager.tsx`; admin-local persisted palette constants in `frontend/src/components/admin/queueProfileColors.ts` (added to resolve a measured UI baseline regression); focused component test under `frontend/src/components/admin/__tests__/`; necessary rules in `frontend/src/components/admin/admin.css`; this progress/evidence ledger.
@@ -59,5 +59,6 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - The first PR check for `Regression Audit Gate` failed: `tsxHex` increased from 384 to 387 and `isDarkBranches` from 105 to 106.
 - Cause: placing three new persisted hex values in TSX and duplicating the theme conditional on the shared Dialog.
 - Correction: moved the palette into `queueProfileColors.ts` with a scoped lint suppression explaining that these values are persisted API data, and let shared Dialog use its design token background instead of adding another theme branch.
+- Correction commit: `6b8f2b7e9` (`fix(queue): satisfy admin UI baseline ratchet`); pushed to PR #3537. PR description records the red check and fix.
 - Validation after correction: `node scripts/ui-baseline.mjs --check` PASS (`tsxHex` 384→379, `inlineStyles` 2471→2242, `isDarkBranches` 105→104, and no ratchet regressions); targeted Vitest 13/13 PASS; type-check PASS; scoped ESLint PASS with zero errors and the same four pre-existing component warnings; stylelint PASS; build PASS with existing CSS minifier warnings.
-- PR checks for the corrected head must finish before merge; the prior red run is preserved here as handled evidence.
+- The corrected PR head had CI checks pending at the first status snapshot; those checks must finish before merge. The prior red run is preserved here as handled evidence.
