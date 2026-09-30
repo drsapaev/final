@@ -745,8 +745,18 @@ class MorningAssignmentService:
         target_date: date,
         *,
         source: str = "morning_assignment",
+        entry_service_tags: set[str] | None = None,
     ) -> MorningAssignmentPreparedQueueAssignment | None:
-        """Присваивает номер в конкретной очереди"""
+        """Присваивает номер в конкретной очереди
+
+        ``entry_service_tags`` — контракт единой врачебной записи
+        (registrar doctor-services plan): для врачебного визита передается
+        полный набор doctor-axis тегов визита, и запись очереди несёт ВСЕ
+        его doctor-axis услуги (включая услуги с пустым queue_tag), а не
+        только услуги переданного тега. ``None`` — прежняя семантика
+        (услуги одного тега; fallback на все услуги визита при пустом
+        результате).
+        """
 
         # Определяем врача для очереди
         doctor_id = visit.doctor_id
@@ -1052,6 +1062,27 @@ class MorningAssignmentService:
 
         for vs in visit_services:
             service = self.db.query(Service).filter(Service.id == vs.service_id).first()
+            # Единая врачебная запись: doctor-axis услуги визита входят в
+            # запись врача ЦЕЛИКОМ (собственный тег/код каждой услуги
+            # сохраняется в payload для отчётности), а не только совпадающие
+            # с routing-тегом записи. Услуги ресурсных тегов визита
+            # исключаются — им создаются собственные записи ресурсных очередей.
+            if entry_service_tags is not None:
+                if service and (
+                    not service.queue_tag or service.queue_tag in entry_service_tags
+                ):
+                    code = service.service_code or get_service_code(service.id, self.db)
+                    if code:
+                        service_codes_for_entry.append(code.upper() if code else None)
+                        services_for_entry.append(
+                            {
+                                "id": service.id,
+                                "code": code.upper() if code else None,
+                                "name": service.name,
+                                "price": float(vs.price) if vs.price else 0,
+                            }
+                        )
+                continue
             if service and service.queue_tag == queue_tag:
                 code = service.service_code or get_service_code(service.id, self.db)
                 if code:

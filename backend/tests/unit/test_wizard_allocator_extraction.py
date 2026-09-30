@@ -45,7 +45,11 @@ def test_assign_same_day_queue_numbers_uses_extracted_wizard_seam():
         queue_tags={101: {"cardiology_common"}},
         prepared_assignments={
             (101, "cardiology_common"): MorningAssignmentPreparedQueueAssignment(
-                assignment={"queue_tag": "cardiology_common", "number": 17, "queue_id": 5}
+                assignment={
+                    "queue_tag": "cardiology_common",
+                    "number": 17,
+                    "queue_id": 5,
+                }
             )
         },
     )
@@ -67,7 +71,9 @@ def test_assign_same_day_queue_numbers_uses_extracted_wizard_seam():
     assert queue_numbers == {
         101: [{"queue_tag": "cardiology_common", "number": 17, "queue_id": 5}]
     }
-    assert visit.status == "confirmed"  # Gate C: status set by VisitLifecycleService, not directly
+    assert (
+        visit.status == "confirmed"
+    )  # Gate C: status set by VisitLifecycleService, not directly
     assert fake_assignment_service.calls == [(101, "cardiology_common", today, "desk")]
 
 
@@ -131,7 +137,9 @@ def test_cart_locks_all_tag_scopes_sorted_before_any_prepare(monkeypatch):
             events.append(("collect", visit.id))
             return super()._get_visit_queue_tags(visit)
 
-        def prepare_wizard_queue_assignment(self, visit, queue_tag, target_day, *, source):
+        def prepare_wizard_queue_assignment(
+            self, visit, queue_tag, target_day, *, source
+        ):
             events.append(("prepare", (visit.id, queue_tag)))
             return super().prepare_wizard_queue_assignment(
                 visit, queue_tag, target_day, source=source

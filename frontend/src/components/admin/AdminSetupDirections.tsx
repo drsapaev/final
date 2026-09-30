@@ -60,8 +60,10 @@ import {
     type ChecklistProfileDto,
     type ChecklistServiceDto,
     type EntryMethodsDto,
+    type ServiceAssignmentGap,
     buildChecklist,
     candidateTags,
+    collectServiceAssignmentGaps,
 } from './setupDirectionsReadiness';
 
 type ScreenView = 'checklist' | 'resources';
@@ -211,6 +213,21 @@ const AdminSetupDirections = () => {
                 postProvisionSupportByProfileKey,
             ),
         [services, profiles, resources, entryMethodsByProfileKey, doctors, postProvisionSupportByProfileKey],
+    );
+
+    // Workstream A (Tasks 2/5): явные назначения «услуга → врач», которые
+    // не может исполнить ни одна карточка мастера (врач неактивен/отсутствует
+    // или не проходит специальность), и врач-исполняемые услуги без
+    // specialty-маппинга. Виден только на checklist-виде; каждая строка —
+    // точная причина + ссылка на экран исправления.
+    const assignmentGaps: ServiceAssignmentGap[] = useMemo(
+        // PR 3511 review P1 (round 5): ресурсы реестра передаются в
+        // проверку назначений — закреплённая услуга с тегом АКТИВНОЙ
+        // ресурсной очереди это видимый админу конфликт владельца
+        // (номер PR без решётки: ui-baseline tsxHex ratchet считает
+        // hex-литералом любую решётку с 3-8 hex-цифрами в TSX).
+        () => collectServiceAssignmentGaps(services, doctors, resources),
+        [services, doctors, resources],
     );
 
     // RQ-18 follow-up (P2-4): the permanent address is provisioned PER
@@ -561,6 +578,70 @@ const AdminSetupDirections = () => {
                                     <Button variant="ghost" size="sm" onClick={() => setWizard(emptyWizard())} data-testid="setup-wizard-close">
                                         {t('admin2.sdx_wizard_close')}
                                     </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* —— Workstream A: назначения «услуга → врач» —— */}
+                    {view === 'checklist' && assignmentGaps.length > 0 && (
+                        <Card data-testid="setup-assignment-gaps" className="admin-sdx-card-gap">
+                            <CardHeader>
+                                <CardTitle>{t('admin2.sdx_assignment_title')}</CardTitle>
+                                <CardDescription>{t('admin2.sdx_assignment_subtitle')}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="admin-sdx-rows">
+                                    {assignmentGaps.map((gap) => (
+                                        <div
+                                            key={`${gap.serviceId}:${gap.reason}`}
+                                            className="admin-sdx-card"
+                                            data-testid={`setup-assignment-gap-${gap.serviceId}`}
+                                        >
+                                            <div className="admin-sdx-row-head">
+                                                <code className="admin-sdx-code">{gap.serviceCode || gap.serviceId}</code>
+                                                <span className="admin-sdx-row-sub">{gap.serviceName}</span>
+                                            </div>
+                                            <table className="admin-sdx-table">
+                                                <tbody>
+                                                    <tr>
+                                                        <td className="admin-sdx-cell-icon">{statusIcon(false)}</td>
+                                                        <td className="admin-sdx-cell">
+                                                            {gap.reason === 'doctor_missing' &&
+                                                                t('admin2.sdx_assignment_doctor_missing', {
+                                                                    service: gap.serviceName,
+                                                                    id: gap.pinnedDoctorId ?? '',
+                                                                })}
+                                                            {gap.reason === 'specialty_mismatch' &&
+                                                                t('admin2.sdx_assignment_specialty_mismatch', {
+                                                                    service: gap.serviceName,
+                                                                })}
+                                                            {gap.reason === 'missing_specialty_mapping' &&
+                                                                t('admin2.sdx_assignment_missing_mapping', {
+                                                                    service: gap.serviceName,
+                                                                })}
+                                                            {gap.reason === 'resource_queue_conflict' &&
+                                                                t('admin2.sdx_assignment_resource_queue', {
+                                                                    service: gap.serviceName,
+                                                                    tag: gap.queueTag ?? '',
+                                                                })}
+                                                        </td>
+                                                        <td className="admin-sdx-cell-right">
+                                                            {gap.reason === 'doctor_missing' ? (
+                                                                <Link className="admin-sdx-link" to="/admin/doctors">
+                                                                    {t('admin2.sdx_assignment_fix_doctors')} <ExternalLink className="admin-sdx-icon-m" size={11} />
+                                                                </Link>
+                                                            ) : (
+                                                                <Link className="admin-sdx-link" to="/admin/services?servicesTab=catalog">
+                                                                    {t('admin2.sdx_assignment_fix_catalog')} <ExternalLink className="admin-sdx-icon-m" size={11} />
+                                                                </Link>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ))}
                                 </div>
                             </CardContent>
                         </Card>
