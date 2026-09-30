@@ -4,13 +4,14 @@ API endpoints для управления информацией о кабине
 
 import logging
 from datetime import date, datetime
-from typing import Any, NoReturn
+from typing import Any, Literal, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.crud.clinic import clinic_today
 from app.models.user import User
 from app.services.queue_cabinet_management_api_service import (
     QueueCabinetManagementApiService,
@@ -64,6 +65,11 @@ class QueueCabinetUpdateRequest(BaseModel):
 class QueueCabinetResponse(BaseModel):
     id: int
     day: str
+    owner_type: Literal["doctor", "resource"]
+    owner_id: int
+    owner_name: str
+    owner_default_cabinet: str | None
+    queue_resource_id: int | None
     # QD-2C (Codex round-8 P1): ресурсные очереди (specialist NULL)
     # — врач-ось отсутствует по дизайну, владелец = реестр
     specialist_id: int | None
@@ -91,7 +97,10 @@ class BulkCabinetUpdateRequest(BaseModel):
 
 @router.get("/queues/cabinet-info", response_model=list[QueueCabinetResponse])
 def get_queues_cabinet_info(
-    day: str | None = Query(None, description="Дата в формате YYYY-MM-DD"),
+    day: str | None = Query(
+        None,
+        description="Дата в формате YYYY-MM-DD; по умолчанию текущий день клиники",
+    ),
     specialist_id: int | None = Query(None, description="ID специалиста"),
     cabinet_number: str | None = Query(None, description="Номер кабинета"),
     db: Session = Depends(get_db),
@@ -101,8 +110,9 @@ def get_queues_cabinet_info(
     Получить информацию о кабинетах для очередей
     """
     try:
+        requested_day = _parse_day_query(day)
         payload = QueueDomainService(db).list_queue_cabinet_info(
-            day=_parse_day_query(day),
+            day=requested_day if requested_day is not None else clinic_today(db),
             specialist_id=specialist_id,
             cabinet_number=cabinet_number,
         )
@@ -115,7 +125,7 @@ def get_queues_cabinet_info(
         _raise_queue_cabinet_internal_error("get_queues_cabinet_info", exc)
 
 
-@router.get("/queues/{queue_id}/cabinet-info", response_model=dict[str, Any])
+@router.get("/queues/{queue_id}/cabinet-info", response_model=QueueCabinetResponse)
 def get_queue_cabinet_info(
     queue_id: int,
     db: Session = Depends(get_db),

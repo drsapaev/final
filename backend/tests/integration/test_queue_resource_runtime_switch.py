@@ -504,9 +504,9 @@ def test_morning_precreate_unowned_tag_skips_fail_closed(
     _make_service(db_session, queue_tag="general", name="Приём")
 
     with caplog.at_level(logging.ERROR, logger="app.services.morning_assignment"):
-        created = MorningAssignmentService(
-            db_session
-        ).ensure_daily_queues_for_all_tags(_DAY)
+        created = MorningAssignmentService(db_session).ensure_daily_queues_for_all_tags(
+            _DAY
+        )
     assert created == 0
     queue = queue_resource_routing.find_active_tag_queue(db_session, _DAY, "general")
     assert queue is None
@@ -2162,6 +2162,11 @@ def test_cabinet_info_represents_resource_axis(db_session: Session) -> None:
     resource_item = next(i for i in items if i.id == resource_queue.id)
     assert resource_item.specialist_id is None
     assert resource_item.specialist_name == "Ресурс очереди"
+    assert resource_item.owner_type == "resource"
+    assert resource_item.owner_id == resource.id
+    assert resource_item.owner_name == "Ресурс очереди"
+    assert resource_item.queue_resource_id == resource.id
+    assert resource_item.owner_default_cabinet == "7"
     assert resource_item.sync_status == "resource_owned"
     assert resource_item.cabinet_number == "7"
     assert resource_item.effective_cabinet == "7"
@@ -5239,9 +5244,7 @@ def test_rest_call_next_broadcast_uses_resolved_queue_day(
         payload = asyncio.run(scenario())
         assert payload.success is True
 
-        routed = [
-            c for c in ws_calls if c.get("data", {}).get("action") == "call_next"
-        ]
+        routed = [c for c in ws_calls if c.get("data", {}).get("action") == "call_next"]
         assert routed, ws_calls
         assert all(
             c["date"] == tz_day.strftime("%Y-%m-%d") for c in routed
@@ -5385,9 +5388,7 @@ def test_department_overview_counts_clinic_day_resource_queues(
 
     tz_name, clinic_day = _divergent_clinic_day()
     assert clinic_day != date.today()
-    monkeypatch.setattr(
-        "app.crud.clinic.clinic_today", lambda db: clinic_day
-    )
+    monkeypatch.setattr("app.crud.clinic.clinic_today", lambda db: clinic_day)
 
     department = Department(key="laboratory_ll", name_ru="Лаборатория LL")
     profile = QueueProfile(
@@ -5409,9 +5410,7 @@ def test_department_overview_counts_clinic_day_resource_queues(
         _make_waiting_entry(db_session, queue, number=6)
 
         overview = dept_helpers._collect_department_overview(db_session)
-        item = next(
-            i for i in overview["departments"] if i["key"] == "laboratory_ll"
-        )
+        item = next(i for i in overview["departments"] if i["key"] == "laboratory_ll")
         assert item["stats"]["queue_entries_today"] == 2
     finally:
         _durable_cleanup(db_session)
@@ -7546,9 +7545,7 @@ def test_force_majeure_transfer_numbers_from_day_snapshot_doctor_queue(
     from app.services.force_majeure_service import ForceMajeureService
 
     doctor_user = _make_user(db_session, username="fm_snap_dr1", role="doctor")
-    doctor = _make_doctor(
-        db_session, user_id=doctor_user.id, specialty="stom_r19a"
-    )
+    doctor = _make_doctor(db_session, user_id=doctor_user.id, specialty="stom_r19a")
     doctor.start_number_online = 41
     db_session.commit()
     db_session.refresh(doctor)

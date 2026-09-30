@@ -35754,6 +35754,19 @@ export type components = {
             id: number;
             /** Day */
             day: string;
+            /**
+             * Owner Type
+             * @enum {string}
+             */
+            owner_type: "doctor" | "resource";
+            /** Owner Id */
+            owner_id: number;
+            /** Owner Name */
+            owner_name: string;
+            /** Owner Default Cabinet */
+            owner_default_cabinet: string | null;
+            /** Queue Resource Id */
+            queue_resource_id: number | null;
             /** Specialist Id */
             specialist_id: number | null;
             /** Specialist Name */
@@ -47994,7 +48007,7 @@ export interface operations {
     get_queues_cabinet_info_api_v1_admin_queues_cabinet_info_get: {
         parameters: {
             query?: {
-                /** @description Дата в формате YYYY-MM-DD */
+                /** @description Дата в формате YYYY-MM-DD; по умолчанию текущий день клиники */
                 day?: string | null;
                 /** @description ID специалиста */
                 specialist_id?: number | null;
@@ -48044,9 +48057,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["QueueCabinetResponse"];
                 };
             };
             /** @description Validation Error */

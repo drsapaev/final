@@ -96,6 +96,11 @@ class TestQueueDomainService:
                 "day": "2026-03-07",
                 "specialist_id": 7,
                 "specialist_name": "Doctor Test",
+                "owner_type": "doctor",
+                "owner_id": 7,
+                "owner_name": "Doctor Test",
+                "owner_default_cabinet": None,
+                "queue_resource_id": None,
                 "queue_tag": "lab",
                 "cabinet_number": "201",
                 "doctor_cabinet": None,
@@ -110,6 +115,90 @@ class TestQueueDomainService:
                 "integrity_warnings": ["doctor_cabinet_missing"],
             }
         ]
+
+    def test_list_queue_cabinet_info_reports_default_difference_as_information(
+        self,
+    ) -> None:
+        queue = SimpleNamespace(
+            id=8,
+            day=SimpleNamespace(isoformat=lambda: "2026-03-07"),
+            specialist_id=12,
+            queue_resource_id=None,
+            queue_tag="dermatology",
+            cabinet_number="399",
+            cabinet_floor=None,
+            cabinet_building=None,
+            active=True,
+        )
+        doctor = SimpleNamespace(
+            cabinet="305",
+            user=SimpleNamespace(full_name="Queue Doctor"),
+        )
+
+        class Repository:
+            def list_daily_queues(
+                self, *, day_obj, specialist_id, cabinet_number, registry_tag
+            ):
+                return [queue]
+
+            def get_doctor(self, doctor_id):
+                assert doctor_id == 12
+                return doctor
+
+            def count_entries(self, *, queue_id):
+                return 2
+
+        service = QueueDomainService(db=None, read_repository=Repository())
+        item = service.list_queue_cabinet_info(
+            day=None, specialist_id=None, cabinet_number=None
+        )[0]
+
+        assert item["owner_type"] == "doctor"
+        assert item["owner_id"] == 12
+        assert item["owner_name"] == "Queue Doctor"
+        assert item["owner_default_cabinet"] == "305"
+        assert item["cabinet_number"] == "399"
+        assert item["sync_status"] == "default_differs"
+        assert "queue_cabinet_stale" not in item["integrity_warnings"]
+
+    def test_list_queue_cabinet_info_returns_typed_resource_owner(self) -> None:
+        queue = SimpleNamespace(
+            id=9,
+            day=SimpleNamespace(isoformat=lambda: "2026-03-07"),
+            specialist_id=None,
+            queue_resource_id=31,
+            queue_resource=SimpleNamespace(
+                display_name="Laboratory",
+                default_cabinet="7",
+            ),
+            queue_tag="lab",
+            cabinet_number="8",
+            cabinet_floor=1,
+            cabinet_building="A",
+            active=True,
+        )
+
+        class Repository:
+            def list_daily_queues(
+                self, *, day_obj, specialist_id, cabinet_number, registry_tag
+            ):
+                return [queue]
+
+            def count_entries(self, *, queue_id):
+                return 4
+
+        service = QueueDomainService(db=None, read_repository=Repository())
+        item = service.list_queue_cabinet_info(
+            day=None, specialist_id=None, cabinet_number=None
+        )[0]
+
+        assert item["owner_type"] == "resource"
+        assert item["owner_id"] == 31
+        assert item["owner_name"] == "Laboratory"
+        assert item["queue_resource_id"] == 31
+        assert item["owner_default_cabinet"] == "7"
+        assert item["cabinet_number"] == "8"
+        assert item["sync_status"] == "resource_owned"
 
     def test_get_queue_cabinet_info_raises_when_queue_missing(self) -> None:
         class Repository:
@@ -217,8 +306,9 @@ class TestQueueDomainService:
 
         assert "Unsupported queue allocation mode" in str(exc_info.value)
 
-
-    def test_get_queue_groups_payload_preserves_static_groups_and_db_enrichment(self) -> None:
+    def test_get_queue_groups_payload_preserves_static_groups_and_db_enrichment(
+        self,
+    ) -> None:
         service_row = SimpleNamespace(service_code="K77")
 
         class Repository:

@@ -1,20 +1,20 @@
 # Progress
 
 Plan version: 1.0
-Current task: T02
-Current status: PR_OPEN
-Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t02-settings-state\final`
-Branch: `codex/aqs-T02-queue-settings-state`
-Base commit: `967bd398c14bce4b835bd5be1205532387e2a909`
-Current commit: reviewed code HEAD `36cbcfebce3778c9ea04982a6abe9b00c47e21ae` (GitHub CI passed; evidence-only follow-up pending)
-Last updated: 2026-09-30T23:10:08+05:00
+Current task: T03
+Current status: IN_PROGRESS
+Worktree: `C:\final\_wt_aqs_t03_cabinet_read`
+Branch: `codex/aqs-T03-cabinet-read`
+Base commit: `b4ba6320797f056da19bbdc5cc672b3a97d2091e`
+Current commit: `b4ba6320797f056da19bbdc5cc672b3a97d2091e` (T03 edits are uncommitted)
+Last updated: 2026-10-01T01:18:45+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
 | T00 | MERGED | `codex/aqs-T00-docs` / [PR #3536](https://github.com/drsapaev/final/pull/3536) | `bae927f5c88010808d9091e7f47d09bbfdfa1005` | `EVIDENCE.md#t00` |
 | T01 | MERGED | `codex/aqs-T01-profile-modal` / [PR #3537](https://github.com/drsapaev/final/pull/3537) | `967bd398c14bce4b835bd5be1205532387e2a909` | `EVIDENCE.md#t01` |
-| T02 | PR_OPEN | `codex/aqs-T02-queue-settings-state` / [PR #3538](https://github.com/drsapaev/final/pull/3538) | | `EVIDENCE.md#t02` |
-| T03 | PLANNED | | | |
+| T02 | MERGED | `codex/aqs-T02-queue-settings-state` / [PR #3538](https://github.com/drsapaev/final/pull/3538) | `b4ba6320797f056da19bbdc5cc672b3a97d2091e` | `EVIDENCE.md#t02` |
+| T03 | IN_PROGRESS | `codex/aqs-T03-cabinet-read` | | `EVIDENCE.md#t03` |
 | T04 | PLANNED | | | |
 | T05 | PLANNED | | | |
 | T06 | PLANNED | | | |
@@ -33,12 +33,12 @@ Last updated: 2026-09-30T23:10:08+05:00
 
 ## Current checkpoint
 
-- Completed: T00 merged as PR #3536 (`bae927f5...`); T01 merged as PR #3537 (`967bd398...`) after all required checks passed; local main fast-forwarded to fresh `origin/main`; T02 started from that exact base.
-- Changed and validated in merged T01: status filter uses Select value callback; profile form uses shared Dialog with Escape/focus handling; preset hex values satisfy API; 13 focused tests, type-check, scoped ESLint, stylelint, build, baseline ratchet and rerun frontend E2E passed.
-- Completed: T00 merged as PR #3536 (`bae927f5...`); T01 merged as PR #3537 (`967bd398...`) after all required checks passed; T02 was opened from that fresh base and has a validated review-fix commit locally.
-- Changed and validated in T02: initial settings-load/save safeguards and removal of fabricated controls; review fixes now store draft base state and principal identity, require explicit rebase when server state changed, clear drafts on logout, distinguish saved fields from newer edits, and guard storage failures during refresh.
-- Remaining: obtain reviewer acknowledgment for the deferred Tier 2 specs before merge. T02 remains `PR_OPEN`; start T03 only after T02 is merged and main is refreshed.
-- Blocker: the user/reviewer acknowledgment required by `docs/AGENTS_UI.md` §13 is still unchecked. Tier 2 backend-dependent E2E remains `NOT_RUN`; local Windows Playwright lacks Windows-specific baselines. The review-fix implementation and current GitHub CI are otherwise green.
-- Next exact action: update the durable CI evidence and PR body to show the completed checks, then request reviewer acknowledgment for the Tier 2 deferral. Do not merge until it is explicitly recorded.
-- Checks already run on code HEAD `36cbcfebce3778c9ea04982a6abe9b00c47e21ae`: GitHub Frontend unit, lint, build, and E2E (13m22s) passed; PR Required Gate, CodeQL, gitleaks, security scans, locale parity, CI scope, regression audit, PR quality, and lifecycle recommendation passed. Backend tests, backend parity, and other backend-only jobs were path-aware skipped. Locally, focused QueueSettings/auth Vitest passed 40/40, type-check, scoped ESLint (0 errors), strict locale parity (all five locales, 10,275 keys), production build, UI baseline ratchet, PR body gate, and `git diff --check` passed. Full local Vitest had 2,872 passed and 2 failures in unrelated `DepartmentManagement.keyContract.test.tsx` during concurrent build; the isolated file rerun passed 8/8.
-- Checks to rerun after the next change: `git diff --check` and PR body gate after evidence/description updates. Any code change requires fresh Tier 1 CI. Tier 2 remains `NOT_RUN` until explicitly run in a safe backend environment.
+- Completed: T00–T02 merged; PR #3538 merged as `b4ba6320797f056da19bbdc5cc672b3a97d2091e`. T02's formal Tier 2 deferral acknowledgment was recorded before merge. Tier 2 backend-dependent specs remain `NOT_RUN`; they are not represented as passed.
+- Changed and validated in T02: queue-settings loading/save protection, stale draft conflict metadata, logout isolation, correct dirty state after edits during save, defensive storage access, and removal of fabricated controls. See `EVIDENCE.md#t02` for separate local and GitHub validation snapshots.
+- T03 scope: cabinet read contract only. The current patch defaults an omitted day to clinic-local today, returns typed queue owner and default cabinet alongside the saved day assignment, derives displayed statistics from the same filtered read, treats changed defaults as informational, and distinguishes load failure from empty results.
+- Completed in T03: backend tests 14/14; final component tests 3/3; full Vitest 2,877/2,877; type-check; scoped ESLint; direct pinned Stylelint; theme and icon audits; production build; UI baseline ratchet; strict locale parity; OpenAPI/frontend-type generation; PR body gate (19 checks).
+- Changed but not verified: GitHub CI/Playwright and first-screen browser timing. The exact `lint:check` wrapper failed locally because Stylelint was absent from PATH after the ESLint stage passed; the pinned cached Stylelint 16.26.1 run passed directly. `git diff --check` passed after final code and ledger edits.
+- Remaining: stage and review the exact changed paths, commit, rerun generated-type parity after commit, push, open PR, and wait for required GitHub checks.
+- Blocker: none for opening the T03 PR. Merge still requires green Tier 1 CI and formal acknowledgment if Tier 2 remains deferred. Staging timing is `NOT_RUN`; T02 Tier 2 is also `NOT_RUN`.
+- Next exact action: stage the allowed T03 paths, review the staged diff, and commit.
+- Checks to rerun after the next change: `git diff --check`; after committing, `npm.cmd run generate:api-types:check`.

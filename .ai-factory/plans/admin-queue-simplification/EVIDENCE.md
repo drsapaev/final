@@ -180,3 +180,44 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Remaining limitation: Tier 2 backend-dependent E2E and live browser QA of the route have not been run.
 - PR: [#3538](https://github.com/drsapaev/final/pull/3538), open and mergeable; waiting for Tier 2 deferral acknowledgment.
 - Merge commit: pending.
+
+## T02 merge update — 2026-10-01
+
+- GitHub state: PR #3538 is `MERGED` at `2026-09-30T19:05:08Z`; merge commit `b4ba6320797f056da19bbdc5cc672b3a97d2091e`.
+- Formal Tier 2 deferral acknowledgment was recorded before merge. Tier 2 backend-dependent specs remain `NOT_RUN`; the acknowledgment and user's technical approval do not convert skipped tests into passes.
+- The reviewed frontend/auth-draft implementation and Tier 1 CI evidence remain as recorded above. No backend or production behavior was added to T02.
+
+## T03 — 2026-10-01
+
+- Commit under test: local changes based on `b4ba6320797f056da19bbdc5cc672b3a97d2091e`; uncommitted at this checkpoint.
+- Environment: Windows isolated worktree `C:\final\_wt_aqs_t03_cabinet_read`, branch `codex/aqs-T03-cabinet-read`; frontend dependencies resolved through the existing `C:\final\frontend\node_modules` junction. Test `DATABASE_URL` pointed to an unused loopback database; pytest fixtures used isolated test databases and no production/staging database was accessed.
+- Execution mode: `advisory_gate`. This T03 slice changes a read-only API contract and its Admin presentation; it does not change schema, authentication, queue ownership/fairness, clinical lifecycle, or writes. Gate exploration first missed the service/UI roots; source and focused tests established the read-path ownership, so the advisory exception in `AGENTS.md` applies.
+- Canonical anchors: `QueueDomainService`, `QueueReadRepository`, `DailyQueue`/`QueueResource` ownership contract, `queue_cabinet_management.py`, `QueueCabinetManagement.tsx`, focused queue-cabinet and OpenAPI tests, and the T03 requirements in the plan.
+- First-touch/allowed paths: cabinet read endpoint and queue read service; focused backend/frontend tests; `backend/openapi.json` and generated `frontend/src/types/generated/api.ts`; the five locale files; this plan's progress/evidence files.
+- Denied paths: schema/migrations; cabinet write, bulk update, and sync service behavior; queue owner assignment; queue admission/runtime/scheduler; route registry and unrelated admin screens.
+- Actual changed paths: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE}.md`; `backend/app/api/v1/endpoints/queue_cabinet_management.py`; `backend/app/services/queue_domain_service.py`; `backend/openapi.json`; `backend/tests/integration/test_admin_linkage_cleanup.py`; `backend/tests/integration/test_queue_resource_runtime_switch.py`; `backend/tests/test_openapi_contract.py`; `backend/tests/unit/test_queue_domain_service.py`; `frontend/src/components/admin/QueueCabinetManagement.tsx`; `frontend/src/components/admin/__tests__/QueueCabinetManagement.test.tsx`; `frontend/src/i18n/locales/{en,kk,ru,uz-Cyrl,uz-Latn}.ts`; `frontend/src/types/generated/api.ts`.
+- Original failures reproduced before implementation: omitted day included rows outside clinic-today; response had no typed owner/default fields; a saved daily cabinet differing from the current default was labelled stale; cabinet list and statistics used separate reads; a failed list read appeared as an empty result; a late response to an older filter could overwrite newer rows/statistics.
+- Validation commands and results:
+  - `scripts/run_backend_pytest.ps1 tests/unit/test_queue_domain_service.py tests/integration/test_admin_linkage_cleanup.py::test_queue_cabinet_info_defaults_to_clinic_day_and_separates_snapshot_from_default tests/integration/test_queue_resource_runtime_switch.py::test_cabinet_info_represents_resource_axis tests/test_openapi_contract.py::test_openapi_queue_cabinet_response_exposes_typed_owner_fields` — PASS, 14 tests; one existing warning.
+  - `npm.cmd run test:run -- src/components/admin/__tests__/QueueCabinetManagement.test.tsx` — PASS, 2 tests.
+  - Final `npm.cmd run test:run -- src/components/admin/__tests__/QueueCabinetManagement.test.tsx` — PASS, 3 tests including the out-of-order filter response regression.
+  - `npm.cmd run test -- --run` — PASS, 311 files and 2,877 tests.
+  - `npm.cmd run type-check -- --pretty false` — PASS on the final generated API contract.
+  - `npx.cmd eslint src/components/admin/QueueCabinetManagement.tsx src/components/admin/__tests__/QueueCabinetManagement.test.tsx` — PASS, no errors or warnings on final source.
+  - `npm.cmd run lint:check` — full ESLint stage completed with 0 errors and 3,515 existing warnings, then command exited 1 because `stylelint` was not on the worktree PATH. The lockfile-matched cached Stylelint 16.26.1 executable ran `src/**/*.css` directly — PASS. GitHub lint job remains required.
+  - `npm.cmd run check-theme` — PASS. `npm.cmd run audit:icon-controls` — PASS, 0 findings.
+  - Final `npm.cmd run build` — PASS, 1m31s. Existing CSS minifier warnings for `flexWrap` and `marginBottom` remain.
+  - `npm.cmd run audit:ui-ratchet` — PASS, no ratchet regressions.
+  - `scripts/run_python.ps1 -RequireModule @() scripts/i18n/validate_locales.py --strict` — PASS; all five locales have 10,283 matching keys.
+  - `generate_openapi.py --output backend/openapi.json` with `PYTHONPATH=backend` and an unused loopback `DATABASE_URL` — PASS; 1,063 paths and 1,216 operations. `npm.cmd run generate:api-types` — PASS and regenerated the frontend contract from this OpenAPI snapshot.
+  - `npm.cmd run generate:api-types:check` — generated the updated types, then exited 1 because its final `git diff --exit-code` compares the intentionally changed generated file against the uncommitted base. Rerun after the code commit, when the generated contract is part of `HEAD`.
+  - Self-contained Tier 1 Playwright suite — `NOT_RUN` locally; the worktree host is Windows and the repository's CI Linux job is the authoritative run for its Chromium baselines. GitHub CI must pass before merge.
+  - `git diff --check` — PASS after final code and ledger edits; Git emitted only its LF-to-CRLF normalization notice for the generated API types file.
+  - `scripts/run_pr_review_gate_checks.py --body-file .tmp-pr-body-T03.md` — PASS; 19 gate unit tests, sample bodies, and this PR body passed.
+- Result: local backend/frontend tests, type-check, scoped ESLint, direct Stylelint, theme/icon audits, build, UI ratchet, and locale parity pass. The exact `lint:check` wrapper had a local PATH limitation; GitHub lint and Playwright checks remain required before merge.
+- Staging/browser evidence: `NOT_RUN`. The isolated Compose project had no running services, `ops/.env.staging` and `ops/.env` were absent from this worktree, and ports `18001`, `18080`, and `55432` had no listeners. Production `:18000` was left untouched. First-screen cold/return timing is therefore still required before completing the corresponding UI evidence.
+- Other environment note: importing the backend for OpenAPI generation created an ignored development `.secret_key` in this worktree; its contents were not read or recorded, and it is not in the changed-file list.
+- Scope check: only cabinet read semantics, read presentation, read-contract generation, focused tests, locales, and this plan ledger changed. No schema, migration, queue mutation, ownership, admission, or production files changed.
+- Remaining limitation: staging timing/browser checks and GitHub PR checks have not run. The generated-types check must be rerun after committing the intentional generated diff.
+- PR: pending.
+- Merge commit: pending.

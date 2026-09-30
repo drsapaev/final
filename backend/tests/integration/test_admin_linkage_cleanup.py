@@ -1,6 +1,7 @@
-from datetime import date
+from datetime import date, timedelta
 
 from app.api.v1.endpoints import admin_doctors
+from app.crud.clinic import clinic_today
 from app.core.security import get_password_hash
 from app.models.appointment import Appointment
 from app.models.clinic import Doctor
@@ -155,7 +156,7 @@ def test_admin_appointments_returns_enriched_doctor_and_effective_cabinet(
     assert "queue_cabinet_stale" in item["integrityWarnings"]
 
 
-def test_queue_cabinet_info_reports_sync_status_and_rejects_manual_canonical_changes(
+def test_queue_cabinet_info_defaults_to_clinic_day_and_separates_snapshot_from_default(
     client,
     db_session,
     auth_headers,
@@ -182,25 +183,41 @@ def test_queue_cabinet_info_reports_sync_status_and_rejects_manual_canonical_cha
     db_session.commit()
     db_session.refresh(doctor)
 
+    clinic_day = clinic_today(db_session)
     queue = DailyQueue(
-        day=date.today(),
+        day=clinic_day,
         specialist_id=doctor.id,
         queue_tag="dermatology",
         cabinet_number="399",
         active=True,
     )
-    db_session.add(queue)
+    historical_queue = DailyQueue(
+        day=clinic_day - timedelta(days=1),
+        specialist_id=doctor.id,
+        queue_tag="dermatology",
+        cabinet_number="301",
+        active=True,
+    )
+    db_session.add_all([queue, historical_queue])
     db_session.commit()
     db_session.refresh(queue)
+    db_session.refresh(historical_queue)
 
     response = client.get("/api/v1/admin/queues/cabinet-info", headers=auth_headers)
     assert response.status_code == 200
     payload = response.json()
     item = next((row for row in payload if row["id"] == queue.id), None)
     assert item is not None
+    assert all(row["id"] != historical_queue.id for row in payload)
     assert item["doctor_cabinet"] == "305"
     assert item["effective_cabinet"] == "399"
-    assert item["sync_status"] == "stale"
+    assert item["owner_type"] == "doctor"
+    assert item["owner_id"] == doctor.id
+    assert item["owner_name"] == "Queue Doctor"
+    assert item["owner_default_cabinet"] == "305"
+    assert item["queue_resource_id"] is None
+    assert item["sync_status"] == "default_differs"
+    assert "queue_cabinet_stale" not in item["integrity_warnings"]
 
     response = client.put(
         f"/api/v1/admin/queues/{queue.id}/cabinet-info",
@@ -263,9 +280,7 @@ def test_create_doctor_returns_duplicate_link_error_on_commit_race(
 
     # Race window: the pre-check runs before the winner commits, so it
     # misses the link and lets the losing INSERT reach the DB constraint.
-    monkeypatch.setattr(
-        crud_clinic, "get_doctor_by_user_id", lambda db, user_id: None
-    )
+    monkeypatch.setattr(crud_clinic, "get_doctor_by_user_id", lambda db, user_id: None)
 
     response = client.post(
         "/api/v1/admin/doctors",
@@ -303,9 +318,7 @@ def test_update_doctor_returns_duplicate_link_error_on_commit_race(
     db_session.commit()
     db_session.refresh(target)
 
-    monkeypatch.setattr(
-        crud_clinic, "get_doctor_by_user_id", lambda db, user_id: None
-    )
+    monkeypatch.setattr(crud_clinic, "get_doctor_by_user_id", lambda db, user_id: None)
 
     response = client.put(
         f"/api/v1/admin/doctors/{target.id}",
