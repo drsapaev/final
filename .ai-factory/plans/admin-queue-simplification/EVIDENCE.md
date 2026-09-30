@@ -126,6 +126,23 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - PR: [#3538](https://github.com/drsapaev/final/pull/3538).
 - Merge commit: pending.
 
+### T02 review-fix CI snapshot — 2026-09-30
+
+- Commit under test: `36cbcfebce3778c9ea04982a6abe9b00c47e21ae` (`docs(queue): record review gate validation`), including implementation commit `3f2c74529`.
+- Environment: GitHub Actions Linux runners; PR base `967bd398c14bce4b835bd5be1205532387e2a909`; branch `codex/aqs-T02-queue-settings-state`.
+- Execution mode: implementation used `gate_known_root_cause` for the confirmed queue-settings and auth teardown roots; docs follow-ups changed only plan progress/evidence.
+- Allowed paths: the T02 queue settings component, focused tests, auth teardown and focused test, five locales, and this plan's ledgers.
+- Actual changed paths in the review-fix series: `frontend/src/components/admin/QueueSettings.tsx`; `frontend/src/components/admin/__tests__/QueueSettings.effective.test.tsx`; `frontend/src/stores/auth.ts`; `frontend/src/stores/__tests__/auth.test.ts`; five queue-settings locale files; this plan's `PROGRESS.md` and `EVIDENCE.md`.
+- Original failure: none on this PR head; this snapshot records CI for the review-fix series.
+- Validation command: `gh pr checks 3538` — PASS for Frontend unit tests, Frontend lint, Frontend build, Frontend e2e (13m22s), PR Required Gate, CodeQL, gitleaks, GitGuardian, security scan, locale key parity, hardcoded Russian detector, CI Scope, Regression Audit Gate, PR Review Quality Gate, Recommend PR lifecycle state, and notification job.
+- Path-aware skipped checks: backend tests, Frontend-Backend Parity, generic code-quality/backend scan jobs, integration tests, Docker build, load tests, and staging/production readiness reports. These were skipped for the frontend/auth-draft scope; they are not reported as passes.
+- Result: Tier 1 PASS on PR head `36cbcfebce3778c9ea04982a6abe9b00c47e21ae`. PR remains open with merge state `CLEAN`; no review decision is present. No merge performed.
+- Relevant output or artifact: [PR #3538](https://github.com/drsapaev/final/pull/3538); check links are attached to the PR.
+- Scope check: no backend/API, schema, queue-runtime, routing, or deployment changes.
+- Remaining limitation: Tier 2 backend-dependent E2E is still `NOT_RUN`; the PR template's reviewer acknowledgment checkbox remains unchecked. Local full Vitest had two unrelated failures under concurrent build, and that test file passed when rerun alone; GitHub Frontend unit tests passed on this head.
+- PR: [#3538](https://github.com/drsapaev/final/pull/3538), open; awaiting reviewer acknowledgment for the Tier 2 deferral.
+- Merge commit: pending.
+
 ### T02 pre-commit check — 2026-09-30
 
 - `check-added-large-files`, merge-conflict, private-key, end-of-file, branch guard, and `gitleaks` hooks passed on the commit attempt.
