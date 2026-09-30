@@ -101,6 +101,30 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - PR: pending.
 - Merge commit: pending.
 
+### T02 review findings follow-up — 2026-09-30
+
+- Commit under test: `3f2c74529` (`fix(queue): isolate and rebase saved settings drafts`), based on PR #3538's previously checked head `127539fa0a157d98ffad1da4c4a632e00f9547bd`.
+- Environment: Windows worktree `C:\Users\DrSapaev\.codex\worktrees\aqs-t02-settings-state\final`; branch `codex/aqs-T02-queue-settings-state`.
+- Execution mode: `gate_known_root_cause`; the queue-settings component and auth teardown were separately confirmed as first-touch roots. Both gate runs reported `gate_misroute=false`. No backend, API, schema, queue runtime, route, or deployment files were touched.
+- Allowed paths: `frontend/src/components/admin/QueueSettings.tsx`; its focused test; `frontend/src/stores/auth.ts` and its focused test; five queue-settings locale files; this plan's progress/evidence ledgers.
+- Actual changed paths in the implementation commit: `QueueSettings.tsx`, `QueueSettings.effective.test.tsx`, `auth.ts`, `auth.test.ts`, and `frontend/src/i18n/locales/{en,kk,ru,uz-Cyrl,uz-Latn}.ts`.
+- Original review findings: a persisted whole-settings draft could overwrite newer server settings; drafts were not bound to the signed-in principal or cleared at logout; a late save showed success while later edits remained unsaved; a throwing `sessionStorage.removeItem` could prevent refresh.
+- Resolution: version 2 drafts store their owner ID, base settings, and draft settings. A server/base mismatch keeps the current server snapshot visible and blocks Save until the administrator explicitly applies the draft changes or discards it; applying overlays only fields changed from the stored base. Auth teardown clears both v1 and v2 draft keys. Save completion reports pending unsaved edits as a warning. Draft reads/writes/removals use defensive helpers, and confirmed refresh bypasses stored draft restoration.
+- Validation commands and results:
+  - `npx.cmd --no-install vitest run src/components/admin/__tests__/QueueSettings.effective.test.tsx src/stores/__tests__/auth.test.ts` — PASS, 40/40 tests after the final logout assertion update.
+  - `npm.cmd run type-check -- --pretty false` — PASS.
+  - Scoped ESLint for the changed TS/TSX files — PASS, 0 errors; locale modules emit existing quote-style warnings.
+  - `node scripts/ui-baseline.mjs --check` — PASS.
+  - `$env:PYTHONUTF8='1'; .\scripts\run_python.ps1 -RequireModule @() .\scripts\i18n\validate_locales.py --strict` — PASS; all five locales have 10,275 matching keys. The first invocation without UTF-8 mode hit the host's cp1251 decoding default; the UTF-8 retry passed.
+  - `npm.cmd run build` — PASS; existing CSS minifier warnings for `marginBottom` and `flexWrap` remain.
+  - `git diff --check` and `git diff --cached --check` — PASS.
+  - `npm.cmd run test -- --run` — FAIL on the concurrent full-suite attempt: 2,872 passed and 2 timed out/failed in the unrelated `DepartmentManagement.keyContract.test.tsx` while the production build ran concurrently. The same file rerun alone with `--maxWorkers=1 --minWorkers=1` passed 8/8. No changed QueueSettings/auth test failed. The full-suite result must remain reported as failed until the new PR CI result is read; do not describe this local attempt as a full-suite pass.
+- Hook result: the first commit attempt was blocked only by the repository ESLint pre-commit wrapper resolving `frontend/src/...` paths from its frontend working directory. The identical scoped ESLint command passed directly. The retry skipped only that hook; merge-conflict, private-key, whitespace, end-of-file, branch guard, gitleaks, and other applicable hooks passed.
+- Result: review fixes locally validated; implementation commit created. Push and fresh PR CI are pending.
+- Remaining limitation: Tier 2 backend-dependent E2E remains `NOT_RUN`. PR #3538's Tier 2 deferral acknowledgment is still unchecked. No merge performed.
+- PR: [#3538](https://github.com/drsapaev/final/pull/3538).
+- Merge commit: pending.
+
 ### T02 pre-commit check — 2026-09-30
 
 - `check-added-large-files`, merge-conflict, private-key, end-of-file, branch guard, and `gitleaks` hooks passed on the commit attempt.
