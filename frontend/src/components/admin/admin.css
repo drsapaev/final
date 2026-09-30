@@ -11840,28 +11840,10 @@
   gap: 8px;
 }
 
-.admin-qp-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: color-mix(in srgb, black, transparent 50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
 .admin-qp-modal {
-  background: var(--admin-bgc0, white);
-  border-radius: 16px;
   padding: 24px;
-  width: 500px;
-  max-width: 90vw;
-  max-height: 90vh;
-  overflow: auto;
-  box-shadow: 0 25px 50px -12px color-mix(in srgb, black, transparent 75%);
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .admin-qp-modal-header {

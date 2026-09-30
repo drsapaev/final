@@ -22,5 +22,33 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Relevant output/artifact: command output retained in task transcript; do not copy environment secrets.
 - Scope check: no production config or patient data accessed.
 - Remaining limitation: confirm every writer's transaction boundary during T08; staging/browser/runtime checks were not performed.
+- PR: [#3536](https://github.com/drsapaev/final/pull/3536), merged after the PR body quality gate was corrected and the latest review-quality check passed.
+- Merge commit: `bae927f5c88010808d9091e7f47d09bbfdfa1005`.
+
+## T01 — 2026-09-30
+
+- Commit under test: uncommitted T01 changes based on `bae927f5c88010808d9091e7f47d09bbfdfa1005`.
+- Environment: Windows worktree `C:\final\_wt_aqs_t01`; branch `codex/aqs-T01-profile-modal`.
+- Execution mode: `advisory_gate`; narrow UI-only task, no backend/API/schema/lifecycle edits.
+- Allowed paths: `frontend/src/components/admin/QueueProfilesManager.tsx`; focused component test under `frontend/src/components/admin/__tests__/`; necessary rules in `frontend/src/components/admin/admin.css`; this progress/evidence ledger.
+- Denied paths: backend, API schemas/contracts, migrations, route registry, queue/profile business semantics, unrelated UI and generated output.
+- Original failure: the new focused component tests failed against the pre-change source: status selection filtered out every row; spaces closed the form; no accessible modal/focus behavior existed; color presets were CSS variables rather than usable hex values; form labels had no control association.
+- Validation commands and results:
+  - `npm.cmd run test:run -- src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx src/components/admin/__tests__/QueueProfilesManager.csv.test.tsx` — PASS, 13/13 tests.
+  - `npm.cmd run type-check` — PASS.
+  - `npx.cmd --no-install eslint src/components/admin/QueueProfilesManager.tsx src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx` — PASS, 0 errors; 4 existing warnings remain for missing `t` dependency, old hex/rgba values outside the new palette, and their existing lines.
+  - `npx.cmd --no-install stylelint src/components/admin/admin.css` — PASS.
+  - `npm.cmd run build` — PASS; build emitted existing `marginBottom`/`flexWrap` CSS-property warnings from generated/minified CSS.
+  - `git diff --check` — PASS.
+- Pre-commit results on the final five-file scope:
+  - `check-added-large-files` — PASS.
+  - `gitleaks` — PASS using the existing user cache.
+  - Merge-conflict, private-key, end-of-file, trailing-whitespace, and no-commit-to-branch hooks — PASS after the trailing-whitespace hook normalized two comment lines and those lines were re-staged.
+  - The repository's `eslint` pre-commit wrapper — FAILS before linting with ESLint 9 error `patterns must be a non-empty string or an array of non-empty strings`; the same scoped ESLint command run directly from `frontend/` passes with 0 errors and 4 pre-existing warnings. No shared hook configuration was changed because that is outside T01 scope.
+- Result: PASS for local T01 validation.
+- Relevant output or artifact: Vitest uses synthetic profiles only; CSV suite emitted its expected synthetic network-failure log in the test that verifies per-profile errors.
+- Actual changed paths: `frontend/src/components/admin/QueueProfilesManager.tsx`; `frontend/src/components/admin/admin.css`; `frontend/src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx`; this plan's `PROGRESS.md` and `EVIDENCE.md`.
+- Scope check: no profile semantics, backend, API contract, schema, routing, or queue behavior changed. Filter now consumes `Select.onValueChange`; API's max-20 hex color contract was checked in source. No network/load path changed.
+- Remaining limitation: live browser visual QA and first-row cold/repeat timing are deferred to T18 synthetic-staging acceptance; staging was stopped at T00. No production data was accessed.
 - PR: pending.
 - Merge commit: pending.
