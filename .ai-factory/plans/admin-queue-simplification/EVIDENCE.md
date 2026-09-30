@@ -222,6 +222,14 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Other environment note: importing the backend for OpenAPI generation created an ignored development `.secret_key` in this worktree; its contents were not read or recorded, and it is not in the changed-file list.
 - Scope check: only cabinet read semantics, read presentation, read-contract generation, focused tests, locales, and this plan ledger changed. No schema, migration, queue mutation, ownership, admission, or production files changed.
 - Remaining limitation: staging timing/browser checks and GitHub PR checks have not run. The generated-types check must be rerun after committing the intentional generated diff.
-- Code commit: `e9448bca543fcb98595c63ef086fdfeb47a8dd52`; docs-only checkpoint follow-up pending.
-- PR: pending.
+- Code commit: `e9448bca543fcb98595c63ef086fdfeb47a8dd52`; PR-cycle checkpoint commit: `15110f2b9696d151ef022d756bb5b5a27b932275`.
+- PR: [#3540](https://github.com/drsapaev/final/pull/3540), open; latest plan-ledger checkpoint is being recorded.
 - Merge commit: pending.
+
+## T03 PR opened — 2026-10-01
+
+- PR: [#3540](https://github.com/drsapaev/final/pull/3540), title `fix(queue): make cabinet reads owner-aware`.
+- Initial head: `15110f2b9696d151ef022d756bb5b5a27b932275`, based on `b4ba6320797f056da19bbdc5cc672b3a97d2091e`.
+- Initial check snapshot: Python formatting report, frontend lint report, CodeQL, PR lifecycle/review/regression gates, role integrity, locale parity, CI scope, gitleaks, and security scan had started; no result was treated as passed at PR creation. This run will be superseded by the final checkpoint head.
+- Merge gate: wait for green Tier 1 CI. Backend-dependent Tier 2 E2E and live staging timing remain `NOT_RUN`; the reviewer-acknowledgment checkbox remains unchecked pending a formal decision for this PR.
+- PR body evidence: `scripts/run_pr_review_gate_checks.py --body-file .tmp-pr-body-T03.md` passed 19 gate tests and body validation before PR creation; scratch file is not part of the PR and is removed after use.
