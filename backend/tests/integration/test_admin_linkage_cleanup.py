@@ -228,7 +228,7 @@ def test_queue_cabinet_info_defaults_to_clinic_day_and_separates_snapshot_from_d
     assert "Канонический номер кабинета" in response.json()["detail"]
 
     response = client.post(
-        "/api/v1/admin/queues/sync-cabinet-info",
+        f"/api/v1/admin/queues/sync-cabinet-info?day={clinic_day.isoformat()}",
         headers=auth_headers,
     )
     assert response.status_code == 200

@@ -241,3 +241,20 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Correction: remove only the terminal LF from `backend/openapi.json` so the artifact matches the existing CI serializer; keep `end-of-file-fixer` enabled for all other commits and skip it only for the corrective commit. This changes no API semantics.
 - Validation after correction: `npm.cmd run generate:api-types:check` — PASS; `git diff --check` — PASS. Latest full CI after pushing the correction remains required and must be recorded separately.
 - Scope check: only generated OpenAPI serialization and this plan evidence/progress ledger are touched; no endpoint behavior, schema, migrations, or queue writes change.
+
+## T03 CI diagnosis and deterministic clinic-day test — 2026-10-01
+
+- Commit under test: failing GitHub head `66e3d9fc0ef0066554bf895ed358c29621bd3df5`; the one-line integration-test follow-up is uncommitted at this checkpoint.
+- Environment: GitHub Actions full backend suite on PostgreSQL; local Windows worktree has no test `DATABASE_URL`, and loopback PostgreSQL `127.0.0.1:55432` is not listening. No production or staging database was used.
+- Execution mode: `direct_execute` for a confirmed test-only root cause. The canonical sync service was inspected read-only; no write behavior is changed.
+- Allowed path: `backend/tests/integration/test_admin_linkage_cleanup.py` plus this T03 progress/evidence ledger.
+- Original failure: `test_queue_cabinet_info_defaults_to_clinic_day_and_separates_snapshot_from_default` reached its final sync assertion with the queue still at cabinet `399` instead of expected `305`.
+- Root cause: the test creates the queue for `clinic_today(db_session)` but calls the existing sync command without a `day`; that command defaults to host `date.today()`. Around UTC/Tashkent midnight those dates can differ, so sync reads a different day and correctly leaves this queue unchanged. The GET request in this test remains day-omitted and still verifies the new clinic-local read default.
+- Correction: pass `day=clinic_day.isoformat()` explicitly to the sync request, keeping this T03 test deterministic without changing sync/write semantics or broadening the read-only contract.
+- Validation command: `scripts/run_backend_pytest.ps1 tests/integration/test_admin_linkage_cleanup.py::test_queue_cabinet_info_defaults_to_clinic_day_and_separates_snapshot_from_default -q` — `NOT_RUN` locally because `DATABASE_URL` is absent; local port 55432 probe returned false. `git diff --check` — PASS.
+- CI evidence before correction: GitHub run `36774939443`, attempt 1 — backend failed at the assertion above; Frontend e2e failed an unrelated Lab dirty-guard E2E timeout; required parity was skipped because backend failed. The exact failed Frontend e2e job is rerunning as attempt 2 (`110098018959`) on the same old head; result pending.
+- Result: code-level cause confirmed, deterministic test correction made; fresh backend/parity and complete Tier 1 validation must pass on the next PR head.
+- Scope check: no endpoint/service/model/write code changes. Only one existing integration test request now passes an explicit day, alongside evidence/checkpoint updates.
+- Remaining limitation: local database integration test, repeated Lab E2E outcome, new-head backend/parity/Tier 1 checks, Tier 2 E2E, and staging browser timing remain pending or `NOT_RUN` as stated.
+- PR: [#3540](https://github.com/drsapaev/final/pull/3540), open.
+- Merge commit: pending.
