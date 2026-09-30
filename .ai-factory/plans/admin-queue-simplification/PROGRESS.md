@@ -6,8 +6,8 @@ Current status: IN_PROGRESS
 Worktree: `C:\final\_wt_aqs_t03_cabinet_read`
 Branch: `codex/aqs-T03-cabinet-read`
 Base commit: `b4ba6320797f056da19bbdc5cc672b3a97d2091e`
-Current commit: `b4ba6320797f056da19bbdc5cc672b3a97d2091e` (T03 edits are uncommitted)
-Last updated: 2026-10-01T01:18:45+05:00
+Current commit: `e9448bca543fcb98595c63ef086fdfeb47a8dd52` (T03 code committed; docs-only PR checkpoint remains)
+Last updated: 2026-10-01T01:25:51+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -36,9 +36,9 @@ Last updated: 2026-10-01T01:18:45+05:00
 - Completed: T00–T02 merged; PR #3538 merged as `b4ba6320797f056da19bbdc5cc672b3a97d2091e`. T02's formal Tier 2 deferral acknowledgment was recorded before merge. Tier 2 backend-dependent specs remain `NOT_RUN`; they are not represented as passed.
 - Changed and validated in T02: queue-settings loading/save protection, stale draft conflict metadata, logout isolation, correct dirty state after edits during save, defensive storage access, and removal of fabricated controls. See `EVIDENCE.md#t02` for separate local and GitHub validation snapshots.
 - T03 scope: cabinet read contract only. The current patch defaults an omitted day to clinic-local today, returns typed queue owner and default cabinet alongside the saved day assignment, derives displayed statistics from the same filtered read, treats changed defaults as informational, and distinguishes load failure from empty results.
-- Completed in T03: backend tests 14/14; final component tests 3/3; full Vitest 2,877/2,877; type-check; scoped ESLint; direct pinned Stylelint; theme and icon audits; production build; UI baseline ratchet; strict locale parity; OpenAPI/frontend-type generation; PR body gate (19 checks).
+- Completed in T03: backend tests 14/14; final component tests 3/3; full Vitest 2,877/2,877; type-check; scoped ESLint; direct pinned Stylelint; theme and icon audits; production build; UI baseline ratchet; strict locale parity; OpenAPI/frontend-type generation; post-commit generated-types parity; PR body gate (19 checks). Code commit: `e9448bca543fcb98595c63ef086fdfeb47a8dd52`.
 - Changed but not verified: GitHub CI/Playwright and first-screen browser timing. The exact `lint:check` wrapper failed locally because Stylelint was absent from PATH after the ESLint stage passed; the pinned cached Stylelint 16.26.1 run passed directly. `git diff --check` passed after final code and ledger edits.
-- Remaining: stage and review the exact changed paths, commit, rerun generated-type parity after commit, push, open PR, and wait for required GitHub checks.
+- Remaining: update this checkpoint, remove the untracked PR-body scratch file, push the branch, open PR, and wait for required GitHub checks.
 - Blocker: none for opening the T03 PR. Merge still requires green Tier 1 CI and formal acknowledgment if Tier 2 remains deferred. Staging timing is `NOT_RUN`; T02 Tier 2 is also `NOT_RUN`.
-- Next exact action: stage the allowed T03 paths, review the staged diff, and commit.
-- Checks to rerun after the next change: `git diff --check`; after committing, `npm.cmd run generate:api-types:check`.
+- Next exact action: make a docs-only checkpoint commit with the PR-cycle state, then push and open the PR using the already validated PR body.
+- Checks to rerun after the next change: `git diff --check`; after the docs checkpoint, verify clean tracked status and push the code plus checkpoint commits.
