@@ -27,7 +27,7 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 
 ## T01 — 2026-09-30
 
-- Commit under test: uncommitted T01 changes based on `bae927f5c88010808d9091e7f47d09bbfdfa1005`.
+- Commit under test: `9ca4573a5` based on `bae927f5c88010808d9091e7f47d09bbfdfa1005`.
 - Environment: Windows worktree `C:\final\_wt_aqs_t01`; branch `codex/aqs-T01-profile-modal`.
 - Execution mode: `advisory_gate`; narrow UI-only task, no backend/API/schema/lifecycle edits.
 - Allowed paths: `frontend/src/components/admin/QueueProfilesManager.tsx`; focused component test under `frontend/src/components/admin/__tests__/`; necessary rules in `frontend/src/components/admin/admin.css`; this progress/evidence ledger.
@@ -45,6 +45,7 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
   - `gitleaks` — PASS using the existing user cache.
   - Merge-conflict, private-key, end-of-file, trailing-whitespace, and no-commit-to-branch hooks — PASS after the trailing-whitespace hook normalized two comment lines and those lines were re-staged.
   - The repository's `eslint` pre-commit wrapper — FAILS before linting with ESLint 9 error `patterns must be a non-empty string or an array of non-empty strings`; the same scoped ESLint command run directly from `frontend/` passes with 0 errors and 4 pre-existing warnings. No shared hook configuration was changed because that is outside T01 scope.
+- Commit: `9ca4573a5` (`fix(queue): repair profile form interactions`). Commit hooks passed except the three individually validated hooks (`check-added-large-files`, `gitleaks`, direct scoped ESLint), which were skipped in the hook process because the ESLint wrapper fails before linting; all remaining applicable hooks passed.
 - Result: PASS for local T01 validation.
 - Relevant output or artifact: Vitest uses synthetic profiles only; CSV suite emitted its expected synthetic network-failure log in the test that verifies per-profile errors.
 - Actual changed paths: `frontend/src/components/admin/QueueProfilesManager.tsx`; `frontend/src/components/admin/admin.css`; `frontend/src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx`; this plan's `PROGRESS.md` and `EVIDENCE.md`.
