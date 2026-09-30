@@ -258,3 +258,21 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Remaining limitation: local database integration test, repeated Lab E2E outcome, new-head backend/parity/Tier 1 checks, Tier 2 E2E, and staging browser timing remain pending or `NOT_RUN` as stated.
 - PR: [#3540](https://github.com/drsapaev/final/pull/3540), open.
 - Merge commit: pending.
+
+## T03 Tier 1 CI passed — 2026-10-01
+
+- Commit under test: `2945d33e6c3ae1df500a4f098dbcf3b7dc5156d9` (`test(queue): stabilize clinic-day cabinet sync case`), based on `b4ba6320797f056da19bbdc5cc672b3a97d2091e`.
+- Environment: GitHub Actions Linux runners; isolated Windows worktree. `origin/main` remains at `b4ba6320797f056da19bbdc5cc672b3a97d2091e` (`git rev-list --left-right --count origin/main...HEAD` returned `0 5`).
+- Execution mode: T03 `advisory_gate`; final follow-up was a test-only date pin within the approved scope.
+- Actual changed paths in the follow-up commit: `backend/tests/integration/test_admin_linkage_cleanup.py` and T03 evidence/progress ledger only. No runtime behavior changed.
+- Root-cause correction: the clinic-day GET assertion stays implicit; only the later legacy cabinet sync call now passes `day=clinic_day`, because that write command defaults to host `date.today()` and is outside this read-only patch.
+- Validation: CI run `36777744124` on this exact head — PASS for Backend tests (9m11s), Frontend E2E (13m18s), Frontend unit tests (2,877), Frontend build, Frontend lint/type checks, OpenAPI freshness, Frontend-Backend Parity, Code Quality, PR Required Gate, CodeQL, gitleaks, role integrity, locale key parity, context boundary, Telegram Mini App release gate, and separate security scan. The Lab dirty-guard E2E timeout from the previous head did not recur.
+- Required checks: `gh pr checks 3540 --required` — PASS for PR Required Gate, Frontend-Backend Parity, CodeQL, gitleaks, Frontend build/lint/unit, Backend tests, and Code Quality.
+- PR body: refreshed with the final Tier 1 CI snapshot; `scripts/run_pr_review_gate_checks.py --body-file .tmp-pr-body-T03.md` — PASS (19 checks); `gh pr edit 3540 --body-file .tmp-pr-body-T03.md` — PASS. The Tier 2 reviewer-acknowledgment checkbox remains intentionally unchecked.
+- Path-aware skipped jobs are explicitly not passes: separate integration-test job, Docker build, load tests, staging/production readiness reports, unified security job, nightly DAST, and metadata checks.
+- Local validation of the final test-only line: `NOT_RUN` because no test `DATABASE_URL` was configured and `127.0.0.1:55432` was not listening. The full GitHub PostgreSQL backend suite passed with the correction.
+- Result: Tier 1 CI is green on the current PR head; PR remains open and mergeable. Tier 2 backend-dependent E2E and synthetic-staging first-content timing remain `NOT_RUN`.
+- Scope check: no schema, migration, endpoint/service write behavior, cabinet assignment, queue ownership, admission, scheduler, or clinical lifecycle changes.
+- Remaining limitation: PR #3540's formal Tier 2 deferral acknowledgment is still unchecked. The user's latest approval/deferral statement referred to frontend-only PR #3538, already merged, so it has not been copied to this separate PR.
+- PR: [#3540](https://github.com/drsapaev/final/pull/3540), open; head `2945d33e6c3ae1df500a4f098dbcf3b7dc5156d9`.
+- Merge commit: pending.

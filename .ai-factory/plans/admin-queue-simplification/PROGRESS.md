@@ -6,8 +6,8 @@ Current status: PR_OPEN
 Worktree: `C:\final\_wt_aqs_t03_cabinet_read`
 Branch: `codex/aqs-T03-cabinet-read`
 Base commit: `b4ba6320797f056da19bbdc5cc672b3a97d2091e`
-Current commit: `66e3d9fc0ef0066554bf895ed358c29621bd3df5` (OpenAPI freshness correction; T03 test follow-up is currently uncommitted)
-Last updated: 2026-10-01T02:06:49+05:00
+Current commit: `2945d33e6c3ae1df500a4f098dbcf3b7dc5156d9` (T03 deterministic test follow-up; later commits are evidence checkpoints)
+Last updated: 2026-10-01T02:32:26+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -36,9 +36,9 @@ Last updated: 2026-10-01T02:06:49+05:00
 - Completed: T00–T02 merged; PR #3538 merged as `b4ba6320797f056da19bbdc5cc672b3a97d2091e`. T02's formal Tier 2 deferral acknowledgment was recorded before merge. Tier 2 backend-dependent specs remain `NOT_RUN`; they are not represented as passed.
 - Changed and validated in T02: queue-settings loading/save protection, stale draft conflict metadata, logout isolation, correct dirty state after edits during save, defensive storage access, and removal of fabricated controls. See `EVIDENCE.md#t02` for separate local and GitHub validation snapshots.
 - T03 scope: cabinet read contract only. The current patch defaults an omitted day to clinic-local today, returns typed queue owner and default cabinet alongside the saved day assignment, derives displayed statistics from the same filtered read, treats changed defaults as informational, and distinguishes load failure from empty results.
-- Completed in T03: backend tests 14/14; final component tests 3/3; full Vitest 2,877/2,877; type-check; scoped ESLint; direct pinned Stylelint; theme and icon audits; production build; UI baseline ratchet; strict locale parity; OpenAPI/frontend-type generation; post-commit generated-types parity; PR body gate (19 checks). Code commit: `e9448bca543fcb98595c63ef086fdfeb47a8dd52`.
-- Changed but not verified: a test-only follow-up passes `clinic_day` explicitly to the existing cabinet sync command so the read test remains deterministic across UTC/Tashkent date boundaries. Local execution is `NOT_RUN` because no test `DATABASE_URL` is configured and isolated PostgreSQL port 55432 is stopped. The failed Frontend E2E job is rerunning on the previous SHA.
-- Remaining: commit and push the deterministic test follow-up and updated evidence; await the new full GitHub check set; resolve any remaining red Tier 1 checks in PR #3540.
-- Blocker: full CI on head `66e3d9fc` failed once in the backend suite because the test's sync request omitted its day while the queue used clinic-local today; the write path defaults to host-local `date.today()`. The previous CI attempt also failed an unrelated Lab dirty-guard E2E timeout; that exact job is being rerun. Backend failure caused required parity to be skipped. Merge requires green Tier 1 CI and an applicable formal Tier 2 decision for this PR. Staging timing and backend-dependent Tier 2 E2E are `NOT_RUN`.
-- Next exact action: record the explicit-day test correction, commit/push it to PR #3540, then monitor the full checks and E2E rerun.
-- Checks to rerun after the next change: focused backend integration test (when disposable PostgreSQL is available), `git diff --check`, and all GitHub PR checks for the new head.
+- Completed in T03: local backend focus 14/14 before the final test-only adjustment; frontend component focus 3/3; full Vitest 2,877/2,877; type-check; scoped ESLint; direct pinned Stylelint; theme and icon audits; production build; UI baseline ratchet; strict locale parity; OpenAPI/frontend-type generation; post-commit generated-types parity; PR body gate (19 checks). Full GitHub Tier 1 CI passed on `2945d33e6c3ae1df500a4f098dbcf3b7dc5156d9`: backend, frontend unit/build/lint, Playwright E2E, OpenAPI freshness, parity, Code Quality, PR Required Gate, CodeQL, and gitleaks.
+- Changed but not verified: local rerun of the final test-only follow-up was `NOT_RUN` because no test `DATABASE_URL` is configured and isolated PostgreSQL port 55432 is stopped. The full GitHub PostgreSQL backend suite passed. Synthetic-staging first-content timing and Tier 2 backend-dependent E2E remain `NOT_RUN`.
+- Remaining: obtain/record the applicable formal Tier 2 deferral decision for PR #3540 before merge; then continue with T04 only after the T03 PR cycle closes.
+- Blocker: no Tier 1 CI failures remain. Tier 2 E2E and first-screen staging timing are deferred/not run, and PR #3540's reviewer deferral checkbox remains blank. The user's latest technical approval referenced frontend-only PR #3538, already merged, and is not recorded as the T03 #3540 acknowledgment.
+- Next exact action: wait for a formal Tier 2 deferral acknowledgment explicitly applying to PR #3540, or run the deferred backend-dependent checks when synthetic staging and QA credentials are available.
+- Checks to rerun after the next change: if the deferral checkbox is updated, rerun the PR-body review gate and review the resulting GitHub checks; no code test rerun is needed unless code changes.
