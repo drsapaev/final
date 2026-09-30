@@ -233,3 +233,11 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Initial check snapshot: Python formatting report, frontend lint report, CodeQL, PR lifecycle/review/regression gates, role integrity, locale parity, CI scope, gitleaks, and security scan had started; no result was treated as passed at PR creation. This run will be superseded by the final checkpoint head.
 - Merge gate: wait for green Tier 1 CI. Backend-dependent Tier 2 E2E and live staging timing remain `NOT_RUN`; the reviewer-acknowledgment checkbox remains unchecked pending a formal decision for this PR.
 - PR body evidence: `scripts/run_pr_review_gate_checks.py --body-file .tmp-pr-body-T03.md` passed 19 gate tests and body validation before PR creation; scratch file is not part of the PR and is removed after use.
+
+## T03 OpenAPI freshness correction — 2026-10-01
+
+- Failing check: PR #3540 run `36772863739`, job `OpenAPI spec freshness (app code → backend/openapi.json)`. The job compared the checked-in snapshot with `json.dump(app.openapi(), indent=2, ensure_ascii=False)`.
+- Root cause: local reproduction with the CI environment (`CORS_DISABLE=1`, `WS_DEV_ALLOW=1`, isolated unused `DATABASE_URL`) produced the same parsed JSON object. The only byte-level difference was one terminal LF: generated output was 3,285,117 bytes and the checkout text with the pre-commit-added LF was 3,285,118 bytes. `end-of-file-fixer` had appended the LF after the generated OpenAPI artifact was created.
+- Correction: remove only the terminal LF from `backend/openapi.json` so the artifact matches the existing CI serializer; keep `end-of-file-fixer` enabled for all other commits and skip it only for the corrective commit. This changes no API semantics.
+- Validation after correction: `npm.cmd run generate:api-types:check` — PASS; `git diff --check` — PASS. Latest full CI after pushing the correction remains required and must be recorded separately.
+- Scope check: only generated OpenAPI serialization and this plan evidence/progress ledger are touched; no endpoint behavior, schema, migrations, or queue writes change.
