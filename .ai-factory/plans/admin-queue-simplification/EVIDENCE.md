@@ -120,5 +120,21 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - PR review body gate: `scripts/run_pr_review_gate_checks.py --body-file .tmp-pr-body-T02.md` — PASS; its 19 unit checks and both sample bodies passed, as did this PR body. The temporary body file was removed after PR creation.
 - Code commit: `c428d5a8583cea5d21bc99b476050a4ff0ac403d`; ledger-only follow-up at PR creation: `c1067b7f4`.
 - PR: [#3538](https://github.com/drsapaev/final/pull/3538), open; attached to this task.
-- CI snapshot after PR creation: frontend unit/build/lint, Frontend e2e, CodeQL, and security scan were pending; scope, review-quality, regression-audit, locale-parity, hardcoded-Russian, gitleaks, and lifecycle recommendation checks passed. No merge performed.
+- Initial CI snapshot after PR creation: frontend unit/build/lint, Frontend e2e, CodeQL, and security scan were pending; scope, review-quality, regression-audit, locale-parity, hardcoded-Russian, gitleaks, and lifecycle recommendation checks passed. Superseded by the final check snapshot below. No merge performed.
+
+### T02 final CI snapshot — 2026-09-30
+
+- Commit under test: PR head `78be0c32b8aca7aa11fee7391a3b7fd2550bd835`.
+- Environment: GitHub Actions Linux runners; frontend-only PR.
+- Execution mode: `advisory_gate`; no API, backend, runtime, schema, or deployment changes.
+- Allowed paths: the T02 UI/test/locale/style files and this plan's progress/evidence ledger as listed above.
+- Actual changed paths: unchanged from the T02 full frontend gates section above.
+- Original failure: no additional failure after the local validation results recorded above.
+- Validation command: `gh pr checks 3538 --required` — PASS for PR Required Gate, Frontend build, Frontend lint, Frontend unit tests, CodeQL, and gitleaks. Backend tests, Frontend-Backend Parity, and security job were skipped by the UI-only CI scope. `Frontend e2e` — PASS in 12m16s, including UX/visual, Lab, business/security/concurrency, and load/chaos phases. Regression Audit Gate, PR Review Quality Gate, locale parity, hardcoded Russian detector, and PR lifecycle recommendation — PASS.
+- Local frontend evidence remains: focused QueueSettings Vitest 24/24; full Vitest 2,870/2,870; type-check, ESLint/Stylelint, theme and icon-control audits, build, UI baseline, and `git diff --check` passed. Local Windows Playwright had 46/86 passing and 40 visual comparisons could not find Windows-specific snapshots; Linux E2E passed, and no generated snapshots were retained.
+- Result: Tier 1 PASS on PR head `78be0c32b8aca7aa11fee7391a3b7fd2550bd835`. Tier 2 backend-dependent specs remain `NOT_RUN`; PR template states the reason and lists skipped specs, but reviewer acknowledgment checkbox remains unchecked pending user/reviewer response. No merge performed.
+- Relevant output or artifact: [PR #3538](https://github.com/drsapaev/final/pull/3538); required-check links are attached to the PR.
+- Scope check: no backend/API/schema, queue runtime, routing, deployment, or patient-data changes.
+- Remaining limitation: Tier 2 backend-dependent E2E and live browser QA of the route have not been run.
+- PR: [#3538](https://github.com/drsapaev/final/pull/3538), open and mergeable; waiting for Tier 2 deferral acknowledgment.
 - Merge commit: pending.
