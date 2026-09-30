@@ -54,6 +54,7 @@ import {
   parseQueueProfilesCsv,
   queueProfileToCsvPayload,
 } from './queueProfilesCsv';
+import { QUEUE_PROFILE_COLOR_PRESETS } from './queueProfileColors';
 
 interface QueueProfileDto {
     key: string;
@@ -94,22 +95,6 @@ const getAvailableIcons = (t: (key: string, options?: Record<string, unknown>) =
     { name: 'Users', component: Users, label: t('admin2.qp_icon_users') },
     { name: 'Package', component: Package, label: t('admin2.qp_icon_package') },
 ];
-
-// Predefined colors
-// QueueProfile's API accepts hex colors (max 20 characters), and native
-// <input type="color"> cannot display CSS custom-property values.
-/* eslint-disable custom/no-hardcoded-colors -- These are persisted profile color choices. */
-const PRESET_COLORS = [
-    '#E53E3E', // Red
-    '#3182CE', // Blue
-    '#9F7AEA', // Purple
-    '#38A169', // Green
-    '#DD6B20', // Orange
-    '#718096', // Gray
-    '#D53F8C', // Pink
-    '#4A5568', // Dark gray
-];
-/* eslint-enable custom/no-hardcoded-colors */
 
 const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' }) => {
     const { t: rawT } = useTranslation();
@@ -839,13 +824,11 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                 maxHeight: '90vh',
                 overflowY: 'auto',
                 padding: 0,
-                background: isDark ? 'var(--mac-bg-primary)' : 'white',
             }}
         >
             <div
                 ref={dialogContentRef}
                 className="admin-qp-modal"
-                style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-primary)' : 'white' } as CSSProperties}
                 tabIndex={-1}
             >
                 <div className="admin-qp-modal-header">
@@ -983,7 +966,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     <div className="admin-qp-field">
                         <div className="admin-qp-label" id="queue-profile-color-label">{t('admin2.qp_color_label')}</div>
                         <div className="admin-qp-color-grid" role="group" aria-labelledby="queue-profile-color-label">
-                            {PRESET_COLORS.map(color => (
+                            {QUEUE_PROFILE_COLOR_PRESETS.map(color => (
                                 <button
                                     key={color}
                                     type="button"
