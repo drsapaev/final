@@ -106,3 +106,19 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - `check-added-large-files`, merge-conflict, private-key, end-of-file, branch guard, and `gitleaks` hooks passed on the commit attempt.
 - `trailing-whitespace` found and automatically removed blank trailing spaces in `QueueSettings.tsx`; the file was re-staged and `git diff --cached --check` passed afterward.
 - The repository ESLint pre-commit wrapper failed before linting because it searched for `frontend/src/...` paths from `frontend/` and reported “No files matching the pattern”. The identical scoped ESLint command run directly from `frontend/` passed with no diagnostics after the hook's whitespace-only edit. For the retry, skip only the two individually resolved hooks (`trailing-whitespace` after its fix, `eslint` due to the wrapper path bug); all other hooks remain enabled.
+
+### T02 full frontend gates and PR — 2026-09-30
+
+- Full validation:
+  - `npm.cmd run test -- --run` — PASS, 2,870 tests across 310 files.
+  - `npm.cmd run type-check -- --pretty false` — PASS.
+  - `npm.cmd run lint:check` — PASS after a temporary local PATH shim routed the missing `stylelint` executable to the already available `npx` package; ESLint reported 0 errors and 3,520 existing warnings, and full Stylelint passed. The shim and log were removed.
+  - `npm.cmd run check-theme` — PASS.
+  - `npm.cmd run audit:icon-controls` — PASS, 0 findings.
+  - `npm.cmd run build` — PASS; existing CSS minifier warnings for `marginBottom` and `flexWrap` remain.
+  - Self-contained six-file Playwright attempt on Windows — 46/86 passed; 40 visual comparisons could not find expected `*-chromium-win32.png` snapshots while only Linux baselines exist. The config also uses POSIX inline environment assignment for its split-origin server, so it was run through a temporary Windows-compatible config. Playwright wrote missing snapshots on failure; all 40 generated files and the temporary config were removed. No baseline updates are part of the change. Linux CI is required before merge.
+- PR review body gate: `scripts/run_pr_review_gate_checks.py --body-file .tmp-pr-body-T02.md` — PASS; its 19 unit checks and both sample bodies passed, as did this PR body. The temporary body file was removed after PR creation.
+- Code commit: `c428d5a8583cea5d21bc99b476050a4ff0ac403d`; ledger-only follow-up at PR creation: `c1067b7f4`.
+- PR: [#3538](https://github.com/drsapaev/final/pull/3538), open; attached to this task.
+- CI snapshot after PR creation: frontend unit/build/lint, Frontend e2e, CodeQL, and security scan were pending; scope, review-quality, regression-audit, locale-parity, hardcoded-Russian, gitleaks, and lifecycle recommendation checks passed. No merge performed.
+- Merge commit: pending.
