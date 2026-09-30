@@ -14,7 +14,7 @@
  * explicit query parameters — no client-side merging of partial data.
  */
 import '@testing-library/jest-dom';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -35,6 +35,9 @@ vi.mock('@/api/client', () => ({
     patch: vi.fn(),
     delete: vi.fn(),
   },
+  me: vi.fn(),
+  setToken: vi.fn(),
+  setSessionInvalidationListener: vi.fn(),
 }));
 
 const mockedGet = vi.mocked(api.get);
@@ -239,7 +242,6 @@ const settingsFixture = {
   auto_close_time: '09:00',
   start_numbers: { cardiology: 10 },
   max_per_day: {},
-  dev_mode_enabled: false,
 };
 
 const renderPanel = () =>
@@ -292,6 +294,7 @@ describe('queueSettingsEffective SSOT normalizer (RQ-23.ui)', () => {
 describe('QueueSettings effective-settings report panel (RQ-23.ui, S-20)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     mockedGet.mockImplementation(async (url: string) => {
       if (url.startsWith('/admin/queue/settings/effective')) {
         return {
@@ -453,6 +456,7 @@ describe('QueueSettings effective-settings report panel (RQ-23.ui, S-20)', () =>
 describe('QueueSettings panel fixes for PR 3291 review findings (owner audit, current main)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     mockedGet.mockImplementation(async (url: string) => {
       if (url.startsWith('/admin/queue/settings/effective')) {
         return {
@@ -555,6 +559,7 @@ describe('QueueSettings panel fixes for PR 3291 review findings (owner audit, cu
     const user = userEvent.setup();
     renderPanel();
     await getEffectiveRegion();
+    fireEvent.change(await screen.findByDisplayValue('09:00'), { target: { value: '10:00' } });
     const effectiveGetsBefore = mockedGet.mock.calls.filter(
       ([url]) => String(url).includes('/admin/queue/settings/effective'),
     ).length;
@@ -566,6 +571,8 @@ describe('QueueSettings panel fixes for PR 3291 review findings (owner audit, cu
       ).length;
       expect(effectiveGetsAfter).toBeGreaterThan(effectiveGetsBefore);
     });
+    expect(mockedPut).toHaveBeenCalledTimes(1);
+    expect(mockedPut.mock.calls[0]?.[1]).not.toHaveProperty('dev_mode_enabled');
   });
 
   it('P2-2 round 2: post-save refresh targets the LATEST selected scope', async () => {
@@ -587,6 +594,7 @@ describe('QueueSettings panel fixes for PR 3291 review findings (owner audit, cu
     await waitFor(() => {
       expect(mockedGet.mock.calls.some(([url]) => String(url).includes('department_id=2'))).toBe(true);
     });
+    fireEvent.change(await screen.findByDisplayValue('09:00'), { target: { value: '10:00' } });
     await user.click(screen.getByRole('button', { name: 'Сохранить' }));
 
     // While the PUT is in flight the admin switches the scope back to clinic.
@@ -702,5 +710,222 @@ describe('QueueSettings panel fixes for PR 3291 review findings (owner audit, cu
         /Настройки отделения \(display-only; живые поля помечены\)/,
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe('QueueSettings draft safeguards (T02)', () => {
+  const draftKey = 'admin.queue.settings.draft.v2';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    window.sessionStorage.setItem('auth_profile', JSON.stringify({ id: 1, clinic_id: 1, role: 'admin' }));
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url.startsWith('/admin/queue/settings/effective')) {
+        return { data: url.includes('department_id=2') ? scopedReport : baseReport };
+      }
+      if (url === '/admin/queue/settings') return { data: settingsFixture };
+      if (url.startsWith('/queues/profiles')) return { data: { profiles: [...profilesFixture, archivedProfileFixture] } };
+      if (url.startsWith('/admin/doctors')) return { data: doctorsFixture };
+      if (url.startsWith('/admin/departments')) {
+        return { data: { success: true, data: departmentsFixture, count: departmentsFixture.length } };
+      }
+      return { data: {} };
+    });
+  });
+  it('does not offer saving when the settings GET fails', async () => {
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url === '/admin/queue/settings') throw new Error('synthetic GET failure');
+      if (url.startsWith('/admin/queue/settings/effective')) return { data: baseReport };
+      return { data: {} };
+    });
+
+    renderPanel();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ошибка загрузки настроек очередей.');
+    expect(screen.queryByRole('button', { name: 'Сохранить' })).not.toBeInTheDocument();
+    expect(mockedPut).not.toHaveBeenCalled();
+  });
+
+  it('restores an unsaved draft after the settings screen is left and reopened', async () => {
+    const firstVisit = renderPanel();
+    const autoCloseInput = await screen.findByDisplayValue('09:00');
+    fireEvent.change(autoCloseInput, { target: { value: '10:30' } });
+
+    firstVisit.unmount();
+    renderPanel();
+
+    expect(await screen.findByDisplayValue('10:30')).toBeInTheDocument();
+  });
+
+  it('does not silently restore a stale draft over newer server settings and rebases only the draft changes on request', async () => {
+    const currentSettings = { ...settingsFixture, max_per_day: { cardiology: 30 } };
+    window.sessionStorage.setItem(draftKey, JSON.stringify({
+      version: 2,
+      ownerId: '1:1',
+      baseSettings: settingsFixture,
+      settings: { ...settingsFixture, auto_close_time: '10:30' },
+    }));
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url === '/admin/queue/settings') return { data: currentSettings };
+      if (url.startsWith('/admin/queue/settings/effective')) return { data: baseReport };
+      return { data: {} };
+    });
+    mockedPut.mockResolvedValue({
+      data: {
+        message: 'Настройки сохранены',
+        settings: { ...currentSettings, auto_close_time: '10:30' },
+      },
+    } as never);
+
+    const user = userEvent.setup();
+    renderPanel();
+
+    expect(await screen.findByDisplayValue('09:00')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('09:00')).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Настройки на сервере изменились после создания черновика.');
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Применить мои изменения' }));
+    expect(await screen.findByDisplayValue('10:30')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(mockedPut).toHaveBeenCalledTimes(1));
+    expect(mockedPut.mock.calls[0]?.[1]).toMatchObject({
+      auto_close_time: '10:30',
+      max_per_day: { cardiology: 30 },
+    });
+  });
+
+  it('discards a draft owned by a different signed-in principal', async () => {
+    window.sessionStorage.setItem('auth_profile', JSON.stringify({ id: 2, clinic_id: 1, role: 'admin' }));
+    window.sessionStorage.setItem(draftKey, JSON.stringify({
+      version: 2,
+      ownerId: '1:1',
+      baseSettings: settingsFixture,
+      settings: { ...settingsFixture, auto_close_time: '10:30' },
+    }));
+
+    renderPanel();
+
+    expect(await screen.findByDisplayValue('09:00')).toBeInTheDocument();
+    expect(await screen.findByText('Черновик не привязан к текущей учётной записи и удалён. Загружены актуальные настройки сервера.')).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(draftKey)).toBeNull();
+  });
+
+  it('requires explicit confirmation before refresh discards an unsaved draft', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const autoCloseInput = await screen.findByDisplayValue('09:00');
+    fireEvent.change(autoCloseInput, { target: { value: '10:30' } });
+    const settingsGetsBefore = mockedGet.mock.calls.filter(([url]) => url === '/admin/queue/settings').length;
+
+    await user.click(screen.getByRole('button', { name: 'Обновить' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Несохранённые изменения будут удалены. Обновить настройки?')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    expect(mockedGet.mock.calls.filter(([url]) => url === '/admin/queue/settings')).toHaveLength(settingsGetsBefore);
+    expect(screen.getByDisplayValue('10:30')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Обновить' }));
+    const confirmDialog = await screen.findByRole('dialog');
+    await user.click(within(confirmDialog).getByRole('button', { name: 'Обновить' }));
+    await waitFor(() => {
+      expect(mockedGet.mock.calls.filter(([url]) => url === '/admin/queue/settings')).toHaveLength(settingsGetsBefore + 1);
+    });
+    expect(await screen.findByDisplayValue('09:00')).toBeInTheDocument();
+  });
+
+  it('does not keep a confirmed-discard draft active when refresh GET fails', async () => {
+    let settingsGets = 0;
+    mockedGet.mockImplementation(async (url: string) => {
+      if (url === '/admin/queue/settings') {
+        settingsGets += 1;
+        if (settingsGets === 2) throw new Error('synthetic refresh failure');
+        return { data: settingsFixture };
+      }
+      if (url.startsWith('/admin/queue/settings/effective')) return { data: baseReport };
+      return { data: {} };
+    });
+
+    const user = userEvent.setup();
+    renderPanel();
+    fireEvent.change(await screen.findByDisplayValue('09:00'), { target: { value: '10:30' } });
+    await user.click(screen.getByRole('button', { name: 'Обновить' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Обновить' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ошибка загрузки настроек очередей.');
+    await user.click(screen.getByRole('button', { name: 'Обновить' }));
+
+    expect(await screen.findByDisplayValue('09:00')).toBeInTheDocument();
+    expect(settingsGets).toBe(3);
+  });
+
+  it('continues refreshing after sessionStorage rejects draft removal', async () => {
+    window.sessionStorage.setItem(draftKey, JSON.stringify({
+      version: 2,
+      ownerId: '1:1',
+      baseSettings: settingsFixture,
+      settings: { ...settingsFixture, auto_close_time: '10:30' },
+    }));
+
+    const user = userEvent.setup();
+    renderPanel();
+    expect(await screen.findByDisplayValue('10:30')).toBeInTheDocument();
+    const settingsGetsBefore = mockedGet.mock.calls.filter(([url]) => url === '/admin/queue/settings').length;
+    const originalRemoveItem = window.sessionStorage.removeItem.bind(window.sessionStorage);
+    const removeSpy = vi.spyOn(window.sessionStorage, 'removeItem').mockImplementationOnce((key: string) => {
+      if (key === draftKey) throw new DOMException('Storage access denied', 'SecurityError');
+      originalRemoveItem(key);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Обновить' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Обновить' }));
+
+    expect(await screen.findByDisplayValue('09:00')).toBeInTheDocument();
+    expect(mockedGet.mock.calls.filter(([url]) => url === '/admin/queue/settings')).toHaveLength(settingsGetsBefore + 1);
+    removeSpy.mockRestore();
+  });
+
+  it('keeps newer edits when an older save response arrives late', async () => {
+    let releasePut!: (value: { data: unknown }) => void;
+    const putGate = new Promise<{ data: unknown }>((resolve) => {
+      releasePut = resolve;
+    });
+    mockedPut.mockImplementation(async () => await putGate as never);
+
+    const user = userEvent.setup();
+    renderPanel();
+    const autoCloseInput = await screen.findByDisplayValue('09:00');
+    fireEvent.change(autoCloseInput, { target: { value: '10:30' } });
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(mockedPut).toHaveBeenCalledTimes(1));
+
+    fireEvent.change(autoCloseInput, { target: { value: '11:00' } });
+    releasePut({
+      data: {
+        message: 'Настройки сохранены',
+        settings: { ...settingsFixture, auto_close_time: '10:30' },
+      },
+    });
+
+    expect(await screen.findByText('Предыдущие изменения сохранены. Остались новые несохранённые изменения.')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('11:00')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeEnabled();
+  });
+
+  it('shows no fake QR test and does not fabricate a quota or number range', async () => {
+    renderPanel();
+    await getEffectiveRegion();
+
+    await screen.findByDisplayValue('09:00');
+    expect(screen.queryByRole('button', { name: /Test queue generation/i })).not.toBeInTheDocument();
+    expect(api.post).not.toHaveBeenCalled();
+    const numberInputs = screen.getAllByRole('spinbutton');
+    expect((numberInputs[1] as HTMLInputElement).value).toBe('');
+    expect(screen.queryByText('10 - 10')).not.toBeInTheDocument();
   });
 });

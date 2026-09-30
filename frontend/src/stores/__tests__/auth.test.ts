@@ -84,6 +84,21 @@ describe('auth store', () => {
     expect(storage.auth_profile).toBeUndefined();
   });
 
+  it('clears queue settings drafts when the signed-in principal logs out', async () => {
+    primeSessionStorage({
+      auth_token: createJwt(3600),
+      auth_profile: JSON.stringify({ id: 1, username: 'admin', role: 'admin' }),
+      'admin.queue.settings.draft.v1': 'legacy-settings-draft',
+      'admin.queue.settings.draft.v2': 'synthetic-settings-draft',
+    });
+
+    const auth = await import('../auth');
+    auth.clearToken();
+
+    expect(storage['admin.queue.settings.draft.v1']).toBeUndefined();
+    expect(storage['admin.queue.settings.draft.v2']).toBeUndefined();
+  });
+
   it('reuses a recent validated session instead of calling /auth/me again', async () => {
     primeSessionStorage({
       auth_token: createJwt(3600),
