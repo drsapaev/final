@@ -85,7 +85,7 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 
 ### T02 local validation — 2026-09-30
 
-- Commit under test: working tree based on `967bd398c14bce4b835bd5be1205532387e2a909`; implementation is not committed yet.
+- Commit under test: `c428d5a8583cea5d21bc99b476050a4ff0ac403d` based on `967bd398c14bce4b835bd5be1205532387e2a909`.
 - Original failure: source inspection confirmed failed settings GET used fallback controls with active Save; a missing per-profile quota rendered as `1`; the view displayed synthetic number ranges; `dev_mode_enabled` entered the PUT payload; and the “test” action called mutating `POST /admin/queue/test`. The close-time hint implied runtime behavior while the effective-settings report marked it display-only.
 - Validation commands and results:
   - `npx.cmd --no-install vitest run src/components/admin/__tests__/QueueSettings.effective.test.tsx` — PASS, 24/24 tests, including retry after a confirmed discard whose GET fails.

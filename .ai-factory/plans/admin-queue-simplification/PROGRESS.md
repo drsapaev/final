@@ -6,7 +6,7 @@ Current status: VALIDATED
 Worktree: `C:\Users\DrSapaev\.codex\worktrees\aqs-t02-settings-state\final`
 Branch: `codex/aqs-T02-queue-settings-state`
 Base commit: `967bd398c14bce4b835bd5be1205532387e2a909`
-Current commit: working tree based on `967bd398c14bce4b835bd5be1205532387e2a909`; T02 changes not committed yet
+Current commit: `c428d5a8583cea5d21bc99b476050a4ff0ac403d`
 Last updated: 2026-09-30T17:40:24+05:00
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
@@ -39,6 +39,6 @@ Last updated: 2026-09-30T17:40:24+05:00
 - Changed and validated in T02: GET state and Save guard, in-tab draft restore/confirm-discard, stale-request/save protection, removal of fake QR mutation and unsupported dev-mode payload, truthful range/quota/time hints, localized copy, and dead Dev Mode CSS cleanup.
 - Remaining: inspect final diff, commit, open and merge the T02 PR, then start T03 from the resulting fresh main.
 - Blocker: none. T02 changed no backend/API contract or queue runtime behavior.
-- Next exact action: review the scoped diff and `git status`, run applicable pre-commit checks, then commit and open the T02 PR.
+- Next exact action: push `c428d5a85` and open the T02 PR; then monitor checks and merge when green.
 - Checks already run: focused QueueSettings Vitest (24/24), type-check, scoped ESLint, scoped stylelint, production build, UI baseline ratchet, `git diff --check`.
 - Checks to rerun after the next change: focused tests and `git diff --check`; then required PR checks.
