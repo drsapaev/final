@@ -116,6 +116,7 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
   - Scoped ESLint for the changed TS/TSX files — PASS, 0 errors; locale modules emit existing quote-style warnings.
   - `node scripts/ui-baseline.mjs --check` — PASS.
   - `$env:PYTHONUTF8='1'; .\scripts\run_python.ps1 -RequireModule @() .\scripts\i18n\validate_locales.py --strict` — PASS; all five locales have 10,275 matching keys. The first invocation without UTF-8 mode hit the host's cp1251 decoding default; the UTF-8 retry passed.
+  - `scripts/run_pr_review_gate_checks.py --body-file .tmp-pr-body-T02-review.md` — PASS; 19 unit checks, both sample PR bodies, and the updated PR description passed validation.
   - `npm.cmd run build` — PASS; existing CSS minifier warnings for `marginBottom` and `flexWrap` remain.
   - `git diff --check` and `git diff --cached --check` — PASS.
   - `npm.cmd run test -- --run` — FAIL on the concurrent full-suite attempt: 2,872 passed and 2 timed out/failed in the unrelated `DepartmentManagement.keyContract.test.tsx` while the production build ran concurrently. The same file rerun alone with `--maxWorkers=1 --minWorkers=1` passed 8/8. No changed QueueSettings/auth test failed. The full-suite result must remain reported as failed until the new PR CI result is read; do not describe this local attempt as a full-suite pass.
