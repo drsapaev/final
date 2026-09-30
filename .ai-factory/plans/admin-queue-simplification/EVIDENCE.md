@@ -51,5 +51,5 @@ Do not put secrets, patient data, tokens or full network payloads here. Record e
 - Actual changed paths: `frontend/src/components/admin/QueueProfilesManager.tsx`; `frontend/src/components/admin/admin.css`; `frontend/src/components/admin/__tests__/QueueProfilesManager.interactions.test.tsx`; this plan's `PROGRESS.md` and `EVIDENCE.md`.
 - Scope check: no profile semantics, backend, API contract, schema, routing, or queue behavior changed. Filter now consumes `Select.onValueChange`; API's max-20 hex color contract was checked in source. No network/load path changed.
 - Remaining limitation: live browser visual QA and first-row cold/repeat timing are deferred to T18 synthetic-staging acceptance; staging was stopped at T00. No production data was accessed.
-- PR: pending.
+- PR: [#3537](https://github.com/drsapaev/final/pull/3537), opened from `codex/aqs-T01-profile-modal`; CI checks were pending at the first status snapshot. PR review-quality body gate passed locally using `scripts/check_pr_review_template.py`.
 - Merge commit: pending.
