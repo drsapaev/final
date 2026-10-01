@@ -716,7 +716,7 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Environment: Python 3.11.9; isolated disposable PostgreSQL 16, Compose project `aqs-t06-pg-20261001`, loopback `127.0.0.1:55439`, tmpfs/no volume. No shared staging or production systems used.
 - Execution mode: same T06.1 migration scope; no new gate expansion. The correction is confined to a historical migration integration fixture and its test evidence.
 - Allowed paths: `backend/tests/integration/test_nurse_serving_0073_backfill_pg.py` plus T06.1 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. No runtime source, schema or migration changed.
-- Original failure: Backend CI on the initial T06.1 code attempted to use current `DailyQueue` ORM after upgrading its scratch DB only to revision 0072. SQLAlchemy therefore emitted `policy_version` and `online_issued_count` columns that did not exist yet. This was a test-fixture compatibility issue, not a migration runtime failure.
+- Original failure: Backend job `110381935470` in run `36865252719` completed with 5 setup errors in `test_nurse_serving_0073_backfill_pg.py`, all `psycopg.errors.UndefinedColumn: column "policy_version" of relation "daily_queues" does not exist`; SQLAlchemy emitted both new fields while the fixture DB was at 0072. The overall job had 5206 passed, 65 skipped, 25 deselected, 3 xfailed and 124 warnings. This was a test-fixture compatibility issue, not a migration runtime failure.
 - Correction: removed the current `DailyQueue` ORM from this pre-0073 seeding path and inserted the two queue rows with raw SQL listing only the historical 0072 columns. The fixture still uses current ORM for tables/entities whose shape is present at 0072. No migration or production code changed.
 - Validation commands/results:
   - `DATABASE_URL=postgresql+psycopg://aqs_t06@127.0.0.1:55439/aqs_t06 .\scripts\run_backend_pytest.ps1 tests/integration/test_nurse_serving_0073_backfill_pg.py -q` — PASS, 5 passed, 1 warning.
@@ -724,9 +724,36 @@ Recorded: 2026-10-01T16:41:51+05:00
   - `py -3.11 -m ruff check --fix` and `py -3.11 -m ruff format` were applied only to the changed fixture file; subsequent `ruff check`, `ruff format --check`, `black --check`, and `compileall` — PASS. Commit hooks on `d3da8908` passed, including gitleaks, Ruff, Ruff format, and Black. An attempted standalone `pre_commit` invocation was unavailable because this Python environment does not contain the `pre_commit` module; no package was installed.
   - `git diff --check` — PASS.
 - CI status: the prior run is attached to older PR HEAD `383928178180a3ecbb7b870ff49bd0a302f33ab0`; it is not evidence for the correction. Fresh applicable CI must run on the follow-up pushed HEAD. Path-aware skipped jobs are not counted as passed.
+- Cleanup: after the local regression rerun, only this task's Compose project `aqs-t06-pg-20261001` and its task-owned WSL keepalive PID 4484 were stopped. The separate staging project and production were not touched.
 - Scope check: only the named historical fixture and T06.1 plan-memory files. `.t06-pg.compose.yml` and `.t06-pr-body.md` remain local scratch and must not be staged.
 - Result: local regression and contract tests PASS; correction commit is local. GitHub validation of the correction is NOT_RUN until pushed.
 - Remaining limitation: no staging/browser validation, no T06.2 writers, and no production or rollout checks.
 - PR: [#3545](https://github.com/drsapaev/final/pull/3545), follow-up pending.
 - Merge commit: none; do not merge without user approval.
 - Next exact action: commit the plan checkpoint, update the PR body, push the existing branch, then wait for the fresh checks.
+
+## T06.1 follow-up pushed — 2026-10-01T18:20:16+05:00
+
+- Source fix: `d3da890805fc7f1b2a7ba4a492ff80fb642a1a75`; checkpoint commit: `529644a94000c5adc50ef740c167fa970466ac2e`.
+- PR: [#3545](https://github.com/drsapaev/final/pull/3545), OPEN, mergeable, no review decision; base remains `1af792e82935e10ae9b60a374ce5f149d2de0616`; exact remote HEAD is `529644a94000c5adc50ef740c167fa970466ac2e`.
+- PR body was updated from `.t06-pr-body.md`; `scripts/run_pr_review_gate_checks.py --body-file .t06-pr-body.md --author drsapaev` — PASS (19 gate unit tests and live-body validation).
+- Fresh GitHub checks started for the exact HEAD above: Unified CI run `36867926429` was QUEUED; Gitleaks `36867926186`, security scan `36867926184`, PR Review Quality Gate `36867926272`, and lifecycle recommendation `36867926173` were IN_PROGRESS at this snapshot. Path-aware Dependabot auto-merge was SKIPPED. Do not treat any as passed until their final conclusions are observed.
+- At the push snapshot the tracked tree was clean. This live-status checkpoint is currently uncommitted; `.t06-pg.compose.yml` and `.t06-pr-body.md` remain untracked local scratch and are excluded from the PR.
+- Next exact action: wait for applicable checks on this PR HEAD; fix red checks in this PR and reassess the exact resulting head. No merge has been authorized or performed.
+
+## T06.1 second backend CI correction — 2026-10-01T18:48:42+05:00
+
+- Source under test: local commit `b14cc03da1c0171bcfe9fe45df7035c4f93cbd9c`, atop pushed PR HEAD `529644a94000c5adc50ef740c167fa970466ac2e`. The only source change is a test in `backend/tests/integration/test_rq17_owner_invariant.py`; plan files are the only other tracked paths being prepared.
+- CI evidence: Unified CI run `36867926429` on HEAD 529 failed Backend job `110388762530`: 5211 passed, 1 failed, 65 skipped, 25 deselected, 3 xfailed, 124 warnings. The failing assertion at `test_pin1_post_active_resource_on_requires_doctor_tag_rejected` expected total `QueueResource.count() == 0`; the suite had one row at the assertion. All five 0073 historical migration regression setups passed on this run, so the prior `UndefinedColumn` issue is closed. PR Required Gate job `110393363698` failed because Backend was red and the dependent parity result was skipped while marked required; workflow condition confirms parity does not run when an upstream job fails. If Backend passes on the next run, recheck that parity executes.
+- Root-cause assessment: the RQ17 test's global-empty-table assertion is coupled to test-suite database contents and does not isolate whether the rejected request created a row. The endpoint's activation gate runs before adding a row and rolls back owner-invariant failures. The test now seeds an unrelated existing resource, records the starting count, asserts the count is unchanged, and asserts the rejected code `usound-r` is absent. This remains test-only; queue runtime, ownership rules and API behavior are unchanged.
+- Gate: `run_agent_gate.ps1 "Fix the T06.1 CI failure in the RQ17 rejection test without runtime changes" --known-root-cause "backend/tests/integration/test_rq17_owner_invariant.py"`. Result `narrow_override`, mode `execute`, `gate_misroute=false`, `override_used=true`, handoff false, first-touch exactly the test file. The task classifier initially returned no first-touch files, so the confirmed test was inserted via the explicit known-root-cause option. Basis to address the red in this same PR: the user-approved cyclic plan says to fix red checks in the current PR. No runtime or workflow path was expanded.
+- Allowed/actual scope: the named RQ17 integration test only for this code fix. Other touched plan files record the checkpoint. `.github/workflows/ci-cd-unified.yml`, queue endpoint/runtime, migration/model, API and frontend were not changed.
+- Local validation:
+  - `DATABASE_URL=sqlite:///:memory: ALLOW_SQLITE_DATABASE_URL=1 scripts/run_backend_pytest.ps1 tests/integration/test_rq17_owner_invariant.py::test_pin1_post_active_resource_on_requires_doctor_tag_rejected -q` — PASS, 1 passed, 1 warning.
+  - Same launcher with the full `test_rq17_owner_invariant.py` — PASS, 26 passed, 8 skipped (PostgreSQL-only cases), 1 warning.
+  - `pre_commit run --files backend/tests/integration/test_rq17_owner_invariant.py` using the repo backend venv — initial pass applied Black formatting; the subsequent run and commit hooks passed Ruff, Ruff format, Black, gitleaks and hygiene checks. `py_compile` and `git diff --check` passed.
+  - Newer globally selected Ruff/Black versions initially reported existing formatting drift in untouched parts of this legacy test file. The repository-pinned hooks normalized the file and passed; the mechanical formatter changes are included in the touched test file.
+- Status: code commit `b14cc03d` is local and not pushed. The currently remote PR head 529 remains red; fresh GitHub checks for the fix are NOT_RUN.
+- Remaining limitations: full suite is not rerun locally; no staging/browser/production check was run. The isolated RQ17 test module uses the pytest SQLite fixture; its PostgreSQL-only cases were skipped.
+- PR: [#3545](https://github.com/drsapaev/final/pull/3545), open; merge not authorized or performed.
+- Next exact action: update the PR body and checkpoint, push the local test fix, then check the resulting Backend, PR Required Gate and parity statuses on that exact HEAD.
