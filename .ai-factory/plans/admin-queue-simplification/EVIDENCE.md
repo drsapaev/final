@@ -709,3 +709,24 @@ Recorded: 2026-10-01T16:41:51+05:00
 - First GitHub snapshot for PR HEAD `e3c7d5f2dea3a9aab40d650490431a87b84e9372`: PR OPEN, mergeable, no review decision. PR Review Quality Gate, CI Scope, gitleaks, GitGuardian Security Checks and lifecycle recommendation were PASS. Backend tests, code quality, Context Boundary Integrity, documentation generation, security scan, secret scan, Python/JavaScript/Actions CodeQL and frontend lint report were pending. Frontend build/E2E/lint/unit, Telegram Mini App Release Gate, Supabase Preview, nightly DAST, classify-and-route and metadata checks were path-aware SKIPPED; skipped is not PASS.
 - Merge: not performed. Wait for current-head applicable checks and same-PR fixes; then request the merge decision before starting T06.2.
 - Next exact action: refresh PR HEAD/status, wait for all applicable checks, record final status and preserve the exact review/merge decision.
+
+## T06.1 CI regression correction — 2026-10-01T18:13:13+05:00
+
+- Commit under test: code fix `d3da890805fc7f1b2a7ba4a492ff80fb642a1a75`, atop ledger commit `383928178180a3ecbb7b870ff49bd0a302f33ab0` and initial code commit `e3c7d5f2dea3a9aab40d650490431a87b84e9372`; checkpoint/body update remains uncommitted. Branch `codex/aqs-T06-policy-schema`.
+- Environment: Python 3.11.9; isolated disposable PostgreSQL 16, Compose project `aqs-t06-pg-20261001`, loopback `127.0.0.1:55439`, tmpfs/no volume. No shared staging or production systems used.
+- Execution mode: same T06.1 migration scope; no new gate expansion. The correction is confined to a historical migration integration fixture and its test evidence.
+- Allowed paths: `backend/tests/integration/test_nurse_serving_0073_backfill_pg.py` plus T06.1 `PROGRESS.md`, `EVIDENCE.md`, and `RESUME.md`. No runtime source, schema or migration changed.
+- Original failure: Backend CI on the initial T06.1 code attempted to use current `DailyQueue` ORM after upgrading its scratch DB only to revision 0072. SQLAlchemy therefore emitted `policy_version` and `online_issued_count` columns that did not exist yet. This was a test-fixture compatibility issue, not a migration runtime failure.
+- Correction: removed the current `DailyQueue` ORM from this pre-0073 seeding path and inserted the two queue rows with raw SQL listing only the historical 0072 columns. The fixture still uses current ORM for tables/entities whose shape is present at 0072. No migration or production code changed.
+- Validation commands/results:
+  - `DATABASE_URL=postgresql+psycopg://aqs_t06@127.0.0.1:55439/aqs_t06 .\scripts\run_backend_pytest.ps1 tests/integration/test_nurse_serving_0073_backfill_pg.py -q` — PASS, 5 passed, 1 warning.
+  - Same launcher with `tests/integration/test_nurse_serving_0073_backfill_pg.py tests/integration/test_queue_resource_contract.py -q` — PASS, 29 passed, 1 warning, 28.91s.
+  - `py -3.11 -m ruff check --fix` and `py -3.11 -m ruff format` were applied only to the changed fixture file; subsequent `ruff check`, `ruff format --check`, `black --check`, and `compileall` — PASS. Commit hooks on `d3da8908` passed, including gitleaks, Ruff, Ruff format, and Black. An attempted standalone `pre_commit` invocation was unavailable because this Python environment does not contain the `pre_commit` module; no package was installed.
+  - `git diff --check` — PASS.
+- CI status: the prior run is attached to older PR HEAD `383928178180a3ecbb7b870ff49bd0a302f33ab0`; it is not evidence for the correction. Fresh applicable CI must run on the follow-up pushed HEAD. Path-aware skipped jobs are not counted as passed.
+- Scope check: only the named historical fixture and T06.1 plan-memory files. `.t06-pg.compose.yml` and `.t06-pr-body.md` remain local scratch and must not be staged.
+- Result: local regression and contract tests PASS; correction commit is local. GitHub validation of the correction is NOT_RUN until pushed.
+- Remaining limitation: no staging/browser validation, no T06.2 writers, and no production or rollout checks.
+- PR: [#3545](https://github.com/drsapaev/final/pull/3545), follow-up pending.
+- Merge commit: none; do not merge without user approval.
+- Next exact action: commit the plan checkpoint, update the PR body, push the existing branch, then wait for the fresh checks.
