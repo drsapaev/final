@@ -9,8 +9,8 @@ Current status: VALIDATED
 Worktree: `C:\final\_wt_aqs_t04_empty_profiles`
 Branch: `codex/aqs-T04-empty-profiles`
 Base commit: `1e781da72bd927926b538b139a6c251cd09848b5`
-Current commit: `4c50520f9eacda38b0eae226d950ea9d21bfbdfc` (dependent consumer test and final validation evidence; runtime implementation is `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`)
-Last updated: 2026-10-01T12:40:58+05:00
+Current commit: `516a66d86f1102d2b2940b6e2f69340c015bb8cd` (prior committed checkpoint; focused integration regression and evidence are validated in the worktree)
+Last updated: 2026-10-01T12:53:18+05:00
 
 > **Возобновлено пользователем 2026-10-01:** «Продолжай реализации плана». T03 завершён: PR #3540 слит после исправления P1 и code-review verdict APPROVE. Tier 2 для #3540 остаётся принятым deferral, не пройденным тестовым набором.
 
@@ -20,7 +20,7 @@ Last updated: 2026-10-01T12:40:58+05:00
 | T01 | MERGED | `codex/aqs-T01-profile-modal` / [PR #3537](https://github.com/drsapaev/final/pull/3537) | `967bd398c14bce4b835bd5be1205532387e2a909` | `EVIDENCE.md#t01` |
 | T02 | MERGED | `codex/aqs-T02-queue-settings-state` / [PR #3538](https://github.com/drsapaev/final/pull/3538) | `b4ba6320797f056da19bbdc5cc672b3a97d2091e` | `EVIDENCE.md#t02` |
 | T03 | MERGED | `codex/aqs-T03-cabinet-read` / [PR #3540](https://github.com/drsapaev/final/pull/3540) | `1e781da72bd927926b538b139a6c251cd09848b5` | `EVIDENCE.md#t03-merge-checkpoint` |
-| T04 | VALIDATED | `codex/aqs-T04-empty-profiles` | | `EVIDENCE.md#t04-final-validation` |
+| T04 | VALIDATED | `codex/aqs-T04-empty-profiles` | | `EVIDENCE.md#t04-integration-follow-up` |
 | T05 | PLANNED | | | |
 | T06 | PLANNED | | | |
 | T07 | PLANNED | | | |
@@ -42,12 +42,13 @@ Last updated: 2026-10-01T12:40:58+05:00
 - Current task: T04, remove runtime fallback restoration of built-in queue profiles. Canonical anchors: `backend/app/api/v1/endpoints/registrar_integration/_queue_profiles.py`, `frontend/src/components/navigation/Tabs.tsx`, and the explicit initial seed in Alembic `0055_queue_resource_provisioning.py`.
 - Confirmed baseline: both admin and public GET endpoints returned `success: true` with `INITIAL_QUEUE_PROFILES` when the query was empty and did the same after read exceptions. `Tabs.tsx` treated a valid empty response as an exception and substituted six hardcoded tabs on failure. Migration 0055 explicitly seeds the initial catalog; it remains unchanged.
 - Execution mode: `advisory_gate` under the GPT-6 UI/API exception. The known-root `agent_gate` run returned only `_queue_profiles.py` plus `py_compile` (`gate_misroute=false`, `result=narrow_override`, `override_used=true`); this output is advisory and does not replace the manually declared task scope.
-- T04 first-touch scope: the two profile read functions, the `Tabs.tsx` fallback and its focused tests, backend read-contract tests, the obsolete static fallback-marker assertion, and this progress/evidence ledger. After full-suite evidence, `frontend/src/pages/registrar/views/__tests__/WorklistView.tabpanel.test.tsx` was added as the directly dependent consumer test whose mock assumed the removed six-tab fallback. Denied areas remain untouched: schema/migrations, profile writes, role/RBAC, queue admission/join/token logic, QR ownership/eligibility, route registry, and unrelated wizard fallbacks.
+- T04 first-touch scope: the two profile read functions, the `Tabs.tsx` fallback and its focused tests, backend read-contract tests, the obsolete static fallback-marker assertion, and this progress/evidence ledger. After full-suite evidence, `frontend/src/pages/registrar/views/__tests__/WorklistView.tabpanel.test.tsx` was added as the directly dependent consumer test whose mock assumed the removed six-tab fallback. Final diff review found a stale empty-catalog assertion in `backend/tests/integration/test_specialty_canonicalization.py` and an outdated comment in `backend/tests/integration/test_rq16b_direction_entry_methods.py` describing the removed public-read fallback; both are now in scope for narrow contract/documentation updates. Denied areas remain untouched: schema/migrations, profile writes, role/RBAC, queue admission/join/token logic, QR ownership/eligibility, route registry, and unrelated wizard fallbacks.
 - Completed for T04: fresh worktree from `origin/main` at `1e781da72`; canonical/legacy and seed paths inspected; red-first backend tests reproduced the fallback/error behavior; endpoint and UI fixes added; the old dependent fixture now supplies one explicit `ecg` backend profile. Focused backend/frontend tests, full Vitest (311 files / 2,880 tests), strict type check, full lint, theme and icon-control checks, production build, and all 86 Chromium tests across the six Tier 1 specs passed. Exact commands and environment notes are in `EVIDENCE.md#t04-final-validation`.
 - Validation notes: full lint exited 0 with 0 errors and 3,514 warnings. Direct scoped ESLint passed; the repository's local ESLint pre-commit hook has a path mismatch after changing directory to `frontend`, reproduced on the implementation and final test/evidence commits. Only that hook is skipped on retry; all other hooks remain enabled. Pinned Ruff-format and Black hooks passed after their formatting-only changes. The first Windows browser run lacked platform-specific Win32 snapshots; generated untracked images were removed. The complete browser suite passed against checked-in Linux baselines in an isolated WSL ext4 copy; no snapshots or package manifests were changed.
-- Remaining: push the validated branch, open the T04 PR, run PR body checks and GitHub CI, and obtain the required reviewer acknowledgment for the Tier 2 deferral before merge.
+- Resolved finding: the empty-catalog integration test now asserts `success`, `profiles == []`, and `source == "database"`; the separate database-backed test still verifies canonical `settings_key`. The stale comment in `test_rq16b_direction_entry_methods.py` now distinguishes the removed public-read fallback from that test's independent archived-key guard.
+- Remaining: commit the focused backend regression/evidence update, push, open the PR, run PR body checks and GitHub CI, and obtain reviewer acknowledgment for the Tier 2 deferral before merge.
 - Blocker: no blocker to opening the PR. Tier 2 backend-dependent E2E remains formally DEFERRED and unpassed because no isolated synthetic staging/QA environment was available; do not merge until the deferral is recorded and acknowledged in the PR. Stop if the fix requires changing a join/admission contract, auth/RBAC, or seeding behavior beyond migration 0055.
-- Next exact action: push `codex/aqs-T04-empty-profiles` and open a PR with `Tier 1 PASS; Tier 2 DEFERRED` plus all six required deferral fields. Keep the reviewer acknowledgment checkbox unchecked until the reviewer confirms it.
+- Next exact action: commit the two backend test updates and this validation checkpoint, push `codex/aqs-T04-empty-profiles`, and open the T04 PR. Keep the reviewer acknowledgment checkbox unchecked until the reviewer confirms the Tier 2 deferral.
 - The previous T03 worktree remains locally preserved with its separate documentation and QA scratch; it is not part of T04. Do not delete or overwrite those files during this task.
 
 ## Checkpoint rules for the next agent

@@ -437,3 +437,28 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
 - Scope check: no schema/migration/seed, profile write, auth/RBAC, queue admission, join/token, ownership/eligibility, route registry, production, or deployment change. No snapshot baseline, package manifest, or lockfile change.
 - Result: local status `VALIDATED`; Tier 1 is PASS, Tier 2 is DEFERRED and unpassed. PR not yet opened; no merge or deployment performed.
 - Next exact action: commit the dependent test and evidence checkpoint, push the branch, open the T04 PR with the Tier 2 deferral fields, run the PR-body gate and wait for GitHub CI and review. Do not merge until the reviewer formally acknowledges the deferral.
+
+## T04 stale integration assertion — 2026-10-01T12:44:02+05:00
+
+- Commit under review: `516a66d86f1102d2b2940b6e2f69340c015bb8cd`; branch `codex/aqs-T04-empty-profiles`; no push or PR yet.
+- Discovery: final source/test search found `backend/tests/integration/test_specialty_canonicalization.py::test_queue_profiles_response_carries_canonical_settings_key`, which asserts fallback defaults are returned when the catalog table is empty. This test directly contradicts T04's adopted behavior. A separate database-backed test in the same file already verifies the canonical `settings_key` mapping.
+- Canonical anchor: admin GET `/queues/profiles` in `_queue_profiles.py`; empty database query now returns `success: true`, `profiles: []`, and `source: "database"`.
+- Pre-edit observation: the obsolete integration assertion has not yet been run against this branch; targeted result is `NOT_RUN` pending the fixture update. Frontend Tier 1 results above remain valid; this discovery does not change runtime code.
+- First-touch scope update: add `backend/tests/integration/test_specialty_canonicalization.py` to replace the stale fallback assertion with an empty-catalog contract regression, and `backend/tests/integration/test_rq16b_direction_entry_methods.py` for a comment-only clarification of the removed endpoint fallback reference. No other assertion or fixture in the latter file changes. Continue to deny schema/migrations, profile writers, RBAC, queue admission/join/token behavior, QR ownership/eligibility, route registry and unrelated UI behavior.
+- Stop condition: stop if the focused integration test requires changing production paths, seed behavior, schema, queue ownership, or admission semantics.
+- Next exact action: correct the cross-reference comment, assert an empty profiles list and database source for the empty catalog, run the focused backend integration case using `scripts/run_backend_pytest.ps1`, run `git diff --check`, then update final T04 evidence before push.
+
+## T04 integration follow-up — 2026-10-01T12:51:52+05:00
+
+- Commit under test: prior branch head `516a66d86f1102d2b2940b6e2f69340c015bb8cd` plus the focused integration-test and evidence edits in this checkpoint; runtime code remains `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`.
+- Red result: `scripts/run_backend_pytest.ps1 tests/integration/test_specialty_canonicalization.py -k queue_profiles_response_carries_canonical_settings_key -q` — FAIL as expected because it asserted fallback profiles while the actual empty database response had `profiles == []`.
+- Change: renamed that test to `test_queue_profiles_empty_catalog_stays_empty` and asserted `success is True`, `profiles == []`, and `source == "database"`. The existing `test_queue_profiles_db_path_settings_key_canonical` remains separate and unchanged, preserving the real database contract. Clarified one `test_rq16b_direction_entry_methods.py` docstring that had described the removed public-read fallback as a current condition; no assertion or fixture changed there.
+- Validation environment: Python 3.11.9 on Windows; `DATABASE_URL` was set to a non-routable PostgreSQL-shaped URL solely for application import. The `db_session` test fixture uses its isolated temporary SQLite database; no PostgreSQL service, staging, or production data was accessed.
+- Validation commands and results:
+  - `scripts/run_backend_pytest.ps1 tests/unit/test_queue_profiles_read_contract.py tests/unit/test_stack_trace_exposure.py -q` — PASS, 13 passed, 1 warning.
+  - `scripts/run_backend_pytest.ps1 tests/integration/test_specialty_canonicalization.py -k 'queue_profiles_empty_catalog_stays_empty or queue_profiles_db_path_settings_key_canonical' -q` — PASS, 2 passed, 64 deselected, 1 warning.
+  - `git diff --check` — PASS.
+- Actual additional paths: `backend/tests/integration/test_specialty_canonicalization.py`; comment-only clarification in `backend/tests/integration/test_rq16b_direction_entry_methods.py`; this plan's `PROGRESS.md` and `EVIDENCE.md`.
+- Scope check: no runtime changes after `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`; no schema, seed, profile write, auth/RBAC, queue admission, QR selection, route, or production changes.
+- Result: local status `VALIDATED`; Tier 1 frontend evidence from `T04 final validation` remains current because this follow-up changes only backend tests and documentation. Tier 2 remains `DEFERRED`, not run, and needs reviewer acknowledgment as recorded above. PR not yet opened.
+- Next exact action: commit this integration regression and its ledger update, push the branch, create the PR, run body checks/GitHub CI, and leave Tier 2 acknowledgment pending for a reviewer.
