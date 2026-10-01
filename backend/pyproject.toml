@@ -359,6 +359,13 @@ pytest_add_cli_args_test_selection = [
     # locally; zero mutation value lost outside this file's own assertions
     # (the crud modules stay covered by the remaining ~2900 tests).
     "--deselect", "tests/unit/test_patient_portal_jwt_api.py",
+    # tests/unit/test_portal_department_booking_lock.py — whole-file deselect
+    # (nightly 2026-10-01 run 36909115097, after the patient-portal file in
+    # #3552): sibling file from the same mini-app booking workstream, same
+    # structural class - TestClient booking POST + "assert row is not None"
+    # via the test's own session (module-identity / session-graph visibility
+    # under the mutmut sandbox). Green in normal CI (real PG) and locally.
+    "--deselect", "tests/unit/test_portal_department_booking_lock.py",
 ]
 only_mutate = [
     "app/crud/appointment.py",
