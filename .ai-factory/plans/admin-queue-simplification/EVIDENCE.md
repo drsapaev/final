@@ -450,7 +450,7 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
 
 ## T04 integration follow-up — 2026-10-01T12:51:52+05:00
 
-- Commit under test: prior branch head `516a66d86f1102d2b2940b6e2f69340c015bb8cd` plus the focused integration-test and evidence edits in this checkpoint; runtime code remains `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`.
+- Commit under test: `77783b8a1d7c54843b3b47a257e5a45d10439a2f`, including the focused integration-test changes and evidence update; runtime code remains `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`.
 - Red result: `scripts/run_backend_pytest.ps1 tests/integration/test_specialty_canonicalization.py -k queue_profiles_response_carries_canonical_settings_key -q` — FAIL as expected because it asserted fallback profiles while the actual empty database response had `profiles == []`.
 - Change: renamed that test to `test_queue_profiles_empty_catalog_stays_empty` and asserted `success is True`, `profiles == []`, and `source == "database"`. The existing `test_queue_profiles_db_path_settings_key_canonical` remains separate and unchanged, preserving the real database contract. Clarified one `test_rq16b_direction_entry_methods.py` docstring that had described the removed public-read fallback as a current condition; no assertion or fixture changed there.
 - Validation environment: Python 3.11.9 on Windows; `DATABASE_URL` was set to a non-routable PostgreSQL-shaped URL solely for application import. The `db_session` test fixture uses its isolated temporary SQLite database; no PostgreSQL service, staging, or production data was accessed.
@@ -458,7 +458,8 @@ Current plan: version 1.1. The user resumed implementation on 2026-10-01; the ac
   - `scripts/run_backend_pytest.ps1 tests/unit/test_queue_profiles_read_contract.py tests/unit/test_stack_trace_exposure.py -q` — PASS, 13 passed, 1 warning.
   - `scripts/run_backend_pytest.ps1 tests/integration/test_specialty_canonicalization.py -k 'queue_profiles_empty_catalog_stays_empty or queue_profiles_db_path_settings_key_canonical' -q` — PASS, 2 passed, 64 deselected, 1 warning.
   - `git diff --check` — PASS.
+- Commit-hook reconciliation: the first commit attempt passed Ruff and Ruff-format, then pinned Black 24.10 reformatted the two touched integration files and aborted the commit. The same two focused integration tests passed after formatting. Retry passed Ruff, Ruff-format, Black, gitleaks, whitespace, branch and secret hooks; no hook was skipped.
 - Actual additional paths: `backend/tests/integration/test_specialty_canonicalization.py`; comment-only clarification in `backend/tests/integration/test_rq16b_direction_entry_methods.py`; this plan's `PROGRESS.md` and `EVIDENCE.md`.
 - Scope check: no runtime changes after `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`; no schema, seed, profile write, auth/RBAC, queue admission, QR selection, route, or production changes.
 - Result: local status `VALIDATED`; Tier 1 frontend evidence from `T04 final validation` remains current because this follow-up changes only backend tests and documentation. Tier 2 remains `DEFERRED`, not run, and needs reviewer acknowledgment as recorded above. PR not yet opened.
-- Next exact action: commit this integration regression and its ledger update, push the branch, create the PR, run body checks/GitHub CI, and leave Tier 2 acknowledgment pending for a reviewer.
+- Next exact action: commit the final commit-reference update in the ledger, push the branch, create the PR, run body checks/GitHub CI, and leave Tier 2 acknowledgment pending for a reviewer.

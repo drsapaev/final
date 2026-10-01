@@ -9,8 +9,8 @@ Current status: VALIDATED
 Worktree: `C:\final\_wt_aqs_t04_empty_profiles`
 Branch: `codex/aqs-T04-empty-profiles`
 Base commit: `1e781da72bd927926b538b139a6c251cd09848b5`
-Current commit: `516a66d86f1102d2b2940b6e2f69340c015bb8cd` (prior committed checkpoint; focused integration regression and evidence are validated in the worktree)
-Last updated: 2026-10-01T12:53:18+05:00
+Current commit: `77783b8a1d7c54843b3b47a257e5a45d10439a2f` (empty-catalog integration regression and updated evidence; runtime implementation is `2a02273b4a1b3e7a5b6f21c3ff0215e4d7abaf82`)
+Last updated: 2026-10-01T12:58:11+05:00
 
 > **Возобновлено пользователем 2026-10-01:** «Продолжай реализации плана». T03 завершён: PR #3540 слит после исправления P1 и code-review verdict APPROVE. Tier 2 для #3540 остаётся принятым deferral, не пройденным тестовым набором.
 
@@ -48,7 +48,7 @@ Last updated: 2026-10-01T12:53:18+05:00
 - Resolved finding: the empty-catalog integration test now asserts `success`, `profiles == []`, and `source == "database"`; the separate database-backed test still verifies canonical `settings_key`. The stale comment in `test_rq16b_direction_entry_methods.py` now distinguishes the removed public-read fallback from that test's independent archived-key guard.
 - Remaining: commit the focused backend regression/evidence update, push, open the PR, run PR body checks and GitHub CI, and obtain reviewer acknowledgment for the Tier 2 deferral before merge.
 - Blocker: no blocker to opening the PR. Tier 2 backend-dependent E2E remains formally DEFERRED and unpassed because no isolated synthetic staging/QA environment was available; do not merge until the deferral is recorded and acknowledged in the PR. Stop if the fix requires changing a join/admission contract, auth/RBAC, or seeding behavior beyond migration 0055.
-- Next exact action: commit the two backend test updates and this validation checkpoint, push `codex/aqs-T04-empty-profiles`, and open the T04 PR. Keep the reviewer acknowledgment checkbox unchecked until the reviewer confirms the Tier 2 deferral.
+- Next exact action: record this commit and the formatter-hook reconciliation in the ledger, push `codex/aqs-T04-empty-profiles`, and open the T04 PR. Keep the reviewer acknowledgment checkbox unchecked until the reviewer confirms the Tier 2 deferral.
 - The previous T03 worktree remains locally preserved with its separate documentation and QA scratch; it is not part of T04. Do not delete or overwrite those files during this task.
 
 ## Checkpoint rules for the next agent
