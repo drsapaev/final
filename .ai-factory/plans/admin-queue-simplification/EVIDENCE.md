@@ -699,3 +699,13 @@ Recorded: 2026-10-01T16:41:51+05:00
 - PR: not opened.
 - Merge commit: none.
 - Next exact action: rerun compileall and `git diff --check`, review the full diff and plan ledger, commit/open the T06.1 PR, then inspect checks for that exact PR head. Do not start T06.2 until T06.1 is merged and the worktree is synced.
+
+## T06.1 PR open — 2026-10-01T17:55:43+05:00
+
+- PR: [#3545](https://github.com/drsapaev/final/pull/3545), title `feat(queue): persist daily queue policy state`.
+- Code commit under review: `e3c7d5f2dea3a9aab40d650490431a87b84e9372`; branch `codex/aqs-T06-policy-schema`; base `main` at `1af792e82935e10ae9b60a374ce5f149d2de0616`. `git fetch origin` confirmed the branch base remained current before publication.
+- PR body: repository `scripts.run_pr_review_gate_checks --body-file .t06-pr-body.md --author drsapaev` — PASS, including 19 quality-gate tests and live-body validation. PR body itself is local scratch and not tracked.
+- Local final checks before PR: full `test_queue_resource_contract.py` PASS (24 passed, 1 warning); the two updated static migration-head tests PASS (2 passed, 1 warning); compileall PASS for model/revision/seven changed test files; pre-commit PASS across 9 Python and 3 plan-memory files; `git diff --check` PASS. Commit-time hooks also passed.
+- First GitHub snapshot for PR HEAD `e3c7d5f2dea3a9aab40d650490431a87b84e9372`: PR OPEN, mergeable, no review decision. PR Review Quality Gate, CI Scope, gitleaks, GitGuardian Security Checks and lifecycle recommendation were PASS. Backend tests, code quality, Context Boundary Integrity, documentation generation, security scan, secret scan, Python/JavaScript/Actions CodeQL and frontend lint report were pending. Frontend build/E2E/lint/unit, Telegram Mini App Release Gate, Supabase Preview, nightly DAST, classify-and-route and metadata checks were path-aware SKIPPED; skipped is not PASS.
+- Merge: not performed. Wait for current-head applicable checks and same-PR fixes; then request the merge decision before starting T06.2.
+- Next exact action: refresh PR HEAD/status, wait for all applicable checks, record final status and preserve the exact review/merge decision.

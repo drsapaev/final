@@ -5,15 +5,15 @@ Execution permission: IMPLEMENTATION_ACTIVE — user resumed the full plan on 20
 Start here: [RESUME.md](RESUME.md), then this file and current-task EVIDENCE
 Canonical plan: [codex-admin-queue-simplification.md](../codex-admin-queue-simplification.md)
 Current task: T06
-Current status: IN_PROGRESS (T06.1 schema/model/test slice validated locally; PR not opened)
+Current status: PR_OPEN (T06.1 schema/model/test slice; CI in progress)
 Last completed task: T05 — MERGED
 Worktree: `C:\final\_wt_aqs_t06_policy_schema`
 Branch: `codex/aqs-T06-policy-schema`
 Base commit: `1af792e82935e10ae9b60a374ce5f149d2de0616`
-Current commit: `1af792e82935e10ae9b60a374ce5f149d2de0616` (T06 changes are uncommitted)
-Last updated: 2026-10-01T17:44:48+05:00
+Current commit: `e3c7d5f2dea3a9aab40d650490431a87b84e9372` (T06.1 code commit under review; PR HEAD is tracked in EVIDENCE)
+Last updated: 2026-10-01T17:54:15+05:00
 
-> T00–T05 are confirmed MERGED. T06.1 is in progress in its own worktree; T06.2 and T07–T18 remain PLANNED. The #3543 staging deferral remains separate and staging stays NOT_RUN. No production activation is authorized.
+> T00–T05 are confirmed MERGED. T06.1 PR #3545 is open; T06.2 and T07–T18 remain PLANNED. The #3543 staging deferral remains separate and staging stays NOT_RUN. No production activation is authorized.
 
 | Task | Status | Branch / PR | Merge commit | Evidence |
 |------|--------|-------------|--------------|----------|
@@ -23,7 +23,7 @@ Last updated: 2026-10-01T17:44:48+05:00
 | T03 | MERGED | `codex/aqs-T03-cabinet-read` / [PR #3540](https://github.com/drsapaev/final/pull/3540) | `1e781da72bd927926b538b139a6c251cd09848b5` | `EVIDENCE.md#t03-merge-checkpoint` |
 | T04 | MERGED | `codex/aqs-T04-empty-profiles` / [PR #3541](https://github.com/drsapaev/final/pull/3541) | `ecc14b05411c7e7b54efca2966416cd6a69df37c` | `EVIDENCE.md#t04-merge-checkpoint` |
 | T05 | MERGED | `codex/aqs-T05-settings-cache` / [PR #3543](https://github.com/drsapaev/final/pull/3543) | `fd53206f03b0361de6fc345f53b2bacf4195845c` | `EVIDENCE.md#t05-merge-checkpoint` |
-| T06 | IN_PROGRESS | `codex/aqs-T06-policy-schema` / T06.1 | | `EVIDENCE.md#t06-kickoff`; `EVIDENCE.md#t06.1-schema-checkpoint` |
+| T06 | PR_OPEN | `codex/aqs-T06-policy-schema` / [PR #3545](https://github.com/drsapaev/final/pull/3545), T06.1 | | `EVIDENCE.md#t06.1-schema-checkpoint`; `EVIDENCE.md#t06.1-pr-open` |
 | T07 | PLANNED | | | |
 | T08 | PLANNED | | | |
 | T09 | PLANNED | | | |
@@ -51,10 +51,10 @@ Last updated: 2026-10-01T17:44:48+05:00
 - Required graph-test updates: six existing tests pin the current Alembic head, so those exact head assertions now advance to 0077; no historical migration behavior was changed. The queue schema contract suite adds model/revision parity and DB-default/check tests.
 - PostgreSQL evidence: disposable PostgreSQL 16 completed the blank upgrade through 0076, received a synthetic resource-owned daily queue plus a synthetic `source='online'` entry at that revision, and upgraded to 0077. The same queue retained identity, resource ownership, tag, cabinet and day snapshots; policy is `legacy`, counter is `0` despite its online entry. A writer omitting both columns inserted with `legacy/0`. Invalid policy and negative counter were rejected by their named checks. A synthetic v1 row caused the downgrade guard to refuse; it was removed and the DB remained at 0077. Full details are in `EVIDENCE.md#t06.1-schema-checkpoint`.
 - Validation environment: separate Compose project `aqs-t06-pg-20261001`, PostgreSQL 16, tmpfs/no volume, loopback-only port `55439`. The prior run's WSL keepalive expired and its container stopped; that proof was discarded and repeated from a clean empty container while a fresh keepalive remained active. Shared staging for PR #3524 and production were not used.
-- Changed but not fully verified: T06.1 source/tests pass local targeted validation; full final diff review, docs-ledger consistency check and PR/current-head CI remain. The required pre-commit hooks passed after their configured Ruff/Black formatting was applied to touched Python files. T05 staging coverage remains NOT_RUN and is not waived by this local PG evidence.
+- Changed but not fully verified: T06.1 source/tests pass local targeted validation and PR #3545 is open at `e3c7d5f2dea3a9aab40d650490431a87b84e9372`. PR Review Quality Gate, CI Scope, gitleaks, GitGuardian and lifecycle recommendation passed at the first snapshot; backend, quality, context-boundary, docs, security and CodeQL jobs are pending. Path-aware frontend jobs are skipped, not passed. Required pre-commit hooks passed after configured Ruff/Black formatting was applied to touched Python files. T05 staging coverage remains NOT_RUN and is not waived by this local PG evidence.
 - Remaining: finish T06.1's diff review and PR cycle. Keep T06.2 shared creation policy/constructors out of this PR; resume T06.2 only after T06.1 is merged and base/worktree are synchronized. T07–T18 remain planned.
 - Blocker: none for local T06.1. Synthetic staging, production and unknown PostgreSQL services remain outside this task.
-- Next exact action: rerun compileall and `git diff --check`, inspect the complete diff including formatter-only changes, append final evidence, commit and open the T06.1 PR. Then inspect only checks for the current PR head and obtain the merge decision before beginning T06.2.
+- Next exact action: recheck PR #3545's current HEAD and wait for applicable CI. Fix any red check in the same PR. After current-head checks finish, present the concrete merge decision; do not begin T06.2 until T06.1 is merged and the worktree is synced.
 - Checks to rerun after any code change: focused `test_queue_resource_contract.py`; the two queue migration-chain tests; `alembic heads`/`history`; disposable PG upgrade if migration/model/revision changes; pre-commit on actual changed files; `git diff --check`. T05 staging deferral is not a replacement.
 
 ## Checkpoint rules for the next agent

@@ -2,7 +2,7 @@
 
 Plan version: 1.2
 Last updated: 2026-10-01, Asia/Tashkent
-Execution permission: IMPLEMENTATION_ACTIVE; T06.1 schema PR is in progress
+Execution permission: IMPLEMENTATION_ACTIVE; T06.1 PR #3545 is open, CI in progress
 
 ## First read
 
@@ -15,7 +15,7 @@ The user resumed implementation with “Продолжай реализации 
 
 ## Verified checkpoint
 
-- T00–T05 are MERGED. T06.1 is implemented and locally validated in the active worktree; it is not yet committed or opened as a PR. T06.2 and T07–T18 remain PLANNED.
+- T00–T05 are MERGED. T06.1 is committed as `e3c7d5f2dea3a9aab40d650490431a87b84e9372` and open as [PR #3545](https://github.com/drsapaev/final/pull/3545); local validation passed and applicable CI is in progress. T06.2 and T07–T18 remain PLANNED.
 - T05 [PR #3543](https://github.com/drsapaev/final/pull/3543) merged at `fd53206f03b0361de6fc345f53b2bacf4195845c`, 2026-10-01T16:24:40+05:00, from reviewed head `c04f41021bef5f8c306b9668cbb1c4b9afef2cc1`. Runtime code dates from `47276d178972226b0bcf561bdf8fa26a6940b913`; merged/reviewed trees match.
 - Applicable T05 CI gates passed. Merged-tree focused tests: 24 passed, 1 warning. Local PostgreSQL integration, synthetic staging/browser E2E and cold/repeat timing are NOT_RUN. Skipped jobs are not PASS.
 - The executing agent accepted a bounded #3543/T05 deferral under the user's explicit delegation. Original requirement, reason, evidence, owner, resume condition and headline impact are in DECISIONS/EVIDENCE. No GitHub author-approval review was invented. Prior PR acknowledgments were not inherited.
@@ -26,11 +26,11 @@ Check actual git status/HEAD and GitHub PR state first. If they differ from this
 
 ## Active runtime step — T06.1
 
-- Worktree: `C:\final\_wt_aqs_t06_policy_schema`; branch `codex/aqs-T06-policy-schema`; base/current HEAD before commit `1af792e82935e10ae9b60a374ce5f149d2de0616`.
+- Worktree: `C:\final\_wt_aqs_t06_policy_schema`; branch `codex/aqs-T06-policy-schema`; base `1af792e82935e10ae9b60a374ce5f149d2de0616`; code commit `e3c7d5f2dea3a9aab40d650490431a87b84e9372`.
 - Changed: new revision `backend/alembic/versions/0077_daily_queue_policy.py`; `DailyQueue` fields/defaults/checks; focused schema/migration-parity tests; six exact current-head expectation updates; PROGRESS/EVIDENCE/RESUME.
 - Validation: `alembic heads` returns only `0077_daily_queue_policy`; `alembic history` exits 0. Disposable PostgreSQL 16 upgrade/data-preservation/default/check/downgrade-guard evidence is recorded in `EVIDENCE.md#t06.1-schema-checkpoint`. Targeted tests, compileall, pre-commit and diff checks are tracked there.
 - Do not commit `.t06-pg.compose.yml`; it is local disposable infrastructure scratch. Do not run or stop the separate PR #3524 staging Compose project. No production DB/process/configuration or flag was touched.
-- Next exact action: review the full diff for scope and formatting, complete final evidence and PR publication for T06.1. Do not begin T06.2 constructors or policy writers until this PR is merged and the worktree is synced to fresh main.
+- Next exact action: inspect PR #3545's current HEAD and wait for applicable CI, fixing any red check in the same PR. After current-head checks finish, request the merge decision. Do not begin T06.2 constructors or policy writers until this PR is merged and the worktree is synced to fresh main.
 
 The T05 deferral does not authorize bypassing any T06 requirement. Close each small PR cycle before the next one; do not begin T07 while T06 is unresolved. T06.2 is a required separate continuation after T06.1, not a reason to widen this schema PR.
 
