@@ -147,12 +147,13 @@ const Tabs = ({
       // Формат: { profiles: [{key, title, title_ru, queue_tags, icon, color}] }
       const response = await api.get('/queues/profiles?active_only=true');
 
-      // Backend returns {success: true, profiles: [...], source: 'database'|'fallback'}
-      const profiles = (response.data?.profiles as Record<string, any>[]) || [];
-
-      if (profiles.length === 0) {
-        throw new Error('No profiles returned from API');
+      // Backend returns {success: true, profiles: [...], source: 'database'}.
+      // An empty configured catalog is valid and must stay empty.
+      const profilePayload = response.data?.profiles;
+      if (!Array.isArray(profilePayload)) {
+        throw new Error('Invalid queue profiles response');
       }
+      const profiles = profilePayload as Record<string, any>[];
 
       // Преобразуем данные из API в формат для вкладок
       const profilesData: TabItem[] = profiles.map((profile) => ({
@@ -172,8 +173,8 @@ const Tabs = ({
       // disabled/removed in ANOTHER session. Falling back to the
       // all-departments view is the understandable outcome — the alternative
       // is silently sitting on a filter whose profile no longer exists.
-      // Success path ONLY: a failed refresh (fallback set below) must never
-      // deselect the user's tab. Refs keep loadQueueProfiles identity stable.
+      // Success path ONLY: a failed refresh must never deselect the user's
+      // tab. Refs keep loadQueueProfiles identity stable.
       const currentActive = activeTabRef.current;
       if (currentActive && !profilesData.some((profile) => profile.key === currentActive)) {
         logger.info(`Tabs: RQ-27.b active tab "${currentActive}" vanished from profiles — resetting to all departments`);
@@ -186,59 +187,8 @@ const Tabs = ({
       }
     } catch (error) {
       logger.error('Ошибка загрузки профилей очередей:', error);
-
-      // Fallback на hardcoded вкладки если API не работает
-      // ⚠️ TEMPORARY ADAPTER: Remove when API is stable
-      setTabs([
-      {
-        key: 'cardiology',
-        label: language === 'uz' ? 'Kardiolog' : t('misc.mt_kardiolog'),
-        queue_tags: ['cardio', 'cardiology', 'cardiology_common'],
-        icon: Heart,
-        color: 'var(--mac-error)',
-        gradient: toGradient('var(--mac-error)')
-      },
-      {
-        key: 'ecg',
-        label: language === 'uz' ? 'EKG' : t('misc.mt_ekg'),
-        queue_tags: ['ecg', 'echokg'],
-        icon: Activity,
-        color: 'var(--mac-accent-purple)',
-        gradient: toGradient('var(--mac-accent-purple)')
-      },
-      {
-        key: 'dermatology',
-        label: language === 'uz' ? 'Dermatolog' : t('misc.mt_dermatolog'),
-        queue_tags: ['derma', 'dermatology'],
-        icon: UserCheck,
-        color: 'var(--mac-warning)',
-        gradient: toGradient('var(--mac-warning)')
-      },
-      {
-        key: 'stomatology',
-        label: language === 'uz' ? 'Stomatolog' : t('misc.mt_stomatolog'),
-        queue_tags: ['dental', 'stomatology', 'dentist'],
-        icon: Smile,
-        color: 'var(--mac-accent)',
-        gradient: toGradient('var(--mac-accent)')
-      },
-      {
-        key: 'lab',
-        label: language === 'uz' ? 'Laboratoriya' : t('misc.mt_laboratoriya'),
-        queue_tags: ['lab', 'laboratory'],
-        icon: FlaskConical,
-        color: 'var(--mac-success)',
-        gradient: toGradient('var(--mac-success)')
-      },
-      {
-        key: 'procedures',
-        label: language === 'uz' ? 'Muolajalar' : t('misc.mt_protsedury'),
-        queue_tags: ['procedures', 'physio', 'therapy'],
-        icon: Syringe,
-        color: 'var(--mac-accent-purple)',
-        gradient: toGradient('var(--mac-accent-purple)')
-      }]
-      );
+      // Keep the last successful list. On the first failed load the list stays
+      // empty until the server returns the configured catalog.
     } finally {
       setLoading(false);
     }

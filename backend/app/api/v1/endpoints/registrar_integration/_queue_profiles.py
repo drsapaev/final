@@ -59,7 +59,7 @@ def get_queue_profiles(
     SSOT: Вкладки определяются в БД, НЕ хардкодятся в frontend.
     """
     try:
-        from app.models.queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
+        from app.models.queue_profile import QueueProfile
 
         # Пытаемся получить из БД
         query = db.query(QueueProfile)
@@ -68,31 +68,6 @@ def get_queue_profiles(
             query = query.filter(QueueProfile.is_active == True)
 
         profiles = query.order_by(QueueProfile.display_order).all()
-
-        # Если таблица не существует или пуста - возвращаем fallback
-        if not profiles:
-            logger.warning("Queue profiles table is empty, returning hardcoded fallback")
-            return {
-                "success": True,
-                "profiles": [
-                    {
-                        "key": p["key"],
-                        "title": p["title"],
-                        "title_ru": p["title_ru"],
-                        "queue_tags": p["queue_tags"],
-                        "department_key": p.get("department_key"),
-                        "icon": p.get("icon"),
-                        "color": p.get("color"),
-                        "order": p.get("order", 0),
-                        # D-1: canonical clinic_settings segment this
-                        # profile's start_number_*/max_per_day_* rows live
-                        # under (QueueSettings screen reads/edits by it).
-                        "settings_key": canonical_specialty(p["key"]),
-                    }
-                    for p in INITIAL_QUEUE_PROFILES
-                ],
-                "source": "fallback",
-            }
 
         return {
             "success": True,
@@ -107,7 +82,9 @@ def get_queue_profiles(
                     "color": p.color,
                     "order": p.display_order,  # API returns as 'order' for frontend compatibility
                     "is_active": p.is_active,
-                    "show_on_qr_page": getattr(p, 'show_on_qr_page', True),  # Handle missing column
+                    "show_on_qr_page": getattr(
+                        p, "show_on_qr_page", True
+                    ),  # Handle missing column
                     # D-1: canonical clinic_settings segment this profile's
                     # start_number_*/max_per_day_* rows live under (the
                     # profile key itself may be a legacy machinery value —
@@ -121,28 +98,7 @@ def get_queue_profiles(
         }
 
     except Exception as e:
-        # При любой ошибке (включая отсутствие таблицы) возвращаем fallback
-        logger.error("Error fetching queue profiles", exc_info=True)
-        from app.models.queue_profile import INITIAL_QUEUE_PROFILES
-
-        return {
-            "success": True,
-            "profiles": [
-                {
-                    "key": p["key"],
-                    "title": p["title"],
-                    "title_ru": p["title_ru"],
-                    "queue_tags": p["queue_tags"],
-                    "department_key": p.get("department_key"),
-                    "icon": p.get("icon"),
-                    "color": p.get("color"),
-                    "order": p.get("order", 0),
-                    "settings_key": canonical_specialty(p["key"]),
-                }
-                for p in INITIAL_QUEUE_PROFILES
-            ],
-            "source": "fallback_error",
-        }
+        _raise_registrar_internal_error("fetch_queue_profiles", e)
 
 
 @router.get("/queues/profiles/public", response_model=dict[str, Any])
@@ -158,37 +114,17 @@ def get_queue_profiles_public(
     Используется на странице /queue/join для выбора специальности.
     """
     try:
-        from app.models.queue_profile import INITIAL_QUEUE_PROFILES, QueueProfile
+        from app.models.queue_profile import QueueProfile
 
         # Получаем только активные профили, которые видны на QR странице
         profiles = (
             db.query(QueueProfile)
             .filter(
-                QueueProfile.is_active == True,
-                QueueProfile.show_on_qr_page == True
+                QueueProfile.is_active == True, QueueProfile.show_on_qr_page == True
             )
             .order_by(QueueProfile.display_order)
             .all()
         )
-
-        if not profiles:
-            # Fallback: возвращаем все из INITIAL_QUEUE_PROFILES (кроме general и ecg)
-            logger.warning("Queue profiles table is empty for QR page, returning fallback")
-            return {
-                "success": True,
-                "specialists": [
-                    {
-                        "id": idx + 1,
-                        "specialty": p["key"],
-                        "specialty_display": p["title_ru"] or p["title"],
-                        "icon": _get_emoji_for_key(p["key"]),
-                        "color": p.get("color", "#6b7280"),
-                    }
-                    for idx, p in enumerate(INITIAL_QUEUE_PROFILES)
-                    if p["key"] not in ["general", "ecg"]  # Exclude general and ecg from QR
-                ],
-                "source": "fallback",
-            }
 
         return {
             "success": True,
@@ -206,18 +142,7 @@ def get_queue_profiles_public(
         }
 
     except Exception as e:
-        logger.error("Error fetching queue profiles for QR page", exc_info=True)
-        # Fallback на базовый список
-        return {
-            "success": True,
-            "specialists": [
-                {"id": 1, "specialty": "cardiology", "specialty_display": "Кардиолог", "icon": "❤️", "color": "#FF3B30"},
-                {"id": 2, "specialty": "dermatology", "specialty_display": "Дерматолог", "icon": "✨", "color": "#FF9500"},
-                {"id": 3, "specialty": "stomatology", "specialty_display": "Стоматолог", "icon": "🦷", "color": "#007AFF"},
-                {"id": 4, "specialty": "lab", "specialty_display": "Лаборатория", "icon": "🔬", "color": "#34C759"},
-            ],
-            "source": "fallback_error",
-        }
+        _raise_registrar_internal_error("fetch_public_queue_profiles", e)
 
 
 def _get_emoji_for_key(key: str) -> str:
@@ -263,9 +188,7 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
     entries_waiting = 0
     entries_total = 0
     if tags:
-        services = (
-            db.query(Service).filter(Service.queue_tag.in_(tags)).count()
-        )
+        services = db.query(Service).filter(Service.queue_tag.in_(tags)).count()
         daily_queues = (
             db.query(DailyQueue).filter(DailyQueue.queue_tag.in_(tags)).count()
         )
@@ -291,7 +214,9 @@ def _profile_link_counts(db: Session, profile: Any) -> dict[str, int]:
     }
 
 
-@router.get("/queues/profiles/{profile_key}/impact-preview", response_model=dict[str, Any])
+@router.get(
+    "/queues/profiles/{profile_key}/impact-preview", response_model=dict[str, Any]
+)
 def get_queue_profile_impact_preview(
     profile_key: str,
     db: Session = Depends(get_db),
@@ -308,9 +233,7 @@ def get_queue_profile_impact_preview(
     try:
         from app.models.queue_profile import QueueProfile
 
-        profile = (
-            db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
-        )
+        profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
         if not profile:
             raise HTTPException(
                 status_code=404, detail=f"Profile '{profile_key}' not found"
@@ -344,32 +267,47 @@ def get_queue_profile_impact_preview(
 # ===================== QUEUE PROFILE CRUD (ADMIN) =====================
 
 
-
-
-
 class QueueProfileCreate(BaseModel):
     """Schema for creating a new QueueProfile"""
-    key: str = Field(..., min_length=1, max_length=50, pattern=r"^[a-z][a-z0-9_]*$", description="Unique key (e.g., 'cardiology')")
+
+    key: str = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        pattern=r"^[a-z][a-z0-9_]*$",
+        description="Unique key (e.g., 'cardiology')",
+    )
     title: str = Field(..., min_length=1, max_length=100, description="English title")
     title_ru: str | None = Field(None, max_length=100, description="Russian title")
-    queue_tags: list[str] = Field(default=[], description="List of queue_tag values for this profile")
+    queue_tags: list[str] = Field(
+        default=[], description="List of queue_tag values for this profile"
+    )
     department_key: str | None = Field(None, max_length=50)
     display_order: int = Field(default=0, ge=0)
     is_active: bool = Field(default=True)
-    show_on_qr_page: bool = Field(default=True, description="Show this profile on QR join page")
-    icon: str | None = Field(None, max_length=50, description="Lucide icon name (e.g., 'Heart')")
-    color: str | None = Field(None, max_length=20, description="Hex color (e.g., '#E53E3E')")
+    show_on_qr_page: bool = Field(
+        default=True, description="Show this profile on QR join page"
+    )
+    icon: str | None = Field(
+        None, max_length=50, description="Lucide icon name (e.g., 'Heart')"
+    )
+    color: str | None = Field(
+        None, max_length=20, description="Hex color (e.g., '#E53E3E')"
+    )
 
 
 class QueueProfileUpdate(BaseModel):
     """Schema for updating an existing QueueProfile"""
+
     title: str | None = Field(None, max_length=100)
     title_ru: str | None = Field(None, max_length=100)
     queue_tags: list[str] | None = None
     department_key: str | None = Field(None, max_length=50)
     display_order: int | None = Field(None, ge=0)
     is_active: bool | None = None
-    show_on_qr_page: bool | None = Field(None, description="Show this profile on QR join page")
+    show_on_qr_page: bool | None = Field(
+        None, description="Show this profile on QR join page"
+    )
     icon: str | None = Field(None, max_length=50)
     color: str | None = Field(None, max_length=20)
 
@@ -389,9 +327,14 @@ def create_queue_profile(
         from app.models.queue_profile import QueueProfile
 
         # Check if key already exists
-        existing = db.query(QueueProfile).filter(QueueProfile.key == profile_data.key).first()
+        existing = (
+            db.query(QueueProfile).filter(QueueProfile.key == profile_data.key).first()
+        )
         if existing:
-            raise HTTPException(status_code=400, detail=f"Profile with key '{profile_data.key}' already exists")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Profile with key '{profile_data.key}' already exists",
+            )
 
         # Create new profile
         new_profile = QueueProfile(
@@ -401,7 +344,9 @@ def create_queue_profile(
             # D-1 (Codex round-6 P1): a dental-family profile must never be
             # persisted with tags blind to the canonical spelling (see
             # _canonical_profile_tags for the exact contract).
-            queue_tags=_canonical_profile_tags(profile_data.queue_tags, profile_data.key),
+            queue_tags=_canonical_profile_tags(
+                profile_data.queue_tags, profile_data.key
+            ),
             department_key=profile_data.department_key,
             display_order=profile_data.display_order,
             is_active=profile_data.is_active,
@@ -459,7 +404,9 @@ def update_queue_profile(
         # Find profile
         profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
         if not profile:
-            raise HTTPException(status_code=404, detail=f"Profile '{profile_key}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"Profile '{profile_key}' not found"
+            )
 
         # Update fields (only those provided)
         update_data = profile_data.dict(exclude_unset=True)
@@ -518,7 +465,9 @@ def delete_queue_profile(
         # Find profile
         profile = db.query(QueueProfile).filter(QueueProfile.key == profile_key).first()
         if not profile:
-            raise HTTPException(status_code=404, detail=f"Profile '{profile_key}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"Profile '{profile_key}' not found"
+            )
 
         # RQ-12.b (D-02 owner decision 2026-09-15): hard delete is allowed
         # ONLY with proven absence of significant links — services on the
@@ -530,9 +479,7 @@ def delete_queue_profile(
         # and NEVER authorizes the delete (stale-preview protection, S-10).
         counts = _profile_link_counts(db, profile)
         if any(counts.values()):
-            logger.warning(
-                f"Delete of QueueProfile '{profile_key}' blocked: {counts}"
-            )
+            logger.warning(f"Delete of QueueProfile '{profile_key}' blocked: {counts}")
             raise HTTPException(
                 status_code=409,
                 detail={
@@ -556,22 +503,18 @@ def delete_queue_profile(
         # delete; only exclusively-owned tags are cleaned.
         other_tags: set[str] = set()
         for other in (
-            db.query(QueueProfile)
-            .filter(QueueProfile.key != profile_key)
-            .all()
+            db.query(QueueProfile).filter(QueueProfile.key != profile_key).all()
         ):
             other_tags.update(other.queue_tags or [])
 
         tags_to_clean = [
-            tag
-            for tag in (profile.queue_tags or [])
-            if tag not in other_tags
+            tag for tag in (profile.queue_tags or []) if tag not in other_tags
         ]
         services_cleaned = 0
         if tags_to_clean:
-            services = db.query(Service).filter(
-                Service.queue_tag.in_(tags_to_clean)
-            ).all()
+            services = (
+                db.query(Service).filter(Service.queue_tag.in_(tags_to_clean)).all()
+            )
             for svc in services:
                 if svc.queue_tag in tags_to_clean:
                     svc.queue_tag = None
@@ -580,7 +523,9 @@ def delete_queue_profile(
         db.delete(profile)
         db.commit()
 
-        logger.info(f"Deleted QueueProfile: {profile_key} (cleaned {services_cleaned} services)")
+        logger.info(
+            f"Deleted QueueProfile: {profile_key} (cleaned {services_cleaned} services)"
+        )
 
         return {
             "success": True,
@@ -633,4 +578,3 @@ def reorder_queue_profiles(
 
 
 # ===================== СПРАВОЧНИК УСЛУГ (СТАРЫЙ) =====================
-
