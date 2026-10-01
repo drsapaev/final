@@ -757,3 +757,28 @@ Recorded: 2026-10-01T16:41:51+05:00
 - Remaining limitations: full suite is not rerun locally; no staging/browser/production check was run. The isolated RQ17 test module uses the pytest SQLite fixture; its PostgreSQL-only cases were skipped.
 - PR: [#3545](https://github.com/drsapaev/final/pull/3545), open; merge not authorized or performed.
 - Next exact action: update the PR body and checkpoint, push the local test fix, then check the resulting Backend, PR Required Gate and parity statuses on that exact HEAD.
+
+## T06.1 second test fix pushed — 2026-10-01T18:53:01+05:00
+
+- Source fix `b14cc03da1c0171bcfe9fe45df7035c4f93cbd9c` and plan checkpoint commit `ca590e81f9afd15a9b4f04c467a4220cc9733cfb` are pushed to branch `codex/aqs-T06-policy-schema`.
+- PR #3545 is OPEN, base `1af792e82935e10ae9b60a374ce5f149d2de0616`, remote HEAD `ca590e81f9afd15a9b4f04c467a4220cc9733cfb`, mergeable; no review decision. The PR description was updated and its body gate passed again (19 unit tests plus live-body validation).
+- Fresh checks for this exact head: Unified CI run `36872005425`; Gitleaks, CI Scope, CodeQL actions, Frontend lint report, and GitGuardian passed at this snapshot. Backend, code quality, docs, context boundary, Python/JS CodeQL, lifecycle recommendation and PR Review Quality Gate were pending. Frontend checks and other path-aware jobs were skipped; not passed.
+- The previous run 36867926429 is closed with one RQ17 test failure and one PR Required Gate failure. That failure is fixed in b14; no fresh result is counted yet. Confirm Backend and dependent parity on the new head.
+- Next exact action: wait for all applicable checks on `ca590e81f9afd15a9b4f04c467a4220cc9733cfb`; resolve any new red check in PR #3545. No merge or T06.2 work is authorized before this cycle closes.
+
+## T06.1 current-code CI checkpoint — 2026-10-01T19:12:36+05:00
+
+- Code commit under test: `ca590e81f9afd15a9b4f04c467a4220cc9733cfb`.
+- Environment: GitHub Actions for PR #3545; base `1af792e82935e10ae9b60a374ce5f149d2de0616` equals current `origin/main` at inspection. PR is OPEN, mergeable, `mergeStateStatus=CLEAN`, with no GitHub review decision recorded.
+- Execution mode: existing T06.1 schema/model/test patch and its same-PR regression fixes; this checkpoint only updates the plan-memory documents.
+- Allowed paths: `.ai-factory/plans/admin-queue-simplification/{PROGRESS,EVIDENCE,RESUME}.md`.
+- Actual changed paths for this checkpoint: those three plan-memory files. Local scratch `.t06-pg.compose.yml` and `.t06-pr-body.md` remain excluded.
+- Original failures: historical 0073 test setup used the current ORM model against a 0072 schema; the next backend run exposed an RQ17 test's global zero-row assumption. Both were corrected in the same PR; no runtime code was changed by the follow-up fixes.
+- Validation command: GitHub run `36872005425` on exact code HEAD `ca590e81f9afd15a9b4f04c467a4220cc9733cfb`, plus current PR check rollup inspection.
+- Result: PASS for applicable code checks. Backend (`110402179911`), code quality (`110402179943`), Context Boundary (`110402180042`), docs generation (`110402180250`), Frontend–Backend Parity (`110407417619`), CI Scope, and PR Required Gate (`110407570049`) succeeded. CodeQL (actions/JS/Python), Gitleaks, security scan, GitGuardian, PR Review Quality Gate, lifecycle recommendation and formatting reports also succeeded. Frontend unit/E2E/lint/build, DAST, Supabase Preview, staging/production readiness, load tests and integration jobs were path-aware SKIPPED; they are not PASS. No synthetic staging/browser check was run.
+- Relevant output: [Unified CI run 36872005425](https://github.com/drsapaev/final/actions/runs/36872005425); [PR #3545](https://github.com/drsapaev/final/pull/3545).
+- Scope check: no runtime, UI, endpoint, model, migration, test or workflow changes in this checkpoint; no production or shared staging access.
+- Remaining limitation: no staging/browser E2E or staged operator review. Merge has not been authorized or performed. The full T06 plan remains incomplete; T06.2 is blocked on T06.1 PR closure and fresh-main synchronization.
+- PR: [#3545](https://github.com/drsapaev/final/pull/3545), OPEN at the code HEAD observed above; any docs-only checkpoint pushed afterward must have its own live checks revalidated.
+- Merge commit: none.
+- Next exact action: retain the passing-code evidence, verify any docs-only PR HEAD checks, then request the user's explicit merge decision. Do not start T06.2 before merge and synchronization.

@@ -2,7 +2,7 @@
 
 Plan version: 1.2
 Last updated: 2026-10-01, Asia/Tashkent
-Execution permission: IMPLEMENTATION_ACTIVE; T06.1 PR #3545 is open, CI in progress
+Execution permission: IMPLEMENTATION_ACTIVE; T06.1 PR #3545 is open; applicable CI passed on code HEAD ca590; staging checks NOT_RUN; merge awaits user decision
 
 ## First read
 
@@ -15,7 +15,7 @@ The user resumed implementation with “Продолжай реализации 
 
 ## Verified checkpoint
 
-- T00–T05 are MERGED. T06.1 is open as [PR #3545](https://github.com/drsapaev/final/pull/3545). Commit `d3da890805fc7f1b2a7ba4a492ff80fb642a1a75` fixes the 0072 historical-fixture failure and is in remote PR HEAD `529644a94000c5adc50ef740c167fa970466ac2e`. The full backend run on 529 exposed a test-only RQ17 assertion that assumed `queue_resources` was globally empty; local follow-up commit `b14cc03da1c0171bcfe9fe45df7035c4f93cbd9c` checks no change from baseline plus absence of the attempted code. The RQ17 module passed locally (26 passed, 8 PostgreSQL-only skipped). That fix is not pushed yet; refresh CI after pushing. T06.2 and T07–T18 remain PLANNED.
+- T00–T05 are MERGED. T06.1 is open as [PR #3545](https://github.com/drsapaev/final/pull/3545). Commits `d3da890805fc7f1b2a7ba4a492ff80fb642a1a75` and `b14cc03da1c0171bcfe9fe45df7035c4f93cbd9c` fix the historical 0072 fixture and the RQ17 global-count assertion. The focused RQ17 module passed locally (26 passed, 8 PostgreSQL-only skipped). On exact code HEAD `ca590e81f9afd15a9b4f04c467a4220cc9733cfb`, applicable CI passed, including Backend, parity and PR Required Gate. Path-aware UI and staging/readiness jobs were skipped, and staging/browser validation remains NOT_RUN. T06.2 and T07–T18 remain PLANNED; do not merge until the user explicitly authorizes it.
 - T05 [PR #3543](https://github.com/drsapaev/final/pull/3543) merged at `fd53206f03b0361de6fc345f53b2bacf4195845c`, 2026-10-01T16:24:40+05:00, from reviewed head `c04f41021bef5f8c306b9668cbb1c4b9afef2cc1`. Runtime code dates from `47276d178972226b0bcf561bdf8fa26a6940b913`; merged/reviewed trees match.
 - Applicable T05 CI gates passed. Merged-tree focused tests: 24 passed, 1 warning. Local PostgreSQL integration, synthetic staging/browser E2E and cold/repeat timing are NOT_RUN. Skipped jobs are not PASS.
 - The executing agent accepted a bounded #3543/T05 deferral under the user's explicit delegation. Original requirement, reason, evidence, owner, resume condition and headline impact are in DECISIONS/EVIDENCE. No GitHub author-approval review was invented. Prior PR acknowledgments were not inherited.
@@ -28,9 +28,9 @@ Check actual git status/HEAD and GitHub PR state first. If they differ from this
 
 - Worktree: `C:\final\_wt_aqs_t06_policy_schema`; branch `codex/aqs-T06-policy-schema`; base `1af792e82935e10ae9b60a374ce5f149d2de0616`; code commit `e3c7d5f2dea3a9aab40d650490431a87b84e9372`.
 - Changed: new revision `backend/alembic/versions/0077_daily_queue_policy.py`; `DailyQueue` fields/defaults/checks; focused schema/migration-parity tests; six exact current-head expectation updates; PROGRESS/EVIDENCE/RESUME.
-- Validation: `alembic heads` returns only `0077_daily_queue_policy`; `alembic history` exits 0. Disposable PostgreSQL 16 upgrade/data-preservation/default/check/downgrade-guard evidence is recorded in `EVIDENCE.md#t06.1-schema-checkpoint`. After backend CI found the 0072 historical fixture using current `DailyQueue` ORM columns, that fixture now seeds the old queue shape with raw SQL; `test_nurse_serving_0073_backfill_pg.py` and `test_queue_resource_contract.py` passed together (29 passed, 1 warning) on isolated PostgreSQL 16. Targeted Ruff/format/Black and `git diff --check` passed. Final CI must be checked on the follow-up commit.
+- Validation: `alembic heads` returns only `0077_daily_queue_policy`; `alembic history` exits 0. Disposable PostgreSQL 16 upgrade/data-preservation/default/check/downgrade-guard evidence is recorded in `EVIDENCE.md#t06.1-schema-checkpoint`. After backend CI found the 0072 historical fixture using current `DailyQueue` ORM columns, that fixture now seeds the old queue shape with raw SQL; `test_nurse_serving_0073_backfill_pg.py` and `test_queue_resource_contract.py` passed together (29 passed, 1 warning) on isolated PostgreSQL 16. Targeted Ruff/format/Black and `git diff --check` passed. Current-code GitHub CI on code HEAD `ca590e81f9afd15a9b4f04c467a4220cc9733cfb` passed Backend, Frontend–Backend Parity and PR Required Gate; skipped path-aware checks and staging validation are not claimed as passed.
 - Do not commit `.t06-pg.compose.yml`; it is local disposable infrastructure scratch. Do not run or stop the separate PR #3524 staging Compose project. No production DB/process/configuration or flag was touched.
-- Next exact action: update the plan evidence and PR body for the test-only RQ17 fix, push `b14cc03da1c0171bcfe9fe45df7035c4f93cbd9c`, and wait for checks on the resulting PR HEAD. If Backend passes, confirm the dependent parity gate runs. Fix any red check in the same PR; after applicable checks finish, request the merge decision. Do not begin T06.2 constructors or policy writers until this PR is merged and the worktree is synced to fresh main.
+- Next exact action: recheck PR #3545's live HEAD and check rollup, then ask the user to authorize merge. Do not merge without explicit authorization. Do not begin T06.2 constructors or policy writers until this PR is merged and the worktree is synced to fresh main.
 
 The T05 deferral does not authorize bypassing any T06 requirement. Close each small PR cycle before the next one; do not begin T07 while T06 is unresolved. T06.2 is a required separate continuation after T06.1, not a reason to widen this schema PR.
 
