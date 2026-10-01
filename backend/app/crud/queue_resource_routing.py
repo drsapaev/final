@@ -36,6 +36,7 @@ pairs (QD-2E) — the legacy fallback paths here keep working until E.
 from __future__ import annotations
 
 from datetime import date
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -208,6 +209,7 @@ def effective_day_start_number(
     resource: QueueResource | None = None,
     doctor=None,
     queue_tag: str | None = None,
+    settings: dict[str, Any] | None = None,
 ) -> int:
     """RQ-13.b / D-06 SSOT: effective start number to freeze into a NEW day.
 
@@ -232,10 +234,12 @@ def effective_day_start_number(
         owner_start = int(doctor.start_number_online or 0)
         if owner_start > 1:
             return owner_start
-    from app.crud.clinic import get_queue_settings
     from app.services.queue_svc._base import QueueBusinessServiceMixinBase
 
-    settings = get_queue_settings(db) or {}
+    if settings is None:
+        from app.crud.clinic import get_queue_settings
+
+        settings = get_queue_settings(db) or {}
     start_numbers = settings.get("start_numbers", {}) or {}
     tag_key = queue_tag or "default"
     raw = start_numbers.get(tag_key)
