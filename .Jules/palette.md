@@ -25,3 +25,7 @@
 ## 2026-09-03 - Component Testing with useTranslation hook
 **Learning:** I learned that it is critical to confirm the  hook is properly initialized inside the functional component when using , rather than just relying on the top-level import. Doing so prevents runtime ReferenceErrors when the component mounts.
 **Action:** When I replace hardcoded strings with , I must explicitly check the component's body for , and add it if missing.
+
+## 2026-10-01 - Localized ARIA labels for internal components
+**Learning:** Hardcoded ARIA labels inside shared design system components (like the "Clear input" button in `Input.tsx`) cause accessibility and usability issues in localized applications, as screen readers will read the English text to users using other languages.
+**Action:** Always use the `t()` function from `useTranslation` for `aria-label` and `title` attributes, even for internal buttons within custom generic UI components, providing a fallback (e.g. `t('common.clear', { defaultValue: 'Clear input' })`) to handle missing keys gracefully.
